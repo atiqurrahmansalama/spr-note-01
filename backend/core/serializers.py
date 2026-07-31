@@ -1,21 +1,37 @@
 from rest_framework import serializers
-from .models import Student, HifzReport
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import User, Student, StudentDailyReport
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # টোকেনের ভেতরে পেলোড হিসেবে তথ্য যোগ করা
+        token['username'] = user.username
+        token['role'] = user.role
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # রেসপন্স বডিতে ইউজারের বিস্তারিত তথ্য পাঠানো
+        data['user'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'email': self.user.email,
+            'role': self.user.role,
+        }
+        return data
 
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ['id', 'full_name', 'roll_number', 'guardian_phone', 'admission_date', 'created_at']
-        read_only_fields = ['id', 'admission_date', 'created_at']
+        fields = '__all__'
 
-class HifzReportSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.full_name', read_only=True)
+class StudentDailyReportSerializer(serializers.ModelSerializer):
+    student_name = serializers.ReadOnlyField(source='student.name')
+    student_group = serializers.ReadOnlyField(source='student.group')
+    creator_username = serializers.ReadOnlyField(source='created_by.username')
 
     class Meta:
-        model = HifzReport
-        fields = [
-            'id', 'student', 'student_name', 'report_date', 
-            'sabak_para', 'sabak_lines', 'sabak_mistakes', 
-            'sabak_dhor', 'amukhta_dhor', 'grade', 'remarks', 
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        model = StudentDailyReport
+        fields = '__all__'

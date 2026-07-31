@@ -1,89 +1,84 @@
-import uuid
-import logging
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.utils.translation import gettext_lazy as _
-
-logger = logging.getLogger(__name__)
 
 class User(AbstractUser):
-    """
-    Custom User Model for Teachers/Administrators with Email-based authentication.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(_('email address'), unique=True)
-    is_teacher = models.BooleanField(default=True)
+    # 🎯 ৪টি স্তরের রোল অপশন
+    ROLE_CHOICES = (
+        ("SUPER_ADMIN", "Super Admin (Owner)"),
+        ("PRINCIPAL", "Principal"),
+        ("HEAD_TEACHER", "Head Teacher"),
+        ("TEACHER", "Teacher"),
+    )
+
+    role = models.CharField(
+        max_length=20, 
+        choices=ROLE_CHOICES, 
+        default="TEACHER"
+    )
     
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='subordinates',
+        help_text="Superior user/manager in hierarchy"
+    )
+    is_active_user = models.BooleanField(default=True)
+    last_login_ip = models.GenericIPAddressField(null=True, blank=True)
 
-    def __str__(self) -> str:
-        return str(self.email)
+    groups = models.ManyToManyField('auth.Group', related_name='custom_user_set', blank=True)
+    user_permissions = models.ManyToManyField('auth.Permission', related_name='custom_user_permissions_set', blank=True)
+
+    def __str__(self):
+        return f"{self.username} [{self.get_role_display()}]"
 
 
+# 🎯 2. Permanent Student Database Table
 class Student(models.Model):
-    """
-    Represents a Hifz student enrolled in the institution.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name="students")
+    name = models.CharField(max_length=255)
+    group = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.group}"
+
+
+# 🎯 3. Student Daily Hifz Report Table
+class StudentDailyReport(models.Model):
+    student = models.ForeignKey(
+        Student, 
+        on_delete=models.CASCADE, 
+        related_name='daily_reports'
+    )
     
-    full_name = models.CharField(max_length=255)
-    roll_number = models.CharField(max_length=50, blank=True, null=True)
-    guardian_phone = models.CharField(max_length=20, blank=True)
-    admission_date = models.DateField(auto_now_add=True)
+    juz_and_pages = models.JSONField(default=list, blank=True)
+    session_name = models.CharField(max_length=100, null=True, blank=True)
+    mistakes = models.JSONField(default=list, blank=True)
+    stucks = models.JSONField(default=list, blank=True)
+    comment = models.TextField(null=True, blank=True)
+
+    # Tracking & Security Metadata
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='created_reports'
+    )
+    report_date = models.DateField()
+    is_locked = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        db_table = 'hifz_students'
-        ordering = ['full_name']
+    @property
+    def student_name(self):
+        return self.student.name
 
-    def __str__(self) -> str:
-        return f"{self.full_name} (Roll: {self.roll_number})"
+    @property
+    def student_group(self):
+        return self.student.group
 
-
-class HifzReport(models.Model):
-    """
-    Daily Hifz Report tracking Sabak (New Lesson), Sabak Dhor (Recent Revision), 
-    and Amukhta (Grand Revision) along with mistakes and grades.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="reports")
-    
-    report_date = models.DateField(db_index=True)
-    
-    # Hifz Progress Fields
-    sabak_para = models.CharField(max_length=100, blank=True) # যেমন: পারা ৩০ / সূরা বাকারা
-    sabak_lines = models.IntegerField(default=0) # কত লাইন সবক দিয়েছে
-    sabak_mistakes = models.IntegerField(default=0) # ভুল বা ওয়াকফের ভুল সংখ্যা
-    
-    sabak_dhor = models.CharField(max_length=100, blank=True) # সবক দোর
-    amukhta_dhor = models.CharField(max_length=100, blank=True) # আমুখতা / বড় দোর
-    
-    # Evaluation & Remarks
-    grade = models.CharField(max_length=20, choices=[
-        (' ممتاز ', 'Mumtaz (Excellent)'),
-        (' جيد جداً ', 'Jayyid Jiddan (Very Good)'),
-        (' جيد ', 'Jayyid (Good)'),
-        (' مقبول ', 'Maqbul (Passed)'),
-        (' ضعيف ', 'Daiyf (Weak)'),
-    ], default='ممتاز')
-    
-    remarks = models.TextField(blank=True) # ওস্তাদের মন্তব্য
-    
-    # Sync & Metadata
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True, db_index=True)
-    is_deleted = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'hifz_reports'
-        indexes = [
-            models.Index(fields=['student', 'report_date']),
-        ]
-        ordering = ['-report_date']
-
-    def __str__(self) -> str:
-        return f"Report for {self.student.full_name} on {self.report_date}"
+    def __str__(self):
+        return f"{self.student.name} - {self.report_date} (By: {self.created_by.username})"
