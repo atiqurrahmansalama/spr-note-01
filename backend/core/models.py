@@ -82,3 +82,11 @@ class StudentDailyReport(models.Model):
 
     def __str__(self):
         return f"{self.student.name} - {self.report_date} (By: {self.created_by.username})"
+    
+    
+class Session(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name

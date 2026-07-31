@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ChevronIcon from "./ChevronIcon"; // 🚀 কাস্টম SVG আইকন ইমপোর্ট
 
 export default function AutocompleteDropdown({
   options = [],
@@ -55,7 +56,7 @@ export default function AutocompleteDropdown({
 
   const handleSaveClick = (e) => {
     e.stopPropagation();
-    setIsOpen(false); // 🎯 সেভ ক্লিক করলে ড্রপডাউন সাজেশন বক্স সাথে সাথে বন্ধ হয়ে যাবে
+    setIsOpen(false);
     if (onAddNew) onAddNew(searchTerm);
   };
 
@@ -81,12 +82,13 @@ export default function AutocompleteDropdown({
           </button>
         )}
 
-        <span
+        {/* 🚀 ইমোজি সরিয়ে কাস্টম SVG আউটলাইন রিয়্যুজেবল আইকন */}
+        <div
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-3 text-slate-500 text-[10px] cursor-pointer select-none"
+          className="absolute right-3 p-1 text-slate-500 hover:text-slate-300 cursor-pointer select-none flex items-center justify-center"
         >
-          {isOpen ? "▲" : "▼"}
-        </span>
+          <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 text-slate-400" />
+        </div>
       </div>
 
       {isOpen && (

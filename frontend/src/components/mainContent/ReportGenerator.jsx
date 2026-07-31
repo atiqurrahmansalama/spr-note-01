@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { saveReportLocally, getLocalReports } from "../utils/syncEngine";
+import { saveReportLocally, getLocalReports } from "../../utils/syncEngine";
 
 export default function ReportGenerator() {
   const [formData, setFormData] = useState({
