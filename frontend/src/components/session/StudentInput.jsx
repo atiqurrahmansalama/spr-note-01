@@ -1,5 +1,5 @@
 // 🟢 সঠিক ইমপোর্ট পাথ (AutocompleteDropdown):
-import AutocompleteDropdown from "../../common/AutocompleteDropdown";
+import AutocompleteDropdown from "../ui/AutocompleteDropdown";
 import StudentSavePanel from "./StudentSavePanel";
 
 export default function StudentInput({
@@ -16,8 +16,8 @@ export default function StudentInput({
   onSaveResult,
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 w-16">
+    <div className="flex items-start justify-between gap-4">
+      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 w-20 mt-3 shrink-0">
         STUDENT
       </label>
       <div className="flex-1">

@@ -62,6 +62,8 @@ export const triggerCloudSync = async (apiClient) => {
   const pendingItems = reports.filter((r) => pendingIds.includes(r.id));
 
   try {
+    // ⚠️ NOTE: This endpoint does not exist on the backend yet.
+    // When implemented, add: router.register(r'reports/sync', ReportSyncViewSet)
     const response = await apiClient.post("/api/reports/sync/", {
       changes: pendingItems,
       last_synced_at: lastSyncedAt,

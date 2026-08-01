@@ -1,13 +1,13 @@
 import { useState } from "react";
-import Sidebar from "./components/sidebar/Sidebar";
-import UserProfileDrawer from "./components/UserProfileDrawer";
-import HifzReportForm from "./components/mainContent/HifzReportForm";
+import Sidebar from "./components/layout/Sidebar";
+import UserProfileDrawer from "./components/layout/UserProfileDrawer";
+import HifzReportForm from "./components/session/HifzReportForm";
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [timeZone, setTimeZone] = useState("America/New_York (EDT)");
-  const [dateFormat, setDateFormat] = useState("MM/DD/YYYY");
+  const [timeZone, setTimeZone] = useState("Asia/Dhaka");
+  const [dateFormat, setDateFormat] = useState("DD/MM/YYYY");
 
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem("user");

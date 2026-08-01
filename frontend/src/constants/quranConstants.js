@@ -1,0 +1,1 @@
+export const QURAN_CONSTANTS = { MAX_PAGES: 604, MAX_JUZ: 30 };

@@ -1,7 +1,9 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
 // Register User (Sign Up)
 export const registerUser = async (userData) => {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/register/', {
+    const response = await fetch(`${API_BASE_URL}/api/register/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
@@ -16,7 +18,7 @@ export const registerUser = async (userData) => {
 // Login User
 export const loginUser = async (usernameOrEmail, password) => {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/token/', {
+    const response = await fetch(`${API_BASE_URL}/api/token/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: usernameOrEmail, password }),
@@ -46,7 +48,7 @@ export const fetchWithAuth = async (url, options = {}) => {
     ...options.headers,
   };
 
-  const response = await fetch(`http://127.0.0.1:8000${url}`, { ...options, headers });
+  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
   if (response.status === 401) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');

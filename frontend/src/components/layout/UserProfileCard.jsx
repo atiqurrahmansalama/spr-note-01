@@ -1,5 +1,5 @@
 import { useState } from "react";
-import LoginModal from "../LoginModal";
+import LoginModal from "../auth/LoginModal";
 
 export default function UserProfileCard({ isProfileOpen, setIsProfileOpen }) {
   const [user, setUser] = useState(() => {

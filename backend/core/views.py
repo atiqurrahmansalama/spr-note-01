@@ -31,7 +31,7 @@ class ChangePasswordView(APIView):
 
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data)
-        if serializer.is_validate():
+        if serializer.is_valid():
             user = request.user
             if not user.check_password(serializer.data.get("old_password")):
                 return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
@@ -51,7 +51,7 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == User.Role.SUPER_ADMIN or user.is_superuser:
+        if user.role == "SUPER_ADMIN" or user.is_superuser:
             return StudentDailyReport.objects.all().order_by('-created_at')
         return StudentDailyReport.objects.filter(is_deleted=False, created_by=user).order_by('-created_at')
 

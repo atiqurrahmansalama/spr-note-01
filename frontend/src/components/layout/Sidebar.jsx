@@ -2,7 +2,7 @@ import { useState } from "react";
 import CalendarSettings from "./CalendarSettings";
 import SessionManager from "./SessionManager";
 import UserProfileCard from "./UserProfileCard";
-import ChevronIcon from "../common/ChevronIcon"; // 🚀 কাস্টম SVG আইকন ইমপোর্ট
+import ChevronIcon from "../ui/ChevronIcon"; // 🚀 কাস্টম SVG আইকন ইমপোর্ট
 
 export default function Sidebar({ 
   isOpen, 

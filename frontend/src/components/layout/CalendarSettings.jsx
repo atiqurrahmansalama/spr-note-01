@@ -1,4 +1,4 @@
-import CustomSelect from "../common/CustomSelect";
+import CustomSelect from "../ui/CustomSelect";
 
 export default function CalendarSettings({ timeZone, setTimeZone, dateFormat, setDateFormat }) {
   const timeZoneOptions = [

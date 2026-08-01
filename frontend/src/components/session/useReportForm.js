@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "../../../utils/authService";
-import { useToast } from "../../../context/ToastContext";
+import { fetchWithAuth } from "../../utils/authService";
+import { useToast } from "../../context/ToastContext";
 
 export function useReportForm() {
   const { showToast } = useToast();
@@ -9,6 +9,22 @@ export function useReportForm() {
   const [studentName, setStudentName] = useState("");
   const [groupName, setGroupName] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
+  
+  const [juzPageData, setJuzPageData] = useState([
+    {
+      id: crypto.randomUUID(),
+      juz: "",
+      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }]
+    }
+  ]);
+
+  const [mistakeData, setMistakeData] = useState([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }
+  ]);
+
+  const [stuckData, setStuckData] = useState([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }
+  ]);
 
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [pendingName, setPendingName] = useState("");
@@ -111,6 +127,9 @@ export function useReportForm() {
       session: selectedSession,
       report_date: selectedDate || new Date().toISOString().split("T")[0],
       subject_course: groupName || "General Group",
+      juz_and_pages: juzPageData, // 👈 Added this
+      mistakes: mistakeData,
+      stucks: stuckData,
       overall_status: "COMPLETED",
       client_updated_at: new Date().toISOString(),
     };
@@ -126,6 +145,13 @@ export function useReportForm() {
         setStudentName("");
         setGroupName("");
         setSelectedSession("");
+        setJuzPageData([{
+          id: crypto.randomUUID(),
+          juz: "",
+          ranges: [{ id: crypto.randomUUID(), start: "", end: "" }]
+        }]);
+        setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+        setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
         await fetchData();
       } else {
         const errData = await response.json();
@@ -145,6 +171,12 @@ export function useReportForm() {
     setGroupName,
     selectedSession,
     setSelectedSession,
+    juzPageData,
+    setJuzPageData,
+    mistakeData,
+    setMistakeData,
+    stuckData,
+    setStuckData,
     isPanelOpen,
     setIsPanelOpen,
     pendingName,

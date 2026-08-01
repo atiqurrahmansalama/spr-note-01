@@ -1,6 +1,6 @@
 import HeaderDateControl from "./HeaderDateControl";
 import SessionInput from "./SessionInput";
-import { useReportForm } from "./hooks/useReportForm";
+import { useReportForm } from "./useReportForm";
 
 export default function HifzReportForm({ timeZone, dateFormat }) {
   const {
@@ -11,6 +11,12 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     setGroupName,
     selectedSession,
     setSelectedSession,
+    juzPageData,
+    setJuzPageData,
+    mistakeData,
+    setMistakeData,
+    stuckData,
+    setStuckData,
     isPanelOpen,
     setIsPanelOpen,
     pendingName,
@@ -52,6 +58,12 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
         groupName={groupName}
         sessionList={sessionList}
         selectedSession={selectedSession}
+        juzPageData={juzPageData}
+        setJuzPageData={setJuzPageData}
+        mistakeData={mistakeData}
+        setMistakeData={setMistakeData}
+        stuckData={stuckData}
+        setStuckData={setStuckData}
         isPanelOpen={isPanelOpen}
         pendingName={pendingName}
         availableGroups={availableGroups}

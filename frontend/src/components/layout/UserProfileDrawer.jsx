@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fetchWithAuth } from '../utils/authService';
+import { fetchWithAuth } from "../../utils/authService";
 
 export default function UserProfileDrawer({ isOpen, onClose, user, onLogout }) {
   const [oldPassword, setOldPassword] = useState('');

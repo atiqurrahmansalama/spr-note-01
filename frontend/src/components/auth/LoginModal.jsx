@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { loginUser, registerUser } from '../utils/authService';
+import { loginUser, registerUser } from '../../utils/authService';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [tab, setTab] = useState('signin');
