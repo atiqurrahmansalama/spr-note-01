@@ -17,7 +17,6 @@ export default function SessionInput({
   onCloseSavePanel,
   onSaveResult,
 }) {
-  // সেশন লিস্ট ফরম্যাটিং
   const sessionOptions = sessionList.map((s) => ({
     label: typeof s === "object" ? (s.name || s.label) : s,
     value: typeof s === "object" ? (s.name || s.value) : s,
