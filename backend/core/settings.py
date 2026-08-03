@@ -64,6 +64,8 @@ TEMPLATES = [
 ]
 
 ROOT_URLCONF = "core.urls"
+WSGI_APPLICATION = "core.wsgi.application"
+
 
 # Database Configuration
 # Railway provides DATABASE_URL automatically when PostgreSQL is added
