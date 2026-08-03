@@ -26,6 +26,9 @@ export function useReportForm() {
     { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }
   ]);
 
+  const [comment, setComment] = useState("");
+  const [savedComments, setSavedComments] = useState([]);
+
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [pendingName, setPendingName] = useState("");
 
@@ -162,6 +165,16 @@ export function useReportForm() {
     }
   };
 
+  // 🚀 ৫. মেক রিপোর্ট বাটন হ্যান্ডলার
+  const handleMakeReport = async () => {
+    if (!studentName.trim()) {
+      showToast("Please specify a student name first", "warning");
+      return;
+    }
+    showToast(`Generating report for "${studentName}"...`, "info");
+    await handleSaveRecord();
+  };
+
   return {
     selectedDate,
     setSelectedDate,
@@ -177,6 +190,10 @@ export function useReportForm() {
     setMistakeData,
     stuckData,
     setStuckData,
+    comment,
+    setComment,
+    savedComments,
+    setSavedComments,
     isPanelOpen,
     setIsPanelOpen,
     pendingName,
@@ -187,5 +204,6 @@ export function useReportForm() {
     isLoading,
     handleSaveResult,
     handleSaveRecord,
+    handleMakeReport,
   };
 }

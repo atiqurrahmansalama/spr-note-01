@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import StudentInput from "./StudentInput";
 import AutocompleteDropdown from "../ui/AutocompleteDropdown";
 import JuzPageInputSection from "./JuzPageInputSection";
 import DetailSection from "../quran/DetailSection";
+import CommentSection from "./CommentSection";
 
 export default function SessionInput({
   studentDatabase,
@@ -16,6 +17,10 @@ export default function SessionInput({
   setMistakeData,
   stuckData,
   setStuckData,
+  comment,
+  setComment,
+  savedComments,
+  setSavedComments,
   isPanelOpen,
   pendingName,
   availableGroups,
@@ -25,6 +30,8 @@ export default function SessionInput({
   onOpenSavePanel,
   onCloseSavePanel,
   onSaveResult,
+  onAddToRecord,
+  onMakeReport,
 }) {
   const sessionOptions = sessionList.map((s) => ({
     label: typeof s === "object" ? (s.name || s.label) : s,
@@ -47,6 +54,33 @@ export default function SessionInput({
   
   const totalMistakes = countValid(mistakeData);
   const totalStuck = countValid(stuckData);
+
+  // Helper to create a blank row
+  const createBlankRow = () => ({
+    id: crypto.randomUUID(),
+    juz: "",
+    page: "",
+    ayahs: [{ id: crypto.randomUUID(), value: "" }],
+  });
+
+  // Refresh handlers for Mistake and Stuck
+  const mistakeRefreshCount = useRef(0);
+  const handleMistakeRefresh = () => {
+    mistakeRefreshCount.current += 1;
+    if (mistakeRefreshCount.current === 1) {
+      // Single click: reset only mistake rows, keep at least one blank row
+      setMistakeData([createBlankRow()]);
+    } else if (mistakeRefreshCount.current >= 2) {
+      // Double click: reset both mistake and stuck rows
+      setMistakeData([createBlankRow()]);
+      setStuckData([createBlankRow()]);
+      mistakeRefreshCount.current = 0;
+    }
+  };
+  const handleStuckRefresh = () => {
+    // Reset only stuck rows, keep at least one blank row
+    setStuckData([createBlankRow()]);
+  };
 
   const [draggedItem, setDraggedItem] = useState(null);
 
@@ -144,7 +178,7 @@ export default function SessionInput({
               <span className="text-[10px] font-bold text-slate-500 tracking-wider">TOTAL MISTAKE</span>
               <span className="text-3xl font-bold text-slate-300 leading-none mt-1">{totalMistakes}</span>
             </div>
-
+            
             {/* STUCK BOX */}
             <div className="bg-[#212327] border border-slate-700/50 rounded-xl px-5 py-4 flex-1 flex flex-col items-center justify-center shadow-sm">
               <span className="text-[10px] font-bold text-slate-500 tracking-wider">TOTAL STUCK</span>
@@ -164,6 +198,7 @@ export default function SessionInput({
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
+          onReset={handleMistakeRefresh}
         />
 
         {/* 5. Stuck Detail Section */}
@@ -178,9 +213,20 @@ export default function SessionInput({
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onReset={handleStuckRefresh}
           />
         </div>
       </div>
+
+      {/* 6. Comment Section (Separate Component & Card) */}
+      <CommentSection
+        comment={comment}
+        setComment={setComment}
+        savedComments={savedComments}
+        setSavedComments={setSavedComments}
+        onAddToRecord={onAddToRecord}
+        onMakeReport={onMakeReport}
+      />
     </div>
   );
 }

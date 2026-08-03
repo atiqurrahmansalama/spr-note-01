@@ -1,5 +1,6 @@
 import { useState } from "react";
 import NumberScrollInput from "../ui/NumberScrollInput";
+import CustomSelect from "../ui/CustomSelect";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../constants/quranConstants";
 
@@ -114,23 +115,13 @@ export default function DetailRow({
         {availableJuzs && availableJuzs.length > 1 && (
           <div className="flex items-center gap-1.5 shrink-0">
             <label className="text-xs font-semibold text-slate-400">Juz</label>
-            <div className="bg-[#1c1d1f] rounded-lg border border-slate-700/50 overflow-hidden h-9 w-14 shadow-inner focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 transition-all relative">
-              <select
-                value={rowData.juz || (availableJuzs[0] || "")}
-                onChange={(e) => handleJuzChange(e.target.value)}
-                className="w-full h-full bg-transparent text-sm text-slate-300 font-semibold focus:outline-none appearance-none cursor-pointer pl-1.5 pr-4 text-center"
-                style={{ textAlignLast: 'center' }}
-              >
-                {availableJuzs.map((j) => (
-                  <option key={j} value={j} className="bg-slate-800 text-slate-200">
-                    {j}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-              </div>
-            </div>
+            <CustomSelect
+              options={availableJuzs.map((j) => ({ label: j, value: j }))}
+              value={rowData.juz || (availableJuzs[0] || "")}
+              onChange={(val) => handleJuzChange(val)}
+              className="w-14"
+              buttonClassName="h-9 w-14 bg-[#1c1d1f] rounded-lg border border-slate-700/50 hover:border-slate-600 flex items-center justify-between px-2 text-sm text-slate-200 font-semibold cursor-pointer shadow-inner transition-colors select-none"
+            />
           </div>
         )}
 

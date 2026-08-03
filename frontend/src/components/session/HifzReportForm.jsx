@@ -1,10 +1,17 @@
+import { useState } from "react";
 import HeaderDateControl from "./HeaderDateControl";
 import SessionInput from "./SessionInput";
+import ReportModal from "./ReportModal";
 import { useReportForm } from "./useReportForm";
+import { generateReportText } from "../../utils/reportGenerator";
+import { useToast } from "../../context/ToastContext";
 
 export default function HifzReportForm({ timeZone, dateFormat }) {
+  const { showToast } = useToast();
+
   const {
-    setSelectedDate, // 👈 selectedDate সরিয়ে দেওয়া হলো
+    selectedDate,
+    setSelectedDate,
     studentName,
     setStudentName,
     groupName,
@@ -17,6 +24,10 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     setMistakeData,
     stuckData,
     setStuckData,
+    comment,
+    setComment,
+    savedComments,
+    setSavedComments,
     isPanelOpen,
     setIsPanelOpen,
     pendingName,
@@ -28,6 +39,30 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     handleSaveResult,
     handleSaveRecord,
   } = useReportForm();
+
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportText, setReportText] = useState("");
+
+  const handleMakeReportClick = () => {
+    if (!studentName.trim()) {
+      showToast("Please specify a student name first", "warning");
+      return;
+    }
+
+    const text = generateReportText({
+      studentName,
+      groupName,
+      selectedSession,
+      selectedDate,
+      juzPageData,
+      mistakeData,
+      stuckData,
+      comment,
+    });
+
+    setReportText(text);
+    setIsReportModalOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -64,6 +99,10 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
         setMistakeData={setMistakeData}
         stuckData={stuckData}
         setStuckData={setStuckData}
+        comment={comment}
+        setComment={setComment}
+        savedComments={savedComments}
+        setSavedComments={setSavedComments}
         isPanelOpen={isPanelOpen}
         pendingName={pendingName}
         availableGroups={availableGroups}
@@ -83,17 +122,25 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
         }}
         onCloseSavePanel={() => setIsPanelOpen(false)}
         onSaveResult={handleSaveResult}
+        onAddToRecord={handleSaveRecord}
+        onMakeReport={handleMakeReportClick}
       />
 
-      {/* 3. Action Button */}
-      <div className="pt-2">
-        <button
-          onClick={handleSaveRecord}
-          className="w-full bg-[#2c2d31] hover:bg-[#34353a] text-slate-200 font-semibold py-3.5 px-4 rounded-2xl shadow-lg transition"
-        >
-          Add to Record
-        </button>
-      </div>
+      {/* 3. Report Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportData={{
+          studentName,
+          groupName,
+          selectedSession,
+          selectedDate,
+          juzPageData,
+          mistakeData,
+          stuckData,
+          comment,
+        }}
+      />
     </div>
   );
 }

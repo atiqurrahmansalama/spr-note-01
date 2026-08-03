@@ -29,15 +29,17 @@ export default function AutocompleteDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const safeSearchTerm = typeof searchTerm === "string" ? searchTerm : (searchTerm?.label || "");
+
   const filteredOptions = options.filter((item) => {
-    const label = typeof item === "string" ? item : item.label;
-    return label.toLowerCase().includes((searchTerm || "").toLowerCase());
+    const label = typeof item === "string" ? item : (item?.label || "");
+    return label.toLowerCase().includes(safeSearchTerm.toLowerCase());
   });
 
   const isNewName =
-    searchTerm.trim().length > 0 &&
+    safeSearchTerm.trim().length > 0 &&
     !options.some(
-      (opt) => (typeof opt === "string" ? opt : opt.label).toLowerCase() === searchTerm.trim().toLowerCase()
+      (opt) => (typeof opt === "string" ? opt : (opt?.label || "")).toLowerCase() === safeSearchTerm.trim().toLowerCase()
     );
 
   const handleSelect = (item) => {
@@ -65,7 +67,7 @@ export default function AutocompleteDropdown({
       <div className="relative flex items-center">
         <input
           type="text"
-          value={searchTerm}
+          value={safeSearchTerm}
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
