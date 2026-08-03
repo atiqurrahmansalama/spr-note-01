@@ -40,23 +40,23 @@ export function ToastProvider({ children }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="pointer-events-auto flex items-center justify-between px-4 py-3.5 rounded-xl bg-[#1e2023] text-slate-200 shadow-2xl relative overflow-hidden transition-all duration-300"
+            className="pointer-events-auto flex items-center justify-between px-4 py-3.5 rounded-xl theme-bg-surface border theme-border theme-text-primary shadow-2xl relative overflow-hidden transition-all duration-300"
           >
-            {/* Left Color Accent Bar (No border around the box) */}
+            {/* Left Color Accent Bar */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${
               toast.type === 'success' ? 'bg-emerald-500' :
               toast.type === 'error' ? 'bg-rose-500' :
               toast.type === 'warning' ? 'bg-amber-500' :
-              'bg-indigo-500'
+              'bg-[var(--accent-main)]'
             }`} />
 
             <div className="flex items-center gap-3 pl-1">
-              <p className="text-xs font-medium text-slate-300 leading-relaxed">{toast.message}</p>
+              <p className="text-xs font-medium theme-text-primary leading-relaxed">{toast.message}</p>
             </div>
 
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-500 hover:text-slate-300 text-xs p-1 transition ml-4 shrink-0"
+              className="theme-text-secondary hover:theme-text-primary text-xs p-1 transition ml-4 shrink-0"
             >
               ✕
             </button>

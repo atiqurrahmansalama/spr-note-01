@@ -4,16 +4,15 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
-from .models import Student, StudentDailyReport
+from .models import Student, StudentDailyReport, Session
 from .serializers import (
     CustomTokenObtainPairSerializer, 
     RegisterSerializer, 
     ChangePasswordSerializer,
     StudentSerializer, 
-    StudentDailyReportSerializer
+    StudentDailyReportSerializer,
+    SessionSerializer
 )
-from .models import Session
-from .serializers import SessionSerializer
 
 
 User = get_user_model()

@@ -41,10 +41,10 @@ export default function CommentSection({
   return (
     <div className="space-y-4">
       {/* Message Card */}
-      <div ref={containerRef} className="bg-[#212327] rounded-2xl p-5 shadow-lg relative z-0 space-y-3">
+      <div ref={containerRef} className="theme-bg-surface rounded-2xl p-5 shadow-lg relative z-0 space-y-3 border theme-border">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
             Comments
           </h3>
 
@@ -54,10 +54,10 @@ export default function CommentSection({
               <button
                 type="button"
                 onClick={handleClearComment}
-                className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800/50 transition-colors"
+                className="p-1 rounded-md theme-text-secondary hover:text-red-500 hover:theme-bg-sub transition-colors group cursor-pointer"
                 title="Clear comment text"
               >
-                <RefreshIcon className="w-4 h-4" />
+                <RefreshIcon className="w-4 h-4 text-inherit group-hover:text-red-500 transition-colors" />
               </button>
             )}
 
@@ -66,7 +66,7 @@ export default function CommentSection({
               <button
                 type="button"
                 onClick={handleSaveComment}
-                className="p-1 rounded-md text-slate-500 hover:text-indigo-400 hover:bg-slate-800/50 transition-colors"
+                className="p-1 rounded-md theme-text-secondary hover:theme-accent hover:theme-bg-sub transition-colors"
                 title="Save to templates"
               >
                 <SaveIcon className="w-4 h-4" />
@@ -77,12 +77,12 @@ export default function CommentSection({
             <button
               type="button"
               onClick={() => setIsSavedDropdownOpen((prev) => !prev)}
-              className="relative p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors flex items-center justify-center"
+              className="relative p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors flex items-center justify-center"
               title="Saved Messages"
             >
               <SavedMessagesIcon className="w-4 h-4" />
               {savedComments.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center leading-none py-0.5">
+                <span className="absolute -top-1 -right-1 theme-bg-accent theme-accent-text text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center leading-none py-0.5">
                   {savedComments.length}
                 </span>
               )}
@@ -95,26 +95,26 @@ export default function CommentSection({
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            className="w-full h-36 p-3 rounded-xl bg-[#17181a] text-slate-100 text-sm border border-slate-800 focus:outline-none focus:border-indigo-500/80 transition-colors resize-none placeholder-slate-600"
+            className="w-full h-36 p-3 rounded-xl theme-bg-sub theme-text-primary text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors resize-none placeholder:theme-text-secondary placeholder:opacity-60"
             placeholder="Enter comment..."
           />
 
           {/* Saved Messages Dropdown Overlay */}
           {isSavedDropdownOpen && (
-            <div className="absolute inset-0 bg-[#17181a] border border-slate-700/80 rounded-xl shadow-2xl z-20 p-3 flex flex-col space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2 px-1">
+            <div className="absolute inset-0 theme-bg-sub border theme-border rounded-xl shadow-2xl z-20 p-3 flex flex-col space-y-2">
+              <div className="flex items-center justify-between border-b theme-border pb-2 px-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
                     Saved Templates
                   </span>
-                  <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded-full font-mono">
+                  <span className="theme-bg-accent-soft theme-accent text-[10px] font-semibold px-2 py-0.5 rounded-full font-mono">
                     {savedComments.length}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsSavedDropdownOpen(false)}
-                  className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
+                  className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors"
                   title="Close templates"
                 >
                   <CloseIcon className="w-4 h-4" />
@@ -130,27 +130,27 @@ export default function CommentSection({
                         setComment(msg);
                         setIsSavedDropdownOpen(false);
                       }}
-                      className="px-3 py-2 text-xs text-slate-200 bg-[#212327]/60 hover:bg-indigo-600/20 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/30 rounded-lg cursor-pointer transition-colors flex items-center justify-between group gap-2"
+                      className="px-3 py-2 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-center justify-between group gap-2"
                       title={msg}
                     >
-                      <span className="truncate flex-1 font-serif">{msg}</span>
+                      <span className="truncate flex-1">{msg}</span>
                       <button
                         type="button"
                         onClick={(e) => handleRemoveSavedComment(e, index)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700/80 rounded transition-all shrink-0"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:theme-bg-elevated rounded transition-all shrink-0"
                         title="Delete saved message"
                       >
-                        <TrashIcon className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                        <TrashIcon className="w-3.5 h-3.5 theme-text-secondary hover:text-red-400" />
                       </button>
                     </div>
                   ))
                 ) : (
                   <div
                     onClick={() => setIsSavedDropdownOpen(false)}
-                    className="h-full flex flex-col items-center justify-center text-slate-500 text-xs py-4 cursor-pointer hover:text-slate-300 transition-colors select-none gap-1"
+                    className="h-full flex flex-col items-center justify-center theme-text-secondary text-xs py-4 cursor-pointer hover:theme-text-primary transition-colors select-none gap-1"
                   >
                     <span>No saved messages yet.</span>
-                    <span className="text-indigo-400 hover:text-indigo-300 underline font-medium text-[11px]">
+                    <span className="theme-accent hover:underline font-medium text-[11px]">
                       Click to add
                     </span>
                   </div>
@@ -162,11 +162,11 @@ export default function CommentSection({
       </div>
 
       {/* Action Buttons Below Message Card */}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-1">
         <button
           type="button"
           onClick={onAddToRecord}
-          className="flex-1 bg-[#2c2d31] hover:bg-[#34353a] text-slate-200 font-semibold py-3.5 px-4 rounded-2xl shadow-lg transition text-sm text-center cursor-pointer border border-slate-700/40"
+          className="flex-1 theme-bg-elevated hover:theme-bg-sub theme-text-primary font-semibold py-3 sm:py-3.5 px-4 rounded-2xl shadow-md transition text-sm text-center cursor-pointer border theme-border"
         >
           Add to Record
         </button>
@@ -174,7 +174,7 @@ export default function CommentSection({
         <button
           type="button"
           onClick={onMakeReport}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 px-4 rounded-2xl shadow-lg transition text-sm text-center cursor-pointer shadow-indigo-600/20"
+          className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text font-bold py-3 sm:py-3.5 px-4 rounded-2xl shadow-lg transition text-sm text-center cursor-pointer"
         >
           Make Report
         </button>

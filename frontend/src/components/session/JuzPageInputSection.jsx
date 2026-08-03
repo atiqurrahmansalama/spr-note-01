@@ -32,8 +32,8 @@ export default function JuzPageInputSection({ data, onChange }) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
+    <div className="space-y-3">
+      <div className="space-y-1.5 sm:space-y-2.5">
         {data.map((row, index) => (
           <JuzRow
             key={row.id}
@@ -45,10 +45,11 @@ export default function JuzPageInputSection({ data, onChange }) {
         ))}
       </div>
 
-      <div className="pl-[104px] pt-1">
+      <div className="flex justify-center sm:justify-start sm:pl-[104px] pt-1">
         <button
+          type="button"
           onClick={addJuzRow}
-          className="px-4 py-1.5 rounded-full border border-slate-700/80 border-dashed hover:border-solid hover:bg-[#232529] text-slate-400 hover:text-slate-200 text-sm font-medium transition-all"
+          className="px-4 py-1.5 rounded-full border theme-border border-dashed hover:border-solid theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-sm"
         >
           + Add Juz
         </button>

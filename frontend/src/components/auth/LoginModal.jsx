@@ -74,13 +74,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-[#18191c] border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl transition-all">
+      <div className="theme-bg-surface border theme-border rounded-2xl p-6 w-full max-w-md shadow-2xl transition-all">
         {/* Header Tabs */}
-        <div className="flex bg-[#121315] p-1 rounded-xl mb-6 border border-slate-800/60">
+        <div className="flex theme-bg-app p-1 rounded-xl mb-6 border theme-border">
           <button
             onClick={() => { setTab('signin'); setError(''); }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              tab === 'signin' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              tab === 'signin' ? 'theme-bg-accent theme-accent-text shadow-md' : 'theme-text-secondary hover:theme-text-primary'
             }`}
           >
             Sign In
@@ -88,7 +88,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           <button
             onClick={() => { setTab('signup'); setError(''); }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              tab === 'signup' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              tab === 'signup' ? 'theme-bg-accent theme-accent-text shadow-md' : 'theme-text-secondary hover:theme-text-primary'
             }`}
           >
             Create Account
@@ -111,7 +111,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           /* Sign In Form */
           <form onSubmit={handleSignIn} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium theme-text-secondary mb-1 uppercase tracking-wider">
                 Username or Email
               </label>
               <input
@@ -119,13 +119,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 required
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
-                className="w-full bg-[#121315] border border-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition"
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 placeholder="enter username or email..."
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium theme-text-secondary mb-1 uppercase tracking-wider">
                 Password
               </label>
               <input
@@ -133,7 +133,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#121315] border border-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition"
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 placeholder="••••••••"
               />
             </div>
@@ -142,14 +142,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 bg-[#121315] hover:bg-slate-800 text-slate-400 py-2.5 rounded-xl text-xs font-medium transition"
+                className="flex-1 theme-bg-elevated hover:opacity-80 theme-text-secondary py-2.5 rounded-xl text-xs font-medium border theme-border transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold shadow-lg transition disabled:opacity-50"
+                className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text py-2.5 rounded-xl text-xs font-semibold shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Signing In...' : 'Sign In'}
               </button>
@@ -160,59 +160,59 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           <form onSubmit={handleSignUp} className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1 uppercase">First Name</label>
+                <label className="block text-[10px] theme-text-secondary mb-1 uppercase">First Name</label>
                 <input
                   type="text"
                   value={regData.first_name}
                   onChange={(e) => setRegData(prev => ({ ...prev, first_name: e.target.value }))}
-                  className="w-full bg-[#121315] border border-slate-800 text-white px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                   placeholder="e.g. Atiqur"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1 uppercase">Last Name</label>
+                <label className="block text-[10px] theme-text-secondary mb-1 uppercase">Last Name</label>
                 <input
                   type="text"
                   value={regData.last_name}
                   onChange={(e) => setRegData(prev => ({ ...prev, last_name: e.target.value }))}
-                  className="w-full bg-[#121315] border border-slate-800 text-white px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                   placeholder="e.g. Rahman"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1 uppercase">Username</label>
+              <label className="block text-[10px] theme-text-secondary mb-1 uppercase">Username</label>
               <input
                 type="text"
                 required
                 value={regData.username}
                 onChange={(e) => setRegData(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full bg-[#121315] border border-slate-800 text-white px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 placeholder="unique username..."
               />
             </div>
 
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1 uppercase">Email Address</label>
+              <label className="block text-[10px] theme-text-secondary mb-1 uppercase">Email Address</label>
               <input
                 type="email"
                 required
                 value={regData.email}
                 onChange={(e) => setRegData(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full bg-[#121315] border border-slate-800 text-white px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 placeholder="name@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1 uppercase">Password</label>
+              <label className="block text-[10px] theme-text-secondary mb-1 uppercase">Password</label>
               <input
                 type="password"
                 required
                 value={regData.password}
                 onChange={(e) => setRegData(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full bg-[#121315] border border-slate-800 text-white px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 placeholder="at least 6 characters..."
               />
             </div>
@@ -221,14 +221,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 bg-[#121315] text-slate-400 py-2.5 rounded-xl text-xs font-medium"
+                className="flex-1 theme-bg-elevated hover:opacity-80 theme-text-secondary py-2.5 rounded-xl text-xs font-medium border theme-border transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold shadow-lg"
+                className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text py-2.5 rounded-xl text-xs font-semibold shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Creating...' : 'Register'}
               </button>

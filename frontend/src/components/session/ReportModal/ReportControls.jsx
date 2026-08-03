@@ -5,8 +5,8 @@ export function ReportControls({
   setIncludeTeacher,
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-6 px-5 py-3 bg-[#181a1e] border-t border-slate-800/80 text-xs text-slate-300">
-      <label className="flex items-center gap-2 cursor-pointer select-none hover:text-white transition-colors">
+    <div className="flex flex-wrap items-center gap-6 px-5 py-3 theme-bg-sub border-t theme-border text-xs theme-text-secondary">
+      <label className="flex items-center gap-2 cursor-pointer select-none hover:theme-text-primary transition-colors">
         <input
           type="checkbox"
           checked={includeGroup}
@@ -15,14 +15,14 @@ export function ReportControls({
             setIncludeGroup(checked);
             if (!checked) setIncludeTeacher(false);
           }}
-          className="w-4 h-4 rounded accent-indigo-600 bg-slate-800 border-slate-700 cursor-pointer"
+          className="w-4 h-4 rounded accent-[var(--accent-main)] theme-bg-elevated theme-border cursor-pointer"
         />
         <span>Include Group Name</span>
       </label>
 
       <label
         className={`flex items-center gap-2 select-none transition-colors ${
-          includeGroup ? "cursor-pointer text-slate-300 hover:text-white" : "cursor-not-allowed text-slate-600"
+          includeGroup ? "cursor-pointer theme-text-secondary hover:theme-text-primary" : "cursor-not-allowed opacity-40"
         }`}
       >
         <input
@@ -30,7 +30,7 @@ export function ReportControls({
           checked={includeTeacher}
           disabled={!includeGroup}
           onChange={(e) => setIncludeTeacher(e.target.checked)}
-          className="w-4 h-4 rounded accent-indigo-600 bg-slate-800 border-slate-700 cursor-pointer disabled:opacity-40"
+          className="w-4 h-4 rounded accent-[var(--accent-main)] theme-bg-elevated theme-border cursor-pointer disabled:opacity-40"
         />
         <span>Mention Teacher</span>
       </label>

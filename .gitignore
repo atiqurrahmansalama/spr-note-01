@@ -1,0 +1,47 @@
+# ==========================================
+# 1. Environment & Global Ignores
+# ==========================================
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+.vscode/
+.idea/
+
+# ==========================================
+# 2. Python & Virtual Environments
+# ==========================================
+venv/
+env/
+ENV/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+backend/**/__pycache__/
+backend/**/*.pyc
+
+# ==========================================
+# 3. Django Backend Exclusions
+# ==========================================
+backend/db.sqlite3
+backend/db.sqlite3-journal
+backend/staticfiles/
+backend/media/
+backend/logs/
+
+# ==========================================
+# 4. Frontend Exclusions (Node & React/Vite)
+# ==========================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+frontend/dist-ssr/
+frontend/coverage/
+
+# ==========================================
+# 5. Extra Unused Folders
+# ==========================================
+modern-report/

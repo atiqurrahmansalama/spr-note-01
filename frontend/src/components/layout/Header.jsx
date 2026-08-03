@@ -1,17 +1,17 @@
 const Header = () => {
   return (
-    <header className="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6">
+    <header className="h-16 theme-bg-sub border-b theme-border flex items-center justify-between px-6">
       <div className="flex-1 max-w-lg">
         <input
           type="text"
           placeholder="Search notes..."
-          className="w-full bg-slate-900 text-white text-sm px-4 py-2 rounded-lg border border-slate-700 focus:outline-none"
+          className="w-full theme-bg-surface theme-text-primary text-sm px-4 py-2 rounded-lg border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
         />
       </div>
 
       <div className="flex items-center space-x-4 ml-4">
-        <button className="text-slate-300 hover:text-white">Sync</button>
-        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+        <button className="theme-text-secondary hover:theme-text-primary text-xs font-semibold">Sync</button>
+        <div className="w-8 h-8 theme-bg-accent rounded-full flex items-center justify-center theme-accent-text font-bold cursor-pointer">
           U
         </div>
       </div>

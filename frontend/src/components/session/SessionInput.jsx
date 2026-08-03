@@ -128,7 +128,7 @@ export default function SessionInput({
   return (
     <div className="space-y-6">
       {/* Top Card: Student, Session, Juz/Page */}
-      <div className="bg-[#212327] rounded-2xl p-5 shadow-lg space-y-4 relative z-0">
+      <div className="theme-bg-surface rounded-2xl p-5 shadow-lg space-y-4 relative z-0 border theme-border">
         {/* 1. Student Input Section */}
         <StudentInput
           studentDatabase={studentDatabase}
@@ -145,11 +145,11 @@ export default function SessionInput({
         />
 
         {/* 2. Session Dropdown Section */}
-        <div className="flex items-center justify-between gap-4 border-t border-slate-800/80 pt-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 w-20 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 border-t theme-border pt-4 mt-4">
+          <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary w-full sm:w-20 shrink-0">
             SESSION
           </label>
-          <div className="flex-1">
+          <div className="flex-1 w-full min-w-0">
             <AutocompleteDropdown
               options={sessionOptions}
               value={selectedSession}
@@ -160,7 +160,7 @@ export default function SessionInput({
         </div>
 
         {/* 3. Juz / Page Input Section */}
-        <div className="border-t border-slate-800/80 pt-4 mt-2">
+        <div className="border-t theme-border pt-4 mt-4">
           <JuzPageInputSection 
             data={juzPageData}
             onChange={setJuzPageData}
@@ -169,20 +169,20 @@ export default function SessionInput({
       </div>
 
       {/* Bottom Card: Mistake and Stuck Details */}
-      <div className="bg-[#212327] rounded-2xl p-5 shadow-lg relative z-0">
+      <div className="theme-bg-surface rounded-2xl p-5 shadow-lg relative z-0 border theme-border">
         {/* Header with Totals */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-5 mb-5">
+        <div className="flex items-center justify-between border-b theme-border pb-5 mb-5">
           <div className="flex items-center gap-4 w-full">
             {/* MISTAKE BOX */}
-            <div className="bg-[#212327] border border-slate-700/50 rounded-xl px-5 py-4 flex-1 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-[10px] font-bold text-slate-500 tracking-wider">TOTAL MISTAKE</span>
-              <span className="text-3xl font-bold text-slate-300 leading-none mt-1">{totalMistakes}</span>
+            <div className="theme-bg-sub rounded-xl px-5 py-3.5 flex-1 flex flex-col items-center justify-center shadow-sm">
+              <span className="text-[10px] font-bold theme-text-secondary tracking-wider">TOTAL MISTAKE</span>
+              <span className="text-3xl font-bold theme-text-primary leading-none mt-1">{totalMistakes}</span>
             </div>
             
             {/* STUCK BOX */}
-            <div className="bg-[#212327] border border-slate-700/50 rounded-xl px-5 py-4 flex-1 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-[10px] font-bold text-slate-500 tracking-wider">TOTAL STUCK</span>
-              <span className="text-3xl font-bold text-slate-300 leading-none mt-1">{totalStuck}</span>
+            <div className="theme-bg-sub rounded-xl px-5 py-3.5 flex-1 flex flex-col items-center justify-center shadow-sm">
+              <span className="text-[10px] font-bold theme-text-secondary tracking-wider">TOTAL STUCK</span>
+              <span className="text-3xl font-bold theme-text-primary leading-none mt-1">{totalStuck}</span>
             </div>
           </div>
         </div>
@@ -202,7 +202,7 @@ export default function SessionInput({
         />
 
         {/* 5. Stuck Detail Section */}
-        <div className="border-t border-slate-800/80 pt-4 mt-4">
+        <div className="border-t theme-border pt-6 mt-6">
           <DetailSection
             title="Stuck Detail"
             listType="stuck"

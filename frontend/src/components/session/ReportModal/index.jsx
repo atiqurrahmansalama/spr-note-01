@@ -42,7 +42,7 @@ export default function ReportModal({ isOpen, onClose, reportData = {} }) {
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="bg-[#212327] border border-slate-700/80 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-slate-200"
+          className="theme-bg-surface border theme-border rounded-2xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] theme-text-primary"
         >
           {/* Modal Header */}
           <ReportHeader

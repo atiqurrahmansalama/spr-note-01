@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#121315]">
+    <div className="flex h-screen w-screen overflow-hidden theme-bg-app">
       {/* ১. বামপাশের সাইডবার (lg:pl-72 প্যাডিং দিয়ে মেইন কন্টেন্ট আলাদা থাকবে) */}
       <Sidebar 
         isProfileOpen={isProfileOpen}

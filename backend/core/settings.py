@@ -95,8 +95,6 @@ REST_FRAMEWORK = {
 }
 
 # SimpleJWT Settings
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),  # টেস্টের সুবিধার জন্য ১ দিন রাখা হলো। আর না হয় timedelta(minutes=60)
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),

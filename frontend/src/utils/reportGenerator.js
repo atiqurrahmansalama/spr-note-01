@@ -1,4 +1,25 @@
 /**
+ * Helper to format date into MM/DD/YYYY
+ */
+export function formatDate(selectedDate) {
+  if (!selectedDate) {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
+  const d = new Date(selectedDate);
+  if (!isNaN(d.getTime())) {
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
+  return String(selectedDate);
+}
+
+/**
  * Utility to generate formatted plain text report
  */
 export function generateReportText({
@@ -13,25 +34,8 @@ export function generateReportText({
   includeGroup = true,
   includeTeacher = true,
 }) {
-  // 1. Date Formatting (DD/MM/YYYY or MM/DD/YYYY)
-  let formattedDate = "";
-  if (selectedDate) {
-    const d = new Date(selectedDate);
-    if (!isNaN(d.getTime())) {
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const year = d.getFullYear();
-      formattedDate = `${month}/${day}/${year}`;
-    } else {
-      formattedDate = selectedDate;
-    }
-  } else {
-    const d = new Date();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const year = d.getFullYear();
-    formattedDate = `${month}/${day}/${year}`;
-  }
+  // 1. Date Formatting
+  const formattedDate = formatDate(selectedDate);
 
   // 2. Extract Juz & Page Ranges
   const juzMap = new Map();

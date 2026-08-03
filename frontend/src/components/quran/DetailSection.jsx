@@ -52,16 +52,17 @@ export default function DetailSection({
       onDrop={(e) => onDrop(e, listType)}
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
           {title}
         </h3>
         {onReset && (
           <button
+            type="button"
             onClick={onReset}
-            className="text-slate-500 hover:text-red-400 transition-colors p-1 rounded-md hover:bg-slate-800"
-            title={`Reset Details`}
+            className="theme-text-secondary hover:text-red-500 transition-colors p-1 rounded-md hover:theme-bg-sub cursor-pointer group"
+            title="Reset Details"
           >
-            <RefreshIcon className="w-4 h-4 text-slate-500 hover:text-red-400" />
+            <RefreshIcon className="w-4 h-4 text-inherit group-hover:text-red-500 transition-colors" />
           </button>
         )}
       </div>
@@ -84,10 +85,12 @@ export default function DetailSection({
         ))}
       </div>
 
-      <div className="pl-[80px] pt-1">
+      {/* Centered on mobile, left-indented on desktop */}
+      <div className="flex justify-center sm:justify-start sm:pl-[80px] pt-3.5 mt-2">
         <button
+          type="button"
           onClick={addRow}
-          className="px-4 py-1.5 rounded-full border border-slate-700/80 border-dashed hover:border-solid hover:bg-[#232529] text-slate-400 hover:text-slate-200 text-sm font-medium transition-all"
+          className="px-4 py-1.5 rounded-full border theme-border border-dashed hover:border-solid theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-sm"
         >
           + Add {title.split(" ")[0]}
         </button>

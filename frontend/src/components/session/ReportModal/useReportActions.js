@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { jsPDF } from "jspdf";
-import { generateReportText } from "../../../utils/reportGenerator";
+import { generateReportText, formatDate } from "../../../utils/reportGenerator";
 
 export function useReportActions({ isOpen, onClose, reportData }) {
   const { showToast } = useToast();
@@ -12,21 +12,30 @@ export function useReportActions({ isOpen, onClose, reportData }) {
   const [includeTeacher, setIncludeTeacher] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [currentText, setCurrentText] = useState("");
+  const [currentText, setCurrentText] = useState(() =>
+    generateReportText({
+      ...reportData,
+      includeGroup: true,
+      includeTeacher: true,
+    })
+  );
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   const [showDiscardAlert, setShowDiscardAlert] = useState(false);
 
-  // Generate / Regenerate report text when reportData or toggles change (unless editing manually)
-  useEffect(() => {
-    if (isOpen && !isEditing) {
-      const generated = generateReportText({
+  // Synchronize generated text when settings/reportData change, if user is not manually editing
+  const prevDataKey = `${isOpen}-${includeGroup}-${includeTeacher}-${JSON.stringify(reportData)}`;
+  const [lastSyncKey, setLastSyncKey] = useState(prevDataKey);
+
+  if (isOpen && !isEditing && lastSyncKey !== prevDataKey) {
+    setLastSyncKey(prevDataKey);
+    setCurrentText(
+      generateReportText({
         ...reportData,
         includeGroup,
         includeTeacher,
-      });
-      setCurrentText(generated);
-    }
-  }, [isOpen, reportData, includeGroup, includeTeacher, isEditing]);
+      })
+    );
+  }
 
   // Click outside to close share dropdown
   useEffect(() => {
@@ -60,7 +69,7 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       setCopied(true);
       showToast("Report text copied to clipboard!", "success");
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       showToast("Failed to copy report text", "error");
     }
   };
@@ -99,24 +108,7 @@ export function useReportActions({ isOpen, onClose, reportData }) {
         comment = "",
       } = reportData || {};
 
-      let formattedDate = "";
-      if (selectedDate) {
-        const d = new Date(selectedDate);
-        if (!isNaN(d.getTime())) {
-          const month = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          const year = d.getFullYear();
-          formattedDate = `${month}/${day}/${year}`;
-        } else {
-          formattedDate = selectedDate;
-        }
-      } else {
-        const d = new Date();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        const year = d.getFullYear();
-        formattedDate = `${month}/${day}/${year}`;
-      }
+      const formattedDate = formatDate(selectedDate);
 
       // Build structured lines & bold flags
       const items = [];

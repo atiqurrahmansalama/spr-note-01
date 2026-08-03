@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "../../context/ToastContext";
-import { fetchWithAuth } from "../../utils/authService";
 
 export default function StudentSavePanel({
   isOpen,
@@ -32,7 +31,6 @@ export default function StudentSavePanel({
       return;
     }
 
-    // 🚀 ১. মূল HifzReportForm-এর handleSaveResult কল করবে যা ব্যাকএন্ড ডাটাবেজে POST রিকোয়েস্ট পাঠাবে
     if (onSave) {
       await onSave({
         mode,
@@ -47,14 +45,14 @@ export default function StudentSavePanel({
   };
 
   return (
-    <div className="mt-3 bg-[#18191b] border border-slate-800 rounded-xl p-4 space-y-3 animate-fade-in shadow-inner">
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-        <span className="text-xs font-semibold text-slate-300">
+    <div className="mt-3 theme-bg-sub border theme-border rounded-xl p-4 space-y-3 animate-fade-in shadow-inner">
+      <div className="flex items-center justify-between border-b theme-border pb-2">
+        <span className="text-xs font-semibold theme-text-primary">
           Save Student Action
         </span>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-300 text-xs px-1"
+          className="theme-text-secondary hover:theme-text-primary text-xs px-1 transition-colors"
         >
           ✕
         </button>
@@ -67,8 +65,8 @@ export default function StudentSavePanel({
           onClick={() => setMode("NEW")}
           className={`px-3 py-1.5 rounded-lg border font-medium transition ${
             mode === "NEW"
-              ? "bg-slate-800 border-slate-700 text-indigo-300"
-              : "bg-[#1c1d1f] border-slate-800 text-slate-400 hover:text-slate-200"
+              ? "theme-bg-elevated theme-border theme-accent"
+              : "theme-bg-app theme-border theme-text-secondary hover:theme-text-primary"
           }`}
         >
           + Add as New
@@ -78,8 +76,8 @@ export default function StudentSavePanel({
           onClick={() => setMode("REPLACE")}
           className={`px-3 py-1.5 rounded-lg border font-medium transition ${
             mode === "REPLACE"
-              ? "bg-slate-800 border-slate-700 text-indigo-300"
-              : "bg-[#1c1d1f] border-slate-800 text-slate-400 hover:text-slate-200"
+              ? "theme-bg-elevated theme-border theme-accent"
+              : "theme-bg-app theme-border theme-text-secondary hover:theme-text-primary"
           }`}
         >
           ⇄ Replace Existing
@@ -88,14 +86,14 @@ export default function StudentSavePanel({
 
       {/* Input Name */}
       <div className="space-y-1">
-        <label className="text-[10px] font-mono uppercase text-slate-500">
+        <label className="text-[10px] font-mono uppercase theme-text-secondary">
           Student Name
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => setTypedName(e.target.value)}
-          className="w-full bg-[#1c1d1f] border border-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-slate-600"
+          className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
           placeholder="Enter student name..."
         />
       </div>
@@ -103,13 +101,13 @@ export default function StudentSavePanel({
       {/* Replace Dropdown Mode */}
       {mode === "REPLACE" && (
         <div className="space-y-1">
-          <label className="text-[10px] font-mono uppercase text-slate-500">
+          <label className="text-[10px] font-mono uppercase theme-text-secondary">
             Select Existing Student to Replace
           </label>
           <select
             value={selectedOldStudent}
             onChange={(e) => setSelectedOldStudent(e.target.value)}
-            className="w-full bg-[#1c1d1f] border border-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-slate-600"
+            className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
           >
             <option value="">-- Choose Student --</option>
             {studentOptions.map((opt, i) => (
@@ -123,14 +121,14 @@ export default function StudentSavePanel({
 
       {/* Select Group */}
       <div className="space-y-1">
-        <label className="text-[10px] font-mono uppercase text-slate-500">
+        <label className="text-[10px] font-mono uppercase theme-text-secondary">
           Group / Course
         </label>
         <input
           type="text"
           value={selectedGroup}
           onChange={(e) => setSelectedGroup(e.target.value)}
-          className="w-full bg-[#1c1d1f] border border-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-slate-600"
+          className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
           placeholder="e.g. General Group"
           list="group-suggestions"
         />
@@ -148,7 +146,7 @@ export default function StudentSavePanel({
         <button
           type="button"
           onClick={handleSave}
-          className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs py-2 rounded-lg font-medium transition"
+          className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text text-xs py-2.5 rounded-lg font-semibold transition shadow"
         >
           Confirm & Save
         </button>

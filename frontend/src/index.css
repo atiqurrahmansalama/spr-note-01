@@ -1,27 +1,260 @@
 @import "tailwindcss";
 
-/* 🚀 Custom Dark Theme Scrollbars for entire web app, textareas & dropdowns */
+@layer base {
+  :root {
+    --bg-app: #121315;
+    --bg-surface: #1c1d1f;
+    --bg-surface-sub: #18191b;
+    --bg-elevated: #26282c;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.15);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-main: #6366f1;
+    --accent-soft: rgba(99, 102, 241, 0.12);
+    --accent-text: #ffffff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #17181a;
-  border-radius: 8px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgba(148, 163, 184, 0.4);
 }
 
-/* Firefox custom scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #334155 #17181a;
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom theme utility classes */
+.theme-bg-app {
+  background-color: var(--bg-app);
+}
+.theme-bg-surface {
+  background-color: var(--bg-surface);
+}
+.theme-bg-sub {
+  background-color: var(--bg-surface-sub);
+}
+.theme-bg-elevated {
+  background-color: var(--bg-elevated);
+}
+.theme-border {
+  border-color: var(--border-color);
+}
+.theme-text-primary {
+  color: var(--text-primary);
+}
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+.theme-accent {
+  color: var(--accent-main);
+}
+.theme-bg-accent {
+  background-color: var(--accent-main);
+}
+.theme-bg-accent-soft {
+  background-color: var(--accent-soft);
+}
+.theme-accent-text {
+  color: var(--accent-text);
+}
+
+/* 1. Enterprise Slate Theme */
+html[data-theme="slate"][data-mode="dark"] {
+  --bg-app: #121315;
+  --bg-surface: #1c1d1f;
+  --bg-surface-sub: #18191b;
+  --bg-elevated: #2d3036;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-main: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.12);
+  --accent-text: #ffffff;
+}
+html[data-theme="slate"][data-mode="light"] {
+  --bg-app: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #f8fafc;
+  --bg-elevated: #e2e8f0;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent-main: #4f46e5;
+  --accent-soft: rgba(79, 70, 229, 0.10);
+  --accent-text: #ffffff;
+}
+
+/* 2. Mono Theme (Softened Light-Grey & Sleek Charcoal-Grey) */
+html[data-theme="mono"][data-mode="dark"] {
+  --bg-app: #141416;
+  --bg-surface: #1e1e22;
+  --bg-surface-sub: #18181b;
+  --bg-elevated: #2a2a30;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --accent-main: #e4e4e7;
+  --accent-soft: rgba(228, 228, 231, 0.14);
+  --accent-text: #141416;
+}
+html[data-theme="mono"][data-mode="light"] {
+  --bg-app: #f4f4f6;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #eef0f3;
+  --bg-elevated: #e2e4e9;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --accent-main: #18181b;
+  --accent-soft: rgba(24, 24, 27, 0.08);
+  --accent-text: #ffffff;
+}
+
+/* 3. Midnight Cyber (Softened Pastel Sky Blue) */
+html[data-theme="midnight"][data-mode="dark"] {
+  --bg-app: #0b1120;
+  --bg-surface: #131b2e;
+  --bg-surface-sub: #0f1626;
+  --bg-elevated: #222f4c;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-main: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.12);
+  --accent-text: #0b1120;
+}
+html[data-theme="midnight"][data-mode="light"] {
+  --bg-app: #f0f9ff;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #f0f9ff;
+  --bg-elevated: #e0f2fe;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #0f172a;
+  --text-secondary: #0369a1;
+  --accent-main: #0284c7;
+  --accent-soft: rgba(2, 132, 199, 0.10);
+  --accent-text: #ffffff;
+}
+
+/* 4. Emerald Forest (Softened Pastel Mint) */
+html[data-theme="emerald"][data-mode="dark"] {
+  --bg-app: #0b1712;
+  --bg-surface: #13241b;
+  --bg-surface-sub: #0e1d16;
+  --bg-elevated: #244232;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #f0fdf4;
+  --text-secondary: #86efac;
+  --accent-main: #34d399;
+  --accent-soft: rgba(52, 211, 153, 0.12);
+  --accent-text: #064e3b;
+}
+html[data-theme="emerald"][data-mode="light"] {
+  --bg-app: #f0fdf4;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #f0fdf4;
+  --bg-elevated: #dcfce7;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #064e3b;
+  --text-secondary: #047857;
+  --accent-main: #059669;
+  --accent-soft: rgba(5, 150, 105, 0.10);
+  --accent-text: #ffffff;
+}
+
+/* 5. Royal Amethyst (Softened Pastel Lavender) */
+html[data-theme="violet"][data-mode="dark"] {
+  --bg-app: #110c21;
+  --bg-surface: #19132e;
+  --bg-surface-sub: #140e26;
+  --bg-elevated: #312454;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #faf5ff;
+  --text-secondary: #c084fc;
+  --accent-main: #c084fc;
+  --accent-soft: rgba(192, 132, 252, 0.12);
+  --accent-text: #110c21;
+}
+html[data-theme="violet"][data-mode="light"] {
+  --bg-app: #faf5ff;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #faf5ff;
+  --bg-elevated: #f3e8ff;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #4c1d95;
+  --text-secondary: #7e22ce;
+  --accent-main: #9333ea;
+  --accent-soft: rgba(147, 51, 234, 0.10);
+  --accent-text: #ffffff;
+}
+
+/* 6. Warm Amber (Softened Pastel Gold) */
+html[data-theme="amber"][data-mode="dark"] {
+  --bg-app: #17110a;
+  --bg-surface: #211910;
+  --bg-surface-sub: #1a130c;
+  --bg-elevated: #42301c;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #fffbeb;
+  --text-secondary: #fcd34d;
+  --accent-main: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.12);
+  --accent-text: #17110a;
+}
+html[data-theme="amber"][data-mode="light"] {
+  --bg-app: #fffbeb;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #fffbeb;
+  --bg-elevated: #fef3c7;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #78350f;
+  --text-secondary: #b45309;
+  --accent-main: #d97706;
+  --accent-soft: rgba(217, 119, 6, 0.10);
+  --accent-text: #ffffff;
 }

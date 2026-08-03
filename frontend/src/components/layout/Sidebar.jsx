@@ -1,38 +1,110 @@
 import { useState } from "react";
-import CalendarSettings from "./CalendarSettings";
-import SessionManager from "./SessionManager";
 import UserProfileCard from "./UserProfileCard";
-import ChevronIcon from "../ui/ChevronIcon"; // 🚀 কাস্টম SVG আইকন ইমপোর্ট
+import { 
+  DashboardIcon, 
+  AppearanceIcon, 
+  SettingsIcon, 
+  GroupsIcon, 
+  SessionsIcon, 
+  ShortcutsIcon, 
+  AppGuideIcon, 
+  AboutIcon,
+  ChevronIcon,
+  CalendarIcon,
+  CopyIcon,
+  CloudIcon,
+  GlobeIcon,
+  UsersIcon,
+  FolderIcon,
+  ClockIcon,
+  ChatIcon
+} from "../ui/Icons";
 
 export default function Sidebar({ 
   isOpen, 
   onClose, 
-  timeZone, 
-  setTimeZone, 
-  dateFormat, 
-  setDateFormat,
+  activeTab,
+  setActiveTab,
   isProfileOpen,
   setIsProfileOpen 
 }) {
-  const [activeTab, setActiveTab] = useState("Dashboard");
-  const [openSubMenu, setOpenSubMenu] = useState("Settings");
+  const [openSubMenus, setOpenSubMenus] = useState({
+    Settings: true, // Default expanded like sample image 2
+    Groups: false,
+    Sessions: false,
+  });
+
+  const toggleSubMenu = (menuName) => {
+    setOpenSubMenus((prev) => ({
+      ...prev,
+      [menuName]: !prev[menuName],
+    }));
+  };
 
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard" },
-    { id: "Profiles", name: "Profiles" },
-    { id: "Appearance", name: "Appearance" },
-    { id: "Settings", name: "Settings", hasSub: true },
-    { id: "Groups", name: "Groups & Students", hasSub: true },
-    { id: "Sessions", name: "Sessions & Comments", hasSub: true },
-    { id: "Shortcuts", name: "Shortcuts" },
-    { id: "AppGuide", name: "App Guide" },
-    { id: "About", name: "About" },
+    { 
+      id: "Dashboard", 
+      name: "Dashboard", 
+      Icon: DashboardIcon 
+    },
+    { 
+      id: "Appearance", 
+      name: "Appearance", 
+      Icon: AppearanceIcon 
+    },
+    { 
+      id: "Settings", 
+      name: "Settings", 
+      Icon: SettingsIcon, 
+      hasSub: true,
+      subItems: [
+        { id: "Date & Time", name: "Date & Time", Icon: CalendarIcon },
+        { id: "Copy Report Settings", name: "Copy Report Settings", Icon: CopyIcon },
+        { id: "Data & Backup", name: "Data & Backup", Icon: CloudIcon },
+        { id: "Language", name: "Language", Icon: GlobeIcon },
+      ]
+    },
+    { 
+      id: "Groups & Students", 
+      name: "Groups & Students", 
+      Icon: GroupsIcon, 
+      hasSub: true,
+      subItems: [
+        { id: "Student Directory", name: "Student Directory", Icon: UsersIcon },
+        { id: "Student Groups", name: "Student Groups", Icon: FolderIcon },
+      ]
+    },
+    { 
+      id: "Sessions & Comments", 
+      name: "Sessions & Comments", 
+      Icon: SessionsIcon, 
+      hasSub: true,
+      subItems: [
+        { id: "Sessions List", name: "Sessions List", Icon: ClockIcon },
+        { id: "Saved Comments", name: "Saved Comments", Icon: ChatIcon },
+      ]
+    },
+    { 
+      id: "Shortcuts", 
+      name: "Shortcuts", 
+      Icon: ShortcutsIcon 
+    },
+    { 
+      id: "App Guide", 
+      name: "App Guide", 
+      Icon: AppGuideIcon 
+    },
+    { 
+      id: "About", 
+      name: "About", 
+      Icon: AboutIcon 
+    },
   ];
 
-  const handleTabClick = (item) => {
-    setActiveTab(item.name);
-    if (item.hasSub) {
-      setOpenSubMenu(openSubMenu === item.name ? null : item.name);
+  const handleSelectTab = (tabName) => {
+    setActiveTab(tabName);
+    if (isOpen) {
+      onClose(); // Close mobile drawer on selection
     }
   };
 
@@ -43,71 +115,136 @@ export default function Sidebar({
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
-        ></div>
+        />
       )}
 
       {/* Responsive Sidebar Wrapper */}
       <aside
         className={`
-          fixed lg:static top-0 left-0 z-50 h-full w-72 bg-[#1c1d1f] text-slate-300 border-r border-slate-800 
-          shrink-0 flex flex-col justify-between shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out
+          fixed lg:static top-0 left-0 z-50 h-full w-72 theme-bg-surface theme-text-secondary border-r theme-border 
+          shrink-0 flex flex-col justify-between shadow-2xl lg:shadow-none transition-transform duration-200 ease-out
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        {/* Mobile Header with Close Cross */}
-        <div className="p-4 border-b border-slate-800 bg-[#18191b] flex justify-between items-center lg:hidden">
-          <span className="font-bold text-white text-sm">Navigation</span>
+        {/* Mobile Header */}
+        <div className="p-4 border-b theme-border theme-bg-sub flex justify-between items-center lg:hidden shrink-0">
+          <span className="font-bold theme-text-primary text-sm">Navigation</span>
           <button 
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 text-sm rounded-md"
+            className="theme-text-secondary hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
           >
             ✕
           </button>
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1 text-sm font-medium">
-          {menuItems.map((item) => (
-            <div key={item.id}>
+        {/* Navigation Menu List (Fixed overflow to prevent layout shift) */}
+        <nav 
+          className="flex-1 overflow-y-auto p-3 space-y-1.5 text-xs font-medium"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          {menuItems.map((item) => {
+            const isParentActive = activeTab === item.name;
+            const ItemIcon = item.Icon;
+            const isSubOpen = openSubMenus[item.id] || false;
+
+            if (item.hasSub) {
+              return (
+                <div key={item.id} className="space-y-1">
+                  {/* Parent Accordion Header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleSubMenu(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors cursor-pointer select-none ${
+                      isParentActive
+                        ? "theme-bg-elevated theme-text-primary font-semibold border theme-border"
+                        : "hover:theme-bg-sub theme-text-secondary"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-7 h-7 rounded-lg theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary shrink-0">
+                        <ItemIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate text-xs font-semibold">{item.name}</span>
+                    </div>
+
+                    <ChevronIcon 
+                      isOpen={isSubOpen} 
+                      className="w-3.5 h-3.5 theme-text-secondary shrink-0" 
+                    />
+                  </button>
+
+                  {/* Sub-items List (Matches Sample Image 2) */}
+                  {isSubOpen && (
+                    <div className="pl-4 space-y-1 pt-0.5 transition-all">
+                      {item.subItems.map((sub) => {
+                        const isSubActive = activeTab === sub.name;
+                        const SubIcon = sub.Icon;
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => handleSelectTab(sub.name)}
+                            className={`w-full relative flex items-center gap-3 px-3 py-2 rounded-xl transition-all cursor-pointer select-none ${
+                              isSubActive
+                                ? "theme-bg-elevated theme-text-primary font-bold border theme-border shadow-sm"
+                                : "hover:theme-bg-sub theme-text-secondary"
+                            }`}
+                          >
+                            {/* Left Active Indicator Bar (Matches Sample Image 2) */}
+                            {isSubActive && (
+                              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
+                            )}
+
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSubActive 
+                                ? "theme-bg-sub theme-text-primary border theme-border" 
+                                : "theme-bg-sub theme-text-secondary"
+                            }`}>
+                              <SubIcon className="w-3.5 h-3.5" />
+                            </div>
+
+                            <span className="truncate text-xs">{sub.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            {/* Standalone Item */}
+            const isActive = activeTab === item.name;
+            return (
               <button
-                onClick={() => handleTabClick(item)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all duration-150 ${
-                  activeTab === item.name
-                    ? "bg-slate-800 text-white font-semibold"
-                    : "hover:bg-slate-800/50 text-slate-400 hover:text-slate-200"
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectTab(item.name)}
+                className={`w-full relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors cursor-pointer select-none ${
+                  isActive
+                    ? "theme-bg-elevated theme-text-primary font-bold border theme-border shadow-sm"
+                    : "hover:theme-bg-sub theme-text-secondary"
                 }`}
               >
-                <span>{item.name}</span>
-                
-                {/* 🚀 ইমোজি সরিয়ে স্মুথ SVG তীরের আউটলাইন যুক্ত করা হলো */}
-                {item.hasSub && (
-                  <ChevronIcon 
-                    isOpen={openSubMenu === item.name} 
-                    className="w-3.5 h-3.5 text-slate-400"
-                  />
+                {/* Left Active Indicator Bar */}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
                 )}
+
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    isActive 
+                      ? "theme-bg-accent-soft theme-accent" 
+                      : "theme-bg-sub theme-text-secondary"
+                  }`}>
+                    <ItemIcon className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="truncate text-xs font-semibold">{item.name}</span>
+                </div>
               </button>
-
-              {/* Settings Sub-Menu */}
-              {item.name === "Settings" && openSubMenu === "Settings" && (
-                <div className="mt-1 pl-2">
-                  <CalendarSettings
-                    timeZone={timeZone}
-                    setTimeZone={setTimeZone}
-                    dateFormat={dateFormat}
-                    setDateFormat={setDateFormat}
-                  />
-                </div>
-              )}
-
-              {/* Sessions & Comments Sub-Menu */}
-              {item.name === "Sessions & Comments" && openSubMenu === "Sessions & Comments" && (
-                <div className="mt-1 pl-2">
-                  <SessionManager />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Minimal Clean Profile Card */}

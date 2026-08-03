@@ -12,7 +12,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
   const maxPage = getMaxPage(juzValue);
 
   return (
-    <div className="flex items-center bg-[#1c1d1f] rounded-lg border border-slate-700/50 overflow-hidden h-10 shadow-inner group focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 transition-all">
+    <div className="flex items-center theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 shrink-0">
       <NumberScrollInput
         id={`${range.id}-start`}
         value={range.start}
@@ -24,17 +24,17 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
           }
         }}
         onEmptyBackspace={(e) => {
-          // Focus previous input before deleting the range
           handleBackspaceFocusPrev(e, true);
           if (onRemove) onRemove();
         }}
         min={1}
         max={maxPage}
-        className="w-10 h-full text-sm text-slate-300 placeholder-slate-600 focus:bg-slate-800"
+        placeholder="--"
+        className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"
       />
-      <div className="w-px h-6 bg-slate-700/50 mx-1"></div>
-      <span className="text-slate-500 font-mono text-xs">-</span>
-      <div className="w-px h-6 bg-slate-700/50 mx-1"></div>
+      <div className="w-px h-5 sm:h-6 theme-border border-r mx-[2px] sm:mx-1"></div>
+      <span className="theme-text-secondary font-mono text-[11px] sm:text-xs">-</span>
+      <div className="w-px h-5 sm:h-6 theme-border border-r mx-[2px] sm:mx-1"></div>
       <NumberScrollInput
         value={range.end}
         onChange={(val) => onChange({ ...range, end: val })}
@@ -52,12 +52,12 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
           }
         }}
         onEmptyBackspace={(e) => {
-          // Focus previous input (start)
           handleBackspaceFocusPrev(e, true);
         }}
         min={range.start ? parseInt(range.start, 10) : 1}
         max={maxPage}
-        className="w-10 h-full text-sm text-slate-300 placeholder-slate-600 focus:bg-slate-800"
+        placeholder="--"
+        className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"
       />
     </div>
   );

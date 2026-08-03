@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { formatDate } from "../../../utils/reportGenerator";
 
 export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportData, includeGroup }, ref) {
   const {
@@ -13,24 +14,7 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportDat
   } = reportData || {};
 
   // 1. Date Formatting
-  let formattedDate = "";
-  if (selectedDate) {
-    const d = new Date(selectedDate);
-    if (!isNaN(d.getTime())) {
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const year = d.getFullYear();
-      formattedDate = `${month}/${day}/${year}`;
-    } else {
-      formattedDate = selectedDate;
-    }
-  } else {
-    const d = new Date();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const year = d.getFullYear();
-    formattedDate = `${month}/${day}/${year}`;
-  }
+  const formattedDate = formatDate(selectedDate);
 
   // 2. Extract Juz & Page Ranges
   const juzMap = new Map();

@@ -6,7 +6,7 @@ export default function NumberScrollInput({
   onChange, 
   min = 1, 
   max, 
-  placeholder = "-", 
+  placeholder = "--", 
   className = "",
   onEnter,
   onEmptyBackspace,
@@ -14,13 +14,6 @@ export default function NumberScrollInput({
   id
 }) {
   const inputRef = useRef(null);
-
-  const handleWheel = (e) => {
-    // Removed focus check to allow scrolling on hover
-    e.preventDefault();
-    const step = e.deltaY < 0 ? 1 : -1;
-    updateValue(step);
-  };
 
   const handleKeyDown = (e) => {
     if (e.key === "ArrowUp") {
@@ -76,14 +69,13 @@ export default function NumberScrollInput({
       return;
     }
     
-    // Only allow typing numbers. We don't clamp min/max here to allow user to type freely (e.g. typing "12" when min is "11")
     let num = parseInt(val, 10);
     if (!isNaN(num)) {
       onChange(num.toString());
     }
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = () => {
     if (value === "") return;
     
     let current = parseInt(value, 10);
@@ -105,11 +97,30 @@ export default function NumberScrollInput({
 
   useEffect(() => {
     const inputEl = inputRef.current;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 1 : -1;
+      let current = parseInt(value, 10);
+      if (isNaN(current)) {
+        current = step > 0 ? min : max;
+      } else {
+        current += step;
+      }
+
+      if (current < min) {
+        current = max !== undefined ? max : min;
+      } else if (max !== undefined && current > max) {
+        current = min;
+      }
+
+      onChange(current.toString());
+    };
+
     if (inputEl) {
-      inputEl.addEventListener("wheel", handleWheel, { passive: false });
-      return () => inputEl.removeEventListener("wheel", handleWheel);
+      inputEl.addEventListener("wheel", onWheel, { passive: false });
+      return () => inputEl.removeEventListener("wheel", onWheel);
     }
-  }, [value, max, min]);
+  }, [value, max, min, onChange]);
 
   return (
     <input
@@ -121,7 +132,7 @@ export default function NumberScrollInput({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      className={`bg-transparent border-none outline-none text-center font-mono rounded transition-all ${className}`}
+      className={`bg-transparent focus:theme-bg-elevated border-none outline-none text-center font-mono rounded transition-all placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent focus:placeholder:opacity-0 ${className}`}
       inputMode="numeric"
     />
   );

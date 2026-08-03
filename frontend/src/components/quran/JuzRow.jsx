@@ -38,7 +38,6 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
     });
   };
 
-  // Calculate total pages for this row
   const totalPages = rowData.ranges.reduce((sum, range) => {
     const start = parseInt(range.start, 10);
     const end = parseInt(range.end, 10);
@@ -49,19 +48,21 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
   }, 0);
 
   return (
-    <div className="flex items-center justify-between gap-4 w-full">
-      {/* Label (only shown on first row) */}
-      <div className="w-20 shrink-0">
-        {showLabel && (
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block whitespace-nowrap">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 w-full">
+      {/* Label or Empty Spacer of exact same width */}
+      <div className="w-full sm:w-20 shrink-0 mb-3.5 sm:mb-0">
+        {showLabel ? (
+          <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary block whitespace-nowrap">
             JUZ / PAGE
           </label>
+        ) : (
+          <div className="hidden sm:block h-4" />
         )}
       </div>
 
-      <div className="flex items-center gap-3 flex-1">
+      <div className="flex items-center gap-1.5 sm:gap-3 flex-1 w-full min-w-0">
         {/* Juz Input */}
-        <div className="bg-[#1c1d1f] rounded-lg border border-slate-700/50 overflow-hidden h-10 w-16 shadow-inner shrink-0 focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 transition-all">
+        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-12 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 mr-2 sm:mr-3.5">
           <NumberScrollInput
             value={rowData.juz}
             onChange={handleJuzChange}
@@ -72,17 +73,17 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
             }}
             min={1}
             max={QURAN_CONSTANTS.MAX_JUZ}
-            placeholder="Juz"
-            className="w-full h-full text-sm text-slate-300 font-semibold focus:bg-slate-800"
+            placeholder="--"
+            className="w-full h-full text-xs sm:text-sm theme-text-primary font-semibold"
           />
         </div>
 
-        {/* Page Ranges & Actions - Wraps after ~2 ranges */}
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-3 max-w-[300px]">
+        {/* Page Ranges & Actions - Side-by-side flex row */}
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-2 flex-1 min-w-0">
           {rowData.ranges.map((range, idx) => {
             const isLast = idx === rowData.ranges.length - 1;
             return (
-              <div key={range.id} className="flex items-center gap-1">
+              <div key={range.id} className="flex items-center gap-1 shrink-0">
                 <PageRangeInput
                   range={range}
                   onChange={(newR) => handleRangeChange(idx, newR)}
@@ -91,25 +92,24 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
                   isLast={isLast}
                   onAddNextRange={addRange}
                 />
-                {/* Slash at the end of the line if there is a next range */}
-                {!isLast && <span className="text-slate-600 font-mono text-sm px-0.5 text-center">/</span>}
+                {!isLast && <span className="theme-text-secondary font-mono text-xs sm:text-sm px-0.5 text-center shrink-0">/</span>}
               </div>
             );
           })}
 
-          {/* Action Buttons & Badge Group (Always together on one line) */}
-          <div className="flex items-center gap-1 ml-2 shrink-0 whitespace-nowrap">
+          {/* Action Buttons & Badge Group */}
+          <div className="flex items-center gap-1 ml-0.5 sm:ml-1 shrink-0 whitespace-nowrap">
             <button
               onClick={addRange}
-              className="w-6 h-6 text-sm rounded-full border border-slate-700/80 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:border-slate-500 hover:bg-slate-800 transition-all shrink-0"
+              className="w-6 h-6 text-sm rounded-full border theme-border flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-all shrink-0 cursor-pointer"
               title="Add Page Range"
             >
               +
             </button>
 
             {totalPages > 0 && (
-              <div className="px-3 py-1 ml-1 rounded-md bg-[#1f2125] border border-slate-800 text-xs font-medium text-slate-400 shadow-sm shrink-0">
-                {totalPages} pages
+              <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 ml-0.5 rounded-md theme-bg-sub text-[11px] sm:text-xs font-medium theme-text-secondary shrink-0">
+                {totalPages} p
               </div>
             )}
           </div>

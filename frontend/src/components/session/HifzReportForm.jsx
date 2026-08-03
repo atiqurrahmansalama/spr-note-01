@@ -3,11 +3,12 @@ import HeaderDateControl from "./HeaderDateControl";
 import SessionInput from "./SessionInput";
 import ReportModal from "./ReportModal";
 import { useReportForm } from "./useReportForm";
-import { generateReportText } from "../../utils/reportGenerator";
 import { useToast } from "../../context/ToastContext";
+import { useFont } from "../../context/useFont";
 
 export default function HifzReportForm({ timeZone, dateFormat }) {
   const { showToast } = useToast();
+  const { activeFont, activeFontSize } = useFont();
 
   const {
     selectedDate,
@@ -41,7 +42,6 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
   } = useReportForm();
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [reportText, setReportText] = useState("");
 
   const handleMakeReportClick = () => {
     if (!studentName.trim()) {
@@ -49,34 +49,25 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
       return;
     }
 
-    const text = generateReportText({
-      studentName,
-      groupName,
-      selectedSession,
-      selectedDate,
-      juzPageData,
-      mistakeData,
-      stuckData,
-      comment,
-    });
-
-    setReportText(text);
     setIsReportModalOpen(true);
   };
 
   if (isLoading) {
     return (
-      <div className="text-center py-12 text-slate-500 text-xs font-mono">
+      <div className="text-center py-12 theme-text-secondary text-xs font-mono">
         Connecting to Backend Database...
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-xl mx-auto space-y-4 pb-12 font-sans text-slate-200 relative">
-      {/* 1. Header Card */}
-      <div className="bg-[#212327] rounded-2xl p-6 text-center shadow-lg space-y-3 relative z-10">
-        <h1 className="text-2xl font-serif font-bold text-slate-100 tracking-wide">
+    <div 
+      style={{ fontFamily: activeFont.css, fontSize: activeFontSize.px }} 
+      className="w-full max-w-xl mx-auto space-y-5 pb-12 theme-text-primary relative transition-all"
+    >
+      {/* 1. Header Card (Clean & Minimal with Dynamic Theme) */}
+      <div className="theme-bg-surface rounded-2xl p-4 sm:p-5 text-center shadow-lg space-y-1.5 sm:space-y-2 relative z-10 border theme-border">
+        <h1 className="text-lg sm:text-2xl font-bold theme-text-primary tracking-wide">
           Hifz Daily Progress Report
         </h1>
         <HeaderDateControl
