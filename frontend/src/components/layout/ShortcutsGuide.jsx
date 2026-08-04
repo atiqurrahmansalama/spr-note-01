@@ -17,6 +17,8 @@ export default function ShortcutsGuide() {
   const submitShortcuts = [
     { key: "Ctrl + S / Cmd + S", desc: "Make Report (Open formatted preview modal & export report)" },
     { key: "Alt + S / Ctrl + Enter", desc: "Add Record (Save current report entry directly to record log)" },
+    { key: "Ctrl + Z / Cmd + Z", desc: "Undo Form Changes (Restore previous draft state)" },
+    { key: "Alt + Ctrl + Z / Ctrl + Shift + Z", desc: "Redo Form Changes (Restore next redone state)" },
   ];
 
   const themeShortcuts = [

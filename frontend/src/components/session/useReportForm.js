@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
 import { 
@@ -48,6 +48,90 @@ export function useReportForm() {
   const [availableGroups, setAvailableGroups] = useState([]);
   const [sessionList, setSessionList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ↩️ Undo / Redo History Stack Management
+  const historyStackRef = useRef([]);
+  const redoStackRef = useRef([]);
+  const isRestoringRef = useRef(false);
+
+  const captureSnapshot = useCallback(() => {
+    return JSON.stringify({
+      studentName,
+      groupName,
+      selectedSession,
+      juzPageData,
+      mistakeData,
+      stuckData,
+      comment,
+    });
+  }, [studentName, groupName, selectedSession, juzPageData, mistakeData, stuckData, comment]);
+
+  useEffect(() => {
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      return;
+    }
+    const snap = captureSnapshot();
+    const stack = historyStackRef.current;
+    if (stack.length === 0 || stack[stack.length - 1] !== snap) {
+      stack.push(snap);
+      if (stack.length > 35) stack.shift();
+      redoStackRef.current = [];
+    }
+  }, [captureSnapshot]);
+
+  const handleUndo = useCallback(() => {
+    const stack = historyStackRef.current;
+    if (stack.length <= 1) {
+      showToast("Nothing to undo", "info");
+      return;
+    }
+    const currentSnap = stack.pop();
+    redoStackRef.current.push(currentSnap);
+
+    const prevSnapStr = stack[stack.length - 1];
+    if (prevSnapStr) {
+      try {
+        const data = JSON.parse(prevSnapStr);
+        isRestoringRef.current = true;
+        setStudentName(data.studentName || "");
+        setGroupName(data.groupName || "");
+        setSelectedSession(data.selectedSession || "");
+        if (data.juzPageData) setJuzPageData(data.juzPageData);
+        if (data.mistakeData) setMistakeData(data.mistakeData);
+        if (data.stuckData) setStuckData(data.stuckData);
+        setComment(data.comment || "");
+        showToast("Undo: Restored previous draft state", "info");
+      } catch (err) {
+        console.error("Undo restore failed", err);
+      }
+    }
+  }, [showToast]);
+
+  const handleRedo = useCallback(() => {
+    const rStack = redoStackRef.current;
+    if (rStack.length === 0) {
+      showToast("Nothing to redo", "info");
+      return;
+    }
+    const nextSnapStr = rStack.pop();
+    historyStackRef.current.push(nextSnapStr);
+
+    try {
+      const data = JSON.parse(nextSnapStr);
+      isRestoringRef.current = true;
+      setStudentName(data.studentName || "");
+      setGroupName(data.groupName || "");
+      setSelectedSession(data.selectedSession || "");
+      if (data.juzPageData) setJuzPageData(data.juzPageData);
+      if (data.mistakeData) setMistakeData(data.mistakeData);
+      if (data.stuckData) setStuckData(data.stuckData);
+      setComment(data.comment || "");
+      showToast("Redo: Restored next draft state", "info");
+    } catch (err) {
+      console.error("Redo restore failed", err);
+    }
+  }, [showToast]);
   const [isOffline, setIsOffline] = useState(!isOnline());
 
   // 📝 Unsaved Draft state detection on mount
@@ -397,5 +481,7 @@ export function useReportForm() {
     handleSaveSession,
     handleSaveRecord,
     handleMakeReport,
+    handleUndo,
+    handleRedo,
   };
 }

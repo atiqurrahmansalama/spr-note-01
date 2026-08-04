@@ -44,9 +44,35 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     handleSaveResult,
     handleSaveSession,
     handleSaveRecord,
+    handleUndo,
+    handleRedo,
   } = useReportForm();
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // 🎹 Global Undo & Redo Keyboard Listener (Ctrl+Z, Ctrl+Shift+Z, Alt+Ctrl+Z, Ctrl+Y)
+  useEffect(() => {
+    const handleUndoRedoKeys = (e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl) return;
+
+      const key = e.key.toLowerCase();
+
+      // Undo: Ctrl + Z (without Shift or Alt)
+      if (key === "z" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      // Redo: Ctrl + Shift + Z OR Alt + Ctrl + Z OR Ctrl + Y
+      else if ((key === "z" && (e.shiftKey || e.altKey)) || key === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleUndoRedoKeys);
+    return () => window.removeEventListener("keydown", handleUndoRedoKeys);
+  }, [handleUndo, handleRedo]);
 
   useEffect(() => {
     if (!isLoading) {

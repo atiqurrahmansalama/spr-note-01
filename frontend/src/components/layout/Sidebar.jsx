@@ -1,6 +1,6 @@
 import { useState } from "react";
 import UserProfileCard from "./UserProfileCard";
-import { sidebarSettings } from "../../utils/localStore";
+import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../constants/version";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -139,7 +139,7 @@ export default function Sidebar({
                 Navigation
               </span>
               <span className="text-[10px] theme-text-secondary font-mono theme-bg-elevated px-1.5 py-0.5 rounded border theme-border">
-                v1.93.0
+                {APP_VERSION}
               </span>
             </div>
           )}
