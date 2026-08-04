@@ -83,32 +83,32 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     >
       {/* 0. Draft Recovery Notification Banner */}
       {draftInfo && (
-        <div className="w-full theme-bg-sub border theme-border rounded-xl p-3 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in border-l-4 border-l-[var(--accent-main)]">
-          <div className="flex items-center gap-2.5 min-w-0 text-left">
+        <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in border-l-4 border-l-[var(--accent-main)] select-none">
+          <div className="flex items-center gap-2 min-w-0 text-left">
             <div className="p-1.5 theme-bg-accent-soft rounded-lg theme-accent shrink-0">
               <ClockIcon className="w-4 h-4" />
             </div>
-            <div className="text-xs font-medium theme-text-primary truncate">
-              You have an unsaved report draft from{" "}
+            <div className="text-xs font-semibold theme-text-primary truncate">
+              Unsaved draft from{" "}
               <span className="font-bold theme-accent">
-                {draftInfo.savedAtTime ? `${draftInfo.savedAtTime} (${draftInfo.savedAtDate || ''})` : "earlier session"}
+                {draftInfo.savedAtTime || "session"}
               </span>
-              . Would you like to recover it?
+              . Recover?
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={recoverDraft}
-              className="theme-bg-accent hover:opacity-90 theme-accent-text text-xs px-3 py-1 rounded-lg font-semibold transition shadow cursor-pointer"
+              className="theme-bg-accent hover:opacity-90 theme-accent-text text-xs px-2.5 py-1 rounded-lg font-semibold transition shadow cursor-pointer"
             >
               Recover
             </button>
             <button
               type="button"
               onClick={discardDraft}
-              className="theme-text-secondary hover:theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer"
+              className="theme-text-secondary hover:theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border text-xs px-2 py-1 rounded-lg font-medium transition cursor-pointer"
             >
               Discard
             </button>

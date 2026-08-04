@@ -112,19 +112,24 @@ export default function NumberScrollInput({
       e.preventDefault();
       const step = e.deltaY < 0 ? 1 : -1;
       let current = parseInt(value, 10);
+      const safeMin = min !== undefined ? min : 1;
+      const safeMax = max;
+
       if (isNaN(current)) {
-        current = step > 0 ? min : max;
+        current = step > 0 ? safeMin : (safeMax !== undefined ? safeMax : safeMin);
       } else {
         current += step;
       }
 
-      if (current < min) {
-        current = max !== undefined ? max : min;
-      } else if (max !== undefined && current > max) {
-        current = min;
+      if (current < safeMin) {
+        current = safeMax !== undefined ? safeMax : safeMin;
+      } else if (safeMax !== undefined && current > safeMax) {
+        current = safeMin;
       }
 
-      onChange(current.toString());
+      if (current !== undefined && current !== null && !isNaN(current)) {
+        onChange(current.toString());
+      }
     };
 
     if (inputEl) {

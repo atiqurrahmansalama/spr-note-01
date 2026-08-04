@@ -145,10 +145,10 @@ export default function DetailRow({
   };
 
   const hasJuz = availableJuzs && availableJuzs.length > 1;
-  // Line 1: on mobile multi-Juz: 1 (to leave ample room and prevent overlap with x button); on mobile single-Juz: 3; on desktop: 3 or 4
+  // Line 1: on mobile multi-Juz: 1 (keeps 1 Ayah box on line 1 and prevents overlap with x button); on mobile single-Juz: 3; on desktop: 3 or 4
   const line1Max = isMobile ? (hasJuz ? 1 : 3) : (hasJuz ? 3 : 4);
-  // Extra lines (mobile multi-Juz only): 4 per line aligned under the Page box
-  const extraLineMax = 4;
+  // Extra lines (mobile multi-Juz only): 3 per line aligned under the Page box (prevents right-side overflow on narrow screens)
+  const extraLineMax = 3;
 
   // Group ayahs: first chunk uses line1Max, subsequent chunks use extraLineMax if mobile+multiJuz
   const ayahChunks = [];
@@ -162,7 +162,7 @@ export default function DetailRow({
     i += chunkSize;
   }
 
-  // On Mobile when multiple Juzs exist, extra Ayah rows (Line 2+) align EXACTLY under the 1st Ayah Box
+  // On Mobile when multiple Juzs exist, extra Ayah rows (Line 2+) align EXACTLY under the Page Box
   const isMobileMultiJuzExtraRows = isMobile && hasJuz && ayahChunks.length > 1;
   const line1Chunk = ayahChunks[0] || { items: [], startIndex: 0 };
   const extraChunks = isMobileMultiJuzExtraRows ? ayahChunks.slice(1) : [];
@@ -197,7 +197,7 @@ export default function DetailRow({
 
       {/* Main Row Content */}
       <div className="flex flex-col gap-2.5 sm:gap-3 flex-1 min-w-0">
-        {/* Line 1: Juz + Page + Ayah label + Ayahs */}
+        {/* Line 1: Juz + Page + Ayah label + 1 Ayah box */}
         <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0 flex-nowrap">
           {/* Left Side: Juz Dropdown (if any) & Page Input */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -235,7 +235,7 @@ export default function DetailRow({
             </div>
           </div>
 
-          {/* Right Side: Ayah Label + Ayah Rows */}
+          {/* Right Side: Ayah Label + Line 1 Ayah Chunk */}
           <div className="flex items-start gap-1 sm:gap-1.5 shrink-0">
             <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary shrink-0 h-[38px] sm:h-10 flex items-center select-none">Ayah</label>
 

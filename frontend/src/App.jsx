@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { calendarSettings, auth as authStore, saveStatusStore } from "./utils/localStore";
+import { calendarSettings, sidebarSettings, auth as authStore, saveStatusStore } from "./utils/localStore";
 import Sidebar from "./components/layout/Sidebar";
 import UserProfileDrawer from "./components/layout/UserProfileDrawer";
 import HifzReportForm from "./components/session/HifzReportForm";
@@ -15,6 +15,7 @@ import AppGuideView from "./components/layout/AppGuideView";
 import AboutAppView from "./components/layout/AboutAppView";
 import StudentDirectoryView from "./components/layout/StudentDirectoryView";
 import { useTheme } from "./context/useTheme";
+import { useToast } from "./context/ToastContext";
 import { SleekCheckIcon, CloudCheckIcon } from "./components/ui/Icons";
 
 function SaveStatusBadge() {
@@ -64,7 +65,9 @@ function SaveStatusBadge() {
 }
 
 export default function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { showToast } = useToast();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [sidebarMode, setSidebarMode] = useState(() => sidebarSettings.getMode());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const themeContext = useTheme();
@@ -76,6 +79,37 @@ export default function App() {
   // 💾 পরিবর্তন হলে LocalStorage-এ সেভ করো
   useEffect(() => { calendarSettings.saveTimezone(timeZone); }, [timeZone]);
   useEffect(() => { calendarSettings.saveDateFormat(dateFormat); }, [dateFormat]);
+
+  const lastBackTimeRef = useRef(0);
+
+  // 📱 Mobile Back Swipe & Back Button Listener
+  useEffect(() => {
+    window.history.pushState({ sprApp: true, tab: activeTab }, "");
+
+    const handlePopState = () => {
+      // 1. If currently inside a sub-screen (not Dashboard), return to Dashboard!
+      if (activeTab !== "Dashboard") {
+        setActiveTab("Dashboard");
+        window.history.pushState({ sprApp: true, tab: "Dashboard" }, "");
+        return;
+      }
+
+      // 2. If currently on Dashboard (main form):
+      const now = Date.now();
+      if (now - lastBackTimeRef.current < 2500) {
+        // Double back swipe within 2.5s: allow exit
+        window.history.back();
+      } else {
+        // First back swipe: block exit, show toast alert & push dummy state back
+        lastBackTimeRef.current = now;
+        window.history.pushState({ sprApp: true, tab: "Dashboard" }, "");
+        showToast("Press back again to exit", "info");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [activeTab, showToast]);
 
   // 🎹 Global Keyboard Shortcuts Listener
   useEffect(() => {
@@ -257,29 +291,58 @@ export default function App() {
     }
   };
 
+  const handleToggleMenu = () => {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      setIsSidebarOpen((prev) => !prev);
+      setSidebarMode("overlay");
+    } else {
+      if (!isSidebarOpen) {
+        setIsSidebarOpen(true);
+        setSidebarMode("inline");
+        sidebarSettings.saveMode("inline");
+      } else if (sidebarMode === "inline") {
+        setSidebarMode("collapsed");
+        sidebarSettings.saveMode("collapsed");
+      } else if (sidebarMode === "collapsed") {
+        setSidebarMode("overlay");
+        sidebarSettings.saveMode("overlay");
+      } else {
+        setSidebarMode("inline");
+        sidebarSettings.saveMode("inline");
+      }
+    }
+  };
+
+  const getMenuTooltip = () => {
+    if (!isSidebarOpen) return "Open Navigation Sidebar (Inline Mode)";
+    if (sidebarMode === "inline") return "Current: Inline Mode (Click for Icon Rail Mode)";
+    if (sidebarMode === "collapsed") return "Current: Icon Rail Mode (Click for Full Overlay Mode)";
+    return "Current: Full Overlay Mode (Click for Inline Mode)";
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden theme-bg-app theme-text-primary">
       
       {/* Global Top Navigation Bar */}
-      <header className="theme-bg-surface border-b theme-border px-4 py-3 flex justify-between items-center z-30 shadow-md shrink-0">
+      <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 select-none">
         <div className="flex items-center gap-3">
+          {/* Menu Button (Icon only, cycles through modes on click) */}
           <button 
             type="button"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="theme-text-secondary hover:theme-text-primary px-2.5 py-1.5 rounded-lg border theme-border theme-bg-sub hover:theme-bg-elevated text-xs font-medium transition flex items-center gap-2 cursor-pointer"
-            title="Toggle Left Menu"
+            onClick={handleToggleMenu}
+            className="w-9 h-9 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-primary text-lg font-bold transition flex items-center justify-center cursor-pointer shadow-sm hover:border-[var(--accent-main)]/50 active:scale-95"
+            title={getMenuTooltip()}
           >
             <span>☰</span>
-            <span className="hidden sm:inline">Menu</span>
           </button>
           
           <button 
             type="button"
             onClick={() => setActiveTab("Dashboard")}
-            className="flex items-center gap-2 cursor-pointer text-left"
+            className="flex items-center gap-2 cursor-pointer text-left group"
           >
-            <span className="font-bold theme-text-primary text-base tracking-wide">SPR Note</span>
-            <span className="text-[10px] theme-text-secondary font-mono theme-bg-sub px-1.5 py-0.5 rounded border theme-border hidden sm:inline-block">v1.93.0</span>
+            <span className="font-bold theme-text-primary text-lg tracking-wide group-hover:theme-accent transition-colors">SPR Note</span>
           </button>
         </div>
 
@@ -287,17 +350,21 @@ export default function App() {
         <div className="flex items-center gap-3">
           <SaveStatusBadge />
 
-          {/* Right Top User Profile Button */}
+          {/* Right Top Premium User Profile Button */}
           {user ? (
             <button 
               type="button"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex items-center gap-2.5 theme-bg-sub hover:theme-bg-elevated border theme-border px-3 py-1.5 rounded-xl transition text-left cursor-pointer"
+              className="flex items-center gap-2.5 theme-bg-sub hover:theme-bg-elevated border theme-border hover:border-[var(--accent-main)]/50 px-2.5 py-1.5 rounded-xl transition-all text-left cursor-pointer shadow-sm active:scale-95 group"
+              title="View User Profile"
             >
-              <div className="w-6 h-6 rounded-md theme-bg-elevated border theme-border text-xs theme-accent font-bold flex items-center justify-center">
-                {avatarChar}
+              <div className="relative">
+                <div className="w-7 h-7 rounded-lg theme-bg-accent theme-accent-text text-xs font-bold flex items-center justify-center shadow-sm group-hover:opacity-90">
+                  {avatarChar}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[var(--bg-surface)]" />
               </div>
-              <span className="text-xs font-semibold theme-text-primary hidden md:inline truncate max-w-30">
+              <span className="text-xs font-semibold theme-text-primary hidden md:inline truncate max-w-28">
                 {user.first_name ? `${user.first_name}` : user.username}
               </span>
             </button>
@@ -321,6 +388,8 @@ export default function App() {
           onClose={() => setIsSidebarOpen(false)}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          sidebarMode={sidebarMode}
+          setSidebarMode={setSidebarMode}
           isProfileOpen={isProfileOpen}
           setIsProfileOpen={setIsProfileOpen}
         />

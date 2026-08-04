@@ -307,6 +307,13 @@ export const copyReportSettings = {
   saveAutoCopy:      (v) => writeString(KEYS.COPY_AUTO, v.toString()),
 };
 
+// ─── Sidebar Display Mode Settings ─────────────────────────────────────────
+
+export const sidebarSettings = {
+  getMode: () => readString("spr_sidebar_mode", "inline"),
+  saveMode: (v) => writeString("spr_sidebar_mode", v),
+};
+
 // ─── Network Utility ────────────────────────────────────────────────────────
 
 /** true হলে ব্রাউজার অনলাইন বলছে */

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import UserProfileCard from "./UserProfileCard";
+import { sidebarSettings } from "../../utils/localStore";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -13,11 +14,7 @@ import {
   CalendarIcon,
   CopyIcon,
   CloudIcon,
-  GlobeIcon,
-  UsersIcon,
-  FolderIcon,
-  ClockIcon,
-  ChatIcon
+  GlobeIcon
 } from "../ui/Icons";
 
 export default function Sidebar({ 
@@ -25,11 +22,13 @@ export default function Sidebar({
   onClose, 
   activeTab,
   setActiveTab,
+  sidebarMode = "inline",
+  setSidebarMode,
   isProfileOpen,
   setIsProfileOpen 
 }) {
   const [openSubMenus, setOpenSubMenus] = useState({
-    Settings: true, // Default expanded like sample image 2
+    Settings: true,
     Groups: false,
     Sessions: false,
   });
@@ -97,47 +96,69 @@ export default function Sidebar({
 
   const handleSelectTab = (tabName) => {
     setActiveTab(tabName);
-    if (isOpen) {
-      onClose(); // Close mobile drawer on selection
+    if (sidebarMode === "overlay" && isOpen) {
+      onClose(); // Close overlay drawer on selection
     }
   };
 
+  if (!isOpen) return null;
+
+  const isCollapsed = sidebarMode === "collapsed";
+  const isOverlay = sidebarMode === "overlay";
+
+  const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
+
+  const displayMenuItems = menuItems.filter((item) => {
+    if (isMobileScreen && item.id === "Shortcuts") return false;
+    return true;
+  });
+
   return (
     <>
-      {/* Mobile Overlay Layer */}
-      {isOpen && (
+      {/* Screen Blocking Backdrop (Overlay Mode ONLY) */}
+      {isOverlay && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-fade-in"
           onClick={onClose}
         />
       )}
 
-      {/* Responsive Sidebar Wrapper */}
+      {/* Sidebar Container */}
       <aside
         className={`
-          fixed lg:static top-0 left-0 z-50 h-full w-72 theme-bg-surface theme-text-secondary border-r theme-border 
-          shrink-0 flex flex-col justify-between shadow-2xl lg:shadow-none transition-transform duration-200 ease-out
-          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full shadow-none"}
+          ${isCollapsed ? "w-16 sm:w-16" : "w-72 sm:w-72"}
+          theme-bg-surface theme-text-secondary border-r theme-border shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
         `}
       >
-        {/* Mobile Header */}
-        <div className="p-4 border-b theme-border theme-bg-sub flex justify-between items-center lg:hidden shrink-0">
-          <span className="font-bold theme-text-primary text-sm">Navigation</span>
+        {/* Clean Sidebar Header */}
+        <div className="p-3 border-b theme-border theme-bg-sub flex items-center justify-between shrink-0 select-none">
+          {!isCollapsed && (
+            <div className="flex items-center gap-2">
+              <span className="font-bold theme-text-primary text-xs tracking-wide">
+                Navigation
+              </span>
+              <span className="text-[10px] theme-text-secondary font-mono theme-bg-elevated px-1.5 py-0.5 rounded border theme-border">
+                v1.93.0
+              </span>
+            </div>
+          )}
           <button 
             type="button"
             onClick={onClose}
-            className="theme-text-secondary hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+            className="theme-text-secondary hover:text-red-400 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ml-auto"
+            title="Close Sidebar"
           >
             ✕
           </button>
         </div>
 
-        {/* Navigation Menu List (Fixed overflow to prevent layout shift) */}
+        {/* Navigation Menu List */}
         <nav 
-          className="flex-1 overflow-y-auto p-3 space-y-1.5 text-xs font-medium"
+          className={`flex-1 overflow-y-auto ${isCollapsed ? "p-1.5 space-y-2" : "p-3 space-y-1.5"} text-xs font-medium`}
           style={{ scrollbarGutter: "stable" }}
         >
-          {menuItems.map((item) => {
+          {displayMenuItems.map((item) => {
             const isParentActive = activeTab === item.name;
             const ItemIcon = item.Icon;
             const isSubOpen = openSubMenus[item.id] || false;
@@ -145,11 +166,17 @@ export default function Sidebar({
             if (item.hasSub) {
               return (
                 <div key={item.id} className="space-y-1">
-                  {/* Parent Accordion Header */}
                   <button
                     type="button"
-                    onClick={() => toggleSubMenu(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors cursor-pointer select-none ${
+                    onClick={() => {
+                      if (isCollapsed) {
+                        handleSelectTab(item.subItems[0].name);
+                      } else {
+                        toggleSubMenu(item.id);
+                      }
+                    }}
+                    title={item.name}
+                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2.5"} rounded-xl transition-colors cursor-pointer select-none ${
                       isParentActive
                         ? "theme-bg-elevated theme-text-primary font-semibold border theme-border"
                         : "hover:theme-bg-sub theme-text-secondary"
@@ -159,17 +186,19 @@ export default function Sidebar({
                       <div className="w-7 h-7 rounded-lg theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary shrink-0">
                         <ItemIcon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="truncate text-xs font-semibold">{item.name}</span>
+                      {!isCollapsed && <span className="truncate text-xs font-semibold">{item.name}</span>}
                     </div>
 
-                    <ChevronIcon 
-                      isOpen={isSubOpen} 
-                      className="w-3.5 h-3.5 theme-text-secondary shrink-0" 
-                    />
+                    {!isCollapsed && (
+                      <ChevronIcon 
+                        isOpen={isSubOpen} 
+                        className="w-3.5 h-3.5 theme-text-secondary shrink-0" 
+                      />
+                    )}
                   </button>
 
-                  {/* Sub-items List (Matches Sample Image 2) */}
-                  {isSubOpen && (
+                  {/* Sub-items List (Only when NOT collapsed) */}
+                  {!isCollapsed && isSubOpen && (
                     <div className="pl-4 space-y-1 pt-0.5 transition-all">
                       {item.subItems.map((sub) => {
                         const isSubActive = activeTab === sub.name;
@@ -185,7 +214,6 @@ export default function Sidebar({
                                 : "hover:theme-bg-sub theme-text-secondary"
                             }`}
                           >
-                            {/* Left Active Indicator Bar (Matches Sample Image 2) */}
                             {isSubActive && (
                               <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
                             )}
@@ -215,14 +243,14 @@ export default function Sidebar({
                 key={item.id}
                 type="button"
                 onClick={() => handleSelectTab(item.name)}
-                className={`w-full relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors cursor-pointer select-none ${
+                title={item.name}
+                className={`w-full relative flex items-center ${isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2.5"} rounded-xl transition-colors cursor-pointer select-none ${
                   isActive
                     ? "theme-bg-elevated theme-text-primary font-bold border theme-border shadow-sm"
                     : "hover:theme-bg-sub theme-text-secondary"
                 }`}
               >
-                {/* Left Active Indicator Bar */}
-                {isActive && (
+                {isActive && !isCollapsed && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
                 )}
 
@@ -234,18 +262,20 @@ export default function Sidebar({
                   }`}>
                     <ItemIcon className="w-3.5 h-3.5" />
                   </div>
-                  <span className="truncate text-xs font-semibold">{item.name}</span>
+                  {!isCollapsed && <span className="truncate text-xs font-semibold">{item.name}</span>}
                 </div>
               </button>
             );
           })}
         </nav>
 
-        {/* Minimal Clean Profile Card */}
-        <UserProfileCard
-          isProfileOpen={isProfileOpen}
-          setIsProfileOpen={setIsProfileOpen}
-        />
+        {/* User Profile Card */}
+        {!isCollapsed && (
+          <UserProfileCard
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+          />
+        )}
       </aside>
     </>
   );
