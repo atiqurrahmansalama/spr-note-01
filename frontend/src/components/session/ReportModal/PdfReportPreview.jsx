@@ -1,7 +1,13 @@
 import { forwardRef } from "react";
 import { formatDate } from "../../../utils/reportGenerator";
 
-export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportData, includeGroup }, ref) {
+export const PdfReportPreview = forwardRef(function PdfReportPreview({
+  reportData,
+  includeGroup,
+  pdfFont = "Outfit",
+  isPdfBold = false,
+  isPdfItalic = false,
+}, ref) {
   const {
     studentName = "N/A",
     groupName = "",
@@ -97,8 +103,10 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportDat
   return (
     <div
       ref={ref}
-      style={{ fontFamily: "'Outfit', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif" }}
-      className="w-full bg-[#fafafa] text-[#1e293b] p-6 md:p-7 rounded-xl shadow-md border border-slate-300 select-all space-y-2 text-[16px] leading-snug max-w-lg mx-auto"
+      style={{ fontFamily: `'${pdfFont}', system-ui, sans-serif` }}
+      className={`w-full bg-[#fafafa] text-[#1e293b] p-6 md:p-7 rounded-xl shadow-md border border-slate-300 select-all space-y-2 text-[16px] leading-snug max-w-lg mx-auto ${
+        isPdfBold ? "font-bold" : "font-normal"
+      } ${isPdfItalic ? "italic" : "non-italic"}`}
     >
       {/* Document Title (20pt Bold) */}
       <h1 className="text-[20px] font-bold text-[#0f172a] tracking-tight mb-2">
@@ -159,7 +167,7 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportDat
       {mistakeMap.size > 0 && (
         <div className="pt-1.5 space-y-0.5">
           <h2 className="text-[16px] font-bold text-[#0f172a]">Mistake</h2>
-          {isSingleJuz || mistakeMap.size === 1 ? (
+          {isSingleJuz ? (
             Array.from(mistakeMap.values())[0].map((item, idx) => (
               <div key={idx}>{item}</div>
             ))
@@ -182,7 +190,7 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({ reportDat
       {stuckMap.size > 0 && (
         <div className="pt-1.5 space-y-0.5">
           <h2 className="text-[16px] font-bold text-[#0f172a]">Stuck</h2>
-          {isSingleJuz || stuckMap.size === 1 ? (
+          {isSingleJuz ? (
             Array.from(stuckMap.values())[0].map((item, idx) => (
               <div key={idx}>{item}</div>
             ))

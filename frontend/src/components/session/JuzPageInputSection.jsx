@@ -40,6 +40,7 @@ export default function JuzPageInputSection({ data, onChange }) {
             rowData={row}
             onChange={(rowUpdater) => handleRowChange(index, rowUpdater)}
             onRemoveJuz={() => handleRemoveJuz(index)}
+            onAddJuz={addJuzRow}
             showLabel={index === 0}
           />
         ))}

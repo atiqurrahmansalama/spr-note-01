@@ -1,22 +1,31 @@
+import { calendarSettings } from "./localStore";
+
 /**
- * Helper to format date into MM/DD/YYYY
+ * Helper to format date based on date format settings
  */
 export function formatDate(selectedDate) {
-  if (!selectedDate) {
-    const d = new Date();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${month}/${day}/${year}`;
+  const format = calendarSettings.getDateFormat();
+  const d = selectedDate ? new Date(selectedDate) : new Date();
+  if (isNaN(d.getTime())) {
+    return String(selectedDate);
   }
-  const d = new Date(selectedDate);
-  if (!isNaN(d.getTime())) {
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const year = d.getFullYear();
+
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const mmm = monthNames[d.getMonth()];
+
+  if (format === "MM/DD/YYYY") {
     return `${month}/${day}/${year}`;
+  } else if (format === "YYYY-MM-DD") {
+    return `${year}-${month}-${day}`;
+  } else if (format === "DD MMM YYYY") {
+    return `${day} ${mmm} ${year}`;
   }
-  return String(selectedDate);
+  // Default is "DD/MM/YYYY"
+  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -142,7 +151,7 @@ export function generateReportText({
 
     let resLines = [title];
 
-    if (isSingleJuz || detailByJuz.size === 1) {
+    if (isSingleJuz) {
       // Single Juz format
       const entries = Array.from(detailByJuz.values())[0];
       entries.forEach((item) => {
@@ -156,7 +165,7 @@ export function generateReportText({
             resLines.push(`${juzNum}: ${item}`);
           } else {
             // Indent subsequent items under the juz prefix
-            const padLen = juzNum.length + 2; // "3: " -> length is 3
+            const padLen = juzNum.length + 4; // e.g. "17: " + 4 spaces = 6 spaces
             resLines.push(`${" ".repeat(padLen)}${item}`);
           }
         });

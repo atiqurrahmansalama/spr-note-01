@@ -14,18 +14,28 @@ export default function DetailSection({
   onReset 
 }) {
   const addRow = () => {
+    const newId = crypto.randomUUID();
     onChange(prevData => {
       const lastJuz = prevData.length > 0 ? prevData[prevData.length - 1].juz : (availableJuzs?.[0] || "");
       return [
         ...prevData,
         {
-          id: crypto.randomUUID(),
+          id: newId,
           juz: lastJuz,
           page: "",
           ayahs: [{ id: crypto.randomUUID(), value: "" }]
         }
       ];
     });
+
+    // Auto-focus new row's page box
+    setTimeout(() => {
+      const el = document.getElementById(`page-${newId}`);
+      if (el) {
+        el.focus();
+        if (el.select) el.select();
+      }
+    }, 60);
   };
 
   const handleRemoveRow = (index) => {
@@ -45,8 +55,30 @@ export default function DetailSection({
     });
   };
 
+  const handleNextSection = () => {
+    if (listType === "mistake") {
+      const stuckInputs = Array.from(document.querySelectorAll('input[id^="page-"]'));
+      const stuckPageInput = stuckInputs.find((el) => {
+        const parent = el.closest('[data-list-type="stuck"]');
+        return parent !== null;
+      }) || document.querySelector('[data-list-type="stuck"] input');
+
+      if (stuckPageInput) {
+        stuckPageInput.focus();
+        if (stuckPageInput.select) stuckPageInput.select();
+        return;
+      }
+    }
+
+    const commentEl = document.getElementById("comment-textarea") || document.querySelector("textarea");
+    if (commentEl) {
+      commentEl.focus();
+    }
+  };
+
   return (
     <div 
+      data-list-type={listType}
       className="relative"
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, listType)}
@@ -59,10 +91,10 @@ export default function DetailSection({
           <button
             type="button"
             onClick={onReset}
-            className="theme-text-secondary hover:text-red-500 transition-colors p-1 rounded-md hover:theme-bg-sub cursor-pointer group"
+            className="theme-text-secondary hover:text-red-400 transition-colors p-1 cursor-pointer"
             title="Reset Details"
           >
-            <RefreshIcon className="w-4 h-4 text-inherit group-hover:text-red-500 transition-colors" />
+            <RefreshIcon className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -76,6 +108,8 @@ export default function DetailSection({
             rowData={row}
             onChange={(newR) => handleRowChange(idx, newR)}
             onRemoveRow={data.length > 1 ? () => handleRemoveRow(idx) : undefined}
+            onAddNewRow={addRow}
+            onNextSection={handleNextSection}
             availableJuzs={availableJuzs}
             juzPageData={juzPageData}
             onDragStart={onDragStart}

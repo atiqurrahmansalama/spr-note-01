@@ -9,8 +9,10 @@ export default function NumberScrollInput({
   placeholder = "--", 
   className = "",
   onEnter,
+  onShiftEnter,
   onEmptyBackspace,
   onAdd,
+  onAddShift,
   id
 }) {
   const inputRef = useRef(null);
@@ -33,10 +35,19 @@ export default function NumberScrollInput({
         focusNextInput(inputRef.current);
       }
     } else if (e.key === "Enter") {
-      if (onEnter) onEnter(e);
-    } else if (e.key === "+") {
+      if (e.shiftKey && onShiftEnter) {
+        e.preventDefault();
+        onShiftEnter(e);
+      } else if (onEnter) {
+        onEnter(e);
+      }
+    } else if (e.key === "+" || e.key === "=") {
       e.preventDefault();
-      if (onAdd) onAdd(e);
+      if (e.shiftKey && onAddShift) {
+        onAddShift(e);
+      } else if (onAdd) {
+        onAdd(e);
+      }
     } else if (e.key === "Backspace") {
       if (value === "" && onEmptyBackspace) {
         e.preventDefault();
@@ -132,7 +143,7 @@ export default function NumberScrollInput({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      className={`bg-transparent focus:theme-bg-elevated border-none outline-none text-center font-mono rounded transition-all placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent focus:placeholder:opacity-0 ${className}`}
+      className={`bg-transparent focus:theme-bg-elevated border-none outline-none text-center font-mono rounded transition-all placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent focus:placeholder:opacity-0 select-text ${className}`}
       inputMode="numeric"
     />
   );

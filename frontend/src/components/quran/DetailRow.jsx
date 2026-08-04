@@ -8,7 +8,10 @@ export default function DetailRow({
   rowData,
   onChange,
   onRemoveRow,
+  onAddNewRow,
+  onNextSection,
   availableJuzs,
+  juzPageData,
   listType,
   index,
   onDragStart,
@@ -29,6 +32,30 @@ export default function DetailRow({
   }, []);
 
   const getPageRangeForJuz = (juzNum) => {
+    if (juzPageData && juzPageData.length > 0) {
+      const matchingRows = juzPageData.filter(
+        (row) => row.juz && row.juz.toString() === juzNum?.toString()
+      );
+
+      if (matchingRows.length > 0) {
+        let min = 9999;
+        let max = -1;
+
+        matchingRows.forEach((row) => {
+          (row.ranges || []).forEach((r) => {
+            const s = parseInt(r.start, 10);
+            const e = parseInt(r.end, 10);
+            if (!isNaN(s) && s > 0 && s < min) min = s;
+            if (!isNaN(e) && e > 0 && e > max) max = e;
+          });
+        });
+
+        if (min !== 9999 && max !== -1) {
+          return { min, max };
+        }
+      }
+    }
+
     const j = parseInt(juzNum, 10);
     const starts = QURAN_CONSTANTS.JUZ_PAGE_STARTS;
     if (!j || isNaN(j) || !starts || j < 1 || j > 30) return { min: 1, max: 604 };
@@ -38,6 +65,41 @@ export default function DetailRow({
   };
 
   const { min: minPage, max: maxPage } = getPageRangeForJuz(rowData.juz);
+
+  // Auto-clamp Juz & Page bounds based on top Juz/Page section data
+  useEffect(() => {
+    let updatedJuz = rowData.juz;
+    let needsUpdate = false;
+
+    if (availableJuzs && availableJuzs.length > 0) {
+      if (!availableJuzs.includes(rowData.juz)) {
+        updatedJuz = availableJuzs[0];
+        needsUpdate = true;
+      }
+    }
+
+    if (rowData.page !== "" && rowData.page !== null && rowData.page !== undefined) {
+      const { min, max } = getPageRangeForJuz(updatedJuz);
+      let currentPageNum = parseInt(rowData.page, 10);
+
+      if (!isNaN(currentPageNum) && (currentPageNum < min || currentPageNum > max)) {
+        const clamped = Math.min(Math.max(currentPageNum, min), max);
+        onChange((prev) => ({
+          ...prev,
+          juz: updatedJuz,
+          page: clamped.toString(),
+        }));
+        return;
+      }
+    }
+
+    if (needsUpdate) {
+      onChange((prev) => ({
+        ...prev,
+        juz: updatedJuz,
+      }));
+    }
+  }, [juzPageData, availableJuzs]);
 
   const handleJuzChange = (newJuz) => {
     const range = getPageRangeForJuz(newJuz);
@@ -83,9 +145,9 @@ export default function DetailRow({
   };
 
   const hasJuz = availableJuzs && availableJuzs.length > 1;
-  // Line 1: on mobile multi-Juz: 2; on mobile single-Juz: 3; on desktop: 3 or 4
-  const line1Max = isMobile ? (hasJuz ? 2 : 3) : (hasJuz ? 3 : 4);
-  // Extra lines (mobile multi-Juz only): 4 per line for wider display
+  // Line 1: on mobile multi-Juz: 1 (to leave ample room and prevent overlap with x button); on mobile single-Juz: 3; on desktop: 3 or 4
+  const line1Max = isMobile ? (hasJuz ? 1 : 3) : (hasJuz ? 3 : 4);
+  // Extra lines (mobile multi-Juz only): 4 per line aligned under the Page box
   const extraLineMax = 4;
 
   // Group ayahs: first chunk uses line1Max, subsequent chunks use extraLineMax if mobile+multiJuz
@@ -100,14 +162,14 @@ export default function DetailRow({
     i += chunkSize;
   }
 
-  // On Mobile when multiple Juzs exist, extra Ayah rows (Line 2+) align to the LEFT with the PAGE BOX ([3])
+  // On Mobile when multiple Juzs exist, extra Ayah rows (Line 2+) align EXACTLY under the 1st Ayah Box
   const isMobileMultiJuzExtraRows = isMobile && hasJuz && ayahChunks.length > 1;
   const line1Chunk = ayahChunks[0] || { items: [], startIndex: 0 };
   const extraChunks = isMobileMultiJuzExtraRows ? ayahChunks.slice(1) : [];
 
   return (
     <div 
-      className="flex items-start gap-1.5 sm:gap-2.5 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150"
+      className="flex items-start gap-1.5 sm:gap-2.5 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none"
       draggable={isDraggable}
       onDragStart={(e) => {
         if (onDragStart) onDragStart(e, listType, index);
@@ -124,7 +186,7 @@ export default function DetailRow({
     >
       {/* Drag handle */}
       <div 
-        className="theme-text-secondary opacity-50 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity shrink-0 flex items-center justify-center self-start mt-2.5"
+        className="theme-text-secondary opacity-50 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity shrink-0 flex items-center justify-center h-[38px] sm:h-10 self-start select-none"
         onMouseEnter={() => setIsDraggable(true)}
         onMouseLeave={() => setIsDraggable(false)}
       >
@@ -141,20 +203,20 @@ export default function DetailRow({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {hasJuz && (
               <div className="flex items-center gap-1 shrink-0 relative z-30">
-                <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary">Juz</label>
+                <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
                 <CustomSelect
                   options={availableJuzs.map((j) => ({ label: j, value: j }))}
                   value={rowData.juz || (availableJuzs[0] || "")}
                   onChange={(val) => handleJuzChange(val)}
-                  className="w-[42px] sm:w-16"
-                  buttonClassName="h-9 sm:h-10 w-[42px] sm:w-16 theme-bg-sub rounded-lg border theme-border flex items-center justify-between px-1 text-xs sm:text-sm theme-text-primary font-semibold cursor-pointer shadow-sm transition-colors select-none"
+                  className="w-[50px] sm:w-16"
+                  buttonClassName="h-[38px] sm:h-10 w-[50px] sm:w-16 theme-bg-sub rounded-lg border theme-border flex items-center justify-between px-1 text-xs sm:text-sm theme-text-primary font-semibold cursor-pointer shadow-sm transition-colors select-none"
                 />
               </div>
             )}
 
             <div className="flex items-center gap-1 shrink-0">
-              <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary">Page</label>
-              <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-[36px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
+              <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Page</label>
+              <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-[42px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
                 <NumberScrollInput
                   id={`page-${rowData.id}`}
                   value={rowData.page}
@@ -175,7 +237,7 @@ export default function DetailRow({
 
           {/* Right Side: Ayah Label + Ayah Rows */}
           <div className="flex items-start gap-1 sm:gap-1.5 shrink-0">
-            <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary shrink-0 mt-2">Ayah</label>
+            <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary shrink-0 h-[38px] sm:h-10 flex items-center select-none">Ayah</label>
 
             <div className="flex flex-col gap-2.5 sm:gap-3">
               {(isMobileMultiJuzExtraRows ? [line1Chunk] : ayahChunks).map((chunk, chunkRowIdx) => {
@@ -190,12 +252,18 @@ export default function DetailRow({
                       const isLastTotal = globalIdx === rowData.ayahs.length - 1;
                       return (
                         <div key={ayah.id} className="flex items-center gap-0.5 shrink-0">
-                          <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-[36px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
+                          <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-[42px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
                             <NumberScrollInput
                               id={`ayah-${ayah.id}`}
                               value={ayah.value}
                               onChange={(val) => handleAyahChange(globalIdx, val)}
-                              onEnter={handleEnterFocusNext}
+                              onEnter={(e) => {
+                                if (isLastTotal && onAddNewRow) {
+                                  onAddNewRow();
+                                }
+                                handleEnterFocusNext(e);
+                              }}
+                              onShiftEnter={onNextSection}
                               onAdd={() => {
                                 if (isLastTotal) addAyah();
                               }}
@@ -208,7 +276,7 @@ export default function DetailRow({
                               className="w-full h-full text-xs sm:text-sm theme-text-primary font-semibold"
                             />
                           </div>
-                          {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px]">,</span>}
+                          {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px] select-none">,</span>}
                         </div>
                       );
                     })}
@@ -230,9 +298,9 @@ export default function DetailRow({
           </div>
         </div>
 
-        {/* Mobile ONLY with Multiple Juzs: Extra Ayah Rows (Line 2+) aligned EXACTLY under the Page Box ([3]) */}
+        {/* Mobile ONLY with Multiple Juzs: Extra Ayah Rows (Line 2+) aligned EXACTLY under the Page Box */}
         {isMobileMultiJuzExtraRows && (
-          <div className="flex flex-col gap-2.5 pl-[96px]">
+          <div className="flex flex-col gap-2.5 pl-[108px]">
             {extraChunks.map((chunk, extraIdx) => {
               const isLastChunk = extraIdx === extraChunks.length - 1;
               return (
@@ -242,7 +310,7 @@ export default function DetailRow({
                     const isLastTotal = globalIdx === rowData.ayahs.length - 1;
                     return (
                       <div key={ayah.id} className="flex items-center gap-0.5 shrink-0">
-                        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 w-[36px] shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
+                        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] w-[42px] shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
                           <NumberScrollInput
                             id={`ayah-${ayah.id}`}
                             value={ayah.value}
@@ -260,7 +328,7 @@ export default function DetailRow({
                             className="w-full h-full text-xs theme-text-primary font-semibold"
                           />
                         </div>
-                        {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px]">,</span>}
+                        {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px] select-none">,</span>}
                       </div>
                     );
                   })}
@@ -284,8 +352,9 @@ export default function DetailRow({
 
       {onRemoveRow && (
         <button
+          type="button"
           onClick={onRemoveRow}
-          className="w-5 h-5 rounded-full theme-text-secondary hover:bg-red-500/20 hover:text-red-400 transition-colors shrink-0 flex items-center justify-center self-start mt-2.5 cursor-pointer ml-auto"
+          className="p-1 theme-text-secondary hover:text-red-400 transition-colors shrink-0 flex items-center justify-center h-[38px] sm:h-10 self-start cursor-pointer ml-auto"
           title="Remove Row"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>

@@ -93,10 +93,24 @@ export default function CommentSection({
         {/* Comment Input Container & Overlay */}
         <div className="relative">
           <textarea
+            id="comment-textarea"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            onKeyDown={(e) => {
+              const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+              if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
+                e.preventDefault();
+                if (onMakeReport) onMakeReport();
+              } else if (e.altKey && e.key.toLowerCase() === "s") {
+                e.preventDefault();
+                if (onAddToRecord) onAddToRecord();
+              } else if (isCmdOrCtrl && e.key === "Enter") {
+                e.preventDefault();
+                if (onAddToRecord) onAddToRecord();
+              }
+            }}
             className="w-full h-36 p-3 rounded-xl theme-bg-sub theme-text-primary text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors resize-none placeholder:theme-text-secondary placeholder:opacity-60"
-            placeholder="Enter comment..."
+            placeholder="Enter comment... (Ctrl+S to Make Report, Alt+S or Ctrl+Enter to Add to Record)"
           />
 
           {/* Saved Messages Dropdown Overlay */}
@@ -173,6 +187,7 @@ export default function CommentSection({
 
         <button
           type="button"
+          data-shortcut="make-report"
           onClick={onMakeReport}
           className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text font-bold py-3 sm:py-3.5 px-4 rounded-2xl shadow-lg transition text-sm text-center cursor-pointer"
         >

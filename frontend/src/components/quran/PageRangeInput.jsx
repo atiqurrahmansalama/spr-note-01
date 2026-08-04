@@ -1,7 +1,7 @@
 import NumberScrollInput from "../ui/NumberScrollInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
 
-export default function PageRangeInput({ range, onChange, onRemove, juzValue, isLast, onAddNextRange }) {
+export default function PageRangeInput({ range, onChange, onRemove, juzValue, isLast, onAddNextRange, onAddJuzRow }) {
   const getMaxPage = (juzStr) => {
     const j = parseInt(juzStr, 10);
     if (j === 29) return 24;
@@ -23,6 +23,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
             onAddNextRange();
           }
         }}
+        onAddShift={onAddJuzRow}
         onEmptyBackspace={(e) => {
           handleBackspaceFocusPrev(e, true);
           if (onRemove) onRemove();
@@ -51,6 +52,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
             onAddNextRange();
           }
         }}
+        onAddShift={onAddJuzRow}
         onEmptyBackspace={(e) => {
           handleBackspaceFocusPrev(e, true);
         }}

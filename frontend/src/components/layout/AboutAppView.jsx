@@ -2,7 +2,7 @@ import { AboutIcon } from "../ui/Icons";
 
 export default function AboutAppView() {
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4">
+    <div className="w-full max-w-2xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-6 shadow-2xl text-center space-y-3">
         <div className="w-16 h-16 theme-bg-accent-soft rounded-2xl mx-auto flex items-center justify-center theme-accent shrink-0 shadow-inner">
           <AboutIcon className="w-8 h-8" />

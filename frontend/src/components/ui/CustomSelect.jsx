@@ -46,7 +46,7 @@ export default function CustomSelect({
           "w-full theme-bg-sub border theme-border rounded-lg px-3 py-2 theme-text-primary text-xs font-mono flex items-center justify-between cursor-pointer hover:theme-border transition-colors select-none"
         }
       >
-        <span className={!value ? "theme-text-secondary" : "theme-text-primary"}>
+        <span className={`flex-1 text-center ${!value ? "theme-text-secondary" : "theme-text-primary"}`}>
           {selectedLabel}
         </span>
         <ChevronIcon isOpen={isOpen} className="w-3 h-3 theme-text-secondary shrink-0 ml-1" />

@@ -25,6 +25,7 @@ export default function StudentInput({
           value={studentName}
           onChange={onStudentSelect}
           onAddNew={onOpenSavePanel}
+          autoFocus={true}
           placeholder="Search student..."
         />
 

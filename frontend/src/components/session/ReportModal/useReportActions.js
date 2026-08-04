@@ -8,19 +8,89 @@ export function useReportActions({ isOpen, onClose, reportData }) {
   const shareDropdownRef = useRef(null);
 
   const [viewMode, setViewMode] = useState("TEXT"); // "TEXT" | "PDF"
-  const [includeGroup, setIncludeGroup] = useState(true);
-  const [includeTeacher, setIncludeTeacher] = useState(true);
+  
+  const [includeGroup, setIncludeGroup] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("spr_include_group");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  const [includeTeacher, setIncludeTeacher] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("spr_include_teacher");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  const [pdfFont, setPdfFont] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("spr_pdf_font");
+      return saved || "Outfit";
+    }
+    return "Outfit";
+  });
+
+  const [isPdfBold, setIsPdfBold] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("spr_pdf_bold");
+      return saved !== null ? saved === "true" : false;
+    }
+    return false;
+  });
+
+  const [isPdfItalic, setIsPdfItalic] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("spr_pdf_italic");
+      return saved !== null ? saved === "true" : false;
+    }
+    return false;
+  });
+
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [currentText, setCurrentText] = useState(() =>
-    generateReportText({
+
+  const [currentText, setCurrentText] = useState(() => {
+    let initGroup = true;
+    let initTeacher = true;
+    if (typeof window !== "undefined") {
+      const g = localStorage.getItem("spr_include_group");
+      if (g !== null) initGroup = g === "true";
+      const t = localStorage.getItem("spr_include_teacher");
+      if (t !== null) initTeacher = t === "true";
+    }
+    return generateReportText({
       ...reportData,
-      includeGroup: true,
-      includeTeacher: true,
-    })
-  );
+      includeGroup: initGroup,
+      includeTeacher: initTeacher,
+    });
+  });
+
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   const [showDiscardAlert, setShowDiscardAlert] = useState(false);
+
+  // Sync checkboxes and style properties with LocalStorage
+  useEffect(() => {
+    localStorage.setItem("spr_include_group", includeGroup);
+  }, [includeGroup]);
+
+  useEffect(() => {
+    localStorage.setItem("spr_include_teacher", includeTeacher);
+  }, [includeTeacher]);
+
+  useEffect(() => {
+    localStorage.setItem("spr_pdf_font", pdfFont);
+  }, [pdfFont]);
+
+  useEffect(() => {
+    localStorage.setItem("spr_pdf_bold", isPdfBold);
+  }, [isPdfBold]);
+
+  useEffect(() => {
+    localStorage.setItem("spr_pdf_italic", isPdfItalic);
+  }, [isPdfItalic]);
 
   // Synchronize generated text when settings/reportData change, if user is not manually editing
   const prevDataKey = `${isOpen}-${includeGroup}-${includeTeacher}-${JSON.stringify(reportData)}`;
@@ -185,12 +255,12 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       const m = getDetails(mistakeData);
       if (m.size > 0) {
         items.push({ text: "Mistake", isHeader: true });
-        if (isSingleJuz || m.size === 1) {
+        if (isSingleJuz) {
           Array.from(m.values())[0].forEach((line) => items.push({ text: line }));
         } else {
           m.forEach((list, j) => {
             items.push({ text: `${j}:`, isBold: true });
-            list.forEach((line) => items.push({ text: `  ${line}` }));
+            list.forEach((line) => items.push({ text: `      ${line}` }));
           });
         }
         items.push({ text: "" });
@@ -199,12 +269,12 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       const s = getDetails(stuckData);
       if (s.size > 0) {
         items.push({ text: "Stuck", isHeader: true });
-        if (isSingleJuz || s.size === 1) {
+        if (isSingleJuz) {
           Array.from(s.values())[0].forEach((line) => items.push({ text: line }));
         } else {
           s.forEach((list, j) => {
             items.push({ text: `${j}:`, isBold: true });
-            list.forEach((line) => items.push({ text: `  ${line}` }));
+            list.forEach((line) => items.push({ text: `      ${line}` }));
           });
         }
         items.push({ text: "" });
@@ -233,9 +303,9 @@ export function useReportActions({ isOpen, onClose, reportData }) {
 
       let height = padding * 2;
       items.forEach((item) => {
-        if (item.isTitle) height += 30;
+        if (item.text === "") height += 8;
+        else if (item.isTitle) height += 30;
         else if (item.isHeader) height += 24;
-        else if (item.text === "") height += 8;
         else height += 20;
       });
 
@@ -248,6 +318,18 @@ export function useReportActions({ isOpen, onClose, reportData }) {
 
       let currentY = padding;
 
+      const getFontStr = (size, isHeaderOrBold = false) => {
+        let weight = "";
+        if (isHeaderOrBold) {
+          weight = "bold";
+        } else if (isPdfBold) {
+          weight = "bold";
+        }
+        let style = isPdfItalic ? "italic" : "";
+        const parts = [style, weight, `${size}px`, `'${pdfFont}', sans-serif`].filter(Boolean);
+        return parts.join(" ");
+      };
+
       items.forEach((item) => {
         if (item.text === "") {
           currentY += 8;
@@ -255,31 +337,31 @@ export function useReportActions({ isOpen, onClose, reportData }) {
         }
 
         if (item.isTitle) {
-          ctx.font = "bold 20px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(20, true);
           ctx.fillStyle = "#0f172a";
           ctx.fillText(item.text, padding, currentY + 16);
           currentY += 30;
         } else if (item.isHeader) {
-          ctx.font = "bold 16px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(16, true);
           ctx.fillStyle = "#0f172a";
           ctx.fillText(item.text, padding, currentY + 13);
           currentY += 24;
         } else if (item.boldPrefix) {
-          ctx.font = "bold 16px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(16, true);
           ctx.fillStyle = "#0f172a";
           const prefixWidth = ctx.measureText(item.boldPrefix).width;
           ctx.fillText(item.boldPrefix, padding, currentY + 13);
-          ctx.font = "16px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(16, false);
           ctx.fillStyle = "#1e293b";
           ctx.fillText(` ${item.value}`, padding + prefixWidth, currentY + 13);
           currentY += 20;
         } else if (item.isBold) {
-          ctx.font = "bold 16px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(16, true);
           ctx.fillStyle = "#0f172a";
           ctx.fillText(item.text, padding, currentY + 13);
           currentY += 20;
         } else {
-          ctx.font = "16px 'Outfit', 'Inter', system-ui, sans-serif";
+          ctx.font = getFontStr(16, false);
           ctx.fillStyle = "#1e293b";
           ctx.fillText(item.text, padding, currentY + 13);
           currentY += 20;
@@ -310,9 +392,20 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       const fontSize = 15;
       const lineHeight = 22;
       const padding = 32;
-      const font = `${fontSize}px 'Outfit', 'Inter', system-ui, sans-serif`;
 
-      ctx.font = font;
+      const getFontStr = (size, isHeaderOrBold = false) => {
+        let weight = "";
+        if (isHeaderOrBold) {
+          weight = "bold";
+        } else if (isPdfBold) {
+          weight = "bold";
+        }
+        let style = isPdfItalic ? "italic" : "";
+        const parts = [style, weight, `${size}px`, `'${pdfFont}', sans-serif`].filter(Boolean);
+        return parts.join(" ");
+      };
+
+      ctx.font = getFontStr(fontSize, false);
       let maxLineWidth = 0;
       lines.forEach((l) => {
         const w = ctx.measureText(l).width;
@@ -343,13 +436,13 @@ export function useReportActions({ isOpen, onClose, reportData }) {
         const trimmed = line.trim();
 
         if (index === 0 || trimmed === "Session Summary" || trimmed === "Mistake" || trimmed === "Stuck" || trimmed === "Comment") {
-          ctx.font = `bold ${index === 0 ? 19 : 15}px 'Outfit', 'Inter', system-ui, sans-serif`;
+          ctx.font = getFontStr(index === 0 ? 19 : 15, true);
           ctx.fillStyle = "#0f172a";
         } else if (line.startsWith("Date:") || line.startsWith("Student Name:") || line.startsWith("Juz Number:") || line.startsWith("Page:")) {
-          ctx.font = `bold ${fontSize}px 'Outfit', 'Inter', system-ui, sans-serif`;
+          ctx.font = getFontStr(fontSize, true);
           ctx.fillStyle = "#0f172a";
         } else {
-          ctx.font = `15px 'Outfit', 'Inter', system-ui, sans-serif`;
+          ctx.font = getFontStr(fontSize, false);
           ctx.fillStyle = "#1e293b";
         }
 
@@ -375,6 +468,12 @@ export function useReportActions({ isOpen, onClose, reportData }) {
     setIncludeGroup,
     includeTeacher,
     setIncludeTeacher,
+    pdfFont,
+    setPdfFont,
+    isPdfBold,
+    setIsPdfBold,
+    isPdfItalic,
+    setIsPdfItalic,
     isEditing,
     setIsEditing,
     copied,

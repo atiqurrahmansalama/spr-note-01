@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import StudentInput from "./StudentInput";
 import AutocompleteDropdown from "../ui/AutocompleteDropdown";
 import JuzPageInputSection from "./JuzPageInputSection";
@@ -27,6 +27,7 @@ export default function SessionInput({
   onStudentSelect,
   onGroupNameChange,
   onSessionChange,
+  onSaveSession,
   onOpenSavePanel,
   onCloseSavePanel,
   onSaveResult,
@@ -38,11 +39,13 @@ export default function SessionInput({
     value: typeof s === "object" ? (s.name || s.value) : s,
   }));
 
-  const availableJuzs = Array.from(new Set(
-    juzPageData
-      .map(d => d.juz)
-      .filter(j => j !== "" && j !== undefined && j !== null)
-  ));
+  const availableJuzs = useMemo(() => {
+    return Array.from(new Set(
+      juzPageData
+        .map(d => d.juz)
+        .filter(j => j !== "" && j !== undefined && j !== null)
+    ));
+  }, [juzPageData]);
 
   const countValid = (data) => {
     return data.reduce((total, row) => {
@@ -86,13 +89,17 @@ export default function SessionInput({
 
   const handleDragStart = (e, listType, index) => {
     setDraggedItem({ listType, index });
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = "copyMove";
     // We can also attach data to dataTransfer for external drops, but react state is enough here
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    if (e.ctrlKey || e.altKey) {
+      e.dataTransfer.dropEffect = "copy";
+    } else {
+      e.dataTransfer.dropEffect = "move";
+    }
   };
 
   const handleDrop = (e, targetListType, targetIndex) => {
@@ -100,10 +107,7 @@ export default function SessionInput({
     if (!draggedItem) return;
 
     const { listType: sourceListType, index: sourceIndex } = draggedItem;
-    if (sourceListType === targetListType && sourceIndex === targetIndex) {
-      setDraggedItem(null);
-      return;
-    }
+    const isCopy = e.ctrlKey || e.altKey;
 
     let newMistake = [...mistakeData];
     let newStuck = [...stuckData];
@@ -111,16 +115,53 @@ export default function SessionInput({
     let sourceList = sourceListType === 'mistake' ? newMistake : newStuck;
     let targetList = targetListType === 'mistake' ? newMistake : newStuck;
 
-    const [item] = sourceList.splice(sourceIndex, 1);
-    
-    if (targetIndex === undefined) {
-      targetList.push(item);
-    } else {
-      targetList.splice(targetIndex, 0, item);
-    }
+    if (isCopy) {
+      const sourceItem = sourceList[sourceIndex];
+      const itemCopy = {
+        ...sourceItem,
+        id: crypto.randomUUID(),
+        ayahs: sourceItem.ayahs.map(a => ({
+          ...a,
+          id: crypto.randomUUID()
+        }))
+      };
 
-    if (sourceListType === 'mistake' || targetListType === 'mistake') setMistakeData(newMistake);
-    if (sourceListType === 'stuck' || targetListType === 'stuck') setStuckData(newStuck);
+      if (targetListType === 'mistake') {
+        if (targetIndex === undefined) {
+          newMistake.push(itemCopy);
+        } else {
+          newMistake.splice(targetIndex, 0, itemCopy);
+        }
+        setMistakeData(newMistake);
+      } else {
+        if (targetIndex === undefined) {
+          newStuck.push(itemCopy);
+        } else {
+          newStuck.splice(targetIndex, 0, itemCopy);
+        }
+        setStuckData(newStuck);
+      }
+    } else {
+      if (sourceListType === targetListType && sourceIndex === targetIndex) {
+        setDraggedItem(null);
+        return;
+      }
+
+      const [item] = sourceList.splice(sourceIndex, 1);
+      
+      if (targetIndex === undefined) {
+        targetList.push(item);
+      } else {
+        targetList.splice(targetIndex, 0, item);
+      }
+
+      if (sourceListType === 'mistake' || targetListType === 'mistake') {
+        setMistakeData(newMistake);
+      }
+      if (sourceListType === 'stuck' || targetListType === 'stuck') {
+        setStuckData(newStuck);
+      }
+    }
     
     setDraggedItem(null);
   };
@@ -154,13 +195,14 @@ export default function SessionInput({
               options={sessionOptions}
               value={selectedSession}
               onChange={(sel) => onSessionChange(typeof sel === "object" ? sel.label : sel)}
+              onAddNew={onSaveSession}
               placeholder="Select session..."
             />
           </div>
         </div>
 
         {/* 3. Juz / Page Input Section */}
-        <div className="border-t theme-border pt-4 mt-4">
+        <div className="pt-2 mt-7">
           <JuzPageInputSection 
             data={juzPageData}
             onChange={setJuzPageData}

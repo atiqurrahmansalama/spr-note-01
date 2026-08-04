@@ -13,6 +13,12 @@ export default function ReportModal({ isOpen, onClose, reportData = {} }) {
     setIncludeGroup,
     includeTeacher,
     setIncludeTeacher,
+    pdfFont,
+    setPdfFont,
+    isPdfBold,
+    setIsPdfBold,
+    isPdfItalic,
+    setIsPdfItalic,
     isEditing,
     setIsEditing,
     copied,
@@ -59,17 +65,24 @@ export default function ReportModal({ isOpen, onClose, reportData = {} }) {
             setCurrentText={setCurrentText}
             reportData={reportData}
             includeGroup={includeGroup}
+            pdfFont={pdfFont}
+            isPdfBold={isPdfBold}
+            isPdfItalic={isPdfItalic}
           />
 
-          {/* Controls / Checkboxes (TEXT mode only) */}
-          {viewMode === "TEXT" && (
-            <ReportControls
-              includeGroup={includeGroup}
-              setIncludeGroup={setIncludeGroup}
-              includeTeacher={includeTeacher}
-              setIncludeTeacher={setIncludeTeacher}
-            />
-          )}
+          {/* Controls / Checkboxes & Styling Toolbar */}
+          <ReportControls
+            includeGroup={includeGroup}
+            setIncludeGroup={setIncludeGroup}
+            includeTeacher={includeTeacher}
+            setIncludeTeacher={setIncludeTeacher}
+            pdfFont={pdfFont}
+            setPdfFont={setPdfFont}
+            isPdfBold={isPdfBold}
+            setIsPdfBold={setIsPdfBold}
+            isPdfItalic={isPdfItalic}
+            setIsPdfItalic={setIsPdfItalic}
+          />
 
           {/* Modal Footer */}
           <ReportFooter

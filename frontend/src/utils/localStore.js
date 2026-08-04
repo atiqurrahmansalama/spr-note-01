@@ -37,10 +37,12 @@ export const KEYS = {
   COPY_TEACHER:   "spr_copy_include_teacher",
   COPY_AUTO:      "spr_copy_auto_copy",
 
-  // Sync engine
+  // Sync engine & drafts
   REPORTS:        "spr_reports_local_v1",
   PENDING_QUEUE:  "spr_reports_pending_queue",
   LAST_SYNCED_AT: "spr_last_synced_at",
+  DRAFT_REPORT:   "spr_report_draft",
+  SAVE_STATUS:    "spr_save_status",
 };
 
 // ─── Generic helpers ────────────────────────────────────────────────────────
@@ -97,7 +99,7 @@ export const auth = {
 };
 
 // ─── Students ───────────────────────────────────────────────────────────────
-// Shape: [{ label: "Ahmed", sub: "Group A" }, ...]
+// Shape: [{ label: "Ahmed", sub: "Group A", _local?: true }, ...]
 
 export const students = {
   getAll: () => readJSON(KEYS.STUDENTS, []),
@@ -138,8 +140,37 @@ export const students = {
   },
 };
 
+/**
+ * mergeStudents — API ডেটা ও LocalStorage ডেটা মার্জ করে, duplicate ছাড়া।
+ *
+ * নিয়ম:
+ *  1. API ডেটা authoritative (server থেকে এসেছে, _local flag নেই)
+ *  2. Local-only ডেটা (API-তে নেই, _local: true) শেষে যোগ হয়
+ *  3. একই নাম দুইবার আসে না
+ *  4. Merged result LocalStorage-এ cache হিসেবে সেভ হয়
+ */
+export function mergeStudents(apiStudents, localStudents) {
+  // API items-এর নামের set তৈরি (case-insensitive)
+  const apiLabels = new Set(apiStudents.map((s) => s.label?.toLowerCase()));
+
+  // LocalStorage-এ যেগুলো আছে কিন্তু API-তে নেই (offline-only)
+  const localOnly = localStudents
+    .filter((s) => !apiLabels.has(s.label?.toLowerCase()))
+    .map((s) => ({ ...s, _local: true }));
+
+  // API items (clean, no _local flag) + local-only items
+  const merged = [
+    ...apiStudents.map(({ _local, ...rest }) => rest), // _local flag মুছে দাও
+    ...localOnly,
+  ];
+
+  // Cache-এ সেভ করো
+  writeJSON(KEYS.STUDENTS, merged);
+  return merged;
+}
+
 // ─── Sessions ───────────────────────────────────────────────────────────────
-// Shape: [{ id: "uuid", name: "Morning Session" }, ...]
+// Shape: [{ id: "uuid", name: "Morning Session", _local?: true }, ...]
 
 export const sessions = {
   getAll: () => readJSON(KEYS.SESSIONS, []),
@@ -174,6 +205,35 @@ export const sessions = {
     return updated;
   },
 };
+
+/**
+ * mergeSessions — API ডেটা ও LocalStorage ডেটা মার্জ করে, duplicate ছাড়া।
+ *
+ * নিয়ম:
+ *  1. API ডেটা authoritative (server ID আছে, _local নেই)
+ *  2. Local-only সেশন (API-তে নেই, _local: true) শেষে যোগ হয়
+ *  3. একই name দুইবার আসে না
+ *  4. Merged result LocalStorage-এ cache হিসেবে সেভ হয়
+ */
+export function mergeSessions(apiSessions, localSessions) {
+  // API items-এর নামের set তৈরি (case-insensitive)
+  const apiNames = new Set(apiSessions.map((s) => s.name?.toLowerCase()));
+
+  // LocalStorage-এ যেগুলো আছে কিন্তু API-তে নেই (offline-only)
+  const localOnly = localSessions
+    .filter((s) => !apiNames.has(s.name?.toLowerCase()))
+    .map((s) => ({ ...s, _local: true }));
+
+  // API items (clean, _local flag মুছে দাও) + local-only items
+  const merged = [
+    ...apiSessions.map(({ _local, ...rest }) => rest),
+    ...localOnly,
+  ];
+
+  // Cache-এ সেভ করো
+  writeJSON(KEYS.SESSIONS, merged);
+  return merged;
+}
 
 // ─── Saved Comments (Templates) ─────────────────────────────────────────────
 // Shape: ["comment text 1", "comment text 2", ...]
@@ -216,6 +276,8 @@ export const calendarSettings = {
   saveHijriEnabled: (v) => writeString(KEYS.ENABLE_HIJRI, v.toString()),
 };
 
+export const dateTimeSettings = calendarSettings;
+
 // ─── Appearance Settings ─────────────────────────────────────────────────────
 
 export const appearanceSettings = {
@@ -249,3 +311,37 @@ export const copyReportSettings = {
 
 /** true হলে ব্রাউজার অনলাইন বলছে */
 export const isOnline = () => navigator.onLine;
+
+// ─── Draft Report & Live Save Status ─────────────────────────────────────────
+
+export const draftReport = {
+  get: () => readJSON(KEYS.DRAFT_REPORT, null),
+  save: (formData) => {
+    const payload = {
+      ...formData,
+      timestamp: new Date().toISOString(),
+      savedAtTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      savedAtDate: new Date().toLocaleDateString(),
+    };
+    writeJSON(KEYS.DRAFT_REPORT, payload);
+    return payload;
+  },
+  clear: () => localStorage.removeItem(KEYS.DRAFT_REPORT),
+};
+
+export const saveStatusStore = {
+  get: () => readJSON(KEYS.SAVE_STATUS, { type: "local", label: "Saved", timestamp: Date.now() }),
+  set: (type, label = "") => {
+    const defaultLabel = type === "database" ? "Database Synced" : "Saved (Local)";
+    const payload = {
+      type, // "local" | "database" | "saving"
+      label: label || defaultLabel,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: Date.now(),
+    };
+    writeJSON(KEYS.SAVE_STATUS, payload);
+    window.dispatchEvent(new CustomEvent("spr_save_status_change", { detail: payload }));
+    return payload;
+  },
+};
+

@@ -1,11 +1,18 @@
 import { useState } from "react";
 import { CopyIcon } from "../ui/Icons";
-import { copyReportSettings as copyStore } from "../../utils/localStore";
+import { copyReportSettings as copyStore, calendarSettings, dateTimeSettings } from "../../utils/localStore";
 
 export default function CopyReportSettingsView() {
   const [includeGroup, setIncludeGroup] = useState(() => copyStore.getIncludeGroup());
   const [includeTeacher, setIncludeTeacher] = useState(() => copyStore.getIncludeTeacher());
   const [autoCopy, setAutoCopy] = useState(() => copyStore.getAutoCopy());
+  const [dateFormat, setDateFormat] = useState(() => calendarSettings.getDateFormat());
+
+  const handleDateFormatChange = (e) => {
+    const val = e.target.value;
+    setDateFormat(val);
+    calendarSettings.saveDateFormat(val);
+  };
 
   const toggleGroup = () => {
     const val = !includeGroup;
@@ -26,7 +33,7 @@ export default function CopyReportSettingsView() {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4">
+    <div className="w-full max-w-2xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
       {/* Header */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-6 shadow-2xl space-y-2">
         <div className="flex items-center gap-3">
@@ -101,6 +108,24 @@ export default function CopyReportSettingsView() {
                 autoCopy ? "right-1" : "left-1"
               }`} />
             </button>
+          </div>
+
+          {/* Report Date Format */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 theme-bg-sub rounded-xl gap-3 hover:theme-bg-elevated transition">
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold theme-text-primary">Report Date Format</div>
+              <div className="text-[11px] theme-text-secondary">Choose the format of dates displayed in generated progress reports</div>
+            </div>
+            <select
+              value={dateFormat}
+              onChange={handleDateFormatChange}
+              className="px-3.5 py-2 rounded-xl theme-bg-elevated border theme-border text-xs theme-text-primary font-semibold outline-none cursor-pointer hover:theme-border shadow transition-all"
+            >
+              <option value="DD/MM/YYYY">DD/MM/YYYY (e.g. 04/08/2026)</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY (e.g. 08/04/2026)</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-08-04)</option>
+              <option value="DD MMM YYYY">DD MMM YYYY (e.g. 04 Aug 2026)</option>
+            </select>
           </div>
 
         </div>

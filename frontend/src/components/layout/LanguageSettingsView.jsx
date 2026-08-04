@@ -2,7 +2,7 @@ import { GlobeIcon, CheckIcon } from "../ui/Icons";
 
 export default function LanguageSettingsView() {
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4">
+    <div className="w-full max-w-2xl mx-auto space-y-6 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-6 shadow-2xl space-y-2">
         <div className="flex items-center gap-3">
           <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent">

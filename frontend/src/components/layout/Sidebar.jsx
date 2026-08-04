@@ -60,29 +60,23 @@ export default function Sidebar({
       subItems: [
         { id: "Date & Time", name: "Date & Time", Icon: CalendarIcon },
         { id: "Copy Report Settings", name: "Copy Report Settings", Icon: CopyIcon },
-        { id: "Data & Backup", name: "Data & Backup", Icon: CloudIcon },
         { id: "Language", name: "Language", Icon: GlobeIcon },
       ]
     },
     { 
+      id: "Data & Backup", 
+      name: "Data & Backup", 
+      Icon: CloudIcon 
+    },
+    { 
       id: "Groups & Students", 
       name: "Groups & Students", 
-      Icon: GroupsIcon, 
-      hasSub: true,
-      subItems: [
-        { id: "Student Directory", name: "Student Directory", Icon: UsersIcon },
-        { id: "Student Groups", name: "Student Groups", Icon: FolderIcon },
-      ]
+      Icon: GroupsIcon 
     },
     { 
       id: "Sessions & Comments", 
       name: "Sessions & Comments", 
-      Icon: SessionsIcon, 
-      hasSub: true,
-      subItems: [
-        { id: "Sessions List", name: "Sessions List", Icon: ClockIcon },
-        { id: "Saved Comments", name: "Saved Comments", Icon: ChatIcon },
-      ]
+      Icon: SessionsIcon 
     },
     { 
       id: "Shortcuts", 

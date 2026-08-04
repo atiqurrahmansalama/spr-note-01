@@ -20,6 +20,10 @@
   box-sizing: border-box;
 }
 
+input, textarea, select, button {
+  font-family: inherit;
+}
+
 body {
   margin: 0;
   padding: 0;

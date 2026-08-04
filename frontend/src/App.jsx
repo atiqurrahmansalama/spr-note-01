@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { calendarSettings, auth as authStore } from "./utils/localStore";
+import { useState, useEffect, useRef } from "react";
+import { calendarSettings, auth as authStore, saveStatusStore } from "./utils/localStore";
 import Sidebar from "./components/layout/Sidebar";
 import UserProfileDrawer from "./components/layout/UserProfileDrawer";
 import HifzReportForm from "./components/session/HifzReportForm";
@@ -13,12 +13,61 @@ import SessionManager from "./components/layout/SessionManager";
 import ShortcutsGuide from "./components/layout/ShortcutsGuide";
 import AppGuideView from "./components/layout/AppGuideView";
 import AboutAppView from "./components/layout/AboutAppView";
-import { GroupsIcon } from "./components/ui/Icons";
+import StudentDirectoryView from "./components/layout/StudentDirectoryView";
+import { useTheme } from "./context/useTheme";
+import { SleekCheckIcon, CloudCheckIcon } from "./components/ui/Icons";
+
+function SaveStatusBadge() {
+  const [status, setStatus] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    const handleStatusChange = (e) => {
+      if (e.detail) {
+        setStatus(e.detail);
+        setVisible(true);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        // Popup for ~0.6 seconds then vanish smoothly
+        timerRef.current = setTimeout(() => {
+          setVisible(false);
+        }, 600);
+      }
+    };
+    window.addEventListener("spr_save_status_change", handleStatusChange);
+    return () => {
+      window.removeEventListener("spr_save_status_change", handleStatusChange);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  if (!status) return null;
+
+  const isDb = status.type === "database";
+
+  return (
+    <div 
+      className={`flex items-center gap-1.5 text-xs font-semibold transition-all duration-300 transform select-none ${
+        visible 
+          ? "opacity-100 translate-y-0 scale-100" 
+          : "opacity-0 -translate-y-1 scale-95 pointer-events-none"
+      } ${isDb ? "text-emerald-400" : "theme-accent"}`}
+    >
+      {isDb ? (
+        <CloudCheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+      ) : (
+        <SleekCheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+      )}
+      <span>{status.label || (isDb ? "Database Synced" : "Saved")}</span>
+    </div>
+  );
+}
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const themeContext = useTheme();
 
   // 💾 timezone & dateFormat — LocalStorage থেকে initialize
   const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());
@@ -27,6 +76,96 @@ export default function App() {
   // 💾 পরিবর্তন হলে LocalStorage-এ সেভ করো
   useEffect(() => { calendarSettings.saveTimezone(timeZone); }, [timeZone]);
   useEffect(() => { calendarSettings.saveDateFormat(dateFormat); }, [dateFormat]);
+
+  // 🎹 Global Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+
+      // 1. Alt + L / Ctrl + Shift + L -> Toggle Dark/Light Mode
+      if ((e.altKey || (isCmdOrCtrl && e.shiftKey)) && key === "l") {
+        e.preventDefault();
+        if (themeContext?.setModeId) {
+          themeContext.setModeId((prev) => (prev === "dark" ? "light" : "dark"));
+        }
+        return;
+      }
+
+      // 2. Alt + T / Ctrl + Shift + T -> Cycle Theme Palette
+      if ((e.altKey || (isCmdOrCtrl && e.shiftKey)) && key === "t") {
+        e.preventDefault();
+        if (themeContext?.palettes && themeContext?.setThemeId) {
+          const palettes = themeContext.palettes;
+          const currentIdx = palettes.findIndex((p) => p.id === themeContext.themeId);
+          const nextPalette = palettes[(currentIdx + 1) % palettes.length];
+          themeContext.setThemeId(nextPalette.id);
+        }
+        return;
+      }
+
+      // 3. Ctrl/Cmd + S -> Save / Generate Report
+      if (isCmdOrCtrl && !e.shiftKey && key === "s") {
+        e.preventDefault();
+        const makeReportBtn = document.querySelector('button[data-shortcut="make-report"]');
+        if (makeReportBtn) {
+          makeReportBtn.click();
+        } else {
+          setActiveTab("Dashboard");
+        }
+        return;
+      }
+
+      // 3b. Alt + S -> Add to Record
+      if (e.altKey && key === "s") {
+        e.preventDefault();
+        const addRecordBtn = Array.from(document.querySelectorAll("button")).find(
+          (b) => b.textContent.includes("Add to Record")
+        );
+        if (addRecordBtn) addRecordBtn.click();
+        return;
+      }
+
+      // 4. Ctrl/Cmd + M -> Toggle Sidebar
+      if (isCmdOrCtrl && !e.shiftKey && key === "m") {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
+        return;
+      }
+
+      // 5. Ctrl/Cmd + K -> Focus Search / Student Input
+      if (isCmdOrCtrl && !e.shiftKey && key === "k") {
+        e.preventDefault();
+        const input = document.querySelector('input[type="text"], input[placeholder*="Search"], input[placeholder*="student"]');
+        if (input) input.focus();
+        return;
+      }
+
+      // 6. Ctrl/Cmd + Shift + Hotkeys for navigation
+      if (isCmdOrCtrl && e.shiftKey) {
+        if (key === "d") { e.preventDefault(); setActiveTab("Dashboard"); }
+        else if (key === "a") { e.preventDefault(); setActiveTab("Appearance"); }
+        else if (key === "g") { e.preventDefault(); setActiveTab("Groups & Students"); }
+        else if (key === "s") { e.preventDefault(); setActiveTab("Sessions & Comments"); }
+        else if (key === "b") { e.preventDefault(); setActiveTab("Data & Backup"); }
+        else if (key === "k") { e.preventDefault(); setActiveTab("Shortcuts"); }
+      }
+
+      // 7. Escape -> Return to Dashboard or close drawer
+      if (e.key === "Escape") {
+        if (isProfileOpen) {
+          setIsProfileOpen(false);
+        } else if (isSidebarOpen) {
+          setIsSidebarOpen(false);
+        } else if (activeTab !== "Dashboard") {
+          setActiveTab("Dashboard");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, isSidebarOpen, isProfileOpen, themeContext]);
 
   const [user, setUser] = useState(() => authStore.getUser());
 
@@ -41,7 +180,7 @@ export default function App() {
     ? (user.first_name ? user.first_name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase())
     : "S";
 
-  const renderMainContent = () => {
+  const renderSidebarScreen = () => {
     switch (activeTab) {
       case "Appearance":
         return (
@@ -110,24 +249,11 @@ export default function App() {
       case "Student Groups":
         return (
           <SidebarScreenBlockView title="Groups & Students Directory" onClose={() => setActiveTab("Dashboard")}>
-            <div className="theme-bg-surface border theme-border rounded-2xl p-8 max-w-lg text-center space-y-3 shadow-2xl my-auto">
-              <div className="w-12 h-12 theme-bg-sub border theme-border rounded-2xl mx-auto flex items-center justify-center theme-accent">
-                <GroupsIcon className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold theme-text-primary">Groups & Students Directory</h3>
-              <p className="text-xs theme-text-secondary leading-relaxed">
-                Student profiles and groups are dynamically synced with the database and report forms.
-              </p>
-            </div>
+            <StudentDirectoryView />
           </SidebarScreenBlockView>
         );
-      case "Dashboard":
       default:
-        return (
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
-            <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
-          </main>
-        );
+        return null;
     }
   };
 
@@ -157,8 +283,11 @@ export default function App() {
           </button>
         </div>
 
-        {/* Right Top Action Button */}
-        <div>
+        {/* Live Auto-Save / DB Sync Status Badge */}
+        <div className="flex items-center gap-3">
+          <SaveStatusBadge />
+
+          {/* Right Top User Profile Button */}
           {user ? (
             <button 
               type="button"
@@ -198,7 +327,12 @@ export default function App() {
 
         {/* Dynamic Center / Screen-blocking Main Content View */}
         <div className="flex-1 h-full overflow-hidden relative">
-          {renderMainContent()}
+          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
+            <div className={activeTab === "Dashboard" ? "w-full max-w-xl mx-auto" : "hidden"}>
+              <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
+            </div>
+            {activeTab !== "Dashboard" && renderSidebarScreen()}
+          </main>
         </div>
 
         {/* Right Sidebar Drawer for User Profile */}

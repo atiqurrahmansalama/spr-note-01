@@ -7,6 +7,9 @@ export function ReportBody({
   setCurrentText,
   reportData,
   includeGroup,
+  pdfFont,
+  isPdfBold,
+  isPdfItalic,
 }) {
   return (
     <div className="p-4 overflow-y-auto h-[480px] theme-bg-app relative flex flex-col">
@@ -14,6 +17,9 @@ export function ReportBody({
         <PdfReportPreview
           reportData={reportData}
           includeGroup={includeGroup}
+          pdfFont={pdfFont}
+          isPdfBold={isPdfBold}
+          isPdfItalic={isPdfItalic}
         />
       ) : isEditing ? (
         <textarea

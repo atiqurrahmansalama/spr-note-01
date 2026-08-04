@@ -3,7 +3,7 @@ import PageRangeInput from "./PageRangeInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../constants/quranConstants";
 
-export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
+export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz, showLabel }) {
   const handleJuzChange = (val) => {
     onChange((prevRow) => ({ ...prevRow, juz: val }));
   };
@@ -62,11 +62,12 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
 
       <div className="flex items-center gap-1.5 sm:gap-3 flex-1 w-full min-w-0">
         {/* Juz Input */}
-        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-12 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 mr-2 sm:mr-3.5">
+        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-12 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 mr-0.5 sm:mr-1">
           <NumberScrollInput
             value={rowData.juz}
             onChange={handleJuzChange}
             onEnter={handleEnterFocusNext}
+            onAddShift={onAddJuz}
             onEmptyBackspace={(e) => {
                if (onRemoveJuz) onRemoveJuz();
                handleBackspaceFocusPrev(e, true);
@@ -91,6 +92,7 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, showLabel }) {
                   juzValue={rowData.juz}
                   isLast={isLast}
                   onAddNextRange={addRange}
+                  onAddJuzRow={onAddJuz}
                 />
                 {!isLast && <span className="theme-text-secondary font-mono text-xs sm:text-sm px-0.5 text-center shrink-0">/</span>}
               </div>

@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
-import { students as studentStore, sessions as sessionStore, savedComments as commentStore, isOnline } from "../../utils/localStore";
+import { 
+  students as studentStore, 
+  sessions as sessionStore, 
+  savedComments as commentStore, 
+  isOnline, 
+  mergeStudents, 
+  mergeSessions,
+  draftReport,
+  saveStatusStore,
+} from "../../utils/localStore";
 
 export function useReportForm() {
   const { showToast } = useToast();
@@ -41,10 +50,83 @@ export function useReportForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!isOnline());
 
+  // 📝 Unsaved Draft state detection on mount
+  const [draftInfo, setDraftInfo] = useState(() => {
+    const existing = draftReport.get();
+    if (existing && (existing.studentName || existing.comment || existing.selectedSession || existing.hasData)) {
+      return existing;
+    }
+    return null;
+  });
+
   // 💾 savedComments পরিবর্তন হলে LocalStorage-এ সেভ করা
   useEffect(() => {
     commentStore.saveAll(savedComments);
   }, [savedComments]);
+
+  // 💾 Auto-Save Draft to LocalStorage every 1.5 - 2 minutes (90s) & when form inputs change
+  useEffect(() => {
+    const hasAnyContent = Boolean(
+      studentName.trim() || 
+      groupName.trim() || 
+      selectedSession || 
+      comment.trim() || 
+      juzPageData.some(d => d.juz || d.ranges.some(r => r.start || r.end)) ||
+      mistakeData.some(m => m.page || m.ayahs.some(a => a.value)) ||
+      stuckData.some(s => s.page || s.ayahs.some(a => a.value))
+    );
+
+    if (!hasAnyContent) return;
+
+    const draftPayload = {
+      studentName,
+      groupName,
+      selectedSession,
+      selectedDate,
+      juzPageData,
+      mistakeData,
+      stuckData,
+      comment,
+      hasData: true,
+    };
+
+    // Save to LocalStorage immediately
+    draftReport.save(draftPayload);
+    saveStatusStore.set("local", "Saved");
+
+    // Periodic 90s (1.5 min) re-trigger auto-save
+    const interval = setInterval(() => {
+      draftReport.save(draftPayload);
+      saveStatusStore.set("local", "Saved");
+    }, 90000);
+
+    return () => clearInterval(interval);
+  }, [studentName, groupName, selectedSession, selectedDate, juzPageData, mistakeData, stuckData, comment]);
+
+  // 🔄 Recover draft handler
+  const recoverDraft = () => {
+    if (!draftInfo) return;
+    if (draftInfo.studentName !== undefined) setStudentName(draftInfo.studentName);
+    if (draftInfo.groupName !== undefined) setGroupName(draftInfo.groupName);
+    if (draftInfo.selectedSession !== undefined) setSelectedSession(draftInfo.selectedSession);
+    if (draftInfo.selectedDate !== undefined) setSelectedDate(draftInfo.selectedDate);
+    if (draftInfo.juzPageData?.length) setJuzPageData(draftInfo.juzPageData);
+    if (draftInfo.mistakeData?.length) setMistakeData(draftInfo.mistakeData);
+    if (draftInfo.stuckData?.length) setStuckData(draftInfo.stuckData);
+    if (draftInfo.comment !== undefined) setComment(draftInfo.comment);
+
+    setDraftInfo(null);
+    draftReport.clear();
+    showToast("Report draft recovered successfully!", "success");
+    saveStatusStore.set("local", "Saved (Local)");
+  };
+
+  // 🗑️ Discard draft handler
+  const discardDraft = () => {
+    setDraftInfo(null);
+    draftReport.clear();
+    showToast("Report draft discarded", "info");
+  };
 
   // 🌐 Online/offline status monitor
   useEffect(() => {
@@ -64,15 +146,8 @@ export function useReportForm() {
 
   /**
    * 🚀 ডেটা লোড করার মূল ফাংশন
-   * 
-   * Strategy:
-   * 1. LocalStorage থেকে আগেই ডেটা লোড করে (instant)
-   * 2. API call করার চেষ্টা করে
-   * 3. API সফল হলে → LocalStorage cache আপডেট
-   * 4. API ব্যর্থ হলে → LocalStorage ডেটাই ব্যবহার (offline mode)
    */
   const fetchData = async () => {
-    // Step 1: LocalStorage থেকে তাৎক্ষণিকভাবে ডেটা দেখাও
     const cachedStudents = studentStore.getAll();
     const cachedSessions = sessionStore.getAll();
 
@@ -84,7 +159,6 @@ export function useReportForm() {
       setSessionList(cachedSessions);
     }
 
-    // Step 2: API থেকে fresh data আনার চেষ্টা
     if (!isOnline()) {
       console.info("[useReportForm] Offline — using cached data.");
       return;
@@ -98,25 +172,24 @@ export function useReportForm() {
 
       if (studentsRes.ok) {
         const rawStudents = await studentsRes.json();
-        const formattedStudents = rawStudents.map((s) => ({
+        const apiStudents = rawStudents.map((s) => ({
           label: typeof s === "object" ? (s.name || s.student_name || s.label) : s,
           sub: typeof s === "object" ? (s.group || s.group_name || s.sub || "General Group") : "General Group",
         }));
 
-        // ✅ API সফল: cache আপডেট করো
-        studentStore.saveAll(formattedStudents);
-        setStudentDatabase(formattedStudents);
-        setAvailableGroups(Array.from(new Set(formattedStudents.map((s) => s.sub))));
+        const localStudents = studentStore.getAll();
+        const merged = mergeStudents(apiStudents, localStudents);
+        setStudentDatabase(merged);
+        setAvailableGroups(Array.from(new Set(merged.map((s) => s.sub))).filter(Boolean));
       }
 
       if (sessionsRes.ok) {
         const rawSessions = await sessionsRes.json();
-        // ✅ API সফল: cache আপডেট করো
-        sessionStore.saveAll(rawSessions);
-        setSessionList(rawSessions);
+        const localSessions = sessionStore.getAll();
+        const merged = mergeSessions(rawSessions, localSessions);
+        setSessionList(merged);
       }
     } catch (error) {
-      // ❌ API ব্যর্থ: cached ডেটাই ব্যবহার হবে (ইতোমধ্যে set হয়েছে)
       console.warn("[useReportForm] API unreachable, using cached data:", error.message);
     }
   };
@@ -151,19 +224,17 @@ export function useReportForm() {
       sub: result.group || "General Group",
     };
 
-    // 💾 সবার আগে LocalStorage-এ সেভ করো (offline-first)
     let updatedList;
     if (result.mode === "REPLACE" && result.oldStudent) {
-      updatedList = studentStore.replace(result.oldStudent, newStudent);
+      updatedList = studentStore.replace(result.oldStudent, { ...newStudent, _local: true });
     } else {
-      updatedList = studentStore.add(newStudent);
+      updatedList = studentStore.add({ ...newStudent, _local: true });
     }
     setStudentDatabase(updatedList);
     setAvailableGroups(Array.from(new Set(updatedList.map((s) => s.sub))).filter(Boolean));
     setStudentName(result.name);
     setGroupName(result.group || "General Group");
 
-    // 🌐 অনলাইনে থাকলে API-তেও পাঠাও
     if (isOnline()) {
       try {
         const payload = {
@@ -177,16 +248,19 @@ export function useReportForm() {
 
         if (response.ok) {
           showToast(`Student "${result.name}" saved to database!`, "success");
-          // API থেকে fresh data আনো (server-assigned ID পেতে)
+          saveStatusStore.set("database", "Database Synced");
           await fetchData();
         } else {
           showToast(`"${result.name}" saved locally. Will sync when possible.`, "info");
+          saveStatusStore.set("local", "Saved (Local)");
         }
       } catch {
         showToast(`"${result.name}" saved locally (offline).`, "info");
+        saveStatusStore.set("local", "Saved (Local)");
       }
     } else {
       showToast(`"${result.name}" saved locally (offline).`, "info");
+      saveStatusStore.set("local", "Saved (Local)");
     }
   };
 
@@ -209,7 +283,6 @@ export function useReportForm() {
       client_updated_at: new Date().toISOString(),
     };
 
-    // 🌐 অনলাইনে থাকলে API-তে পাঠাও
     if (isOnline()) {
       try {
         const response = await fetchWithAuth("/reports/", {
@@ -219,6 +292,7 @@ export function useReportForm() {
 
         if (response.ok) {
           showToast(`Report for "${studentName}" saved to Database!`, "success");
+          saveStatusStore.set("database", "Database Synced");
         } else {
           const errData = await response.json();
           showToast(typeof errData === "string" ? errData : "Failed to save report", "error");
@@ -229,11 +303,15 @@ export function useReportForm() {
         return;
       }
     } else {
-      // অফলাইনে syncEngine দিয়ে local-এ সেভ
       showToast(`Report saved locally (offline). Will sync later.`, "info");
+      saveStatusStore.set("local", "Saved (Local)");
     }
 
-    // ফর্ম রিসেট
+    // Clear local report draft upon successful save
+    draftReport.clear();
+    setDraftInfo(null);
+
+    // Reset Form
     setStudentName("");
     setGroupName("");
     setSelectedSession("");
@@ -255,6 +333,33 @@ export function useReportForm() {
     }
     showToast(`Generating report for "${studentName}"...`, "info");
     await handleSaveRecord();
+  };
+
+  // 🚀 নতুন সেশন সেভ হ্যান্ডলার (মেইন রিপোর্ট ফর্মের সেশন ড্রপডাউন থেকে)
+  const handleSaveSession = async (sessionName) => {
+    const trimmed = typeof sessionName === "string" ? sessionName.trim() : (sessionName?.label || "");
+    if (!trimmed) return;
+
+    const { updated } = sessionStore.add(trimmed);
+    setSessionList(updated);
+    setSelectedSession(trimmed);
+    showToast(`Session "${trimmed}" saved!`, "success");
+    saveStatusStore.set("local", "Saved (Local)");
+
+    if (isOnline()) {
+      try {
+        const response = await fetchWithAuth("/sessions/", {
+          method: "POST",
+          body: JSON.stringify({ name: trimmed }),
+        });
+        if (response.ok) {
+          saveStatusStore.set("database", "Database Synced");
+          await fetchData();
+        }
+      } catch (err) {
+        console.warn("[useReportForm] Online session save failed:", err.message);
+      }
+    }
   };
 
   return {
@@ -285,7 +390,11 @@ export function useReportForm() {
     sessionList,
     isLoading,
     isOffline,
+    draftInfo,
+    recoverDraft,
+    discardDraft,
     handleSaveResult,
+    handleSaveSession,
     handleSaveRecord,
     handleMakeReport,
   };
