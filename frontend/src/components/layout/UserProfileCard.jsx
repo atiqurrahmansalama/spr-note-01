@@ -1,18 +1,9 @@
 import { useState } from "react";
 import LoginModal from "../auth/LoginModal";
+import { auth as authStore } from "../../utils/localStore";
 
 export default function UserProfileCard({ isProfileOpen, setIsProfileOpen }) {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        return JSON.parse(savedUser);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
+  const [user, setUser] = useState(() => authStore.getUser());
 
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 

@@ -1,5 +1,6 @@
 import { CloudIcon, SaveIcon, RefreshIcon } from "../ui/Icons";
 import { useToast } from "../../context/ToastContext";
+import { KEYS, students as studentStore, sessions as sessionStore, savedComments as commentStore, appearanceSettings as appStore } from "../../utils/localStore";
 
 export default function DataBackupView() {
   const { showToast } = useToast();
@@ -7,11 +8,14 @@ export default function DataBackupView() {
   const handleExportData = () => {
     try {
       const data = {
-        reports: JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]"),
-        fontId: localStorage.getItem("spr_app_font_id"),
-        fontSize: localStorage.getItem("spr_app_font_size"),
-        theme: localStorage.getItem("spr_app_theme"),
-        mode: localStorage.getItem("spr_app_mode"),
+        students: studentStore.getAll(),
+        sessions: sessionStore.getAll(),
+        savedComments: commentStore.getAll(),
+        reports: JSON.parse(localStorage.getItem(KEYS.REPORTS) || "[]"),
+        fontId: appStore.getFontId(),
+        fontSize: appStore.getFontSize(),
+        theme: appStore.getTheme(),
+        mode: appStore.getMode(),
         exportDate: new Date().toISOString(),
       };
 
@@ -30,8 +34,8 @@ export default function DataBackupView() {
 
   const handleClearCache = () => {
     if (window.confirm("Are you sure you want to clear local report cache?")) {
-      localStorage.removeItem("spr_reports_local_v1");
-      localStorage.removeItem("spr_reports_pending_queue");
+      localStorage.removeItem(KEYS.REPORTS);
+      localStorage.removeItem(KEYS.PENDING_QUEUE);
       showToast("Local cache cleared successfully", "info");
     }
   };

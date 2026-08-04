@@ -1,33 +1,28 @@
 import { useState } from "react";
 import { CopyIcon } from "../ui/Icons";
+import { copyReportSettings as copyStore } from "../../utils/localStore";
 
 export default function CopyReportSettingsView() {
-  const [includeGroup, setIncludeGroup] = useState(() => {
-    return localStorage.getItem("spr_copy_include_group") !== "false";
-  });
-  const [includeTeacher, setIncludeTeacher] = useState(() => {
-    return localStorage.getItem("spr_copy_include_teacher") !== "false";
-  });
-  const [autoCopy, setAutoCopy] = useState(() => {
-    return localStorage.getItem("spr_copy_auto_copy") === "true";
-  });
+  const [includeGroup, setIncludeGroup] = useState(() => copyStore.getIncludeGroup());
+  const [includeTeacher, setIncludeTeacher] = useState(() => copyStore.getIncludeTeacher());
+  const [autoCopy, setAutoCopy] = useState(() => copyStore.getAutoCopy());
 
   const toggleGroup = () => {
     const val = !includeGroup;
     setIncludeGroup(val);
-    localStorage.setItem("spr_copy_include_group", val.toString());
+    copyStore.saveIncludeGroup(val);
   };
 
   const toggleTeacher = () => {
     const val = !includeTeacher;
     setIncludeTeacher(val);
-    localStorage.setItem("spr_copy_include_teacher", val.toString());
+    copyStore.saveIncludeTeacher(val);
   };
 
   const toggleAutoCopy = () => {
     const val = !autoCopy;
     setAutoCopy(val);
-    localStorage.setItem("spr_copy_auto_copy", val.toString());
+    copyStore.saveAutoCopy(val);
   };
 
   return (

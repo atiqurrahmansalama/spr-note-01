@@ -1,27 +1,23 @@
 import { useState, useEffect } from "react";
 import { FONT_OPTIONS, FONT_SIZES } from "../constants/fontConstants";
 import { FontContext } from "./FontContextObject";
+import { appearanceSettings as appStore } from "../utils/localStore";
 
 export function FontProvider({ children }) {
-  const [fontId, setFontId] = useState(() => {
-    return localStorage.getItem("spr_app_font_id") || "Outfit";
-  });
-
-  const [fontSizeId, setFontSizeId] = useState(() => {
-    return localStorage.getItem("spr_app_font_size") || "normal";
-  });
+  const [fontId, setFontId] = useState(() => appStore.getFontId());
+  const [fontSizeId, setFontSizeId] = useState(() => appStore.getFontSize());
 
   const activeFont = FONT_OPTIONS.find((f) => f.id === fontId) || FONT_OPTIONS[2];
   const activeFontSize = FONT_SIZES.find((s) => s.id === fontSizeId) || FONT_SIZES[1];
 
   useEffect(() => {
-    localStorage.setItem("spr_app_font_id", fontId);
+    appStore.saveFontId(fontId);
     document.documentElement.style.fontFamily = activeFont.css;
     document.body.style.fontFamily = activeFont.css;
   }, [fontId, activeFont]);
 
   useEffect(() => {
-    localStorage.setItem("spr_app_font_size", fontSizeId);
+    appStore.saveFontSize(fontSizeId);
     document.documentElement.style.fontSize = activeFontSize.px;
   }, [fontSizeId, activeFontSize]);
 

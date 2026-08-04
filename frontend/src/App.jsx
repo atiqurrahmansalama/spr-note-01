@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { calendarSettings, auth as authStore } from "./utils/localStore";
 import Sidebar from "./components/layout/Sidebar";
 import UserProfileDrawer from "./components/layout/UserProfileDrawer";
 import HifzReportForm from "./components/session/HifzReportForm";
@@ -19,21 +20,18 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
 
-  const [timeZone, setTimeZone] = useState("Asia/Dhaka");
-  const [dateFormat, setDateFormat] = useState("DD/MM/YYYY");
+  // 💾 timezone & dateFormat — LocalStorage থেকে initialize
+  const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());
+  const [dateFormat, setDateFormat] = useState(() => calendarSettings.getDateFormat());
 
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try { return JSON.parse(savedUser); } catch { return null; }
-    }
-    return null;
-  });
+  // 💾 পরিবর্তন হলে LocalStorage-এ সেভ করো
+  useEffect(() => { calendarSettings.saveTimezone(timeZone); }, [timeZone]);
+  useEffect(() => { calendarSettings.saveDateFormat(dateFormat); }, [dateFormat]);
+
+  const [user, setUser] = useState(() => authStore.getUser());
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+    authStore.clear();
     setUser(null);
     setIsProfileOpen(false);
     window.location.reload();

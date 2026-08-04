@@ -1,22 +1,15 @@
 import { useState } from 'react';
+import { auth as authStore } from '../utils/localStore';
 import Sidebar from '../components/sidebar/Sidebar';
 import UserProfileDrawer from '../components/UserProfileDrawer';
 
 export default function DashboardLayout({ children }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try { return JSON.parse(savedUser); } catch { return null; }
-    }
-    return null;
-  });
+  const [user, setUser] = useState(() => authStore.getUser());
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+    authStore.clear();
     setUser(null);
     setIsProfileOpen(false);
     window.location.reload();

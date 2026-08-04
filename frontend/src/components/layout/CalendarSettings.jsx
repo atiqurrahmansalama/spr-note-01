@@ -11,6 +11,7 @@ import {
   DATE_FORMAT_LIST, 
   FIRST_DAY_LIST 
 } from "../../constants/calendarConstants";
+import { calendarSettings as calStore } from "../../utils/localStore";
 
 export default function CalendarSettings({ 
   timeZone, 
@@ -18,13 +19,8 @@ export default function CalendarSettings({
   dateFormat, 
   setDateFormat 
 }) {
-  const [firstDay, setFirstDay] = useState(() => {
-    return localStorage.getItem("spr_first_day_of_week") || "Saturday";
-  });
-  
-  const [enableHijri, setEnableHijri] = useState(() => {
-    return localStorage.getItem("spr_enable_hijri") === "true";
-  });
+  const [firstDay, setFirstDay] = useState(() => calStore.getFirstDay());
+  const [enableHijri, setEnableHijri] = useState(() => calStore.getHijriEnabled());
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -36,13 +32,13 @@ export default function CalendarSettings({
 
   const handleFirstDayChange = (dayId) => {
     setFirstDay(dayId);
-    localStorage.setItem("spr_first_day_of_week", dayId);
+    calStore.saveFirstDay(dayId);
   };
 
   const handleHijriToggle = () => {
     const val = !enableHijri;
     setEnableHijri(val);
-    localStorage.setItem("spr_enable_hijri", val.toString());
+    calStore.saveHijriEnabled(val);
   };
 
   const handleResetDefaults = () => {
@@ -50,8 +46,10 @@ export default function CalendarSettings({
     setDateFormat("DD/MM/YYYY");
     setFirstDay("Saturday");
     setEnableHijri(false);
-    localStorage.setItem("spr_first_day_of_week", "Saturday");
-    localStorage.setItem("spr_enable_hijri", "false");
+    calStore.saveTimezone("Asia/Dhaka");
+    calStore.saveDateFormat("DD/MM/YYYY");
+    calStore.saveFirstDay("Saturday");
+    calStore.saveHijriEnabled(false);
   };
 
   const getFormattedSampleDate = (fmt) => {
