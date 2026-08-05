@@ -185,8 +185,8 @@ export default function SessionInput({
           onSaveResult={onSaveResult}
         />
 
-        {/* 2. Session Dropdown Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 border-t theme-border pt-4 mt-4">
+        {/* 2. Session Dropdown Section (Increased Spacing) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-4 border-t theme-border pt-6 mt-6">
           <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary w-full sm:w-20 shrink-0">
             SESSION
           </label>

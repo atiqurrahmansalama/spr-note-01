@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { RefreshIcon, SaveIcon, SavedMessagesIcon, TrashIcon, CloseIcon } from "../ui/Icons";
+import { fetchWithAuth } from "../../utils/authService";
+import { isOnline } from "../../utils/localStore";
 
 export default function CommentSection({
   comment = "",
@@ -22,10 +24,21 @@ export default function CommentSection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSaveComment = () => {
+  const handleSaveComment = async () => {
     const trimmed = comment.trim();
     if (trimmed && !savedComments.includes(trimmed)) {
       setSavedComments((prev) => [...prev, trimmed]);
+
+      if (isOnline()) {
+        try {
+          await fetchWithAuth("/messages/", {
+            method: "POST",
+            body: JSON.stringify({ text: trimmed }),
+          });
+        } catch (err) {
+          console.warn("[CommentSection] Failed to sync saved comment with server:", err.message);
+        }
+      }
     }
   };
 
@@ -77,15 +90,10 @@ export default function CommentSection({
             <button
               type="button"
               onClick={() => setIsSavedDropdownOpen((prev) => !prev)}
-              className="relative p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors flex items-center justify-center"
+              className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors flex items-center justify-center cursor-pointer"
               title="Saved Messages"
             >
               <SavedMessagesIcon className="w-4 h-4" />
-              {savedComments.length > 0 && (
-                <span className="absolute -top-1 -right-1 theme-bg-accent theme-accent-text text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center leading-none py-0.5">
-                  {savedComments.length}
-                </span>
-              )}
             </button>
           </div>
         </div>
@@ -109,13 +117,13 @@ export default function CommentSection({
                 if (onAddToRecord) onAddToRecord();
               }
             }}
-            className="w-full h-36 p-3 rounded-xl theme-bg-sub theme-text-primary text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors resize-none placeholder:theme-text-secondary placeholder:opacity-60"
-            placeholder="Enter comment... (Ctrl+S to Make Report, Alt+S or Ctrl+Enter to Add to Record)"
+            className="w-full h-36 p-3.5 rounded-xl theme-bg-sub theme-text-primary text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors resize-none placeholder:theme-text-secondary placeholder:opacity-60 font-normal leading-relaxed"
+            placeholder="Enter comment..."
           />
 
           {/* Saved Messages Dropdown Overlay */}
           {isSavedDropdownOpen && (
-            <div className="absolute inset-0 theme-bg-sub border theme-border rounded-xl shadow-2xl z-20 p-3 flex flex-col space-y-2">
+            <div className="absolute inset-0 theme-bg-sub border theme-border rounded-xl z-20 p-3 flex flex-col space-y-2">
               <div className="flex items-center justify-between border-b theme-border pb-2 px-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
@@ -128,7 +136,7 @@ export default function CommentSection({
                 <button
                   type="button"
                   onClick={() => setIsSavedDropdownOpen(false)}
-                  className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors"
+                  className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
                   title="Close templates"
                 >
                   <CloseIcon className="w-4 h-4" />
@@ -141,21 +149,16 @@ export default function CommentSection({
                     <div
                       key={index}
                       onClick={() => {
-                        setComment(msg);
+                        setComment((prev) => {
+                          if (!prev.trim()) return msg;
+                          return `${prev}\n${msg}`;
+                        });
                         setIsSavedDropdownOpen(false);
                       }}
-                      className="px-3 py-2 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-center justify-between group gap-2"
+                      className="px-3.5 py-2.5 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2"
                       title={msg}
                     >
-                      <span className="truncate flex-1">{msg}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleRemoveSavedComment(e, index)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:theme-bg-elevated rounded transition-all shrink-0"
-                        title="Delete saved message"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5 theme-text-secondary hover:text-red-400" />
-                      </button>
+                      <span className="truncate flex-1 font-medium">{msg}</span>
                     </div>
                   ))
                 ) : (
@@ -164,9 +167,6 @@ export default function CommentSection({
                     className="h-full flex flex-col items-center justify-center theme-text-secondary text-xs py-4 cursor-pointer hover:theme-text-primary transition-colors select-none gap-1"
                   >
                     <span>No saved messages yet.</span>
-                    <span className="theme-accent hover:underline font-medium text-[11px]">
-                      Click to add
-                    </span>
                   </div>
                 )}
               </div>

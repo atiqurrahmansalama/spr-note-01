@@ -17,10 +17,15 @@ export const TIMEZONE_LIST = [
 ];
 
 export const DATE_FORMAT_LIST = [
-  { id: "DD/MM/YYYY", name: "DD/MM/YYYY", sample: "03/08/2026", label: "Day / Month / Year (UK / Asia / International Standard)" },
-  { id: "MM/DD/YYYY", name: "MM/DD/YYYY", sample: "08/03/2026", label: "Month / Day / Year (US Standard)" },
-  { id: "YYYY-MM-DD", name: "YYYY-MM-DD", sample: "2026-08-03", label: "Year - Month - Day (ISO 8601 Standard)" },
-  { id: "DD MMM YYYY", name: "DD MMM YYYY", sample: "03 Aug 2026", label: "Day Month Name Year (Textual Full Standard)" },
+  { id: "DD/MM/YYYY", name: "DD/MM/YYYY", sample: "05/08/2026", label: "Day / Month / Year (UK / Asia / International Standard)" },
+  { id: "MM/DD/YYYY", name: "MM/DD/YYYY", sample: "08/05/2026", label: "Month / Day / Year (US Standard)" },
+  { id: "YYYY-MM-DD", name: "YYYY-MM-DD", sample: "2026-08-05", label: "Year - Month - Day (ISO 8601 Standard)" },
+  { id: "DD MMM YYYY", name: "DD MMM YYYY", sample: "05 Aug 2026", label: "Day Short-Month Year" },
+  { id: "DD MMMM YYYY", name: "DD MMMM YYYY", sample: "05 August 2026", label: "Day Full-Month Year" },
+  { id: "MMM DD, YYYY", name: "MMM DD, YYYY", sample: "Aug 05, 2026", label: "Short-Month Day, Year" },
+  { id: "MMMM DD, YYYY", name: "MMMM DD, YYYY", sample: "August 05, 2026", label: "Full-Month Day, Year" },
+  { id: "DD.MM.YYYY", name: "DD.MM.YYYY", sample: "05.08.2026", label: "Day.Month.Year (European Standard)" },
+  { id: "YYYY/MM/DD", name: "YYYY/MM/DD", sample: "2026/08/05", label: "Year / Month / Day (East Asia Standard)" },
 ];
 
 export const FIRST_DAY_LIST = [

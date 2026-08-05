@@ -64,6 +64,7 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz, showL
         {/* Juz Input */}
         <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 w-12 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 mr-0.5 sm:mr-1">
           <NumberScrollInput
+            id={rowData.juzInputId}
             value={rowData.juz}
             onChange={handleJuzChange}
             onEnter={handleEnterFocusNext}

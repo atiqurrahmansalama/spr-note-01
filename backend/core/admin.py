@@ -1,16 +1,27 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
-from .models import User, Student, StudentDailyReport
+from .models import (
+    User, 
+    Student, 
+    StudentGroup,
+    Session,
+    SavedMessage,
+    StudentDailyReport, 
+    MistakeDetail, 
+    StuckDetail
+)
 
-admin.site.unregister(Group)
+try:
+    admin.site.unregister(Group)
+except admin.sites.NotRegistered:
+    pass
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     list_display = ('username', 'email', 'role', 'parent', 'is_active_user', 'last_login')
     list_filter = ('role', 'is_active_user')
     
-    # 🎯 এডমিন ফর্মে রোল ও প্যারেন্ট ড্রপডাউন নিশ্চিত করা
     fieldsets = UserAdmin.fieldsets + (
         ('Role & Hierarchy Settings', {'fields': ('role', 'parent', 'is_active_user')}),
     )
@@ -18,22 +29,46 @@ class CustomUserAdmin(UserAdmin):
         ('Role & Hierarchy Settings', {'fields': ('role', 'parent', 'is_active_user')}),
     )
 
+@admin.register(StudentGroup)
+class StudentGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at')
+    search_fields = ('name',)
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at')
+    search_fields = ('name',)
+
+@admin.register(SavedMessage)
+class SavedMessageAdmin(admin.ModelAdmin):
+    list_display = ('text', 'created_at')
+    search_fields = ('text',)
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'group', 'is_active', 'created_at')
-    search_fields = ('name', 'group')
-    list_filter = ('group', 'is_active')
+    list_display = ('roll', 'unique_id', 'name', 'group_name', 'is_active', 'created_at')
+    search_fields = ('name', 'group_name', 'unique_id')
+    list_filter = ('group_name', 'is_active')
+
+class MistakeDetailInline(admin.TabularInline):
+    model = MistakeDetail
+    extra = 0
+
+class StuckDetailInline(admin.TabularInline):
+    model = StuckDetail
+    extra = 0
 
 @admin.register(StudentDailyReport)
 class StudentDailyReportAdmin(admin.ModelAdmin):
-    list_display = ('get_student_name', 'get_student_group', 'created_by', 'report_date', 'is_locked', 'created_at')
-    list_filter = ('is_locked', 'is_deleted', 'report_date', 'created_by')
-    search_fields = ('student__name', 'created_by__username')
+    list_display = ('report_unique_id', 'student_name', 'session_name', 'date', 'total_mistake', 'total_stuck', 'created_at')
+    list_filter = ('is_locked', 'is_deleted', 'date', 'session_name')
+    search_fields = ('report_unique_id', 'student_name', 'student__name')
+    inlines = [MistakeDetailInline, StuckDetailInline]
 
-    def get_student_name(self, obj):
-        return obj.student.name
-    get_student_name.short_description = 'Student Name'
+@admin.register(MistakeDetail)
+class MistakeDetailAdmin(admin.ModelAdmin):
+    list_display = ('report', 'juz', 'page', 'ayah')
 
-    def get_student_group(self, obj):
-        return obj.student.group
-    get_student_group.short_description = 'Student Group'
+@admin.register(StuckDetail)
+class StuckDetailAdmin(admin.ModelAdmin):
+    list_display = ('report', 'juz', 'page', 'ayah')

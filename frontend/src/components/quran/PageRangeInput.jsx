@@ -40,12 +40,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
         value={range.end}
         onChange={(val) => onChange({ ...range, end: val })}
         onEnter={(e) => {
-          if (isLast && onAddNextRange) {
-            onAddNextRange();
-            setTimeout(() => handleEnterFocusNext(e), 50);
-          } else {
-            handleEnterFocusNext(e);
-          }
+          handleEnterFocusNext(e);
         }}
         onAdd={() => {
           if (onAddNextRange) {

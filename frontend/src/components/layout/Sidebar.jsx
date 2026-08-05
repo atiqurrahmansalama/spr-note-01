@@ -73,6 +73,11 @@ export default function Sidebar({
       Icon: GroupsIcon 
     },
     { 
+      id: "Student Reports", 
+      name: "Student Reports", 
+      Icon: CloudIcon 
+    },
+    { 
       id: "Sessions & Comments", 
       name: "Sessions & Comments", 
       Icon: SessionsIcon 
@@ -126,36 +131,14 @@ export default function Sidebar({
       {/* Sidebar Container */}
       <aside
         className={`
-          ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full shadow-none"}
-          ${isCollapsed ? "w-16 sm:w-16" : "w-72 sm:w-72"}
-          theme-bg-surface theme-text-secondary border-r theme-border shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
+          ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full"}
+          ${isCollapsed ? "w-20 sm:w-20" : "w-72 sm:w-72"}
+          theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
         `}
       >
-        {/* Clean Sidebar Header */}
-        <div className="p-3 border-b theme-border theme-bg-sub flex items-center justify-between shrink-0 select-none">
-          {!isCollapsed && (
-            <div className="flex items-center gap-2">
-              <span className="font-bold theme-text-primary text-xs tracking-wide">
-                Navigation
-              </span>
-              <span className="text-[10px] theme-text-secondary font-mono theme-bg-elevated px-1.5 py-0.5 rounded border theme-border">
-                {APP_VERSION}
-              </span>
-            </div>
-          )}
-          <button 
-            type="button"
-            onClick={onClose}
-            className="theme-text-secondary hover:text-red-400 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ml-auto"
-            title="Close Sidebar"
-          >
-            ✕
-          </button>
-        </div>
-
         {/* Navigation Menu List */}
         <nav 
-          className={`flex-1 overflow-y-auto ${isCollapsed ? "p-1.5 space-y-2" : "p-3 space-y-1.5"} text-xs font-medium`}
+          className={`flex-1 overflow-y-auto ${isCollapsed ? "px-3 py-6 space-y-4" : "px-4 py-6 space-y-2"} text-sm font-medium`}
           style={{ scrollbarGutter: "stable" }}
         >
           {displayMenuItems.map((item) => {
@@ -164,42 +147,42 @@ export default function Sidebar({
             const isSubOpen = openSubMenus[item.id] || false;
 
             if (item.hasSub) {
+              const isAnySubActive = item.subItems.some((sub) => sub.name === activeTab);
+
               return (
-                <div key={item.id} className="space-y-1">
+                <div key={item.id} className="space-y-1.5">
                   <button
                     type="button"
                     onClick={() => {
-                      if (isCollapsed) {
-                        handleSelectTab(item.subItems[0].name);
-                      } else {
-                        toggleSubMenu(item.id);
-                      }
+                      toggleSubMenu(item.id);
                     }}
                     title={item.name}
-                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2.5"} rounded-xl transition-colors cursor-pointer select-none ${
-                      isParentActive
-                        ? "theme-bg-elevated theme-text-primary font-semibold border theme-border"
-                        : "hover:theme-bg-sub theme-text-secondary"
+                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-3" : "justify-between px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                      isParentActive || isAnySubActive
+                        ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
+                        : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-7 h-7 rounded-lg theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary shrink-0">
-                        <ItemIcon className="w-3.5 h-3.5" />
-                      </div>
-                      {!isCollapsed && <span className="truncate text-xs font-semibold">{item.name}</span>}
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <ItemIcon className={`w-4.5 h-4.5 shrink-0 ${isParentActive || isAnySubActive ? "theme-accent" : "opacity-80"}`} />
+                      {!isCollapsed && <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
                     </div>
 
                     {!isCollapsed && (
                       <ChevronIcon 
                         isOpen={isSubOpen} 
-                        className="w-3.5 h-3.5 theme-text-secondary shrink-0" 
+                        className="w-3.5 h-3.5 theme-text-secondary shrink-0 opacity-60" 
                       />
                     )}
                   </button>
 
-                  {/* Sub-items List (Only when NOT collapsed) */}
-                  {!isCollapsed && isSubOpen && (
-                    <div className="pl-4 space-y-1 pt-0.5 transition-all">
+                  {/* Sub-items List (Identical typography & size, indented right) */}
+                  {(isSubOpen || isCollapsed) && (
+                    <div className={
+                      isCollapsed 
+                        ? "space-y-2 pt-1 flex flex-col items-center" 
+                        : "pl-5 space-y-1.5 pt-1"
+                    }>
                       {item.subItems.map((sub) => {
                         const isSubActive = activeTab === sub.name;
                         const SubIcon = sub.Icon;
@@ -208,25 +191,17 @@ export default function Sidebar({
                             key={sub.id}
                             type="button"
                             onClick={() => handleSelectTab(sub.name)}
-                            className={`w-full relative flex items-center gap-3 px-3 py-2 rounded-xl transition-all cursor-pointer select-none ${
+                            title={sub.name}
+                            className={`w-full flex items-center gap-3.5 relative ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                               isSubActive
-                                ? "theme-bg-elevated theme-text-primary font-bold border theme-border shadow-sm"
-                                : "hover:theme-bg-sub theme-text-secondary"
+                                ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
+                                : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                             }`}
                           >
-                            {isSubActive && (
-                              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
+                            <SubIcon className={`w-4.5 h-4.5 shrink-0 ${isSubActive ? "theme-accent" : "opacity-80"}`} />
+                            {!isCollapsed && (
+                              <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{sub.name}</span>
                             )}
-
-                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                              isSubActive 
-                                ? "theme-bg-sub theme-text-primary border theme-border" 
-                                : "theme-bg-sub theme-text-secondary"
-                            }`}>
-                              <SubIcon className="w-3.5 h-3.5" />
-                            </div>
-
-                            <span className="truncate text-xs">{sub.name}</span>
                           </button>
                         );
                       })}
@@ -244,25 +219,15 @@ export default function Sidebar({
                 type="button"
                 onClick={() => handleSelectTab(item.name)}
                 title={item.name}
-                className={`w-full relative flex items-center ${isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2.5"} rounded-xl transition-colors cursor-pointer select-none ${
+                className={`w-full flex items-center ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                   isActive
-                    ? "theme-bg-elevated theme-text-primary font-bold border theme-border shadow-sm"
-                    : "hover:theme-bg-sub theme-text-secondary"
+                    ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
+                    : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                 }`}
               >
-                {isActive && !isCollapsed && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 theme-bg-accent rounded-r-full shadow-sm" />
-                )}
-
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    isActive 
-                      ? "theme-bg-accent-soft theme-accent" 
-                      : "theme-bg-sub theme-text-secondary"
-                  }`}>
-                    <ItemIcon className="w-3.5 h-3.5" />
-                  </div>
-                  {!isCollapsed && <span className="truncate text-xs font-semibold">{item.name}</span>}
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <ItemIcon className={`w-4.5 h-4.5 shrink-0 ${isActive ? "theme-accent" : "opacity-80"}`} />
+                  {!isCollapsed && <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
                 </div>
               </button>
             );

@@ -256,10 +256,18 @@ export function SleekCheckIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export function EditIcon({ className = "w-3.5 h-3.5" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.586 6a2 2 0 010 2.828L10 17.414l-4 1 1-4 10.414-10.414z" />
+    </svg>
+  );
+}
+
 export function CloudCheckIcon({ className = "w-4 h-4" }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M9 13l2 2 4-4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 15a4 4 0 004 4h9a5 5 0 001-9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
     </svg>
   );
 }

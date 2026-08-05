@@ -49,6 +49,13 @@ export default function HeaderDateControl({
   const tzObj = TIMEZONE_LIST.find((t) => t.id === timeZone);
   const tzAbbr = tzObj ? tzObj.offset : "(UTC+06:00)";
 
+  // Notify initial date on mount
+  useEffect(() => {
+    if (onDateChange && selectedCustomDate) {
+      onDateChange(selectedCustomDate);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Close calendar popover on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {

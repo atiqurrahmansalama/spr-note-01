@@ -11,11 +11,12 @@ import {
   draftReport,
   saveStatusStore,
 } from "../../utils/localStore";
+import { saveReportLocally } from "../../utils/syncEngine";
 
 export function useReportForm() {
   const { showToast } = useToast();
 
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [studentName, setStudentName] = useState("");
   const [groupName, setGroupName] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
@@ -249,14 +250,16 @@ export function useReportForm() {
     }
 
     try {
-      const [studentsRes, sessionsRes] = await Promise.all([
+      const [studentsRes, sessionsRes, messagesRes] = await Promise.all([
         fetchWithAuth("/students/"),
         fetchWithAuth("/sessions/"),
+        fetchWithAuth("/messages/"),
       ]);
 
       if (studentsRes.ok) {
         const rawStudents = await studentsRes.json();
         const apiStudents = rawStudents.map((s) => ({
+          id: typeof s === "object" ? s.id : null,
           label: typeof s === "object" ? (s.name || s.student_name || s.label) : s,
           sub: typeof s === "object" ? (s.group || s.group_name || s.sub || "General Group") : "General Group",
         }));
@@ -272,6 +275,17 @@ export function useReportForm() {
         const localSessions = sessionStore.getAll();
         const merged = mergeSessions(rawSessions, localSessions);
         setSessionList(merged);
+      }
+
+      if (messagesRes.ok) {
+        const rawMessages = await messagesRes.json();
+        const apiComments = rawMessages
+          .map((m) => (typeof m === "object" ? (m.text || m.comment) : m))
+          .filter(Boolean);
+        const localComments = commentStore.getAll();
+        const mergedComments = Array.from(new Set([...apiComments, ...localComments]));
+        setSavedComments(mergedComments);
+        commentStore.saveAll(mergedComments);
       }
     } catch (error) {
       console.warn("[useReportForm] API unreachable, using cached data:", error.message);
@@ -310,7 +324,8 @@ export function useReportForm() {
 
     let updatedList;
     if (result.mode === "REPLACE" && result.oldStudent) {
-      updatedList = studentStore.replace(result.oldStudent, { ...newStudent, _local: true });
+      studentStore.remove(result.oldStudent);
+      updatedList = studentStore.add({ ...newStudent, _local: true });
     } else {
       updatedList = studentStore.add({ ...newStudent, _local: true });
     }
@@ -348,24 +363,56 @@ export function useReportForm() {
     }
   };
 
-  // 🚀 মেইন রিপোর্ট সেভ বাটন হ্যান্ডলার
-  const handleSaveRecord = async () => {
+  // 🚀 ফর্ম ইনপুট ভ্যালিডেশন চেক
+  const validateReportForm = () => {
     if (!studentName.trim()) {
       showToast("Please specify a student name first", "warning");
-      return;
+      return false;
     }
 
+    if (!selectedSession.trim()) {
+      showToast("Please select a session first", "warning");
+      return false;
+    }
+
+    const hasJuzPageData = juzPageData.some(
+      (d) => d.juz.trim() || d.ranges.some((r) => r.start.trim() || r.end.trim())
+    );
+    if (!hasJuzPageData) {
+      showToast("Please enter Juz & Page information first", "warning");
+      return false;
+    }
+
+    return true;
+  };
+
+  // 🚀 মেইন রিপোর্ট সেভ বাটন হ্যান্ডলার
+  const handleSaveRecord = async () => {
+    if (!validateReportForm()) return;
+
+    // Filter out blank detail rows so empty inputs treat total count as 0
+    const cleanMistakes = mistakeData.filter(
+      (m) => m.juz.trim() || m.page.trim() || m.ayahs.some((a) => a.value.trim())
+    );
+    const cleanStucks = stuckData.filter(
+      (s) => s.juz.trim() || s.page.trim() || s.ayahs.some((a) => a.value.trim())
+    );
+
     const payload = {
-      student: studentName,
-      session: selectedSession,
+      student: studentName.trim(),
+      session: selectedSession.trim(),
       report_date: selectedDate || new Date().toISOString().split("T")[0],
       subject_course: groupName || "General Group",
       juz_and_pages: juzPageData,
-      mistakes: mistakeData,
-      stucks: stuckData,
+      mistakes: cleanMistakes,
+      stucks: cleanStucks,
+      comment: comment,
       overall_status: "COMPLETED",
       client_updated_at: new Date().toISOString(),
     };
+
+    // Always save to LocalStorage first
+    saveReportLocally(payload);
 
     if (isOnline()) {
       try {
@@ -375,19 +422,35 @@ export function useReportForm() {
         });
 
         if (response.ok) {
-          showToast(`Report for "${studentName}" saved to Database!`, "success");
+          showToast(`Report for "${studentName}" recorded to Database!`, "success");
           saveStatusStore.set("database", "Database Synced");
         } else {
           const errData = await response.json();
-          showToast(typeof errData === "string" ? errData : "Failed to save report", "error");
+          console.error("[handleSaveRecord Server Error]", errData);
+          
+          let errorMsg = "Failed to save report to server";
+          if (typeof errData === "string") {
+            errorMsg = errData;
+          } else if (errData && typeof errData === "object") {
+            if (errData.detail) {
+              errorMsg = errData.detail;
+            } else if (errData.details) {
+              errorMsg = typeof errData.details === "string" ? errData.details : JSON.stringify(errData.details);
+            } else {
+              errorMsg = Object.entries(errData)
+                .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+                .join(" | ");
+            }
+          }
+          showToast(errorMsg, "error");
           return;
         }
       } catch (error) {
-        showToast("Server Connection Failed: " + error.message, "error");
-        return;
+        showToast("Saved locally. Server connection issue: " + error.message, "info");
+        saveStatusStore.set("local", "Saved (Local)");
       }
     } else {
-      showToast(`Report saved locally (offline). Will sync later.`, "info");
+      showToast(`Report for "${studentName}" saved locally (offline).`, "info");
       saveStatusStore.set("local", "Saved (Local)");
     }
 
@@ -409,14 +472,11 @@ export function useReportForm() {
     await fetchData();
   };
 
-  // 🚀 মেক রিপোর্ট বাটন হ্যান্ডলার
-  const handleMakeReport = async () => {
-    if (!studentName.trim()) {
-      showToast("Please specify a student name first", "warning");
-      return;
-    }
-    showToast(`Generating report for "${studentName}"...`, "info");
-    await handleSaveRecord();
+  // 🚀 মেক রিপোর্ট বাটন হ্যান্ডলার (শুধু রিপোর্ট প্রিভিউ তৈরি করবে, ডাটাবেজে সেভ করবে না)
+  const handleMakeReport = () => {
+    if (!validateReportForm()) return;
+    showToast(`Generating report preview for "${studentName}"...`, "info");
+    setIsReportModalOpen(true);
   };
 
   // 🚀 নতুন সেশন সেভ হ্যান্ডলার (মেইন রিপোর্ট ফর্মের সেশন ড্রপডাউন থেকে)

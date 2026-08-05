@@ -3,11 +3,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-# 🟢 সব ViewSet ও View একসাথে সুন্দরভাবে ইমপোর্ট
 from .views import (
     StudentViewSet, 
-    StudentDailyReportViewSet, 
+    StudentGroupViewSet,
     SessionViewSet,
+    SavedMessageViewSet,
+    StudentDailyReportViewSet, 
+    MistakeDetailViewSet,
+    StuckDetailViewSet,
     CustomTokenObtainPairView,
     RegisterView,
     ChangePasswordView
@@ -15,8 +18,12 @@ from .views import (
 
 router = DefaultRouter()
 router.register(r'students', StudentViewSet, basename='student')
+router.register(r'groups', StudentGroupViewSet, basename='group')
+router.register(r'sessions', SessionViewSet, basename='session')
+router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
-router.register(r'sessions', SessionViewSet, basename='session') # 👈 এখানে একবারই থাকবে
+router.register(r'mistakes', MistakeDetailViewSet, basename='mistake')
+router.register(r'stucks', StuckDetailViewSet, basename='stuck')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,5 +31,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view(), name='auth_register'),
     path('api/change-password/', ChangePasswordView.as_view(), name='change_password'),
-    path('', include(router.urls)), # 💡 'api/' প্রিফিক্স দেওয়া ভালো অথবা আপনার প্রোজেক্ট অনুযায়ী শুধু '' রাখতে পারেন
+    path('', include(router.urls)),
 ]

@@ -83,34 +83,45 @@ export default function AppearanceSettings(props) {
             <p className="text-[10px] theme-text-secondary">Switch between dark mode and crisp light mode</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {modes.map((m) => {
-              const isSelected = m.id === modeId;
-              const Icon = m.id === "dark" ? MoonIcon : SunIcon;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setModeId(m.id)}
-                  className={`p-3.5 rounded-xl border text-left transition-all duration-150 cursor-pointer flex items-center justify-between ${
-                    isSelected
-                      ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-text-primary shadow-sm"
-                      : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isSelected ? "theme-bg-accent-soft theme-accent" : "theme-bg-sub theme-text-secondary"}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold theme-text-primary">{m.name}</div>
-                      <div className="text-[10px] theme-text-secondary">{m.label}</div>
-                    </div>
-                  </div>
-                  {isSelected && <CheckIcon className="w-4 h-4 theme-accent" />}
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between theme-bg-sub border theme-border p-3.5 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl theme-bg-elevated theme-accent">
+                {modeId === "dark" ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
+              </div>
+              <div>
+                <div className="text-xs font-bold theme-text-primary">
+                  {modeId === "dark" ? "Dark Mode" : "Light Mode"}
+                </div>
+                <div className="text-[10px] theme-text-secondary">
+                  {modeId === "dark" ? "Sleek dark interface active" : "Crisp bright interface active"}
+                </div>
+              </div>
+            </div>
+
+            {/* Premium Dual-Icon Toggle Switch */}
+            <button
+              type="button"
+              onClick={() => setModeId(modeId === "dark" ? "light" : "dark")}
+              className="relative w-20 h-10 theme-bg-elevated border theme-border rounded-full p-1 transition-all duration-300 cursor-pointer flex items-center justify-between shadow-inner shrink-0"
+              title={`Switch to ${modeId === "dark" ? "Light Mode" : "Dark Mode"}`}
+            >
+              {/* Animated Sliding Pill */}
+              <div
+                className={`absolute top-1 bottom-1 w-8 rounded-full theme-bg-accent transition-transform duration-300 ease-in-out shadow-md ${
+                  modeId === "dark" ? "translate-x-10" : "translate-x-0"
+                }`}
+              />
+
+              {/* Sun Icon (Light side) */}
+              <div className={`relative z-10 w-8 h-8 flex items-center justify-center transition-colors duration-300 ${modeId === "light" ? "theme-accent-text" : "theme-text-secondary opacity-60"}`}>
+                <SunIcon className="w-4 h-4" />
+              </div>
+
+              {/* Moon Icon (Dark side) */}
+              <div className={`relative z-10 w-8 h-8 flex items-center justify-center transition-colors duration-300 ${modeId === "dark" ? "theme-accent-text" : "theme-text-secondary opacity-60"}`}>
+                <MoonIcon className="w-4 h-4 translate-x-[0.5px]" />
+              </div>
+            </button>
           </div>
         </div>
 
@@ -219,37 +230,45 @@ export default function AppearanceSettings(props) {
         </div>
       </div>
 
-      {/* 4. Font Size Scale Selector */}
+      {/* 4. Font Size Scale Selector (Slider Bar) */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-4">
-        <div className="pb-1">
-          <h3 className="text-xs font-bold theme-text-primary">Typography Scale (Font Size)</h3>
-          <p className="text-[10px] theme-text-secondary">Adjust text size density across all components</p>
+        <div className="flex items-center justify-between pb-1">
+          <div>
+            <h3 className="text-xs font-bold theme-text-primary">Typography Scale (Font Size)</h3>
+            <p className="text-[10px] theme-text-secondary">Adjust text size scale using the slider</p>
+          </div>
+          <span className="text-xs font-mono theme-bg-app border theme-border px-2.5 py-1 rounded-lg theme-accent font-bold">
+            {fontSizes.find((s) => s.id === fontSizeId)?.name || "Normal"} ({fontSizes.find((s) => s.id === fontSizeId)?.px || "15px"})
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {fontSizes.map((s) => {
-            const isSelected = s.id === fontSizeId;
-            return (
-              <button
+        <div className="space-y-2 py-2">
+          <input
+            type="range"
+            min="0"
+            max={fontSizes.length - 1}
+            step="1"
+            value={Math.max(0, fontSizes.findIndex((s) => s.id === fontSizeId))}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value, 10);
+              if (fontSizes[idx]) {
+                setFontSizeId(fontSizes[idx].id);
+              }
+            }}
+            className="w-full accent-[var(--accent-main)] cursor-pointer h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none"
+          />
+
+          <div className="flex justify-between text-[11px] font-medium theme-text-secondary px-1">
+            {fontSizes.map((s) => (
+              <span 
                 key={s.id}
-                type="button"
                 onClick={() => setFontSizeId(s.id)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  isSelected
-                    ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-text-primary font-bold shadow-sm"
-                    : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
-                }`}
+                className={`cursor-pointer transition-colors ${s.id === fontSizeId ? "theme-text-primary font-bold" : "hover:theme-text-primary"}`}
               >
-                <div className="text-left">
-                  <div className="text-xs font-semibold">{s.name}</div>
-                  <div className="text-[10px] theme-text-secondary">{s.label}</div>
-                </div>
-                <span className="text-xs font-mono theme-bg-app px-2 py-0.5 rounded theme-accent font-semibold">
-                  {s.px}
-                </span>
-              </button>
-            );
-          })}
+                {s.name} ({s.px})
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 

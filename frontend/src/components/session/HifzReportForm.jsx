@@ -90,6 +90,17 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
       showToast("Please specify a student name first", "warning");
       return;
     }
+    if (!selectedSession.trim()) {
+      showToast("Please select a session first", "warning");
+      return;
+    }
+    const hasJuzPageData = juzPageData.some(
+      (d) => d.juz.trim() || d.ranges.some((r) => r.start.trim() || r.end.trim())
+    );
+    if (!hasJuzPageData) {
+      showToast("Please enter Juz & Page information first", "warning");
+      return;
+    }
 
     setIsReportModalOpen(true);
   };

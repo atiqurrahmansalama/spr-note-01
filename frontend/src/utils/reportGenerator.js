@@ -15,17 +15,23 @@ export function formatDate(selectedDate) {
   const year = d.getFullYear();
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const fullMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  
   const mmm = monthNames[d.getMonth()];
+  const mmmm = fullMonthNames[d.getMonth()];
 
-  if (format === "MM/DD/YYYY") {
-    return `${month}/${day}/${year}`;
-  } else if (format === "YYYY-MM-DD") {
-    return `${year}-${month}-${day}`;
-  } else if (format === "DD MMM YYYY") {
-    return `${day} ${mmm} ${year}`;
+  switch (format) {
+    case "MM/DD/YYYY": return `${month}/${day}/${year}`;
+    case "YYYY-MM-DD": return `${year}-${month}-${day}`;
+    case "DD MMM YYYY": return `${day} ${mmm} ${year}`;
+    case "DD MMMM YYYY": return `${day} ${mmmm} ${year}`;
+    case "MMM DD, YYYY": return `${mmm} ${day}, ${year}`;
+    case "MMMM DD, YYYY": return `${mmmm} ${day}, ${year}`;
+    case "DD.MM.YYYY": return `${day}.${month}.${year}`;
+    case "YYYY/MM/DD": return `${year}/${month}/${day}`;
+    case "DD/MM/YYYY":
+    default: return `${day}/${month}/${year}`;
   }
-  // Default is "DD/MM/YYYY"
-  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -201,7 +207,9 @@ export function generateReportText({
   if (includeGroup) {
     let footerParts = [];
     if (includeTeacher) {
-      footerParts.push("@Mustafa");
+      const rawTeacher = typeof window !== "undefined" ? localStorage.getItem("spr_copy_teacher_name") || "Mustafa" : "Mustafa";
+      const cleanTeacher = rawTeacher.replace(/^@+/, "").trim();
+      footerParts.push(`@${cleanTeacher || "Mustafa"}`);
     }
     let groupStr = groupName ? groupName.trim() : "Ml Saqib's Group";
     if (!groupStr.toLowerCase().endsWith("group") && !groupStr.toLowerCase().includes("'s")) {

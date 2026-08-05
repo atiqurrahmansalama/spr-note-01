@@ -188,70 +188,33 @@ export default function CalendarSettings({
         </div>
       </div>
 
-      {/* 4. First Day of Week & Hijri Mode Cards */}
-      <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-        
-        {/* First Day of Week */}
-        <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-3">
+      {/* 4. Hijri Mode Option Card */}
+      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-3">
+        <div>
           <div className="pb-1">
-            <h3 className="text-xs font-bold theme-text-primary">First Day of Week</h3>
-            <p className="text-[10px] theme-text-secondary">Calendar start day preference</p>
+            <h3 className="text-xs font-bold theme-text-primary">Hijri Calendar Estimate</h3>
+            <p className="text-[10px] theme-text-secondary">Display Islamic lunar date on headers</p>
           </div>
 
-          <div className="flex flex-col space-y-1.5">
-            {FIRST_DAY_LIST.map((fd) => {
-              const isSelected = fd.id === firstDay;
-              return (
-                <button
-                  key={fd.id}
-                  type="button"
-                  onClick={() => handleFirstDayChange(fd.id)}
-                  className={`w-full px-3.5 py-2 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between border ${
-                    isSelected
-                      ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-text-primary font-bold shadow-sm"
-                      : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold">{fd.name}</span>
-                    <span className="text-[10px] theme-text-secondary">({fd.label})</span>
-                  </div>
-                  {isSelected && <CheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Hijri Calendar Support Option */}
-        <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="pb-1">
-              <h3 className="text-xs font-bold theme-text-primary">Hijri Calendar Estimate</h3>
-              <p className="text-[10px] theme-text-secondary">Display Islamic lunar date on headers</p>
+          <div className="p-3.5 mt-3 theme-bg-sub rounded-xl flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold theme-text-primary">Enable Hijri Tracking</div>
+              <div className="text-[10px] theme-text-secondary">Shows estimated Islamic date</div>
             </div>
 
-            <div className="p-3.5 mt-3 theme-bg-sub rounded-xl flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="text-xs font-bold theme-text-primary">Enable Hijri Tracking</div>
-                <div className="text-[10px] theme-text-secondary">Shows estimated Islamic date</div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleHijriToggle}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  enableHijri ? "theme-bg-accent" : "theme-bg-elevated"
-                }`}
-              >
-                <div className={`w-4 h-4 rounded-full theme-bg-surface transition-transform absolute top-1 ${
-                  enableHijri ? "right-1" : "left-1"
-                }`} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleHijriToggle}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                enableHijri ? "theme-bg-accent" : "theme-bg-elevated"
+              }`}
+            >
+              <div className={`w-4 h-4 rounded-full theme-bg-surface transition-transform absolute top-1 ${
+                enableHijri ? "right-1" : "left-1"
+              }`} />
+            </button>
           </div>
         </div>
-
       </div>
 
       {/* 5. Live Date & Clock Preview Card */}

@@ -12,6 +12,9 @@ export default function AutocompleteDropdown({
   className = "",
   autoFocus = false,
   inputRef = null,
+  disableSaveButton = false,
+  showAllOptionsOnFocus = false,
+  readOnly = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value);
@@ -49,7 +52,11 @@ export default function AutocompleteDropdown({
 
   const safeSearchTerm = typeof searchTerm === "string" ? searchTerm : (searchTerm?.label || "");
 
+  const selectedItemLabel = typeof value === "string" ? value : (value?.label || "");
+  const isSearchMatchingSelected = safeSearchTerm.trim().toLowerCase() === selectedItemLabel.trim().toLowerCase();
+
   const filteredOptions = options.filter((item) => {
+    if (showAllOptionsOnFocus || isSearchMatchingSelected) return true;
     const label = typeof item === "string" ? item : (item?.label || "");
     return label.toLowerCase().includes(safeSearchTerm.toLowerCase());
   });
@@ -93,9 +100,9 @@ export default function AutocompleteDropdown({
   };
 
   const handleKeyDown = (e) => {
-    // If user presses '+' to trigger Save Student Panel
-    if (e.key === "+" || (e.shiftKey && e.key === "=")) {
-      if (isNewName && onAddNew) {
+    // If user presses Shift + '+' (Shift + Plus) to trigger Save Student Panel
+    if (e.shiftKey && (e.key === "+" || e.key === "=")) {
+      if (onAddNew) {
         e.preventDefault();
         handleSaveClick(e);
         return;
@@ -139,16 +146,19 @@ export default function AutocompleteDropdown({
     <div ref={containerRef} className={`relative w-full ${className}`}>
       <div className="flex items-center gap-2">
         {/* Input field with chevron */}
-        <div className="relative flex items-center flex-1">
+        <div className="relative flex items-center flex-1 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
           <input
             ref={refToUse}
             type="text"
+            readOnly={readOnly}
             value={safeSearchTerm}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
+            onChange={readOnly ? undefined : handleInputChange}
+            onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') setIsOpen(!isOpen); } : handleKeyDown}
             onFocus={() => setIsOpen(true)}
             placeholder={placeholder}
-            className="w-full theme-bg-sub rounded-xl px-4 py-2.5 theme-text-primary font-medium text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-8"
+            className={`w-full theme-bg-sub rounded-xl px-4 py-2.5 theme-text-primary font-medium text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-8 ${
+              readOnly ? "cursor-pointer select-none" : ""
+            }`}
           />
 
           <div
@@ -160,7 +170,7 @@ export default function AutocompleteDropdown({
         </div>
 
         {/* Save button - outside the input box on the right */}
-        {isNewName && (
+        {isNewName && !disableSaveButton && (
           <button
             type="button"
             onClick={handleSaveClick}
@@ -178,20 +188,60 @@ export default function AutocompleteDropdown({
             filteredOptions.map((item, index) => {
               const label = typeof item === "string" ? item : item.label;
               const sub = typeof item === "object" ? item.sub : null;
+              const hasActions = typeof item === "object" && (item.onEdit || item.onDelete);
               const isHighlighted = index === highlightedIndex;
 
               return (
                 <li
                   key={index}
                   onClick={() => handleSelect(item)}
-                  className={`px-3.5 py-2 rounded-lg cursor-pointer transition-colors flex justify-between items-center ${
+                  className={`px-3.5 py-2 rounded-lg cursor-pointer transition-colors flex justify-between items-center group/item ${
                     isHighlighted
                       ? "theme-bg-elevated theme-accent font-semibold"
                       : "hover:theme-bg-elevated theme-text-primary"
                   }`}
                 >
-                  <span>{label}</span>
-                  {sub && <span className="text-[11px] theme-text-secondary font-sans">{sub}</span>}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate">{label}</span>
+                    {sub && <span className="text-[11px] theme-text-secondary font-sans truncate">{sub}</span>}
+                  </div>
+
+                  {hasActions && (
+                    <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                      {item.onEdit && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsOpen(false);
+                            item.onEdit(item);
+                          }}
+                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-accent transition cursor-pointer"
+                          title="Edit"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.586 6a2 2 0 010 2.828L10 17.414l-4 1 1-4 10.414-10.414z" />
+                          </svg>
+                        </button>
+                      )}
+                      {item.onDelete && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsOpen(false);
+                            item.onDelete(item);
+                          }}
+                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:text-rose-400 transition cursor-pointer"
+                          title="Delete"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })

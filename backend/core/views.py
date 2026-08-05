@@ -4,14 +4,26 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
-from .models import Student, StudentDailyReport, Session
+from .models import (
+    Student, 
+    StudentGroup, 
+    Session, 
+    SavedMessage, 
+    StudentDailyReport, 
+    MistakeDetail, 
+    StuckDetail
+)
 from .serializers import (
     CustomTokenObtainPairSerializer, 
     RegisterSerializer, 
     ChangePasswordSerializer,
     StudentSerializer, 
+    StudentGroupSerializer,
+    SessionSerializer,
+    SavedMessageSerializer,
     StudentDailyReportSerializer,
-    SessionSerializer
+    MistakeDetailSerializer,
+    StuckDetailSerializer
 )
 
 
@@ -40,24 +52,40 @@ class ChangePasswordView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(is_active=True).order_by('name')
+    queryset = Student.objects.filter(is_active=True).order_by('roll', 'name')
     serializer_class = StudentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
-class StudentDailyReportViewSet(viewsets.ModelViewSet):
-    serializer_class = StudentDailyReportSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.role == "SUPER_ADMIN" or user.is_superuser:
-            return StudentDailyReport.objects.all().order_by('-created_at')
-        return StudentDailyReport.objects.filter(is_deleted=False, created_by=user).order_by('-created_at')
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-        
+class StudentGroupViewSet(viewsets.ModelViewSet):
+    queryset = StudentGroup.objects.all().order_by('name')
+    serializer_class = StudentGroupSerializer
+    permission_classes = [AllowAny]
 
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all().order_by('id')
     serializer_class = SessionSerializer
+    permission_classes = [AllowAny]
+
+class SavedMessageViewSet(viewsets.ModelViewSet):
+    queryset = SavedMessage.objects.all().order_by('-created_at')
+    serializer_class = SavedMessageSerializer
+    permission_classes = [AllowAny]
+
+class StudentDailyReportViewSet(viewsets.ModelViewSet):
+    queryset = StudentDailyReport.objects.filter(is_deleted=False).order_by('-created_at')
+    serializer_class = StudentDailyReportSerializer
+    permission_classes = [AllowAny]
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(created_by=user)
+
+class MistakeDetailViewSet(viewsets.ModelViewSet):
+    queryset = MistakeDetail.objects.all().order_by('-id')
+    serializer_class = MistakeDetailSerializer
+    permission_classes = [AllowAny]
+
+class StuckDetailViewSet(viewsets.ModelViewSet):
+    queryset = StuckDetail.objects.all().order_by('-id')
+    serializer_class = StuckDetailSerializer
+    permission_classes = [AllowAny]

@@ -96,15 +96,15 @@ export default function StudentSavePanel({
   }));
 
   return (
-    <div className="mt-3 theme-bg-sub border theme-border rounded-xl p-4 space-y-3 animate-fade-in shadow-inner">
-      <div className="flex items-center justify-between border-b theme-border pb-2">
-        <span className="text-xs font-semibold theme-text-primary">
-          Save Student Action
+    <div className="mt-4 theme-bg-surface border theme-border rounded-2xl p-4.5 space-y-4 animate-fade-in shadow-xl relative z-20">
+      <div className="flex items-center justify-between border-b theme-border pb-3">
+        <span className="text-xs font-bold theme-text-primary tracking-wide">
+          Save Student Record
         </span>
         <button
           type="button"
           onClick={onClose}
-          className="theme-text-secondary hover:theme-text-primary text-xs px-1 transition-colors cursor-pointer"
+          className="theme-text-secondary hover:theme-text-primary text-xs p-1 rounded-lg hover:theme-bg-sub transition-colors cursor-pointer"
         >
           ✕
         </button>
@@ -117,10 +117,10 @@ export default function StudentSavePanel({
           type="button"
           onClick={() => setMode("NEW")}
           onKeyDown={handleModeKeyDown}
-          className={`px-3 py-1.5 rounded-lg border font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-main)] ${
+          className={`flex-1 px-3 py-2 rounded-xl border font-semibold transition cursor-pointer focus:outline-none ${
             mode === "NEW"
-              ? "theme-bg-elevated theme-border theme-accent font-bold"
-              : "theme-bg-app theme-border theme-text-secondary hover:theme-text-primary"
+              ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-accent shadow-sm"
+              : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
           }`}
         >
           + Add as New
@@ -130,10 +130,10 @@ export default function StudentSavePanel({
           type="button"
           onClick={() => setMode("REPLACE")}
           onKeyDown={handleModeKeyDown}
-          className={`px-3 py-1.5 rounded-lg border font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-main)] ${
+          className={`flex-1 px-3 py-2 rounded-xl border font-semibold transition cursor-pointer focus:outline-none ${
             mode === "REPLACE"
-              ? "theme-bg-elevated theme-border theme-accent font-bold"
-              : "theme-bg-app theme-border theme-text-secondary hover:theme-text-primary"
+              ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-accent shadow-sm"
+              : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
           }`}
         >
           ⇄ Replace Existing
@@ -141,8 +141,8 @@ export default function StudentSavePanel({
       </div>
 
       {/* Input Name */}
-      <div className="space-y-1">
-        <label className="text-[10px] font-mono uppercase theme-text-secondary">
+      <div className="space-y-1.5">
+        <label className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
           Student Name
         </label>
         <input
@@ -151,62 +151,61 @@ export default function StudentSavePanel({
           value={name}
           onChange={(e) => setTypedName(e.target.value)}
           onKeyDown={handleNameKeyDown}
-          className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+          className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
           placeholder="Enter student name..."
         />
       </div>
 
-      {/* Replace Dropdown Mode */}
+      {/* Replace Dropdown Mode (Using app's AutocompleteDropdown) */}
       {mode === "REPLACE" && (
-        <div className="space-y-1">
-          <label className="text-[10px] font-mono uppercase theme-text-secondary">
+        <div className="space-y-1.5">
+          <label className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
             Select Existing Student to Replace
           </label>
-          <select
-            ref={replaceSelectRef}
+          <AutocompleteDropdown
+            inputRef={replaceSelectRef}
+            options={studentOptions}
             value={selectedOldStudent}
-            onChange={(e) => setSelectedOldStudent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                if (groupInputRef.current) groupInputRef.current.focus();
-              }
+            onChange={(sel) => {
+              const label = typeof sel === "object" ? (sel.label || sel.name) : sel;
+              setSelectedOldStudent(label);
             }}
-            className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-          >
-            <option value="">-- Choose Student --</option>
-            {studentOptions.map((opt, i) => (
-              <option key={i} value={opt.label || opt}>
-                {opt.label || opt}
-              </option>
-            ))}
-          </select>
+            onNextFocus={() => {
+              if (groupInputRef.current) groupInputRef.current.focus();
+            }}
+            placeholder="Search or choose student to replace..."
+          />
         </div>
       )}
 
       {/* Select Group / Course Dropdown */}
-      <div className="space-y-1">
-        <label className="text-[10px] font-mono uppercase theme-text-secondary">
+      <div className="space-y-1.5">
+        <label className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
           Group / Course
         </label>
         <AutocompleteDropdown
           inputRef={groupInputRef}
           options={groupOptions}
           value={selectedGroup}
-          onChange={(val) => setSelectedGroup(typeof val === "object" ? val.label : val)}
-          onNextFocus={handleSave}
+          onChange={(val) => {
+            const groupVal = typeof val === "object" ? (val.label || val.value) : val;
+            setSelectedGroup(groupVal);
+          }}
+          onNextFocus={() => {
+            /* Keep panel open when item selected from dropdown */
+          }}
           placeholder="e.g. General Group"
         />
       </div>
 
       {/* Action Submit */}
-      <div className="pt-1 flex gap-2">
+      <div className="pt-2 flex gap-2">
         <button
           type="button"
           onClick={handleSave}
-          className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text text-xs py-2.5 rounded-lg font-semibold transition shadow cursor-pointer"
+          className="flex-1 theme-bg-accent hover:opacity-90 theme-accent-text text-xs py-2.5 rounded-xl font-bold transition shadow cursor-pointer active:scale-95"
         >
-          Confirm & Save (Enter)
+          Confirm &amp; Save
         </button>
       </div>
     </div>

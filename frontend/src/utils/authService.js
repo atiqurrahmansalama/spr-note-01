@@ -17,9 +17,8 @@ export const registerUser = async (userData) => {
   }
 };
 
-// Login User (Online ও Offline উভয়েই কাজ করে)
+// Login User
 export const loginUser = async (usernameOrEmail, password) => {
-  // 🌐 অনলাইনে থাকলে API-তে লগইন করার চেষ্টা করো
   if (navigator.onLine) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/token/`, {
@@ -31,7 +30,6 @@ export const loginUser = async (usernameOrEmail, password) => {
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ API সফল: tokens ও user info LocalStorage-এ সেভ করো
         authStore.saveAccessToken(data.access);
         authStore.saveRefreshToken(data.refresh);
         authStore.saveUser(data.user);
@@ -40,17 +38,14 @@ export const loginUser = async (usernameOrEmail, password) => {
         return { success: false, message: data.detail || 'Login failed' };
       }
     } catch {
-      // API ব্যর্থ — অফলাইন fallback-এ যাও
       console.warn('[authService] Login API unreachable, checking cached session.');
     }
   }
 
-  // 📴 অফলাইন fallback: LocalStorage-এ stored session আছে কিনা দেখো
   const cachedUser = authStore.getUser();
   const cachedToken = authStore.getAccessToken();
 
   if (cachedUser && cachedToken) {
-    // Stored credentials আছে → offline mode-এ logged in থাকবে
     return {
       success: true,
       user: cachedUser,
@@ -66,20 +61,62 @@ export const loginUser = async (usernameOrEmail, password) => {
   };
 };
 
-// Authenticated Request Helper
+// Token Refresh Helper
+export const refreshToken = async () => {
+  const refresh = authStore.getRefreshToken();
+  if (!refresh) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.access) {
+        authStore.saveAccessToken(data.access);
+        return data.access;
+      }
+    }
+  } catch (err) {
+    console.warn('[authService] Token refresh failed:', err.message);
+  }
+
+  // Refresh token is also expired or invalid
+  authStore.clear();
+  return null;
+};
+
+// Authenticated Request Helper with Auto-Refresh & Fallback Retry
 export const fetchWithAuth = async (url, options = {}) => {
-  const token = authStore.getAccessToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-    ...options.headers,
+  let token = authStore.getAccessToken();
+  
+  const makeRequest = async (authToken) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+      ...options.headers,
+    };
+    return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
   };
 
-  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
+  let response = await makeRequest(token);
+
   if (response.status === 401) {
-    // Token মেয়াদ শেষ — LocalStorage clear করো এবং reload
-    authStore.clear();
-    window.location.reload();
+    console.warn('[authService] Access token expired or invalid (401). Attempting auto refresh...');
+    const newToken = await refreshToken();
+    
+    if (newToken) {
+      // Retry request with newly refreshed token
+      response = await makeRequest(newToken);
+    } else {
+      // Refresh failed or no refresh token exists -> Clear expired tokens and retry without Authorization header
+      authStore.clear();
+      response = await makeRequest(null);
+    }
   }
+
   return response;
 };

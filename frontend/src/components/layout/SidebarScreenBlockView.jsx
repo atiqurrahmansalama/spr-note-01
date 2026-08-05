@@ -23,7 +23,7 @@ export default function SidebarScreenBlockView({ title, onClose, children }) {
       </div>
 
       {/* Main Centered / Top-Middle Aligned Viewport */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center items-start">
+      <div className="flex-1 overflow-y-auto flex justify-center items-start">
         {children}
       </div>
     </div>

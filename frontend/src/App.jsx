@@ -14,6 +14,7 @@ import ShortcutsGuide from "./components/layout/ShortcutsGuide";
 import AppGuideView from "./components/layout/AppGuideView";
 import AboutAppView from "./components/layout/AboutAppView";
 import StudentDirectoryView from "./components/layout/StudentDirectoryView";
+import StudentReportsView from "./components/layout/StudentReportsView";
 import { useTheme } from "./context/useTheme";
 import { useToast } from "./context/ToastContext";
 import { SleekCheckIcon, CloudCheckIcon } from "./components/ui/Icons";
@@ -250,6 +251,12 @@ export default function App() {
         return (
           <SidebarScreenBlockView title="Language Settings" onClose={() => setActiveTab("Dashboard")}>
             <LanguageSettingsView />
+          </SidebarScreenBlockView>
+        );
+      case "Student Reports":
+        return (
+          <SidebarScreenBlockView title="Student Progress & Daily Reports" onClose={() => setActiveTab("Dashboard")}>
+            <StudentReportsView />
           </SidebarScreenBlockView>
         );
       case "Sessions & Comments":

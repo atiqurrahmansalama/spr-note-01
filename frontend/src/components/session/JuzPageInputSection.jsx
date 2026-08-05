@@ -21,14 +21,24 @@ export default function JuzPageInputSection({ data, onChange }) {
   };
 
   const addJuzRow = () => {
+    const newJuzId = `juz-input-${crypto.randomUUID()}`;
     onChange(prevData => [
       ...prevData,
       {
         id: crypto.randomUUID(),
         juz: "",
+        juzInputId: newJuzId,
         ranges: [{ id: crypto.randomUUID(), start: "", end: "" }]
       }
     ]);
+
+    setTimeout(() => {
+      const el = document.getElementById(newJuzId);
+      if (el) {
+        el.focus();
+        if (typeof el.select === "function") el.select();
+      }
+    }, 100);
   };
 
   return (

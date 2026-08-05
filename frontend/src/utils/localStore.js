@@ -130,6 +130,29 @@ export const students = {
     return updated;
   },
 
+  /** গ্রুপ নাম পরিবর্তন করে সকল স্টুডেন্টের গ্রুপ আপডেট করে */
+  updateGroupName: (oldGroupName, newGroupName) => {
+    const list = students.getAll();
+    const updated = list.map((s) => {
+      if ((s.sub || "General Group").toLowerCase() === oldGroupName.toLowerCase()) {
+        return { ...s, sub: newGroupName, _local: true };
+      }
+      return s;
+    });
+    writeJSON(KEYS.STUDENTS, updated);
+    return updated;
+  },
+
+  /** একটি নির্দিষ্ট গ্রুপের সকল স্টুডেন্ট ডিলিট করে */
+  removeGroup: (groupName) => {
+    const list = students.getAll();
+    const updated = list.filter(
+      (s) => (s.sub || "General Group").toLowerCase() !== groupName.toLowerCase()
+    );
+    writeJSON(KEYS.STUDENTS, updated);
+    return updated;
+  },
+
   /** নাম দিয়ে ডিলিট করে. */
   remove: (label) => {
     const updated = students.getAll().filter(
@@ -169,11 +192,23 @@ export function mergeStudents(apiStudents, localStudents) {
   return merged;
 }
 
-// ─── Sessions ───────────────────────────────────────────────────────────────
-// Shape: [{ id: "uuid", name: "Morning Session", _local?: true }, ...]
+const DEFAULT_SESSIONS = [
+  { id: "sess-1", name: "সবক (Sabaq)" },
+  { id: "sess-2", name: "সবকী (Sabqi)" },
+  { id: "sess-3", name: "আমুখতা (Amukhta)" },
+  { id: "sess-4", name: "নাজেরা (Nazera)" },
+  { id: "sess-5", name: "হিফজ (Hifz)" },
+];
 
 export const sessions = {
-  getAll: () => readJSON(KEYS.SESSIONS, []),
+  getAll: () => {
+    const list = readJSON(KEYS.SESSIONS, []);
+    if (list.length === 0) {
+      writeJSON(KEYS.SESSIONS, DEFAULT_SESSIONS);
+      return DEFAULT_SESSIONS;
+    }
+    return list;
+  },
 
   saveAll: (list) => writeJSON(KEYS.SESSIONS, list),
 
@@ -302,6 +337,9 @@ export const copyReportSettings = {
 
   getIncludeTeacher: () => readString(KEYS.COPY_TEACHER, "true") !== "false",
   saveIncludeTeacher:(v) => writeString(KEYS.COPY_TEACHER, v.toString()),
+
+  getTeacherName:    () => readString("spr_copy_teacher_name", "Mustafa"),
+  saveTeacherName:   (v) => writeString("spr_copy_teacher_name", v),
 
   getAutoCopy:       () => readString(KEYS.COPY_AUTO, "false") === "true",
   saveAutoCopy:      (v) => writeString(KEYS.COPY_AUTO, v.toString()),
