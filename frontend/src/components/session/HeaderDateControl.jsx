@@ -131,10 +131,10 @@ export default function HeaderDateControl({
         <button
           type="button"
           onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-          className="relative cursor-pointer hover:theme-bg-elevated px-2 py-0.5 rounded-lg transition-all duration-150 flex items-center justify-center border border-transparent hover:theme-border group"
+          className="relative cursor-pointer hover:theme-bg-elevated px-0.5 py-0.5 rounded-lg transition-all duration-150 flex items-center justify-center border border-transparent hover:theme-border group"
           title="Click to select date"
         >
-          <span className="theme-text-primary font-semibold text-xs sm:text-sm tracking-normal opacity-90 group-hover:opacity-100 group-hover:theme-accent transition-colors">
+          <span className="theme-text-primary text-xs sm:text-sm tracking-normal opacity-90 group-hover:opacity-100 group-hover:theme-accent transition-colors">
             {formattedDisplayDate}
           </span>
 
@@ -151,7 +151,7 @@ export default function HeaderDateControl({
       {/* Timezone Badge */}
       <span 
         style={{ fontFamily: activeFont.css }}
-        className="text-[10px] sm:text-[11px] theme-accent font-semibold theme-bg-accent-soft px-2.5 py-0.5 rounded-lg border theme-border uppercase shrink-0"
+        className="text-[10px] sm:text-[11px] theme-accent font-semibold theme-bg-accent-soft px-2 py-0.5 rounded-lg uppercase shrink-0"
       >
         ({tzAbbr})
       </span>
@@ -171,7 +171,7 @@ export default function HeaderDateControl({
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-xs transition cursor-pointer font-bold"
+                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-[18px] transition cursor-pointer"
                 title="Previous Month"
               >
                 ‹
@@ -179,7 +179,7 @@ export default function HeaderDateControl({
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-xs transition cursor-pointer font-bold"
+                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-[18px] transition cursor-pointer"
                 title="Next Month"
               >
                 ›
@@ -188,7 +188,7 @@ export default function HeaderDateControl({
           </div>
 
           {/* Weekday Labels */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+          <div className="grid grid-cols-7 gap-1 text-center mb-1.5 ">
             {WEEKDAY_NAMES.map((wd) => (
               <span key={wd} className="text-[11px] font-bold theme-text-secondary">
                 {wd}

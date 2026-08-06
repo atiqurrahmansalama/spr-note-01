@@ -188,6 +188,8 @@ export default function SessionManager() {
 
     const updated = sessionStore.remove(id);
     setSessions(updated);
+    window.dispatchEvent(new CustomEvent("spr_session_updated"));
+    window.dispatchEvent(new CustomEvent("spr_project_changed"));
 
     if (isOnline() && id && !String(id).startsWith("local-")) {
       try {

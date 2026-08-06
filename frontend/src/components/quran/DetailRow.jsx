@@ -169,7 +169,7 @@ export default function DetailRow({
 
   return (
     <div 
-      className="flex items-start gap-1.5 sm:gap-2.5 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none"
+      className="flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none"
       draggable={isDraggable}
       onDragStart={(e) => {
         if (onDragStart) onDragStart(e, listType, index);

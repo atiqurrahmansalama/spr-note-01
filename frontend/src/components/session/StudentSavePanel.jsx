@@ -123,7 +123,7 @@ export default function StudentSavePanel({
               : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
           }`}
         >
-          + Add as New
+          Add as New
         </button>
         <button
           ref={replaceBtnRef}
@@ -136,7 +136,7 @@ export default function StudentSavePanel({
               : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
           }`}
         >
-          ⇄ Replace Existing
+          Replace Existing
         </button>
       </div>
 

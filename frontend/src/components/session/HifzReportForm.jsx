@@ -6,6 +6,7 @@ import { useReportForm } from "./useReportForm";
 import { useToast } from "../../context/ToastContext";
 import { useFont } from "../../context/useFont";
 import { ClockIcon } from "../ui/Icons";
+import { CloseIcon } from "../ui/Icons";
 
 export default function HifzReportForm({ timeZone, dateFormat }) {
   const { showToast } = useToast();
@@ -120,13 +121,13 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
     >
       {/* 0. Draft Recovery Notification Banner */}
       {draftInfo && (
-        <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in border-l-4 border-l-[var(--accent-main)] select-none">
+        <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
           <div className="flex items-center gap-2 min-w-0 text-left">
-            <div className="p-1.5 theme-bg-accent-soft rounded-lg theme-accent shrink-0">
+            <div className="p-0.5 rounded-lg theme-accent shrink-0">
               <ClockIcon className="w-4 h-4" />
             </div>
-            <div className="text-xs font-semibold theme-text-primary truncate">
-              Unsaved draft from{" "}
+            <div className="text-xs theme-text-primary truncate">
+              Auto-saved Draft Found at {" "}
               <span className="font-bold theme-accent">
                 {draftInfo.savedAtTime || "session"}
               </span>
@@ -145,16 +146,16 @@ export default function HifzReportForm({ timeZone, dateFormat }) {
             <button
               type="button"
               onClick={discardDraft}
-              className="theme-text-secondary hover:theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border text-xs px-2 py-1 rounded-lg font-medium transition cursor-pointer"
+              className="theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated text-xs px-2 py-1 rounded-lg font-medium transition cursor-pointer"
             >
-              Discard
+              <CloseIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
       {/* 1. Header Card (Clean & Minimal with Dynamic Theme) */}
-      <div className="theme-bg-surface rounded-2xl p-4 sm:p-5 text-center shadow-lg space-y-1.5 sm:space-y-2 relative z-10 border theme-border">
+      <div className="theme-bg-surface rounded-2xl p-4 sm:p-5 text-center shadow-lg space-y-1 sm:space-y-2 relative z-10 border theme-border">
         <h1 className="text-lg sm:text-2xl font-bold theme-text-primary tracking-wide">
           Hifz Daily Progress Report
         </h1>

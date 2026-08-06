@@ -91,10 +91,10 @@ export default function DetailSection({
           <button
             type="button"
             onClick={onReset}
-            className="theme-text-secondary hover:text-red-400 transition-colors p-1 cursor-pointer"
+            className="theme-text-secondary hover:theme-danger p-1 rounded-lg transition-colors cursor-pointer"
             title="Reset Details"
           >
-            <RefreshIcon className="w-4 h-4" />
+            <RefreshIcon className="w-4 h-4 text-inherit transition-colors" />
           </button>
         )}
       </div>

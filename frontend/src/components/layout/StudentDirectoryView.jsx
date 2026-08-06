@@ -180,6 +180,8 @@ export default function StudentDirectoryView() {
 
     const updated = studentStore.remove(label);
     setStudentList(updated);
+    window.dispatchEvent(new CustomEvent("spr_student_saved"));
+    window.dispatchEvent(new CustomEvent("spr_project_changed"));
 
     if (isOnline()) {
       try {
@@ -310,6 +312,8 @@ export default function StudentDirectoryView() {
     if (selectedGroupFilter === grpName) {
       setSelectedGroupFilter("ALL");
     }
+    window.dispatchEvent(new CustomEvent("spr_student_saved"));
+    window.dispatchEvent(new CustomEvent("spr_project_changed"));
     showToast(`Group "${grpName}" and its students deleted!`, "success");
   };
 

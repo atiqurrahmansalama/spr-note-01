@@ -67,10 +67,10 @@ export default function CommentSection({
               <button
                 type="button"
                 onClick={handleClearComment}
-                className="p-1 rounded-md theme-text-secondary hover:text-red-500 hover:theme-bg-sub transition-colors group cursor-pointer"
+                className="p-1 rounded-md theme-text-secondary hover:theme-danger hover:theme-bg-sub transition-colors group cursor-pointer"
                 title="Clear comment text"
               >
-                <RefreshIcon className="w-4 h-4 text-inherit group-hover:text-red-500 transition-colors" />
+                <RefreshIcon className="w-4 h-4" />
               </button>
             )}
 

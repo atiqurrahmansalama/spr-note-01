@@ -13,6 +13,10 @@
     --accent-main: #6366f1;
     --accent-soft: rgba(99, 102, 241, 0.12);
     --accent-text: #ffffff;
+    --danger-main: #f43f5e;
+    --danger-soft: rgba(244, 63, 94, 0.12);
+    --danger-hover: rgba(244, 63, 94, 0.22);
+    --danger-text: #fb7185;
   }
 }
 
@@ -60,39 +64,45 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom theme utility classes */
-.theme-bg-app {
+/* Custom theme utility classes (Tailwind v4 @utility layer) */
+@utility theme-bg-app {
   background-color: var(--bg-app);
 }
-.theme-bg-surface {
+@utility theme-bg-surface {
   background-color: var(--bg-surface);
 }
-.theme-bg-sub {
+@utility theme-bg-sub {
   background-color: var(--bg-surface-sub);
 }
-.theme-bg-elevated {
+@utility theme-bg-elevated {
   background-color: var(--bg-elevated);
 }
-.theme-border {
+@utility theme-border {
   border-color: var(--border-color);
 }
-.theme-text-primary {
+@utility theme-text-primary {
   color: var(--text-primary);
 }
-.theme-text-secondary {
+@utility theme-text-secondary {
   color: var(--text-secondary);
 }
-.theme-accent {
+@utility theme-accent {
   color: var(--accent-main);
 }
-.theme-bg-accent {
+@utility theme-bg-accent {
   background-color: var(--accent-main);
 }
-.theme-bg-accent-soft {
+@utility theme-bg-accent-soft {
   background-color: var(--accent-soft);
 }
-.theme-accent-text {
+@utility theme-accent-text {
   color: var(--accent-text);
+}
+@utility theme-danger {
+  color: var(--danger-text);
+}
+@utility theme-bg-danger-soft {
+  background-color: var(--danger-soft);
 }
 
 /* 1. Enterprise Slate Theme */

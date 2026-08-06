@@ -470,11 +470,14 @@ export default function StudentReportsView() {
 
     setReportsList(updatedList);
     localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedList));
+    window.dispatchEvent(new CustomEvent("spr_report_saved"));
+    window.dispatchEvent(new CustomEvent("spr_project_changed"));
     showToast(`Report ${reportIdStr} deleted!`, "success");
 
     if (isOnline() && rep.id) {
       try {
         await fetchWithAuth(`/reports/${rep.id}/`, { method: "DELETE" });
+        window.dispatchEvent(new CustomEvent("spr_report_saved"));
       } catch (err) {
         console.warn("[StudentReportsView] Delete API failed:", err.message);
       }

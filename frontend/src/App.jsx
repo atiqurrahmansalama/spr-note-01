@@ -68,11 +68,27 @@ function SaveStatusBadge() {
 
 export default function App() {
   const { showToast } = useToast();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [sidebarMode, setSidebarMode] = useState(() => sidebarSettings.getMode());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState(() => {
+    const mode = sidebarSettings.getMode();
+    return mode === "inline" ? "overlay" : mode;
+  });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const themeContext = useTheme();
+
+  // Ensure mobile view always defaults to hidden overlay mode
+  useEffect(() => {
+    const checkMobile = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+        setSidebarMode("overlay");
+      }
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // 💾 timezone & dateFormat — LocalStorage থেকে initialize
   const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());

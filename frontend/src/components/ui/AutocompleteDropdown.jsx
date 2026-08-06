@@ -52,19 +52,18 @@ export default function AutocompleteDropdown({
 
   const safeSearchTerm = typeof searchTerm === "string" ? searchTerm : (searchTerm?.label || "");
 
-  const selectedItemLabel = typeof value === "string" ? value : (value?.label || "");
-  const isSearchMatchingSelected = safeSearchTerm.trim().toLowerCase() === selectedItemLabel.trim().toLowerCase();
-
   const filteredOptions = options.filter((item) => {
-    if (showAllOptionsOnFocus || isSearchMatchingSelected) return true;
-    const label = typeof item === "string" ? item : (item?.label || "");
-    return label.toLowerCase().includes(safeSearchTerm.toLowerCase());
+    if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
+    const term = safeSearchTerm.trim().toLowerCase();
+    const label = (typeof item === "string" ? item : (item?.label || item?.name || "")).toLowerCase();
+    const sub = (typeof item === "object" ? (item?.sub || item?.group_name || "") : "").toLowerCase();
+    return label.includes(term) || sub.includes(term);
   });
 
   const isNewName =
     safeSearchTerm.trim().length > 0 &&
     !options.some(
-      (opt) => (typeof opt === "string" ? opt : (opt?.label || "")).toLowerCase() === safeSearchTerm.trim().toLowerCase()
+      (opt) => (typeof opt === "string" ? opt : (opt?.label || opt?.name || "")).toLowerCase() === safeSearchTerm.trim().toLowerCase()
     );
 
   const triggerNextFocus = () => {
@@ -146,7 +145,7 @@ export default function AutocompleteDropdown({
     <div ref={containerRef} className={`relative w-full ${className}`}>
       <div className="flex items-center gap-2">
         {/* Input field with chevron */}
-        <div className="relative flex items-center flex-1 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+        <div className="relative flex items-center flex-1">
           <input
             ref={refToUse}
             type="text"
@@ -155,6 +154,7 @@ export default function AutocompleteDropdown({
             onChange={readOnly ? undefined : handleInputChange}
             onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') setIsOpen(!isOpen); } : handleKeyDown}
             onFocus={() => setIsOpen(true)}
+            onClick={() => setIsOpen(true)}
             placeholder={placeholder}
             className={`w-full theme-bg-sub rounded-xl px-4 py-2.5 theme-text-primary font-medium text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-8 ${
               readOnly ? "cursor-pointer select-none" : ""
@@ -162,7 +162,10 @@ export default function AutocompleteDropdown({
           />
 
           <div
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen((prev) => !prev);
+            }}
             className="absolute right-3 p-1 theme-text-secondary hover:theme-text-primary cursor-pointer select-none flex items-center justify-center"
           >
             <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
@@ -175,9 +178,9 @@ export default function AutocompleteDropdown({
             type="button"
             onClick={handleSaveClick}
             className="theme-bg-accent hover:opacity-90 theme-accent-text text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors shadow shrink-0 cursor-pointer"
-            title="Press + to save"
+            title="Press Shift + + to save"
           >
-            Save (+)
+            Save
           </button>
         )}
       </div>

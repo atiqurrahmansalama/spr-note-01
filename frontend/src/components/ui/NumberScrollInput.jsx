@@ -148,7 +148,7 @@ export default function NumberScrollInput({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      className={`bg-transparent focus:theme-bg-elevated border-none outline-none text-center font-mono rounded transition-all placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent focus:placeholder:opacity-0 select-text ${className}`}
+      className={`bg-transparent focus:theme-bg-elevated border-none outline-none text-center text-[12px] sm:text-[14px] font-mono rounded transition-all placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent focus:placeholder:opacity-0 select-text ${className}`}
       inputMode="numeric"
     />
   );

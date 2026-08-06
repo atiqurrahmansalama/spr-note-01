@@ -26,14 +26,14 @@ export default function StudentInput({
           onChange={onStudentSelect}
           onAddNew={onOpenSavePanel}
           autoFocus={true}
-          placeholder="Search student..."
+          placeholder="Search Student..."
         />
 
         <input
           type="text"
           value={groupName}
           onChange={(e) => onGroupNameChange(e.target.value)}
-          className="w-full bg-transparent text-[11px] theme-text-secondary mt-1 pl-1 focus:outline-none focus:theme-text-primary transition-colors"
+          className="w-[150px] ml-[13px] bg-transparent text-[12px] theme-text-secondary font-semibold mt-1 pl-1 focus:outline-none focus:theme-text-primary transition-colors placeholder:font-normal"
           placeholder="Group Name"
         />
 

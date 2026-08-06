@@ -19,7 +19,7 @@ export const THEME_PALETTES = [
     id: "midnight",
     name: "Midnight Cyber",
     category: "Deep Sapphire",
-    accentColor: "#06b6d4",
+    accentColor: "#06a8c5ff",
     darkPreview: "bg-[#0f172a] border-cyan-800 text-cyan-400",
     lightPreview: "bg-[#f0f9ff] border-cyan-200 text-cyan-700",
   },
@@ -53,3 +53,14 @@ export const THEME_MODES = [
   { id: "dark", name: "Dark Mode", label: "Recommended for low light" },
   { id: "light", name: "Light Mode", label: "Clean bright interface" },
 ];
+
+export const BRAND_COLORS = {
+  accent: "var(--accent-main)",
+  accentSoft: "var(--accent-soft)",
+  danger: "var(--danger-main, #f43f5e)",
+  dangerSoft: "var(--danger-soft, rgba(244, 63, 94, 0.12))",
+  dangerHover: "var(--danger-hover, rgba(244, 63, 94, 0.22))",
+  dangerText: "var(--danger-text, #fb7185)",
+  success: "#10b981",
+  warning: "#f59e0b",
+};
