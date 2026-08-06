@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 import uuid
 
 class User(AbstractUser):
@@ -32,6 +33,97 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} [{self.get_role_display()}]"
+
+    @property
+    def unique_key(self):
+        return f"USR-{self.id:04d}"
+
+    @property
+    def formatted_created_at(self):
+        if self.date_joined:
+            return self.date_joined.strftime("%Y-%m-%d %I:%M %p")
+        return "--"
+
+    @property
+    def total_lifetime_activity(self):
+        logs = list(self.activity_logs.order_by('timestamp'))
+        if not logs:
+            logs = list(self.login_logs.order_by('timestamp'))
+            if not logs:
+                return "--"
+
+        total_seconds = 0
+        active_start = None
+
+        for log in logs:
+            status = log.status.upper()
+            if status in ["ACTIVE", "LOGIN"]:
+                if active_start is None:
+                    active_start = log.timestamp
+            elif status in ["INACTIVE", "LOGOUT"]:
+                if active_start is not None:
+                    delta = (log.timestamp - active_start).total_seconds()
+                    if delta > 0:
+                        total_seconds += delta
+                    active_start = None
+
+        if active_start is not None:
+            delta = (timezone.now() - active_start).total_seconds()
+            if delta > 0:
+                total_seconds += delta
+
+        if total_seconds <= 0:
+            return "--"
+
+        days = int(total_seconds // 86400)
+        hours = int((total_seconds % 86400) // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+
+        parts = []
+        if days > 0:
+            parts.append(f"{days} Day{'s' if days > 1 else ''}")
+        if hours > 0:
+            parts.append(f"{hours} Hr{'s' if hours > 1 else ''}")
+        if minutes > 0 or not parts:
+            parts.append(f"{minutes} Min{'s' if minutes > 1 else ''}")
+
+        return ", ".join(parts)
+
+
+# 🎯 User Activity & Login Tracking Tables
+class UserLoginLog(models.Model):
+    STATUS_CHOICES = (
+        ("LOGIN", "Login"),
+        ("LOGOUT", "Logout"),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="login_logs")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    timestamp = models.DateTimeField(default=timezone.now)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True, default="--")
+    city = models.CharField(max_length=100, null=True, blank=True, default="--")
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.status} at {self.timestamp}"
+
+
+class UserActivityLog(models.Model):
+    STATUS_CHOICES = (
+        ("ACTIVE", "Active"),
+        ("INACTIVE", "Inactive"),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="activity_logs")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.status} at {self.timestamp}"
 
 
 # 🎯 1. Group Table

@@ -14,7 +14,9 @@ import {
   CalendarIcon,
   CopyIcon,
   CloudIcon,
-  GlobeIcon
+  GlobeIcon,
+  ChatIcon,
+  SavedMessagesIcon
 } from "../ui/Icons";
 
 export default function Sidebar({ 
@@ -47,6 +49,11 @@ export default function Sidebar({
       Icon: DashboardIcon 
     },
     { 
+      id: "Student Reports", 
+      name: "Student Reports", 
+      Icon: SavedMessagesIcon 
+    },
+    { 
       id: "Appearance", 
       name: "Appearance", 
       Icon: AppearanceIcon 
@@ -71,11 +78,6 @@ export default function Sidebar({
       id: "Groups & Students", 
       name: "Groups & Students", 
       Icon: GroupsIcon 
-    },
-    { 
-      id: "Student Reports", 
-      name: "Student Reports", 
-      Icon: CloudIcon 
     },
     { 
       id: "Sessions & Comments", 

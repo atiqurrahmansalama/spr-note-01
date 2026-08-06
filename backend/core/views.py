@@ -11,7 +11,9 @@ from .models import (
     SavedMessage, 
     StudentDailyReport, 
     MistakeDetail, 
-    StuckDetail
+    StuckDetail,
+    UserLoginLog,
+    UserActivityLog
 )
 from .serializers import (
     CustomTokenObtainPairSerializer, 
@@ -23,7 +25,10 @@ from .serializers import (
     SavedMessageSerializer,
     StudentDailyReportSerializer,
     MistakeDetailSerializer,
-    StuckDetailSerializer
+    StuckDetailSerializer,
+    UserLoginLogSerializer,
+    UserActivityLogSerializer,
+    UserActivitySummarySerializer
 )
 
 
@@ -31,6 +36,32 @@ User = get_user_model()
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            username_or_email = request.data.get("username", "")
+            try:
+                if "@" in username_or_email:
+                    user_obj = User.objects.get(email=username_or_email)
+                else:
+                    user_obj = User.objects.get(username=username_or_email)
+                
+                ip = request.META.get('REMOTE_ADDR')
+                country = request.data.get('country', '--')
+                city = request.data.get('city', '--')
+
+                UserLoginLog.objects.create(
+                    user=user_obj,
+                    status="LOGIN",
+                    ip_address=ip,
+                    country=country or "--",
+                    city=city or "--"
+                )
+                UserActivityLog.objects.create(user=user_obj, status="ACTIVE")
+            except User.DoesNotExist:
+                pass
+        return response
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -89,3 +120,85 @@ class StuckDetailViewSet(viewsets.ModelViewSet):
     queryset = StuckDetail.objects.all().order_by('-id')
     serializer_class = StuckDetailSerializer
     permission_classes = [AllowAny]
+
+
+class LogLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        status_val = request.data.get("status", "LOGIN").upper()
+        if status_val not in ["LOGIN", "LOGOUT"]:
+            status_val = "LOGIN"
+
+        user_obj = request.user if request.user.is_authenticated else None
+        username = request.data.get("username")
+        if not user_obj and username:
+            try:
+                user_obj = User.objects.get(username=username)
+            except User.DoesNotExist:
+                user_obj = None
+
+        if not user_obj:
+            return Response({"detail": "User not identified"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = request.META.get('REMOTE_ADDR')
+        country = request.data.get('country', '--')
+        city = request.data.get('city', '--')
+
+        log = UserLoginLog.objects.create(
+            user=user_obj,
+            status=status_val,
+            ip_address=ip,
+            country=country or "--",
+            city=city or "--"
+        )
+        return Response({"status": "logged", "log_id": log.id}, status=status.HTTP_200_OK)
+
+
+class LogActivityView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        status_val = request.data.get("status", "ACTIVE").upper()
+        if status_val not in ["ACTIVE", "INACTIVE"]:
+            status_val = "ACTIVE"
+
+        user_obj = request.user if request.user.is_authenticated else None
+        username = request.data.get("username")
+        if not user_obj and username:
+            try:
+                user_obj = User.objects.get(username=username)
+            except User.DoesNotExist:
+                user_obj = None
+
+        if not user_obj:
+            return Response({"detail": "User not identified"}, status=status.HTTP_400_BAD_REQUEST)
+
+        log = UserActivityLog.objects.create(
+            user=user_obj,
+            status=status_val
+        )
+        return Response({"status": "logged", "log_id": log.id}, status=status.HTTP_200_OK)
+
+
+class UserActivitySummaryView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            user_obj = request.user
+        else:
+            username = request.query_params.get("username")
+            if username:
+                try:
+                    user_obj = User.objects.get(username=username)
+                except User.DoesNotExist:
+                    user_obj = User.objects.first()
+            else:
+                user_obj = User.objects.first()
+
+        if not user_obj:
+            return Response({"detail": "No users found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserActivitySummarySerializer(user_obj)
+        return Response(serializer.data, status=status.HTTP_200_OK)

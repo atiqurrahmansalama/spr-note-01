@@ -1,11 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchWithAuth } from "../../utils/authService";
+import { fetchUserActivitySummary } from "../../utils/activityTracker";
 
 export default function UserProfileDrawer({ isOpen, onClose, user, onLogout }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
+  const [activitySummary, setActivitySummary] = useState(null);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchUserActivitySummary().then((data) => {
+        if (data) setActivitySummary(data);
+      });
+    }
+  }, [isOpen, user]);
 
   if (!isOpen || !user) return null;
 
@@ -46,11 +56,11 @@ export default function UserProfileDrawer({ isOpen, onClose, user, onLogout }) {
         onClick={onClose}
       ></div>
 
-      <aside className="fixed lg:static top-0 right-0 z-50 w-72 h-full theme-bg-sub border-l theme-border shrink-0 flex flex-col justify-between p-5 transition-all duration-300 shadow-2xl lg:shadow-none">
+      <aside className="fixed lg:static top-0 right-0 z-50 w-80 h-full theme-bg-sub border-l theme-border shrink-0 flex flex-col justify-between p-5 transition-all duration-300 shadow-2xl lg:shadow-none overflow-y-auto">
         <div>
           {/* Header */}
           <div className="flex justify-between items-center pb-4 border-b theme-border mb-5">
-            <span className="text-xs font-semibold theme-text-secondary uppercase tracking-wider">Account Settings</span>
+            <span className="text-xs font-semibold theme-text-secondary uppercase tracking-wider">User Account & Activity</span>
             <button 
               onClick={onClose} 
               className="theme-text-secondary hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
@@ -61,29 +71,49 @@ export default function UserProfileDrawer({ isOpen, onClose, user, onLogout }) {
           </div>
 
           {/* User Identity Info */}
-          <div className="flex items-center gap-3.5 mb-6">
-            <div className="w-10 h-10 rounded-lg theme-bg-elevated border theme-border theme-text-primary font-semibold text-sm flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-3.5 mb-5">
+            <div className="w-10 h-10 rounded-full theme-bg-accent theme-accent-text font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
               {avatarChar}
             </div>
             <div className="overflow-hidden">
-              <h4 className="text-xs font-semibold theme-text-primary truncate">{fullName}</h4>
+              <h4 className="text-xs font-bold theme-text-primary truncate">{fullName}</h4>
               <p className="text-[10px] theme-text-secondary truncate">@{user.username}</p>
-              <span className="inline-block mt-1 text-[9px] theme-accent font-mono uppercase">
+              <span className="inline-block mt-0.5 text-[9px] theme-accent font-mono uppercase font-semibold">
                 {user.role || 'MEMBER'}
               </span>
             </div>
           </div>
 
-          {/* Readonly Info */}
-          <div className="space-y-2 mb-6 text-xs font-mono">
-            <div className="theme-bg-surface px-3 py-2 rounded-md border theme-border flex justify-between text-[11px]">
-              <span className="theme-text-secondary">Email:</span>
-              <span className="theme-text-primary truncate max-w-32">{user.email || 'N/A'}</span>
+          {/* Activity & Usage Tracking Metrics Card */}
+          <div className="space-y-2 mb-5 text-xs font-mono">
+            <div className="theme-bg-surface px-3 py-2 rounded-xl border theme-border flex justify-between items-center text-[11px]">
+              <span className="theme-text-secondary">Unique Key:</span>
+              <span className="theme-accent font-bold">{activitySummary?.unique_key || (user.id ? `USR-${String(user.id).padStart(4, '0')}` : '--')}</span>
             </div>
-            <div className="theme-bg-surface px-3 py-2 rounded-md border theme-border flex justify-between text-[11px]">
-              <span className="theme-text-secondary">Joined:</span>
-              <span className="theme-text-primary">{user.date_joined || 'N/A'}</span>
+
+            <div className="theme-bg-surface px-3 py-2 rounded-xl border theme-border flex justify-between items-center text-[11px]">
+              <span className="theme-text-secondary">Created At:</span>
+              <span className="theme-text-primary">{activitySummary?.formatted_created_at || user.date_joined || '--'}</span>
             </div>
+
+            <div className="theme-bg-surface px-3 py-2 rounded-xl border theme-border flex justify-between items-center text-[11px]">
+              <span className="theme-text-secondary">Total Active Time:</span>
+              <span className="text-emerald-400 font-bold">{activitySummary?.total_lifetime_activity || '--'}</span>
+            </div>
+
+            {activitySummary?.recent_login_logs && activitySummary.recent_login_logs.length > 0 && (
+              <div className="theme-bg-surface p-3 rounded-xl border theme-border space-y-1.5 text-[10px]">
+                <span className="theme-text-secondary block font-semibold uppercase tracking-wider text-[9px] mb-1">Recent Activity Log</span>
+                {activitySummary.recent_login_logs.slice(0, 3).map((log) => (
+                  <div key={log.id} className="flex items-center justify-between border-b theme-border/40 pb-1 last:border-0 last:pb-0">
+                    <span className={`font-bold ${log.status === 'LOGIN' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {log.status}
+                    </span>
+                    <span className="theme-text-secondary font-mono">{log.timestamp_formatted}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Change Password Form */}

@@ -1,11 +1,43 @@
 import { auth as authStore } from "./localStore";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+  return ""; // empty string uses Vite dev server proxy or current origin
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Helper to make fetch request with relative proxy & absolute fallback
+const fetchApi = async (path, options = {}) => {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // Primary try with relative path (Vite proxy / same origin)
+  try {
+    const res = await fetch(cleanPath, options);
+    if (res.ok || res.status < 500) return res;
+  } catch {
+    console.warn(`[authService] Proxy fetch to ${cleanPath} failed, attempting direct target...`);
+  }
+
+  // Fallback try 1: 127.0.0.1:8000
+  try {
+    const fallbackUrl = `http://127.0.0.1:8000${cleanPath}`;
+    const res = await fetch(fallbackUrl, options);
+    if (res.ok || res.status < 500) return res;
+  } catch {
+    console.warn(`[authService] Direct 127.0.0.1 fetch failed, trying localhost fallback...`);
+  }
+
+  // Fallback try 2: localhost:8000
+  const localhostUrl = `http://localhost:8000${cleanPath}`;
+  return fetch(localhostUrl, options);
+};
 
 // Register User (Sign Up)
 export const registerUser = async (userData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/register/`, {
+    const response = await fetchApi('/api/register/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
@@ -21,11 +53,19 @@ export const registerUser = async (userData) => {
 export const loginUser = async (usernameOrEmail, password) => {
   if (navigator.onLine) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/token/`, {
+      let response = await fetchApi('/api/token/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: usernameOrEmail, password }),
       });
+
+      if (!response.ok && response.status === 404) {
+        response = await fetchApi('/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: usernameOrEmail, password }),
+        });
+      }
 
       const data = await response.json();
 
@@ -33,6 +73,10 @@ export const loginUser = async (usernameOrEmail, password) => {
         authStore.saveAccessToken(data.access);
         authStore.saveRefreshToken(data.refresh);
         authStore.saveUser(data.user);
+        import("./activityTracker").then(({ sendLoginLog, sendActivityLog }) => {
+          sendLoginLog("LOGIN");
+          sendActivityLog("ACTIVE");
+        }).catch(() => {});
         return { success: true, user: data.user };
       } else {
         return { success: false, message: data.detail || 'Login failed' };
@@ -61,13 +105,24 @@ export const loginUser = async (usernameOrEmail, password) => {
   };
 };
 
+export const logoutUser = async () => {
+  try {
+    const { sendLoginLog, sendActivityLog } = await import("./activityTracker");
+    await sendActivityLog("INACTIVE");
+    await sendLoginLog("LOGOUT");
+  } catch {
+    // fallback
+  }
+  authStore.clear();
+};
+
 // Token Refresh Helper
 export const refreshToken = async () => {
   const refresh = authStore.getRefreshToken();
   if (!refresh) return null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+    const response = await fetchApi('/api/token/refresh/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh }),
@@ -84,7 +139,6 @@ export const refreshToken = async () => {
     console.warn('[authService] Token refresh failed:', err.message);
   }
 
-  // Refresh token is also expired or invalid
   authStore.clear();
   return null;
 };
@@ -99,7 +153,7 @@ export const fetchWithAuth = async (url, options = {}) => {
       ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
       ...options.headers,
     };
-    return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
+    return fetchApi(url, { ...options, headers });
   };
 
   let response = await makeRequest(token);
@@ -109,10 +163,8 @@ export const fetchWithAuth = async (url, options = {}) => {
     const newToken = await refreshToken();
     
     if (newToken) {
-      // Retry request with newly refreshed token
       response = await makeRequest(newToken);
     } else {
-      // Refresh failed or no refresh token exists -> Clear expired tokens and retry without Authorization header
       authStore.clear();
       response = await makeRequest(null);
     }

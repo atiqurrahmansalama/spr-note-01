@@ -1,7 +1,16 @@
-export const APP_VERSION = "v1.94.0";
-export const APP_BUILD_DATE = "2026-08-05";
-export const APP_BUILD_TIME = "03:02 AM";
-export const APP_BUILD_TIMESTAMP = "2026-08-05 03:02:43";
+import { getVersionTrackerInfo } from "../utils/versionTracker";
+
+const trackerInfo = typeof window !== "undefined" ? getVersionTrackerInfo() : {
+  version: "v1.94",
+  lastChangeDate: "2026-08-06",
+  lastChangeTime: "06:05 PM",
+  lastChangeFull: "2026-08-06 06:05 PM"
+};
+
+export const APP_VERSION = trackerInfo.version;
+export const APP_BUILD_DATE = trackerInfo.lastChangeDate;
+export const APP_BUILD_TIME = trackerInfo.lastChangeTime;
+export const APP_BUILD_TIMESTAMP = trackerInfo.lastChangeFull;
 
 export const APP_INFO = {
   name: "SPR Note",
@@ -10,7 +19,6 @@ export const APP_INFO = {
   buildDate: APP_BUILD_DATE,
   buildTime: APP_BUILD_TIME,
   buildTimestamp: APP_BUILD_TIMESTAMP,
-  license: "Active License",
   author: "SPR Note Team",
-  description: "Enterprise management platform for logging student daily Hifz progress, tracking mistakes/stuck items, and generating automated reports."
+  description: "Management platform for logging student daily Hifz progress, tracking mistakes/stuck items, and generating automated reports."
 };

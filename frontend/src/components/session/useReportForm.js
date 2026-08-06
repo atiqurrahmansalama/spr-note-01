@@ -11,7 +11,7 @@ import {
   draftReport,
   saveStatusStore,
 } from "../../utils/localStore";
-import { saveReportLocally } from "../../utils/syncEngine";
+import { saveReportLocally, syncSessionsAndComments } from "../../utils/syncEngine";
 
 export function useReportForm() {
   const { showToast } = useToast();
@@ -250,6 +250,9 @@ export function useReportForm() {
     }
 
     try {
+      // Sync offline session/comment data to DB first
+      await syncSessionsAndComments();
+
       const [studentsRes, sessionsRes, messagesRes] = await Promise.all([
         fetchWithAuth("/students/"),
         fetchWithAuth("/sessions/"),
@@ -258,29 +261,37 @@ export function useReportForm() {
 
       if (studentsRes.ok) {
         const rawStudents = await studentsRes.json();
-        const apiStudents = rawStudents.map((s) => ({
+        const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s) => ({
           id: typeof s === "object" ? s.id : null,
-          label: typeof s === "object" ? (s.name || s.student_name || s.label) : s,
-          sub: typeof s === "object" ? (s.group || s.group_name || s.sub || "General Group") : "General Group",
+          label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
+          sub: typeof s === "object" ? (s.group_name || s.group || s.sub || "General Group") : "General Group",
         }));
 
         const localStudents = studentStore.getAll();
         const merged = mergeStudents(apiStudents, localStudents);
         setStudentDatabase(merged);
         setAvailableGroups(Array.from(new Set(merged.map((s) => s.sub))).filter(Boolean));
+      } else {
+        console.warn("[useReportForm] Students API failed with status:", studentsRes.status);
       }
 
       if (sessionsRes.ok) {
         const rawSessions = await sessionsRes.json();
+        const apiSessions = (Array.isArray(rawSessions) ? rawSessions : []).map((s) => ({
+          id: typeof s === "object" ? (s.id || s.name) : String(s),
+          name: typeof s === "object" ? (s.name || s.session_name || s.label || String(s)) : String(s),
+        }));
         const localSessions = sessionStore.getAll();
-        const merged = mergeSessions(rawSessions, localSessions);
+        const merged = mergeSessions(apiSessions, localSessions);
         setSessionList(merged);
+      } else {
+        console.warn("[useReportForm] Sessions API failed with status:", sessionsRes.status);
       }
 
       if (messagesRes.ok) {
         const rawMessages = await messagesRes.json();
-        const apiComments = rawMessages
-          .map((m) => (typeof m === "object" ? (m.text || m.comment) : m))
+        const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
+          .map((m) => (typeof m === "object" ? (m.text || m.comment) : String(m)))
           .filter(Boolean);
         const localComments = commentStore.getAll();
         const mergedComments = Array.from(new Set([...apiComments, ...localComments]));
@@ -424,6 +435,8 @@ export function useReportForm() {
         if (response.ok) {
           showToast(`Report for "${studentName}" recorded to Database!`, "success");
           saveStatusStore.set("database", "Database Synced");
+          // 🔔 Notify StudentReportsView to refresh its list
+          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database" } }));
         } else {
           const errData = await response.json();
           console.error("[handleSaveRecord Server Error]", errData);
@@ -448,10 +461,12 @@ export function useReportForm() {
       } catch (error) {
         showToast("Saved locally. Server connection issue: " + error.message, "info");
         saveStatusStore.set("local", "Saved (Local)");
+        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
       }
     } else {
       showToast(`Report for "${studentName}" saved locally (offline).`, "info");
       saveStatusStore.set("local", "Saved (Local)");
+      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
     }
 
     // Clear local report draft upon successful save

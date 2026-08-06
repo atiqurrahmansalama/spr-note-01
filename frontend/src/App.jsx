@@ -14,10 +14,11 @@ import ShortcutsGuide from "./components/layout/ShortcutsGuide";
 import AppGuideView from "./components/layout/AppGuideView";
 import AboutAppView from "./components/layout/AboutAppView";
 import StudentDirectoryView from "./components/layout/StudentDirectoryView";
-import StudentReportsView from "./components/layout/StudentReportsView";
+import StudentReportsView from "./components/reports/StudentReportsView";
 import { useTheme } from "./context/useTheme";
 import { useToast } from "./context/ToastContext";
 import { SleekCheckIcon, CloudCheckIcon } from "./components/ui/Icons";
+import { initActivityTracker } from "./utils/activityTracker";
 
 function SaveStatusBadge() {
   const [status, setStatus] = useState(null);
@@ -204,6 +205,10 @@ export default function App() {
 
   const [user, setUser] = useState(() => authStore.getUser());
 
+  useEffect(() => {
+    initActivityTracker();
+  }, []);
+
   const handleLogout = () => {
     authStore.clear();
     setUser(null);
@@ -334,11 +339,11 @@ export default function App() {
       {/* Global Top Navigation Bar */}
       <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 select-none">
         <div className="flex items-center gap-3">
-          {/* Menu Button (Icon only, cycles through modes on click) */}
+          {/* Menu Button (Icon only, cycles through modes on click, no background) */}
           <button 
             type="button"
             onClick={handleToggleMenu}
-            className="w-9 h-9 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-primary text-lg font-bold transition flex items-center justify-center cursor-pointer shadow-sm hover:border-[var(--accent-main)]/50 active:scale-95"
+            className="p-1.5 theme-text-primary hover:theme-accent text-xl font-bold transition-colors bg-transparent border-0 flex items-center justify-center cursor-pointer active:scale-95"
             title={getMenuTooltip()}
           >
             <span>☰</span>
@@ -357,23 +362,20 @@ export default function App() {
         <div className="flex items-center gap-3">
           <SaveStatusBadge />
 
-          {/* Right Top Premium User Profile Button */}
+          {/* Right Top User Profile Icon Only (Fully round, background-free button) */}
           {user ? (
             <button 
               type="button"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex items-center gap-2.5 theme-bg-sub hover:theme-bg-elevated border theme-border hover:border-[var(--accent-main)]/50 px-2.5 py-1.5 rounded-xl transition-all text-left cursor-pointer shadow-sm active:scale-95 group"
+              className="p-0 bg-transparent border-0 cursor-pointer active:scale-95 group focus:outline-none flex items-center justify-center"
               title="View User Profile"
             >
               <div className="relative">
-                <div className="w-7 h-7 rounded-lg theme-bg-accent theme-accent-text text-xs font-bold flex items-center justify-center shadow-sm group-hover:opacity-90">
+                <div className="w-8 h-8 rounded-full theme-bg-accent theme-accent-text text-xs font-bold flex items-center justify-center shadow-sm group-hover:opacity-90 transition-opacity">
                   {avatarChar}
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[var(--bg-surface)]" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--bg-surface)]" />
               </div>
-              <span className="text-xs font-semibold theme-text-primary hidden md:inline truncate max-w-28">
-                {user.first_name ? `${user.first_name}` : user.username}
-              </span>
             </button>
           ) : (
             <button

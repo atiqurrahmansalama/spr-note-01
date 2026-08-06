@@ -9,7 +9,9 @@ from .models import (
     SavedMessage, 
     StudentDailyReport, 
     MistakeDetail, 
-    StuckDetail
+    StuckDetail,
+    UserLoginLog,
+    UserActivityLog
 )
 
 User = get_user_model()
@@ -258,3 +260,53 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         report.save(update_fields=['total_mistake', 'total_stuck'])
 
         return report
+
+
+class UserLoginLogSerializer(serializers.ModelSerializer):
+    timestamp_formatted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserLoginLog
+        fields = ['id', 'status', 'timestamp', 'timestamp_formatted', 'ip_address', 'country', 'city']
+
+    def get_timestamp_formatted(self, obj):
+        if obj.timestamp:
+            return obj.timestamp.strftime("%Y-%m-%d %I:%M %p")
+        return "--"
+
+
+class UserActivityLogSerializer(serializers.ModelSerializer):
+    timestamp_formatted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserActivityLog
+        fields = ['id', 'status', 'timestamp', 'timestamp_formatted']
+
+    def get_timestamp_formatted(self, obj):
+        if obj.timestamp:
+            return obj.timestamp.strftime("%Y-%m-%d %I:%M %p")
+        return "--"
+
+
+class UserActivitySummarySerializer(serializers.ModelSerializer):
+    unique_key = serializers.ReadOnlyField()
+    formatted_created_at = serializers.ReadOnlyField()
+    total_lifetime_activity = serializers.ReadOnlyField()
+    recent_login_logs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 
+            'unique_key', 
+            'username', 
+            'email', 
+            'role', 
+            'formatted_created_at', 
+            'total_lifetime_activity',
+            'recent_login_logs'
+        ]
+
+    def get_recent_login_logs(self, obj):
+        recent = obj.login_logs.all()[:5]
+        return UserLoginLogSerializer(recent, many=True).data

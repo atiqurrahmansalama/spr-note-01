@@ -152,6 +152,22 @@ export function MoonIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export function SearchIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
+export function PrinterIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4h12z" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className = "w-4 h-4" }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -60,10 +60,10 @@ export default function StudentDirectoryView() {
       const res = await fetchWithAuth("/students/");
       if (res.ok) {
         const raw = await res.json();
-        const apiStudents = raw.map((s) => ({
+        const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => ({
           id: typeof s === "object" ? s.id : null,
-          label: typeof s === "object" ? (s.name || s.student_name || s.label) : s,
-          sub: typeof s === "object" ? (s.group || s.group_name || s.sub || "General Group") : "General Group",
+          label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
+          sub: typeof s === "object" ? (s.group_name || s.group || s.sub || "General Group") : "General Group",
         }));
 
         const localStudents = studentStore.getAll();
@@ -92,8 +92,8 @@ export default function StudentDirectoryView() {
       const res = await fetchWithAuth("/reports/");
       if (res.ok) {
         const raw = await res.json();
-        setReportsList(raw);
-        localStorage.setItem("spr_reports_local_v1", JSON.stringify(raw));
+        setReportsList(Array.isArray(raw) ? raw : []);
+        localStorage.setItem("spr_reports_local_v1", JSON.stringify(Array.isArray(raw) ? raw : []));
       }
     } catch (err) {
       console.warn("[StudentDirectory] Reports API fetch failed:", err.message);
@@ -105,10 +105,10 @@ export default function StudentDirectoryView() {
     loadReports();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unique list of groups
+  // Unique list of groups (sorted alphabetically)
   const groupsList = Array.from(
     new Set(studentList.map((s) => s.sub || "General Group"))
-  ).filter(Boolean);
+  ).filter(Boolean).sort((a, b) => a.localeCompare(b));
 
   // Group dropdown options for AutocompleteDropdown in Student Edit Panel
   const groupDropdownOptions = (groupsList.length > 0 ? groupsList : ["General Group"]).map((g) => ({
@@ -116,7 +116,7 @@ export default function StudentDirectoryView() {
     value: g,
   }));
 
-  // Filter logic
+  // Filter and sort logic
   const filteredStudents = studentList.filter((student) => {
     const nameMatch = (student.label || "").toLowerCase().includes(searchQuery.toLowerCase());
     const groupMatch = (student.sub || "").toLowerCase().includes(searchQuery.toLowerCase());
@@ -127,7 +127,7 @@ export default function StudentDirectoryView() {
       (student.sub || "General Group").toLowerCase() === selectedGroupFilter.toLowerCase();
 
     return passesSearch && passesGroup;
-  });
+  }).sort((a, b) => (a.label || "").localeCompare(b.label || ""));
 
   // Save student callback (from StudentSavePanel)
   const handleSaveStudent = async (result) => {
@@ -390,10 +390,10 @@ export default function StudentDirectoryView() {
                 {/* All Groups Filter Card */}
                 <div
                   onClick={() => setSelectedGroupFilter("ALL")}
-                  className={`w-full p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between select-none ${
+                  className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none ${
                     selectedGroupFilter === "ALL"
-                      ? "theme-bg-sub border-[var(--accent-main)] theme-accent shadow-sm font-bold"
-                      : "theme-bg-sub border-transparent theme-text-primary hover:theme-bg-elevated"
+                      ? "theme-bg-sub theme-accent shadow-sm font-bold"
+                      : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -454,10 +454,10 @@ export default function StudentDirectoryView() {
                     <div
                       key={grp + idx}
                       onClick={() => setSelectedGroupFilter(grp)}
-                      className={`w-full p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between select-none group/grp ${
+                      className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none group/grp ${
                         isSelected
-                          ? "theme-bg-sub border-[var(--accent-main)] theme-accent shadow-sm font-bold"
-                          : "theme-bg-sub border-transparent theme-text-primary hover:theme-bg-elevated"
+                          ? "theme-bg-sub theme-accent shadow-sm font-bold"
+                          : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -550,10 +550,10 @@ export default function StudentDirectoryView() {
                     <div
                       key={grp + idx}
                       onClick={() => setSelectedGroupFilter(grp)}
-                      className={`w-full p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between select-none group/grp ${
+                      className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none group/grp ${
                         isSelected
-                          ? "theme-bg-sub border-[var(--accent-main)] theme-accent shadow-sm font-bold"
-                          : "theme-bg-sub border-transparent theme-text-primary hover:theme-bg-elevated"
+                          ? "theme-bg-sub theme-accent shadow-sm font-bold"
+                          : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">

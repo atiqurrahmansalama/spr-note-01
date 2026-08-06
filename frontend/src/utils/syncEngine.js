@@ -1,3 +1,6 @@
+import { fetchWithAuth } from "./authService";
+import { sessions as sessionStore, savedComments as commentStore, mergeSessions } from "./localStore";
+
 /**
  * Hybrid Sync Engine (LocalStorage <-> Django PostgreSQL)
  * Handles offline persistence, background queueing, and delta sync with API.
@@ -91,5 +94,72 @@ export const triggerCloudSync = async (apiClient) => {
     console.log("[SyncEngine] Hybrid sync completed successfully.");
   } catch (error) {
     console.error("[SyncEngine] Cloud sync failed:", error);
+  }
+};
+
+// 4. Sync local sessions & comment templates to the database
+export const syncSessionsAndComments = async () => {
+  if (!navigator.onLine) return;
+
+  // 4a. Sync Sessions
+  try {
+    const localSessions = sessionStore.getAll();
+    const localOnlySessions = localSessions.filter(s => s._local);
+    
+    for (const session of localOnlySessions) {
+      try {
+        const res = await fetchWithAuth("/sessions/", {
+          method: "POST",
+          body: JSON.stringify({ name: session.name }),
+        });
+        if (res.ok) {
+          const apiSession = await res.json();
+          // Update local session list: remove local flag, save backend ID
+          const currentSessions = sessionStore.getAll();
+          const updated = currentSessions.map(s => 
+            s.name.toLowerCase() === session.name.toLowerCase() 
+              ? { id: apiSession.id, name: apiSession.name } 
+              : s
+          );
+          sessionStore.saveAll(updated);
+          console.log("[SyncEngine] Synced session preset:", session.name);
+        }
+      } catch (err) {
+        console.error("[SyncEngine] Failed to sync session:", session.name, err);
+      }
+    }
+  } catch (err) {
+    console.error("[SyncEngine] Session sync failed:", err);
+  }
+
+  // 4b. Sync Comment Templates
+  try {
+    const res = await fetchWithAuth("/messages/");
+    if (res.ok) {
+      const rawMessages = await res.json();
+      const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
+        .map(m => typeof m === "object" ? (m.text || m.comment) : String(m))
+        .filter(Boolean);
+      
+      const localComments = commentStore.getAll();
+      const apiCommentsLower = new Set(apiComments.map(c => c.toLowerCase()));
+      const localOnlyComments = localComments.filter(c => !apiCommentsLower.has(c.toLowerCase()));
+      
+      for (const commentText of localOnlyComments) {
+        try {
+          const postRes = await fetchWithAuth("/messages/", {
+            method: "POST",
+            body: JSON.stringify({ text: commentText }),
+          });
+          if (postRes.ok) {
+            console.log("[SyncEngine] Synced comment template:", commentText);
+          }
+        } catch (err) {
+          console.error("[SyncEngine] Failed to sync comment template:", commentText, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[SyncEngine] Comment template sync failed:", err);
   }
 };
