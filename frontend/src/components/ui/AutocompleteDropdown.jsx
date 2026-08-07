@@ -53,6 +53,7 @@ export default function AutocompleteDropdown({
   const safeSearchTerm = typeof searchTerm === "string" ? searchTerm : (searchTerm?.label || "");
 
   const filteredOptions = options.filter((item) => {
+    if (showAllOptionsOnFocus && isOpen) return true;
     if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
     const term = safeSearchTerm.trim().toLowerCase();
     const label = (typeof item === "string" ? item : (item?.label || item?.name || "")).toLowerCase();

@@ -126,7 +126,8 @@ export default function DetailSection({
           onClick={addRow}
           className="px-4 py-1.5 rounded-full border theme-border border-dashed hover:border-solid theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-sm"
         >
-          + Add {title.split(" ")[0]}
+          + Add More
+          {/* {title.split(" ")[0]} */}
         </button>
       </div>
     </div>

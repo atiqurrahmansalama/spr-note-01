@@ -43,5 +43,6 @@ urlpatterns = [
     path('api/activity/log-status/', LogActivityView.as_view(), name='activity_log_status_legacy'),
     path('activity/user-summary/', UserActivitySummaryView.as_view(), name='user_activity_summary'),
     path('api/activity/user-summary/', UserActivitySummaryView.as_view(), name='user_activity_summary_legacy'),
+    path('api/', include(router.urls)),
     path('', include(router.urls)),
 ]

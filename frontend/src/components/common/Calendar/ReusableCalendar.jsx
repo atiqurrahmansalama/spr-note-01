@@ -1,0 +1,211 @@
+import { useState, useRef, useEffect } from "react";
+import { ChevronIcon, CalendarIcon } from "../../ui/Icons";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+const WEEKDAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+export default function ReusableCalendar({
+  selectedDate = "",
+  startDate = "",
+  endDate = "",
+  onSelectDate,
+  onRangeSelect,
+  isRange = false,
+  minDate = "",
+  maxDate = "",
+  placeholder = "Select Date",
+  className = "",
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempStart, setTempStart] = useState(startDate || selectedDate);
+  const [tempEnd, setTempEnd] = useState(endDate);
+  const containerRef = useRef(null);
+
+  const activeDate = selectedDate || startDate || new Date().toISOString().split("T")[0];
+  const initDate = new Date(activeDate);
+  const [viewYear, setViewYear] = useState(
+    isNaN(initDate.getFullYear()) ? new Date().getFullYear() : initDate.getFullYear()
+  );
+  const [viewMonth, setViewMonth] = useState(
+    isNaN(initDate.getMonth()) ? new Date().getMonth() : initDate.getMonth()
+  );
+
+  useEffect(() => {
+    setTempStart(startDate || selectedDate);
+    setTempEnd(endDate);
+  }, [selectedDate, startDate, endDate]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const handlePrevMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  const handleSelectDay = (dayNum) => {
+    const monthStr = String(viewMonth + 1).padStart(2, "0");
+    const dayStr = String(dayNum).padStart(2, "0");
+    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
+
+    if (!isRange) {
+      setTempStart(dateStr);
+      if (onSelectDate) onSelectDate(dateStr);
+      setIsOpen(false);
+      return;
+    }
+
+    if (!tempStart || (tempStart && tempEnd)) {
+      setTempStart(dateStr);
+      setTempEnd("");
+    } else if (tempStart && !tempEnd) {
+      if (dateStr < tempStart) {
+        setTempStart(dateStr);
+        setTempEnd("");
+      } else {
+        setTempEnd(dateStr);
+        if (onRangeSelect) onRangeSelect(tempStart, dateStr);
+        setIsOpen(false);
+      }
+    }
+  };
+
+  const formatDateDisplay = (dStr) => {
+    if (!dStr) return "";
+    const [y, m, d] = dStr.split("-");
+    return `${d}/${m}/${y.slice(2)}`;
+  };
+
+  const getLabel = () => {
+    if (isRange) {
+      if (startDate && endDate) {
+        return `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`;
+      }
+      if (startDate) return `${formatDateDisplay(startDate)} - ...`;
+      return placeholder;
+    }
+    if (selectedDate) return formatDateDisplay(selectedDate);
+    return placeholder;
+  };
+
+  return (
+    <div ref={containerRef} className={`relative inline-block ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-semibold hover:theme-bg-elevated transition-colors cursor-pointer select-none"
+      >
+        <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+        <span>{getLabel()}</span>
+        <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 mt-2 w-72 p-3 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-3 animate-fade-in select-none">
+          {/* Month/Year Header */}
+          <div className="flex items-center justify-between text-xs font-bold theme-text-primary px-1">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-1.5 rounded-lg hover:theme-bg-elevated transition-colors cursor-pointer"
+            >
+              &larr;
+            </button>
+            <span>
+              {MONTH_NAMES[viewMonth]} {viewYear}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1.5 rounded-lg hover:theme-bg-elevated transition-colors cursor-pointer"
+            >
+              &rarr;
+            </button>
+          </div>
+
+          {/* Weekday Grid */}
+          <div className="grid grid-cols-7 text-center text-[10px] font-bold theme-text-secondary">
+            {WEEKDAY_NAMES.map((w) => (
+              <span key={w}>{w}</span>
+            ))}
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-1 text-center text-xs">
+            {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+              <span key={`blank-${i}`} />
+            ))}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const monthStr = String(viewMonth + 1).padStart(2, "0");
+              const dayStr = String(dayNum).padStart(2, "0");
+              const currDateStr = `${viewYear}-${monthStr}-${dayStr}`;
+
+              const isSelected = isRange
+                ? currDateStr === tempStart || currDateStr === tempEnd
+                : currDateStr === selectedDate;
+
+              const isInRange = isRange && tempStart && tempEnd && currDateStr >= tempStart && currDateStr <= tempEnd;
+
+              const isToday = currDateStr === new Date().toISOString().split("T")[0];
+              const isDisabled = (minDate && currDateStr < minDate) || (maxDate && currDateStr > maxDate);
+
+              return (
+                <button
+                  key={currDateStr}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => handleSelectDay(dayNum)}
+                  className={`h-8 w-8 rounded-lg flex items-center justify-center font-medium transition-colors text-xs cursor-pointer ${
+                    isSelected
+                      ? "theme-bg-accent theme-accent-text font-bold shadow"
+                      : isInRange
+                      ? "bg-[var(--accent-main)]/20 theme-accent font-semibold"
+                      : isToday
+                      ? "border border-[var(--accent-main)] theme-accent font-bold"
+                      : isDisabled
+                      ? "opacity-30 cursor-not-allowed"
+                      : "hover:theme-bg-elevated theme-text-primary"
+                  }`}
+                >
+                  {dayNum}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

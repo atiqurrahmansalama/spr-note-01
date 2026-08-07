@@ -102,10 +102,18 @@ class SavedMessageViewSet(viewsets.ModelViewSet):
     serializer_class = SavedMessageSerializer
     permission_classes = [AllowAny]
 
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 500
+
 class StudentDailyReportViewSet(viewsets.ModelViewSet):
     queryset = StudentDailyReport.objects.filter(is_deleted=False).order_by('-created_at')
     serializer_class = StudentDailyReportSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardResultsSetPagination
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None

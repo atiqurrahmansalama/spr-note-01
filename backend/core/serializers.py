@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.db.models import Max
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import (
@@ -114,7 +115,8 @@ class StudentSerializer(serializers.ModelSerializer):
         group_val = validated_data.pop('group', None) or self.initial_data.get('group') or validated_data.get('group_name') or 'General Group'
         validated_data['group_name'] = group_val
         if 'roll' not in validated_data:
-            validated_data['roll'] = Student.objects.count() + 1
+            max_roll = Student.objects.aggregate(Max('roll'))['roll__max'] or 0
+            validated_data['roll'] = max_roll + 1
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -193,13 +195,14 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             elif isinstance(student_input, str):
                 name_clean = student_input.strip()
                 group_val = mutable_data.get('subject_course') or mutable_data.get('group_name') or 'General Group'
-                student_obj, _ = Student.objects.get_or_create(
-                    name=name_clean,
-                    defaults={
-                        'group_name': group_val,
-                        'roll': Student.objects.count() + 1
-                    }
-                )
+                student_obj = Student.objects.filter(name=name_clean).first()
+                if not student_obj:
+                    max_roll = Student.objects.aggregate(Max('roll'))['roll__max'] or 0
+                    student_obj = Student.objects.create(
+                        name=name_clean,
+                        group_name=group_val,
+                        roll=max_roll + 1
+                    )
                 mutable_data['student'] = student_obj.pk
                 mutable_data['student_name'] = student_obj.name
 

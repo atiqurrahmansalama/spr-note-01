@@ -1,10 +1,10 @@
-import { calendarSettings } from "./localStore";
+import { calendarSettings, copyReportSettings } from "./localStore";
 
 /**
  * Helper to format date based on date format settings
  */
-export function formatDate(selectedDate) {
-  const format = calendarSettings.getDateFormat();
+export function formatDate(selectedDate, customFormat) {
+  const format = customFormat || copyReportSettings.getDateFormat() || calendarSettings.getDateFormat();
   const d = selectedDate ? new Date(selectedDate) : new Date();
   if (isNaN(d.getTime())) {
     return String(selectedDate);

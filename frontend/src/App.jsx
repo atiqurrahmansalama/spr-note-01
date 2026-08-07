@@ -1,70 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { calendarSettings, sidebarSettings, auth as authStore, saveStatusStore } from "./utils/localStore";
-import Sidebar from "./components/layout/Sidebar";
-import UserProfileDrawer from "./components/layout/UserProfileDrawer";
-import HifzReportForm from "./components/session/HifzReportForm";
-import SidebarScreenBlockView from "./components/layout/SidebarScreenBlockView";
-import AppearanceSettings from "./components/layout/AppearanceSettings";
-import CalendarSettings from "./components/layout/CalendarSettings";
-import CopyReportSettingsView from "./components/layout/CopyReportSettingsView";
-import DataBackupView from "./components/layout/DataBackupView";
-import LanguageSettingsView from "./components/layout/LanguageSettingsView";
-import SessionManager from "./components/layout/SessionManager";
-import ShortcutsGuide from "./components/layout/ShortcutsGuide";
-import AppGuideView from "./components/layout/AppGuideView";
-import AboutAppView from "./components/layout/AboutAppView";
-import StudentDirectoryView from "./components/layout/StudentDirectoryView";
-import StudentReportsView from "./components/reports/StudentReportsView";
+import Sidebar from "./modules/sidebar/SidebarContainer";
+import UserProfileDrawer from "./modules/sidebar/UserProfileDrawer";
+import SidebarScreenBlockView from "./modules/sidebar/SidebarScreenBlockView";
+import HifzReportForm from "./modules/report-builder/HifzReportBuilderModule";
+import AppearanceSettings from "./modules/settings/components/AppearanceSettings";
+import CalendarSettings from "./modules/settings/components/CalendarSettings";
+import CopyReportSettingsView from "./modules/settings/components/CopyReportSettingsView";
+import DataBackupView from "./modules/settings/components/DataBackupView";
+import LanguageSettingsView from "./modules/settings/components/LanguageSettingsView";
+import SessionManager from "./modules/student-directory/components/SessionManager";
+import ShortcutsGuide from "./modules/settings/components/ShortcutsGuide";
+import AppGuideView from "./modules/settings/components/AppGuideView";
+import AboutAppView from "./modules/settings/components/AboutAppView";
+import StudentDirectoryView from "./modules/student-directory/StudentDirectoryModule";
+import StudentReportsView from "./modules/reports-history/ReportsHistoryModule";
+import SectionToggleControlPanel from "./modules/settings/components/SectionToggleControlPanel";
+import SaveStatusBadge from "./components/common/SaveStatusBadge/SaveStatusBadge";
 import { useTheme } from "./context/useTheme";
 import { useToast } from "./context/ToastContext";
-import { SleekCheckIcon, CloudCheckIcon } from "./components/ui/Icons";
 import { initActivityTracker } from "./utils/activityTracker";
-
-function SaveStatusBadge() {
-  const [status, setStatus] = useState(null);
-  const [visible, setVisible] = useState(false);
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    const handleStatusChange = (e) => {
-      if (e.detail) {
-        setStatus(e.detail);
-        setVisible(true);
-        if (timerRef.current) clearTimeout(timerRef.current);
-        // Popup for ~0.6 seconds then vanish smoothly
-        timerRef.current = setTimeout(() => {
-          setVisible(false);
-        }, 600);
-      }
-    };
-    window.addEventListener("spr_save_status_change", handleStatusChange);
-    return () => {
-      window.removeEventListener("spr_save_status_change", handleStatusChange);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  if (!status) return null;
-
-  const isDb = status.type === "database";
-
-  return (
-    <div 
-      className={`flex items-center gap-1.5 text-xs font-semibold transition-all duration-300 transform select-none ${
-        visible 
-          ? "opacity-100 translate-y-0 scale-100" 
-          : "opacity-0 -translate-y-1 scale-95 pointer-events-none"
-      } ${isDb ? "text-emerald-400" : "theme-accent"}`}
-    >
-      {isDb ? (
-        <CloudCheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-      ) : (
-        <SleekCheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-      )}
-      <span>{status.label || (isDb ? "Database Synced" : "Saved")}</span>
-    </div>
-  );
-}
 
 export default function App() {
   const { showToast } = useToast();
@@ -90,13 +45,22 @@ export default function App() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // 💾 timezone & dateFormat — LocalStorage থেকে initialize
+  // 💾 timezone & dateFormat — LocalStorage থেকে initialize & real-time sync
   const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());
   const [dateFormat, setDateFormat] = useState(() => calendarSettings.getDateFormat());
 
-  // 💾 পরিবর্তন হলে LocalStorage-এ সেভ করো
-  useEffect(() => { calendarSettings.saveTimezone(timeZone); }, [timeZone]);
-  useEffect(() => { calendarSettings.saveDateFormat(dateFormat); }, [dateFormat]);
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setTimeZone(calendarSettings.getTimezone());
+      setDateFormat(calendarSettings.getDateFormat());
+    };
+    window.addEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+    window.addEventListener("storage", handleSettingsUpdate);
+    return () => {
+      window.removeEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+      window.removeEventListener("storage", handleSettingsUpdate);
+    };
+  }, []);
 
   const lastBackTimeRef = useRef(0);
 
@@ -274,6 +238,14 @@ export default function App() {
             <LanguageSettingsView />
           </SidebarScreenBlockView>
         );
+      case "Section Control":
+      case "Section Toggle":
+      case "Section Control Panel":
+        return (
+          <SidebarScreenBlockView title="Super Admin Section Control Panel" onClose={() => setActiveTab("Dashboard")}>
+            <SectionToggleControlPanel />
+          </SidebarScreenBlockView>
+        );
       case "Student Reports":
         return (
           <SidebarScreenBlockView title="Student Progress & Daily Reports" onClose={() => setActiveTab("Dashboard")}>
@@ -421,12 +393,15 @@ export default function App() {
 
         {/* Dynamic Center / Screen-blocking Main Content View */}
         <div className="flex-1 h-full overflow-hidden relative">
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
-            <div className={activeTab === "Dashboard" ? "w-full max-w-xl mx-auto" : "hidden"}>
-              <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
-            </div>
-            {activeTab !== "Dashboard" && renderSidebarScreen()}
-          </main>
+          {activeTab === "Dashboard" ? (
+            <main className="w-full h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
+              <div className="w-full max-w-xl mx-auto">
+                <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
+              </div>
+            </main>
+          ) : (
+            renderSidebarScreen()
+          )}
         </div>
 
         {/* Right Sidebar Drawer for User Profile */}

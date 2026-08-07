@@ -36,6 +36,7 @@ export const KEYS = {
   COPY_GROUP:     "spr_copy_include_group",
   COPY_TEACHER:   "spr_copy_include_teacher",
   COPY_AUTO:      "spr_copy_auto_copy",
+  COPY_DATE_FORMAT:"spr_copy_date_format",
 
   // Sync engine & drafts
   REPORTS:        "spr_reports_local_v1",
@@ -343,6 +344,9 @@ export const copyReportSettings = {
 
   getAutoCopy:       () => readString(KEYS.COPY_AUTO, "false") === "true",
   saveAutoCopy:      (v) => writeString(KEYS.COPY_AUTO, v.toString()),
+
+  getDateFormat:     () => readString(KEYS.COPY_DATE_FORMAT, "DD/MM/YYYY"),
+  saveDateFormat:    (v) => writeString(KEYS.COPY_DATE_FORMAT, v),
 };
 
 // ─── Sidebar Display Mode Settings ─────────────────────────────────────────
