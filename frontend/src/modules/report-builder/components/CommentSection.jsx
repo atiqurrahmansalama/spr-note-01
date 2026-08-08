@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { RefreshIcon, SaveIcon, SavedMessagesIcon, CloseIcon } from "../../../components/ui/Icons";
+import { RefreshIcon, SaveIcon, SavedMessagesIcon, CloseIcon, EditIcon } from "../../../components/ui/Icons";
 import { fetchWithAuth } from "../../../utils/authService";
 import { isOnline } from "../../../utils/localStore";
 
@@ -11,6 +11,7 @@ export default function CommentSection({
   onAddToRecord,
   onMakeReport,
   showActions = true,
+  isEditMode = false,
 }) {
   const [isSavedDropdownOpen, setIsSavedDropdownOpen] = useState(false);
   const containerRef = useRef(null);
@@ -169,9 +170,20 @@ export default function CommentSection({
           <button
             type="button"
             onClick={onAddToRecord}
-            className="flex-1 theme-bg-elevated hover:theme-bg-sub theme-text-primary font-semibold py-3 sm:py-3.5 px-4 rounded-2xl shadow-md transition text-sm text-center cursor-pointer border theme-border"
+            className={`flex-1 font-bold py-3 sm:py-3.5 px-4 rounded-2xl shadow-lg transition-all text-sm text-center cursor-pointer flex items-center justify-center gap-2 ${
+              isEditMode
+                ? "bg-amber-500 hover:bg-amber-600 text-white border border-amber-400/40 shadow-amber-500/20 active:scale-[0.99]"
+                : "theme-bg-elevated hover:theme-bg-sub theme-text-primary border theme-border shadow-md font-semibold"
+            }`}
           >
-            Add to Record
+            {isEditMode ? (
+              <>
+                <EditIcon className="w-4 h-4 text-white shrink-0" />
+                <span>Confirm Edit</span>
+              </>
+            ) : (
+              "Add to Record"
+            )}
           </button>
 
           <button

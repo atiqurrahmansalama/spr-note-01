@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronIcon } from "../../../components/ui/Icons";
+import { ChevronIcon, EditIcon } from "../../../components/ui/Icons";
 import ReportCardDetail from "./ReportCardDetail";
 
 export default function RecordReportsList({
@@ -186,11 +186,11 @@ export default function RecordReportsList({
             {/* Row Layout with Fixed Column Alignment for Badges */}
             <div
               onClick={() => setExpandedId(isExpanded ? null : repKey)}
-              className="p-3.5 sm:p-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 cursor-pointer select-none"
+              className="p-3.5 sm:p-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none"
             >
               {/* Left Column: Checkbox + Avatar + Student Name & Group */}
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                {/* Apparent Checkbox */}
+                {/* Checkbox */}
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -215,13 +215,27 @@ export default function RecordReportsList({
                 </div>
 
                 {/* Student Info */}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold theme-text-primary truncate tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate tracking-tight">
                       {rep.student_name}
                     </h4>
                     {rep.sync_status === "PENDING" && (
                       <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Pending Sync" />
+                    )}
+                    {(rep.is_edited || rep.edited_at) && (
+                      <span
+                        className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border cursor-pointer select-none shrink-0 flex items-center gap-1 hover:opacity-90 transition"
+                        title={rep.edited_at ? `Edited: ${new Date(rep.edited_at).toLocaleString()}` : "Edited"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const timeStr = rep.edited_at ? new Date(rep.edited_at).toLocaleString() : "Date unavailable";
+                          alert(`Edited on: ${timeStr}`);
+                        }}
+                      >
+                        <EditIcon className="w-2.5 h-2.5 theme-accent" />
+                        <span>Edited</span>
+                      </span>
                     )}
                   </div>
                   <p className="text-[11px] theme-text-secondary mt-0.5 truncate font-sans">
@@ -231,26 +245,26 @@ export default function RecordReportsList({
               </div>
 
               {/* Right Section: Fixed Column Alignment Grid for Badges */}
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="grid grid-cols-4 gap-2 items-center text-center text-[11px] w-[310px] sm:w-[340px]">
+              <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 theme-border">
+                <div className="grid grid-cols-4 gap-2 items-center text-center text-xs w-full md:w-[360px]">
                   
                   {/* Col 1: Pages */}
-                  <div className="justify-self-center">
-                    <span className="px-2.5 py-0.5 rounded-md font-bold font-mono theme-bg-sub theme-text-primary border theme-border block truncate">
+                  <div className="justify-self-center w-full">
+                    <span className="px-2.5 py-1 rounded-lg font-bold font-mono theme-bg-sub theme-text-primary border theme-border block truncate">
                       {rep.totalPages}p
                     </span>
                   </div>
 
                   {/* Col 2: Session Name */}
                   <div className="justify-self-center w-full">
-                    <span className="px-2 py-0.5 rounded-md font-semibold theme-bg-elevated theme-text-primary border theme-border block truncate">
+                    <span className="px-2 py-1 rounded-lg font-semibold theme-bg-elevated theme-accent border theme-border block truncate text-[11px]">
                       {rep.session_name}
                     </span>
                   </div>
 
                   {/* Col 3: Mistakes */}
-                  <div className="justify-self-center">
-                    <span className={`px-2 py-0.5 rounded-md font-bold font-mono block truncate ${
+                  <div className="justify-self-center w-full">
+                    <span className={`px-2 py-1 rounded-lg font-bold font-mono block truncate ${
                       rep.mistakesCount > 0
                         ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                         : "theme-bg-sub theme-text-secondary border theme-border"
@@ -260,8 +274,8 @@ export default function RecordReportsList({
                   </div>
 
                   {/* Col 4: Stucks */}
-                  <div className="justify-self-center">
-                    <span className={`px-2 py-0.5 rounded-md font-bold font-mono block truncate ${
+                  <div className="justify-self-center w-full">
+                    <span className={`px-2 py-1 rounded-lg font-bold font-mono block truncate ${
                       rep.stucksCount > 0
                         ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                         : "theme-bg-sub theme-text-secondary border theme-border"

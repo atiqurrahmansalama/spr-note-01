@@ -19,6 +19,7 @@ export default function DetailRow({
   onDrop,
 }) {
   const [isDraggable, setIsDraggable] = useState(false);
+  const [isDragOverTarget, setIsDragOverTarget] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     return typeof window !== "undefined" ? window.innerWidth < 640 : false;
   });
@@ -169,15 +170,26 @@ export default function DetailRow({
 
   return (
     <div 
-      className="flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none"
+      className={`flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-all duration-150 select-none ${
+        isDragOverTarget ? "border-2 border-dashed border-[var(--accent-main)] bg-[var(--accent-main)]/10" : ""
+      }`}
       draggable={isDraggable}
       onDragStart={(e) => {
         if (onDragStart) onDragStart(e, listType, index);
       }}
       onDragOver={(e) => {
+        e.preventDefault();
         if (onDragOver) onDragOver(e);
       }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        setIsDragOverTarget(true);
+      }}
+      onDragLeave={() => {
+        setIsDragOverTarget(false);
+      }}
       onDrop={(e) => {
+        setIsDragOverTarget(false);
         if (onDrop) {
           e.stopPropagation();
           onDrop(e, listType, index);

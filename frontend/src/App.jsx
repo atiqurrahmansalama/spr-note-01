@@ -29,7 +29,23 @@ export default function App() {
     return mode === "inline" ? "overlay" : mode;
   });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  // Restore activeTab from sessionStorage so refresh doesn't lose current screen
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return sessionStorage.getItem("spr_active_tab") || "Dashboard";
+    } catch {
+      return "Dashboard";
+    }
+  });
+
+  // Persist activeTab changes to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("spr_active_tab", activeTab);
+    } catch {
+      // ignore storage errors
+    }
+  }, [activeTab]);
   const themeContext = useTheme();
 
   // Ensure mobile view always defaults to hidden overlay mode
@@ -43,6 +59,13 @@ export default function App() {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Listen for programmatic navigation to Dashboard (e.g., from Edit button in StudentReportsView)
+  useEffect(() => {
+    const handleNavDashboard = () => setActiveTab("Dashboard");
+    window.addEventListener("spr_navigate_dashboard", handleNavDashboard);
+    return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, []);
 
   // 💾 timezone & dateFormat — LocalStorage থেকে initialize & real-time sync

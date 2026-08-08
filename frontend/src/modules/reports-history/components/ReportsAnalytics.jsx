@@ -45,13 +45,13 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
     <div className="w-full space-y-5 animate-fade-in select-none">
       
       {/* 4 Metric Key Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
         
-        <div className="theme-bg-surface border theme-border rounded-2xl p-4 shadow-md space-y-1">
+        <div className="theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
             Total Reports
           </span>
-          <div className="text-2xl font-bold theme-accent font-mono">
+          <div className="text-xl sm:text-2xl font-bold theme-accent font-mono">
             {analyticsData.totalReports}
           </div>
           <span className="text-[10px] theme-text-secondary block">
@@ -59,11 +59,11 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
           </span>
         </div>
 
-        <div className="theme-bg-surface border theme-border rounded-2xl p-4 shadow-md space-y-1">
+        <div className="theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
             Active Students
           </span>
-          <div className="text-2xl font-bold theme-text-primary font-mono">
+          <div className="text-xl sm:text-2xl font-bold theme-text-primary font-mono">
             {analyticsData.uniqueStudents}
           </div>
           <span className="text-[10px] theme-text-secondary block">
@@ -71,11 +71,11 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
           </span>
         </div>
 
-        <div className="theme-bg-surface border theme-border rounded-2xl p-4 shadow-md space-y-1">
+        <div className="theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 block">
             Total Mistakes
           </span>
-          <div className="text-2xl font-bold text-rose-400 font-mono">
+          <div className="text-xl sm:text-2xl font-bold text-rose-400 font-mono">
             {analyticsData.totalMistakes}
           </div>
           <span className="text-[10px] theme-text-secondary block">
@@ -83,11 +83,11 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
           </span>
         </div>
 
-        <div className="theme-bg-surface border theme-border rounded-2xl p-4 shadow-md space-y-1">
+        <div className="theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
             Total Stucks
           </span>
-          <div className="text-2xl font-bold text-amber-400 font-mono">
+          <div className="text-xl sm:text-2xl font-bold text-amber-400 font-mono">
             {analyticsData.totalStucks}
           </div>
           <span className="text-[10px] theme-text-secondary block">
@@ -98,13 +98,13 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
       </div>
 
       {/* Progress & Quality Score Gauge */}
-      <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-bold theme-text-primary">Overall Recitation Quality Index</h3>
-            <p className="text-[11px] theme-text-secondary">Estimated accuracy score based on pages and mistake frequency</p>
+            <h3 className="text-xs sm:text-sm font-bold theme-text-primary">Overall Recitation Quality Index</h3>
+            <p className="text-[10px] sm:text-[11px] theme-text-secondary">Estimated accuracy score based on pages and mistake frequency</p>
           </div>
-          <div className="text-xl font-bold font-mono theme-accent px-3 py-1 rounded-xl theme-bg-sub border theme-border">
+          <div className="text-lg sm:text-xl font-bold font-mono theme-accent px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl theme-bg-sub border theme-border shrink-0">
             {analyticsData.accuracyScore}%
           </div>
         </div>

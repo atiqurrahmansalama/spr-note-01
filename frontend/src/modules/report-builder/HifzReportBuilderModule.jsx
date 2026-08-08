@@ -11,7 +11,7 @@ import ReportModal from "./modals/ReportModal";
 import { useReportForm } from "./hooks/useReportForm";
 import { useToast } from "../../context/ToastContext";
 import { useFont } from "../../context/useFont";
-import { ClockIcon, CloseIcon } from "../../components/ui/Icons";
+import { ClockIcon, CloseIcon, EditIcon } from "../../components/ui/Icons";
 import { getSectionConfig } from "../../config/defaultSectionConfig";
 
 export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
@@ -58,6 +58,8 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     draftInfo,
     recoverDraft,
     discardDraft,
+    editingReport,
+    cancelEditMode,
     handleSaveResult,
     handleSaveSession,
     handleSaveRecord,
@@ -65,6 +67,8 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     handleUndo,
     handleRedo,
   } = useReportForm();
+
+  const isEditMode = Boolean(editingReport);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
@@ -156,7 +160,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     }
   };
 
-  const handleDrop = (e, targetListType) => {
+  const handleDrop = (e, targetListType, targetIndex = null) => {
     e.preventDefault();
     if (!draggedItem) return;
 
@@ -167,30 +171,49 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     let newStuck = [...stuckData];
 
     let sourceList = sourceListType === "mistake" ? newMistake : newStuck;
+    let targetList = targetListType === "mistake" ? newMistake : newStuck;
 
     if (isCopy) {
       const sourceItem = sourceList[sourceIndex];
+      if (!sourceItem) return;
+
       const itemCopy = {
         ...sourceItem,
         id: crypto.randomUUID(),
         ayahs: sourceItem.ayahs.map((a) => ({ ...a, id: crypto.randomUUID() })),
       };
 
-      if (targetListType === "mistake") {
-        newMistake.push(itemCopy);
+      if (targetIndex !== null && targetIndex >= 0) {
+        targetList.splice(targetIndex, 0, itemCopy);
       } else {
-        newStuck.push(itemCopy);
+        targetList.push(itemCopy);
       }
     } else {
-      if (sourceListType === targetListType) return;
-      const [movedItem] = sourceList.splice(sourceIndex, 1);
-      if (targetListType === "mistake") {
-        newMistake.push(movedItem);
+      if (sourceListType === targetListType) {
+        // Reordering lines within the SAME list (self lines / up-down)
+        if (
+          targetIndex !== null &&
+          targetIndex >= 0 &&
+          sourceIndex >= 0 &&
+          sourceIndex < targetList.length &&
+          sourceIndex !== targetIndex
+        ) {
+          const [movedItem] = targetList.splice(sourceIndex, 1);
+          targetList.splice(targetIndex, 0, movedItem);
+        }
       } else {
-        newStuck.push(movedItem);
-      }
-      if (sourceList.length === 0) {
-        sourceList.push(createBlankRow());
+        // Moving lines between DIFFERENT lists (mistake <-> stuck)
+        if (sourceIndex >= 0 && sourceIndex < sourceList.length) {
+          const [movedItem] = sourceList.splice(sourceIndex, 1);
+          if (targetIndex !== null && targetIndex >= 0) {
+            targetList.splice(targetIndex, 0, movedItem);
+          } else {
+            targetList.push(movedItem);
+          }
+          if (sourceList.length === 0) {
+            sourceList.push(createBlankRow());
+          }
+        }
       }
     }
 
@@ -220,7 +243,33 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
       style={{ fontFamily: activeFont.css, fontSize: activeFontSize.px }}
       className="w-full max-w-xl mx-auto space-y-5 pb-12 theme-text-primary relative transition-all"
     >
-      {/* 0. Draft Recovery Notification Banner */}
+      {/* 0a. Edit Mode Banner */}
+      {isEditMode && (
+        <div className="w-full theme-bg-sub border border-amber-500/40 rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
+          <div className="flex items-center gap-2 min-w-0 text-left">
+            <div className="p-1 rounded-lg bg-amber-500/15 shrink-0 flex items-center justify-center">
+              <EditIcon className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="text-xs theme-text-primary truncate font-medium">
+              Editing report for{" "}
+              <span className="font-bold theme-accent">{editingReport?.student_name}</span>
+              {editingReport?.formattedDate && (
+                <span className="theme-text-secondary"> · {editingReport.formattedDate}</span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={cancelEditMode}
+            className="theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center gap-1"
+          >
+            <CloseIcon className="w-3.5 h-3.5" />
+            <span>Cancel</span>
+          </button>
+        </div>
+      )}
+
+      {/* 0b. Draft Recovery Notification Banner */}
       {draftInfo && (
         <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
           <div className="flex items-center gap-2 min-w-0 text-left">
@@ -262,6 +311,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
             Hifz Daily Progress Report
           </h1>
           <HeaderDateSection
+            selectedDate={selectedDate}
             timeZone={timeZone}
             dateFormat={dateFormat}
             onDateChange={(customDate) => setSelectedDate(customDate)}
@@ -369,6 +419,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
           onAddToRecord={handleSaveRecord}
           onMakeReport={handleMakeReportClick}
           showActions={sectionConfig.actionButtons?.enabled !== false}
+          isEditMode={isEditMode}
         />
       )}
 

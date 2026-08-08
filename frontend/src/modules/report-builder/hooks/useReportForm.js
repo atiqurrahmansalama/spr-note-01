@@ -133,13 +133,154 @@ export function useReportForm() {
   }, [showToast]);
   const [isOffline, setIsOffline] = useState(!isOnline());
 
-  const [draftInfo, setDraftInfo] = useState(() => {
-    const existing = draftReport.get();
-    if (existing && (existing.studentName || existing.comment || existing.selectedSession || existing.hasData)) {
-      return existing;
+  const [draftInfo, setDraftInfo] = useState(null);
+
+  // Edit Mode state — tracks the report being edited
+  const [editingReport, setEditingReport] = useState(null);
+
+  // Helper to load report object into form state
+  const applyReportToForm = useCallback((rep) => {
+    if (!rep) return;
+
+    const sName = rep.student_name || rep.student || "";
+    const gName = rep.student_group || rep.subject_course || "";
+    const sSession = rep.session_name || rep.session || "";
+    
+    // Extract date from all possible report date field formats
+    let rDate = rep.report_date || rep.record_date || rep.date || rep.isoDateOnly;
+    if (!rDate && rep.date_time) {
+      try {
+        rDate = new Date(rep.date_time).toISOString().split("T")[0];
+      } catch {
+        rDate = String(rep.date_time).split("T")[0];
+      }
     }
-    return null;
-  });
+
+    setStudentName(sName);
+    setGroupName(gName);
+    setSelectedSession(sSession);
+    if (rDate) setSelectedDate(rDate);
+
+    if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
+      setJuzPageData(
+        rep.juz_and_pages.map((jp) => ({
+          id: crypto.randomUUID(),
+          juz: String(jp.juz || ""),
+          ranges: Array.isArray(jp.ranges)
+            ? jp.ranges.map((r) => ({
+                id: crypto.randomUUID(),
+                start: String(r.start || r.page_start || ""),
+                end: String(r.end || r.page_end || ""),
+              }))
+            : [{ id: crypto.randomUUID(), start: "", end: "" }],
+        }))
+      );
+    } else {
+      setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+    }
+
+    const mistakesList = rep.mistake_details || rep.mistakes || [];
+    if (Array.isArray(mistakesList) && mistakesList.length > 0) {
+      setMistakeData(
+        mistakesList.map((m) => ({
+          id: crypto.randomUUID(),
+          juz: String(m.juz || ""),
+          page: String(m.page || ""),
+          ayahs: Array.isArray(m.ayahs)
+            ? m.ayahs.map((a) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+            : m.ayah
+            ? [{ id: crypto.randomUUID(), value: String(m.ayah) }]
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    } else {
+      setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    }
+
+    const stucksList = rep.stuck_details || rep.stucks || [];
+    if (Array.isArray(stucksList) && stucksList.length > 0) {
+      setStuckData(
+        stucksList.map((s) => ({
+          id: crypto.randomUUID(),
+          juz: String(s.juz || ""),
+          page: String(s.page || ""),
+          ayahs: Array.isArray(s.ayahs)
+            ? s.ayahs.map((a) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+            : s.ayah
+            ? [{ id: crypto.randomUUID(), value: String(s.ayah) }]
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    } else {
+      setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    }
+
+    setComment(rep.comment || "");
+    setDraftInfo(null);
+    draftReport.clear();
+    setEditingReport(rep);
+  }, []);
+
+  // Mount effect: Check for pending report to edit in localStorage OR auto-recover draft
+  useEffect(() => {
+    const existing = draftReport.get();
+    const hasUnsavedDraft = Boolean(
+      existing && (existing.studentName || existing.comment || existing.selectedSession || existing.hasData)
+    );
+
+    const pendingEditRaw = localStorage.getItem("spr_editing_report");
+    if (pendingEditRaw) {
+      try {
+        const pendingEdit = JSON.parse(pendingEditRaw);
+        if (pendingEdit && typeof pendingEdit === "object") {
+          // If there is existing unsaved draft data, ask user for confirmation before discarding
+          if (hasUnsavedDraft) {
+            const stuName = existing.studentName || "a student";
+            const targetName = pendingEdit.student_name || pendingEdit.student || "selected student";
+            const confirmed = window.confirm(
+              `The report form currently has unsaved draft data for "${stuName}".\n\nDo you want to discard this draft and load "${targetName}"'s report for editing?`
+            );
+            if (!confirmed) {
+              localStorage.removeItem("spr_editing_report");
+              setDraftInfo(existing);
+              return;
+            }
+          }
+
+          localStorage.removeItem("spr_editing_report");
+          applyReportToForm(pendingEdit);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to parse pending edit report:", err);
+      }
+    }
+
+    if (!hasUnsavedDraft) return;
+
+    const formIsBlank =
+      !studentName.trim() &&
+      !groupName.trim() &&
+      !selectedSession &&
+      !comment.trim() &&
+      !juzPageData.some((d) => d.juz || d.ranges.some((r) => r.start || r.end)) &&
+      !mistakeData.some((m) => m.page || m.ayahs.some((a) => a.value)) &&
+      !stuckData.some((s) => s.page || s.ayahs.some((a) => a.value));
+
+    if (formIsBlank) {
+      if (existing.studentName !== undefined) setStudentName(existing.studentName);
+      if (existing.groupName !== undefined) setGroupName(existing.groupName);
+      if (existing.selectedSession !== undefined) setSelectedSession(existing.selectedSession);
+      if (existing.selectedDate !== undefined) setSelectedDate(existing.selectedDate);
+      if (existing.juzPageData?.length) setJuzPageData(existing.juzPageData);
+      if (existing.mistakeData?.length) setMistakeData(existing.mistakeData);
+      if (existing.stuckData?.length) setStuckData(existing.stuckData);
+      if (existing.comment !== undefined) setComment(existing.comment);
+    } else {
+      setDraftInfo(existing);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     commentStore.saveAll(savedComments);
@@ -203,6 +344,36 @@ export function useReportForm() {
     draftReport.clear();
     showToast("Report draft discarded", "info");
   };
+
+  // Listen for live edit report event dispatched while already mounted
+  useEffect(() => {
+    const handleEditReport = (e) => {
+      const rep = e.detail;
+      if (!rep) return;
+
+      const formHasData = Boolean(
+        studentName.trim() ||
+        groupName.trim() ||
+        selectedSession ||
+        comment.trim() ||
+        juzPageData.some((d) => d.juz || d.ranges.some((r) => r.start || r.end)) ||
+        mistakeData.some((m) => m.page || m.juz || m.ayahs.some((a) => a.value)) ||
+        stuckData.some((s) => s.page || s.juz || s.ayahs.some((a) => a.value))
+      );
+
+      if (formHasData) {
+        const confirmed = window.confirm(
+          `The form currently has unsaved data for "${studentName || "a student"}".\n\nDiscard current data and load "${rep.student_name || "selected"}"'s report for editing?`
+        );
+        if (!confirmed) return;
+      }
+
+      applyReportToForm(rep);
+    };
+
+    window.addEventListener("spr_edit_report", handleEditReport);
+    return () => window.removeEventListener("spr_edit_report", handleEditReport);
+  }, [applyReportToForm, studentName, groupName, selectedSession, comment, juzPageData, mistakeData, stuckData]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -375,6 +546,25 @@ export function useReportForm() {
     return true;
   };
 
+  const resetForm = () => {
+    localStorage.removeItem("spr_editing_report");
+    setStudentName("");
+    setGroupName("");
+    setSelectedSession("");
+    setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+    setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setComment("");
+    draftReport.clear();
+    setDraftInfo(null);
+    setEditingReport(null);
+  };
+
+  const cancelEditMode = () => {
+    resetForm();
+    showToast("Edit cancelled. Form cleared.", "info");
+  };
+
   const handleSaveRecord = async () => {
     if (!validateReportForm()) return;
 
@@ -384,6 +574,9 @@ export function useReportForm() {
     const cleanStucks = stuckData.filter(
       (s) => s.juz.trim() || s.page.trim() || s.ayahs.some((a) => a.value.trim())
     );
+
+    const editedAt = new Date().toISOString();
+    const isEditing = Boolean(editingReport);
 
     const payload = {
       student: studentName.trim(),
@@ -395,67 +588,97 @@ export function useReportForm() {
       stucks: cleanStucks,
       comment: comment,
       overall_status: "COMPLETED",
-      client_updated_at: new Date().toISOString(),
+      client_updated_at: editedAt,
+      ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
     };
 
-    saveReportLocally(payload);
-
-    if (isOnline()) {
-      try {
-        const response = await fetchWithAuth("/reports/", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          showToast(`Report for "${studentName}" recorded to Database!`, "success");
-          saveStatusStore.set("database", "Database Synced");
-          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database" } }));
-        } else {
-          const errData = await response.json();
-          let errorMsg = "Failed to save report to server";
-          if (typeof errData === "string") {
-            errorMsg = errData;
-          } else if (errData && typeof errData === "object") {
-            if (errData.detail) {
-              errorMsg = errData.detail;
-            } else if (errData.details) {
-              errorMsg = typeof errData.details === "string" ? errData.details : JSON.stringify(errData.details);
-            } else {
-              errorMsg = Object.entries(errData)
-                .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
-                .join(" | ");
-            }
-          }
-          showToast(errorMsg, "error");
-          return;
+    if (isEditing) {
+      // Update report in local store
+      const repId = editingReport.id || editingReport.report_unique_id;
+      const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+      const updatedReports = allReports.map((r) => {
+        const rId = r.id || r.report_unique_id;
+        if (rId && String(rId) === String(repId)) {
+          return { ...r, ...payload, id: r.id, report_unique_id: r.report_unique_id };
         }
-      } catch (error) {
-        showToast("Saved locally. Server connection issue: " + error.message, "info");
+        return r;
+      });
+      localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReports));
+
+      if (isOnline() && editingReport.id) {
+        try {
+          const response = await fetchWithAuth(`/reports/${editingReport.id}/`, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          });
+          if (response.ok) {
+            showToast(`Report for "${studentName}" updated in Database! ✏️`, "success");
+            saveStatusStore.set("database", "Database Synced");
+          } else {
+            showToast(`Report updated locally. Will sync when possible.`, "info");
+            saveStatusStore.set("local", "Saved (Local)");
+          }
+        } catch (error) {
+          showToast("Updated locally. Server connection issue: " + error.message, "info");
+          saveStatusStore.set("local", "Saved (Local)");
+        }
+      } else {
+        showToast(`Report for "${studentName}" updated locally! ✏️`, "success");
+        saveStatusStore.set("local", "Saved (Local)");
+      }
+
+      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: isOnline() ? "database" : "local" } }));
+
+    } else {
+      // New report — POST
+      saveReportLocally(payload);
+
+      if (isOnline()) {
+        try {
+          const response = await fetchWithAuth("/reports/", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            showToast(`Report for "${studentName}" recorded to Database!`, "success");
+            saveStatusStore.set("database", "Database Synced");
+            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database" } }));
+          } else {
+            const errData = await response.json();
+            let errorMsg = "Failed to save report to server";
+            if (typeof errData === "string") {
+              errorMsg = errData;
+            } else if (errData && typeof errData === "object") {
+              if (errData.detail) {
+                errorMsg = errData.detail;
+              } else if (errData.details) {
+                errorMsg = typeof errData.details === "string" ? errData.details : JSON.stringify(errData.details);
+              } else {
+                errorMsg = Object.entries(errData)
+                  .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+                  .join(" | ");
+              }
+            }
+            showToast(errorMsg, "error");
+            return;
+          }
+        } catch (error) {
+          showToast("Saved locally. Server connection issue: " + error.message, "info");
+          saveStatusStore.set("local", "Saved (Local)");
+          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
+        }
+      } else {
+        showToast(`Report for "${studentName}" saved locally (offline).`, "info");
         saveStatusStore.set("local", "Saved (Local)");
         window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
       }
-    } else {
-      showToast(`Report for "${studentName}" saved locally (offline).`, "info");
-      saveStatusStore.set("local", "Saved (Local)");
-      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
     }
 
-    draftReport.clear();
-    setDraftInfo(null);
-
-    setStudentName("");
-    setGroupName("");
-    setSelectedSession("");
-    setJuzPageData([{
-      id: crypto.randomUUID(),
-      juz: "",
-      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }]
-    }]);
-    setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
-    setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    resetForm();
     await fetchData();
   };
+
 
   const handleMakeReport = () => {
     if (!validateReportForm()) return;
@@ -543,6 +766,8 @@ export function useReportForm() {
     draftInfo,
     recoverDraft,
     discardDraft,
+    editingReport,
+    cancelEditMode,
     handleSaveResult,
     handleSaveSession,
     handleSaveRecord,

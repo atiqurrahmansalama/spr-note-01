@@ -9,7 +9,23 @@ export default function ReportDateRangePicker({
   onReset
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="space-y-1.5 w-full">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
+          Select Date Range
+        </label>
+        {(startDate || endDate) && onReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-[10px] text-rose-400 hover:underline cursor-pointer font-bold uppercase tracking-wider"
+            title="Reset date filter"
+          >
+            Clear Date
+          </button>
+        )}
+      </div>
+
       <ReusableCalendar
         isRange={true}
         startDate={startDate}
@@ -17,18 +33,9 @@ export default function ReportDateRangePicker({
         onRangeSelect={onRangeSelect}
         minDate={minDate}
         maxDate={maxDate}
-        placeholder="Select Date Range"
+        placeholder="Select Date Range..."
+        className="w-full"
       />
-      {(startDate || endDate) && onReset && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-xs text-rose-400 hover:underline px-1 py-1 cursor-pointer font-medium"
-          title="Reset date filter"
-        >
-          Reset
-        </button>
-      )}
     </div>
   );
 }

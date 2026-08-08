@@ -12,6 +12,7 @@ const MONTH_NAMES = [
 const WEEKDAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 export default function HeaderDateSection({
+  selectedDate,
   timeZone = "Asia/Dhaka",
   dateFormat = "DD/MM/YYYY",
   onDateChange
@@ -20,12 +21,23 @@ export default function HeaderDateSection({
   const containerRef = useRef(null);
 
   const [selectedCustomDate, setSelectedCustomDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
+    return selectedDate || new Date().toISOString().split("T")[0];
   });
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
   const [activeDateFormat, setActiveDateFormat] = useState(() => calendarSettings.getDateFormat());
+
+  useEffect(() => {
+    if (selectedDate && selectedDate !== selectedCustomDate) {
+      setSelectedCustomDate(selectedDate);
+      const dateObj = new Date(selectedDate);
+      if (!isNaN(dateObj.getFullYear())) {
+        setViewYear(dateObj.getFullYear());
+        setViewMonth(dateObj.getMonth());
+      }
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     const handleSettingsUpdate = (e) => {

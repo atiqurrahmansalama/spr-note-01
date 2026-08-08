@@ -1,18 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
-import { useToast } from "../../context/ToastContext";
-import { fetchWithAuth } from "../../utils/authService";
-import { isOnline, students as studentStore, sessions as sessionStore } from "../../utils/localStore";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useToast } from "../../../context/ToastContext";
+import { fetchWithAuth } from "../../../utils/authService";
+import { isOnline } from "../../../utils/localStore";
 import { 
   CloudIcon, 
-  RefreshIcon, 
   UsersIcon, 
   GroupsIcon,
   CheckIcon,
   SearchIcon,
   PrinterIcon,
   CloseIcon
-} from "../ui/Icons";
-import AutocompleteDropdown from "../ui/AutocompleteDropdown";
+} from "../../../components/ui/Icons";
+import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
 
 import ReportDateRangePicker from "./ReportDateRangePicker";
 import RecordReportsList from "./RecordReportsList";
@@ -22,6 +21,7 @@ import ReportContextMenu from "./ReportContextMenu";
 
 export default function StudentReportsView() {
   const { showToast } = useToast();
+  const containerRef = useRef(null);
 
   // Primary data state
   const [reportsList, setReportsList] = useState([]);
@@ -45,6 +45,29 @@ export default function StudentReportsView() {
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Deselect items when clicking outside report cards or interactive controls
+  useEffect(() => {
+    const handleGlobalMouseDown = (e) => {
+      if (!containerRef.current || !containerRef.current.contains(e.target)) {
+        return;
+      }
+      if (
+        e.target.closest(".report-card-row") ||
+        e.target.closest(".student-grouped-row") ||
+        e.target.closest(".report-context-menu") ||
+        e.target.closest("button") ||
+        e.target.closest("input") ||
+        e.target.closest(".autocomplete-dropdown")
+      ) {
+        return;
+      }
+      setSelectedIds(new Set());
+    };
+
+    document.addEventListener("mousedown", handleGlobalMouseDown);
+    return () => document.removeEventListener("mousedown", handleGlobalMouseDown);
+  }, []);
 
   // Monitor online status & auto-refresh
   useEffect(() => {
@@ -117,6 +140,13 @@ export default function StudentReportsView() {
       });
     }
 
+    const hasEditedFlag = Boolean(
+      rep.is_edited ||
+      rep.edited_at ||
+      (rep.updated_at && rep.created_at && rep.updated_at !== rep.created_at)
+    );
+    const editedAtTime = rep.edited_at || rep.updated_at || rep.client_updated_at || null;
+
     return {
       ...rep,
       student_name:
@@ -135,6 +165,8 @@ export default function StudentReportsView() {
       formattedDate,
       formattedTime,
       isoDateOnly,
+      is_edited: hasEditedFlag,
+      edited_at: editedAtTime,
       totalPages: calculatedPages || rep.total_pages || rep.pages || 0,
       mistakesCount: rep.total_mistake ?? (rep.mistakes_count || rep.mistakes?.length || 0),
       stucksCount: rep.total_stuck ?? (rep.stucks_count || rep.stucks?.length || 0),
@@ -144,8 +176,9 @@ export default function StudentReportsView() {
   // Load Reports from LocalStorage & API
   const loadReports = async () => {
     setLoading(true);
+    let localReps = [];
     try {
-      const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+      localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
       if (localReps.length > 0) {
         setReportsList(localReps.map(normalizeReport));
       }
@@ -165,15 +198,33 @@ export default function StudentReportsView() {
         const rawData = Array.isArray(raw) ? raw : (raw.results || []);
         const apiReports = rawData.map(normalizeReport);
 
-        const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
-        const apiUniqueIds = new Set(apiReports.map((r) => r.report_unique_id).filter(Boolean));
+        const localMap = new Map();
+        localReps.forEach((r) => {
+          const key = String(r.id || r.report_unique_id || "");
+          if (key) localMap.set(key, r);
+        });
+
+        const merged = apiReports.map((apiRep) => {
+          const key = String(apiRep.id || apiRep.report_unique_id || "");
+          const localMatch = localMap.get(key);
+          if (localMatch) {
+            return {
+              ...apiRep,
+              is_edited: apiRep.is_edited || localMatch.is_edited,
+              edited_at: apiRep.edited_at || localMatch.edited_at || apiRep.updated_at,
+            };
+          }
+          return apiRep;
+        });
+
+        const apiKeys = new Set(apiReports.map((r) => String(r.id || r.report_unique_id || "")).filter(Boolean));
         const localOnly = localReps
-          .filter((r) => !r.report_unique_id || !apiUniqueIds.has(r.report_unique_id))
+          .filter((r) => !apiKeys.has(String(r.id || r.report_unique_id || "")))
           .map(normalizeReport);
 
-        const merged = [...apiReports, ...localOnly];
-        setReportsList(merged);
-        localStorage.setItem("spr_reports_local_v1", JSON.stringify(merged));
+        const finalMerged = [...merged, ...localOnly];
+        setReportsList(finalMerged);
+        localStorage.setItem("spr_reports_local_v1", JSON.stringify(finalMerged));
       }
     } catch (err) {
       console.warn("[StudentReportsView] Reports API fetch failed:", err.message);
@@ -456,6 +507,15 @@ export default function StudentReportsView() {
     printWindow.document.close();
   };
 
+  // Edit single report — dispatches edit data then navigates back to Dashboard
+  const handleEditReport = (rep) => {
+    localStorage.setItem("spr_editing_report", JSON.stringify(rep));
+    window.dispatchEvent(new CustomEvent("spr_edit_report", { detail: rep }));
+    // Navigate to Dashboard so the form can load the report
+    window.dispatchEvent(new CustomEvent("spr_navigate_dashboard"));
+    showToast(`Loaded report for "${rep.student_name}" for editing!`, "info");
+  };
+
   // Delete single report
   const handleDeleteReport = async (rep) => {
     const reportIdStr = rep.report_unique_id || `REP-#${rep.id}`;
@@ -485,165 +545,99 @@ export default function StudentReportsView() {
     }
   };
 
-  // Delete All Test Reports Helper
-  const handleDeleteAllReports = () => {
-    if (!window.confirm("Are you sure you want to clear all current reports?")) return;
-    setReportsList([]);
-    localStorage.removeItem("spr_reports_local_v1");
-    showToast("Cleared all local test reports!", "info");
-  };
-
-  // Generate 100 Sample Test Reports using saved students
-  const handleGenerate100TestReports = () => {
-    const savedStudents = studentStore.getAll();
-    const savedSessions = sessionStore.getAll();
-
-    const sampleStudentNames = savedStudents.length > 0
-      ? savedStudents.map((s) => ({ name: s.label || s.name, group: s.sub || "General Group" }))
-      : [
-          { name: "Sayeed Ahmed", group: "MI Yasir" },
-          { name: "Abu Bakar Kaha", group: "MI Tawfiq" },
-          { name: "Hasan Mahmud", group: "MI Tawfiq" },
-          { name: "Muhammad Saad Siddiqui", group: "MI Yasir" },
-          { name: "Abdullah Al Mamun", group: "General Group" },
-        ];
-
-    const sampleSessions = savedSessions.length > 0
-      ? savedSessions.map((s) => s.name)
-      : ["Sabaq", "Sabqi", "Amukhta", "Parah Sabaq", "Revision Hifz"];
-
-    const sampleComments = [
-      "Excellent recitation today with clear Tajweed.",
-      "Needs slight revision on Makhraj.",
-      "Good effort, work on stopping signs.",
-      "Very fluent, mashallah!",
-      "Minor mistakes in Ghunnah rules.",
-    ];
-
-    const generated = [];
-    const now = new Date();
-
-    for (let i = 1; i <= 100; i++) {
-      const studentObj = sampleStudentNames[i % sampleStudentNames.length];
-      const sessionName = sampleSessions[i % sampleSessions.length];
-      const comment = sampleComments[i % sampleComments.length];
-
-      const daysAgo = Math.floor(Math.random() * 30);
-      const d = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
-
-      const mistakeCount = Math.floor(Math.random() * 5);
-      const stuckCount = Math.floor(Math.random() * 6);
-      const startPage = Math.floor(Math.random() * 15) + 1;
-      const endPage = startPage + Math.floor(Math.random() * 10) + 1;
-
-      generated.push(normalizeReport({
-        id: `test-100-${i}`,
-        report_unique_id: `REP-TEST-${1000 + i}`,
-        student_name: studentObj.name,
-        student_group: studentObj.group,
-        session_name: sessionName,
-        comment: comment,
-        date_time: d.toISOString(),
-        juz_and_pages: [
-          {
-            juz: (i % 30) + 1,
-            ranges: [{ start: startPage, end: endPage }]
-          }
-        ],
-        total_mistake: mistakeCount,
-        total_stuck: stuckCount,
-      }));
-    }
-
-    const merged = [...generated, ...reportsList];
-    setReportsList(merged);
-    localStorage.setItem("spr_reports_local_v1", JSON.stringify(merged));
-    showToast("Generated 100 sample test reports!", "success");
-  };
-
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-5 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
+    <div
+      ref={containerRef}
+      className="w-full max-w-6xl mx-auto space-y-5 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6"
+    >
       
-      {/* Main Unified Header Card */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-5">
-        
-        {/* Title & View Switcher Bar */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b theme-border">
-          <div className="flex items-center gap-3.5">
-            <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
-              <CloudIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold theme-text-primary tracking-tight">
-                Student Progress & Daily Reports
-              </h2>
-              <p className="text-[11px] theme-text-secondary mt-0.5">
-                Explore reports list, student-wise grouped logs, and professional analytics.
-              </p>
-            </div>
+      {/* 1. Dedicated Top Header Card */}
+      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-3.5">
+          <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
+            <CloudIcon className="w-5 h-5" />
           </div>
-
-          {/* 3 View Tabs */}
-          <div className="flex p-1 theme-bg-sub border theme-border rounded-xl shrink-0 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setViewMode("RECORD_REPORTS")}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                viewMode === "RECORD_REPORTS"
-                  ? "theme-bg-accent theme-accent-text shadow-sm"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <CloudIcon className="w-3.5 h-3.5" />
-              <span>Record Reports</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("STUDENT_VIEW")}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                viewMode === "STUDENT_VIEW"
-                  ? "theme-bg-accent theme-accent-text shadow-sm"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <UsersIcon className="w-3.5 h-3.5" />
-              <span>By Student</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("ANALYTICS")}
-              className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                viewMode === "ANALYTICS"
-                  ? "theme-bg-accent theme-accent-text shadow-sm"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <GroupsIcon className="w-3.5 h-3.5" />
-              <span>Analytics</span>
-            </button>
+          <div>
+            <h2 className="text-base font-bold theme-text-primary tracking-tight">
+              Student Progress & Daily Reports
+            </h2>
+            <p className="text-[11px] theme-text-secondary mt-0.5 leading-snug">
+              Explore reports list, student-wise grouped logs, and professional analytics.
+            </p>
           </div>
         </div>
 
-        {/* Offline Alert */}
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+          <span className="px-3.5 py-1.5 text-xs font-semibold theme-text-primary theme-bg-sub border theme-border rounded-xl flex items-center gap-2 shadow-sm">
+            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+            <span>{reportsList.length} Total Reports</span>
+          </span>
+        </div>
+      </div>
+
+      {/* 2. Filter & View Controls Section Card */}
+      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 sm:space-y-5">
+        
+        {/* Offline Banner */}
         {offline && (
-          <div className="w-full flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+          <div className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span>Offline mode active — showing cached reports from LocalStorage.</span>
+            <span className="text-[11px] sm:text-xs">Offline mode active — showing cached reports from LocalStorage.</span>
           </div>
         )}
 
-        {/* Single Line Filter Row with Identical Equal Height Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end pt-1">
+        {/* 3 View Mode Navigation Tabs Bar (Single line on desktop, 3 lines on small screens) */}
+        <div className="w-full max-w-xl mx-auto flex flex-col sm:flex-row p-1.5 theme-bg-sub border theme-border rounded-2xl shadow-inner gap-1.5 sm:gap-1">
+          <button
+            type="button"
+            onClick={() => setViewMode("RECORD_REPORTS")}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
+              viewMode === "RECORD_REPORTS"
+                ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
+                : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
+            }`}
+          >
+            <CloudIcon className="w-4 h-4 shrink-0" />
+            <span>Record Reports</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("STUDENT_VIEW")}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
+              viewMode === "STUDENT_VIEW"
+                ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
+                : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
+            }`}
+          >
+            <UsersIcon className="w-4 h-4 shrink-0" />
+            <span>By Student</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("ANALYTICS")}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
+              viewMode === "ANALYTICS"
+                ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
+                : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
+            }`}
+          >
+            <GroupsIcon className="w-4 h-4 shrink-0" />
+            <span>Analytics</span>
+          </button>
+        </div>
+
+        {/* 4-Column Filters Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end pt-1">
           
-          {/* 1. Search Box with Height Equalized to AutocompleteDropdown */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold theme-text-secondary mb-1 block">
+          {/* 1. Search Box */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
               Search Student
             </label>
             <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none theme-text-secondary">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none theme-text-secondary">
                 <SearchIcon className="w-4 h-4" />
               </div>
               <input
@@ -651,13 +645,13 @@ export default function StudentReportsView() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search student, session, comment..."
-                className="w-full h-[42px] theme-bg-sub border theme-border theme-text-primary pl-10 pr-9 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                className="w-full h-[42px] theme-bg-sub border theme-border theme-text-primary pl-9 pr-8 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/60 transition-all duration-200 shadow-sm"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs theme-text-secondary hover:theme-text-primary"
+                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs theme-text-secondary hover:theme-text-primary"
                 >
                   <CloseIcon className="w-3.5 h-3.5" />
                 </button>
@@ -665,46 +659,7 @@ export default function StudentReportsView() {
             </div>
           </div>
 
-          {/* 2. Group Filter Dropdown */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold theme-text-secondary mb-1 block">
-              Group Filter
-            </label>
-            <AutocompleteDropdown
-              options={availableGroups}
-              value={selectedGroupFilter}
-              disableSaveButton={true}
-              onChange={(val) => {
-                const selectedVal = typeof val === "object" ? (val.value || val.label) : val;
-                setSelectedGroupFilter(selectedVal || "ALL");
-              }}
-              placeholder="Select Group..."
-            />
-          </div>
-
-          {/* 3. Session Filter Dropdown */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold theme-text-secondary mb-1 block">
-              Session Filter
-            </label>
-            <AutocompleteDropdown
-              options={availableSessions}
-              value={selectedSessionFilter}
-              disableSaveButton={true}
-              onChange={(val) => {
-                const selectedVal = typeof val === "object" ? (val.value || val.label) : val;
-                setSelectedSessionFilter(selectedVal || "ALL");
-              }}
-              placeholder="Select Session..."
-            />
-          </div>
-
-        </div>
-
-        {/* Single Calendar Range & Clean Icon-Only Selection Toolbar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t theme-border text-xs">
-          
-          {/* Single Calendar Range Trigger Component */}
+          {/* 2. Select Date Range Picker (moved here after Search) */}
           <ReportDateRangePicker
             startDate={startDate}
             endDate={endDate}
@@ -720,64 +675,74 @@ export default function StudentReportsView() {
             }}
           />
 
-          {/* Clean Icon-Only Selection & Printer Toolbar */}
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-            
-            {/* Show Icon-Only Select All and Printer buttons when items selected */}
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-1 animate-fade-in">
-                <button
-                  type="button"
-                  onClick={toggleSelectAll}
-                  className="p-2 rounded-xl theme-text-secondary hover:theme-accent hover:theme-bg-sub transition cursor-pointer"
-                  title={selectedIds.size === filteredReports.length ? "Deselect All" : `Select All (${selectedIds.size})`}
-                >
-                  <CheckIcon className="w-4 h-4 theme-accent" />
-                </button>
+          {/* 3. Group Filter Dropdown */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
+              Group Filter
+            </label>
+            <AutocompleteDropdown
+              options={availableGroups}
+              value={selectedGroupFilter === "ALL" ? "" : selectedGroupFilter}
+              disableSaveButton={true}
+              showAllOptionsOnFocus={true}
+              readOnly={true}
+              onChange={(val) => {
+                const selectedVal = typeof val === "object" ? (val.value || val.label) : val;
+                setSelectedGroupFilter(selectedVal || "ALL");
+              }}
+              placeholder="Select Group..."
+            />
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => handlePrintPDF()}
-                  className="p-2 rounded-xl theme-text-secondary hover:theme-accent hover:theme-bg-sub transition cursor-pointer"
-                  title={`Print Selected (${selectedIds.size})`}
-                >
-                  <PrinterIcon className="w-4 h-4 theme-accent" />
-                </button>
-              </div>
-            )}
-
-            {/* Test Helper Action Buttons */}
-            <button
-              type="button"
-              onClick={handleGenerate100TestReports}
-              className="px-2.5 py-1.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-accent text-[11px] font-semibold transition cursor-pointer"
-              title="Generate 100 sample test reports"
-            >
-              + 100 Test Reports
-            </button>
-
-            {reportsList.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDeleteAllReports}
-                className="px-2 py-1.5 rounded-xl theme-bg-sub border theme-border hover:text-rose-400 theme-text-secondary text-[11px] font-semibold transition cursor-pointer"
-                title="Clear test reports"
-              >
-                Clear All
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={loadReports}
-              className="p-2 rounded-xl theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition cursor-pointer"
-              title="Refresh Reports"
-            >
-              <RefreshIcon className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            </button>
+          {/* 4. Session Filter Dropdown */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
+              Session Filter
+            </label>
+            <AutocompleteDropdown
+              options={availableSessions}
+              value={selectedSessionFilter === "ALL" ? "" : selectedSessionFilter}
+              disableSaveButton={true}
+              showAllOptionsOnFocus={true}
+              readOnly={true}
+              onChange={(val) => {
+                const selectedVal = typeof val === "object" ? (val.value || val.label) : val;
+                setSelectedSessionFilter(selectedVal || "ALL");
+              }}
+              placeholder="Select Session..."
+            />
           </div>
 
         </div>
+
+        {/* Selection Toolbar Bar (Shows when items selected) */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between pt-3 border-t theme-border animate-fade-in">
+            <span className="text-xs font-semibold theme-text-secondary">
+              Selected Actions ({selectedIds.size} Items)
+            </span>
+            <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 p-1.5 rounded-xl shrink-0">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="p-1.5 rounded-lg theme-text-secondary hover:theme-accent hover:theme-bg-sub transition cursor-pointer flex items-center gap-1 font-semibold text-xs"
+                title={selectedIds.size === filteredReports.length ? "Deselect All" : `Select All (${selectedIds.size})`}
+              >
+                <CheckIcon className="w-4 h-4 theme-accent" />
+                <span className="theme-accent text-xs font-bold">{selectedIds.size} Selected</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePrintPDF()}
+                className="p-1.5 rounded-lg theme-text-secondary hover:theme-accent hover:theme-bg-sub transition cursor-pointer"
+                title={`Print Selected (${selectedIds.size})`}
+              >
+                <PrinterIcon className="w-4 h-4 theme-accent" />
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -790,6 +755,7 @@ export default function StudentReportsView() {
           onBatchSelect={handleBatchSelect}
           onDeselectAll={handleDeselectAll}
           onContextMenu={handleContextMenu}
+          onEdit={handleEditReport}
           onDelete={handleDeleteReport}
         />
       )}
@@ -797,8 +763,13 @@ export default function StudentReportsView() {
       {viewMode === "STUDENT_VIEW" && (
         <StudentGroupedList
           studentGroupedData={studentGroupedData}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelectReport}
+          onBatchSelect={handleBatchSelect}
+          onDeselectAll={handleDeselectAll}
           onContextMenu={handleContextMenu}
           onStudentContextMenu={handleStudentContextMenu}
+          onEdit={handleEditReport}
           onDelete={handleDeleteReport}
         />
       )}
@@ -821,6 +792,7 @@ export default function StudentReportsView() {
           onExportCSV={() => handleExportCSV(contextMenu.targetList || contextMenu.report)}
           onExportJSON={() => handleExportJSON(contextMenu.targetList || contextMenu.report)}
           onPrintPDF={() => handlePrintPDF(contextMenu.targetList || contextMenu.report)}
+          onEdit={handleEditReport}
           onDelete={handleDeleteReport}
         />
       )}
@@ -828,3 +800,5 @@ export default function StudentReportsView() {
     </div>
   );
 }
+
+
