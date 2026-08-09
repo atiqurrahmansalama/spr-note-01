@@ -4,14 +4,25 @@ const ToastContext = createContext(null);
 
 // নেস্টেড এরর অবজেক্টকে প্রপার স্ট্রিং এ রূপান্তর করার হেল্পার
 const formatErrorMessage = (err) => {
-  if (typeof err === 'string') return err;
-  if (Array.isArray(err)) return err.map(formatErrorMessage).join(', ');
-  if (typeof err === 'object' && err !== null) {
-    return Object.entries(err)
-      .map(([key, val]) => `${key}: ${formatErrorMessage(val)}`)
-      .join(' | ');
+  if (!err) return "Action updated successfully";
+  if (typeof err === 'string') return err.trim() || "An issue occurred";
+  if (Array.isArray(err)) {
+    const list = err.map(formatErrorMessage).filter(Boolean);
+    return list.join(', ') || "An issue occurred";
   }
-  return String(err);
+  if (typeof err === 'object') {
+    if (err.detail) return formatErrorMessage(err.detail);
+    if (err.message) return formatErrorMessage(err.message);
+    const formatted = Object.entries(err)
+      .map(([key, val]) => {
+        const valStr = formatErrorMessage(val);
+        return valStr ? `${key}: ${valStr}` : '';
+      })
+      .filter(Boolean)
+      .join(' | ');
+    return formatted || "An unexpected error occurred";
+  }
+  return String(err) || "An issue occurred";
 };
 
 export function ToastProvider({ children }) {

@@ -7,6 +7,7 @@ import MistakeTrackerSection from "./components/MistakeTrackerSection";
 import StuckTrackerSection from "./components/StuckTrackerSection";
 import CommentSection from "./components/CommentSection";
 import ReportModal from "./modals/ReportModal";
+import SkeletonLoader from "../../components/common/SkeletonLoader/SkeletonLoader";
 
 import { useReportForm } from "./hooks/useReportForm";
 import { useToast } from "../../context/ToastContext";
@@ -55,6 +56,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     availableGroups,
     sessionList,
     isLoading,
+    isSaving,
     draftInfo,
     recoverDraft,
     discardDraft,
@@ -134,14 +136,17 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     mistakeRefreshCount.current += 1;
     if (mistakeRefreshCount.current === 1) {
       setMistakeData([createBlankRow()]);
+      showToast("Mistakes section reset", "info");
     } else if (mistakeRefreshCount.current >= 2) {
       setMistakeData([createBlankRow()]);
       setStuckData([createBlankRow()]);
+      showToast("Mistakes & Stuck sections reset", "info");
       mistakeRefreshCount.current = 0;
     }
   };
   const handleStuckRefresh = () => {
     setStuckData([createBlankRow()]);
+    showToast("Stuck section reset", "info");
   };
 
   const [draggedItem, setDraggedItem] = useState(null);
@@ -231,11 +236,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
   );
 
   if (isLoading) {
-    return (
-      <div className="text-center py-12 theme-text-secondary text-xs font-mono">
-        Connecting to Backend Database...
-      </div>
-    );
+    return <SkeletonLoader type="form" />;
   }
 
   return (
@@ -245,10 +246,10 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     >
       {/* 0a. Edit Mode Banner */}
       {isEditMode && (
-        <div className="w-full theme-bg-sub border border-amber-500/40 rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
+        <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
           <div className="flex items-center gap-2 min-w-0 text-left">
-            <div className="p-1 rounded-lg bg-amber-500/15 shrink-0 flex items-center justify-center">
-              <EditIcon className="w-4 h-4 text-amber-400" />
+            <div className="p-1 rounded-lg theme-bg-accent-soft shrink-0 flex items-center justify-center">
+              <EditIcon className="w-4 h-4 theme-accent" />
             </div>
             <div className="text-xs theme-text-primary truncate font-medium">
               Editing report for{" "}
@@ -420,6 +421,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
           onMakeReport={handleMakeReportClick}
           showActions={sectionConfig.actionButtons?.enabled !== false}
           isEditMode={isEditMode}
+          isSaving={isSaving}
         />
       )}
 

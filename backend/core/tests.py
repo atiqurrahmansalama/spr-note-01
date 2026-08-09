@@ -1,0 +1,370 @@
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+from rest_framework.test import APITestCase
+from rest_framework import status
+
+from core.models import (
+    Student,
+    StudentDetail,
+    StudentDailyReport,
+    ReportPortion,
+    ReportErrorDetail,
+    ReportStatus,
+    UserSession,
+    ActivityLog,
+)
+from core.serializers import StudentDailyReportSerializer
+
+User = get_user_model()
+
+
+class ModelAndRelationshipTestCase(TestCase):
+    """
+    1. Model & Relationship Tests:
+    - Test creating a Student with StudentDetail (OneToOne).
+    - Test creating a StudentDailyReport with ReportPortion and ReportErrorDetail.
+    - Test UserSession and ActivityLog model creation.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone_number="01711111111",
+            password="testpassword123",
+            user_type="TEACHER"
+        )
+
+    def test_student_and_detail_relationship(self):
+        student = Student.objects.create(
+            name_en="Ahmad Hassan",
+            group_name="Group A",
+            status="Active"
+        )
+        detail = StudentDetail.objects.create(
+            student=student,
+            guardian_name="Hassan Ali",
+            guardian_phone="01900000000",
+            cur_address="Dhaka, Bangladesh"
+        )
+
+        self.assertIsNotNone(student.id)
+        self.assertIsNotNone(detail.id)
+        self.assertEqual(student.details, detail)
+        self.assertEqual(detail.student, student)
+        self.assertEqual(student.details.guardian_name, "Hassan Ali")
+
+    def test_report_portion_and_error_detail_relationship(self):
+        student = Student.objects.create(name_en="Tariq Ziyad")
+        report = StudentDailyReport.objects.create(
+            student=student,
+            student_name=student.name,
+            session_name="Subah",
+            total_page=5,
+            score=95,
+            status="Excellent",
+            created_by=self.user
+        )
+
+        portion = ReportPortion.objects.create(
+            report=report,
+            start_juz=1, start_page=1, start_ayah=1,
+            end_juz=1, end_page=5, end_ayah=30
+        )
+
+        mistake = ReportErrorDetail.objects.create(
+            report=report, type="Mistake", juz=1, page=2, ayah=10
+        )
+        stuck = ReportErrorDetail.objects.create(
+            report=report, type="Stuck", juz=1, page=4, ayah=15
+        )
+
+        self.assertEqual(report.portions.count(), 1)
+        self.assertEqual(report.error_details.count(), 2)
+        self.assertEqual(portion.report, report)
+        self.assertEqual(mistake.type, "Mistake")
+        self.assertEqual(stuck.type, "Stuck")
+
+    def test_user_session_and_activity_log(self):
+        session = UserSession.objects.create(
+            user=self.user,
+            device_type="android",
+            device_info="Pixel 8 Pro (Android 14)",
+            ip_address="192.168.1.1",
+            is_active=True
+        )
+        self.assertEqual(session.user, self.user)
+        self.assertEqual(session.device_type, "android")
+        self.assertTrue(session.is_active)
+
+        activity = ActivityLog.objects.create(
+            user=self.user,
+            action_name="CREATE_REPORT",
+            endpoint="/api/reports/",
+            http_method="POST",
+            ip_address="192.168.1.1"
+        )
+        self.assertEqual(activity.user, self.user)
+        self.assertEqual(activity.action_name, "CREATE_REPORT")
+
+
+class SerializerAndLogicTestCase(TestCase):
+    """
+    2. Serializer & Logic Tests:
+    - Test creating a report via StudentDailyReportSerializer using a nested JSON payload.
+    - Assert that total_mistake and total_stuck are automatically calculated correctly from error_details.
+    - Assert that transaction.atomic() handles rollbacks if a portion or error detail fails.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone_number="01722222222",
+            password="testpassword123",
+            user_type="TEACHER"
+        )
+        self.student = Student.objects.create(name_en="Usman Ali")
+
+    def test_nested_report_serializer_creates_and_calculates_errors(self):
+        payload = {
+            "student": self.student.id,
+            "student_name": self.student.name,
+            "session_name": "Subah",
+            "total_page": 10,
+            "score": 90,
+            "status": "Completed",
+            "portions": [
+                {
+                    "start_juz": 2, "start_page": 21, "start_ayah": 1,
+                    "end_juz": 2, "end_page": 30, "end_ayah": 20
+                }
+            ],
+            "error_details": [
+                {"type": "Mistake", "juz": 2, "page": 22, "ayah": 5},
+                {"type": "Mistake", "juz": 2, "page": 25, "ayah": 12},
+                {"type": "Stuck", "juz": 2, "page": 28, "ayah": 18}
+            ]
+        }
+
+        serializer = StudentDailyReportSerializer(data=payload)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        report = serializer.save(created_by=self.user)
+
+        self.assertEqual(report.portions.count(), 1)
+        self.assertEqual(report.error_details.count(), 3)
+
+        # Assert automatic calculation of total_mistake and total_stuck
+        report.refresh_from_db()
+        self.assertEqual(report.total_mistake, 2)
+        self.assertEqual(report.total_stuck, 1)
+
+    def test_atomic_rollback_on_invalid_error_detail(self):
+        initial_report_count = StudentDailyReport.objects.count()
+
+        payload = {
+            "student": self.student.id,
+            "session_name": "Asr",
+            "total_page": 5,
+            "portions": [
+                {
+                    "start_juz": 1, "start_page": 1, "start_ayah": 1,
+                    "end_juz": 1, "end_page": 5, "end_ayah": 10
+                }
+            ],
+            # Invalid payload without required 'juz' field to trigger failure inside transaction
+            "error_details": [
+                {"type": "Mistake", "page": 2}
+            ]
+        }
+
+        serializer = StudentDailyReportSerializer(data=payload)
+        if serializer.is_valid():
+            try:
+                serializer.save()
+            except Exception:
+                pass
+
+        self.assertEqual(StudentDailyReport.objects.count(), initial_report_count)
+
+
+class SecuritySoftDeleteAndLockAPITestCase(APITestCase):
+    """
+    3. Security, Soft-Delete & Lock Tests:
+    - Test soft-delete: Assert that setting is_deleted=True in ReportStatus excludes the report from default GET list API responses.
+    - Test auto-lock: Assert that an update request on a report with is_locked=True returns 403 Forbidden for non-admin users.
+    """
+
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            phone_number="01744444444",
+            password="password123",
+            user_type="TEACHER"
+        )
+        self.admin_user = User.objects.create_superuser(
+            phone_number="01755555555",
+            password="password123",
+            user_type="SUPER_ADMIN"
+        )
+
+        self.student = Student.objects.create(name_en="Omar Farooq")
+        self.report = StudentDailyReport.objects.create(
+            student=self.student,
+            student_name=self.student.name,
+            session_name="Subah",
+            total_page=5,
+            score=95,
+            status="Good",
+            created_by=self.teacher_user
+        )
+
+    def test_soft_deleted_report_excluded_from_api_list(self):
+        self.client.force_authenticate(user=self.teacher_user)
+
+        # Ensure report is in list before soft-delete
+        response = self.client.get("/api/reports/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        report_ids = [r['id'] for r in response.data.get('results', response.data)]
+        self.assertIn(self.report.id, report_ids)
+
+        # Soft-delete the report via ReportStatus
+        status_obj, _ = ReportStatus.objects.get_or_create(report=self.report)
+        status_obj.is_deleted = True
+        status_obj.save()
+
+        # Assert excluded from default list response
+        response = self.client.get("/api/reports/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        report_ids_after = [r['id'] for r in response.data.get('results', response.data)]
+        self.assertNotIn(self.report.id, report_ids_after)
+
+    def test_locked_report_returns_403_for_non_admin_on_update(self):
+        # Lock the report
+        status_obj, _ = ReportStatus.objects.get_or_create(report=self.report)
+        status_obj.is_locked = True
+        status_obj.save()
+
+        # Non-admin (teacher) attempts update
+        self.client.force_authenticate(user=self.teacher_user)
+        update_data = {"session_name": "Night"}
+        response = self.client.patch(f"/api/reports/{self.report.id}/", data=update_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("locked", str(response.data))
+
+    def test_locked_report_allows_update_for_admin_user(self):
+        # Lock the report
+        status_obj, _ = ReportStatus.objects.get_or_create(report=self.report)
+        status_obj.is_locked = True
+        status_obj.save()
+
+        # Admin user attempts update
+        self.client.force_authenticate(user=self.admin_user)
+        update_data = {"session_name": "Subah Updated"}
+        response = self.client.patch(f"/api/reports/{self.report.id}/", data=update_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.session_name, "Subah Updated")
+
+
+class PublicVerificationAPITestCase(APITestCase):
+    """
+    4. Public Verification API:
+    - Test GET /api/v1/hifz/verify-report/<report_id>/ returns correct public report details.
+    - Test non-existent report returns 404.
+    - Test deleted report returns 410.
+    """
+
+    def setUp(self):
+        self.student = Student.objects.create(name_en="Zayd ibn Harithah")
+        self.report = StudentDailyReport.objects.create(
+            student=self.student,
+            student_name=self.student.name,
+            session_name="Subah",
+            total_page=7,
+            score=98.5,
+            status="Mumtaz",
+        )
+
+    def test_verify_report_valid_unique_id(self):
+        url = f"/api/v1/hifz/verify-report/{self.report.report_unique_id}/"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["verification_status"], "VERIFIED")
+        self.assertTrue(response.data["is_valid"])
+        self.assertEqual(response.data["report_unique_id"], self.report.report_unique_id)
+        self.assertEqual(response.data["student_name"], self.student.name)
+        self.assertEqual(response.data["overall_score"], 98.5)
+
+    def test_verify_report_valid_numeric_id(self):
+        url = f"/api/v1/hifz/verify-report/{self.report.id}/"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_valid"])
+
+    def test_verify_report_nonexistent_returns_404(self):
+        url = "/api/v1/hifz/verify-report/REP-NONEXISTENT-9999/"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(response.data["is_valid"])
+        self.assertEqual(response.data["verification_status"], "UNVERIFIED")
+
+    def test_verify_report_deleted_returns_410(self):
+        status_obj, _ = ReportStatus.objects.get_or_create(report=self.report)
+        status_obj.is_deleted = True
+        status_obj.save()
+
+        url = f"/api/v1/hifz/verify-report/{self.report.report_unique_id}/"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
+        self.assertFalse(response.data["is_valid"])
+        self.assertEqual(response.data["verification_status"], "DELETED")
+
+
+class HeartbeatAndAnalyticsAPITestCase(APITestCase):
+    """
+    5. Session Tracking & Heartbeat API Tests
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone_number="01788888888",
+            password="password123",
+            user_type="TEACHER"
+        )
+        self.admin = User.objects.create_superuser(
+            phone_number="01799999999",
+            password="password123",
+            user_type="SUPER_ADMIN"
+        )
+
+    def test_heartbeat_updates_session(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/v1/auth/heartbeat/", data={
+            "device_type": "android",
+            "device_info": "Samsung Galaxy S24"
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["device_type"], "android")
+        self.assertIn("session_id", response.data)
+
+        # Verify UserSession created in DB
+        session = UserSession.objects.filter(user=self.user, is_active=True).first()
+        self.assertIsNotNone(session)
+        self.assertEqual(session.device_type, "android")
+
+    def test_user_activity_analytics_admin_only(self):
+        # Non-admin denied
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/v1/analytics/user-activity/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Admin allowed
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/analytics/user-activity/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")

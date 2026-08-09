@@ -1,0 +1,3238 @@
+openapi: 3.0.3
+info:
+  title: Suffah Hifz Management System API
+  version: 1.0.0
+  description: Comprehensive REST API documentation for Web, Android, and iOS clients.
+paths:
+  /activity/log-login/:
+    post:
+      operationId: activity_log_login_create
+      tags:
+      - activity
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /activity/log-status/:
+    post:
+      operationId: activity_log_status_create
+      tags:
+      - activity
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /activity/user-summary/:
+    get:
+      operationId: activity_user_summary_retrieve
+      tags:
+      - activity
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /analytics/user-activity/:
+    get:
+      operationId: analytics_user_activity_retrieve
+      description: Fetches active time windows, total active durations, and critical
+        activity logs per user/teacher for reporting.
+      summary: User Activity & Time Monitoring Analytics (Admin Only)
+      parameters:
+      - in: query
+        name: device_type
+        schema:
+          type: string
+        description: Filter device type (android, ios, web)
+      - in: query
+        name: from_date
+        schema:
+          type: string
+          format: date
+        description: Filter start date (YYYY-MM-DD)
+      - in: query
+        name: to_date
+        schema:
+          type: string
+          format: date
+        description: Filter end date (YYYY-MM-DD)
+      - in: query
+        name: user_id
+        schema:
+          type: integer
+        description: Filter specific User ID
+      - in: query
+        name: user_type
+        schema:
+          type: string
+        description: Filter user role (e.g. TEACHER, ADMIN)
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: User Activity Summary & Time Windows
+  /api/activity/log-login/:
+    post:
+      operationId: api_activity_log_login_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/activity/log-status/:
+    post:
+      operationId: api_activity_log_status_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/activity/user-summary/:
+    get:
+      operationId: api_activity_user_summary_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/change-password/:
+    post:
+      operationId: api_change_password_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/groups/:
+    get:
+      operationId: api_groups_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    post:
+      operationId: api_groups_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+  /api/groups/{id}/:
+    get:
+      operationId: api_groups_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    put:
+      operationId: api_groups_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    patch:
+      operationId: api_groups_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    delete:
+      operationId: api_groups_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/messages/:
+    get:
+      operationId: api_messages_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    post:
+      operationId: api_messages_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+  /api/messages/{id}/:
+    get:
+      operationId: api_messages_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    put:
+      operationId: api_messages_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    patch:
+      operationId: api_messages_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    delete:
+      operationId: api_messages_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/register/:
+    post:
+      operationId: api_register_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /api/reports/:
+    get:
+      operationId: api_reports_list
+      description: Fetch paginated Hifz daily reports with filtering options. Excludes
+        soft-deleted reports.
+      summary: List Daily Hifz Reports
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: Filter by report date (YYYY-MM-DD)
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: session_name
+        schema:
+          type: string
+        description: Filter by session name (e.g., Subah, Asr, Maghrib)
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by status (Completed, Unprepared, Absent)
+      - in: query
+        name: student_name
+        schema:
+          type: string
+        description: Filter by student name
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudentDailyReportList'
+          description: ''
+    post:
+      operationId: api_reports_create
+      description: Creates a new daily report with nested portions and error details
+        (mistakes and stucks).
+      summary: Create New Daily Hifz Report
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+            examples:
+              CreateReportExample:
+                value:
+                  student: 1
+                  student_name: Ahmad Hassan
+                  session_name: Subah
+                  total_page: 5
+                  score: 95.0
+                  status: Completed
+                  comment: Excellent recitation
+                  portions:
+                  - start_juz: 1
+                    start_page: 1
+                    start_ayah: 1
+                    end_juz: 1
+                    end_page: 5
+                    end_ayah: 30
+                  error_details:
+                  - type: Mistake
+                    juz: 1
+                    page: 2
+                    ayah: 10
+                  - type: Stuck
+                    juz: 1
+                    page: 4
+                    ayah: 15
+                summary: Create Report Example
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+              examples:
+                CreateReportExample:
+                  value:
+                    student: 1
+                    student_name: Ahmad Hassan
+                    session_name: Subah
+                    total_page: 5
+                    score: 95.0
+                    status: Completed
+                    comment: Excellent recitation
+                    portions:
+                    - start_juz: 1
+                      start_page: 1
+                      start_ayah: 1
+                      end_juz: 1
+                      end_page: 5
+                      end_ayah: 30
+                    error_details:
+                    - type: Mistake
+                      juz: 1
+                      page: 2
+                      ayah: 10
+                    - type: Stuck
+                      juz: 1
+                      page: 4
+                      ayah: 15
+                  summary: Create Report Example
+          description: ''
+  /api/reports/{id}/:
+    get:
+      operationId: api_reports_retrieve
+      description: |-
+        Full CRUD for StudentDailyReport.
+        Automatically excludes soft-deleted reports (status_info__is_deleted=True).
+        Supports filtering by: student_name, date (report date), session_name, status.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    put:
+      operationId: api_reports_update
+      description: Updates an existing report. Auto-lock enforcement applies if report
+        is locked by Admin.
+      summary: Update Daily Hifz Report
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    patch:
+      operationId: api_reports_partial_update
+      description: |-
+        Full CRUD for StudentDailyReport.
+        Automatically excludes soft-deleted reports (status_info__is_deleted=True).
+        Supports filtering by: student_name, date (report date), session_name, status.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    delete:
+      operationId: api_reports_destroy
+      description: Marks status_info.is_deleted=True and sets delete_time timestamp.
+      summary: Soft Delete Daily Hifz Report
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/sessions/:
+    get:
+      operationId: api_sessions_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+          description: ''
+    post:
+      operationId: api_sessions_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/sessions/{id}/:
+    get:
+      operationId: api_sessions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    put:
+      operationId: api_sessions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    patch:
+      operationId: api_sessions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    delete:
+      operationId: api_sessions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/students/:
+    get:
+      operationId: api_students_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+          description: ''
+    post:
+      operationId: api_students_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+  /api/students/{id}/:
+    get:
+      operationId: api_students_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    put:
+      operationId: api_students_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    patch:
+      operationId: api_students_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    delete:
+      operationId: api_students_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/token/:
+    post:
+      operationId: api_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/token/refresh/:
+    post:
+      operationId: api_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/analytics/user-activity/:
+    get:
+      operationId: api_v1_analytics_user_activity_retrieve
+      description: Fetches active time windows, total active durations, and critical
+        activity logs per user/teacher for reporting.
+      summary: User Activity & Time Monitoring Analytics (Admin Only)
+      parameters:
+      - in: query
+        name: device_type
+        schema:
+          type: string
+        description: Filter device type (android, ios, web)
+      - in: query
+        name: from_date
+        schema:
+          type: string
+          format: date
+        description: Filter start date (YYYY-MM-DD)
+      - in: query
+        name: to_date
+        schema:
+          type: string
+          format: date
+        description: Filter end date (YYYY-MM-DD)
+      - in: query
+        name: user_id
+        schema:
+          type: integer
+        description: Filter specific User ID
+      - in: query
+        name: user_type
+        schema:
+          type: string
+        description: Filter user role (e.g. TEACHER, ADMIN)
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: User Activity Summary & Time Windows
+  /api/v1/auth/heartbeat/:
+    post:
+      operationId: api_v1_auth_heartbeat_create
+      description: Receives periodic pings from Android, iOS, or Web clients to maintain
+        active UserSession metrics.
+      summary: Record Periodic Client Session Heartbeat
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_type:
+                  type: string
+                  enum:
+                  - android
+                  - ios
+                  - web
+                  example: android
+                device_info:
+                  type: string
+                  example: Pixel 8 Pro (Android 14)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Heartbeat recorded successfully
+  /api/v1/hifz/verify-report/{report_id}/:
+    get:
+      operationId: api_v1_hifz_verify_report_retrieve
+      description: Public API endpoint that verifies non-sensitive authenticity details
+        of a scanned Hifz daily report QR code.
+      summary: Verify Report Authenticity (QR Code Scanner)
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+        description: Report Unique ID (e.g., REP-1001) or numeric ID
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: Valid Report Authenticity Details
+        '404':
+          description: Report Not Found / Invalid QR Code
+        '410':
+          description: Soft-Deleted / Revoked Report
+  /auth/heartbeat/:
+    post:
+      operationId: auth_heartbeat_create
+      description: Receives periodic pings from Android, iOS, or Web clients to maintain
+        active UserSession metrics.
+      summary: Record Periodic Client Session Heartbeat
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_type:
+                  type: string
+                  enum:
+                  - android
+                  - ios
+                  - web
+                  example: android
+                device_info:
+                  type: string
+                  example: Pixel 8 Pro (Android 14)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Heartbeat recorded successfully
+  /change-password/:
+    post:
+      operationId: change_password_create
+      tags:
+      - change-password
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+  /groups/:
+    get:
+      operationId: groups_list
+      tags:
+      - groups
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    post:
+      operationId: groups_create
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+  /groups/{id}/:
+    get:
+      operationId: groups_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - groups
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    put:
+      operationId: groups_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentGroupRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    patch:
+      operationId: groups_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentGroup'
+          description: ''
+    delete:
+      operationId: groups_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student group.
+        required: true
+      tags:
+      - groups
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /hifz/verify-report/{report_id}/:
+    get:
+      operationId: hifz_verify_report_retrieve
+      description: Public API endpoint that verifies non-sensitive authenticity details
+        of a scanned Hifz daily report QR code.
+      summary: Verify Report Authenticity (QR Code Scanner)
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+        description: Report Unique ID (e.g., REP-1001) or numeric ID
+        required: true
+      tags:
+      - hifz
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: Valid Report Authenticity Details
+        '404':
+          description: Report Not Found / Invalid QR Code
+        '410':
+          description: Soft-Deleted / Revoked Report
+  /messages/:
+    get:
+      operationId: messages_list
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    post:
+      operationId: messages_create
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+  /messages/{id}/:
+    get:
+      operationId: messages_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    put:
+      operationId: messages_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SavedMessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    patch:
+      operationId: messages_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedMessageRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedMessage'
+          description: ''
+    delete:
+      operationId: messages_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this saved message.
+        required: true
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /register/:
+    post:
+      operationId: register_create
+      tags:
+      - register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /reports/:
+    get:
+      operationId: reports_list
+      description: Fetch paginated Hifz daily reports with filtering options. Excludes
+        soft-deleted reports.
+      summary: List Daily Hifz Reports
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: Filter by report date (YYYY-MM-DD)
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: session_name
+        schema:
+          type: string
+        description: Filter by session name (e.g., Subah, Asr, Maghrib)
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by status (Completed, Unprepared, Absent)
+      - in: query
+        name: student_name
+        schema:
+          type: string
+        description: Filter by student name
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudentDailyReportList'
+          description: ''
+    post:
+      operationId: reports_create
+      description: Creates a new daily report with nested portions and error details
+        (mistakes and stucks).
+      summary: Create New Daily Hifz Report
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+            examples:
+              CreateReportExample:
+                value:
+                  student: 1
+                  student_name: Ahmad Hassan
+                  session_name: Subah
+                  total_page: 5
+                  score: 95.0
+                  status: Completed
+                  comment: Excellent recitation
+                  portions:
+                  - start_juz: 1
+                    start_page: 1
+                    start_ayah: 1
+                    end_juz: 1
+                    end_page: 5
+                    end_ayah: 30
+                  error_details:
+                  - type: Mistake
+                    juz: 1
+                    page: 2
+                    ayah: 10
+                  - type: Stuck
+                    juz: 1
+                    page: 4
+                    ayah: 15
+                summary: Create Report Example
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+              examples:
+                CreateReportExample:
+                  value:
+                    student: 1
+                    student_name: Ahmad Hassan
+                    session_name: Subah
+                    total_page: 5
+                    score: 95.0
+                    status: Completed
+                    comment: Excellent recitation
+                    portions:
+                    - start_juz: 1
+                      start_page: 1
+                      start_ayah: 1
+                      end_juz: 1
+                      end_page: 5
+                      end_ayah: 30
+                    error_details:
+                    - type: Mistake
+                      juz: 1
+                      page: 2
+                      ayah: 10
+                    - type: Stuck
+                      juz: 1
+                      page: 4
+                      ayah: 15
+                  summary: Create Report Example
+          description: ''
+  /reports/{id}/:
+    get:
+      operationId: reports_retrieve
+      description: |-
+        Full CRUD for StudentDailyReport.
+        Automatically excludes soft-deleted reports (status_info__is_deleted=True).
+        Supports filtering by: student_name, date (report date), session_name, status.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    put:
+      operationId: reports_update
+      description: Updates an existing report. Auto-lock enforcement applies if report
+        is locked by Admin.
+      summary: Update Daily Hifz Report
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    patch:
+      operationId: reports_partial_update
+      description: |-
+        Full CRUD for StudentDailyReport.
+        Automatically excludes soft-deleted reports (status_info__is_deleted=True).
+        Supports filtering by: student_name, date (report date), session_name, status.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentDailyReportRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDailyReport'
+          description: ''
+    delete:
+      operationId: reports_destroy
+      description: Marks status_info.is_deleted=True and sets delete_time timestamp.
+      summary: Soft Delete Daily Hifz Report
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student daily report.
+        required: true
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /sessions/:
+    get:
+      operationId: sessions_list
+      tags:
+      - sessions
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+          description: ''
+    post:
+      operationId: sessions_create
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /sessions/{id}/:
+    get:
+      operationId: sessions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - sessions
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    put:
+      operationId: sessions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    patch:
+      operationId: sessions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+    delete:
+      operationId: sessions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - sessions
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /students/:
+    get:
+      operationId: students_list
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+          description: ''
+    post:
+      operationId: students_create
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+  /students/{id}/:
+    get:
+      operationId: students_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    put:
+      operationId: students_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    patch:
+      operationId: students_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+    delete:
+      operationId: students_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this student.
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /token/:
+    post:
+      operationId: token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /token/refresh/:
+    post:
+      operationId: token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+components:
+  schemas:
+    BlankEnum:
+      enum:
+      - ''
+    CustomTokenObtainPairRequest:
+      type: object
+      properties:
+        phone_number:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - phone_number
+    NullEnum:
+      enum:
+      - null
+    PaginatedStudentDailyReportList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentDailyReport'
+    PatchedSavedMessageRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+    PatchedSessionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    PatchedStudentDailyReportRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        student:
+          type: integer
+          nullable: true
+        student_name:
+          type: string
+        session_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        total_page:
+          type: number
+          format: double
+          title: Total Pages
+          description: Total pages covered in this session
+        total_mistake:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_stuck:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        score:
+          type: string
+          nullable: true
+          maxLength: 10
+        status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        teacher_id:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        juz_and_pages: {}
+        portions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPortionRequest'
+        error_details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportErrorDetailRequest'
+    PatchedStudentGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    PatchedStudentRequest:
+      type: object
+      properties:
+        uniq_id:
+          type: string
+          nullable: true
+          maxLength: 50
+        unique_id:
+          type: string
+          nullable: true
+        roll_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        roll:
+          type: integer
+          nullable: true
+        name_en:
+          type: string
+          nullable: true
+          maxLength: 150
+        name:
+          type: string
+          nullable: true
+        group_name:
+          type: string
+          nullable: true
+          maxLength: 50
+        group:
+          type: string
+          nullable: true
+        admission_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          maxLength: 30
+        education_status:
+          type: string
+          nullable: true
+          maxLength: 50
+        target_status:
+          type: string
+          nullable: true
+          maxLength: 100
+        details:
+          allOf:
+          - $ref: '#/components/schemas/StudentDetailRequest'
+          nullable: true
+    Register:
+      type: object
+      properties:
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        user_type:
+          $ref: '#/components/schemas/UserTypeEnum'
+        role:
+          type: string
+          readOnly: true
+      required:
+      - role
+    RegisterRequest:
+      type: object
+      properties:
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        password:
+          type: string
+          writeOnly: true
+          minLength: 6
+        user_type:
+          $ref: '#/components/schemas/UserTypeEnum'
+      required:
+      - password
+    ReportErrorDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+      required:
+      - id
+      - juz
+      - page
+      - type
+    ReportErrorDetailRequest:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+      required:
+      - juz
+      - page
+      - type
+    ReportPortion:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        start_juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        start_page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        start_surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        start_ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        end_ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+      required:
+      - end_juz
+      - end_page
+      - id
+      - start_juz
+      - start_page
+    ReportPortionRequest:
+      type: object
+      properties:
+        start_juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        start_page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        start_surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        start_ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_juz:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_page:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        end_surah_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        end_ayah:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+      required:
+      - end_juz
+      - end_page
+      - start_juz
+      - start_page
+    ReportStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        is_edited:
+          type: boolean
+        edit_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_edited becomes True
+        is_locked:
+          type: boolean
+        lock_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_locked becomes True
+        is_deleted:
+          type: boolean
+        delete_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_deleted becomes True
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - updated_at
+    ReportStatusRequest:
+      type: object
+      properties:
+        is_edited:
+          type: boolean
+        edit_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_edited becomes True
+        is_locked:
+          type: boolean
+        lock_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_locked becomes True
+        is_deleted:
+          type: boolean
+        delete_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Auto-set when is_deleted becomes True
+    SavedMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - text
+    SavedMessageRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+      required:
+      - text
+    Session:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    SessionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+      - name
+    StatusEnum:
+      enum:
+      - Completed
+      - Unprepared
+      - Absent
+      type: string
+      description: |-
+        * `Completed` - Completed
+        * `Unprepared` - Unprepared
+        * `Absent` - Absent
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uniq_id:
+          type: string
+          nullable: true
+          maxLength: 50
+        unique_id:
+          type: string
+          nullable: true
+        roll_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        roll:
+          type: integer
+          nullable: true
+        name_en:
+          type: string
+          nullable: true
+          maxLength: 150
+        name:
+          type: string
+          nullable: true
+        group_name:
+          type: string
+          nullable: true
+          maxLength: 50
+        group:
+          type: string
+          nullable: true
+        admission_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          maxLength: 30
+        is_active:
+          type: boolean
+          readOnly: true
+        education_status:
+          type: string
+          nullable: true
+          maxLength: 50
+        target_status:
+          type: string
+          nullable: true
+          maxLength: 100
+        details:
+          allOf:
+          - $ref: '#/components/schemas/StudentDetail'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_active
+      - updated_at
+    StudentDailyReport:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        report_unique_id:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date-time
+        date_time:
+          type: string
+          readOnly: true
+        formattedDate:
+          type: string
+          readOnly: true
+        formattedTime:
+          type: string
+          readOnly: true
+        student:
+          type: integer
+          nullable: true
+        student_name:
+          type: string
+        student_group:
+          type: string
+          readOnly: true
+        student_details:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        session_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        total_page:
+          type: number
+          format: double
+          title: Total Pages
+          description: Total pages covered in this session
+        total_mistake:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_stuck:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        score:
+          type: string
+          nullable: true
+          maxLength: 10
+        status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        teacher_id:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_edited:
+          type: boolean
+          readOnly: true
+          default: false
+        edit_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        edited_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_locked:
+          type: boolean
+          readOnly: true
+          default: false
+        lock_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_deleted:
+          type: boolean
+          readOnly: true
+          default: false
+        delete_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        status_info:
+          allOf:
+          - $ref: '#/components/schemas/ReportStatus'
+          readOnly: true
+        report_status:
+          allOf:
+          - $ref: '#/components/schemas/ReportStatus'
+          readOnly: true
+        comment:
+          type: string
+          nullable: true
+        juz_and_pages: {}
+        portions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPortion'
+        error_details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportErrorDetail'
+        mistake_details:
+          type: object
+          additionalProperties: {}
+          description: Returns mistake entries from error_details (type='Mistake').
+          readOnly: true
+        stuck_details:
+          type: object
+          additionalProperties: {}
+          description: Returns stuck entries from error_details (type='Stuck').
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - date_time
+      - delete_time
+      - edit_time
+      - edited_at
+      - formattedDate
+      - formattedTime
+      - id
+      - is_deleted
+      - is_edited
+      - is_locked
+      - lock_time
+      - mistake_details
+      - report_status
+      - report_unique_id
+      - status_info
+      - stuck_details
+      - student_details
+      - student_group
+      - updated_at
+    StudentDailyReportRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        student:
+          type: integer
+          nullable: true
+        student_name:
+          type: string
+        session_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        total_page:
+          type: number
+          format: double
+          title: Total Pages
+          description: Total pages covered in this session
+        total_mistake:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_stuck:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        score:
+          type: string
+          nullable: true
+          maxLength: 10
+        status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        teacher_id:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        juz_and_pages: {}
+        portions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPortionRequest'
+        error_details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportErrorDetailRequest'
+    StudentDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name_bn:
+          type: string
+          nullable: true
+          maxLength: 150
+        photo:
+          nullable: true
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        category:
+          type: string
+          nullable: true
+          maxLength: 50
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        blood_group:
+          type: string
+          nullable: true
+          maxLength: 5
+        father_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        mother_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        guardian_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        guardian_relation:
+          type: string
+          nullable: true
+          maxLength: 50
+        guardian_phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        emergency_phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        cur_address:
+          type: string
+          nullable: true
+        per_address:
+          type: string
+          nullable: true
+      required:
+      - id
+    StudentDetailRequest:
+      type: object
+      properties:
+        name_bn:
+          type: string
+          nullable: true
+          maxLength: 150
+        photo:
+          nullable: true
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        category:
+          type: string
+          nullable: true
+          maxLength: 50
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        blood_group:
+          type: string
+          nullable: true
+          maxLength: 5
+        father_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        mother_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        guardian_name:
+          type: string
+          nullable: true
+          maxLength: 100
+        guardian_relation:
+          type: string
+          nullable: true
+          maxLength: 50
+        guardian_phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        emergency_phone:
+          type: string
+          nullable: true
+          maxLength: 20
+        cur_address:
+          type: string
+          nullable: true
+        per_address:
+          type: string
+          nullable: true
+    StudentGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    StudentGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+      - name
+    StudentRequest:
+      type: object
+      properties:
+        uniq_id:
+          type: string
+          nullable: true
+          maxLength: 50
+        unique_id:
+          type: string
+          nullable: true
+        roll_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        roll:
+          type: integer
+          nullable: true
+        name_en:
+          type: string
+          nullable: true
+          maxLength: 150
+        name:
+          type: string
+          nullable: true
+        group_name:
+          type: string
+          nullable: true
+          maxLength: 50
+        group:
+          type: string
+          nullable: true
+        admission_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          maxLength: 30
+        education_status:
+          type: string
+          nullable: true
+          maxLength: 50
+        target_status:
+          type: string
+          nullable: true
+          maxLength: 100
+        details:
+          allOf:
+          - $ref: '#/components/schemas/StudentDetailRequest'
+          nullable: true
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TypeEnum:
+      enum:
+      - Mistake
+      - Stuck
+      type: string
+      description: |-
+        * `Mistake` - Mistake
+        * `Stuck` - Stuck
+    UserTypeEnum:
+      enum:
+      - SUPER_ADMIN
+      - ADMIN
+      - TEACHER
+      - GUARDIAN
+      - STAFF
+      type: string
+      description: |-
+        * `SUPER_ADMIN` - Super Admin
+        * `ADMIN` - Admin / Nazim
+        * `TEACHER` - Teacher / Ustadh
+        * `GUARDIAN` - Guardian / Parent
+        * `STAFF` - Staff / Accountant
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

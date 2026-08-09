@@ -86,6 +86,7 @@ export const auth = {
   getUser:         ()    => readJSON(KEYS.USER, null),
   saveUser:        (u)   => writeJSON(KEYS.USER, u),
   getAccessToken:  ()    => readString(KEYS.ACCESS_TOKEN),
+  getToken:        ()    => readString(KEYS.ACCESS_TOKEN),
   saveAccessToken: (t)   => writeString(KEYS.ACCESS_TOKEN, t),
   getRefreshToken: ()    => readString(KEYS.REFRESH_TOKEN),
   saveRefreshToken:(t)   => writeString(KEYS.REFRESH_TOKEN, t),
@@ -174,21 +175,27 @@ export const students = {
  *  4. Merged result LocalStorage-এ cache হিসেবে সেভ হয়
  */
 export function mergeStudents(apiStudents, localStudents) {
-  // API items-এর নামের set তৈরি (case-insensitive)
-  const apiLabels = new Set(apiStudents.map((s) => s.label?.toLowerCase()));
+  const apiLabels = new Set(
+    (Array.isArray(apiStudents) ? apiStudents : []).map((s) =>
+      (s.label || s.name || "").toLowerCase().trim()
+    )
+  );
 
-  // LocalStorage-এ যেগুলো আছে কিন্তু API-তে নেই (offline-only)
-  const localOnly = localStudents
-    .filter((s) => !apiLabels.has(s.label?.toLowerCase()))
+  // Preserve any local student not in API and tag with _local: true so syncEngine can upload them to DB
+  const localOnly = (Array.isArray(localStudents) ? localStudents : [])
+    .filter(
+      (s) =>
+        s &&
+        (s.label || s.name) &&
+        !apiLabels.has((s.label || s.name || "").toLowerCase().trim())
+    )
     .map((s) => ({ ...s, _local: true }));
 
-  // API items (clean, no _local flag) + local-only items
   const merged = [
-    ...apiStudents.map(({ _local, ...rest }) => rest), // _local flag মুছে দাও
+    ...apiStudents.map(({ _local, ...rest }) => rest),
     ...localOnly,
   ];
 
-  // Cache-এ সেভ করো
   writeJSON(KEYS.STUDENTS, merged);
   return merged;
 }
@@ -272,7 +279,7 @@ export function mergeSessions(apiSessions, localSessions) {
 }
 
 // ─── Saved Comments (Templates) ─────────────────────────────────────────────
-// Shape: ["comment text 1", "comment text 2", ...]
+// Shape: [{ id, text, _local }, ...] or ["text 1", "text 2", ...]
 
 export const savedComments = {
   getAll: () => readJSON(KEYS.SAVED_COMMENTS, []),
@@ -280,21 +287,73 @@ export const savedComments = {
   saveAll: (list) => writeJSON(KEYS.SAVED_COMMENTS, list),
 
   add: (text) => {
-    const trimmed = text?.trim();
+    const trimmed = typeof text === "string" ? text.trim() : (text?.text || "").trim();
     if (!trimmed) return savedComments.getAll();
     const list = savedComments.getAll();
-    if (list.includes(trimmed)) return list;
-    const updated = [...list, trimmed];
-    writeJSON(KEYS.SAVED_COMMENTS, updated);
-    return updated;
+    const exists = list.some((item) => {
+      const itemText = typeof item === "object" && item !== null ? item.text : item;
+      return (itemText || "").toLowerCase() === trimmed.toLowerCase();
+    });
+    if (!exists) {
+      const newItem = { id: crypto.randomUUID(), text: trimmed, _local: true };
+      const updated = [...list, newItem];
+      writeJSON(KEYS.SAVED_COMMENTS, updated);
+      return { updated, newItem };
+    }
+    return { updated: list, newItem: null };
   },
 
-  remove: (index) => {
-    const updated = savedComments.getAll().filter((_, i) => i !== index);
+  remove: (idOrTextOrIndex) => {
+    const list = savedComments.getAll();
+    const updated = list.filter((item, idx) => {
+      if (typeof idOrTextOrIndex === "number" && idx === idOrTextOrIndex) {
+        return false;
+      }
+      if (typeof item === "string") {
+        return item.toLowerCase() !== String(idOrTextOrIndex).toLowerCase();
+      }
+      if (typeof item === "object" && item !== null) {
+        return (
+          item.id !== idOrTextOrIndex &&
+          (item.text || "").toLowerCase() !== String(idOrTextOrIndex).toLowerCase()
+        );
+      }
+      return true;
+    });
     writeJSON(KEYS.SAVED_COMMENTS, updated);
     return updated;
   },
 };
+
+/**
+ * mergeComments — Merges API data with LocalStorage data.
+ * Server data is authoritative when online.
+ * Only local-only comments (_local: true) that have not been synced yet are preserved.
+ */
+export function mergeComments(apiComments, localComments) {
+  const apiNormalized = (Array.isArray(apiComments) ? apiComments : [])
+    .map((c) => {
+      if (typeof c === "object" && c !== null) {
+        return { id: c.id, text: c.text || c.comment || "" };
+      }
+      return { id: crypto.randomUUID(), text: String(c) };
+    })
+    .filter((c) => Boolean(c.text && c.text.trim()));
+
+  const apiTextsLower = new Set(apiNormalized.map((c) => c.text.toLowerCase()));
+
+  // LocalStorage items pending sync (have _local: true and not present in API)
+  const localOnly = (Array.isArray(localComments) ? localComments : []).filter((c) => {
+    if (typeof c === "object" && c !== null) {
+      return c._local && !apiTextsLower.has((c.text || "").toLowerCase());
+    }
+    return false;
+  });
+
+  const merged = [...apiNormalized, ...localOnly];
+  writeJSON(KEYS.SAVED_COMMENTS, merged);
+  return merged;
+}
 
 // ─── Calendar / Date-Time Settings ──────────────────────────────────────────
 

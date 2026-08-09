@@ -8,10 +8,12 @@ import {
   isOnline, 
   mergeStudents, 
   mergeSessions,
+  mergeComments,
   draftReport,
   saveStatusStore,
 } from "../../../utils/localStore";
 import { saveReportLocally, syncSessionsAndComments } from "../../../utils/syncEngine";
+import { createReport } from "../../../api/reports";
 
 export function useReportForm() {
   const { showToast } = useToast();
@@ -48,6 +50,7 @@ export function useReportForm() {
   const [availableGroups, setAvailableGroups] = useState([]);
   const [sessionList, setSessionList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const historyStackRef = useRef([]);
   const redoStackRef = useRef([]);
@@ -146,13 +149,18 @@ export function useReportForm() {
     const gName = rep.student_group || rep.subject_course || "";
     const sSession = rep.session_name || rep.session || "";
     
-    // Extract date from all possible report date field formats
-    let rDate = rep.report_date || rep.record_date || rep.date || rep.isoDateOnly;
-    if (!rDate && rep.date_time) {
-      try {
-        rDate = new Date(rep.date_time).toISOString().split("T")[0];
-      } catch {
-        rDate = String(rep.date_time).split("T")[0];
+    // Extract date from all possible report date field formats into clean YYYY-MM-DD format
+    let rawDate = rep.report_date || rep.record_date || rep.date || rep.isoDateOnly || rep.date_time || rep.created_at;
+    let rDate = "";
+    if (rawDate) {
+      if (typeof rawDate === "string") {
+        rDate = rawDate.split("T")[0].split(" ")[0];
+      } else {
+        try {
+          rDate = new Date(rawDate).toISOString().split("T")[0];
+        } catch {
+          rDate = "";
+        }
       }
     }
 
@@ -258,27 +266,8 @@ export function useReportForm() {
 
     if (!hasUnsavedDraft) return;
 
-    const formIsBlank =
-      !studentName.trim() &&
-      !groupName.trim() &&
-      !selectedSession &&
-      !comment.trim() &&
-      !juzPageData.some((d) => d.juz || d.ranges.some((r) => r.start || r.end)) &&
-      !mistakeData.some((m) => m.page || m.ayahs.some((a) => a.value)) &&
-      !stuckData.some((s) => s.page || s.ayahs.some((a) => a.value));
-
-    if (formIsBlank) {
-      if (existing.studentName !== undefined) setStudentName(existing.studentName);
-      if (existing.groupName !== undefined) setGroupName(existing.groupName);
-      if (existing.selectedSession !== undefined) setSelectedSession(existing.selectedSession);
-      if (existing.selectedDate !== undefined) setSelectedDate(existing.selectedDate);
-      if (existing.juzPageData?.length) setJuzPageData(existing.juzPageData);
-      if (existing.mistakeData?.length) setMistakeData(existing.mistakeData);
-      if (existing.stuckData?.length) setStuckData(existing.stuckData);
-      if (existing.comment !== undefined) setComment(existing.comment);
-    } else {
-      setDraftInfo(existing);
-    }
+    // Always show the recovery banner — let the user decide to recover or discard
+    setDraftInfo(existing);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -443,12 +432,11 @@ export function useReportForm() {
       if (messagesRes.ok) {
         const rawMessages = await messagesRes.json();
         const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
-          .map((m) => (typeof m === "object" ? (m.text || m.comment) : String(m)))
-          .filter(Boolean);
+          .map((m) => (typeof m === "object" ? { id: m.id, text: m.text || m.comment || "" } : { text: String(m) }))
+          .filter((c) => Boolean(c.text && c.text.trim()));
         const localComments = commentStore.getAll();
-        const mergedComments = Array.from(new Set([...apiComments, ...localComments]));
+        const mergedComments = mergeComments(apiComments, localComments);
         setSavedComments(mergedComments);
-        commentStore.saveAll(mergedComments);
       }
     } catch (error) {
       console.warn("[useReportForm] API unreachable, using cached data:", error.message);
@@ -567,116 +555,132 @@ export function useReportForm() {
 
   const handleSaveRecord = async () => {
     if (!validateReportForm()) return;
+    setIsSaving(true);
 
-    const cleanMistakes = mistakeData.filter(
-      (m) => m.juz.trim() || m.page.trim() || m.ayahs.some((a) => a.value.trim())
-    );
-    const cleanStucks = stuckData.filter(
-      (s) => s.juz.trim() || s.page.trim() || s.ayahs.some((a) => a.value.trim())
-    );
+    try {
+      const cleanMistakes = mistakeData.filter(
+        (m) => m.juz.trim() || m.page.trim() || m.ayahs.some((a) => a.value.trim())
+      );
+      const cleanStucks = stuckData.filter(
+        (s) => s.juz.trim() || s.page.trim() || s.ayahs.some((a) => a.value.trim())
+      );
 
-    const editedAt = new Date().toISOString();
-    const isEditing = Boolean(editingReport);
+      const editedAt = new Date().toISOString();
+      const isEditing = Boolean(editingReport);
 
-    const payload = {
-      student: studentName.trim(),
-      session: selectedSession.trim(),
-      report_date: selectedDate || new Date().toISOString().split("T")[0],
-      subject_course: groupName || "General Group",
-      juz_and_pages: juzPageData,
-      mistakes: cleanMistakes,
-      stucks: cleanStucks,
-      comment: comment,
-      overall_status: "COMPLETED",
-      client_updated_at: editedAt,
-      ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
-    };
+      const payload = {
+        student: studentName.trim(),
+        session: selectedSession.trim(),
+        report_date: selectedDate || new Date().toISOString().split("T")[0],
+        subject_course: groupName || "General Group",
+        juz_and_pages: juzPageData,
+        mistakes: cleanMistakes,
+        stucks: cleanStucks,
+        comment: comment,
+        overall_status: "COMPLETED",
+        client_updated_at: editedAt,
+        ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
+      };
 
-    if (isEditing) {
-      // Update report in local store
-      const repId = editingReport.id || editingReport.report_unique_id;
-      const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
-      const updatedReports = allReports.map((r) => {
-        const rId = r.id || r.report_unique_id;
-        if (rId && String(rId) === String(repId)) {
-          return { ...r, ...payload, id: r.id, report_unique_id: r.report_unique_id };
-        }
-        return r;
-      });
-      localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReports));
+      if (isEditing) {
+        // Update report in local store
+        const repId = editingReport.id || editingReport.report_unique_id;
+        const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+        const updatedReports = allReports.map((r) => {
+          const rId = r.id || r.report_unique_id;
+          if (rId && String(rId) === String(repId)) {
+            return { ...r, ...payload, id: r.id, report_unique_id: r.report_unique_id };
+          }
+          return r;
+        });
+        localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReports));
 
-      if (isOnline() && editingReport.id) {
-        try {
-          const response = await fetchWithAuth(`/reports/${editingReport.id}/`, {
-            method: "PATCH",
-            body: JSON.stringify(payload),
-          });
-          if (response.ok) {
-            showToast(`Report for "${studentName}" updated in Database! ✏️`, "success");
-            saveStatusStore.set("database", "Database Synced");
-          } else {
-            showToast(`Report updated locally. Will sync when possible.`, "info");
+        if (isOnline() && editingReport.id) {
+          try {
+            const response = await fetchWithAuth(`/reports/${editingReport.id}/`, {
+              method: "PATCH",
+              body: JSON.stringify(payload),
+            });
+            if (response.ok) {
+              showToast(`Report for "${studentName}" updated in Database! ✏️`, "success");
+              saveStatusStore.set("database", "Database Synced");
+            } else {
+              showToast(`Report updated locally. Will sync when possible.`, "info");
+              saveStatusStore.set("local", "Saved (Local)");
+            }
+          } catch (error) {
+            showToast("Updated locally. Server connection issue: " + error.message, "info");
             saveStatusStore.set("local", "Saved (Local)");
           }
-        } catch (error) {
-          showToast("Updated locally. Server connection issue: " + error.message, "info");
+        } else {
+          showToast(`Report for "${studentName}" updated locally! ✏️`, "success");
           saveStatusStore.set("local", "Saved (Local)");
         }
+
+        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: isOnline() ? "database" : "local" } }));
+
       } else {
-        showToast(`Report for "${studentName}" updated locally! ✏️`, "success");
-        saveStatusStore.set("local", "Saved (Local)");
-      }
+        // New report — POST
+        saveReportLocally(payload);
 
-      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: isOnline() ? "database" : "local" } }));
+        if (isOnline()) {
+          try {
+            const apiResult = await createReport({
+              studentName: studentName.trim(),
+              groupName: groupName || "General Group",
+              selectedSession: selectedSession.trim(),
+              selectedDate,
+              juzPageData,
+              mistakeData: cleanMistakes,
+              stuckData: cleanStucks,
+              comment,
+            });
 
-    } else {
-      // New report — POST
-      saveReportLocally(payload);
-
-      if (isOnline()) {
-        try {
-          const response = await fetchWithAuth("/reports/", {
-            method: "POST",
-            body: JSON.stringify(payload),
-          });
-
-          if (response.ok) {
-            showToast(`Report for "${studentName}" recorded to Database!`, "success");
-            saveStatusStore.set("database", "Database Synced");
-            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database" } }));
-          } else {
-            const errData = await response.json();
-            let errorMsg = "Failed to save report to server";
-            if (typeof errData === "string") {
-              errorMsg = errData;
-            } else if (errData && typeof errData === "object") {
-              if (errData.detail) {
-                errorMsg = errData.detail;
-              } else if (errData.details) {
-                errorMsg = typeof errData.details === "string" ? errData.details : JSON.stringify(errData.details);
-              } else {
-                errorMsg = Object.entries(errData)
-                  .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
-                  .join(" | ");
+            if (apiResult.success) {
+              const createdData = apiResult.data;
+              showToast(`Report #${createdData.report_unique_id || createdData.id || ''} for "${studentName}" recorded to Database!`, "success");
+              saveStatusStore.set("database", "Database Synced");
+              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: createdData } }));
+            } else if (apiResult.isOffline) {
+              showToast(`Report for "${studentName}" saved locally (Server offline).`, "info");
+              saveStatusStore.set("local", "Saved (Local)");
+              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
+            } else {
+              const errData = apiResult.errors || {};
+              let errorMsg = "Failed to save report to server";
+              if (typeof errData === "string" && errData.trim()) {
+                errorMsg = errData;
+              } else if (errData && typeof errData === "object") {
+                if (errData.detail) {
+                  errorMsg = String(errData.detail);
+                } else {
+                  const formatted = Object.entries(errData)
+                    .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+                    .filter(Boolean)
+                    .join(" | ");
+                  if (formatted) errorMsg = formatted;
+                }
               }
+              showToast(errorMsg, "error");
+              return;
             }
-            showToast(errorMsg, "error");
-            return;
+          } catch (error) {
+            showToast("Saved locally. Server connection issue: " + error.message, "info");
+            saveStatusStore.set("local", "Saved (Local)");
+            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
           }
-        } catch (error) {
-          showToast("Saved locally. Server connection issue: " + error.message, "info");
+        } else {
+          showToast(`Report for "${studentName}" saved locally (offline).`, "info");
           saveStatusStore.set("local", "Saved (Local)");
           window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
         }
-      } else {
-        showToast(`Report for "${studentName}" saved locally (offline).`, "info");
-        saveStatusStore.set("local", "Saved (Local)");
-        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
       }
-    }
 
-    resetForm();
-    await fetchData();
+      resetForm();
+      await fetchData();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
 
@@ -721,18 +725,21 @@ export function useReportForm() {
         ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
       },
     ]);
+    showToast("Juz & Page section reset", "info");
   };
 
   const handleMistakeRefresh = () => {
     setMistakeData([
       { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }
     ]);
+    showToast("Mistakes section reset", "info");
   };
 
   const handleStuckRefresh = () => {
     setStuckData([
       { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }
     ]);
+    showToast("Stuck section reset", "info");
   };
 
   return {

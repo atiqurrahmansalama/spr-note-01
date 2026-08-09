@@ -1,5 +1,5 @@
 import { fetchWithAuth } from "./authService";
-import { sessions as sessionStore, savedComments as commentStore, mergeSessions } from "./localStore";
+import { students as studentStore, sessions as sessionStore, savedComments as commentStore, mergeSessions } from "./localStore";
 
 /**
  * Hybrid Sync Engine (LocalStorage <-> Django PostgreSQL)
@@ -65,8 +65,6 @@ export const triggerCloudSync = async (apiClient) => {
   const pendingItems = reports.filter((r) => pendingIds.includes(r.id));
 
   try {
-    // ⚠️ NOTE: This endpoint does not exist on the backend yet.
-    // When implemented, add: router.register(r'reports/sync', ReportSyncViewSet)
     const response = await apiClient.post("/api/reports/sync/", {
       changes: pendingItems,
       last_synced_at: lastSyncedAt,
@@ -97,15 +95,61 @@ export const triggerCloudSync = async (apiClient) => {
   }
 };
 
-// 4. Sync local sessions & comment templates to the database
+// 4. Sync local students, sessions & comment templates to the database
+export const syncLocalStudentsToBackend = async () => {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetchWithAuth("/students/");
+    if (res.ok) {
+      const raw = await res.json();
+      const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => ({
+        id: s.id,
+        label: s.name || s.student_name || s.label || String(s),
+        sub: s.group_name || s.group || s.sub || "General Group",
+      }));
+      const apiNames = new Set(
+        apiStudents.map((s) => (s.label || "").toLowerCase().trim())
+      );
+
+      const localStudents = studentStore.getAll();
+      const unsyncedLocal = (Array.isArray(localStudents) ? localStudents : []).filter(
+        (s) => s && (s.label || s.name) && !apiNames.has((s.label || s.name || "").toLowerCase().trim())
+      );
+
+      for (const stu of unsyncedLocal) {
+        const name = stu.label || stu.name;
+        const group = stu.sub || stu.group || "General Group";
+        if (!name || !name.trim()) continue;
+
+        try {
+          const postRes = await fetchWithAuth("/students/", {
+            method: "POST",
+            body: JSON.stringify({ name: name.trim(), group: group }),
+          });
+          if (postRes.ok) {
+            console.log("[SyncEngine] Synced local student to database:", name);
+          }
+        } catch (err) {
+          console.error("[SyncEngine] Failed to sync student:", name, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[SyncEngine] Student sync failed:", err);
+  }
+};
+
 export const syncSessionsAndComments = async () => {
   if (!navigator.onLine) return;
 
-  // 4a. Sync Sessions
+  // 4a. Sync Students
+  await syncLocalStudentsToBackend();
+
+  // 4b. Sync Sessions
   try {
     const localSessions = sessionStore.getAll();
-    const localOnlySessions = localSessions.filter(s => s._local);
-    
+    const localOnlySessions = localSessions.filter((s) => s._local);
+
     for (const session of localOnlySessions) {
       try {
         const res = await fetchWithAuth("/sessions/", {
@@ -114,11 +158,10 @@ export const syncSessionsAndComments = async () => {
         });
         if (res.ok) {
           const apiSession = await res.json();
-          // Update local session list: remove local flag, save backend ID
           const currentSessions = sessionStore.getAll();
-          const updated = currentSessions.map(s => 
-            s.name.toLowerCase() === session.name.toLowerCase() 
-              ? { id: apiSession.id, name: apiSession.name } 
+          const updated = currentSessions.map((s) =>
+            s.name.toLowerCase() === session.name.toLowerCase()
+              ? { id: apiSession.id, name: apiSession.name }
               : s
           );
           sessionStore.saveAll(updated);
@@ -132,20 +175,21 @@ export const syncSessionsAndComments = async () => {
     console.error("[SyncEngine] Session sync failed:", err);
   }
 
-  // 4b. Sync Comment Templates
+  // 4c. Sync Comment Templates
   try {
     const res = await fetchWithAuth("/messages/");
     if (res.ok) {
-      const rawMessages = await res.json();
-      const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
-        .map(m => typeof m === "object" ? (m.text || m.comment) : String(m))
-        .filter(Boolean);
-      
       const localComments = commentStore.getAll();
-      const apiCommentsLower = new Set(apiComments.map(c => c.toLowerCase()));
-      const localOnlyComments = localComments.filter(c => !apiCommentsLower.has(c.toLowerCase()));
-      
-      for (const commentText of localOnlyComments) {
+      const localOnlyComments = (Array.isArray(localComments) ? localComments : []).filter((c) => {
+        if (typeof c === "object" && c !== null) {
+          return c._local === true;
+        }
+        return false;
+      });
+
+      for (const commentItem of localOnlyComments) {
+        const commentText = typeof commentItem === "object" ? commentItem.text : String(commentItem);
+        if (!commentText) continue;
         try {
           const postRes = await fetchWithAuth("/messages/", {
             method: "POST",

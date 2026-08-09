@@ -1,6 +1,7 @@
 import { EditIcon, TrashIcon } from "../../../components/ui/Icons";
 
 export default function ReportCardDetail({ report, onEdit, onDelete }) {
+
   if (!report) return null;
 
   // Filter mistakes and stucks so items without page or ayah (just Juz) are ignored
@@ -159,17 +160,22 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
           <span>{report.report_unique_id || report.id}</span>
 
           {isEdited && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                const timeStr = report.edited_at ? new Date(report.edited_at).toLocaleString() : "Date unavailable";
-                alert(`Edited on: ${timeStr}`);
-              }}
-              className="px-2.5 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border text-[10px] font-bold cursor-pointer select-none flex items-center gap-1 hover:opacity-90 transition"
-              title={report.edited_at ? `Edited: ${new Date(report.edited_at).toLocaleString()}` : "Edited"}
-            >
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border text-[10px] font-bold shadow-sm">
               <EditIcon className="w-3 h-3 theme-accent" />
-              <span>Edited {report.edited_at ? `(${new Date(report.edited_at).toLocaleDateString()})` : ""}</span>
+              <span>Edited</span>
+              {report.edited_at && (
+                <span className="theme-text-secondary font-mono font-normal ml-0.5 opacity-80">
+                  ·{" "}
+                  {new Date(report.edited_at).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -182,7 +188,7 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
                 e.stopPropagation();
                 onEdit(report);
               }}
-              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary hover:border-slate-500 transition cursor-pointer flex items-center gap-1.5 shadow-sm font-semibold text-xs"
+              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary hover:border-slate-500 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-semibold text-xs"
             >
               <EditIcon className="w-3.5 h-3.5" />
               <span>Edit</span>
@@ -196,7 +202,7 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
                 e.stopPropagation();
                 onDelete(report);
               }}
-              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:text-rose-400 hover:border-rose-500/40 transition cursor-pointer flex items-center gap-1.5 shadow-sm font-semibold text-xs"
+              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:text-rose-400 hover:border-rose-500/40 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-semibold text-xs"
             >
               <TrashIcon className="w-3.5 h-3.5" />
               <span>Delete</span>

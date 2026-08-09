@@ -1,42 +1,90 @@
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from django.db.models import Max
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.db import transaction
 from .models import (
-    Student, 
-    StudentGroup, 
-    Session, 
-    SavedMessage, 
-    StudentDailyReport, 
-    MistakeDetail, 
-    StuckDetail,
+    TeacherProfile,
+    GuardianProfile,
+    UserDevice,
+    Student,
+    StudentDetail,
+    StudentGroup,
+    Session,
+    SavedMessage,
+    StudentDailyReport,
+    ReportStatus,
+    ReportPortion,
+    ReportErrorDetail,
     UserLoginLog,
-    UserActivityLog
+    UserActivityLog,
+    UserSession,
+    ActivityLog,
 )
 
 User = get_user_model()
 
 
+# ─────────────────────────────────────────────────────────────
+# AUTH SERIALIZERS
+# ─────────────────────────────────────────────────────────────
+
+class TeacherProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TeacherProfile
+        fields = ['id', 'name_bn', 'name_en', 'designation', 'address']
+
+
+class GuardianProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GuardianProfile
+        fields = ['id', 'name_bn', 'name_en', 'students']
+
+
+class UserDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserDevice
+        fields = ['id', 'device_token', 'device_type', 'updated_at']
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        username_or_email = attrs.get("username")
-        if username_or_email and "@" in username_or_email:
-            try:
-                user_obj = User.objects.get(email=username_or_email)
-                attrs["username"] = user_obj.username
-            except User.DoesNotExist:
-                pass
+        phone_input = attrs.get("phone_number") or attrs.get("phone") or attrs.get("username")
+        if phone_input:
+            phone_clean = str(phone_input).strip()
+            if "@" in phone_clean:
+                try:
+                    user_obj = User.objects.get(email=phone_clean)
+                    attrs[self.username_field] = user_obj.phone_number
+                except User.DoesNotExist:
+                    attrs[self.username_field] = phone_clean
+            else:
+                attrs[self.username_field] = phone_clean
 
         data = super().validate(attrs)
-        
+
+        teacher_data = None
+        if hasattr(self.user, 'teacher_profile'):
+            teacher_data = TeacherProfileSerializer(self.user.teacher_profile).data
+
+        guardian_data = None
+        if hasattr(self.user, 'guardian_profile'):
+            guardian_data = GuardianProfileSerializer(self.user.guardian_profile).data
+
         data['user'] = {
             'id': self.user.id,
-            'username': self.user.username,
+            'phone_number': self.user.phone_number,
+            'username': self.user.phone_number,
             'email': self.user.email,
-            'first_name': self.user.first_name,
-            'last_name': self.user.last_name,
-            'role': getattr(self.user, 'role', 'TEACHER'),
+            'user_type': self.user.user_type,
+            'role': self.user.user_type,
+            'is_active': self.user.is_active,
+            'teacher_profile': teacher_data,
+            'guardian_profile': guardian_data,
             'date_joined': self.user.date_joined.strftime("%Y-%m-%d") if self.user.date_joined else "",
         }
         return data
@@ -44,27 +92,35 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    role = serializers.CharField(source='user_type', required=False, read_only=True)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'role']
+        fields = ['phone_number', 'email', 'password', 'user_type', 'role']
+        extra_kwargs = {
+            'user_type': {'required': False},
+            'email': {'required': False, 'allow_null': True},
+        }
 
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            role=validated_data.get('role', 'TEACHER')
+        phone = validated_data.get('phone_number') or self.initial_data.get('username')
+        user_type = validated_data.get('user_type') or validated_data.get('role') or 'TEACHER'
+        return User.objects.create_user(
+            phone_number=phone,
+            email=validated_data.get('email'),
+            password=validated_data.get('password'),
+            user_type=user_type
         )
-        return user
 
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, min_length=6)
 
+
+# ─────────────────────────────────────────────────────────────
+# CORE ENTITY SERIALIZERS
+# ─────────────────────────────────────────────────────────────
 
 class StudentGroupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -96,80 +152,286 @@ class SavedMessageSerializer(serializers.ModelSerializer):
         return super().to_internal_value(mutable_data)
 
 
+class StudentDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentDetail
+        fields = [
+            'id', 'name_bn', 'photo', 'category', 'date_of_birth',
+            'blood_group', 'father_name', 'mother_name',
+            'guardian_name', 'guardian_relation', 'guardian_phone',
+            'emergency_phone', 'cur_address', 'per_address',
+        ]
+        extra_kwargs = {
+            f: {'required': False, 'allow_null': True}
+            for f in fields if f != 'id'
+        }
+
+
 class StudentSerializer(serializers.ModelSerializer):
-    group = serializers.CharField(source='group_name', required=False)
+    # Nested detail serializer
+    details = StudentDetailSerializer(required=False, allow_null=True)
+
+    # Backward compatibility aliases for legacy API consumers & frontend
+    name = serializers.CharField(source='name_en', required=False, allow_blank=True, allow_null=True)
+    roll = serializers.IntegerField(source='roll_number', required=False, allow_null=True)
+    unique_id = serializers.CharField(source='uniq_id', required=False, allow_blank=True, allow_null=True)
+    group = serializers.CharField(source='group_name', required=False, allow_blank=True, allow_null=True)
+    is_active = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Student
-        fields = ['id', 'roll', 'unique_id', 'name', 'group_name', 'group', 'is_active', 'created_at']
+        fields = [
+            'id', 'uniq_id', 'unique_id',
+            'roll_number', 'roll',
+            'name_en', 'name',
+            'group_name', 'group',
+            'admission_date', 'status', 'is_active',
+            'education_status', 'target_status',
+            'details',
+            'created_at', 'updated_at',
+        ]
+        extra_kwargs = {
+            'uniq_id': {'required': False, 'allow_null': True},
+            'roll_number': {'required': False, 'allow_null': True},
+            'name_en': {'required': False, 'allow_null': True},
+            'group_name': {'required': False, 'allow_null': True},
+            'status': {'required': False, 'allow_null': True},
+            'education_status': {'required': False, 'allow_null': True},
+            'target_status': {'required': False, 'allow_null': True},
+            'admission_date': {'required': False, 'allow_null': True},
+        }
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
-        if 'label' in mutable_data and 'name' not in mutable_data:
-            mutable_data['name'] = mutable_data['label']
-        if 'sub' in mutable_data and 'group_name' not in mutable_data:
+
+        # Handle legacy keys (label/name -> name_en, sub/group -> group_name, roll -> roll_number, unique_id -> uniq_id)
+        if 'label' in mutable_data and 'name_en' not in mutable_data and 'name' not in mutable_data:
+            mutable_data['name_en'] = mutable_data['label']
+        if 'name' in mutable_data and 'name_en' not in mutable_data:
+            mutable_data['name_en'] = mutable_data['name']
+
+        if 'sub' in mutable_data and 'group_name' not in mutable_data and 'group' not in mutable_data:
             mutable_data['group_name'] = mutable_data['sub']
+        if 'group' in mutable_data and 'group_name' not in mutable_data:
+            mutable_data['group_name'] = mutable_data['group']
+
+        if 'roll' in mutable_data and 'roll_number' not in mutable_data:
+            mutable_data['roll_number'] = mutable_data['roll']
+
+        if 'unique_id' in mutable_data and 'uniq_id' not in mutable_data:
+            mutable_data['uniq_id'] = mutable_data['unique_id']
+
         return super().to_internal_value(mutable_data)
 
+    @transaction.atomic
     def create(self, validated_data):
-        group_val = validated_data.pop('group', None) or self.initial_data.get('group') or validated_data.get('group_name') or 'General Group'
+        details_data = validated_data.pop('details', None)
+
+        group_val = (
+            validated_data.get('group_name')
+            or self.initial_data.get('group')
+            or self.initial_data.get('sub')
+            or 'General Group'
+        )
         validated_data['group_name'] = group_val
-        if 'roll' not in validated_data:
-            max_roll = Student.objects.aggregate(Max('roll'))['roll__max'] or 0
-            validated_data['roll'] = max_roll + 1
-        return super().create(validated_data)
 
+        name_val = (
+            validated_data.get('name_en')
+            or self.initial_data.get('name')
+            or self.initial_data.get('label')
+        )
+        if name_val and str(name_val).strip():
+            validated_data['name_en'] = str(name_val).strip()
+
+        if 'roll_number' not in validated_data or validated_data['roll_number'] is None:
+            max_roll = Student.objects.filter(group_name=group_val).aggregate(Max('roll_number'))['roll_number__max'] or 0
+            validated_data['roll_number'] = max_roll + 1
+
+        student = Student.objects.create(**validated_data)
+
+        # Automatically create linked StudentDetail
+        details_kwargs = details_data if isinstance(details_data, dict) else {}
+        StudentDetail.objects.create(student=student, **details_kwargs)
+
+        return student
+
+    @transaction.atomic
     def update(self, instance, validated_data):
-        group_val = validated_data.pop('group', None) or self.initial_data.get('group')
+        details_data = validated_data.pop('details', None)
+
+        group_val = validated_data.get('group_name') or self.initial_data.get('group')
         if group_val:
-            instance.group_name = group_val
-        return super().update(instance, validated_data)
+            validated_data['group_name'] = group_val
+
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+        instance.save()
+
+        if details_data is not None and isinstance(details_data, dict):
+            detail_obj, _ = StudentDetail.objects.get_or_create(student=instance)
+            for attr, val in details_data.items():
+                setattr(detail_obj, attr, val)
+            detail_obj.save()
+
+        return instance
 
 
-class MistakeDetailSerializer(serializers.ModelSerializer):
+# ─────────────────────────────────────────────────────────────
+# NORMALIZED REPORT CHILD SERIALIZERS
+# ─────────────────────────────────────────────────────────────
+
+class ReportPortionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = MistakeDetail
-        fields = ['id', 'juz', 'page', 'ayah']
+        model = ReportPortion
+        fields = [
+            'id',
+            'start_juz', 'start_page', 'start_surah_number', 'start_ayah',
+            'end_juz',   'end_page',   'end_surah_number',   'end_ayah',
+        ]
+        extra_kwargs = {
+            'start_surah_number': {'required': False, 'allow_null': True},
+            'end_surah_number':   {'required': False, 'allow_null': True},
+            'start_ayah':         {'required': False},
+            'end_ayah':           {'required': False},
+        }
 
 
-class StuckDetailSerializer(serializers.ModelSerializer):
+class ReportErrorDetailSerializer(serializers.ModelSerializer):
     class Meta:
-        model = StuckDetail
-        fields = ['id', 'juz', 'page', 'ayah']
+        model = ReportErrorDetail
+        fields = ['id', 'type', 'juz', 'page', 'surah_number', 'ayah']
+        extra_kwargs = {
+            'surah_number': {'required': False, 'allow_null': True},
+            'ayah':         {'required': False},
+        }
 
+
+class ReportStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportStatus
+        fields = [
+            'id',
+            'is_edited', 'edit_time',
+            'is_locked', 'lock_time',
+            'is_deleted', 'delete_time',
+            'created_at', 'updated_at',
+        ]
+
+
+# ─────────────────────────────────────────────────────────────
+# MAIN REPORT SERIALIZER
+# ─────────────────────────────────────────────────────────────
 
 class StudentDailyReportSerializer(serializers.ModelSerializer):
-    mistake_details = MistakeDetailSerializer(many=True, read_only=True)
-    stuck_details = StuckDetailSerializer(many=True, read_only=True)
+    # ── Normalized nested (writable) ────────────────────────
+    portions = ReportPortionSerializer(many=True, required=False, default=list)
+    error_details = ReportErrorDetailSerializer(many=True, required=False, default=list)
+
+    # ── Backward-compat computed fields (read-only) ──────────
+    # Frontend still expects `mistake_details` and `stuck_details` arrays.
+    # These are filtered views over error_details — no separate DB tables.
+    mistake_details = serializers.SerializerMethodField()
+    stuck_details   = serializers.SerializerMethodField()
+
+    # ── Report Status (Nested & Flattened) ────────────────────
+    status_info = ReportStatusSerializer(read_only=True)
+    report_status = ReportStatusSerializer(source='status_info', read_only=True)
+    is_edited = serializers.BooleanField(source='status_info.is_edited', read_only=True, default=False)
+    edit_time = serializers.DateTimeField(source='status_info.edit_time', read_only=True, allow_null=True)
+    edited_at = serializers.DateTimeField(source='status_info.edit_time', read_only=True, allow_null=True)
+    is_locked = serializers.BooleanField(source='status_info.is_locked', read_only=True, default=False)
+    lock_time = serializers.DateTimeField(source='status_info.lock_time', read_only=True, allow_null=True)
+    is_deleted = serializers.BooleanField(source='status_info.is_deleted', read_only=True, default=False)
+    delete_time = serializers.DateTimeField(source='status_info.delete_time', read_only=True, allow_null=True)
+
+    # ── Related info ─────────────────────────────────────────
     student_details = StudentSerializer(source='student', read_only=True)
     student_name = serializers.CharField(required=False, allow_blank=True)
     student_group = serializers.CharField(source='student.group_name', read_only=True)
     date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False)
-    student = serializers.PrimaryKeyRelatedField(queryset=Student.objects.all(), required=False, allow_null=True)
+    student = serializers.PrimaryKeyRelatedField(
+        queryset=Student.objects.all(), required=False, allow_null=True
+    )
     created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
-    date_time = serializers.SerializerMethodField()
+    updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+
+    # ── Display helpers ───────────────────────────────────────
+    date_time     = serializers.SerializerMethodField()
+    formattedDate = serializers.SerializerMethodField()
+    formattedTime = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentDailyReport
         fields = [
-            'id', 'report_unique_id', 'date', 'date_time', 'student', 'student_name', 'student_group', 
-            'student_details', 'session_name', 'total_mistake', 'total_stuck', 
-            'comment', 'juz_and_pages', 'mistake_details', 'stuck_details',
-            'created_by', 'is_locked', 'is_deleted', 'created_at', 'updated_at'
+            'id', 'report_unique_id', 'date', 'date_time',
+            'formattedDate', 'formattedTime',
+            'student', 'student_name', 'student_group', 'student_details',
+            'session_name',
+            'total_page',
+            'total_mistake', 'total_stuck',
+            'score', 'status', 'teacher_id',
+            'is_edited', 'edit_time', 'edited_at',
+            'is_locked', 'lock_time',
+            'is_deleted', 'delete_time',
+            'status_info',
+            'report_status',
+            'comment',
+            'juz_and_pages',
+            'portions',
+            'error_details',
+            'mistake_details',   # computed from error_details where type='Mistake'
+            'stuck_details',     # computed from error_details where type='Stuck'
+            'created_by',
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['created_by', 'report_unique_id']
 
+    # ── Computed compat fields ───────────────────────────────
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_mistake_details(self, obj):
+        """Returns mistake entries from error_details (type='Mistake')."""
+        items = [
+            ed for ed in obj.error_details.all()
+            if ed.type == 'Mistake'
+        ]
+        return [
+            {'id': ed.id, 'juz': str(ed.juz), 'page': str(ed.page), 'ayah': str(ed.ayah)}
+            for ed in items
+        ]
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_stuck_details(self, obj):
+        """Returns stuck entries from error_details (type='Stuck')."""
+        items = [
+            ed for ed in obj.error_details.all()
+            if ed.type == 'Stuck'
+        ]
+        return [
+            {'id': ed.id, 'juz': str(ed.juz), 'page': str(ed.page), 'ayah': str(ed.ayah)}
+            for ed in items
+        ]
+
+    @extend_schema_field(OpenApiTypes.STR)
     def get_date_time(self, obj):
-        if obj.date:
-            return obj.date.strftime("%Y-%m-%d %I:%M:%S %p")
-        if obj.created_at:
-            return obj.created_at.strftime("%Y-%m-%d %I:%M:%S %p")
-        return ""
+        dt = obj.date or obj.created_at
+        return dt.strftime("%Y-%m-%d %I:%M:%S %p") if dt else ""
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_formattedDate(self, obj):
+        dt = obj.date or obj.created_at
+        return dt.strftime("%b %d, %Y") if dt else ""
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_formattedTime(self, obj):
+        dt = obj.date or obj.created_at
+        return dt.strftime("%I:%M %p") if dt else ""
+
+    # ── Input pre-processing ─────────────────────────────────
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
 
-        # Date & Time mapping
         date_val = mutable_data.get('report_date') or mutable_data.get('date')
         if date_val:
             if isinstance(date_val, str):
@@ -181,11 +443,9 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         else:
             mutable_data['date'] = timezone.now()
 
-        # Session mapping
         if 'session_name' not in mutable_data and 'session' in mutable_data:
             mutable_data['session_name'] = mutable_data['session']
 
-        # Student mapping (string name or pk)
         student_input = mutable_data.get('student') or mutable_data.get('student_name')
         if student_input:
             if isinstance(student_input, int):
@@ -194,76 +454,190 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                 mutable_data['student'] = int(student_input)
             elif isinstance(student_input, str):
                 name_clean = student_input.strip()
-                group_val = mutable_data.get('subject_course') or mutable_data.get('group_name') or 'General Group'
-                student_obj = Student.objects.filter(name=name_clean).first()
+                group_val = (
+                    mutable_data.get('subject_course')
+                    or mutable_data.get('group_name')
+                    or 'General Group'
+                )
+                student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
                 if not student_obj:
-                    max_roll = Student.objects.aggregate(Max('roll'))['roll__max'] or 0
+                    max_roll = Student.objects.aggregate(Max('roll_number'))['roll_number__max'] or 0
                     student_obj = Student.objects.create(
-                        name=name_clean,
+                        name_en=name_clean,
                         group_name=group_val,
-                        roll=max_roll + 1
+                        roll_number=max_roll + 1,
                     )
                 mutable_data['student'] = student_obj.pk
-                mutable_data['student_name'] = student_obj.name
+                mutable_data['student_name'] = student_obj.name_en
 
         return super().to_internal_value(mutable_data)
 
+    # ── Internal helpers ─────────────────────────────────────
+
+    def _safe_int(self, val, default=0):
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return default
+
+    def _parse_legacy_errors(self, report, mistakes_input, stucks_input):
+        """Parse old frontend format (mistake_details/stuck_details arrays) into ReportErrorDetail."""
+        tot_mistakes = 0
+        tot_stucks = 0
+
+        def _process(items, error_type):
+            count = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                juz  = str(item.get('juz', '')).strip()
+                page = str(item.get('page', '')).strip()
+                ayahs = item.get('ayahs', [])
+
+                if isinstance(ayahs, list) and len(ayahs) > 0:
+                    for a in ayahs:
+                        val = (a.get('value') or a.get('ayah') or '') if isinstance(a, dict) else str(a)
+                        val = str(val).strip()
+                        if val or juz or page:
+                            ReportErrorDetail.objects.create(
+                                report=report,
+                                type=error_type,
+                                juz=self._safe_int(juz),
+                                page=self._safe_int(page),
+                                ayah=self._safe_int(val),
+                            )
+                            count += 1
+                else:
+                    line_val = str(item.get('line') or item.get('ayah') or '').strip()
+                    if juz or page or line_val:
+                        ReportErrorDetail.objects.create(
+                            report=report,
+                            type=error_type,
+                            juz=self._safe_int(juz),
+                            page=self._safe_int(page),
+                            ayah=self._safe_int(line_val),
+                        )
+                        count += 1
+            return count
+
+        tot_mistakes = _process(mistakes_input, 'Mistake')
+        tot_stucks   = _process(stucks_input,   'Stuck')
+        return tot_mistakes, tot_stucks
+
+    def _create_normalized_errors(self, report, error_details_data):
+        """Create ReportErrorDetail rows from new v2 payload."""
+        mistakes, stucks = 0, 0
+        for item in error_details_data:
+            ed = ReportErrorDetail.objects.create(report=report, **item)
+            if ed.type == 'Mistake':
+                mistakes += 1
+            else:
+                stucks += 1
+        return mistakes, stucks
+
+    def _create_portions(self, report, portions_data):
+        for item in portions_data:
+            ReportPortion.objects.create(report=report, **item)
+
+    # ── CREATE ───────────────────────────────────────────────
+
+    @transaction.atomic
     def create(self, validated_data):
-        mistakes_input = self.initial_data.get('mistake_details') or self.initial_data.get('mistakes') or []
-        stucks_input = self.initial_data.get('stuck_details') or self.initial_data.get('stucks') or []
+        portions_data = validated_data.pop('portions', [])
+        error_details_data = validated_data.pop('error_details', [])
+
+        initial = self.initial_data or {}
+        mistakes_input = initial.get('mistake_details') or initial.get('mistakes') or []
+        stucks_input   = initial.get('stuck_details')   or initial.get('stucks')   or []
 
         student_obj = validated_data.get('student')
         if student_obj and not validated_data.get('student_name'):
             validated_data['student_name'] = student_obj.name
 
         report = StudentDailyReport.objects.create(**validated_data)
+        ReportStatus.objects.get_or_create(report=report)
 
-        # Parse mistake entries into MistakeDetail Foreign Key instances
-        tot_mistakes = 0
-        for item in mistakes_input:
-            if isinstance(item, dict):
-                juz = str(item.get('juz', '')).strip()
-                page = str(item.get('page', '')).strip()
-                ayahs = item.get('ayahs', [])
-                if isinstance(ayahs, list) and len(ayahs) > 0:
-                    for a in ayahs:
-                        val = (a.get('value') or a.get('ayah') or '') if isinstance(a, dict) else str(a)
-                        val = str(val).strip()
-                        if val or juz or page:
-                            MistakeDetail.objects.create(report=report, juz=juz, page=page, ayah=val)
-                            tot_mistakes += 1
-                else:
-                    line_val = str(item.get('line') or item.get('ayah') or '').strip()
-                    if juz or page or line_val:
-                        MistakeDetail.objects.create(report=report, juz=juz, page=page, ayah=line_val)
-                        tot_mistakes += 1
+        if portions_data:
+            self._create_portions(report, portions_data)
 
-        # Parse stuck entries into StuckDetail Foreign Key instances
-        tot_stucks = 0
-        for item in stucks_input:
-            if isinstance(item, dict):
-                juz = str(item.get('juz', '')).strip()
-                page = str(item.get('page', '')).strip()
-                ayahs = item.get('ayahs', [])
-                if isinstance(ayahs, list) and len(ayahs) > 0:
-                    for a in ayahs:
-                        val = (a.get('value') or a.get('ayah') or '') if isinstance(a, dict) else str(a)
-                        val = str(val).strip()
-                        if val or juz or page:
-                            StuckDetail.objects.create(report=report, juz=juz, page=page, ayah=val)
-                            tot_stucks += 1
-                else:
-                    line_val = str(item.get('line') or item.get('ayah') or '').strip()
-                    if juz or page or line_val:
-                        StuckDetail.objects.create(report=report, juz=juz, page=page, ayah=line_val)
-                        tot_stucks += 1
+        if error_details_data:
+            tot_mistakes, tot_stucks = self._create_normalized_errors(report, error_details_data)
+        elif mistakes_input or stucks_input:
+            tot_mistakes, tot_stucks = self._parse_legacy_errors(report, mistakes_input, stucks_input)
+        else:
+            tot_mistakes = validated_data.get('total_mistake', 0)
+            tot_stucks   = validated_data.get('total_stuck', 0)
 
         report.total_mistake = tot_mistakes
-        report.total_stuck = tot_stucks
+        report.total_stuck   = tot_stucks
         report.save(update_fields=['total_mistake', 'total_stuck'])
 
         return report
 
+    # ── UPDATE ───────────────────────────────────────────────
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # Auto-Lock Enforcement
+        status_obj = getattr(instance, 'status_info', None) or getattr(instance, 'report_status', None)
+        if status_obj and status_obj.is_locked:
+            request = self.context.get('request')
+            user = getattr(request, 'user', None) if request else None
+            is_admin = user and (
+                user.is_superuser or
+                user.is_staff or
+                getattr(user, 'user_type', None) in ['SUPER_ADMIN', 'ADMIN']
+            )
+            if not is_admin:
+                raise PermissionDenied("This report is locked and cannot be modified by non-admin users.")
+
+        portions_data      = validated_data.pop('portions', None)
+        error_details_data = validated_data.pop('error_details', None)
+
+        initial = self.initial_data or {}
+        mistakes_input = initial.get('mistake_details') or initial.get('mistakes') or None
+        stucks_input   = initial.get('stuck_details')   or initial.get('stucks')   or None
+
+        # Pop status fields if passed directly
+        validated_data.pop('is_edited', None)
+        validated_data.pop('edited_at', None)
+
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+        instance.save()
+
+        # Update ReportStatus
+        status_obj, _ = ReportStatus.objects.get_or_create(report=instance)
+        status_obj.is_edited = True
+        status_obj.edit_time = timezone.now()
+        status_obj.save()
+
+        if portions_data is not None:
+            instance.portions.all().delete()
+            self._create_portions(instance, portions_data)
+
+        if error_details_data is not None:
+            instance.error_details.all().delete()
+            tot_mistakes, tot_stucks = self._create_normalized_errors(instance, error_details_data)
+            instance.total_mistake = tot_mistakes
+            instance.total_stuck   = tot_stucks
+            instance.save(update_fields=['total_mistake', 'total_stuck'])
+
+        elif mistakes_input is not None or stucks_input is not None:
+            instance.error_details.all().delete()
+            tot_mistakes, tot_stucks = self._parse_legacy_errors(
+                instance, mistakes_input or [], stucks_input or []
+            )
+            instance.total_mistake = tot_mistakes
+            instance.total_stuck   = tot_stucks
+            instance.save(update_fields=['total_mistake', 'total_stuck'])
+
+        return instance
+
+
+# ─────────────────────────────────────────────────────────────
+# USER ACTIVITY SERIALIZERS
+# ─────────────────────────────────────────────────────────────
 
 class UserLoginLogSerializer(serializers.ModelSerializer):
     timestamp_formatted = serializers.SerializerMethodField()
@@ -272,10 +646,9 @@ class UserLoginLogSerializer(serializers.ModelSerializer):
         model = UserLoginLog
         fields = ['id', 'status', 'timestamp', 'timestamp_formatted', 'ip_address', 'country', 'city']
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_timestamp_formatted(self, obj):
-        if obj.timestamp:
-            return obj.timestamp.strftime("%Y-%m-%d %I:%M %p")
-        return "--"
+        return obj.timestamp.strftime("%Y-%m-%d %I:%M %p") if obj.timestamp else "--"
 
 
 class UserActivityLogSerializer(serializers.ModelSerializer):
@@ -285,31 +658,64 @@ class UserActivityLogSerializer(serializers.ModelSerializer):
         model = UserActivityLog
         fields = ['id', 'status', 'timestamp', 'timestamp_formatted']
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_timestamp_formatted(self, obj):
-        if obj.timestamp:
-            return obj.timestamp.strftime("%Y-%m-%d %I:%M %p")
-        return "--"
+        return obj.timestamp.strftime("%Y-%m-%d %I:%M %p") if obj.timestamp else "--"
 
 
 class UserActivitySummarySerializer(serializers.ModelSerializer):
-    unique_key = serializers.ReadOnlyField()
-    formatted_created_at = serializers.ReadOnlyField()
-    total_lifetime_activity = serializers.ReadOnlyField()
-    recent_login_logs = serializers.SerializerMethodField()
+    unique_key              = serializers.CharField(read_only=True)
+    role                    = serializers.CharField(read_only=True)
+    formatted_created_at    = serializers.CharField(read_only=True)
+    total_lifetime_activity = serializers.CharField(read_only=True)
+    recent_login_logs       = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'id', 
-            'unique_key', 
-            'username', 
-            'email', 
-            'role', 
-            'formatted_created_at', 
-            'total_lifetime_activity',
-            'recent_login_logs'
+            'id', 'unique_key', 'phone_number', 'email', 'role',
+            'formatted_created_at', 'total_lifetime_activity', 'recent_login_logs',
         ]
 
+    @extend_schema_field(UserLoginLogSerializer(many=True))
     def get_recent_login_logs(self, obj):
-        recent = obj.login_logs.all()[:5]
-        return UserLoginLogSerializer(recent, many=True).data
+        return UserLoginLogSerializer(obj.login_logs.all()[:5], many=True).data
+
+
+class UserSessionSerializer(serializers.ModelSerializer):
+    user_phone = serializers.CharField(source='user.phone_number', read_only=True)
+    user_type = serializers.CharField(source='user.user_type', read_only=True)
+
+    class Meta:
+        model = UserSession
+        fields = [
+            'id',
+            'user',
+            'user_phone',
+            'user_type',
+            'device_type',
+            'device_info',
+            'ip_address',
+            'login_at',
+            'last_active',
+            'logout_at',
+            'total_duration_minutes',
+            'is_active',
+        ]
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    user_phone = serializers.CharField(source='user.phone_number', read_only=True, default=None)
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id',
+            'user',
+            'user_phone',
+            'action_name',
+            'endpoint',
+            'http_method',
+            'ip_address',
+            'timestamp',
+        ]

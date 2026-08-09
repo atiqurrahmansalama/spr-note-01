@@ -358,20 +358,6 @@ export default function StudentGroupedList({
                                 <span className="text-[10px] theme-bg-sub px-2 py-0.5 rounded-md theme-text-primary border theme-border font-semibold">
                                   {rep.session_name}
                                 </span>
-                                {(rep.is_edited || rep.edited_at) && (
-                                  <span
-                                    className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border cursor-pointer select-none shrink-0 flex items-center gap-1 hover:opacity-90 transition"
-                                    title={rep.edited_at ? `Edited: ${new Date(rep.edited_at).toLocaleString()}` : "Edited"}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const timeStr = rep.edited_at ? new Date(rep.edited_at).toLocaleString() : "Date unavailable";
-                                      alert(`Edited on: ${timeStr}`);
-                                    }}
-                                  >
-                                    <EditIcon className="w-2.5 h-2.5 theme-accent" />
-                                    <span>Edited</span>
-                                  </span>
-                                )}
                               </div>
                               {rep.comment && (
                                 <p className="text-[11px] theme-text-secondary italic mt-1 truncate">

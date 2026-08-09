@@ -223,20 +223,6 @@ export default function RecordReportsList({
                     {rep.sync_status === "PENDING" && (
                       <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Pending Sync" />
                     )}
-                    {(rep.is_edited || rep.edited_at) && (
-                      <span
-                        className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border cursor-pointer select-none shrink-0 flex items-center gap-1 hover:opacity-90 transition"
-                        title={rep.edited_at ? `Edited: ${new Date(rep.edited_at).toLocaleString()}` : "Edited"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const timeStr = rep.edited_at ? new Date(rep.edited_at).toLocaleString() : "Date unavailable";
-                          alert(`Edited on: ${timeStr}`);
-                        }}
-                      >
-                        <EditIcon className="w-2.5 h-2.5 theme-accent" />
-                        <span>Edited</span>
-                      </span>
-                    )}
                   </div>
                   <p className="text-[11px] theme-text-secondary mt-0.5 truncate font-sans">
                     {rep.formattedDate} {rep.formattedTime && `· ${rep.formattedTime}`} · <span className="theme-text-primary font-medium">{rep.student_group}</span>

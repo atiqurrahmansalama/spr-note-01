@@ -6,6 +6,7 @@ import {
   isOnline, 
   mergeStudents 
 } from "../../../utils/localStore";
+import { syncLocalStudentsToBackend } from "../../../utils/syncEngine";
 import StudentSavePanel from "./StudentSavePanel";
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
 import { GroupsIcon, UsersIcon, TrashIcon, EditIcon, CloudIcon } from "../../../components/ui/Icons";
@@ -57,6 +58,8 @@ export default function StudentDirectoryView() {
     if (!isOnline()) return;
 
     try {
+      await syncLocalStudentsToBackend();
+
       const res = await fetchWithAuth("/students/");
       if (res.ok) {
         const raw = await res.json();

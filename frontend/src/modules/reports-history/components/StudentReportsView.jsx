@@ -18,6 +18,7 @@ import RecordReportsList from "./RecordReportsList";
 import StudentGroupedList from "./StudentGroupedList";
 import ReportsAnalytics from "./ReportsAnalytics";
 import ReportContextMenu from "./ReportContextMenu";
+import SkeletonLoader from "../../../components/common/SkeletonLoader/SkeletonLoader";
 
 export default function StudentReportsView() {
   const { showToast } = useToast();
@@ -650,7 +651,10 @@ export default function StudentReportsView() {
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => {
+                    setSearchQuery("");
+                    showToast("Search cleared", "info");
+                  }}
                   className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs theme-text-secondary hover:theme-text-primary"
                 >
                   <CloseIcon className="w-3.5 h-3.5" />
@@ -672,6 +676,7 @@ export default function StudentReportsView() {
             onReset={() => {
               setStartDate("");
               setEndDate("");
+              showToast("Date filter cleared", "info");
             }}
           />
 
@@ -747,18 +752,22 @@ export default function StudentReportsView() {
       </div>
 
       {/* VIEW MODES */}
-      {viewMode === "RECORD_REPORTS" && (
-        <RecordReportsList
-          reports={filteredReports}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelectReport}
-          onBatchSelect={handleBatchSelect}
-          onDeselectAll={handleDeselectAll}
-          onContextMenu={handleContextMenu}
-          onEdit={handleEditReport}
-          onDelete={handleDeleteReport}
-        />
-      )}
+      {loading ? (
+        <SkeletonLoader type="list" count={4} />
+      ) : (
+        <>
+          {viewMode === "RECORD_REPORTS" && (
+            <RecordReportsList
+              reports={filteredReports}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelectReport}
+              onBatchSelect={handleBatchSelect}
+              onDeselectAll={handleDeselectAll}
+              onContextMenu={handleContextMenu}
+              onEdit={handleEditReport}
+              onDelete={handleDeleteReport}
+            />
+          )}
 
       {viewMode === "STUDENT_VIEW" && (
         <StudentGroupedList
@@ -778,6 +787,8 @@ export default function StudentReportsView() {
         <ReportsAnalytics
           filteredReports={filteredReports}
         />
+      )}
+        </>
       )}
 
       {/* Right Click Popup Context Menu */}

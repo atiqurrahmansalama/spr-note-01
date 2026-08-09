@@ -20,8 +20,15 @@ import SaveStatusBadge from "./components/common/SaveStatusBadge/SaveStatusBadge
 import { useTheme } from "./context/useTheme";
 import { useToast } from "./context/ToastContext";
 import { initActivityTracker } from "./utils/activityTracker";
+import PublicVerifyReportView from "./modules/verification/PublicVerifyReportView";
 
 export default function App() {
+  // Check if current URL is the public verification route
+  const isVerifyRoute = typeof window !== "undefined" && window.location.pathname.includes("/verify-report");
+  if (isVerifyRoute) {
+    return <PublicVerifyReportView />;
+  }
+
   const { showToast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState(() => {
@@ -60,6 +67,47 @@ export default function App() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (!e.changedTouches || e.changedTouches.length !== 1) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Only trigger if horizontal swipe is prominent
+      if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
+        if (deltaX > 0 && (touchStartX < 60 || !isSidebarOpen)) {
+          // Swipe right -> Open Sidebar
+          setIsSidebarOpen(true);
+        } else if (deltaX < 0 && isSidebarOpen) {
+          // Swipe left -> Close Sidebar
+          setIsSidebarOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isSidebarOpen]);
 
   // Listen for programmatic navigation to Dashboard (e.g., from Edit button in StudentReportsView)
   useEffect(() => {
@@ -143,7 +191,7 @@ export default function App() {
         return;
       }
 
-      // 3. Ctrl/Cmd + S -> Save / Generate Report
+      // 3. Ctrl/Cmd + S -> Save / Generate Report Modal
       if (isCmdOrCtrl && !e.shiftKey && key === "s") {
         e.preventDefault();
         const makeReportBtn = document.querySelector('button[data-shortcut="make-report"]');
@@ -155,11 +203,11 @@ export default function App() {
         return;
       }
 
-      // 3b. Alt + S -> Add to Record
-      if (e.altKey && key === "s") {
+      // 3b. Alt + S / Ctrl + Enter -> Add to Record / Confirm Edit
+      if ((e.altKey && key === "s") || (isCmdOrCtrl && e.key === "Enter")) {
         e.preventDefault();
         const addRecordBtn = Array.from(document.querySelectorAll("button")).find(
-          (b) => b.textContent.includes("Add to Record")
+          (b) => b.textContent.includes("Add to Record") || b.textContent.includes("Confirm Edit")
         );
         if (addRecordBtn) addRecordBtn.click();
         return;
@@ -188,6 +236,7 @@ export default function App() {
         else if (key === "s") { e.preventDefault(); setActiveTab("Sessions & Comments"); }
         else if (key === "b") { e.preventDefault(); setActiveTab("Data & Backup"); }
         else if (key === "k") { e.preventDefault(); setActiveTab("Shortcuts"); }
+        else if (key === "r") { e.preventDefault(); setActiveTab("Reports History"); }
       }
 
       // 7. Escape -> Return to Dashboard or close drawer

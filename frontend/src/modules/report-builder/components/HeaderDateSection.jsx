@@ -29,12 +29,17 @@ export default function HeaderDateSection({
   const [activeDateFormat, setActiveDateFormat] = useState(() => calendarSettings.getDateFormat());
 
   useEffect(() => {
-    if (selectedDate && selectedDate !== selectedCustomDate) {
+    if (selectedDate) {
       setSelectedCustomDate(selectedDate);
-      const dateObj = new Date(selectedDate);
-      if (!isNaN(dateObj.getFullYear())) {
-        setViewYear(dateObj.getFullYear());
-        setViewMonth(dateObj.getMonth());
+      const cleanDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate.split(" ")[0];
+      const parts = cleanDate.split("-");
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (!isNaN(y) && !isNaN(m)) {
+          setViewYear(y);
+          setViewMonth(m);
+        }
       }
     }
   }, [selectedDate]);
@@ -67,12 +72,6 @@ export default function HeaderDateSection({
 
   const tzObj = TIMEZONE_LIST.find((t) => t.id === timeZone);
   const tzAbbr = tzObj ? tzObj.offset : "(UTC+06:00)";
-
-  useEffect(() => {
-    if (onDateChange && selectedCustomDate) {
-      onDateChange(selectedCustomDate);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -146,7 +145,7 @@ export default function HeaderDateSection({
         <button
           type="button"
           onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-          className="relative cursor-pointer hover:theme-bg-elevated px-0.5 py-0.5 rounded-lg transition-all duration-150 flex items-center justify-center border border-transparent hover:theme-border group"
+          className="relative cursor-pointer theme-bg-sub border theme-border hover:theme-bg-elevated active:scale-95 px-2.5 py-1 rounded-xl transition-all duration-150 flex items-center justify-center group shadow-sm"
           title="Click to select date"
         >
           <span className="theme-text-primary text-xs sm:text-sm tracking-normal opacity-90 group-hover:opacity-100 group-hover:theme-accent transition-colors">

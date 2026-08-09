@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import { formatDate } from "../../../utils/reportGenerator";
+import QrCodeBadge from "../../../components/common/QrCodeBadge";
 
 export const PdfReportPreview = forwardRef(function PdfReportPreview({
   reportData,
@@ -17,7 +18,11 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
     mistakeData = [],
     stuckData = [],
     comment = "",
+    report_unique_id = "",
+    id = "",
   } = reportData || {};
+
+  const reportId = report_unique_id || id;
 
   // 1. Date Formatting
   const formattedDate = formatDate(selectedDate);
@@ -108,19 +113,22 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
         isPdfBold ? "font-bold" : "font-normal"
       } ${isPdfItalic ? "italic" : "non-italic"}`}
     >
-      {/* Document Title (20pt Bold) */}
-      <h1 className="text-[20px] font-bold text-[#0f172a] tracking-tight mb-2">
-        Student Daily Progress Report
-      </h1>
-
-      {/* Metadata Block */}
-      <div className="space-y-0.5">
+      {/* Document Header & QR Code */}
+      <div className="flex items-start justify-between border-b border-slate-200 pb-3 mb-2">
         <div>
-          <span className="font-bold text-[#0f172a]">Date:</span> {formattedDate}
+          <h1 className="text-[20px] font-bold text-[#0f172a] tracking-tight mb-2">
+            Student Daily Progress Report
+          </h1>
+          <div className="space-y-0.5 text-[15px]">
+            <div>
+              <span className="font-bold text-[#0f172a]">Date:</span> {formattedDate}
+            </div>
+            <div>
+              <span className="font-bold text-[#0f172a]">Student Name:</span> {studentName}
+            </div>
+          </div>
         </div>
-        <div>
-          <span className="font-bold text-[#0f172a]">Student Name:</span> {studentName}
-        </div>
+        <QrCodeBadge reportId={reportId} size={84} />
       </div>
 
       {/* Juz & Page Block */}

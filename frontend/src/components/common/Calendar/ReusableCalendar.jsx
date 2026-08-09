@@ -100,6 +100,7 @@ export default function ReusableCalendar({
     }
   };
 
+
   const formatDateDisplay = (dStr) => {
     if (!dStr) return "";
     const [y, m, d] = dStr.split("-");
@@ -108,6 +109,31 @@ export default function ReusableCalendar({
 
   const getLabel = () => {
     if (isRange) {
+      if (!startDate && !endDate) return placeholder;
+
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
+
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      const yestStr = yest.toISOString().split("T")[0];
+
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 6);
+      const weekStr = weekAgo.toISOString().split("T")[0];
+
+      const monthAgo = new Date(today);
+      monthAgo.setDate(monthAgo.getDate() - 29);
+      const monthStr = monthAgo.toISOString().split("T")[0];
+
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+
+      if (startDate === todayStr && endDate === todayStr) return "Today";
+      if (startDate === yestStr && endDate === yestStr) return "Yesterday";
+      if (startDate === weekStr && endDate === todayStr) return "Past Week";
+      if (startDate === startOfMonth && endDate === todayStr) return "This Month";
+      if (startDate === monthStr && endDate === todayStr) return "Past 1 Month";
+
       if (startDate && endDate) {
         return `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`;
       }
@@ -127,13 +153,14 @@ export default function ReusableCalendar({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
-          <span className="truncate">{getLabel()}</span>
+          <span className="truncate font-semibold">{getLabel()}</span>
         </div>
         <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
       </button>
 
       {isOpen && (
         <div className="absolute z-50 left-0 mt-2 w-72 p-3 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-3 animate-fade-in select-none">
+
           {/* Month/Year Header */}
           <div className="flex items-center justify-between text-xs font-bold theme-text-primary px-1">
             <button

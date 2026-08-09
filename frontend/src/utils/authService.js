@@ -30,8 +30,13 @@ const fetchApi = async (path, options = {}) => {
   }
 
   // Fallback try 2: localhost:8000
-  const localhostUrl = `http://localhost:8000${cleanPath}`;
-  return fetch(localhostUrl, options);
+  try {
+    const localhostUrl = `http://localhost:8000${cleanPath}`;
+    return await fetch(localhostUrl, options);
+  } catch (err) {
+    console.warn(`[authService] All API targets failed for ${cleanPath}:`, err.message);
+    throw new Error("Server is offline or unreachable.");
+  }
 };
 
 // Register User (Sign Up)

@@ -1,7 +1,12 @@
-from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
+
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 from .views import (
     StudentViewSet, 
@@ -9,14 +14,15 @@ from .views import (
     SessionViewSet,
     SavedMessageViewSet,
     StudentDailyReportViewSet, 
-    MistakeDetailViewSet,
-    StuckDetailViewSet,
     CustomTokenObtainPairView,
     RegisterView,
     ChangePasswordView,
     LogLoginView,
     LogActivityView,
-    UserActivitySummaryView
+    UserActivitySummaryView,
+    HeartbeatView,
+    UserActivityAnalyticsView,
+    VerifyReportView,
 )
 
 router = DefaultRouter()
@@ -25,10 +31,24 @@ router.register(r'groups', StudentGroupViewSet, basename='group')
 router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
-router.register(r'mistakes', MistakeDetailViewSet, basename='mistake')
-router.register(r'stucks', StuckDetailViewSet, basename='stuck')
 
 urlpatterns = [
+    # OpenAPI 3.0 Documentation Endpoints
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Verification endpoint
+    path('api/v1/hifz/verify-report/<str:report_id>/', VerifyReportView.as_view(), name='verify_report'),
+    path('hifz/verify-report/<str:report_id>/', VerifyReportView.as_view(), name='verify_report_legacy'),
+
+    # Architecture endpoints
+    path('api/v1/auth/heartbeat/', HeartbeatView.as_view(), name='heartbeat'),
+    path('auth/heartbeat/', HeartbeatView.as_view(), name='heartbeat_legacy'),
+    path('api/v1/analytics/user-activity/', UserActivityAnalyticsView.as_view(), name='user_activity_analytics'),
+    path('analytics/user-activity/', UserActivityAnalyticsView.as_view(), name='user_activity_analytics_legacy'),
+
+    # Existing auth & activity endpoints
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair_legacy'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

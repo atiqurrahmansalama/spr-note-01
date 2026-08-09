@@ -67,7 +67,7 @@ export default function JuzPageSection({ data, onChange, onReset }) {
         <button
           type="button"
           onClick={handleReset}
-          className="theme-text-secondary hover:theme-danger p-1 rounded-lg transition-colors cursor-pointer"
+          className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm"
           title="Reset Juz / Page Details"
         >
           <RefreshIcon className="w-4 h-4 text-inherit transition-colors" />

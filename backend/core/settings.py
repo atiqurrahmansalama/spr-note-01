@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
+    "drf_spectacular",
 
     # Internal apps
     "core",
@@ -43,6 +44,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.UserActivityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -89,6 +91,7 @@ else:
 
 # REST Framework Configurations
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.authentication.FlexibleJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -102,9 +105,25 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLING_RATES": {
-        "anon": "100/minute",
-        "user": "1000/minute",
+        "anon": "10/minute",
+        "user": "200/minute",
+        "sms_scope": "3/minute",
     }
+}
+
+# OpenAPI / Swagger Settings (drf-spectacular)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Suffah Hifz Management System API',
+    'DESCRIPTION': 'Comprehensive REST API documentation for Web, Android, and iOS clients.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+    },
+    'COMPONENT_SPLIT_PATCH': True,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 # SimpleJWT Settings
