@@ -1,29 +1,62 @@
 import { CloseIcon } from "../../components/ui/Icons";
 
-export default function SidebarScreenBlockView({ title, onClose, children }) {
+export default function SidebarScreenBlockView({ 
+  title, 
+  onClose, 
+  children, 
+  dockPosition = "left", 
+  onToggleDock 
+}) {
   return (
-    <div className="w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20">
-      <div className="theme-bg-surface border-b theme-border px-6 py-3.5 flex justify-between items-center shrink-0 shadow-md">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-mono uppercase tracking-wider theme-text-secondary">
+    <div className={`w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20 @container ${
+      dockPosition === "right" ? "border-l theme-border shadow-2xl" : ""
+    }`}>
+      <div className="theme-bg-surface border-b theme-border px-3.5 sm:px-6 py-3 flex justify-between items-center shrink-0 shadow-md">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
             Navigation /
           </span>
-          <span className="text-sm font-bold theme-text-primary">{title}</span>
+          <span className="text-xs sm:text-sm font-bold theme-text-primary truncate">{title}</span>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-xl theme-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center justify-center"
-          title="Close View"
-        >
-          <CloseIcon className="w-4 h-4 text-inherit" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Dock Position Switch Button */}
+          {onToggleDock && (
+            <button
+              type="button"
+              onClick={onToggleDock}
+              className="hidden md:flex p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer items-center justify-center"
+              title={dockPosition === "right" ? "Dock Panel to Left Main Area" : "Dock Panel to Right Sidebar"}
+            >
+              {dockPosition === "right" ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              )}
+            </button>
+          )}
+
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg theme-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center justify-center"
+            title="Close View"
+          >
+            <CloseIcon className="w-4 h-4 text-inherit" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5 flex justify-center items-start">
         {children}
       </div>
     </div>
   );
+
 }
+

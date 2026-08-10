@@ -61,11 +61,7 @@ export default function AutocompleteDropdown({
     return label.includes(term) || sub.includes(term);
   });
 
-  const isNewName =
-    safeSearchTerm.trim().length > 0 &&
-    !options.some(
-      (opt) => (typeof opt === "string" ? opt : (opt?.label || opt?.name || "")).toLowerCase() === safeSearchTerm.trim().toLowerCase()
-    );
+  const hasSearchTerm = safeSearchTerm.trim().length > 0;
 
   const triggerNextFocus = () => {
     if (onNextFocus) {
@@ -174,17 +170,18 @@ export default function AutocompleteDropdown({
         </div>
 
         {/* Save button - outside the input box on the right */}
-        {isNewName && !disableSaveButton && (
+        {hasSearchTerm && !disableSaveButton && (
           <button
             type="button"
             onClick={handleSaveClick}
             className="theme-bg-accent hover:opacity-90 theme-accent-text text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors shadow shrink-0 cursor-pointer"
-            title="Press Shift + + to save"
+            title="Click or press Shift + + to save student record"
           >
-            Save
+            + Save
           </button>
         )}
       </div>
+
 
       {isOpen && (
         <ul className="absolute z-50 left-0 right-0 mt-1.5 max-h-56 overflow-y-auto theme-bg-surface rounded-xl shadow-2xl space-y-0.5 p-1 text-sm border theme-border">

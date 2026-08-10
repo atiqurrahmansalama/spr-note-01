@@ -467,21 +467,24 @@ export function useReportForm() {
 
   const handleSaveResult = async (result) => {
     const newStudent = {
+      id: `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       label: result.name,
       sub: result.group || "General Group",
+      _local: true,
     };
 
     let updatedList;
     if (result.mode === "REPLACE" && result.oldStudent) {
       studentStore.remove(result.oldStudent);
-      updatedList = studentStore.add({ ...newStudent, _local: true });
+      updatedList = studentStore.add(newStudent);
     } else {
-      updatedList = studentStore.add({ ...newStudent, _local: true });
+      updatedList = studentStore.add(newStudent);
     }
     setStudentDatabase(updatedList);
     setAvailableGroups(Array.from(new Set(updatedList.map((s) => s.sub))).filter(Boolean));
     setStudentName(result.name);
     setGroupName(result.group || "General Group");
+
 
     if (isOnline()) {
       try {

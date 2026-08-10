@@ -8,10 +8,12 @@
 
 // ─── Key Constants ─────────────────────────────────────────────────────────
 export const KEYS = {
-  // Auth
+  // Auth & Multi-Account
   ACCESS_TOKEN:   "accessToken",
   REFRESH_TOKEN:  "refreshToken",
   USER:           "user",
+  SAVED_ACCOUNTS: "spr_saved_accounts",
+
 
   // Student & Session data
   STUDENTS:       "spr_students",
@@ -100,6 +102,67 @@ export const auth = {
   },
 };
 
+export const multiAccount = {
+  getAccounts: () => readJSON(KEYS.SAVED_ACCOUNTS, []),
+
+  saveAccount: (accountData) => {
+    const list = multiAccount.getAccounts();
+    const id = accountData.user?.phone_number || accountData.user?.username || accountData.user?.id;
+    if (!id) return list;
+
+    const filtered = list.filter((a) => {
+      const existingId = a.user?.phone_number || a.user?.username || a.user?.id;
+      return existingId !== id;
+    });
+
+    const updated = [accountData, ...filtered];
+    writeJSON(KEYS.SAVED_ACCOUNTS, updated);
+    return updated;
+  },
+
+  removeAccount: (identifier) => {
+    const list = multiAccount.getAccounts();
+    const updated = list.filter((a) => {
+      const id = a.user?.phone_number || a.user?.username || a.user?.id;
+      return id !== identifier;
+    });
+    writeJSON(KEYS.SAVED_ACCOUNTS, updated);
+    return updated;
+  },
+
+  switchAccount: (identifier) => {
+    const list = multiAccount.getAccounts();
+    const target = list.find((a) => {
+      const id = a.user?.phone_number || a.user?.username || a.user?.id;
+      return id === identifier;
+    });
+
+    if (target && target.access && target.user) {
+      // Save current account to multi-account list first
+      const currentUser = auth.getUser();
+      const currentToken = auth.getAccessToken();
+      const currentRefresh = auth.getRefreshToken();
+      if (currentUser && currentToken) {
+        multiAccount.saveAccount({
+          user: currentUser,
+          access: currentToken,
+          refresh: currentRefresh,
+        });
+      }
+
+      // Set target active credentials
+      auth.saveAccessToken(target.access);
+      if (target.refresh) auth.saveRefreshToken(target.refresh);
+      auth.saveUser(target.user);
+
+      window.dispatchEvent(new CustomEvent("spr_auth_updated"));
+      return true;
+    }
+    return false;
+  },
+};
+
+
 // ─── Students ───────────────────────────────────────────────────────────────
 // Shape: [{ label: "Ahmed", sub: "Group A", _local?: true }, ...]
 
@@ -108,14 +171,25 @@ export const students = {
 
   saveAll: (list) => writeJSON(KEYS.STUDENTS, list),
 
-  /** নতুন স্টুডেন্ট যোগ করে (duplicate check করে). */
+  /** নতুন স্টুডেন্ট যোগ করে (ইউনিক ID সহ, একই নামের একাধিক ছাত্র সেভ করার সুবিধা). */
   add: (student) => {
     const list = students.getAll();
-    const exists = list.some(
-      (s) => s.label?.toLowerCase() === student.label?.toLowerCase()
+    const newId = student.id || `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const newStudentItem = {
+      id: newId,
+      label: student.label || student.name || "",
+      sub: student.sub || student.group || student.group_name || "General Group",
+      _local: true,
+      ...student,
+    };
+
+    // Check exact duplicate ID or exact same name AND group AND ID
+    const isExactDuplicate = list.some(
+      (s) => s.id && s.id === newId
     );
-    if (!exists) {
-      const updated = [...list, student];
+
+    if (!isExactDuplicate) {
+      const updated = [...list, newStudentItem];
       writeJSON(KEYS.STUDENTS, updated);
       return updated;
     }
@@ -126,7 +200,7 @@ export const students = {
   replace: (oldLabel, newStudent) => {
     const list = students.getAll();
     const updated = list.map((s) =>
-      s.label?.toLowerCase() === oldLabel?.toLowerCase() ? newStudent : s
+      s.label?.toLowerCase() === oldLabel?.toLowerCase() ? { ...s, ...newStudent } : s
     );
     writeJSON(KEYS.STUDENTS, updated);
     return updated;
@@ -155,10 +229,12 @@ export const students = {
     return updated;
   },
 
-  /** নাম দিয়ে ডিলিট করে. */
-  remove: (label) => {
+  /** নাম বা ID দিয়ে ডিলিট করে. */
+  remove: (identifier) => {
     const updated = students.getAll().filter(
-      (s) => s.label?.toLowerCase() !== label?.toLowerCase()
+      (s) =>
+        (s.id && String(s.id) !== String(identifier)) &&
+        s.label?.toLowerCase() !== String(identifier)?.toLowerCase()
     );
     writeJSON(KEYS.STUDENTS, updated);
     return updated;
@@ -166,39 +242,27 @@ export const students = {
 };
 
 /**
- * mergeStudents — API ডেটা ও LocalStorage ডেটা মার্জ করে, duplicate ছাড়া।
- *
- * নিয়ম:
- *  1. API ডেটা authoritative (server থেকে এসেছে, _local flag নেই)
- *  2. Local-only ডেটা (API-তে নেই, _local: true) শেষে যোগ হয়
- *  3. একই নাম দুইবার আসে না
- *  4. Merged result LocalStorage-এ cache হিসেবে সেভ হয়
+ * mergeStudents — API ডেটা ও LocalStorage ডেটা মার্জ করে।
  */
 export function mergeStudents(apiStudents, localStudents) {
-  const apiLabels = new Set(
-    (Array.isArray(apiStudents) ? apiStudents : []).map((s) =>
-      (s.label || s.name || "").toLowerCase().trim()
-    )
-  );
+  const apiList = (Array.isArray(apiStudents) ? apiStudents : []).map((s) => ({
+    id: s.id,
+    label: s.label || s.name || s.student_name || String(s),
+    sub: s.sub || s.group_name || s.group || "General Group",
+  }));
 
-  // Preserve any local student not in API and tag with _local: true so syncEngine can upload them to DB
+  const apiIds = new Set(apiList.map((s) => String(s.id)).filter(Boolean));
+
+  // Preserve local additions
   const localOnly = (Array.isArray(localStudents) ? localStudents : [])
-    .filter(
-      (s) =>
-        s &&
-        (s.label || s.name) &&
-        !apiLabels.has((s.label || s.name || "").toLowerCase().trim())
-    )
+    .filter((s) => s && (s.label || s.name) && (s._local || (s.id && !apiIds.has(String(s.id)))))
     .map((s) => ({ ...s, _local: true }));
 
-  const merged = [
-    ...apiStudents.map(({ _local, ...rest }) => rest),
-    ...localOnly,
-  ];
-
+  const merged = [...apiList, ...localOnly];
   writeJSON(KEYS.STUDENTS, merged);
   return merged;
 }
+
 
 const DEFAULT_SESSIONS = [
   { id: "sess-1", name: "সবক (Sabaq)" },

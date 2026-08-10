@@ -8,6 +8,7 @@ import {
 } from "../../../utils/localStore";
 import { syncLocalStudentsToBackend } from "../../../utils/syncEngine";
 import StudentSavePanel from "./StudentSavePanel";
+import StudentProfileModal from "./StudentProfileModal";
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
 import { GroupsIcon, UsersIcon, TrashIcon, EditIcon, CloudIcon } from "../../../components/ui/Icons";
 
@@ -20,7 +21,9 @@ export default function StudentDirectoryView() {
   const [reportSearchQuery, setReportSearchQuery] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
+  const [profileModalStudent, setProfileModalStudent] = useState(null);
   const [offline, setOffline] = useState(!isOnline());
+
 
   // Inline editing state for Student
   const [editingStudentLabel, setEditingStudentLabel] = useState(null);
@@ -720,8 +723,10 @@ export default function StudentDirectoryView() {
                       return (
                         <div
                           key={student.label + idx}
+                          onClick={() => setProfileModalStudent(student)}
                           className="w-full theme-bg-sub border theme-border rounded-xl p-3.5 flex items-center justify-between gap-3 hover:theme-bg-elevated transition group select-none cursor-pointer"
                         >
+
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-9 h-9 rounded-xl theme-bg-elevated border theme-border theme-accent font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
                               {initial}
@@ -835,8 +840,10 @@ export default function StudentDirectoryView() {
                       return (
                         <div
                           key={student.label + idx}
+                          onClick={() => setProfileModalStudent(student)}
                           className="w-full theme-bg-sub border theme-border rounded-xl p-3.5 flex items-center justify-between gap-3 hover:theme-bg-elevated transition group select-none cursor-pointer"
                         >
+
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-9 h-9 rounded-xl theme-bg-elevated border theme-border theme-accent font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
                               {initial}
@@ -887,6 +894,13 @@ export default function StudentDirectoryView() {
           </div>
 
       </div>
+
+      <StudentProfileModal
+        student={profileModalStudent}
+        isOpen={Boolean(profileModalStudent)}
+        onClose={() => setProfileModalStudent(null)}
+      />
     </div>
   );
+
 }

@@ -1,3 +1,5 @@
+import UserProfileSettingsView from "./components/UserProfileSettingsView";
+import SecuritySessionsView from "./components/SecuritySessionsView";
 import AppearanceSettings from "./components/AppearanceSettings";
 import CalendarSettings from "./components/CalendarSettings";
 import CopyReportSettingsView from "./components/CopyReportSettingsView";
@@ -10,8 +12,16 @@ import AboutAppView from "./components/AboutAppView";
 
 export default function SettingsModule({ activeTab = "Settings" }) {
   switch (activeTab) {
+    case "Profile Settings":
+    case "User Profile":
+      return <UserProfileSettingsView />;
+    case "Security & Sessions":
+    case "Security":
+    case "Active Sessions":
+      return <SecuritySessionsView />;
     case "Appearance":
       return <AppearanceSettings />;
+
     case "Date & Time":
       return <CalendarSettings />;
     case "Copy Report Settings":

@@ -42,12 +42,20 @@ class User(AbstractUser):
     username = None  # Phone number is primary credential
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
+    name_bn = models.CharField(max_length=150, null=True, blank=True)
+    avatar_url = models.TextField(null=True, blank=True)
+
+    assigned_group = models.CharField(max_length=100, null=True, blank=True)
     user_type = models.CharField(
         max_length=20,
         choices=USER_TYPE_CHOICES,
         default='TEACHER'
     )
     is_active = models.BooleanField(default=True)
+    is_deactivated = models.BooleanField(default=False)
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+
+
 
     # Legacy fields & hierarchy
     parent = models.ForeignKey(
@@ -404,6 +412,8 @@ class StudentDetail(models.Model):
     emergency_phone = models.CharField(max_length=20, null=True, blank=True)
     cur_address = models.TextField(null=True, blank=True)
     per_address = models.TextField(null=True, blank=True)
+    initial_completed_juz = models.IntegerField(default=0, null=True, blank=True)
+
 
     def __str__(self):
         return f"Details for Student {self.student.uniq_id or self.student.id}"
@@ -648,6 +658,115 @@ class ReportStatus(models.Model):
         flags = []
         if self.is_edited:  flags.append("Edited")
         if self.is_locked:  flags.append("Locked")
-        if self.is_deleted: flags.append("Deleted")
-        label = ", ".join(flags) if flags else "Clean"
-        return f"{self.report.report_unique_id} [{label}]"
+        if self.is_deleted:  flags.append("Deleted")
+        flag_str = f" [{', '.join(flags)}]" if flags else ""
+        return f"Status for Report #{self.report_id}{flag_str}"
+
+
+class UserNotificationPreference(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preference')
+    email_notifications = models.BooleanField(default=True)
+    push_notifications = models.BooleanField(default=True)
+    sms_notifications = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Notification Preferences for {self.user}"
+
+
+class UserSecurity(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='security')
+    is_2fa_enabled = models.BooleanField(default=False)
+    two_factor_secret = models.CharField(max_length=255, null=True, blank=True)
+    backup_codes = models.JSONField(default=list, blank=True)
+
+    def __str__(self):
+        return f"Security for {self.user}"
+
+
+# ─── Granular Feature Flagging & Access Control Models ───────────────────────
+
+class AppSectionCategory(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=150)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'title']
+        verbose_name_plural = "App Section Categories"
+
+    def __str__(self):
+        return f"{self.title} ({self.key})"
+
+
+class AppSection(models.Model):
+    category = models.ForeignKey(AppSectionCategory, on_delete=models.CASCADE, related_name='sections')
+    section_key = models.CharField(max_length=100, unique=True)
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True, default='')
+    is_globally_enabled = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['category__order', 'order', 'title']
+
+    def __str__(self):
+        return f"{self.title} [{self.section_key}] (Global: {self.is_globally_enabled})"
+
+
+class RoleSectionPermission(models.Model):
+    section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='role_permissions')
+    role = models.CharField(max_length=50, choices=User.USER_TYPE_CHOICES)
+    is_enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('section', 'role')
+
+    def __str__(self):
+        return f"Role [{self.role}] -> {self.section.section_key}: {self.is_enabled}"
+
+
+class GroupSectionPermission(models.Model):
+    section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='group_permissions')
+    group_id = models.CharField(max_length=100)
+    is_enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('section', 'group_id')
+
+    def __str__(self):
+        return f"Group [{self.group_id}] -> {self.section.section_key}: {self.is_enabled}"
+
+
+class UserSectionOverride(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='section_overrides')
+    section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='user_overrides')
+    is_enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('user', 'section')
+
+    def __str__(self):
+        return f"User [{self.user.phone_number or self.user.id}] -> {self.section.section_key}: {self.is_enabled}"
+
+
+class FeatureFlagAuditLog(models.Model):
+    SCOPE_TYPE_CHOICES = (
+        ('GLOBAL', 'Global Default'),
+        ('ROLE', 'Role Permission'),
+        ('GROUP', 'Group Permission'),
+        ('USER', 'User Override'),
+    )
+
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    scope_type = models.CharField(max_length=20, choices=SCOPE_TYPE_CHOICES)
+    target_identifier = models.CharField(max_length=150)
+    section_key = models.CharField(max_length=100)
+    previous_state = models.BooleanField()
+    new_state = models.BooleanField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"AuditLog [{self.scope_type} - {self.target_identifier}] {self.section_key}: {self.previous_state} -> {self.new_state}"

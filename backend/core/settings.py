@@ -2,19 +2,25 @@ import os
 import dj_database_url
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Logs Directory Creation (only in dev — Railway doesn't support file logging)
+# Load environment variables from .env file if present
+load_dotenv(BASE_DIR / ".env")
+
+# Logs Directory Creation
 LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Security Headers & Env Configuration
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key-change-in-production")
-DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS_STR = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+# Security Headers & Env Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key-change-in-production"))
+DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() == "true"
+
+ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost"))
 ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()]
+
 
 AUTH_USER_MODEL = "core.User"
 
@@ -70,24 +76,59 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 
 # Database Configuration
-# Railway provides DATABASE_URL automatically when PostgreSQL is added
+# Primary: PostgreSQL (via DATABASE_URL or individual POSTGRES_* environment variables)
+# Fallback: Local Developer SQLite only if USE_SQLITE=True is explicitly specified
+
+USE_SQLITE = os.getenv("USE_SQLITE", "False").lower() in ("true", "1", "t")
 DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True,
-        )
-    }
-else:
-    # Local development fallback (SQLite)
+
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+
+if USE_SQLITE:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+elif DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=not DEBUG,
+        )
+    }
+elif POSTGRES_DB and POSTGRES_USER:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": POSTGRES_DB,
+            "USER": POSTGRES_USER,
+            "PASSWORD": POSTGRES_PASSWORD or "",
+            "HOST": POSTGRES_HOST or "localhost",
+            "PORT": POSTGRES_PORT,
+            "CONN_MAX_AGE": 600,
+            "CONN_HEALTH_CHECKS": True,
+        }
+    }
+else:
+    # Default Production PostgreSQL connection (Local/Docker PostgreSQL default: spr_note_db)
+    DEFAULT_PG_URL = f"postgres://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'spr_note_db')}"
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DEFAULT_PG_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=False,
+        )
+    }
+
 
 # REST Framework Configurations
 REST_FRAMEWORK = {
@@ -147,9 +188,11 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS_STR = os.getenv("CORS_ALLOWED_ORIGINS", "")
 if CORS_ALLOWED_ORIGINS_STR:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED_ORIGINS_STR.split(",") if o.strip()]
+    CORS_ALLOW_ALL_ORIGINS = False
 else:
     # Dev fallback
     CORS_ALLOW_ALL_ORIGINS = True
+
 
 # Security settings (only in production)
 if not DEBUG:

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Enterprise Database Service
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: spr_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: spr_note_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spr_note_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local

@@ -24,7 +24,10 @@ from .models import (
     UserActivityLog,
     UserSession,
     ActivityLog,
+    UserNotificationPreference,
+    UserSecurity,
 )
+
 
 User = get_user_model()
 
@@ -52,13 +55,48 @@ class UserDeviceSerializer(serializers.ModelSerializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'] = serializers.CharField(required=False, allow_blank=True)
+        self.fields['phone_number'] = serializers.CharField(required=False, allow_blank=True)
+        self.fields['email'] = serializers.CharField(required=False, allow_blank=True)
+
+    def to_internal_value(self, data):
+        mutable = data.copy() if hasattr(data, 'copy') else dict(data)
+        raw_identifier = mutable.get("phone_number") or mutable.get("username") or mutable.get("email") or mutable.get("phone")
+        if raw_identifier:
+            identifier = str(raw_identifier).strip()
+            if "@" in identifier:
+                try:
+                    user_obj = User.objects.get(email__iexact=identifier)
+                    identifier = user_obj.phone_number
+                except User.DoesNotExist:
+                    pass
+            else:
+                try:
+                    user_obj = User.objects.get(phone_number=identifier)
+                    identifier = user_obj.phone_number
+                except User.DoesNotExist:
+                    try:
+                        user_obj = User.objects.filter(Q(first_name__iexact=identifier) | Q(last_name__iexact=identifier)).first()
+                        if user_obj and user_obj.phone_number:
+                            identifier = user_obj.phone_number
+                    except Exception:
+                        pass
+
+            mutable[self.username_field] = identifier
+            mutable['username'] = identifier
+            mutable['phone_number'] = identifier
+
+        return super().to_internal_value(mutable)
+
     def validate(self, attrs):
         phone_input = attrs.get("phone_number") or attrs.get("phone") or attrs.get("username")
         if phone_input:
             phone_clean = str(phone_input).strip()
             if "@" in phone_clean:
                 try:
-                    user_obj = User.objects.get(email=phone_clean)
+                    user_obj = User.objects.get(email__iexact=phone_clean)
                     attrs[self.username_field] = user_obj.phone_number
                 except User.DoesNotExist:
                     attrs[self.username_field] = phone_clean
@@ -80,14 +118,53 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'phone_number': self.user.phone_number,
             'username': self.user.phone_number,
             'email': self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
             'user_type': self.user.user_type,
             'role': self.user.user_type,
+            'avatar_url': self.user.avatar_url,
             'is_active': self.user.is_active,
             'teacher_profile': teacher_data,
             'guardian_profile': guardian_data,
             'date_joined': self.user.date_joined.strftime("%Y-%m-%d") if self.user.date_joined else "",
         }
         return data
+
+
+class UserAdminSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='user_type', read_only=True)
+    formatted_created_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'phone_number',
+            'email',
+            'first_name',
+            'last_name',
+            'user_type',
+            'role',
+            'avatar_url',
+            'assigned_group',
+            'is_active',
+            'is_deactivated',
+            'date_joined',
+            'formatted_created_at',
+        ]
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': False},
+            'phone_number': {'required': False},
+            'email': {'required': False, 'allow_null': True, 'allow_blank': True},
+        }
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_formatted_created_at(self, obj):
+        if hasattr(obj, 'date_joined') and obj.date_joined:
+            return obj.date_joined.strftime("%Y-%m-%d")
+        return ""
+
+
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -160,11 +237,54 @@ class StudentDetailSerializer(serializers.ModelSerializer):
             'blood_group', 'father_name', 'mother_name',
             'guardian_name', 'guardian_relation', 'guardian_phone',
             'emergency_phone', 'cur_address', 'per_address',
+            'initial_completed_juz',
         ]
         extra_kwargs = {
             f: {'required': False, 'allow_null': True}
             for f in fields if f != 'id'
         }
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    first_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    name_bn = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    assigned_group = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'phone_number', 'email', 'first_name', 'last_name',
+            'name_bn', 'avatar_url', 'user_type', 'assigned_group',
+        ]
+        read_only_fields = ['id', 'phone_number', 'user_type']
+
+
+
+class UserAdminSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'phone_number', 'email', 'first_name', 'last_name',
+            'name_bn', 'avatar_url', 'user_type', 'assigned_group',
+            'is_active', 'formatted_created_at', 'password',
+        ]
+        read_only_fields = ['id', 'formatted_created_at']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = User.objects.create(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        return user
+
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -719,3 +839,16 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'ip_address',
             'timestamp',
         ]
+
+
+class UserNotificationPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserNotificationPreference
+        fields = ['id', 'email_notifications', 'push_notifications', 'sms_notifications']
+
+
+class UserSecuritySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSecurity
+        fields = ['id', 'is_2fa_enabled', 'two_factor_secret', 'backup_codes']
+        read_only_fields = ['two_factor_secret', 'backup_codes']

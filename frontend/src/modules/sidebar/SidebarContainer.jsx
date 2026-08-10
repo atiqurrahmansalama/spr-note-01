@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import UserProfileCard from "./UserProfileCard";
 import { 
   DashboardIcon, 
@@ -21,13 +22,16 @@ import {
 export default function SidebarContainer({ 
   isOpen, 
   onClose, 
-  activeTab,
-  setActiveTab,
+  activePath: propActivePath,
   sidebarMode = "inline",
   setSidebarMode,
   isProfileOpen,
   setIsProfileOpen 
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = propActivePath || location.pathname;
+
   const [openSubMenus, setOpenSubMenus] = useState({
     Settings: true,
     Groups: false,
@@ -42,34 +46,40 @@ export default function SidebarContainer({
   };
 
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard", Icon: DashboardIcon },
-    { id: "Student Reports", name: "Student Reports", Icon: SavedMessagesIcon },
-    { id: "Section Control", name: "Section Control", Icon: SectionControlIcon },
-    { id: "Appearance", name: "Appearance", Icon: AppearanceIcon },
+    { id: "Dashboard", name: "Dashboard", path: "/", Icon: DashboardIcon },
+    { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
+    { id: "Groups & Students", name: "Groups & Students", path: "/groups-students", Icon: GroupsIcon },
+    { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
+    { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
+    { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
+    { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
+    { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon },
     { 
       id: "Settings", 
       name: "Settings", 
       Icon: SettingsIcon, 
       hasSub: true,
       subItems: [
-        { id: "Section Control", name: "Section Control", Icon: SectionControlIcon },
-        { id: "Date & Time", name: "Date & Time", Icon: CalendarIcon },
-        { id: "Copy Report Settings", name: "Copy Report Settings", Icon: CopyIcon },
-        { id: "Language", name: "Language", Icon: GlobeIcon },
+        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon },
+        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon },
+        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
+        { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon },
+        { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon },
+        { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon },
       ]
     },
-    { id: "Data & Backup", name: "Data & Backup", Icon: CloudIcon },
-    { id: "Groups & Students", name: "Groups & Students", Icon: GroupsIcon },
-    { id: "Sessions & Comments", name: "Sessions & Comments", Icon: SessionsIcon },
-    { id: "Shortcuts", name: "Shortcuts", Icon: ShortcutsIcon },
-    { id: "App Guide", name: "App Guide", Icon: AppGuideIcon },
-    { id: "About", name: "About", Icon: AboutIcon },
+    { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon },
+    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon },
+    { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon },
+    { id: "About", name: "About", path: "/about", Icon: AboutIcon },
   ];
 
-  const handleSelectTab = (tabName) => {
-    setActiveTab(tabName);
-    if (sidebarMode === "overlay" && isOpen) {
-      onClose();
+  const handleNavigate = (path) => {
+    if (path) {
+      navigate(path);
+      if (sidebarMode === "overlay" && isOpen) {
+        onClose();
+      }
     }
   };
 
@@ -83,6 +93,14 @@ export default function SidebarContainer({
     if (isMobileScreen && item.id === "Shortcuts") return false;
     return true;
   });
+
+  const checkIsActive = (path) => {
+    if (!path) return false;
+    if (path === "/") {
+      return currentPath === "/" || currentPath === "/dashboard";
+    }
+    return currentPath === path;
+  };
 
   return (
     <>
@@ -100,17 +118,37 @@ export default function SidebarContainer({
           theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
         `}
       >
+        {/* App Name Header at the top of Sidebar when open in Overlay Mode */}
+        {isOverlay && (
+          <div className="px-4 py-3.5 border-b theme-border flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg theme-bg-accent theme-accent-text flex items-center justify-center font-bold text-xs shadow-sm">
+                SPR
+              </div>
+              <span className="font-bold theme-text-primary text-base tracking-wide">SPR Note</span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer flex items-center justify-center text-sm"
+              title="Close Navigation"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <nav 
           className={`flex-1 overflow-y-auto ${isCollapsed ? "px-3 py-6 space-y-4" : "px-4 py-6 space-y-2"} text-sm font-medium`}
           style={{ scrollbarGutter: "stable" }}
         >
           {displayMenuItems.map((item) => {
-            const isParentActive = activeTab === item.name;
+            const isParentActive = checkIsActive(item.path);
             const ItemIcon = item.Icon;
             const isSubOpen = openSubMenus[item.id] || false;
 
             if (item.hasSub) {
-              const isAnySubActive = item.subItems.some((sub) => sub.name === activeTab);
+              const isAnySubActive = item.subItems.some((sub) => checkIsActive(sub.path));
 
               return (
                 <div key={item.id} className="space-y-1.5">
@@ -144,13 +182,13 @@ export default function SidebarContainer({
                         : "pl-5 space-y-1.5 pt-1"
                     }>
                       {item.subItems.map((sub) => {
-                        const isSubActive = activeTab === sub.name;
+                        const isSubActive = checkIsActive(sub.path);
                         const SubIcon = sub.Icon;
                         return (
                           <button
                             key={sub.id}
                             type="button"
-                            onClick={() => handleSelectTab(sub.name)}
+                            onClick={() => handleNavigate(sub.path)}
                             title={sub.name}
                             className={`w-full flex items-center gap-3.5 relative ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                               isSubActive
@@ -171,12 +209,12 @@ export default function SidebarContainer({
               );
             }
 
-            const isActive = activeTab === item.name;
+            const isActive = checkIsActive(item.path);
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => handleSelectTab(item.name)}
+                onClick={() => handleNavigate(item.path)}
                 title={item.name}
                 className={`w-full flex items-center ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                   isActive
@@ -192,14 +230,10 @@ export default function SidebarContainer({
             );
           })}
         </nav>
-
-        {!isCollapsed && (
-          <UserProfileCard
-            isProfileOpen={isProfileOpen}
-            setIsProfileOpen={setIsProfileOpen}
-          />
-        )}
       </aside>
+
+
     </>
   );
 }
+

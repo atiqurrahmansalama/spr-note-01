@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { 
   CalendarIcon, 
   ClockIcon, 
@@ -14,13 +15,20 @@ import {
 import { calendarSettings as calStore } from "../../../utils/localStore";
 
 export default function CalendarSettings({ 
-  timeZone, 
-  setTimeZone, 
-  dateFormat, 
-  setDateFormat 
+  timeZone: propTimeZone, 
+  setTimeZone: propSetTimeZone, 
+  dateFormat: propDateFormat, 
+  setDateFormat: propSetDateFormat 
 }) {
+  const outletContext = useOutletContext() || {};
+  const timeZone = propTimeZone || outletContext.timeZone || calStore.getTimezone();
+  const setTimeZone = propSetTimeZone || outletContext.setTimeZone || calStore.saveTimezone;
+  const dateFormat = propDateFormat || outletContext.dateFormat || calStore.getDateFormat();
+  const setDateFormat = propSetDateFormat || outletContext.setDateFormat || calStore.saveDateFormat;
+
   const [firstDay, setFirstDay] = useState(() => calStore.getFirstDay());
   const [enableHijri, setEnableHijri] = useState(() => calStore.getHijriEnabled());
+
 
   const [currentTime, setCurrentTime] = useState(new Date());
 

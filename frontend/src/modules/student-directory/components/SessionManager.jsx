@@ -10,16 +10,39 @@ import {
 import { SessionsIcon, ChatIcon, TrashIcon, CopyIcon, EditIcon } from "../../../components/ui/Icons";
 import { syncSessionsAndComments } from "../../../utils/syncEngine";
 
+// Helper to normalize any comment structure into a clean array of strings
+function normalizeCommentList(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  return rawList
+    .map((c) => {
+      if (!c) return "";
+      if (typeof c === "string") return c;
+      if (typeof c === "object") return c.text || c.comment || String(c);
+      return String(c);
+    })
+    .filter((str) => typeof str === "string" && str.trim().length > 0);
+}
+
+// Helper to normalize session structure
+function normalizeSessionList(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  return rawList.map((s, idx) => ({
+    id: typeof s === "object" && s !== null ? (s.id || `sess-${idx}`) : `sess-${idx}`,
+    name: typeof s === "object" && s !== null ? (s.name || s.session_name || s.label || String(s)) : String(s),
+    _local: typeof s === "object" && s !== null ? !!s._local : false,
+  }));
+}
+
 export default function SessionManager() {
   const { showToast } = useToast();
 
-  const [sessions, setSessions] = useState([]);
+  const [sessions, setSessions] = useState(() => normalizeSessionList(sessionStore.getAll()));
   const [newSessionName, setNewSessionName] = useState("");
   const [sessionSearch, setSessionSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Saved comments state
-  const [comments, setComments] = useState(() => commentStore.getAll());
+  // Saved comments state (Strict Array of Strings)
+  const [comments, setComments] = useState(() => normalizeCommentList(commentStore.getAll()));
   const [newCommentText, setNewCommentText] = useState("");
   const [commentSearch, setCommentSearch] = useState("");
 
@@ -55,11 +78,12 @@ export default function SessionManager() {
   const loadSessionsAndComments = async () => {
     const cached = sessionStore.getAll();
     if (cached.length > 0) {
-      setSessions(cached);
+      setSessions(normalizeSessionList(cached));
     }
     const cachedComments = commentStore.getAll();
-    if (cachedComments.length > 0) {
-      setComments(cachedComments);
+    const normalizedCached = normalizeCommentList(cachedComments);
+    if (normalizedCached.length > 0) {
+      setComments(normalizedCached);
     }
 
     if (!isOnline()) return;
@@ -79,17 +103,15 @@ export default function SessionManager() {
 
         const localData = sessionStore.getAll();
         const merged = mergeSessions(formattedApi, localData);
-        setSessions(merged);
+        setSessions(normalizeSessionList(merged));
       }
 
       // Load comments
       const commentsRes = await fetchWithAuth("/messages/");
       if (commentsRes.ok) {
         const rawMessages = await commentsRes.json();
-        const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
-          .map((m) => (typeof m === "object" ? (m.text || m.comment) : String(m)))
-          .filter(Boolean);
-        const localComments = commentStore.getAll();
+        const apiComments = normalizeCommentList(rawMessages);
+        const localComments = normalizeCommentList(commentStore.getAll());
         const mergedComments = Array.from(new Set([...apiComments, ...localComments]));
         setComments(mergedComments);
         commentStore.saveAll(mergedComments);
@@ -120,7 +142,7 @@ export default function SessionManager() {
       setIsSubmitting(false);
       return;
     }
-    setSessions(updated);
+    setSessions(normalizeSessionList(updated));
     setNewSessionName("");
     showToast(`Session "${trimmedName}" saved!`, "success");
 
@@ -160,7 +182,7 @@ export default function SessionManager() {
     const updated = currentSessions.map((s) => 
       s.id === session.id ? { ...s, name: trimmed, _local: true } : s
     );
-    setSessions(updated);
+    setSessions(normalizeSessionList(updated));
     setEditingSessionId(null);
     showToast(`Updated session to "${trimmed}" locally`, "success");
 
@@ -187,7 +209,7 @@ export default function SessionManager() {
     }
 
     const updated = sessionStore.remove(id);
-    setSessions(updated);
+    setSessions(normalizeSessionList(updated));
     window.dispatchEvent(new CustomEvent("spr_session_updated"));
     window.dispatchEvent(new CustomEvent("spr_project_changed"));
 
@@ -212,19 +234,21 @@ export default function SessionManager() {
 
   // Handle Add Saved Comment
   const handleAddComment = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const trimmed = newCommentText.trim();
     if (!trimmed) {
       showToast("Comment template text cannot be empty", "warning");
       return;
     }
 
-    if (comments.includes(trimmed)) {
+    const currentList = normalizeCommentList(comments);
+    if (currentList.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
       showToast("Comment template already exists!", "warning");
       return;
     }
 
-    const updated = commentStore.add(trimmed);
+    const res = commentStore.add(trimmed);
+    const updated = normalizeCommentList(Array.isArray(res) ? res : res?.updated || commentStore.getAll());
     setComments(updated);
     setNewCommentText("");
     showToast("New comment template saved!", "success");
@@ -255,8 +279,8 @@ export default function SessionManager() {
       return;
     }
 
-    const currentComments = commentStore.getAll();
-    const updated = currentComments.map((c, i) => i === index ? trimmed : c);
+    const currentComments = normalizeCommentList(comments);
+    const updated = currentComments.map((c, i) => (i === index ? trimmed : c));
     setComments(updated);
     setEditingCommentIndex(null);
     showToast("Comment template updated locally!", "success");
@@ -266,7 +290,7 @@ export default function SessionManager() {
         const res = await fetchWithAuth("/messages/");
         if (res.ok) {
           const rawMessages = await res.json();
-          const serverMsg = rawMessages.find(m => 
+          const serverMsg = (Array.isArray(rawMessages) ? rawMessages : []).find((m) => 
             (typeof m === "object" ? (m.text || m.comment) : String(m)) === oldText
           );
           if (serverMsg && serverMsg.id) {
@@ -290,8 +314,10 @@ export default function SessionManager() {
       return;
     }
 
-    const updated = commentStore.remove(index);
+    const currentComments = normalizeCommentList(comments);
+    const updated = currentComments.filter((_, idx) => idx !== index);
     setComments(updated);
+    commentStore.saveAll(updated);
     showToast("Comment template deleted", "info");
 
     if (isOnline()) {
@@ -299,7 +325,7 @@ export default function SessionManager() {
         const res = await fetchWithAuth("/messages/");
         if (res.ok) {
           const rawMessages = await res.json();
-          const serverMsg = rawMessages.find(m => 
+          const serverMsg = (Array.isArray(rawMessages) ? rawMessages : []).find((m) => 
             (typeof m === "object" ? (m.text || m.comment) : String(m)) === commentText
           );
           if (serverMsg && serverMsg.id) {
@@ -315,12 +341,14 @@ export default function SessionManager() {
   };
 
   // Filtered and sorted Sessions (A-Z)
-  const filteredSessions = sessions
+  const safeSessions = normalizeSessionList(sessions);
+  const filteredSessions = safeSessions
     .filter((s) => (s.name || "").toLowerCase().includes(sessionSearch.toLowerCase()))
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   // Filtered and sorted Comments (A-Z)
-  const filteredComments = comments
+  const safeComments = normalizeCommentList(comments);
+  const filteredComments = safeComments
     .filter((c) => (c || "").toLowerCase().includes(commentSearch.toLowerCase()))
     .sort((a, b) => (a || "").localeCompare(b || ""));
 
@@ -455,20 +483,20 @@ export default function SessionManager() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
                         <button
                           type="button"
                           onClick={() => startEditSession(s)}
-                          className="p-1 text-xs theme-text-secondary hover:theme-accent rounded-lg hover:theme-bg-surface transition shrink-0"
-                          title="Edit"
+                          className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-app transition"
+                          title="Edit Session Name"
                         >
                           <EditIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteSession(s.id || s.name, s.name)}
-                          className="p-1 text-xs theme-text-secondary hover:text-rose-400 transition rounded-lg hover:theme-bg-surface shrink-0"
-                          title="Delete"
+                          onClick={() => handleDeleteSession(s.id, s.name)}
+                          className="p-1 rounded-md theme-text-secondary hover:text-red-400 hover:theme-bg-app transition"
+                          title="Delete Session"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
                         </button>
@@ -480,25 +508,25 @@ export default function SessionManager() {
             </div>
           </div>
 
-          {/* COLUMN 2: COMMENT TEMPLATES */}
+          {/* COLUMN 2: SAVED COMMENT SHORTCUTS */}
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b theme-border pb-2.5">
               <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
                 <ChatIcon className="w-4 h-4 theme-accent" />
-                <span>Comments Templates</span>
+                <span>Saved Comment Templates</span>
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-accent font-semibold">
-                {filteredComments.length} templates
+                {filteredComments.length} comments
               </span>
             </div>
 
-            {/* Add Comment Form */}
+            {/* Add Comment Template Form */}
             <form onSubmit={handleAddComment} className="flex gap-2">
               <input
                 type="text"
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="Enter comment template text..."
+                placeholder="Add comment template (e.g. মাশাল্লাহ, বেশ উন্নতি হচ্ছে)..."
                 className="flex-1 theme-bg-sub border theme-border theme-text-primary text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
               />
               <button
@@ -513,8 +541,8 @@ export default function SessionManager() {
             <input
               type="text"
               value={commentSearch}
-              onChange={(e) => setSessionSearch(e.target.value)}
-              placeholder="Search templates..."
+              onChange={(e) => setCommentSearch(e.target.value)}
+              placeholder="Search comments..."
               className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
             />
 
@@ -525,23 +553,18 @@ export default function SessionManager() {
                   No comment templates found.
                 </p>
               ) : (
-                filteredComments.map((cmt, idx) => {
+                filteredComments.map((commentText, idx) => {
                   const isEditing = editingCommentIndex === idx;
 
                   if (isEditing) {
                     return (
                       <div key={idx} className="theme-bg-sub border theme-border rounded-xl p-3 space-y-2 shadow-sm animate-fade-in">
                         <textarea
+                          rows={2}
                           value={editCommentTextInput}
                           onChange={(e) => setEditCommentTextInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSaveEditComment(idx, cmt);
-                            }
-                          }}
                           autoFocus
-                          className="w-full h-16 p-2 rounded-xl theme-bg-app border theme-border theme-text-primary text-xs resize-none focus:outline-none"
+                          className="w-full theme-bg-app border theme-border theme-text-primary px-2.5 py-1.5 rounded-md text-xs focus:outline-none resize-none"
                         />
                         <div className="flex justify-end gap-1.5">
                           <button
@@ -553,7 +576,7 @@ export default function SessionManager() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleSaveEditComment(idx, cmt)}
+                            onClick={() => handleSaveEditComment(idx, commentText)}
                             className="px-2.5 py-0.5 text-[10px] font-semibold theme-accent-text theme-bg-accent rounded-md"
                           >
                             Save
@@ -566,37 +589,37 @@ export default function SessionManager() {
                   return (
                     <div
                       key={idx}
-                      className="theme-bg-sub border theme-border rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 hover:theme-bg-elevated transition group select-none cursor-pointer"
+                      className="theme-bg-sub border theme-border rounded-xl px-3 py-2 flex items-center justify-between gap-3 hover:theme-bg-elevated transition group select-none cursor-pointer"
                     >
-                      <span className="text-xs theme-text-primary font-medium flex-1 truncate">
-                        "{cmt}"
+                      <span className="text-xs theme-text-primary truncate flex-1 font-medium">
+                        "{commentText}"
                       </span>
 
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition shrink-0">
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(cmt);
-                            showToast("Comment template copied!", "info");
+                            navigator.clipboard.writeText(commentText);
+                            showToast("Comment text copied!", "success");
                           }}
-                          className="p-1 text-xs theme-text-secondary hover:theme-accent rounded-lg hover:theme-bg-surface transition"
-                          title="Copy"
+                          className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-app transition"
+                          title="Copy Comment Text"
                         >
                           <CopyIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => startEditComment(idx, cmt)}
-                          className="p-1 text-xs theme-text-secondary hover:theme-accent rounded-lg hover:theme-bg-surface transition"
-                          title="Edit"
+                          onClick={() => startEditComment(idx, commentText)}
+                          className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-app transition"
+                          title="Edit Comment"
                         >
                           <EditIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteComment(idx, cmt)}
-                          className="p-1 text-xs theme-text-secondary hover:text-rose-400 rounded-lg hover:theme-bg-surface transition"
-                          title="Delete"
+                          onClick={() => handleDeleteComment(idx, commentText)}
+                          className="p-1 rounded-md theme-text-secondary hover:text-red-400 hover:theme-bg-app transition"
+                          title="Delete Comment"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
                         </button>
@@ -609,9 +632,7 @@ export default function SessionManager() {
           </div>
 
         </div>
-
       </div>
-
     </div>
   );
 }
