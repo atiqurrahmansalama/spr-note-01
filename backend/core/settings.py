@@ -82,56 +82,23 @@ WSGI_APPLICATION = "core.wsgi.application"
 # Fallback: Local Developer SQLite only if USE_SQLITE=True is explicitly specified
 
 USE_SQLITE = os.getenv("USE_SQLITE", "False").lower() in ("true", "1", "t")
+# 2. Database Configuration (Neon PostgreSQL via dj_database_url with Build Phase SQLite Fallback)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-
-if USE_SQLITE:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-            "OPTIONS": {
-                "timeout": 30,
-            },
-        }
-    }
-elif DATABASE_URL:
+if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=not DEBUG,
+            ssl_require=True,
         )
-    }
-elif POSTGRES_DB and POSTGRES_USER:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": POSTGRES_DB,
-            "USER": POSTGRES_USER,
-            "PASSWORD": POSTGRES_PASSWORD or "",
-            "HOST": POSTGRES_HOST or "localhost",
-            "PORT": POSTGRES_PORT,
-            "CONN_MAX_AGE": 600,
-            "CONN_HEALTH_CHECKS": True,
-        }
     }
 else:
-    # Default Production PostgreSQL connection (Local/Docker PostgreSQL default: spr_note_db)
-    DEFAULT_PG_URL = f"postgres://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'spr_note_db')}"
     DATABASES = {
-        "default": dj_database_url.config(
-            default=DEFAULT_PG_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=False,
-        )
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
 
 
