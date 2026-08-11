@@ -73,7 +73,19 @@ router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
 
+from django.http import JsonResponse
+
+def root_health_check(request):
+    return JsonResponse({
+        "status": "healthy",
+        "service": "Suffah Hifz Management System API",
+        "version": "1.0.0"
+    })
+
 urlpatterns = [
+    # Root Health Check
+    path('health/', root_health_check, name='health_check'),
+
     # OpenAPI 3.0 Documentation Endpoints
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
