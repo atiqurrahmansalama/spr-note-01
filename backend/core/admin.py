@@ -53,28 +53,33 @@ class UserDeviceInline(admin.TabularInline):
 class UserSessionInline(admin.TabularInline):
     model = UserSession
     extra = 0
-    readonly_fields = ('login_at', 'last_active', 'total_duration_minutes')
-    fields = ('device_type', 'device_info', 'ip_address', 'login_at', 'last_active', 'total_duration_minutes', 'is_active')
-    ordering = ('-last_active',)
+    readonly_fields = ('login_at', 'last_activity', 'total_duration_minutes')
+    fields = ('device_type', 'device_info', 'ip_address', 'login_at', 'last_activity', 'total_duration_minutes', 'is_active')
+    ordering = ('-last_activity',)
 
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    list_display = ('phone_number', 'email', 'user_type', 'is_active', 'is_staff', 'date_joined')
-    list_filter = ('user_type', 'is_active', 'is_staff')
-    search_fields = ('phone_number', 'email')
-    ordering = ('phone_number',)
+    list_display = ('get_display_name', 'phone_number', 'email', 'user_type', 'role', 'is_active', 'is_staff', 'date_joined')
+    list_filter = ('user_type', 'role', 'is_active', 'is_staff')
+    search_fields = ('name', 'first_name', 'last_name', 'phone_number', 'email')
+    ordering = ('-date_joined',)
+
+    @admin.display(description='NAME', ordering='name')
+    def get_display_name(self, obj):
+        full = (obj.name or f"{obj.first_name or ''} {obj.last_name or ''}").strip()
+        return full if full else (obj.phone_number or f"User #{obj.id}")
 
     fieldsets = (
-        ('👤 Account Identity', {'fields': ('phone_number', 'email', 'password')}),
-        ('🔑 Role & Permissions', {'fields': ('user_type', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('👤 Account Identity', {'fields': ('name', 'first_name', 'last_name', 'phone_number', 'email', 'avatar_url', 'password')}),
+        ('🔑 Role & Permissions', {'fields': ('user_type', 'role', 'assigned_group', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('📅 Dates & Logs', {'fields': ('last_login', 'date_joined', 'last_login_ip', 'parent')}),
     )
 
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('phone_number', 'email', 'password1', 'password2', 'user_type'),
+            'fields': ('name', 'phone_number', 'email', 'password1', 'password2', 'user_type'),
         }),
     )
 
@@ -422,17 +427,17 @@ class ReportErrorDetailAdmin(admin.ModelAdmin):
 class UserSessionAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'user', 'device_type', 'device_info',
-        'ip_address', 'login_at', 'last_active',
+        'ip_address', 'login_at', 'last_activity',
         'logout_at', 'total_duration_minutes', 'is_active'
     )
     list_filter = ('device_type', 'is_active', 'login_at')
     search_fields = ('user__phone_number', 'user__email', 'ip_address', 'device_info')
-    readonly_fields = ('login_at', 'last_active', 'total_duration_minutes')
-    ordering = ('-last_active',)
+    readonly_fields = ('login_at', 'last_activity', 'total_duration_minutes')
+    ordering = ('-last_activity',)
 
     fieldsets = (
         ('👤 User & Device', {'fields': ('user', 'device_type', 'device_info', 'ip_address')}),
-        ('⏱️ Session Timeline', {'fields': ('login_at', 'last_active', 'logout_at', 'total_duration_minutes')}),
+        ('⏱️ Session Timeline', {'fields': ('login_at', 'last_activity', 'logout_at', 'total_duration_minutes')}),
         ('🟢 Status', {'fields': ('is_active',)}),
     )
 

@@ -27,7 +27,9 @@ export default function SectionToggleControlPanel() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // 1. Fetch available Halqa Groups for Group Scope Selector
+  const [dbRoles, setDbRoles] = useState([]);
+
+  // 1. Fetch available Halqa Groups & Dynamic Roles for Scope Selectors
   useEffect(() => {
     const fetchGroups = async () => {
       try {
@@ -42,7 +44,22 @@ export default function SectionToggleControlPanel() {
         setGroupOptions(["All Groups"]);
       }
     };
+
+    const fetchRoles = async () => {
+      try {
+        const res = await fetchWithAuth("/api/v1/roles/");
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : [];
+          setDbRoles(list);
+        }
+      } catch {
+        setDbRoles([]);
+      }
+    };
+
     fetchGroups();
+    fetchRoles();
   }, []);
 
   // 2. Target Identifier Computation based on Scope
@@ -334,19 +351,22 @@ export default function SectionToggleControlPanel() {
       {/* 3. DYNAMIC TARGET SELECTOR SUB-BAR */}
       {activeScope === "role" && (
         <div className="p-4 theme-bg-surface border theme-border rounded-xl flex items-center gap-3">
-          <span className="text-xs font-semibold theme-text-secondary">Target Role:</span>
+          <span className="text-xs font-semibold theme-text-secondary shrink-0">Target Role:</span>
           <div className="flex items-center gap-2 overflow-x-auto">
-            {[
-              { id: "TEACHER", label: "TEACHER (Teacher / Ustadh)" },
-              { id: "GUARDIAN", label: "GUARDIAN (Guardian / Parent)" },
-              { id: "ADMIN", label: "ADMIN (Admin / Nazim)" },
-              { id: "SUPER_ADMIN", label: "SUPER_ADMIN (Super Admin)" },
-            ].map((roleObj) => (
+            {(dbRoles.length > 0
+              ? dbRoles.map((r) => ({ id: r.code, label: `${r.code} (${r.name})` }))
+              : [
+                  { id: "TEACHER", label: "TEACHER (Teacher / Ustadh)" },
+                  { id: "GUARDIAN", label: "GUARDIAN (Guardian / Parent)" },
+                  { id: "ADMIN", label: "ADMIN (Admin / Nazim)" },
+                  { id: "SUPER_ADMIN", label: "SUPER_ADMIN (Super Admin)" },
+                ]
+            ).map((roleObj) => (
               <button
                 key={roleObj.id}
                 type="button"
                 onClick={() => setSelectedRole(roleObj.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border whitespace-nowrap ${
                   selectedRole === roleObj.id
                     ? "theme-bg-accent theme-accent-text border-transparent shadow-sm"
                     : "theme-bg-sub theme-text-secondary hover:theme-text-primary theme-border"

@@ -86,12 +86,19 @@ function writeString(key, value) {
 
 export const auth = {
   getUser:         ()    => readJSON(KEYS.USER, null),
+  getUserProfile:  ()    => readJSON(KEYS.USER, null),
   saveUser:        (u)   => writeJSON(KEYS.USER, u),
+  saveUserProfile: (u)   => writeJSON(KEYS.USER, u),
   getAccessToken:  ()    => readString(KEYS.ACCESS_TOKEN),
   getToken:        ()    => readString(KEYS.ACCESS_TOKEN),
   saveAccessToken: (t)   => writeString(KEYS.ACCESS_TOKEN, t),
   getRefreshToken: ()    => readString(KEYS.REFRESH_TOKEN),
   saveRefreshToken:(t)   => writeString(KEYS.REFRESH_TOKEN, t),
+  clearTokens: () => {
+    localStorage.removeItem(KEYS.ACCESS_TOKEN);
+    localStorage.removeItem(KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(KEYS.USER);
+  },
   clear: () => {
     localStorage.removeItem(KEYS.ACCESS_TOKEN);
     localStorage.removeItem(KEYS.REFRESH_TOKEN);

@@ -30,6 +30,43 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(phone_number, password, **extra_fields)
 
 
+class UserRole(models.Model):
+    COLOR_THEME_CHOICES = (
+        ('emerald', 'Emerald'),
+        ('blue', 'Blue'),
+        ('purple', 'Purple'),
+        ('amber', 'Amber'),
+        ('rose', 'Rose'),
+        ('cyan', 'Cyan'),
+    )
+
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True, default='')
+    hierarchy_level = models.PositiveIntegerField(default=50)
+    color_theme = models.CharField(max_length=30, default='blue', choices=COLOR_THEME_CHOICES)
+    is_system_role = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['hierarchy_level', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class RoleActionPermission(models.Model):
+    role = models.OneToOneField(UserRole, on_delete=models.CASCADE, related_name='action_permissions')
+    can_create_student = models.BooleanField(default=True)
+    can_edit_student = models.BooleanField(default=True)
+    can_delete_report = models.BooleanField(default=False)
+    can_export_reports = models.BooleanField(default=True)
+    can_manage_users = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Permissions for {self.role.code}"
+
+
 class User(AbstractUser):
     USER_TYPE_CHOICES = (
         ('SUPER_ADMIN', 'Super Admin'),
@@ -38,24 +75,38 @@ class User(AbstractUser):
         ('GUARDIAN', 'Guardian / Parent'),
         ('STAFF', 'Staff / Accountant'),
     )
+    AUTH_PROVIDER_CHOICES = (
+        ('email', 'Email/Password'),
+        ('google', 'Google OAuth2'),
+    )
 
     username = None  # Phone number is primary credential
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
+    name = models.CharField(max_length=150, null=True, blank=True)
     name_bn = models.CharField(max_length=150, null=True, blank=True)
     avatar_url = models.TextField(null=True, blank=True)
 
+    is_email_verified = models.BooleanField(default=False)
+    auth_provider = models.CharField(max_length=20, default='email', choices=AUTH_PROVIDER_CHOICES)
+    google_sub_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
     assigned_group = models.CharField(max_length=100, null=True, blank=True)
     user_type = models.CharField(
-        max_length=20,
+        max_length=50,
         choices=USER_TYPE_CHOICES,
         default='TEACHER'
+    )
+    role = models.ForeignKey(
+        UserRole,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='users'
     )
     is_active = models.BooleanField(default=True)
     is_deactivated = models.BooleanField(default=False)
     deactivated_at = models.DateTimeField(null=True, blank=True)
-
-
 
     # Legacy fields & hierarchy
     parent = models.ForeignKey(
@@ -69,6 +120,12 @@ class User(AbstractUser):
     is_active_user = models.BooleanField(default=True)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
 
+    # IAM & Security Suite Fields
+    is_2fa_enabled = models.BooleanField(default=False)
+    totp_secret = models.CharField(max_length=255, null=True, blank=True)
+    backup_codes = models.JSONField(default=list, blank=True)
+    google_sub_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
+
     groups = models.ManyToManyField('auth.Group', related_name='custom_user_set', blank=True)
     user_permissions = models.ManyToManyField('auth.Permission', related_name='custom_user_permissions_set', blank=True)
 
@@ -77,13 +134,22 @@ class User(AbstractUser):
 
     objects = CustomUserManager()
 
-    @property
-    def role(self):
-        return self.user_type
+    def save(self, *args, **kwargs):
+        if self.role and self.role.code:
+            self.user_type = self.role.code
+        if self.first_name or self.last_name:
+            self.name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        elif self.name:
+            parts = self.name.strip().split(' ', 1)
+            self.first_name = parts[0]
+            self.last_name = parts[1] if len(parts) > 1 else ''
+        super().save(*args, **kwargs)
 
-    @role.setter
-    def role(self, value):
-        self.user_type = value
+    @property
+    def role_code(self):
+        if self.role:
+            return self.role.code
+        return self.user_type
 
     @property
     def unique_key(self):
@@ -144,7 +210,82 @@ class User(AbstractUser):
         return ", ".join(parts)
 
     def __str__(self):
-        return f"{self.phone_number} [{self.get_user_type_display()}]"
+        user_id = self.phone_number or self.email or f"User #{self.id}"
+        user_type_display = self.get_user_type_display() if hasattr(self, 'get_user_type_display') else self.user_type
+        return f"{user_id} [{user_type_display}]"
+
+
+def default_email_verification_expiry():
+    return timezone.now() + timezone.timedelta(hours=24)
+
+
+def default_password_reset_expiry():
+    return timezone.now() + timezone.timedelta(hours=1)
+
+
+class EmailVerificationToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=default_email_verification_expiry)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Verification Token for {self.user.phone_number or self.user.email} ({self.token})"
+
+    @property
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=default_password_reset_expiry)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Reset Token for {self.user.phone_number or self.user.email} ({self.token})"
+
+    @property
+    def is_valid(self):
+        return not self.is_used and timezone.now() <= self.expires_at
+
+
+class UserSession(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
+    refresh_token_jti = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    device_type = models.CharField(max_length=50, default='Desktop')
+    device_info = models.CharField(max_length=255, null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    login_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    logout_at = models.DateTimeField(null=True, blank=True)
+    total_duration_minutes = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-last_activity']
+        verbose_name = "User Session"
+        verbose_name_plural = "User Sessions"
+
+    def save(self, *args, **kwargs):
+        if self.login_at:
+            end_time = self.logout_at or timezone.now()
+            duration = end_time - self.login_at
+            self.total_duration_minutes = max(0, int(duration.total_seconds() // 60))
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        user_identifier = self.user.phone_number or self.user.email if self.user else "Unknown User"
+        return f"Session {user_identifier} [{self.device_type}] ({self.ip_address or 'Local'})"
 
 
 # 🎯 2. Teacher Profile Table
@@ -242,38 +383,7 @@ class UserActivityLog(models.Model):
         return f"{self.user.phone_number} - {self.status} at {self.timestamp}"
 
 
-# 🎯 User Session Tracking Architecture Model
-class UserSession(models.Model):
-    DEVICE_CHOICES = (
-        ('android', 'Android'),
-        ('ios', 'iOS'),
-        ('web', 'Web'),
-    )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
-    device_type = models.CharField(max_length=20, choices=DEVICE_CHOICES)
-    device_info = models.CharField(max_length=255, null=True, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    login_at = models.DateTimeField(auto_now_add=True)
-    last_active = models.DateTimeField(auto_now=True)
-    logout_at = models.DateTimeField(null=True, blank=True)
-    total_duration_minutes = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ['-last_active']
-        verbose_name = "User Session"
-        verbose_name_plural = "User Sessions"
-
-    def save(self, *args, **kwargs):
-        if self.login_at:
-            end_time = self.logout_at or timezone.now()
-            duration = end_time - self.login_at
-            self.total_duration_minutes = max(0, int(duration.total_seconds() // 60))
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Session #{self.id} - {self.user.phone_number} ({self.device_type})"
 
 
 # 🎯 User Activity Log Architecture Model
@@ -770,3 +880,43 @@ class FeatureFlagAuditLog(models.Model):
 
     def __str__(self):
         return f"AuditLog [{self.scope_type} - {self.target_identifier}] {self.section_key}: {self.previous_state} -> {self.new_state}"
+
+
+class UserPasskey(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='passkeys')
+    credential_id = models.CharField(max_length=512, unique=True)
+    public_key = models.TextField()
+    sign_count = models.IntegerField(default=0)
+    device_name = models.CharField(max_length=255, default='Security Key')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Passkey [{self.device_name}] for User #{self.user_id}"
+
+
+class QRSessionTicket(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('authorized', 'Authorized'),
+        ('expired', 'Expired'),
+    )
+
+    ticket_id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    authorized_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name='qr_tickets')
+    access_token = models.TextField(null=True, blank=True)
+    refresh_token = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self):
+        return self.status == 'pending' and timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f"QRTicket [{self.ticket_id}] - {self.status}"

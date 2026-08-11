@@ -23,9 +23,13 @@ from .models import (
     UserLoginLog,
     UserActivityLog,
     UserSession,
+    UserRole,
+    RoleActionPermission,
     ActivityLog,
     UserNotificationPreference,
     UserSecurity,
+    EmailVerificationToken,
+    PasswordResetToken,
 )
 
 
@@ -123,6 +127,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'user_type': self.user.user_type,
             'role': self.user.user_type,
             'avatar_url': self.user.avatar_url,
+            'is_email_verified': getattr(self.user, 'is_email_verified', False),
+            'auth_provider': getattr(self.user, 'auth_provider', 'email'),
             'is_active': self.user.is_active,
             'teacher_profile': teacher_data,
             'guardian_profile': guardian_data,
@@ -131,9 +137,149 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
+class GoogleOAuthSerializer(serializers.Serializer):
+    id_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    access_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    credential = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        if not attrs.get('id_token') and not attrs.get('access_token') and not attrs.get('credential'):
+            raise serializers.ValidationError("Either id_token, access_token, or credential must be provided.")
+        return attrs
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, min_length=8)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'phone_number', 'password', 'first_name', 'last_name']
+
+    def validate_email(self, value):
+        email_clean = value.strip().lower()
+        if User.objects.filter(email__iexact=email_clean).exists():
+            raise serializers.ValidationError("An account with this email address already exists.")
+        return email_clean
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        phone = validated_data.get('phone_number') or f"user_{uuid.uuid4().hex[:10]}"
+        user = User.objects.create_user(
+            phone_number=phone,
+            password=password,
+            is_email_verified=False,
+            auth_provider='email',
+            **validated_data
+        )
+        return user
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    token = serializers.UUIDField(required=True)
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.UUIDField(required=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+
+class UserSessionSerializer(serializers.ModelSerializer):
+    is_current = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserSession
+        fields = ['id', 'ip_address', 'user_agent', 'device_type', 'last_activity', 'created_at', 'is_current']
+
+    def get_is_current(self, obj):
+        request = self.context.get('request')
+        current_jti = self.context.get('current_jti')
+        if current_jti:
+            return obj.refresh_token_jti == current_jti
+        return False
+
+
+class RoleActionPermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoleActionPermission
+        fields = [
+            'can_create_student',
+            'can_edit_student',
+            'can_delete_report',
+            'can_export_reports',
+            'can_manage_users',
+        ]
+
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    action_permissions = RoleActionPermissionSerializer(required=False)
+    user_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserRole
+        fields = [
+            'id',
+            'name',
+            'code',
+            'description',
+            'hierarchy_level',
+            'color_theme',
+            'is_system_role',
+            'created_at',
+            'user_count',
+            'action_permissions',
+        ]
+        read_only_fields = ['id', 'created_at', 'user_count']
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_user_count(self, obj):
+        return obj.users.count() if hasattr(obj, 'users') else 0
+
+    def validate_code(self, value):
+        val = str(value).upper().strip().replace(' ', '_')
+        return val
+
+    def create(self, validated_data):
+        permissions_data = validated_data.pop('action_permissions', None)
+        role = UserRole.objects.create(**validated_data)
+        if permissions_data:
+            RoleActionPermission.objects.create(role=role, **permissions_data)
+        else:
+            RoleActionPermission.objects.create(role=role)
+        return role
+
+    def update(self, instance, validated_data):
+        permissions_data = validated_data.pop('action_permissions', None)
+        for attr, value in validated_data.items():
+            if attr == 'code' and instance.is_system_role:
+                continue
+            setattr(instance, attr, value)
+        instance.save()
+
+        if permissions_data is not None:
+            perm_obj, _ = RoleActionPermission.objects.get_or_create(role=instance)
+            for p_attr, p_val in permissions_data.items():
+                setattr(perm_obj, p_attr, p_val)
+            perm_obj.save()
+        return instance
+
+
 class UserAdminSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(source='user_type', read_only=True)
+    role = serializers.SerializerMethodField()
+    role_info = serializers.SerializerMethodField()
     formatted_created_at = serializers.SerializerMethodField()
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -141,28 +287,104 @@ class UserAdminSerializer(serializers.ModelSerializer):
             'id',
             'phone_number',
             'email',
+            'name',
             'first_name',
             'last_name',
+            'name_bn',
             'user_type',
             'role',
+            'role_info',
+            'auth_provider',
+            'is_email_verified',
             'avatar_url',
             'assigned_group',
             'is_active',
             'is_deactivated',
             'date_joined',
             'formatted_created_at',
+            'password',
         ]
+        read_only_fields = ['id', 'formatted_created_at']
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
-            'phone_number': {'required': False},
+            'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
             'email': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_role(self, obj):
+        if obj.role:
+            return {
+                'id': obj.role.id,
+                'name': obj.role.name,
+                'code': obj.role.code,
+                'color_theme': obj.role.color_theme,
+            }
+        return {
+            'id': None,
+            'name': obj.get_user_type_display() if hasattr(obj, 'get_user_type_display') else obj.user_type,
+            'code': obj.user_type,
+            'color_theme': 'purple' if obj.user_type == 'GUARDIAN' else 'blue',
+        }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_role_info(self, obj):
+        return self.get_role(obj)
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_formatted_created_at(self, obj):
         if hasattr(obj, 'date_joined') and obj.date_joined:
-            return obj.date_joined.strftime("%Y-%m-%d")
-        return ""
+            return obj.date_joined.strftime("%b %d, %Y")
+        return "--"
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        phone = validated_data.get('phone_number') or f"user_{uuid.uuid4().hex[:10]}"
+        validated_data['phone_number'] = phone
+        user = User.objects.create_user(password=password, **validated_data)
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        user_type = validated_data.get('user_type')
+        if user_type:
+            role_obj = UserRole.objects.filter(code=user_type).first()
+            if role_obj:
+                instance.role = role_obj
+
+        name_input = validated_data.get('name')
+        first_name = validated_data.get('first_name')
+        last_name = validated_data.get('last_name')
+
+        if first_name is not None:
+            instance.first_name = first_name
+        if last_name is not None:
+            instance.last_name = last_name
+
+        if name_input:
+            instance.name = name_input
+            if not instance.first_name and not instance.last_name:
+                parts = name_input.split(' ', 1)
+                instance.first_name = parts[0]
+                instance.last_name = parts[1] if len(parts) > 1 else ''
+        else:
+            instance.name = f"{instance.first_name or ''} {instance.last_name or ''}".strip()
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+
+        # Direct SQL update fallback to guarantee DB synchronization
+        User.objects.filter(id=instance.id).update(
+            name=instance.name,
+            first_name=instance.first_name,
+            last_name=instance.last_name,
+            email=instance.email,
+            avatar_url=instance.avatar_url
+        )
+        return instance
 
 
 
@@ -263,27 +485,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 
-class UserAdminSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    class Meta:
-        model = User
-        fields = [
-            'id', 'phone_number', 'email', 'first_name', 'last_name',
-            'name_bn', 'avatar_url', 'user_type', 'assigned_group',
-            'is_active', 'formatted_created_at', 'password',
-        ]
-        read_only_fields = ['id', 'formatted_created_at']
-
-    def create(self, validated_data):
-        password = validated_data.pop('password', None)
-        user = User.objects.create(**validated_data)
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
-        user.save()
-        return user
 
 
 
@@ -805,6 +1007,10 @@ class UserActivitySummarySerializer(serializers.ModelSerializer):
 class UserSessionSerializer(serializers.ModelSerializer):
     user_phone = serializers.CharField(source='user.phone_number', read_only=True)
     user_type = serializers.CharField(source='user.user_type', read_only=True)
+    device_name = serializers.SerializerMethodField()
+    is_current = serializers.SerializerMethodField()
+    login_at_formatted = serializers.SerializerMethodField()
+    last_activity_formatted = serializers.SerializerMethodField()
 
     class Meta:
         model = UserSession
@@ -815,13 +1021,80 @@ class UserSessionSerializer(serializers.ModelSerializer):
             'user_type',
             'device_type',
             'device_info',
+            'device_name',
             'ip_address',
             'login_at',
-            'last_active',
+            'login_at_formatted',
+            'last_activity',
+            'last_activity_formatted',
             'logout_at',
             'total_duration_minutes',
             'is_active',
+            'is_current',
         ]
+
+    def get_device_name(self, obj):
+        if obj.device_info and obj.device_info != 'Unknown Device':
+            return obj.device_info
+        ua = str(obj.user_agent or '').lower()
+        if not ua:
+            return f"{obj.device_type.capitalize() if obj.device_type else 'Web'} Device"
+
+        os_name = "Desktop"
+        if "windows nt 10.0" in ua or "windows nt 11.0" in ua:
+            os_name = "Windows 10/11"
+        elif "macintosh" in ua or "mac os x" in ua:
+            os_name = "macOS"
+        elif "iphone" in ua:
+            os_name = "iPhone"
+        elif "ipad" in ua:
+            os_name = "iPad"
+        elif "android" in ua:
+            os_name = "Android Mobile"
+        elif "linux" in ua:
+            os_name = "Linux PC"
+
+        browser_name = "Browser"
+        if "edg" in ua:
+            browser_name = "Microsoft Edge"
+        elif "chrome" in ua and "chromium" not in ua and "edg" not in ua:
+            browser_name = "Google Chrome"
+        elif "firefox" in ua:
+            browser_name = "Mozilla Firefox"
+        elif "safari" in ua and "chrome" not in ua:
+            browser_name = "Apple Safari"
+        elif "opera" in ua or "opr" in ua:
+            browser_name = "Opera"
+
+        return f"{browser_name} on {os_name}"
+
+    def get_is_current(self, obj):
+        current_jti = self.context.get('current_jti')
+        if current_jti and obj.refresh_token_jti == current_jti:
+            return True
+        latest_session_id = self.context.get('latest_session_id')
+        if latest_session_id and obj.id == latest_session_id:
+            return True
+        return False
+
+    def get_login_at_formatted(self, obj):
+        return obj.login_at.strftime("%b %d, %Y - %I:%M %p") if obj.login_at else "--"
+
+    def get_last_activity_formatted(self, obj):
+        if not obj.last_activity:
+            return "Active now"
+        delta = timezone.now() - obj.last_activity
+        if delta.total_seconds() < 60:
+            return "Active now"
+        elif delta.total_seconds() < 3600:
+            mins = int(delta.total_seconds() // 60)
+            return f"{mins} min{'s' if mins > 1 else ''} ago"
+        elif delta.total_seconds() < 86400:
+            hours = int(delta.total_seconds() // 3600)
+            return f"{hours} hour{'s' if hours > 1 else ''} ago"
+        else:
+            days = int(delta.total_seconds() // 86400)
+            return f"{days} day{'s' if days > 1 else ''} ago"
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

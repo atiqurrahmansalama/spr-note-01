@@ -47,10 +47,11 @@ export default function SidebarContainer({
 
   const menuItems = [
     { id: "Dashboard", name: "Dashboard", path: "/", Icon: DashboardIcon },
+    { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
+    { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
     { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
     { id: "Groups & Students", name: "Groups & Students", path: "/groups-students", Icon: GroupsIcon },
     { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
-    { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
     { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
     { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
     { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon },
@@ -62,7 +63,6 @@ export default function SidebarContainer({
       subItems: [
         { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon },
         { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon },
-        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
         { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon },
         { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon },
         { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon },

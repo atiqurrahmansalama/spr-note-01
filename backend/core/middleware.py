@@ -34,12 +34,48 @@ def detect_device_type(request):
 
 
 def detect_device_info(request):
-    """Extracts device info string (app version, OS, model, or User-Agent)."""
+    """Extracts human-readable device name & OS details from User-Agent or custom headers."""
     header_info = request.headers.get('X-Device-Info') or request.META.get('HTTP_X_DEVICE_INFO')
-    if header_info:
+    if header_info and header_info.strip() and header_info != 'Unknown Device':
         return header_info[:255]
-    ua = request.META.get('HTTP_USER_AGENT', '')
-    return ua[:255] if ua else 'Unknown Device'
+
+    ua = str(request.META.get('HTTP_USER_AGENT', '') or '').strip()
+    if not ua:
+        return 'Web Client'
+
+    ua_lower = ua.lower()
+
+    # Detect OS
+    os_name = "Desktop"
+    if "windows nt 10.0" in ua_lower or "windows nt 11.0" in ua_lower:
+        os_name = "Windows 10/11"
+    elif "windows" in ua_lower:
+        os_name = "Windows PC"
+    elif "macintosh" in ua_lower or "mac os x" in ua_lower:
+        os_name = "macOS"
+    elif "iphone" in ua_lower:
+        os_name = "iPhone"
+    elif "ipad" in ua_lower:
+        os_name = "iPad"
+    elif "android" in ua_lower:
+        os_name = "Android Mobile"
+    elif "linux" in ua_lower:
+        os_name = "Linux PC"
+
+    # Detect Browser
+    browser_name = "Browser"
+    if "edg" in ua_lower:
+        browser_name = "Microsoft Edge"
+    elif "chrome" in ua_lower and "chromium" not in ua_lower and "edg" not in ua_lower:
+        browser_name = "Google Chrome"
+    elif "firefox" in ua_lower:
+        browser_name = "Mozilla Firefox"
+    elif "safari" in ua_lower and "chrome" not in ua_lower:
+        browser_name = "Apple Safari"
+    elif "opera" in ua_lower or "opr" in ua_lower:
+        browser_name = "Opera"
+
+    return f"{browser_name} on {os_name}"
 
 
 def _log_activity_async(user_id, action_name, endpoint, http_method, ip_address):
@@ -87,6 +123,10 @@ class UserActivityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Skip middleware session writes for Django admin requests
+        if request.path.startswith('/admin/'):
+            return self.get_response(request)
+
         # 1. Resolve user for JWT or Session authentication
         user = getattr(request, 'user', None)
         if (not user or not user.is_authenticated) and 'HTTP_AUTHORIZATION' in request.META:
@@ -104,7 +144,6 @@ class UserActivityMiddleware:
 
         # 3. Asynchronously log state-changing HTTP methods (POST, PUT, DELETE, PATCH)
         if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
-            # Skip heartbeat path to prevent excessive logging
             if not request.path.endswith('/auth/heartbeat/') and not request.path.endswith('/auth/heartbeat'):
                 user_id = request.user.id if (request.user and request.user.is_authenticated) else None
                 action_name = derive_action_name(request)
@@ -129,18 +168,17 @@ class UserActivityMiddleware:
             ip_address = get_client_ip(request)
             now = timezone.now()
 
-            # Retrieve current active session for user & device_type
             session = UserSession.objects.filter(
                 user=request.user,
                 device_type=device_type,
                 is_active=True
-            ).order_by('-last_active').first()
+            ).order_by('-last_activity').first()
 
             if session:
-                # If session inactive > 12h without explicit logout, mark completed and create new
-                if (now - session.last_active).total_seconds() > 43200:
+                delta_sec = (now - session.last_activity).total_seconds()
+                if delta_sec > 43200:
                     session.is_active = False
-                    session.logout_at = session.last_active
+                    session.logout_at = session.last_activity
                     session.save()
 
                     UserSession.objects.create(
@@ -150,10 +188,10 @@ class UserActivityMiddleware:
                         ip_address=ip_address,
                         is_active=True
                     )
-                else:
+                elif delta_sec > 300:  # Throttle updates to max once per 5 minutes
                     session.device_info = device_info
                     session.ip_address = ip_address
-                    session.save() # auto_now updates last_active & save() recalculates duration
+                    session.save()
             else:
                 UserSession.objects.create(
                     user=request.user,

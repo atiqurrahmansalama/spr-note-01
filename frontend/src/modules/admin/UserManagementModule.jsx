@@ -1,21 +1,23 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useToast } from "../../context/ToastContext";
 import { fetchWithAuth } from "../../utils/authService";
+import RoleManagementPanel from "./RoleManagementPanel";
+import CustomSelect from "../../components/ui/CustomSelect";
 
-// Custom Styled Theme Checkbox Component
+// Custom Styled Checkbox Component
 function CustomCheckbox({ checked, onChange }) {
   return (
     <button
       type="button"
       onClick={onChange}
-      className={`w-4 h-4 rounded border transition-colors cursor-pointer flex items-center justify-center shrink-0 shadow-sm ${
+      className={`w-4 h-4 rounded border transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm ${
         checked
-          ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
-          : "theme-bg-sub theme-border hover:theme-bg-elevated"
+          ? "theme-bg-accent theme-border theme-accent-text"
+          : "theme-bg-sub theme-border hover:theme-border"
       }`}
     >
       {checked && (
-        <svg className="w-3 h-3 text-current stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3 h-3 theme-accent-text stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       )}
@@ -23,7 +25,7 @@ function CustomCheckbox({ checked, onChange }) {
   );
 }
 
-// Project Custom Theme Select Dropdown Component (ALWAYS Opens Upward in Modals to Prevent Bottom Boundary Clipping)
+// Custom Upward-Opening Select Dropdown (Theme Aware)
 function ThemeCustomSelect({ options, value, onChange, placeholder = "Select option...", openUpward = true }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -46,7 +48,7 @@ function ThemeCustomSelect({ options, value, onChange, placeholder = "Select opt
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs sm:text-sm flex items-center justify-between shadow-sm cursor-pointer hover:theme-bg-elevated transition-colors text-left font-medium"
+        className="w-full h-11 theme-bg-sub border theme-border theme-text-primary px-3.5 rounded-xl text-sm flex items-center justify-between shadow-sm cursor-pointer hover:theme-border transition-colors text-left font-medium"
       >
         <span className="truncate">{displayLabel}</span>
         <svg
@@ -63,7 +65,7 @@ function ThemeCustomSelect({ options, value, onChange, placeholder = "Select opt
         <div
           className={`absolute left-0 right-0 ${
             openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } theme-bg-surface border theme-border rounded-xl shadow-2xl z-[100] p-1 space-y-0.5 text-xs sm:text-sm max-h-48 overflow-y-auto animate-fade-in`}
+          } theme-bg-surface border theme-border rounded-xl shadow-2xl z-[100] p-1.5 space-y-0.5 text-sm max-h-64 overflow-y-auto`}
         >
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs theme-text-secondary">No options available</div>
@@ -83,13 +85,13 @@ function ThemeCustomSelect({ options, value, onChange, placeholder = "Select opt
                   }}
                   className={`w-full px-3.5 py-2.5 rounded-lg text-left transition-colors cursor-pointer flex items-center justify-between ${
                     isSelected
-                      ? "theme-bg-accent theme-accent-text font-semibold shadow-sm"
+                      ? "theme-bg-accent-soft theme-accent font-semibold shadow-sm"
                       : "theme-text-primary hover:theme-bg-elevated font-medium"
                   }`}
                 >
                   <span className="truncate">{optLabel}</span>
                   {isSelected && (
-                    <svg className="w-4 h-4 text-current shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 theme-accent shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -103,15 +105,39 @@ function ThemeCustomSelect({ options, value, onChange, placeholder = "Select opt
   );
 }
 
+// Role Badge Color Mapping
+function getRoleBadgeStyle(colorTheme = "blue") {
+  switch (colorTheme) {
+    case "emerald":
+      return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    case "purple":
+      return "bg-purple-500/10 text-purple-400 border border-purple-500/20";
+    case "amber":
+      return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+    case "rose":
+      return "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+    case "cyan":
+      return "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20";
+    case "blue":
+    default:
+      return "bg-sky-500/10 text-sky-400 border border-sky-500/20";
+  }
+}
+
 export default function UserManagementModule() {
   const { showToast } = useToast();
 
+  const [currentView, setCurrentView] = useState("users"); // 'users' | 'roles'
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [dbRoles, setDbRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
   
+  // Search state with 300ms Debounce
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
   // Selection state
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -119,18 +145,66 @@ export default function UserManagementModule() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Active Context Menu Dropdown state
+  // Context Dropdown Menu state
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [dropdownPos, setDropdownPos] = useState(null);
+  const [expandedUserId, setExpandedUserId] = useState(null);
 
-  // Modals state
+  // Long press selection helper for mobile screens
+  const longPressTimerRef = useRef(null);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const isLongPressRef = useRef(false);
+
+  const startPress = (e, userId) => {
+    isLongPressRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+
+    const touch = e.touches ? e.touches[0] : e;
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      handleSelectOneToggle(userId);
+      if (typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
+        try { window.navigator.vibrate(50); } catch {}
+      }
+    }, 350);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!longPressTimerRef.current) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+    if (deltaX > 15 || deltaY > 15) {
+      cancelPress();
+    }
+  };
+
+  const cancelPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleCardClick = (userId) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    setExpandedUserId((prev) => (prev === userId ? null : userId));
+  };
+
+  // Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [groupAssignUser, setGroupAssignUser] = useState(null);
   const [resetPasswordUser, setResetPasswordUser] = useState(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
 
-  // Form states (user_type is initially empty until picked!)
+  // Form States
   const [newUser, setNewUser] = useState({
     phone_number: "",
     password: "",
@@ -138,7 +212,7 @@ export default function UserManagementModule() {
     last_name: "",
     email: "",
     avatar_url: "",
-    user_type: "",
+    user_type: "GUARDIAN",
     assigned_group: "All Groups",
   });
 
@@ -148,17 +222,26 @@ export default function UserManagementModule() {
     email: "",
     phone_number: "",
     avatar_url: "",
-    user_type: "TEACHER",
+    user_type: "GUARDIAN",
     assigned_group: "All Groups",
   });
+  const [initialEditUserForm, setInitialEditUserForm] = useState(null);
 
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [selectedGroupInput, setSelectedGroupInput] = useState("All Groups");
   const [saving, setSaving] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Search Debounce Effect (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   useEffect(() => {
-    loadUsersAndGroups();
+    loadUsersAndRoles();
   }, []);
 
   // Close context dropdown when clicking outside or scrolling
@@ -177,31 +260,41 @@ export default function UserManagementModule() {
     };
   }, []);
 
-  // Dynamic API Fetcher across backend routes
-  const loadUsersAndGroups = async () => {
+  // API Loader for Users, Roles, and Halqa Groups
+  const loadUsersAndRoles = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Real Users from backend endpoints
+      // 1. Fetch Dynamic Roles
+      try {
+        const rRes = await fetchWithAuth("/api/v1/roles/");
+        if (rRes.ok) {
+          const rData = await rRes.json();
+          setDbRoles(Array.isArray(rData) ? rData : []);
+        }
+      } catch {
+        setDbRoles([]);
+      }
+
+      // 2. Fetch Users
       let fetchedUsers = [];
-      const userEndpoints = ["/api/users/", "/users/", "/api/v1/users/"];
+      const userEndpoints = ["/api/v1/users/", "/api/users/", "/users/"];
       for (const ep of userEndpoints) {
         try {
           const res = await fetchWithAuth(ep);
           if (res.ok) {
             const data = await res.json();
             fetchedUsers = Array.isArray(data) ? data : data.results || [];
-            if (fetchedUsers.length >= 0) break;
+            if (fetchedUsers && fetchedUsers.length > 0) break;
           }
         } catch {
           // continue
         }
       }
-
       setUsers(fetchedUsers);
 
-      // 2. Fetch Real Groups from backend endpoints
+      // 3. Fetch Halqa Groups
       let fetchedGroups = [];
-      const groupEndpoints = ["/api/groups/", "/groups/", "/api/v1/groups/"];
+      const groupEndpoints = ["/api/v1/groups/", "/api/groups/", "/groups/"];
       for (const ep of groupEndpoints) {
         try {
           const res = await fetchWithAuth(ep);
@@ -219,20 +312,16 @@ export default function UserManagementModule() {
           // continue
         }
       }
-
       setGroups(fetchedGroups);
-      if (!newUser.assigned_group) {
-        setNewUser((prev) => ({ ...prev, assigned_group: "All Groups" }));
-      }
+
     } catch {
-      setUsers([]);
-      setGroups([]);
+      showToast("Error loading user management data", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper API call wrapper trying candidate endpoints
+  // Helper API Candidate Invoker
   const apiCallCandidate = async (candidatePaths, options = {}) => {
     let lastError = null;
     for (const path of candidatePaths) {
@@ -246,39 +335,64 @@ export default function UserManagementModule() {
     throw lastError || new Error("Failed to reach API endpoint");
   };
 
-  // Dynamic Tab Counts
+  // Dynamic Live Counts per Role
   const counts = useMemo(() => {
-    const res = { ALL: users.length, TEACHER: 0, GUARDIAN: 0, ADMIN: 0 };
+    const res = { ALL: users.length };
     users.forEach((u) => {
-      const role = (u.user_type || u.role || "").toUpperCase();
-      if (role === "TEACHER") res.TEACHER++;
-      else if (role === "GUARDIAN") res.GUARDIAN++;
-      else if (role === "ADMIN" || role === "SUPER_ADMIN") res.ADMIN++;
+      const roleCode = (u.role?.code || u.role_info?.code || u.user_type || u.role || "").toUpperCase();
+      res[roleCode] = (res[roleCode] || 0) + 1;
     });
     return res;
   }, [users]);
 
-  // Role Options list for ThemeCustomSelect
-  const createRoleOptions = useMemo(
-    () => [
-      { label: "Select Account Role...", value: "" },
-      { label: "Teacher / Ustadh", value: "TEACHER" },
-      { label: "Guardian / Parent", value: "GUARDIAN" },
-      { label: "Admin / Nazim", value: "ADMIN" },
-    ],
-    []
-  );
+  const activeUserCount = useMemo(() => {
+    return users.filter(u => u.is_active !== false).length;
+  }, [users]);
 
-  const editRoleOptions = useMemo(
-    () => [
-      { label: "Teacher / Ustadh", value: "TEACHER" },
-      { label: "Guardian / Parent", value: "GUARDIAN" },
-      { label: "Admin / Nazim", value: "ADMIN" },
-    ],
-    []
-  );
+  const googleUserCount = useMemo(() => {
+    return users.filter(u => u.auth_provider === "google").length;
+  }, [users]);
 
-  // Group Options list with "All Groups" included first
+  // Options for main Role Filter Dropdown
+  const roleFilterOptions = useMemo(() => {
+    const list = [{ label: `All Users (${counts.ALL || 0})`, value: "ALL" }];
+
+    if (dbRoles.length > 0) {
+      dbRoles.forEach((r) => {
+        const c = counts[r.code] || 0;
+        list.push({ label: `${r.name} (${c})`, value: r.code });
+      });
+    } else {
+      const defaultRoles = [
+        { code: "SUPER_ADMIN", name: "Super Admin" },
+        { code: "ADMIN", name: "Admin / Nazim" },
+        { code: "STAFF", name: "Staff / Accountant" },
+        { code: "TEACHER", name: "Teacher / Ustadh" },
+        { code: "GUARDIAN", name: "Guardian / Parent" },
+      ];
+      defaultRoles.forEach((r) => {
+        const c = counts[r.code] || 0;
+        list.push({ label: `${r.name} (${c})`, value: r.code });
+      });
+    }
+    return list;
+  }, [dbRoles, counts]);
+
+  // Role List Options for Select Dropdowns
+  const roleSelectOptions = useMemo(() => {
+    if (dbRoles.length > 0) {
+      return dbRoles.map((r) => ({ label: `${r.name} (${r.code})`, value: r.code }));
+    }
+    return [
+      { label: "Guardian / Parent", value: "GUARDIAN" },
+      { label: "Teacher / Ustadh", value: "TEACHER" },
+      { label: "Admin / Nazim", value: "ADMIN" },
+      { label: "Staff / Accountant", value: "STAFF" },
+      { label: "Super Admin", value: "SUPER_ADMIN" },
+    ];
+  }, [dbRoles]);
+
+  // Halqa Group Options
   const groupSelectOptions = useMemo(() => {
     const list = [{ label: "All Groups", value: "All Groups" }];
     groups.forEach((g) => {
@@ -289,15 +403,13 @@ export default function UserManagementModule() {
     return list;
   }, [groups]);
 
-  // Filtered & Searched List
+  // Filtered & Searched Users
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      const uRole = (u.user_type || u.role || "").toUpperCase();
-      const roleMatch =
-        roleFilter === "ALL" ||
-        (roleFilter === "ADMIN" ? uRole === "ADMIN" || uRole === "SUPER_ADMIN" : uRole === roleFilter);
+      const uRole = (u.role?.code || u.role_info?.code || u.user_type || u.role || "").toUpperCase();
+      const roleMatch = roleFilter === "ALL" || uRole === roleFilter.toUpperCase();
 
-      const search = searchQuery.toLowerCase().trim();
+      const search = debouncedSearch.toLowerCase().trim();
       const nameMatch =
         !search ||
         (u.first_name || "").toLowerCase().includes(search) ||
@@ -307,9 +419,9 @@ export default function UserManagementModule() {
 
       return roleMatch && nameMatch;
     });
-  }, [users, roleFilter, searchQuery]);
+  }, [users, roleFilter, debouncedSearch]);
 
-  // Pagination bounds
+  // Pagination calculations
   const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -333,7 +445,6 @@ export default function UserManagementModule() {
     );
   };
 
-  // Date Formatting Helper
   const formatJoinedDate = (rawDate) => {
     if (!rawDate) return "--";
     try {
@@ -349,24 +460,7 @@ export default function UserManagementModule() {
     }
   };
 
-  // Avatar Image Upload Helper
-  const handleAvatarFileUpload = (e, targetFormSetter) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      showToast("Avatar image size must be less than 2MB", "warning");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const dataUrl = uploadEvent.target.result;
-      targetFormSetter((prev) => ({ ...prev, avatar_url: dataUrl }));
-      showToast("Avatar image selected!", "info");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Handle Three-Dots Toggle with Viewport Fixed Positioning
+  // Dropdown Positioning logic
   const handleDropdownToggle = (e, userId) => {
     e.stopPropagation();
     if (activeDropdownId === userId) {
@@ -374,7 +468,7 @@ export default function UserManagementModule() {
       setDropdownPos(null);
     } else {
       const rect = e.currentTarget.getBoundingClientRect();
-      const dropdownWidth = 192; // 12rem (w-48)
+      const dropdownWidth = 192;
       const spaceBelow = window.innerHeight - rect.bottom;
       const isUpward = spaceBelow < 220;
 
@@ -395,722 +489,932 @@ export default function UserManagementModule() {
   // Actions: Create User
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    setFieldErrors({});
 
-    if (!newUser.phone_number || !newUser.password) {
-      showToast("Phone number and password are required.", "warning");
+    if (!newUser.email && !newUser.phone_number) {
+      showToast("Email address or Phone number is required.", "warning");
       return;
     }
-
-    if (!newUser.user_type) {
-      showToast("Please select an Account Role.", "warning");
+    if (!newUser.password) {
+      showToast("Password is required.", "warning");
       return;
     }
 
     setSaving(true);
     try {
-      const payload = { ...newUser };
-      if (payload.user_type === "GUARDIAN") {
-        payload.assigned_group = "";
-      }
-
-      const res = await apiCallCandidate(["/api/users/", "/users/", "/api/v1/users/"], {
+      const fullName = `${newUser.first_name || ''} ${newUser.last_name || ''}`.trim();
+      const payload = { ...newUser, name: fullName };
+      await apiCallCandidate(["/api/v1/users/", "/api/users/", "/users/"], {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
-        const created = await res.json();
-        showToast(`Account for ${created.first_name || created.phone_number} created successfully!`, "success");
-        setIsAddModalOpen(false);
-        setNewUser({
-          phone_number: "",
-          password: "",
-          first_name: "",
-          last_name: "",
-          email: "",
-          avatar_url: "",
-          user_type: "",
-          assigned_group: "All Groups",
-        });
-        loadUsersAndGroups();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setFieldErrors(errData);
-        showToast(errData.detail || "Failed to create user account", "error");
-      }
-    } catch {
-      showToast("Error creating user on server", "error");
+      showToast("User account created successfully!", "success");
+      setIsAddModalOpen(false);
+      setNewUser({
+        phone_number: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        email: "",
+        avatar_url: "",
+        user_type: "GUARDIAN",
+        assigned_group: "All Groups",
+      });
+      loadUsersAndRoles();
+    } catch (err) {
+      showToast(err.message || "Failed to create user account.", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // Actions: Edit User Profile
-  const handleEditProfileSubmit = async (e) => {
+  // Actions: Edit User
+  const handleOpenEdit = (userObj) => {
+    setEditingUser(userObj);
+    const initialForm = {
+      first_name: userObj.first_name || "",
+      last_name: userObj.last_name || "",
+      email: userObj.email || "",
+      phone_number: userObj.phone_number || "",
+      avatar_url: userObj.avatar_url || "",
+      user_type: userObj.role?.code || userObj.role_info?.code || userObj.user_type || "GUARDIAN",
+      assigned_group: userObj.assigned_group || "All Groups",
+    };
+    setEditUserForm(initialForm);
+    setInitialEditUserForm(initialForm);
+    setActiveDropdownId(null);
+  };
+
+  const isEditFormDirty = useMemo(() => {
+    if (!initialEditUserForm || !editUserForm) return false;
+    return (
+      editUserForm.first_name !== initialEditUserForm.first_name ||
+      editUserForm.last_name !== initialEditUserForm.last_name ||
+      editUserForm.email !== initialEditUserForm.email ||
+      editUserForm.phone_number !== initialEditUserForm.phone_number ||
+      editUserForm.user_type !== initialEditUserForm.user_type ||
+      editUserForm.assigned_group !== initialEditUserForm.assigned_group
+    );
+  }, [editUserForm, initialEditUserForm]);
+
+  const handleSaveEditUser = async (e) => {
     e.preventDefault();
-    if (!editingUser) return;
-
+    if (!editingUser || !isEditFormDirty) return;
     setSaving(true);
     try {
-      const payload = { ...editUserForm };
-      if (editingUser.user_type === "SUPER_ADMIN") {
-        delete payload.user_type;
-        delete payload.assigned_group;
-      } else if (payload.user_type === "GUARDIAN") {
-        payload.assigned_group = "";
-      }
+      const fullName = `${editUserForm.first_name || ''} ${editUserForm.last_name || ''}`.trim();
+      const payload = {
+        name: fullName,
+        first_name: editUserForm.first_name,
+        last_name: editUserForm.last_name,
+        email: editUserForm.email,
+        phone_number: editUserForm.phone_number,
+        user_type: editUserForm.user_type,
+        assigned_group: editUserForm.assigned_group,
+      };
 
-      const res = await apiCallCandidate(
-        [`/api/users/${editingUser.id}/`, `/users/${editingUser.id}/`, `/api/v1/users/${editingUser.id}/`],
-        {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        }
-      );
+      await apiCallCandidate([
+        `/api/v1/users/${editingUser.id}/`,
+        `/api/users/${editingUser.id}/`,
+        `/users/${editingUser.id}/`,
+      ], {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      if (res.ok) {
-        showToast("User profile updated successfully!", "success");
-        setEditingUser(null);
-        loadUsersAndGroups();
-      } else {
-        showToast("Failed to update profile", "error");
-      }
-    } catch {
-      showToast("Error updating profile on server", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Actions: Update Group Assignment
-  const handleGroupAssignSubmit = async () => {
-    if (!groupAssignUser) return;
-    setSaving(true);
-    try {
-      const res = await apiCallCandidate(
-        [`/api/users/${groupAssignUser.id}/`, `/users/${groupAssignUser.id}/`, `/api/v1/users/${groupAssignUser.id}/`],
-        {
-          method: "PATCH",
-          body: JSON.stringify({ assigned_group: selectedGroupInput }),
-        }
-      );
-
-      if (res.ok) {
-        showToast(`Assigned group updated to "${selectedGroupInput}"`, "success");
-        setGroupAssignUser(null);
-        loadUsersAndGroups();
-      } else {
-        showToast("Failed to update assigned group", "error");
-      }
-    } catch {
-      showToast("Error updating group assignment", "error");
+      showToast("User account updated successfully!", "success");
+      setEditingUser(null);
+      loadUsersAndRoles();
+    } catch (err) {
+      showToast(err.message || "Failed to update user profile.", "error");
     } finally {
       setSaving(false);
     }
   };
 
   // Actions: Reset Password
-  const handleResetPasswordSubmit = async () => {
+  const handleSaveResetPassword = async (e) => {
+    e.preventDefault();
     if (!resetPasswordUser || !newPasswordInput) return;
     setSaving(true);
     try {
-      const res = await apiCallCandidate(
-        [
-          `/api/users/${resetPasswordUser.id}/reset-password/`,
-          `/users/${resetPasswordUser.id}/reset-password/`,
-          `/api/v1/users/${resetPasswordUser.id}/reset-password/`,
-        ],
-        {
-          method: "POST",
-          body: JSON.stringify({ new_password: newPasswordInput }),
-        }
-      );
+      await apiCallCandidate([
+        `/api/v1/users/${resetPasswordUser.id}/reset-password/`,
+        `/api/users/${resetPasswordUser.id}/change-password/`,
+      ], {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: newPasswordInput }),
+      });
 
-      if (res.ok) {
-        showToast(`Password reset for ${resetPasswordUser.first_name || resetPasswordUser.phone_number}!`, "success");
-        setResetPasswordUser(null);
-        setNewPasswordInput("");
-      } else {
-        showToast(`Password update sent`, "info");
-        setResetPasswordUser(null);
-        setNewPasswordInput("");
-      }
-    } catch {
-      showToast(`Password updated`, "info");
+      showToast(`Password reset for ${resetPasswordUser.first_name || 'User'}`, "success");
       setResetPasswordUser(null);
       setNewPasswordInput("");
+    } catch (err) {
+      showToast(err.message || "Failed to reset password.", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // Actions: Deactivate / Delete User
-  const handleDeleteUserSubmit = async () => {
+  // Actions: Assign Group
+  const handleSaveGroupAssignment = async (e) => {
+    e.preventDefault();
+    if (!groupAssignUser) return;
+    setSaving(true);
+    try {
+      await apiCallCandidate([
+        `/api/v1/users/${groupAssignUser.id}/`,
+        `/api/users/${groupAssignUser.id}/`,
+      ], {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assigned_group: selectedGroupInput }),
+      });
+
+      showToast("Assigned group updated!", "success");
+      setGroupAssignUser(null);
+      loadUsersAndRoles();
+    } catch (err) {
+      showToast(err.message || "Failed to update group.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Actions: Revoke Sessions
+  const handleRevokeSessions = async (userId) => {
+    setActiveDropdownId(null);
+    try {
+      await apiCallCandidate(["/api/v1/auth/sessions/revoke/"], {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, revoke_others: true }),
+      });
+      showToast("All active sessions revoked for user.", "success");
+    } catch {
+      showToast("Sessions revoked successfully.", "info");
+    }
+  };
+
+  // Actions: Toggle Deactivate
+  const handleConfirmDeleteOrDeactivate = async () => {
     if (!deleteConfirmUser) return;
     setSaving(true);
     try {
-      const res = await apiCallCandidate(
-        [`/api/users/${deleteConfirmUser.id}/`, `/users/${deleteConfirmUser.id}/`, `/api/v1/users/${deleteConfirmUser.id}/`],
-        {
-          method: "DELETE",
-        }
-      );
+      await apiCallCandidate([
+        `/api/v1/users/${deleteConfirmUser.id}/`,
+        `/api/users/${deleteConfirmUser.id}/`,
+      ], {
+        method: "DELETE",
+      });
 
-      if (res.ok) {
-        showToast("User account deactivated/deleted.", "warning");
-        loadUsersAndGroups();
-      } else {
-        showToast("Failed to remove user account", "error");
-      }
-    } catch {
-      showToast("Error executing account deactivation", "error");
-    } finally {
+      showToast("User account deleted/deactivated.", "success");
       setDeleteConfirmUser(null);
+      loadUsersAndRoles();
+    } catch (err) {
+      showToast(err.message || "Action failed.", "error");
+    } finally {
       setSaving(false);
     }
   };
 
-  const activeUserObj = useMemo(
-    () => users.find((u) => u.id === activeDropdownId),
-    [users, activeDropdownId]
-  );
-
-  // Helper check if group assignment field is applicable for a role
-  const isGroupApplicable = (role) => {
-    const r = (role || "").toUpperCase();
-    return r === "TEACHER" || r === "ADMIN";
-  };
-
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 font-sans animate-fade-in theme-text-primary p-2 sm:p-4 select-none">
-      
-      {/* 1. HEADER & PRIMARY ACTION BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 theme-bg-surface border theme-border rounded-xl p-5 shadow-xl">
-        <div>
-          <h1 className="text-xl font-semibold theme-text-primary tracking-tight">
-            User & Teacher Management
-          </h1>
-          <p className="text-sm theme-text-secondary mt-0.5">
-            Manage Teachers, Ustadhs, and Guardians, assign Halqa groups, and provision access.
-          </p>
+    <div className="w-full max-w-6xl mx-auto space-y-5 font-sans theme-text-primary selection:bg-indigo-500 selection:text-white pb-12">
+
+      {/* ── ENTERPRISE HEADER CARD WITH UNIFIED TAB SWITCHER ── */}
+      <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-inner">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight theme-text-primary flex items-center gap-2.5">
+                <span>User Management</span>
+                <span className="theme-bg-sub theme-text-secondary text-xs font-mono px-2.5 py-0.5 rounded-full border theme-border">
+                  {currentView === "roles" ? `${dbRoles.length} Roles` : `${users.length} Total Users`}
+                </span>
+              </h1>
+              <p className="text-xs theme-text-secondary">
+                Manage user accounts, access roles, authentication providers, and authority permissions.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setNewUser({
-              phone_number: "",
-              password: "",
-              first_name: "",
-              last_name: "",
-              email: "",
-              avatar_url: "",
-              user_type: "",
-              assigned_group: "All Groups",
-            });
-            setIsAddModalOpen(true);
-          }}
-          className="theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md transition-all cursor-pointer shrink-0 flex items-center justify-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Create User Account</span>
-        </button>
+        {/* Header Navigation Tabs & Action Buttons */}
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setCurrentView("users")}
+            className={`flex-1 md:flex-none h-11 px-4 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap border flex items-center justify-center gap-2 ${
+              currentView === "users"
+                ? "theme-bg-accent theme-accent-text shadow-md border-transparent"
+                : "theme-bg-sub theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated theme-border"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            User Accounts ({users.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCurrentView("roles")}
+            className={`flex-1 md:flex-none h-11 px-4 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap border flex items-center justify-center gap-2 ${
+              currentView === "roles"
+                ? "theme-bg-accent theme-accent-text shadow-md border-transparent"
+                : "theme-bg-sub theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated theme-border"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Manage Roles ({dbRoles.length || 5})
+          </button>
+
+          {currentView === "users" && (
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex-1 md:flex-none h-11 theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border font-semibold px-4 rounded-xl text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <svg className="w-4 h-4 stroke-[2.5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              + Add User
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 2. FILTER & SEARCH CONTROLS BAR */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        
-        {/* Role Filter Tabs (Pills with Dynamic Counts) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {[
-            { id: "ALL", label: `All Users (${counts.ALL})` },
-            { id: "TEACHER", label: `TEACHERS (${counts.TEACHER})` },
-            { id: "GUARDIAN", label: `GUARDIANS (${counts.GUARDIAN})` },
-            { id: "ADMIN", label: `ADMINS (${counts.ADMIN})` },
-          ].map((tab) => {
-            const isActive = roleFilter === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setRoleFilter(tab.id);
-                  setCurrentPage(1);
-                }}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap border ${
-                  isActive
-                    ? "theme-bg-accent theme-accent-text shadow-sm border-transparent"
-                    : "theme-bg-sub theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated theme-border"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search Input Field */}
-        <div className="relative w-full md:w-80 flex items-center">
-          <div className="absolute left-3.5 p-1 theme-text-secondary pointer-events-none">
+      {currentView === "roles" ? (
+        <RoleManagementPanel
+          onBack={() => {
+            setCurrentView("users");
+            loadUsersAndRoles();
+          }}
+          onRoleUpdated={() => loadUsersAndRoles()}
+          showHeaderCard={false}
+        />
+      ) : (
+        <>
+      {/* ── STATS METRICS CARDS ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="theme-bg-surface border theme-border rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary">Total Registered</div>
+            <div className="text-xl font-bold theme-text-primary mt-1">{users.length}</div>
+          </div>
+          <div className="w-9 h-9 rounded-lg theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          
+        </div>
+
+        <div className="theme-bg-surface border theme-border rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary">Active Users</div>
+            <div className="text-xl font-bold text-emerald-400 mt-1">{activeUserCount}</div>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="theme-bg-surface border theme-border rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary">Google Auth</div>
+            <div className="text-xl font-bold theme-text-primary mt-1">{googleUserCount}</div>
+          </div>
+          <div className="w-9 h-9 rounded-lg theme-bg-sub border theme-border flex items-center justify-center theme-text-primary">
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z" />
+              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="theme-bg-surface border theme-border rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary">Custom Roles</div>
+            <div className="text-xl font-bold theme-accent mt-1">{dbRoles.length || 5}</div>
+          </div>
+          <div className="w-9 h-9 rounded-lg theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTROL BAR: Role filter on left, Search on right ── */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="w-full sm:w-64 md:w-72">
+          <CustomSelect
+            options={roleFilterOptions}
+            value={roleFilter}
+            onChange={(val) => {
+              setRoleFilter(val);
+              setCurrentPage(1);
+            }}
+            placeholder="All Roles"
+            className="w-full"
+          />
+        </div>
+
+        <div className="relative w-full sm:w-72 md:w-80">
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by name, phone, email..."
-            className="w-full theme-bg-sub border theme-border theme-text-primary pl-10 pr-12 py-2 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, email, or phone…"
+            className="w-full h-11 pl-10 pr-9 rounded-xl theme-bg-sub border theme-border theme-text-primary text-sm focus:outline-none focus:theme-border transition-colors placeholder:theme-text-secondary shadow-sm font-medium"
           />
-
-          <div className="absolute right-3 hidden sm:flex items-center gap-0.5 text-[10px] font-mono theme-text-secondary theme-bg-elevated px-1.5 py-0.5 rounded border theme-border shadow-sm">
-            <span>⌘K</span>
-          </div>
+          <svg className="w-4 h-4 theme-text-secondary absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 theme-text-secondary hover:theme-text-primary text-sm cursor-pointer p-0.5 rounded"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 3. DATA TABLE CONTAINER */}
-      <div className="theme-bg-surface border theme-border rounded-xl shadow-xl overflow-hidden">
+      {/* ── MAIN USER LIST CARD ── */}
+      <div className="theme-bg-surface border theme-border rounded-2xl overflow-hidden shadow-xl">
         {loading ? (
-          <div className="p-8 space-y-4 animate-pulse">
-            <div className="h-8 theme-bg-sub rounded-lg" />
-            <div className="h-12 theme-bg-sub rounded-lg" />
-            <div className="h-12 theme-bg-sub rounded-lg" />
-            <div className="h-12 theme-bg-sub rounded-lg" />
+          <div className="p-6 space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-14 theme-bg-sub rounded-xl animate-pulse border theme-border" />
+            ))}
           </div>
         ) : paginatedUsers.length === 0 ? (
-          <div className="py-12 text-center text-xs sm:text-sm theme-text-secondary space-y-2">
-            <p className="font-semibold theme-text-primary">No user accounts found in database</p>
-            <p className="text-xs opacity-75">Click "+ Create User Account" to add users to Django backend.</p>
+          <div className="p-12 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl theme-bg-sub border theme-border theme-text-secondary mx-auto flex items-center justify-center shadow-inner">
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold theme-text-primary">No users found</h3>
+              <p className="text-xs theme-text-secondary max-w-xs mx-auto">
+                {debouncedSearch || roleFilter !== "ALL"
+                  ? "No user records match your search or filter selection."
+                  : "Get started by creating a new user account."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text font-semibold text-xs transition-all shadow-lg inline-flex items-center gap-2 cursor-pointer mt-2"
+            >
+              <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Create First User
+            </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead>
-                <tr className="theme-bg-sub border-b theme-border text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
-                  <th className="py-3.5 px-4 w-10 text-center">
-                    <CustomCheckbox
-                      checked={allPaginatedSelected}
-                      onChange={handleSelectAllToggle}
-                    />
-                  </th>
-                  <th className="py-3.5 px-4">USER & CONTACT</th>
-                  <th className="py-3.5 px-4">ROLE</th>
-                  <th className="py-3.5 px-4">ASSIGNED GROUP</th>
-                  <th className="py-3.5 px-4">STATUS</th>
-                  <th className="py-3.5 px-4">JOINED DATE</th>
-                  <th className="py-3.5 px-4 text-right">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody className="border-t theme-border">
-                {paginatedUsers.map((u) => {
-                  const role = (u.user_type || u.role || "TEACHER").toUpperCase();
-                  const isSuperAdmin = role === "SUPER_ADMIN";
-                  const isGuardian = role === "GUARDIAN";
-                  const isSelected = selectedIds.includes(u.id);
-                  const displayName =
-                    [u.first_name, u.last_name].filter(Boolean).join(" ") || u.phone_number || "User Account";
-                  const avatarInitial = displayName.charAt(0).toUpperCase();
+          <>
+            {/* ── DESKTOP TABLE ── */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left">
+                <thead className="theme-bg-sub border-b theme-border theme-text-secondary font-mono text-[11px] uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3.5 px-4 w-10">
+                      <CustomCheckbox checked={allPaginatedSelected} onChange={handleSelectAllToggle} />
+                    </th>
+                    <th className="py-3.5 px-4">User &amp; Contact</th>
+                    <th className="py-3.5 px-4">Role</th>
+                    <th className="py-3.5 px-4">Auth</th>
+                    <th className="py-3.5 px-4">Group</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Joined</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {paginatedUsers.map((u) => {
+                    const isSelected = selectedIds.includes(u.id);
+                    const roleObj = u.role || dbRoles.find((r) => r.code === u.user_type);
+                    const roleName = roleObj?.name || u.user_type || "User";
+                    const badgeStyle = getRoleBadgeStyle(roleObj?.color_theme);
+                    const isGoogle = u.auth_provider === "google";
 
-                  const isActiveStatus = u.is_active !== false && !u.is_deactivated;
-                  const joinedDateFormatted = formatJoinedDate(u.formatted_created_at || u.date_joined);
+                    return (
+                      <tr
+                        key={u.id}
+                        className={`transition-colors ${isSelected ? "theme-bg-accent-soft" : "hover:theme-bg-sub"}`}
+                      >
+                        <td className="py-3.5 px-4">
+                          <CustomCheckbox checked={isSelected} onChange={() => handleSelectOneToggle(u.id)} />
+                        </td>
 
-                  return (
-                    <tr
-                      key={u.id}
-                      className={`border-b theme-border last:border-b-0 hover:theme-bg-elevated transition-colors ${
-                        isSelected ? "theme-bg-accent-soft/30" : ""
-                      }`}
-                    >
-                      {/* Col 1: Custom Theme Checkbox */}
-                      <td className="py-3.5 px-4 text-center">
-                        <CustomCheckbox
-                          checked={isSelected}
-                          onChange={() => handleSelectOneToggle(u.id)}
-                        />
-                      </td>
-
-                      {/* Col 2: User & Contact */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-full theme-bg-accent-soft theme-accent font-semibold flex items-center justify-center border theme-border text-sm shrink-0 overflow-hidden">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
                             {u.avatar_url ? (
-                              <img src={u.avatar_url} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                              <img src={u.avatar_url} alt={u.first_name || "User"} className="w-9 h-9 rounded-full object-cover border theme-border shrink-0" />
                             ) : (
-                              <span>{avatarInitial}</span>
+                              <div className="w-9 h-9 rounded-full theme-bg-elevated border theme-border theme-accent font-bold text-xs flex items-center justify-center shrink-0">
+                                {(u.first_name?.[0] || u.email?.[0] || "U").toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-semibold theme-text-primary text-sm truncate">
+                                {`${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email || u.phone_number}
+                                {u.name_bn && <span className="theme-text-secondary font-normal text-xs ml-1.5">({u.name_bn})</span>}
+                              </div>
+                              <div className="font-mono text-xs theme-text-secondary truncate mt-0.5">
+                                {u.email && <span>{u.email}</span>}
+                                {u.phone_number && <span> • {u.phone_number}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-mono ${badgeStyle}`}>
+                            {roleName}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {isGoogle ? (
+                            <span className="inline-flex items-center gap-1.5 theme-bg-sub theme-text-primary border theme-border text-xs px-2.5 py-1 rounded-lg font-medium">
+                              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z" />
+                                <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" />
+                              </svg>
+                              Google
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 theme-bg-sub theme-text-secondary border theme-border text-xs px-2.5 py-1 rounded-lg font-medium">
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              Email
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="theme-bg-sub theme-text-secondary border theme-border text-xs px-2.5 py-1 rounded-lg font-medium">
+                            {u.assigned_group || "Unassigned"}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {u.is_active !== false ? (
+                            <div className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                              Active
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 text-xs theme-text-secondary font-medium">
+                              <span className="w-2 h-2 rounded-full theme-bg-elevated" />
+                              Inactive
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 theme-text-secondary font-mono text-xs">
+                          {formatJoinedDate(u.date_joined || u.created_at)}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => handleDropdownToggle(e, u.id)}
+                            className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── MOBILE ACCORDION CARDS ── */}
+            <div className="md:hidden divide-y divide-white/[0.04]">
+              {paginatedUsers.map((u) => {
+                const isSelected = selectedIds.includes(u.id);
+                const isExpanded = expandedUserId === u.id;
+                const roleObj = u.role || dbRoles.find((r) => r.code === u.user_type);
+                const roleName = roleObj?.name || u.user_type || "User";
+                const badgeStyle = getRoleBadgeStyle(roleObj?.color_theme);
+                const isGoogle = u.auth_provider === "google";
+
+                return (
+                  <div
+                    key={u.id}
+                    className={`transition-colors ${isSelected ? "theme-bg-accent-soft" : ""}`}
+                  >
+                    {/* Collapsed Row */}
+                    <div
+                      className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none"
+                      onClick={() => handleCardClick(u.id)}
+                      onTouchStart={(e) => startPress(e, u.id)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={cancelPress}
+                    >
+                      {/* Avatar with status dot / selection ring */}
+                      <div className="relative shrink-0">
+                        {u.avatar_url ? (
+                          <img
+                            src={u.avatar_url}
+                            alt={u.first_name || "User"}
+                            className={`w-10 h-10 rounded-full object-cover shrink-0 transition-all ${
+                              isSelected
+                                ? "ring-2 ring-offset-2 ring-offset-[var(--bg-surface)] ring-[var(--accent-main)]"
+                                : "border theme-border"
+                            }`}
+                          />
+                        ) : (
+                          <div className={`w-10 h-10 rounded-full theme-bg-elevated theme-accent font-bold text-sm flex items-center justify-center shrink-0 transition-all ${
+                            isSelected
+                              ? "ring-2 ring-offset-2 ring-offset-[var(--bg-surface)] ring-[var(--accent-main)]"
+                              : "border theme-border"
+                          }`}>
+                            {(u.first_name?.[0] || u.email?.[0] || "U").toUpperCase()}
+                          </div>
+                        )}
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--bg-surface)] ${
+                          u.is_active !== false ? "bg-emerald-400" : "bg-zinc-500"
+                        }`} />
+                      </div>
+
+                      {/* Left: Name + Bengali Name + Plain Theme Role (No color pill) */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold theme-text-primary text-sm truncate leading-snug">
+                          {`${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email || u.phone_number}
+                          {u.name_bn && <span className="theme-text-secondary font-normal text-xs ml-1.5 font-sans">({u.name_bn})</span>}
+                        </div>
+                        <div className="text-xs theme-text-secondary font-medium mt-0.5">
+                          {roleName}
+                        </div>
+                      </div>
+
+                      {/* Right: Active/Inactive status + Chevron */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs font-medium ${u.is_active !== false ? "text-emerald-400" : "theme-text-secondary"}`}>
+                          {u.is_active !== false ? "Active" : "Inactive"}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 theme-text-secondary transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Expanded Detail Panel (Polished UI) */}
+                    {isExpanded && (
+                      <div className="mx-3 mb-3.5 rounded-2xl theme-bg-sub/80 border theme-border overflow-hidden shadow-lg animate-fade-in">
+                        {/* Details grid with icon labels */}
+                        <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider theme-text-secondary mb-1">
+                              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              Phone
+                            </div>
+                            <div className="text-xs font-semibold theme-text-primary font-mono">{u.phone_number || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider theme-text-secondary mb-1">
+                              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                              </svg>
+                              Auth Provider
+                            </div>
+                            {isGoogle ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs theme-text-primary font-medium">
+                                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z" />
+                                  <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" />
+                                </svg>
+                                Google
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-xs theme-text-secondary font-medium">
+                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                Email
+                              </span>
                             )}
                           </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold theme-text-primary text-xs sm:text-sm truncate">
-                              {displayName}
+
+                          <div className="col-span-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider theme-text-secondary mb-1">
+                              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              Email Address
                             </div>
-                            <div className="text-[11px] theme-text-secondary font-mono flex flex-wrap items-center gap-2 mt-0.5">
-                              <span>{u.phone_number || "No Phone"}</span>
-                              {u.email && <span>• {u.email}</span>}
+                            <div className="text-xs theme-text-primary font-mono truncate">{u.email || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider theme-text-secondary mb-1">
+                              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              Halqa Group
                             </div>
+                            <div className="text-xs theme-text-primary font-medium">{u.assigned_group || "Unassigned"}</div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider theme-text-secondary mb-1">
+                              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              Joined Date
+                            </div>
+                            <div className="text-xs theme-text-primary font-mono">{formatJoinedDate(u.date_joined || u.created_at)}</div>
                           </div>
                         </div>
-                      </td>
 
-                      {/* Col 3: Role Badge */}
-                      <td className="py-3.5 px-4">
-                        {role === "TEACHER" ? (
-                          <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs px-2.5 py-1 rounded-full font-semibold inline-block">
-                            TEACHER
-                          </span>
-                        ) : role === "GUARDIAN" ? (
-                          <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs px-2.5 py-1 rounded-full font-semibold inline-block">
-                            GUARDIAN
-                          </span>
-                        ) : (
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-1 rounded-full font-semibold inline-block">
-                            {role}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Col 4: Assigned Group (N/A for Guardians) */}
-                      <td className="py-3.5 px-4">
-                        {isSuperAdmin ? (
-                          <span className="theme-bg-sub border theme-border theme-text-secondary px-2.5 py-1 rounded-lg text-xs font-mono inline-block">
-                            System Admin
-                          </span>
-                        ) : isGuardian ? (
-                          <span className="theme-text-secondary text-xs opacity-50 font-mono inline-block">
-                            N/A
-                          </span>
-                        ) : u.assigned_group ? (
-                          <span className="theme-bg-sub border theme-border theme-text-primary px-2.5 py-1 rounded-lg text-xs font-medium inline-block">
-                            {u.assigned_group}
-                          </span>
-                        ) : (
-                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs px-2.5 py-1 rounded-lg font-medium inline-block">
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Col 5: Status */}
-                      <td className="py-3.5 px-4">
-                        {isActiveStatus ? (
-                          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>Active</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-xs theme-text-secondary font-medium">
-                            <span className="w-2 h-2 rounded-full bg-zinc-500" />
-                            <span>Inactive</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Col 6: Joined Date */}
-                      <td className="py-3.5 px-4 theme-text-secondary font-mono text-xs whitespace-nowrap">
-                        {joinedDateFormatted}
-                      </td>
-
-                      {/* Col 7: Actions Trigger Button */}
-                      <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => handleDropdownToggle(e, u.id)}
-                          className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer inline-flex items-center justify-center border theme-border"
-                          title="User Options"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        {/* Bottom Actions footer: Single 3-dot button only */}
+                        <div className="border-t border-white/[0.06] px-4 py-2.5 flex items-center justify-between theme-bg-elevated/40">
+                          <span className="text-[11px] theme-text-secondary font-mono italic">Long press row to select</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDropdownToggle(e, u.id); }}
+                            className="p-2 rounded-xl theme-bg-elevated border theme-border theme-text-primary hover:theme-border transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+                            title="More Actions"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
 
-        {/* 4. TABLE FOOTER & PAGINATION */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t theme-border text-xs theme-text-secondary">
-          <div>
-            Showing{" "}
-            <span className="font-semibold theme-text-primary">
-              {filteredUsers.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}
-            </span>{" "}
-            –{" "}
-            <span className="font-semibold theme-text-primary">
-              {Math.min(currentPage * pageSize, filteredUsers.length)}
-            </span>{" "}
-            of <span className="font-semibold theme-text-primary">{filteredUsers.length}</span> users
-          </div>
+        {/* ── PAGINATION FOOTER ── */}
+        {filteredUsers.length > 0 && (
+          <div className="p-4 theme-bg-sub border-t theme-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs theme-text-secondary font-mono">
+            <div>
+              Showing {Math.min((currentPage - 1) * pageSize + 1, filteredUsers.length)}–{Math.min(currentPage * pageSize, filteredUsers.length)} of {filteredUsers.length}
+            </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              className="theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <div className="flex items-center gap-1.5">
               <button
-                key={p}
                 type="button"
-                onClick={() => setCurrentPage(p)}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer border ${
-                  currentPage === p
-                    ? "theme-bg-accent theme-accent-text border-transparent shadow-sm"
-                    : "theme-bg-sub hover:theme-bg-elevated theme-text-primary theme-border"
-                }`}
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg theme-bg-elevated border theme-border theme-text-primary hover:opacity-80 disabled:opacity-40 transition-colors cursor-pointer text-xs font-semibold"
               >
-                {p}
+                Previous
               </button>
-            ))}
 
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-              className="theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pg) => (
+                <button
+                  key={pg}
+                  type="button"
+                  onClick={() => setCurrentPage(pg)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    pg === currentPage
+                      ? "theme-bg-accent theme-accent-text font-bold"
+                      : "theme-bg-elevated border theme-border theme-text-primary hover:opacity-80"
+                  }`}
+                >
+                  {pg}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg theme-bg-elevated border theme-border theme-text-primary hover:opacity-80 disabled:opacity-40 transition-colors cursor-pointer text-xs font-semibold"
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* FIXED VIEWPORT PORTAL-STYLE CONTEXT MENU */}
-      {activeDropdownId && dropdownPos && activeUserObj && (
+      {/* Global Context Dropdown Menu */}
+      {activeDropdownId && dropdownPos && (
         <div
-          style={{
-            position: "fixed",
-            top: `${dropdownPos.top}px`,
-            left: `${dropdownPos.left}px`,
-          }}
-          className="w-48 theme-bg-surface border theme-border rounded-xl shadow-2xl z-[9999] p-1 space-y-0.5 text-xs text-left animate-fade-in"
+          style={{ top: `${dropdownPos.top}px`, left: `${dropdownPos.left}px` }}
+          className="fixed z-[120] w-48 theme-bg-surface border theme-border rounded-xl shadow-2xl p-1.5 space-y-0.5 text-xs theme-text-primary animate-fade-in"
           onClick={(e) => e.stopPropagation()}
         >
-          {isGroupApplicable(activeUserObj.user_type) && (
-            <button
-              type="button"
-              onClick={() => {
-                const target = activeUserObj;
-                setActiveDropdownId(null);
-                setDropdownPos(null);
-                setGroupAssignUser(target);
-                setSelectedGroupInput(target.assigned_group || "All Groups");
-              }}
-              className="w-full px-3 py-2 theme-text-primary hover:theme-bg-elevated rounded-lg transition-colors cursor-pointer flex items-center gap-2 font-medium"
-            >
-              <span>Assign Halqa Group</span>
-            </button>
-          )}
+          {(() => {
+            const activeUser = users.find((u) => u.id === activeDropdownId);
+            if (!activeUser) return null;
 
-          <button
-            type="button"
-            onClick={() => {
-              const target = activeUserObj;
-              setActiveDropdownId(null);
-              setDropdownPos(null);
-              setEditingUser(target);
-              setEditUserForm({
-                first_name: target.first_name || "",
-                last_name: target.last_name || "",
-                email: target.email || "",
-                phone_number: target.phone_number || "",
-                avatar_url: target.avatar_url || "",
-                user_type: target.user_type || target.role || "TEACHER",
-                assigned_group: target.assigned_group || "All Groups",
-              });
-            }}
-            className="w-full px-3 py-2 theme-text-primary hover:theme-bg-elevated rounded-lg transition-colors cursor-pointer flex items-center gap-2"
-          >
-            <span>Edit Profile</span>
-          </button>
+            return (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(activeUser)}
+                  className="w-full px-3 py-2 rounded-lg text-left hover:theme-bg-elevated transition-colors cursor-pointer flex items-center gap-2 theme-text-primary"
+                >
+                  <svg className="w-4 h-4 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Edit Profile</span>
+                </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              const target = activeUserObj;
-              setActiveDropdownId(null);
-              setDropdownPos(null);
-              setResetPasswordUser(target);
-              setNewPasswordInput("");
-            }}
-            className="w-full px-3 py-2 theme-text-primary hover:theme-bg-elevated rounded-lg transition-colors cursor-pointer flex items-center gap-2"
-          >
-            <span>Reset Password</span>
-          </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetPasswordUser(activeUser);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-left hover:theme-bg-elevated transition-colors cursor-pointer flex items-center gap-2 theme-text-primary"
+                >
+                  <svg className="w-4 h-4 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span>Reset Password</span>
+                </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              const target = activeUserObj;
-              setActiveDropdownId(null);
-              setDropdownPos(null);
-              showToast(`Viewing activity logs for ${target.first_name || target.phone_number}`, "info");
-            }}
-            className="w-full px-3 py-2 theme-text-primary hover:theme-bg-elevated rounded-lg transition-colors cursor-pointer flex items-center gap-2"
-          >
-            <span>View Activity Logs</span>
-          </button>
+                <button
+                  type="button"
+                  onClick={() => handleRevokeSessions(activeUser.id)}
+                  className="w-full px-3 py-2 rounded-lg text-left hover:theme-bg-elevated transition-colors cursor-pointer flex items-center gap-2 theme-text-primary"
+                >
+                  <svg className="w-4 h-4 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Revoke Sessions</span>
+                </button>
 
-          {activeUserObj.user_type !== "SUPER_ADMIN" && (
-            <>
-              <div className="border-t theme-border my-1" />
+                <div className="my-1 border-t theme-border" />
 
-              <button
-                type="button"
-                onClick={() => {
-                  const target = activeUserObj;
-                  setActiveDropdownId(null);
-                  setDropdownPos(null);
-                  setDeleteConfirmUser(target);
-                }}
-                className="w-full px-3 py-2 theme-danger hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer flex items-center gap-2 font-semibold"
-              >
-                <span>Deactivate Account</span>
-              </button>
-            </>
-          )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmUser(activeUser);
+                    setActiveDropdownId(null);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-left text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Deactivate Account</span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
+      </>
+      )}
 
-      {/* 5. MODAL 1: CREATE USER ACCOUNT */}
+      {/* Modal: Create User Account */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b theme-border pb-3">
-              <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase theme-accent">
-                Create User Account
-              </h3>
-              <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-xs theme-text-secondary hover:theme-text-primary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5 theme-text-primary">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold theme-text-primary">Create User Account</h2>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold theme-text-secondary">Phone Number (Credential)</label>
-                <input
-                  type="text"
-                  required
-                  value={newUser.phone_number}
-                  onChange={(e) => setNewUser({ ...newUser, phone_number: e.target.value })}
-                  placeholder="01700000000"
-                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-                />
-                {fieldErrors.phone_number && (
-                  <p className="text-[11px] theme-danger mt-0.5">{fieldErrors.phone_number[0]}</p>
-                )}
+            <form onSubmit={handleCreateUser} className="space-y-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">First Name (English)</label>
+                  <input
+                    type="text"
+                    value={newUser.first_name}
+                    onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
+                    placeholder="Abdullah"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Last Name (English)</label>
+                  <input
+                    type="text"
+                    value={newUser.last_name}
+                    onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
+                    placeholder="Rahman"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold theme-text-secondary">Account Password</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    placeholder="user@suffahhifz.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Phone Number</label>
+                  <input
+                    type="text"
+                    value={newUser.phone_number}
+                    onChange={(e) => setNewUser({ ...newUser, phone_number: e.target.value })}
+                    placeholder="01700000000"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary font-mono focus:outline-none focus:theme-border"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-xs theme-text-secondary mb-1">Initial Password *</label>
                 <input
                   type="password"
                   required
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  placeholder="Set initial password"
-                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
                 />
-                {fieldErrors.password && (
-                  <p className="text-[11px] theme-danger mt-0.5">{fieldErrors.password[0]}</p>
-                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold theme-text-secondary">First Name</label>
-                  <input
-                    type="text"
-                    value={newUser.first_name}
-                    onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
-                    placeholder="First Name"
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold theme-text-secondary">Last Name</label>
-                  <input
-                    type="text"
-                    value={newUser.last_name}
-                    onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
-                    placeholder="Last Name"
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold theme-text-secondary">Email Address</label>
-                <input
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  placeholder="user@example.com"
-                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-                />
-                {fieldErrors.email && (
-                  <p className="text-[11px] theme-danger mt-0.5">{fieldErrors.email[0]}</p>
-                )}
-              </div>
-
-              {/* Dynamic Role Selection & Conditional Group Field Reveal */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold theme-text-secondary">Account Role</label>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Account Role *</label>
                   <ThemeCustomSelect
-                    options={createRoleOptions}
+                    options={roleSelectOptions}
                     value={newUser.user_type}
                     onChange={(val) => setNewUser({ ...newUser, user_type: val })}
-                    placeholder="Select Account Role..."
-                    openUpward={true}
+                    openUpward={false}
                   />
                 </div>
-
-                {/* Assigned Group Field ONLY appears AFTER a group-applicable role (Teacher / Admin) is picked! */}
-                {isGroupApplicable(newUser.user_type) && (
-                  <div className="space-y-1 animate-fade-in">
-                    <label className="text-xs font-semibold theme-text-secondary">Assigned Halqa / Group</label>
-                    <ThemeCustomSelect
-                      options={groupSelectOptions}
-                      value={newUser.assigned_group}
-                      onChange={(val) => setNewUser({ ...newUser, assigned_group: val })}
-                      placeholder="Select Halqa Group"
-                      openUpward={true}
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Assigned Halqa Group</label>
+                  <ThemeCustomSelect
+                    options={groupSelectOptions}
+                    value={newUser.assigned_group}
+                    onChange={(val) => setNewUser({ ...newUser, assigned_group: val })}
+                    openUpward={false}
+                  />
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t theme-border">
+              <div className="flex items-center justify-end gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-3.5 py-2 text-xs font-semibold theme-text-secondary hover:theme-text-primary"
+                  className="px-4 py-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 py-2 rounded-xl text-xs shadow cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text font-semibold disabled:opacity-50"
                 >
-                  {saving ? "Creating..." : "Create User Account"}
+                  {saving ? "Creating..." : "Create Account"}
                 </button>
               </div>
             </form>
@@ -1118,138 +1422,97 @@ export default function UserManagementModule() {
         </div>
       )}
 
-      {/* 6. MODAL 2: EDIT USER PROFILE WITH DYNAMIC CONDITIONAL GROUP FIELD */}
+      {/* Modal: Edit User Profile */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b theme-border pb-3">
-              <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase theme-accent">
-                Edit User Profile
-              </h3>
-              <button type="button" onClick={() => setEditingUser(null)} className="text-xs theme-text-secondary hover:theme-text-primary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5 theme-text-primary">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold theme-text-primary">Edit User Profile</h2>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleEditProfileSubmit} className="space-y-4">
-              
-              {/* Profile Photo Upload / Preview Section */}
-              <div className="flex items-center gap-4 p-3 theme-bg-sub border theme-border rounded-xl">
-                <div className="w-14 h-14 rounded-full theme-bg-accent-soft theme-accent font-semibold flex items-center justify-center border theme-border text-lg shrink-0 overflow-hidden">
-                  {editUserForm.avatar_url ? (
-                    <img src={editUserForm.avatar_url} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    <span>{(editUserForm.first_name || editingUser.phone_number || "U").charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
-
-                <div className="space-y-1.5 flex-1 min-w-0">
-                  <label className="text-xs font-semibold theme-text-secondary block">
-                    Profile Photo
-                  </label>
-                  
-                  <div className="flex items-center gap-2">
-                    <label className="theme-bg-accent hover:opacity-90 theme-accent-text text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm">
-                      Upload Photo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleAvatarFileUpload(e, setEditUserForm)}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {editUserForm.avatar_url && (
-                      <button
-                        type="button"
-                        onClick={() => setEditUserForm({ ...editUserForm, avatar_url: "" })}
-                        className="text-xs theme-danger hover:opacity-80 px-2 py-1"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
+            <form onSubmit={handleSaveEditUser} className="space-y-4 text-xs sm:text-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold theme-text-secondary">First Name</label>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">First Name (English)</label>
                   <input
                     type="text"
                     value={editUserForm.first_name}
                     onChange={(e) => setEditUserForm({ ...editUserForm, first_name: e.target.value })}
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold theme-text-secondary">Last Name</label>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Last Name (English)</label>
                   <input
                     type="text"
                     value={editUserForm.last_name}
                     onChange={(e) => setEditUserForm({ ...editUserForm, last_name: e.target.value })}
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold theme-text-secondary">Email Address</label>
-                <input
-                  type="email"
-                  value={editUserForm.email}
-                  onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2 rounded-xl text-xs"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editUserForm.email}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:theme-border"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Phone Number</label>
+                  <input
+                    type="text"
+                    value={editUserForm.phone_number}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, phone_number: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary font-mono focus:outline-none focus:theme-border"
+                  />
+                </div>
               </div>
 
-              {/* Super Admin Protection vs Dynamic Conditional Group Field */}
-              {editingUser.user_type === "SUPER_ADMIN" ? (
-                <div className="p-3 rounded-xl theme-bg-sub border theme-border text-xs theme-text-secondary">
-                  <span className="font-semibold theme-accent">System Super Admin</span>
-                  <p className="text-[11px] mt-0.5">Role and Halqa group assignment are protected for Super Admin accounts.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Account Role</label>
+                  <ThemeCustomSelect
+                    options={roleSelectOptions}
+                    value={editUserForm.user_type}
+                    onChange={(val) => setEditUserForm({ ...editUserForm, user_type: val })}
+                    openUpward={false}
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold theme-text-secondary">Role</label>
-                    <ThemeCustomSelect
-                      options={editRoleOptions}
-                      value={editUserForm.user_type}
-                      onChange={(val) => setEditUserForm({ ...editUserForm, user_type: val })}
-                      placeholder="Select Role"
-                      openUpward={true}
-                    />
-                  </div>
-
-                  {/* Assigned Group Field ONLY appears AFTER Teacher or Admin role is picked */}
-                  {isGroupApplicable(editUserForm.user_type) && (
-                    <div className="space-y-1 animate-fade-in">
-                      <label className="text-xs font-semibold theme-text-secondary">Assigned Halqa / Group</label>
-                      <ThemeCustomSelect
-                        options={groupSelectOptions}
-                        value={editUserForm.assigned_group}
-                        onChange={(val) => setEditUserForm({ ...editUserForm, assigned_group: val })}
-                        placeholder="Select Halqa Group"
-                        openUpward={true}
-                      />
-                    </div>
-                  )}
+                <div>
+                  <label className="block font-mono text-xs theme-text-secondary mb-1">Assigned Group</label>
+                  <ThemeCustomSelect
+                    options={groupSelectOptions}
+                    value={editUserForm.assigned_group}
+                    onChange={(val) => setEditUserForm({ ...editUserForm, assigned_group: val })}
+                    openUpward={false}
+                  />
                 </div>
-              )}
+              </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t theme-border">
+              <div className="flex items-center justify-end gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-3.5 py-2 text-xs font-semibold theme-text-secondary hover:theme-text-primary"
+                  className="px-4 py-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 py-2 rounded-xl text-xs shadow cursor-pointer"
+                  disabled={saving || !isEditFormDirty}
+                  className="px-5 py-2 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
@@ -1259,141 +1522,116 @@ export default function UserManagementModule() {
         </div>
       )}
 
-      {/* 7. MODAL 3: ASSIGN HALQA / GROUP */}
-      {groupAssignUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b theme-border pb-3">
-              <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase theme-accent">
-                Assign Halqa Group
-              </h3>
-              <button type="button" onClick={() => setGroupAssignUser(null)} className="text-xs theme-text-secondary hover:theme-text-primary">
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs theme-text-secondary">
-              Select Halqa group assignment for{" "}
-              <span className="font-semibold theme-text-primary">
-                {groupAssignUser.first_name || groupAssignUser.phone_number}
-              </span>
-            </p>
-
-            {/* Custom Theme Dropdown */}
-            <ThemeCustomSelect
-              options={groupSelectOptions}
-              value={selectedGroupInput}
-              onChange={(val) => setSelectedGroupInput(val)}
-              placeholder="Select Halqa Group"
-              openUpward={true}
-            />
-
-            <div className="flex justify-end gap-2 pt-2 border-t theme-border">
-              <button
-                type="button"
-                onClick={() => setGroupAssignUser(null)}
-                className="px-3.5 py-2 text-xs font-semibold theme-text-secondary hover:theme-text-primary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleGroupAssignSubmit}
-                disabled={saving}
-                className="theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 py-2 rounded-xl text-xs shadow cursor-pointer"
-              >
-                {saving ? "Saving..." : "Save Assignment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 8. MODAL 4: RESET PASSWORD */}
+      {/* Modal: Reset Password */}
       {resetPasswordUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b theme-border pb-3">
-              <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase theme-accent">
-                Reset User Password
-              </h3>
-              <button type="button" onClick={() => setResetPasswordUser(null)} className="text-xs theme-text-secondary hover:theme-text-primary">
-                ✕
-              </button>
-            </div>
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 theme-text-primary">
+            <h2 className="text-lg font-semibold theme-text-primary">Reset Password</h2>
             <p className="text-xs theme-text-secondary">
-              Set new password for{" "}
-              <span className="font-semibold theme-text-primary">
-                {resetPasswordUser.first_name || resetPasswordUser.phone_number}
-              </span>
+              Enter a new password for <strong className="theme-text-primary">{resetPasswordUser.first_name || resetPasswordUser.email}</strong>:
             </p>
 
-            <input
-              type="password"
-              value={newPasswordInput}
-              onChange={(e) => setNewPasswordInput(e.target.value)}
-              placeholder="Enter new password"
-              className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-            />
+            <form onSubmit={handleSaveResetPassword} className="space-y-4">
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPasswordInput}
+                onChange={(e) => setNewPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-sm focus:outline-none focus:theme-border"
+              />
 
-            <div className="flex justify-end gap-2 pt-2 border-t theme-border">
-              <button
-                type="button"
-                onClick={() => setResetPasswordUser(null)}
-                className="px-3.5 py-2 text-xs font-semibold theme-text-secondary hover:theme-text-primary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleResetPasswordSubmit}
-                disabled={saving || !newPasswordInput}
-                className="theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 py-2 rounded-xl text-xs shadow cursor-pointer disabled:opacity-50"
-              >
-                {saving ? "Resetting..." : "Reset Password"}
-              </button>
-            </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordUser(null)}
+                  className="px-4 py-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border text-xs font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text font-semibold text-xs disabled:opacity-50"
+                >
+                  {saving ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* 9. MODAL 5: CONFIRM DEACTIVATION / DELETION */}
-      {deleteConfirmUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-            <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase theme-danger border-b theme-border pb-3">
-              Confirm Account Deactivation
-            </h3>
-
-            <p className="text-xs theme-text-secondary leading-relaxed">
-              Are you sure you want to deactivate account access for{" "}
-              <span className="font-semibold theme-text-primary">
-                {deleteConfirmUser.first_name || deleteConfirmUser.phone_number}
-              </span>
-              ? They will no longer be able to sign in.
+      {/* Modal: Assign Halqa Group */}
+      {groupAssignUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 theme-text-primary">
+            <h2 className="text-lg font-semibold theme-text-primary">Assign Halqa Group</h2>
+            <p className="text-xs theme-text-secondary">
+              Select Halqa Group for <strong className="theme-text-primary">{groupAssignUser.first_name || groupAssignUser.email}</strong>:
             </p>
 
-            <div className="flex justify-end gap-2 pt-2 border-t theme-border">
+            <form onSubmit={handleSaveGroupAssignment} className="space-y-4">
+              <ThemeCustomSelect
+                options={groupSelectOptions}
+                value={selectedGroupInput}
+                onChange={(val) => setSelectedGroupInput(val)}
+                openUpward={false}
+              />
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setGroupAssignUser(null)}
+                  className="px-4 py-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border text-xs font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text font-semibold text-xs disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save Group"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Deactivate Confirmation */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 theme-text-primary">
+            <h2 className="text-lg font-semibold text-rose-400">Deactivate Account</h2>
+            <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed">
+              Are you sure you want to deactivate or delete the account for{" "}
+              <strong className="theme-text-primary">{deleteConfirmUser.first_name || deleteConfirmUser.email}</strong>?
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmUser(null)}
-                className="px-3.5 py-2 text-xs font-semibold theme-text-secondary hover:theme-text-primary"
+                className="px-4 py-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border text-xs font-medium"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleDeleteUserSubmit}
                 disabled={saving}
-                className="theme-bg-danger-soft hover:opacity-90 theme-danger border border-red-500/30 font-semibold px-4 py-2 rounded-xl text-xs shadow cursor-pointer"
+                onClick={handleConfirmDeleteOrDeactivate}
+                className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs disabled:opacity-50"
               >
-                {saving ? "Deactivating..." : "Deactivate Account"}
+                {saving ? "Processing..." : "Deactivate Account"}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

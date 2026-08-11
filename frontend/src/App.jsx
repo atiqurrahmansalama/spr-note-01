@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import LoginView from "./modules/auth/LoginView";
+import RegisterView from "./modules/auth/RegisterView";
+import VerifyEmailView from "./modules/auth/VerifyEmailView";
+import ResetPasswordView from "./modules/auth/ResetPasswordView";
 import PublicVerifyReportView from "./modules/verification/PublicVerifyReportView";
 import { auth as authStore } from "./utils/localStore";
 
@@ -38,6 +41,9 @@ export default function App() {
       <Routes>
         {/* Standalone Public Auth & Verification Routes */}
         <Route path="/login" element={<LoginView />} />
+        <Route path="/register" element={<RegisterView />} />
+        <Route path="/verify-email/:token" element={<VerifyEmailView />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordView />} />
         <Route path="/verify-report/:report_id" element={<PublicVerifyReportView />} />
         <Route path="/api/v1/hifz/verify-report/:report_id" element={<PublicVerifyReportView />} />
 
