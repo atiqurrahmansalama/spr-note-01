@@ -19,8 +19,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key-change-in-production"))
 DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() == "true"
 
-ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost"))
-ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()]
+ALLOWED_HOSTS = ['*']
 
 
 AUTH_USER_MODEL = "core.User"
