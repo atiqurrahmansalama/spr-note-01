@@ -75,9 +75,8 @@ export default function LoginView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Google OAuth Trigger via Google GIS SDK (Matches Authorized JavaScript Origins)
+  // Google OAuth Trigger with Redirect Mode (Eliminates Popup Blocker Errors)
   const googleLoginTrigger = useGoogleLogin({
-    prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setAuthErrorBanner(null);
       setGoogleLoading(true);
@@ -99,10 +98,12 @@ export default function LoginView() {
     onError: (error) => {
       setGoogleLoading(false);
       console.warn('Google OAuth login error:', error);
-      const err = 'Google sign-in was closed or blocked.';
+      const err = 'Google sign-in error occurred.';
       setAuthErrorBanner(err);
       showToast(err, 'warning');
     },
+    ux_mode: 'redirect',
+    redirect_uri: window.location.origin,
   });
 
   return (

@@ -123,7 +123,6 @@ export default function RegisterView() {
   }, []);
 
   const googleSignUpTrigger = useGoogleLogin({
-    prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       const result = await loginWithGoogle({
@@ -143,8 +142,10 @@ export default function RegisterView() {
     onError: (error) => {
       setGoogleLoading(false);
       console.warn('Google OAuth login error:', error);
-      showToast('Google sign-up was closed or blocked.', 'warning');
+      showToast('Google sign-up error occurred.', 'warning');
     },
+    ux_mode: 'redirect',
+    redirect_uri: window.location.origin,
   });
 
   const handleChange = (e) => {
