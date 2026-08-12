@@ -247,6 +247,9 @@ class GoogleOAuthExchangeView(APIView):
             if not email and not sub:
                 return Response({'error': 'Failed to verify Google token or extract user profile.'}, status=status.HTTP_400_BAD_REQUEST)
 
+            if email:
+                email = email.strip().lower()
+
             user = None
             if sub:
                 user = User.objects.filter(google_sub_id=sub).first()
@@ -254,12 +257,23 @@ class GoogleOAuthExchangeView(APIView):
                 user = User.objects.filter(email__iexact=email).first()
 
             if user:
+                # Active & Deactivation Check
+                if not user.is_active or getattr(user, 'is_deactivated', False):
+                    return Response({
+                        "error": "Account Deactivated",
+                        "detail": "Your account has been deactivated. Please contact support."
+                    }, status=status.HTTP_403_FORBIDDEN)
+
                 user.auth_provider = 'google'
                 user.is_email_verified = True
                 if sub and not user.google_sub_id:
                     user.google_sub_id = sub
                 if picture and not user.avatar_url:
                     user.avatar_url = picture
+                if first_name and not user.first_name:
+                    user.first_name = first_name
+                if last_name and not user.last_name:
+                    user.last_name = last_name
                 user.save()
             else:
                 # Resilient Default Role Retrieval/Creation
@@ -280,18 +294,34 @@ class GoogleOAuthExchangeView(APIView):
                     logging.getLogger('core').warning(f"Default UserRole fetch warning: {role_ex}")
 
                 phone_dummy = f"g_{sub[:12]}" if sub else f"g_{uuid.uuid4().hex[:10]}"
-                user = User.objects.create_user(
-                    phone_number=phone_dummy,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    auth_provider='google',
-                    is_email_verified=True,
-                    google_sub_id=sub,
-                    avatar_url=picture,
-                    user_type='GUARDIAN',
-                    role=default_role,
-                )
+                defaults_dict = {
+                    'phone_number': phone_dummy,
+                    'first_name': first_name or '',
+                    'last_name': last_name or '',
+                    'avatar_url': picture or '',
+                    'auth_provider': 'google',
+                    'is_email_verified': True,
+                    'google_sub_id': sub,
+                    'user_type': 'GUARDIAN',
+                    'role': default_role,
+                    'is_active': True,
+                    'is_deactivated': False,
+                }
+
+                if email:
+                    user, created = User.objects.get_or_create(
+                        email=email,
+                        defaults=defaults_dict
+                    )
+                else:
+                    user = User.objects.create_user(**defaults_dict)
+
+                # Active & Deactivation Check for newly created or fetched user
+                if not user.is_active or getattr(user, 'is_deactivated', False):
+                    return Response({
+                        "error": "Account Deactivated",
+                        "detail": "Your account has been deactivated. Please contact support."
+                    }, status=status.HTTP_403_FORBIDDEN)
 
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)

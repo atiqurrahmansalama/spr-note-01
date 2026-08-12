@@ -368,3 +368,72 @@ class HeartbeatAndAnalyticsAPITestCase(APITestCase):
         response = self.client.get("/api/v1/analytics/user-activity/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "success")
+
+
+from unittest.mock import patch
+
+
+class GoogleOAuthAPITestCase(APITestCase):
+    """
+    6. Google OAuth & User Registration Logic Tests:
+    - Test auto-registration of new user via get_or_create.
+    - Test login of existing active user.
+    - Test 403 Forbidden on deactivated account.
+    - Test 400 Bad Request when credentials are missing.
+    """
+
+    @patch("google.oauth2.id_token.verify_oauth2_token")
+    def test_google_oauth_auto_register_new_user(self, mock_verify):
+        mock_verify.return_value = {
+            "sub": "google-sub-12345",
+            "email": "newuser@example.com",
+            "given_name": "Google",
+            "family_name": "User",
+            "picture": "https://lh3.googleusercontent.com/a/avatar.jpg"
+        }
+
+        response = self.client.post("/api/v1/auth/google/", {
+            "id_token": "fake-google-id-token"
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertEqual(response.data["user"]["email"], "newuser@example.com")
+
+        # Verify user in database
+        db_user = User.objects.filter(email="newuser@example.com").first()
+        self.assertIsNotNone(db_user)
+        self.assertEqual(db_user.google_sub_id, "google-sub-12345")
+        self.assertEqual(db_user.auth_provider, "google")
+        self.assertTrue(db_user.is_email_verified)
+        self.assertTrue(db_user.is_active)
+
+    @patch("google.oauth2.id_token.verify_oauth2_token")
+    def test_google_oauth_deactivated_account_returns_403(self, mock_verify):
+        user = User.objects.create_user(
+            phone_number="01700000099",
+            email="deactivated@example.com",
+            is_active=False,
+            is_deactivated=True,
+            google_sub_id="google-deactivated-sub"
+        )
+
+        mock_verify.return_value = {
+            "sub": "google-deactivated-sub",
+            "email": "deactivated@example.com",
+            "given_name": "Deactivated",
+            "family_name": "User"
+        }
+
+        response = self.client.post("/api/v1/auth/google/", {
+            "id_token": "fake-deactivated-token"
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "Account Deactivated")
+        self.assertEqual(response.data["detail"], "Your account has been deactivated. Please contact support.")
+
+    def test_google_oauth_missing_credentials_returns_400(self):
+        response = self.client.post("/api/v1/auth/google/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
