@@ -157,7 +157,33 @@ class GoogleOAuthExchangeView(APIView):
 
             id_token_input = serializer.validated_data.get('id_token') or serializer.validated_data.get('credential')
             access_token_input = serializer.validated_data.get('access_token')
+            code_input = serializer.validated_data.get('code')
+            redirect_uri_input = serializer.validated_data.get('redirect_uri')
             client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+
+            # 0. Exchange authorization code with Google if code parameter is provided
+            if code_input:
+                try:
+                    import requests as http_requests
+                    client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '')
+                    token_res = http_requests.post(
+                        'https://oauth2.googleapis.com/token',
+                        data={
+                            'code': code_input,
+                            'client_id': client_id,
+                            'client_secret': client_secret,
+                            'redirect_uri': redirect_uri_input or 'https://spr-note.vercel.app',
+                            'grant_type': 'authorization_code',
+                        },
+                        timeout=10
+                    )
+                    if token_res.ok:
+                        token_data = token_res.json()
+                        access_token_input = token_data.get('access_token') or access_token_input
+                        id_token_input = token_data.get('id_token') or id_token_input
+                except Exception as ex:
+                    import logging
+                    logging.getLogger('core').warning(f"Google authorization code exchange failed: {ex}")
 
             sub = None
             email = None

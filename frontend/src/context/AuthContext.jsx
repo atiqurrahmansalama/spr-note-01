@@ -13,34 +13,43 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      // 1. Check for Google OAuth redirect hash parameters
+      // 1. Check for Google OAuth redirect parameters (code in query search OR access_token in hash)
+      const urlParams = new URLSearchParams(window.location.search);
+      const googleCode = urlParams.get('code');
+
       const hash = window.location.hash;
-      if (hash && hash.includes('access_token')) {
-        const params = new URLSearchParams(hash.replace('#', '?'));
-        const googleAccess = params.get('access_token');
-        const googleId = params.get('id_token');
-        if (googleAccess || googleId) {
-          window.history.replaceState(null, '', window.location.pathname);
-          try {
-            const res = await apiClient.post('/api/v1/auth/google/', {
-              access_token: googleAccess,
-              id_token: googleId,
-            });
-            const data = res.data;
-            if (data.tokens?.access) {
-              authStore.saveTokens(data.tokens.access, data.tokens.refresh);
-              setAccessToken(data.tokens.access);
-            }
-            if (data.user) {
-              authStore.saveUserProfile(data.user);
-              setUser(data.user);
-            }
-          } catch (e) {
-            console.warn('[AuthProvider] Google OAuth redirect token exchange error:', e);
+      const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
+      const googleAccess = hashParams?.get('access_token');
+      const googleId = hashParams?.get('id_token');
+
+      if (googleCode || googleAccess || googleId) {
+        // Clear code/hash from URL immediately so it doesn't re-trigger
+        window.history.replaceState({}, document.title, window.location.pathname);
+        try {
+          const payload = googleCode
+            ? { code: googleCode, redirect_uri: window.location.origin }
+            : { access_token: googleAccess, id_token: googleId };
+
+          const res = await apiClient.post('/api/v1/auth/google/', payload);
+          const data = res.data;
+          const newAccess = data.tokens?.access || data.access;
+          const newRefresh = data.tokens?.refresh || data.refresh;
+
+          if (newAccess) {
+            authStore.saveTokens(newAccess, newRefresh);
+            localStorage.setItem('access_token', newAccess);
+            if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
+            setAccessToken(newAccess);
           }
-          setIsLoading(false);
-          return;
+          if (data.user) {
+            authStore.saveUserProfile(data.user);
+            setUser(data.user);
+          }
+        } catch (e) {
+          console.error('[AuthProvider] Google Auth Exchange Error:', e);
         }
+        setIsLoading(false);
+        return;
       }
 
       // 2. Normal initial token verification

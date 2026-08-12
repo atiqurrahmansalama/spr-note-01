@@ -44,35 +44,39 @@ export default function LoginView() {
     }
   };
 
-  // Handle return from Google OAuth Redirect (when ux_mode: 'redirect')
+  // Handle return from Google OAuth Redirect (Catches code query param OR access_token hash)
   useEffect(() => {
-    const handleGoogleRedirectHash = async () => {
+    const handleGoogleRedirect = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+
       const hash = window.location.hash;
-      if (!hash || !hash.includes('access_token')) return;
+      const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
+      const accessToken = hashParams?.get('access_token');
+      const idToken = hashParams?.get('id_token');
 
-      const params = new URLSearchParams(hash.replace('#', '?'));
-      const accessToken = params.get('access_token');
-      const idToken = params.get('id_token');
-
-      if (accessToken || idToken) {
-        window.history.replaceState(null, '', window.location.pathname);
+      if (code || accessToken || idToken) {
+        // Clear code/hash from URL immediately so it doesn't re-trigger
+        window.history.replaceState({}, document.title, window.location.pathname);
         setGoogleLoading(true);
-        const result = await loginWithGoogle({
-          access_token: accessToken,
-          id_token: idToken,
-        });
+        const payload = code
+          ? { code: code, redirect_uri: window.location.origin }
+          : { access_token: accessToken, id_token: idToken };
+
+        const result = await loginWithGoogle(payload);
         setGoogleLoading(false);
         if (result.success) {
           showToast('Signed in with Google successfully!', 'success');
           navigate('/');
         } else {
-          setAuthErrorBanner(result.error || 'Google authentication failed.');
-          showToast(result.error || 'Google authentication failed.', 'error');
+          const err = result.error || 'Google Sign-In failed on backend.';
+          setAuthErrorBanner(err);
+          showToast(err, 'error');
         }
       }
     };
 
-    handleGoogleRedirectHash();
+    handleGoogleRedirect();
   }, []);
 
   // Standard Google OAuth 2.0 direct authorization handler (Top-Level Window Navigation)
@@ -91,12 +95,11 @@ export default function LoginView() {
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=token&` +
+      `response_type=code&` +
       `scope=${scope}&` +
       `prompt=select_account`;
 
     console.log('[Google Auth] Redirecting to Google:', googleAuthUrl);
-    // Direct window navigation (never blocked by browser popups or adblockers)
     window.location.href = googleAuthUrl;
   };
 

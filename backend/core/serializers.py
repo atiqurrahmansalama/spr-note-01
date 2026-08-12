@@ -171,10 +171,12 @@ class GoogleOAuthSerializer(serializers.Serializer):
     id_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     access_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     credential = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    redirect_uri = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate(self, attrs):
-        if not attrs.get('id_token') and not attrs.get('access_token') and not attrs.get('credential'):
-            raise serializers.ValidationError("Either id_token, access_token, or credential must be provided.")
+        if not attrs.get('id_token') and not attrs.get('access_token') and not attrs.get('credential') and not attrs.get('code'):
+            raise serializers.ValidationError("Either code, id_token, access_token, or credential must be provided.")
         return attrs
 
 
