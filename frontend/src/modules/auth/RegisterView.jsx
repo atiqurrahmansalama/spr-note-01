@@ -94,7 +94,7 @@ export default function RegisterView() {
 
 
 
-  // Standard Google OAuth 2.0 direct authorization handler (Top-Level Window Navigation)
+  // Standard Google OAuth 2.0 direct authorization handler (Opens in NEW TAB)
   const handleGoogleSignUp = () => {
     console.log('[Google Auth] Sign up with Google clicked.');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -114,8 +114,8 @@ export default function RegisterView() {
       `scope=${scope}&` +
       `prompt=select_account`;
 
-    console.log('[Google Auth] Redirecting to Google:', googleAuthUrl);
-    window.location.href = googleAuthUrl;
+    console.log('[Google Auth] Opening Google OAuth in new tab:', googleAuthUrl);
+    window.open(googleAuthUrl, '_blank');
   };
 
   const handleChange = (e) => {

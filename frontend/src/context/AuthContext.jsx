@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import apiClient from '../api/axios';
 import { auth as authStore } from '../utils/localStore';
 
@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => authStore.getUserProfile());
   const [accessToken, setAccessToken] = useState(() => authStore.getAccessToken());
   const [isLoading, setIsLoading] = useState(true);
+  const isProcessingCode = useRef(false);
 
   const isAuthenticated = Boolean(accessToken && user);
 
@@ -22,7 +23,8 @@ export function AuthProvider({ children }) {
       const googleAccess = hashParams?.get('access_token');
       const googleId = hashParams?.get('id_token');
 
-      if (googleCode || googleAccess || googleId) {
+      if ((googleCode || googleAccess || googleId) && !isProcessingCode.current) {
+        isProcessingCode.current = true; // Block duplicate calls from React StrictMode or concurrent renders
         // Clear code and hash parameters from URL bar immediately so it never re-triggers
         window.history.replaceState({}, document.title, window.location.pathname);
         try {
@@ -56,6 +58,8 @@ export function AuthProvider({ children }) {
           return;
         } catch (e) {
           console.error('[AuthProvider] Google Auth Exchange Error:', e?.response?.data || e?.message);
+        } finally {
+          isProcessingCode.current = false;
         }
         setIsLoading(false);
         return;
