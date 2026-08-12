@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import ForgotPasswordModal from './ForgotPasswordModal';
@@ -75,36 +75,31 @@ export default function LoginView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Google OAuth Trigger with Redirect Mode (Eliminates Popup Blocker Errors)
-  const googleLoginTrigger = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setAuthErrorBanner(null);
-      setGoogleLoading(true);
-      const result = await loginWithGoogle({
-        access_token: tokenResponse.access_token,
-        id_token: tokenResponse.id_token,
-      });
-      setGoogleLoading(false);
+  // Native Google Button Success & Error Callbacks (Bypasses all popup blockers)
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setAuthErrorBanner(null);
+    setGoogleLoading(true);
+    const result = await loginWithGoogle({
+      id_token: credentialResponse.credential,
+      credential: credentialResponse.credential,
+    });
+    setGoogleLoading(false);
 
-      if (result.success) {
-        showToast('Signed in with Google successfully!', 'success');
-        navigate('/');
-      } else {
-        const err = result.error || 'Google sign-in failed.';
-        setAuthErrorBanner(err);
-        showToast(err, 'error');
-      }
-    },
-    onError: (error) => {
-      setGoogleLoading(false);
-      console.warn('Google OAuth login error:', error);
-      const err = 'Google sign-in error occurred.';
+    if (result.success) {
+      showToast('Signed in with Google successfully!', 'success');
+      navigate('/');
+    } else {
+      const err = result.error || 'Google sign-in failed.';
       setAuthErrorBanner(err);
-      showToast(err, 'warning');
-    },
-    ux_mode: 'redirect',
-    redirect_uri: window.location.origin,
-  });
+      showToast(err, 'error');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setGoogleLoading(false);
+    console.warn('Google Sign-In Failed');
+    showToast('Google Sign-In failed or was closed.', 'warning');
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 font-sans text-zinc-100 selection:bg-sky-500 selection:text-zinc-950">
@@ -138,40 +133,23 @@ export default function LoginView() {
         )}
 
         {/* Google Primary Social Button */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => googleLoginTrigger()}
-            disabled={googleLoading}
-            className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border border-zinc-800 font-medium py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer disabled:opacity-50"
-          >
-            {googleLoading ? (
-              <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
-                />
-              </svg>
-            )}
-            <span className="text-xs sm:text-sm">Continue with Google</span>
-          </button>
+        <div className="flex justify-center w-full min-h-[44px]">
+          {isGoogleConfigured ? (
+            <div className="w-full flex justify-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/90 p-1 shadow-sm">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap={false}
+                theme="filled_black"
+                shape="rectangular"
+                width="100%"
+                text="continue_with"
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500 text-center">Google Client ID is not configured.</p>
+          )}
+        </div>
 
           {/* Divider */}
           <div className="relative flex items-center justify-center py-1">
@@ -180,7 +158,6 @@ export default function LoginView() {
               OR CONTINUE WITH EMAIL
             </span>
           </div>
-        </div>
 
         {/* Credentials Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
