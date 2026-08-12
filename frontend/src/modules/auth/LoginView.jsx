@@ -44,8 +44,41 @@ export default function LoginView() {
     }
   };
 
-  // Google OAuth Trigger
+  // Handle return from Google OAuth Redirect (when ux_mode: 'redirect')
+  useEffect(() => {
+    const handleGoogleRedirectHash = async () => {
+      const hash = window.location.hash;
+      if (!hash || !hash.includes('access_token')) return;
+
+      const params = new URLSearchParams(hash.replace('#', '?'));
+      const accessToken = params.get('access_token');
+      const idToken = params.get('id_token');
+
+      if (accessToken || idToken) {
+        window.history.replaceState(null, '', window.location.pathname);
+        setGoogleLoading(true);
+        const result = await loginWithGoogle({
+          access_token: accessToken,
+          id_token: idToken,
+        });
+        setGoogleLoading(false);
+        if (result.success) {
+          showToast('Signed in with Google successfully!', 'success');
+          navigate('/');
+        } else {
+          setAuthErrorBanner(result.error || 'Google authentication failed.');
+          showToast(result.error || 'Google authentication failed.', 'error');
+        }
+      }
+    };
+
+    handleGoogleRedirectHash();
+  }, []);
+
+  // Google OAuth Trigger (Redirect Mode - Not blocked by adblockers/popups)
   const googleLoginTrigger = useGoogleLogin({
+    ux_mode: 'redirect',
+    redirect_uri: window.location.origin + '/login',
     prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setAuthErrorBanner(null);
@@ -60,15 +93,15 @@ export default function LoginView() {
         showToast('Signed in with Google successfully!', 'success');
         navigate('/');
       } else {
-        const err = result.error || 'Google sign-in was cancelled or failed.';
+        const err = result.error || 'Google sign-in failed.';
         setAuthErrorBanner(err);
         showToast(err, 'error');
       }
     },
     onError: (error) => {
       setGoogleLoading(false);
-      console.warn('Google OAuth popup blocked or error:', error);
-      const err = 'Google sign-in window was blocked or closed. Please allow popups if blocked.';
+      console.warn('Google OAuth redirect error:', error);
+      const err = 'Google sign-in redirect failed.';
       setAuthErrorBanner(err);
       showToast(err, 'warning');
     },

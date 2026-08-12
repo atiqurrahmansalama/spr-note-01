@@ -92,7 +92,39 @@ export default function RegisterView() {
 
   const isGoogleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
+  // Handle return from Google OAuth Redirect (when ux_mode: 'redirect')
+  useEffect(() => {
+    const handleGoogleRedirectHash = async () => {
+      const hash = window.location.hash;
+      if (!hash || !hash.includes('access_token')) return;
+
+      const params = new URLSearchParams(hash.replace('#', '?'));
+      const accessToken = params.get('access_token');
+      const idToken = params.get('id_token');
+
+      if (accessToken || idToken) {
+        window.history.replaceState(null, '', window.location.pathname);
+        setGoogleLoading(true);
+        const result = await loginWithGoogle({
+          access_token: accessToken,
+          id_token: idToken,
+        });
+        setGoogleLoading(false);
+        if (result.success) {
+          showToast('Signed up with Google successfully!', 'success');
+          navigate('/');
+        } else {
+          showToast(result.error || 'Google sign-up failed.', 'error');
+        }
+      }
+    };
+
+    handleGoogleRedirectHash();
+  }, []);
+
   const googleSignUpTrigger = useGoogleLogin({
+    ux_mode: 'redirect',
+    redirect_uri: window.location.origin + '/register',
     prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
@@ -112,8 +144,8 @@ export default function RegisterView() {
     },
     onError: (error) => {
       setGoogleLoading(false);
-      console.warn('Google OAuth popup error:', error);
-      showToast('Google sign-up window was blocked or closed.', 'warning');
+      console.warn('Google OAuth redirect error:', error);
+      showToast('Google sign-up redirect failed.', 'warning');
     },
   });
 
