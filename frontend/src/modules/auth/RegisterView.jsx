@@ -122,20 +122,30 @@ export default function RegisterView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Native top-level Google OAuth redirect (100% immune to adblockers and popup blockers)
-  const handleGoogleAuthRedirect = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      console.warn('Google OAuth Client ID is not configured.');
-      showToast('Google OAuth Client ID is not configured.', 'warning');
-      return;
-    }
-    setGoogleLoading(true);
-    const redirectUri = window.location.origin;
-    const scope = encodeURIComponent('openid profile email');
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}&prompt=select_account`;
-    window.location.href = authUrl;
-  };
+  const googleSignUpTrigger = useGoogleLogin({
+    prompt: 'select_account',
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      const result = await loginWithGoogle({
+        access_token: tokenResponse.access_token,
+        id_token: tokenResponse.id_token,
+      });
+      setGoogleLoading(false);
+
+      if (result.success) {
+        showToast('Signed up with Google successfully!', 'success');
+        navigate('/');
+      } else {
+        const err = result.error || 'Google sign-up failed.';
+        showToast(err, 'error');
+      }
+    },
+    onError: (error) => {
+      setGoogleLoading(false);
+      console.warn('Google OAuth login error:', error);
+      showToast('Google sign-up was closed or blocked.', 'warning');
+    },
+  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -193,7 +203,7 @@ export default function RegisterView() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={handleGoogleAuthRedirect}
+            onClick={() => googleSignUpTrigger()}
             disabled={googleLoading}
             className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-white font-medium text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 cursor-pointer active:scale-98 disabled:opacity-50"
           >
