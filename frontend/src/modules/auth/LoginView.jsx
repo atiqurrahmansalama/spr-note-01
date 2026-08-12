@@ -75,11 +75,12 @@ export default function LoginView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Standard Google OAuth 2.0 direct authorization handler (Opens in NEW TAB / WINDOW)
+  // Standard Google OAuth 2.0 direct authorization handler (Top-Level Window Navigation)
   const handleGoogleLogin = () => {
+    console.log('[Google Auth] Continue with Google clicked.');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      console.warn('Google OAuth Client ID is not configured.');
+      console.warn('[Google Auth] VITE_GOOGLE_CLIENT_ID is not configured in environment variables.');
       showToast('Google OAuth Client ID is not configured.', 'warning');
       return;
     }
@@ -88,14 +89,15 @@ export default function LoginView() {
     const scope = encodeURIComponent('openid email profile');
 
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${clientId}&` +
+      `client_id=${encodeURIComponent(clientId)}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=token&` +
       `scope=${scope}&` +
       `prompt=select_account`;
 
-    // Open directly in a NEW TAB / WINDOW from direct user gesture
-    window.open(googleAuthUrl, '_blank', 'noopener,noreferrer');
+    console.log('[Google Auth] Redirecting to Google:', googleAuthUrl);
+    // Direct window navigation (never blocked by browser popups or adblockers)
+    window.location.href = googleAuthUrl;
   };
 
   return (
