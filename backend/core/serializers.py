@@ -354,7 +354,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
             'name': obj.get_user_type_display() if hasattr(obj, 'get_user_type_display') else obj.user_type,
             'code': obj.user_type,
             'description': '',
-            'hierarchy_level': 50,
+            'hierarchy_level': 5,
             'color_theme': 'purple' if obj.user_type == 'GUARDIAN' else 'blue',
             'is_system_role': False,
             'action_permissions': {},

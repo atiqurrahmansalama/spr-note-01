@@ -31,7 +31,7 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
     name: "",
     code: "",
     description: "",
-    hierarchy_level: 50,
+    hierarchy_level: 5,
     color_theme: "blue",
     action_permissions: {
       can_create_student: true,
@@ -71,7 +71,7 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
       name: "",
       code: "",
       description: "",
-      hierarchy_level: 50,
+      hierarchy_level: 5,
       color_theme: "blue",
       action_permissions: {
         can_create_student: true,
@@ -101,7 +101,7 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
       name: role.name,
       code: role.code,
       description: role.description || "",
-      hierarchy_level: role.hierarchy_level || 50,
+      hierarchy_level: role.hierarchy_level || 5,
       color_theme: role.color_theme || "blue",
       action_permissions: {
         can_create_student: role.action_permissions?.can_create_student ?? true,
@@ -474,15 +474,16 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-500">
-                    Lower number = Higher authority (1 = Super Admin, 100 = Guardian).
+                    Lower number = Higher authority (1 = Super Admin, 5 = Staff / Evaluation, 10 = Guardian).
                   </p>
                   <input
                     type="range"
-                    min={2}
-                    max={99}
+                    min={1}
+                    max={10}
+                    step={1}
                     value={formData.hierarchy_level}
                     onChange={(e) =>
-                      setFormData({ ...formData, hierarchy_level: parseInt(e.target.value) || 50 })
+                      setFormData({ ...formData, hierarchy_level: parseInt(e.target.value) || 5 })
                     }
                     className="w-full accent-emerald-500 cursor-pointer"
                   />

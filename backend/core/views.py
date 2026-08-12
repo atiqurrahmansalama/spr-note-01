@@ -511,7 +511,7 @@ class UserProfileView(APIView):
                 'name': user.get_user_type_display() if hasattr(user, 'get_user_type_display') else user.user_type,
                 'code': user.user_type,
                 'description': '',
-                'hierarchy_level': 50,
+                'hierarchy_level': 5,
                 'color_theme': 'purple' if user.user_type == 'GUARDIAN' else 'blue',
                 'is_system_role': False,
                 'action_permissions': {},
@@ -1574,14 +1574,6 @@ class UserRoleListCreateView(APIView):
     def post(self, request):
         serializer = UserRoleSerializer(data=request.data)
         if serializer.is_valid():
-            new_level = serializer.validated_data.get('hierarchy_level', 5)
-            if request.user and request.user.is_authenticated and not request.user.is_superuser:
-                current_level = request.user.role.hierarchy_level if getattr(request.user, 'role', None) else 5
-                if current_level >= new_level:
-                    return Response(
-                        {"error": f"Hierarchy Guard Violation: Your rank ({current_level}) cannot create or assign a role with equal or higher authority level ({new_level})."},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
             role = serializer.save()
             return Response(UserRoleSerializer(role).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -1603,15 +1595,6 @@ class UserRoleDetailView(APIView):
             role = UserRole.objects.get(pk=pk)
         except UserRole.DoesNotExist:
             return Response({"error": "Role not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        new_level = request.data.get('hierarchy_level', role.hierarchy_level)
-        if request.user and request.user.is_authenticated and not request.user.is_superuser:
-            current_level = request.user.role.hierarchy_level if getattr(request.user, 'role', None) else 5
-            if current_level >= int(new_level) or current_level >= role.hierarchy_level:
-                return Response(
-                    {"error": "Hierarchy Guard Violation: You cannot edit a role with equal or higher rank than your own."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
 
         serializer = UserRoleSerializer(role, data=request.data, partial=True)
         if serializer.is_valid():
@@ -1657,7 +1640,7 @@ class UserRoleCloneView(APIView):
             name=f"Copy of {source_role.name}",
             code=new_code,
             description=f"Cloned from {source_role.name}. {source_role.description}",
-            hierarchy_level=max(10, source_role.hierarchy_level),
+            hierarchy_level=min(10, max(1, source_role.hierarchy_level)),
             color_theme=source_role.color_theme,
             is_system_role=False,
         )

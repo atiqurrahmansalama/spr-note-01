@@ -43,7 +43,7 @@ class UserRole(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True, default='')
-    hierarchy_level = models.PositiveIntegerField(default=50)
+    hierarchy_level = models.PositiveIntegerField(default=5)
     color_theme = models.CharField(max_length=30, default='blue', choices=COLOR_THEME_CHOICES)
     is_system_role = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
