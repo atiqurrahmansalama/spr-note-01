@@ -158,8 +158,9 @@ export default function StudentReportsView() {
         "Unnamed Student",
       student_group:
         rep.student_group ||
-        rep.student_details?.group_name ||
         rep.subject_course ||
+        rep.student_details?.group_name ||
+        (typeof rep.student === "object" ? (rep.student?.group_name || rep.student?.group) : null) ||
         "General Group",
       session_name: rep.session_name || rep.session || "General Session",
       comment: rep.comment || "",
