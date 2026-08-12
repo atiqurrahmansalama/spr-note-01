@@ -46,6 +46,7 @@ export default function LoginView() {
 
   // Google OAuth Trigger
   const googleLoginTrigger = useGoogleLogin({
+    prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setAuthErrorBanner(null);
       setGoogleLoading(true);
@@ -64,9 +65,10 @@ export default function LoginView() {
         showToast(err, 'error');
       }
     },
-    onError: () => {
+    onError: (error) => {
       setGoogleLoading(false);
-      const err = 'Google sign-in was cancelled or failed.';
+      console.warn('Google OAuth popup blocked or error:', error);
+      const err = 'Google sign-in window was blocked or closed. Please allow popups if blocked.';
       setAuthErrorBanner(err);
       showToast(err, 'warning');
     },
@@ -110,9 +112,9 @@ export default function LoginView() {
             onClick={() => {
               if (!isGoogleConfigured) {
                 console.warn('Google OAuth Client ID is not configured.');
+                showToast('Google OAuth Client ID is not configured.', 'warning');
                 return;
               }
-              setGoogleLoading(true);
               googleLoginTrigger();
             }}
             disabled={googleLoading}

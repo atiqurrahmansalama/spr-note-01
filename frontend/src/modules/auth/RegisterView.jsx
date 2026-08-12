@@ -93,6 +93,7 @@ export default function RegisterView() {
   const isGoogleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const googleSignUpTrigger = useGoogleLogin({
+    prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       const result = await loginWithGoogle({
@@ -109,9 +110,10 @@ export default function RegisterView() {
         showToast(err, 'error');
       }
     },
-    onError: () => {
+    onError: (error) => {
       setGoogleLoading(false);
-      showToast('Google sign-up was cancelled or failed.', 'warning');
+      console.warn('Google OAuth popup error:', error);
+      showToast('Google sign-up window was blocked or closed.', 'warning');
     },
   });
 
@@ -174,9 +176,9 @@ export default function RegisterView() {
             onClick={() => {
               if (!isGoogleConfigured) {
                 console.warn('Google OAuth Client ID is not configured.');
+                showToast('Google OAuth Client ID is not configured.', 'warning');
                 return;
               }
-              setGoogleLoading(true);
               googleSignUpTrigger();
             }}
             disabled={googleLoading}
