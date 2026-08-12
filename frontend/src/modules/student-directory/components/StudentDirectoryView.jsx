@@ -43,6 +43,8 @@ export default function StudentDirectoryView() {
         const raw = await res.json();
         const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => ({
           id: typeof s === "object" ? s.id : null,
+          uniq_id: typeof s === "object" ? s.uniq_id : null,
+          roll_number: typeof s === "object" ? (s.roll_number || s.roll) : null,
           label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
           sub: typeof s === "object" ? (s.group_name || s.group || s.sub || "General Group") : "General Group",
         }));

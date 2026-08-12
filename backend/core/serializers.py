@@ -582,6 +582,29 @@ class StudentSerializer(serializers.ModelSerializer):
         if name_val and str(name_val).strip():
             validated_data['name_en'] = str(name_val).strip()
 
+        # Deduplication Guard: Only merge if no explicit roll_number, uniq_id, or is_new flag is set
+        is_explicit = (
+            self.initial_data.get('is_new')
+            or self.initial_data.get('id')
+            or self.initial_data.get('uniq_id')
+            or validated_data.get('roll_number') is not None
+            or self.initial_data.get('roll_number') is not None
+        )
+
+        if not is_explicit:
+            existing_student = Student.objects.filter(
+                name_en__iexact=validated_data.get('name_en', ''),
+                group_name__iexact=group_val
+            ).first()
+
+            if existing_student:
+                if details_data and isinstance(details_data, dict):
+                    detail_obj, _ = StudentDetail.objects.get_or_create(student=existing_student)
+                    for k, v in details_data.items():
+                        setattr(detail_obj, k, v)
+                    detail_obj.save()
+                return existing_student
+
         if 'roll_number' not in validated_data or validated_data['roll_number'] is None:
             max_roll = Student.objects.filter(group_name=group_val).aggregate(Max('roll_number'))['roll_number__max'] or 0
             validated_data['roll_number'] = max_roll + 1
@@ -590,7 +613,7 @@ class StudentSerializer(serializers.ModelSerializer):
 
         # Automatically create linked StudentDetail
         details_kwargs = details_data if isinstance(details_data, dict) else {}
-        StudentDetail.objects.create(student=student, **details_kwargs)
+        StudentDetail.objects.get_or_create(student=student, defaults=details_kwargs)
 
         return student
 

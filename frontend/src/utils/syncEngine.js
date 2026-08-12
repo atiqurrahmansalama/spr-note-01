@@ -107,13 +107,18 @@ export const syncLocalStudentsToBackend = async () => {
         label: s.name || s.student_name || s.label || String(s),
         sub: s.group_name || s.group || s.sub || "General Group",
       }));
-      const apiNames = new Set(
-        apiStudents.map((s) => (s.label || "").toLowerCase().trim())
+      const apiKeys = new Set(
+        apiStudents.map((s) => `${(s.label || "").toLowerCase().trim()}___${(s.sub || "General Group").toLowerCase().trim()}`)
       );
 
       const localStudents = studentStore.getAll();
       const unsyncedLocal = (Array.isArray(localStudents) ? localStudents : []).filter(
-        (s) => s && (s.label || s.name) && !apiNames.has((s.label || s.name || "").toLowerCase().trim())
+        (s) => {
+          if (!s || (!s.label && !s.name)) return false;
+          if (!s._local) return false;
+          const key = `${(s.label || s.name || "").toLowerCase().trim()}___${(s.sub || s.group || "General Group").toLowerCase().trim()}`;
+          return !apiKeys.has(key);
+        }
       );
 
       for (const stu of unsyncedLocal) {
