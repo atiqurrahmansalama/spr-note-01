@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import apiClient from "./api/axios";
 import AppLayout from "./components/layout/AppLayout";
 import LoginView from "./modules/auth/LoginView";
 import RegisterView from "./modules/auth/RegisterView";
@@ -34,7 +36,63 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function PopupOAuthHandler() {
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+
+    const hash = window.location.hash;
+    const hashParams = hash ? new URLSearchParams(hash.replace("#", "?")) : null;
+    const googleAccess = hashParams?.get("access_token");
+    const googleId = hashParams?.get("id_token");
+
+    if ((code || googleAccess || googleId) && window.opener) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      const payload = code
+        ? { code, redirect_uri: window.location.origin }
+        : { access_token: googleAccess, id_token: googleId };
+
+      apiClient.post("/api/v1/auth/google/", payload)
+        .then((res) => {
+          if (window.opener) {
+            window.opener.postMessage({ type: "GOOGLE_AUTH_SUCCESS", payload: res.data }, window.location.origin);
+          }
+          window.close();
+        })
+        .catch((err) => {
+          console.error("Google Backend Exchange Failed:", err?.response?.data || err?.message);
+          if (window.opener) {
+            window.opener.postMessage({
+              type: "GOOGLE_AUTH_ERROR",
+              error: err?.response?.data || "Backend authentication failed"
+            }, window.location.origin);
+          }
+          window.close();
+        });
+    }
+  }, []);
+
+  return (
+    <div style={{ display: "flex", height: "100vh", justifyContent: "center", alignItems: "center", background: "#09090b", color: "#f4f4f5", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ textAlign: "center", padding: "20px" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px" }}>Signing in with Google...</h2>
+        <p style={{ fontSize: "14px", color: "#a1a1aa" }}>Please wait while we complete authentication.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get("code");
+  const hash = window.location.hash;
+  const isGooglePopup = Boolean((code || (hash && hash.includes("access_token"))) && window.opener);
+
+  if (isGooglePopup) {
+    return <PopupOAuthHandler />;
+  }
+
   return (
     <FeatureControlProvider>
       <BrowserRouter>
