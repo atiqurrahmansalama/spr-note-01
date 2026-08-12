@@ -75,37 +75,20 @@ export default function LoginView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Google OAuth Trigger (Redirect Mode - Not blocked by adblockers/popups)
-  const googleLoginTrigger = useGoogleLogin({
-    ux_mode: 'redirect',
-    redirect_uri: window.location.origin + '/login',
-    prompt: 'select_account',
-    onSuccess: async (tokenResponse) => {
-      setAuthErrorBanner(null);
-      setGoogleLoading(true);
-      const result = await loginWithGoogle({
-        access_token: tokenResponse.access_token,
-        id_token: tokenResponse.id_token,
-      });
-      setGoogleLoading(false);
-
-      if (result.success) {
-        showToast('Signed in with Google successfully!', 'success');
-        navigate('/');
-      } else {
-        const err = result.error || 'Google sign-in failed.';
-        setAuthErrorBanner(err);
-        showToast(err, 'error');
-      }
-    },
-    onError: (error) => {
-      setGoogleLoading(false);
-      console.warn('Google OAuth redirect error:', error);
-      const err = 'Google sign-in redirect failed.';
-      setAuthErrorBanner(err);
-      showToast(err, 'warning');
-    },
-  });
+  // Native top-level Google OAuth redirect (100% immune to adblockers and popup blockers)
+  const handleGoogleAuthRedirect = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.warn('Google OAuth Client ID is not configured.');
+      showToast('Google OAuth Client ID is not configured.', 'warning');
+      return;
+    }
+    setGoogleLoading(true);
+    const redirectUri = window.location.origin + '/login';
+    const scope = encodeURIComponent('openid profile email');
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}&prompt=select_account`;
+    window.location.href = authUrl;
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 font-sans text-zinc-100 selection:bg-sky-500 selection:text-zinc-950">
@@ -142,14 +125,7 @@ export default function LoginView() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => {
-              if (!isGoogleConfigured) {
-                console.warn('Google OAuth Client ID is not configured.');
-                showToast('Google OAuth Client ID is not configured.', 'warning');
-                return;
-              }
-              googleLoginTrigger();
-            }}
+            onClick={handleGoogleAuthRedirect}
             disabled={googleLoading}
             className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border border-zinc-800 font-medium py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer disabled:opacity-50"
           >
