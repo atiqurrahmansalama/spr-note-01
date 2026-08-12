@@ -121,9 +121,27 @@ export function AuthProvider({ children }) {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    // 4. LISTEN FOR STORAGE SYNC EVENTS ACROSS TABS
+    const handleStorageChange = (e) => {
+      if (e.key === 'auth_sync_event') {
+        const token = authStore.getAccessToken() || localStorage.getItem('access_token');
+        const userDataStr = localStorage.getItem('user');
+        const userData = userDataStr ? JSON.parse(userDataStr) : null;
 
-    // Normal initial token verification
+        if (token) {
+          setAccessToken(token);
+          if (userData) {
+            setUser(userData);
+            authStore.saveUserProfile(userData);
+          }
+          window.location.href = '/';
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // 5. Normal initial token verification
     const initAuth = async () => {
       const token = authStore.getAccessToken();
       if (token) {
@@ -143,7 +161,10 @@ export function AuthProvider({ children }) {
 
     initAuth();
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Standard Email/Phone Login

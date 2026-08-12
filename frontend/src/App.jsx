@@ -37,6 +37,10 @@ function ProtectedRoute({ children }) {
 }
 
 function PopupOAuthHandler() {
+  const [status, setStatus] = useState("loading"); // 'loading' | 'success' | 'error'
+  const [errorData, setErrorData] = useState(null);
+  const isProcessing = useRef(false);
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
@@ -46,7 +50,8 @@ function PopupOAuthHandler() {
     const googleAccess = hashParams?.get("access_token");
     const googleId = hashParams?.get("id_token");
 
-    if ((code || googleAccess || googleId) && window.opener) {
+    if ((code || googleAccess || googleId) && !isProcessing.current) {
+      isProcessing.current = true;
       window.history.replaceState({}, document.title, window.location.pathname);
 
       const payload = code
@@ -55,28 +60,75 @@ function PopupOAuthHandler() {
 
       apiClient.post("/api/v1/auth/google/", payload)
         .then((res) => {
-          if (window.opener) {
-            window.opener.postMessage({ type: "GOOGLE_AUTH_SUCCESS", payload: res.data }, window.location.origin);
+          const data = res.data || {};
+          const access = data.tokens?.access || data.access;
+          const refresh = data.tokens?.refresh || data.refresh;
+          const user = data.user;
+
+          if (access) {
+            // 1. Save auth payload
+            localStorage.setItem("access_token", access);
+            if (refresh) localStorage.setItem("refresh_token", refresh);
+            if (user) localStorage.setItem("user", JSON.stringify(user));
+            authStore.saveTokens(access, refresh);
+
+            // 2. Trigger cross-tab sync event for main window
+            localStorage.setItem("auth_sync_event", Date.now().toString());
+
+            if (window.opener) {
+              window.opener.postMessage({ type: "GOOGLE_AUTH_SUCCESS", payload: res.data }, window.location.origin);
+            }
+
+            setStatus("success");
+
+            // Close popup after brief delay
+            setTimeout(() => {
+              window.close();
+            }, 500);
+          } else {
+            setStatus("error");
+            setErrorData({ detail: "No access token returned from backend." });
           }
-          window.close();
         })
         .catch((err) => {
-          console.error("Google Backend Exchange Failed:", err?.response?.data || err?.message);
+          console.error("Django Google Auth Exchange Error:", err?.response?.data || err?.message);
+          const errPayload = err?.response?.data || { detail: err?.message || "Backend authentication failed" };
+          setStatus("error");
+          setErrorData(errPayload);
+
           if (window.opener) {
             window.opener.postMessage({
               type: "GOOGLE_AUTH_ERROR",
-              error: err?.response?.data || "Backend authentication failed"
+              error: errPayload
             }, window.location.origin);
           }
-          window.close();
+          // DO NOT CLOSE POPUP ON ERROR SO DEVELOPER CAN INSPECT
         });
     }
   }, []);
 
+  if (status === "error") {
+    return (
+      <div style={{ padding: "24px", background: "#18181b", color: "#f87171", fontFamily: "monospace", minHeight: "100vh", boxSizing: "border-box" }}>
+        <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", color: "#ef4444" }}>❌ Backend Authentication Error</h3>
+        <p style={{ fontSize: "14px", color: "#a1a1aa", marginBottom: "16px" }}>Google code exchange failed on Django server:</p>
+        <pre style={{ background: "#09090b", padding: "16px", borderRadius: "8px", color: "#fca5a5", overflowX: "auto", fontSize: "13px", border: "1px solid #27272a" }}>
+          {JSON.stringify(errorData, null, 2)}
+        </pre>
+        <button
+          onClick={() => window.close()}
+          style={{ padding: "10px 20px", background: "#27272a", color: "#f4f4f5", border: "1px solid #3f3f46", borderRadius: "8px", cursor: "pointer", marginTop: "16px", fontWeight: "600" }}
+        >
+          Close Window
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: "flex", height: "100vh", justifyContent: "center", alignItems: "center", background: "#09090b", color: "#f4f4f5", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", justifyContent: "center", alignItems: "center", background: "#09090b", color: "#38bdf8", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ textAlign: "center", padding: "20px" }}>
-        <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px" }}>Signing in with Google...</h2>
+        <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px" }}>Syncing Google Authentication...</h2>
         <p style={{ fontSize: "14px", color: "#a1a1aa" }}>Please wait while we complete authentication.</p>
       </div>
     </div>
