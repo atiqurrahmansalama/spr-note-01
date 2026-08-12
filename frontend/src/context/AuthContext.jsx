@@ -13,6 +13,37 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      // 1. Check for Google OAuth redirect hash parameters
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.replace('#', '?'));
+        const googleAccess = params.get('access_token');
+        const googleId = params.get('id_token');
+        if (googleAccess || googleId) {
+          window.history.replaceState(null, '', window.location.pathname);
+          try {
+            const res = await apiClient.post('/api/v1/auth/google/', {
+              access_token: googleAccess,
+              id_token: googleId,
+            });
+            const data = res.data;
+            if (data.tokens?.access) {
+              authStore.saveTokens(data.tokens.access, data.tokens.refresh);
+              setAccessToken(data.tokens.access);
+            }
+            if (data.user) {
+              authStore.saveUserProfile(data.user);
+              setUser(data.user);
+            }
+          } catch (e) {
+            console.warn('[AuthProvider] Google OAuth redirect token exchange error:', e);
+          }
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // 2. Normal initial token verification
       const token = authStore.getAccessToken();
       if (token) {
         setAccessToken(token);
@@ -23,7 +54,6 @@ export function AuthProvider({ children }) {
             authStore.saveUserProfile(res.data);
           }
         } catch {
-          // Token expired or invalid
           console.warn('[AuthProvider] Initial token verification failed.');
         }
       }

@@ -131,7 +131,7 @@ export default function RegisterView() {
       return;
     }
     setGoogleLoading(true);
-    const redirectUri = window.location.origin + '/register';
+    const redirectUri = window.location.origin;
     const scope = encodeURIComponent('openid profile email');
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}&prompt=select_account`;
     window.location.href = authUrl;
