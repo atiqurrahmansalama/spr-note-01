@@ -13,26 +13,56 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(accessToken && user);
 
   useEffect(() => {
-    const initAuth = async () => {
-      // 1. Check for Google OAuth redirect parameters (code in query search OR access_token in hash)
-      const urlParams = new URLSearchParams(window.location.search);
-      const googleCode = urlParams.get('code');
+    const urlParams = new URLSearchParams(window.location.search);
+    const googleCode = urlParams.get('code');
 
-      const hash = window.location.hash;
-      const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
-      const googleAccess = hashParams?.get('access_token');
-      const googleId = hashParams?.get('id_token');
+    const hash = window.location.hash;
+    const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
+    const googleAccess = hashParams?.get('access_token');
+    const googleId = hashParams?.get('id_token');
 
-      if ((googleCode || googleAccess || googleId) && !isProcessingCode.current) {
-        isProcessingCode.current = true; // Block duplicate calls from React StrictMode or concurrent renders
-        // Clear code and hash parameters from URL bar immediately so it never re-triggers
-        window.history.replaceState({}, document.title, window.location.pathname);
-        try {
-          const payload = googleCode
-            ? { code: googleCode, redirect_uri: window.location.origin }
-            : { access_token: googleAccess, id_token: googleId };
+    // 1. IF WE ARE INSIDE THE POPUP WINDOW RETURNING FROM GOOGLE:
+    if ((googleCode || googleAccess || googleId) && window.opener && !isProcessingCode.current) {
+      isProcessingCode.current = true;
+      window.history.replaceState({}, document.title, window.location.pathname);
 
-          const res = await apiClient.post('/api/v1/auth/google/', payload);
+      const payload = googleCode
+        ? { code: googleCode, redirect_uri: window.location.origin }
+        : { access_token: googleAccess, id_token: googleId };
+
+      apiClient.post('/api/v1/auth/google/', payload)
+        .then(res => {
+          if (window.opener) {
+            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', payload: res.data }, window.location.origin);
+          }
+          window.close();
+        })
+        .catch(err => {
+          console.error('Database/Backend Google Exchange Failed:', err?.response?.data || err?.message);
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'GOOGLE_AUTH_ERROR',
+              error: err?.response?.data || 'Backend database update failed'
+            }, window.location.origin);
+          }
+          window.close();
+        })
+        .finally(() => {
+          isProcessingCode.current = false;
+        });
+      return;
+    }
+
+    // 2. IF WE ARE IN MAIN WINDOW RETURNING VIA DIRECT REDIRECT (no opener):
+    if ((googleCode || googleAccess || googleId) && !window.opener && !isProcessingCode.current) {
+      isProcessingCode.current = true;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const payload = googleCode
+        ? { code: googleCode, redirect_uri: window.location.origin }
+        : { access_token: googleAccess, id_token: googleId };
+
+      apiClient.post('/api/v1/auth/google/', payload)
+        .then(res => {
           const data = res.data;
           const newAccess = data.tokens?.access || data.access;
           const newRefresh = data.tokens?.refresh || data.refresh;
@@ -48,24 +78,53 @@ export function AuthProvider({ children }) {
             authStore.saveUserProfile(userData);
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
-          } else {
-            setUser(true);
           }
-
-          setIsLoading(false);
-          // Force clean top-level reload to ensure React Router guards hydrate cleanly with non-empty auth state
           window.location.href = '/';
-          return;
-        } catch (e) {
-          console.error('[AuthProvider] Google Auth Exchange Error:', e?.response?.data || e?.message);
-        } finally {
+        })
+        .catch(err => {
+          console.error('[AuthProvider] Direct Google Exchange Error:', err?.response?.data || err?.message);
+        })
+        .finally(() => {
           isProcessingCode.current = false;
+          setIsLoading(false);
+        });
+      return;
+    }
+
+    // 3. IF WE ARE IN THE MAIN WINDOW: Listen for postMessage from popup window
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        const payload = event.data.payload || {};
+        const newAccess = payload.tokens?.access || payload.access;
+        const newRefresh = payload.tokens?.refresh || payload.refresh;
+        const userData = payload.user;
+
+        if (newAccess) {
+          authStore.saveTokens(newAccess, newRefresh);
+          localStorage.setItem('access_token', newAccess);
+          if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
+          setAccessToken(newAccess);
         }
-        setIsLoading(false);
-        return;
+        if (userData) {
+          authStore.saveUserProfile(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        }
+
+        window.location.href = '/';
       }
 
-      // 2. Normal initial token verification
+      if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        console.error('Google Login Error from Popup:', event.data.error);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Normal initial token verification
+    const initAuth = async () => {
       const token = authStore.getAccessToken();
       if (token) {
         setAccessToken(token);
@@ -83,6 +142,8 @@ export function AuthProvider({ children }) {
     };
 
     initAuth();
+
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   // Standard Email/Phone Login

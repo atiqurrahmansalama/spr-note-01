@@ -46,7 +46,7 @@ export default function LoginView() {
 
 
 
-  // Standard Google OAuth 2.0 direct authorization handler (Opens in NEW TAB)
+  // Standard Google OAuth 2.0 direct authorization handler (Opens dedicated Popup Window)
   const handleGoogleLogin = () => {
     console.log('[Google Auth] Continue with Google clicked.');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -66,8 +66,12 @@ export default function LoginView() {
       `scope=${scope}&` +
       `prompt=select_account`;
 
-    console.log('[Google Auth] Opening Google OAuth in new tab:', googleAuthUrl);
-    window.open(googleAuthUrl, '_blank');
+    console.log('[Google Auth] Opening Google OAuth in popup window:', googleAuthUrl);
+    window.open(
+      googleAuthUrl,
+      'GoogleLoginPopup',
+      'width=500,height=600,scrollbars=yes'
+    );
   };
 
   return (
