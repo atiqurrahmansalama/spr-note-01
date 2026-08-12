@@ -1,5 +1,5 @@
 import { fetchWithAuth } from "./authService";
-import { students as studentStore, sessions as sessionStore, savedComments as commentStore, mergeSessions } from "./localStore";
+import { students as studentStore, sessions as sessionStore, savedComments as commentStore } from "./localStore";
 
 /**
  * Hybrid Sync Engine (LocalStorage <-> Django PostgreSQL)

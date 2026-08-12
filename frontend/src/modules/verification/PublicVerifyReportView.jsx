@@ -3,38 +3,33 @@ import { verifyReport } from "../../api/reports";
 import QrCodeBadge from "../../components/common/QrCodeBadge";
 
 export default function PublicVerifyReportView({ reportIdParam }) {
-  const [reportId, setReportId] = useState(reportIdParam || "");
-  const [searchInput, setSearchInput] = useState(reportIdParam || "");
-  const [loading, setLoading] = useState(true);
+  const getInitialTargetId = () => {
+    if (reportIdParam) return reportIdParam;
+    if (typeof window !== "undefined") {
+      const match = window.location.pathname.match(/\/verify-report\/([^/]+)/);
+      if (match && match[1]) return match[1];
+    }
+    return "";
+  };
+
+  const initialTarget = getInitialTargetId();
+  const [reportId, setReportId] = useState(initialTarget);
+  const [searchInput, setSearchInput] = useState(initialTarget);
+  const [loading, setLoading] = useState(!!initialTarget);
   const [result, setResult] = useState(null);
 
-  useEffect(() => {
-    // Extract reportId from URL path if not provided via props
-    let targetId = reportIdParam;
-    if (!targetId && typeof window !== "undefined") {
-      const match = window.location.pathname.match(/\/verify-report\/([^/]+)/);
-      if (match && match[1]) {
-        targetId = match[1];
-      }
-    }
-
-    if (targetId) {
-      setReportId(targetId);
-      setSearchInput(targetId);
-      performVerification(targetId);
-    } else {
-      setLoading(false);
-    }
-  }, [reportIdParam]);
-
   const performVerification = async (idToVerify) => {
-    setLoading(true);
-    setResult(null);
-
     const res = await verifyReport(idToVerify);
     setResult(res);
     setLoading(false);
   };
+
+  useEffect(() => {
+    const targetId = reportIdParam || getInitialTargetId();
+    if (targetId) {
+      performVerification(targetId);
+    }
+  }, [reportIdParam]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

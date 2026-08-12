@@ -340,7 +340,11 @@ export function mergeSessions(apiSessions, localSessions) {
 
   // API items (clean, _local flag মুছে দাও) + local-only items
   const merged = [
-    ...apiSessions.map(({ _local, ...rest }) => rest),
+    ...apiSessions.map((s) => {
+      const copy = { ...s };
+      delete copy._local;
+      return copy;
+    }),
     ...localOnly,
   ];
 

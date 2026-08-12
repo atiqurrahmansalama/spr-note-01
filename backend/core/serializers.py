@@ -3,7 +3,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from drf_spectacular.utils import extend_schema_field
 from drf_spectacular.types import OpenApiTypes
-from django.db.models import Max
+import uuid
+from django.db.models import Max, Q
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import transaction
@@ -117,6 +118,34 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if hasattr(self.user, 'guardian_profile'):
             guardian_data = GuardianProfileSerializer(self.user.guardian_profile).data
 
+        role_obj = getattr(self.user, 'role', None)
+        if role_obj:
+            perms_obj = getattr(role_obj, 'action_permissions', None)
+            perms_dict = {
+                'can_create_student': perms_obj.can_create_student,
+                'can_edit_student': perms_obj.can_edit_student,
+                'can_delete_report': perms_obj.can_delete_report,
+                'can_export_reports': perms_obj.can_export_reports,
+                'can_manage_users': perms_obj.can_manage_users,
+            } if perms_obj else {}
+            role_data = {
+                'id': role_obj.id,
+                'name': role_obj.name,
+                'code': role_obj.code,
+                'description': role_obj.description,
+                'hierarchy_level': role_obj.hierarchy_level,
+                'color_theme': role_obj.color_theme,
+                'is_system_role': role_obj.is_system_role,
+                'action_permissions': perms_dict,
+            }
+        else:
+            role_data = {
+                'id': None,
+                'name': self.user.get_user_type_display() if hasattr(self.user, 'get_user_type_display') else self.user.user_type,
+                'code': self.user.user_type,
+                'color_theme': 'purple' if self.user.user_type == 'GUARDIAN' else 'blue',
+            }
+
         data['user'] = {
             'id': self.user.id,
             'phone_number': self.user.phone_number,
@@ -125,7 +154,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'user_type': self.user.user_type,
-            'role': self.user.user_type,
+            'role': role_data,
+            'role_info': role_data,
             'avatar_url': self.user.avatar_url,
             'is_email_verified': getattr(self.user, 'is_email_verified', False),
             'auth_provider': getattr(self.user, 'auth_provider', 'email'),
@@ -195,19 +225,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, min_length=8)
 
 
-class UserSessionSerializer(serializers.ModelSerializer):
-    is_current = serializers.SerializerMethodField()
-
-    class Meta:
-        model = UserSession
-        fields = ['id', 'ip_address', 'user_agent', 'device_type', 'last_activity', 'created_at', 'is_current']
-
-    def get_is_current(self, obj):
-        request = self.context.get('request')
-        current_jti = self.context.get('current_jti')
-        if current_jti:
-            return obj.refresh_token_jti == current_jti
-        return False
 
 
 class RoleActionPermissionSerializer(serializers.ModelSerializer):
@@ -314,17 +331,33 @@ class UserAdminSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_role(self, obj):
         if obj.role:
+            perms_obj = getattr(obj.role, 'action_permissions', None)
+            perms_dict = {
+                'can_create_student': perms_obj.can_create_student,
+                'can_edit_student': perms_obj.can_edit_student,
+                'can_delete_report': perms_obj.can_delete_report,
+                'can_export_reports': perms_obj.can_export_reports,
+                'can_manage_users': perms_obj.can_manage_users,
+            } if perms_obj else {}
             return {
                 'id': obj.role.id,
                 'name': obj.role.name,
                 'code': obj.role.code,
+                'description': obj.role.description,
+                'hierarchy_level': obj.role.hierarchy_level,
                 'color_theme': obj.role.color_theme,
+                'is_system_role': obj.role.is_system_role,
+                'action_permissions': perms_dict,
             }
         return {
             'id': None,
             'name': obj.get_user_type_display() if hasattr(obj, 'get_user_type_display') else obj.user_type,
             'code': obj.user_type,
+            'description': '',
+            'hierarchy_level': 50,
             'color_theme': 'purple' if obj.user_type == 'GUARDIAN' else 'blue',
+            'is_system_role': False,
+            'action_permissions': {},
         }
 
     @extend_schema_field(OpenApiTypes.OBJECT)
@@ -341,6 +374,11 @@ class UserAdminSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None)
         phone = validated_data.get('phone_number') or f"user_{uuid.uuid4().hex[:10]}"
         validated_data['phone_number'] = phone
+        user_type = validated_data.get('user_type')
+        if user_type and 'role' not in validated_data:
+            role_obj = UserRole.objects.filter(code__iexact=user_type).first()
+            if role_obj:
+                validated_data['role'] = role_obj
         user = User.objects.create_user(password=password, **validated_data)
         return user
 
@@ -348,7 +386,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None)
         user_type = validated_data.get('user_type')
         if user_type:
-            role_obj = UserRole.objects.filter(code=user_type).first()
+            role_obj = UserRole.objects.filter(code__iexact=user_type).first()
             if role_obj:
                 instance.role = role_obj
 
@@ -389,27 +427,6 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
-    role = serializers.CharField(source='user_type', required=False, read_only=True)
-
-    class Meta:
-        model = User
-        fields = ['phone_number', 'email', 'password', 'user_type', 'role']
-        extra_kwargs = {
-            'user_type': {'required': False},
-            'email': {'required': False, 'allow_null': True},
-        }
-
-    def create(self, validated_data):
-        phone = validated_data.get('phone_number') or self.initial_data.get('username')
-        user_type = validated_data.get('user_type') or validated_data.get('role') or 'TEACHER'
-        return User.objects.create_user(
-            phone_number=phone,
-            email=validated_data.get('email'),
-            password=validated_data.get('password'),
-            user_type=user_type
-        )
 
 
 class ChangePasswordSerializer(serializers.Serializer):

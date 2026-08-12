@@ -137,6 +137,10 @@ class User(AbstractUser):
     def save(self, *args, **kwargs):
         if self.role and self.role.code:
             self.user_type = self.role.code
+        elif self.user_type:
+            role_obj = UserRole.objects.filter(code__iexact=self.user_type).first()
+            if role_obj:
+                self.role = role_obj
         if self.first_name or self.last_name:
             self.name = f"{self.first_name or ''} {self.last_name or ''}".strip()
         elif self.name:

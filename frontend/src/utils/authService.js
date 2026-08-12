@@ -12,6 +12,15 @@ const API_BASE_URL = getApiBaseUrl();
 const fetchApi = async (path, options = {}) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   
+  if (API_BASE_URL) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${cleanPath}`, options);
+      if (res.ok || res.status < 500) return res;
+    } catch {
+      console.warn(`[authService] Direct API_BASE_URL fetch to ${cleanPath} failed...`);
+    }
+  }
+
   // Primary try with relative path (Vite proxy / same origin)
   try {
     const res = await fetch(cleanPath, options);
@@ -35,7 +44,7 @@ const fetchApi = async (path, options = {}) => {
     return await fetch(localhostUrl, options);
   } catch (err) {
     console.warn(`[authService] All API targets failed for ${cleanPath}:`, err.message);
-    throw new Error("Server is offline or unreachable.");
+    throw new Error("Server is offline or unreachable.", { cause: err });
   }
 };
 

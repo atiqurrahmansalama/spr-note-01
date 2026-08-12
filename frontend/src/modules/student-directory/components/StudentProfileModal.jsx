@@ -3,36 +3,25 @@ import { fetchWithAuth } from "../../../utils/authService";
 
 export default function StudentProfileModal({ student, isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState("ACADEMIC");
-  const [details, setDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [details, setDetails] = useState(() => student?.details || {});
+  const [loading] = useState(false);
 
   useEffect(() => {
-    if (student && isOpen) {
-      loadStudentDetail();
+    let isMounted = true;
+    if (student?.id && isOpen) {
+      fetchWithAuth(`/api/students/${student.id}/`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (isMounted && data?.details) {
+            setDetails(data.details);
+          }
+        })
+        .catch(() => {});
     }
-  }, [student, isOpen]);
-
-  const loadStudentDetail = async () => {
-    if (!student?.id) {
-      setDetails(student?.details || {});
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`/api/students/${student.id}/`);
-      if (res.ok) {
-        const data = await res.json();
-        setDetails(data.details || {});
-      } else {
-        setDetails(student?.details || {});
-      }
-    } catch {
-      setDetails(student?.details || {});
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, [student?.id, isOpen]);
 
   if (!isOpen || !student) return null;
 

@@ -8,6 +8,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import uuid
+import datetime
+import io
+import base64
+import pyotp
+import qrcode
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
@@ -482,18 +487,34 @@ class UserProfileView(APIView):
 
         role_data = None
         if user.role:
+            perms_obj = getattr(user.role, 'action_permissions', None)
+            perms_dict = {
+                'can_create_student': perms_obj.can_create_student,
+                'can_edit_student': perms_obj.can_edit_student,
+                'can_delete_report': perms_obj.can_delete_report,
+                'can_export_reports': perms_obj.can_export_reports,
+                'can_manage_users': perms_obj.can_manage_users,
+            } if perms_obj else {}
             role_data = {
                 'id': user.role.id,
                 'name': user.role.name,
                 'code': user.role.code,
+                'description': user.role.description,
+                'hierarchy_level': user.role.hierarchy_level,
                 'color_theme': user.role.color_theme,
+                'is_system_role': user.role.is_system_role,
+                'action_permissions': perms_dict,
             }
         else:
             role_data = {
                 'id': None,
                 'name': user.get_user_type_display() if hasattr(user, 'get_user_type_display') else user.user_type,
                 'code': user.user_type,
+                'description': '',
+                'hierarchy_level': 50,
                 'color_theme': 'purple' if user.user_type == 'GUARDIAN' else 'blue',
+                'is_system_role': False,
+                'action_permissions': {},
             }
 
         full_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip()
@@ -1427,25 +1448,6 @@ class VerifyReportView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class UserProfileView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"detail": "No user found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = UserProfileSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def patch(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"detail": "No user found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = UserProfileSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserSessionView(APIView):
@@ -1542,15 +1544,14 @@ def seed_system_roles():
 
     for item in system_roles:
         perms_data = item.pop('perms')
-        role, _ = UserRole.objects.get_or_create(code=item['code'], defaults=item)
-        for k, v in item.items():
-            setattr(role, k, v)
-        role.save()
-
-        perm_obj, _ = RoleActionPermission.objects.get_or_create(role=role)
-        for pk, pv in perms_data.items():
-            setattr(perm_obj, pk, pv)
-        perm_obj.save()
+        role, created = UserRole.objects.get_or_create(code=item['code'], defaults=item)
+        if created:
+            perm_obj, _ = RoleActionPermission.objects.get_or_create(role=role)
+            for pk, pv in perms_data.items():
+                setattr(perm_obj, pk, pv)
+            perm_obj.save()
+        else:
+            RoleActionPermission.objects.get_or_create(role=role)
 
     User = get_user_model()
     for u in User.objects.filter(role__isnull=True):
@@ -1635,9 +1636,6 @@ class UserRoleDetailView(APIView):
         role.delete()
         return Response({"status": "success", "message": f"Role '{role.name}' deleted successfully."}, status=status.HTTP_200_OK)
 
-        role.delete()
-        return Response({"status": "success", "message": f"Role '{role.name}' deleted successfully."}, status=status.HTTP_200_OK)
-
 
 class UserRoleCloneView(APIView):
     permission_classes = [AllowAny]
@@ -1697,13 +1695,21 @@ class UserViewSet(viewsets.ModelViewSet):
         user_type = self.request.data.get('user_type') or self.request.data.get('role') or self.request.data.get('role_code')
         role_obj = None
         if user_type:
-            role_obj = UserRole.objects.filter(code__iexact=user_type).first()
+            if isinstance(user_type, int) or (isinstance(user_type, str) and user_type.isdigit()):
+                role_obj = UserRole.objects.filter(pk=int(user_type)).first()
+            if not role_obj and isinstance(user_type, str):
+                role_obj = UserRole.objects.filter(code__iexact=user_type).first()
         serializer.save(role=role_obj)
 
     def perform_update(self, serializer):
         user_type = self.request.data.get('user_type') or self.request.data.get('role') or self.request.data.get('role_code')
+        role_obj = None
         if user_type:
-            role_obj = UserRole.objects.filter(code__iexact=user_type).first()
+            if isinstance(user_type, int) or (isinstance(user_type, str) and user_type.isdigit()):
+                role_obj = UserRole.objects.filter(pk=int(user_type)).first()
+            if not role_obj and isinstance(user_type, str):
+                role_obj = UserRole.objects.filter(code__iexact=user_type).first()
+        if role_obj:
             serializer.save(role=role_obj)
         else:
             serializer.save()
@@ -2253,12 +2259,8 @@ class SecurityAuditLogView(APIView):
 # IAM & SECURITY SUITE VIEWS
 # ==============================================================================
 
-import io
-import base64
-import pyotp
-import qrcode
 from django.contrib.auth.hashers import make_password, check_password
-from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework_simplejwt.tokens import AccessToken
 from .models import UserPasskey, QRSessionTicket
 
 
@@ -2628,7 +2630,7 @@ class Setup2FAView(APIView):
         # Render QR Code PNG as Base64 Image
         img = qrcode.make(totp_uri)
         buf = io.BytesIO()
-        img.save(buf, format='PNG')
+        img.save(buf)
         qr_b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
         return Response({

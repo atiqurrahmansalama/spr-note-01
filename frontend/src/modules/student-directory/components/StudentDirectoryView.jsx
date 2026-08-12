@@ -15,15 +15,12 @@ import { GroupsIcon, UsersIcon, TrashIcon, EditIcon, CloudIcon } from "../../../
 export default function StudentDirectoryView() {
   const { showToast } = useToast();
 
-  const [studentList, setStudentList] = useState([]);
-  const [reportsList, setReportsList] = useState([]);
+  const [studentList, setStudentList] = useState(() => studentStore.getAll());
   const [searchQuery, setSearchQuery] = useState("");
-  const [reportSearchQuery, setReportSearchQuery] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
   const [profileModalStudent, setProfileModalStudent] = useState(null);
   const [offline, setOffline] = useState(!isOnline());
-
 
   // Inline editing state for Student
   const [editingStudentLabel, setEditingStudentLabel] = useState(null);
@@ -34,30 +31,8 @@ export default function StudentDirectoryView() {
   const [editingGroupName, setEditingGroupName] = useState(null);
   const [newGroupNameInput, setNewGroupNameInput] = useState("");
 
-  // Monitor online status
-  useEffect(() => {
-    const handleOnline = () => {
-      setOffline(false);
-      loadStudents();
-      loadReports();
-    };
-    const handleOffline = () => setOffline(true);
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Load students from LocalStorage & API
+  // Load students from API asynchronously
   const loadStudents = async () => {
-    const cached = studentStore.getAll();
-    if (cached.length > 0) {
-      setStudentList(cached);
-    }
-
     if (!isOnline()) return;
 
     try {
@@ -81,35 +56,25 @@ export default function StudentDirectoryView() {
     }
   };
 
-  // Load daily reports from LocalStorage & API
-  const loadReports = async () => {
-    try {
-      const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
-      if (localReps.length > 0) {
-        setReportsList(localReps);
-      }
-    } catch {
-      setReportsList([]);
-    }
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => {
+      setOffline(false);
+      loadStudents();
+    };
+    const handleOffline = () => setOffline(true);
 
-    if (!isOnline()) return;
-
-    try {
-      const res = await fetchWithAuth("/reports/");
-      if (res.ok) {
-        const raw = await res.json();
-        setReportsList(Array.isArray(raw) ? raw : []);
-        localStorage.setItem("spr_reports_local_v1", JSON.stringify(Array.isArray(raw) ? raw : []));
-      }
-    } catch (err) {
-      console.warn("[StudentDirectory] Reports API fetch failed:", err.message);
-    }
-  };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     loadStudents();
-    loadReports();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Unique list of groups (sorted alphabetically)
   const groupsList = Array.from(
