@@ -90,10 +90,7 @@ export default function RegisterView() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const isGoogleConfigured = Boolean(
-    import.meta.env.VITE_GOOGLE_CLIENT_ID &&
-    !import.meta.env.VITE_GOOGLE_CLIENT_ID.includes("dummyid")
-  );
+  const isGoogleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const googleSignUpTrigger = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -175,6 +172,11 @@ export default function RegisterView() {
           <button
             type="button"
             onClick={() => {
+              if (!isGoogleConfigured) {
+                console.warn('Google OAuth Client ID is not configured.');
+                return;
+              }
+              setGoogleLoading(true);
               googleSignUpTrigger();
             }}
             disabled={googleLoading}

@@ -9,7 +9,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "1000000000000-dummyid.apps.googleusercontent.com";
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

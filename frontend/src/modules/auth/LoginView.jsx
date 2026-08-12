@@ -20,10 +20,7 @@ export default function LoginView() {
 
   const [authErrorBanner, setAuthErrorBanner] = useState(null);
 
-  const isGoogleConfigured = Boolean(
-    import.meta.env.VITE_GOOGLE_CLIENT_ID &&
-    !import.meta.env.VITE_GOOGLE_CLIENT_ID.includes("dummyid")
-  );
+  const isGoogleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   // Email/Phone Form Submit
   const handleSubmit = async (e) => {
@@ -112,7 +109,7 @@ export default function LoginView() {
             type="button"
             onClick={() => {
               if (!isGoogleConfigured) {
-                showToast('Google OAuth Client ID is not configured.', 'warning');
+                console.warn('Google OAuth Client ID is not configured.');
                 return;
               }
               setGoogleLoading(true);
