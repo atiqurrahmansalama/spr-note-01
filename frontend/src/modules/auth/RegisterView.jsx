@@ -122,31 +122,27 @@ export default function RegisterView() {
     handleGoogleRedirectHash();
   }, []);
 
-  const googleSignUpTrigger = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setGoogleLoading(true);
-      const result = await loginWithGoogle({
-        access_token: tokenResponse.access_token,
-        id_token: tokenResponse.id_token,
-      });
-      setGoogleLoading(false);
+  // Standard Google OAuth 2.0 direct authorization handler (Opens in NEW TAB / WINDOW)
+  const handleGoogleSignUp = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.warn('Google OAuth Client ID is not configured.');
+      showToast('Google OAuth Client ID is not configured.', 'warning');
+      return;
+    }
 
-      if (result.success) {
-        showToast('Signed up with Google successfully!', 'success');
-        navigate('/');
-      } else {
-        const err = result.error || 'Google sign-up failed.';
-        showToast(err, 'error');
-      }
-    },
-    onError: (error) => {
-      setGoogleLoading(false);
-      console.warn('Google OAuth login error:', error);
-      showToast('Google sign-up error occurred.', 'warning');
-    },
-    ux_mode: 'redirect',
-    redirect_uri: window.location.origin,
-  });
+    const redirectUri = window.location.origin;
+    const scope = encodeURIComponent('openid email profile');
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${clientId}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=token&` +
+      `scope=${scope}&` +
+      `prompt=select_account`;
+
+    window.open(googleAuthUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -204,7 +200,7 @@ export default function RegisterView() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => googleSignUpTrigger()}
+            onClick={handleGoogleSignUp}
             disabled={googleLoading}
             className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-white font-medium text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 cursor-pointer active:scale-98 disabled:opacity-50"
           >

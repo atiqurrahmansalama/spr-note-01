@@ -75,36 +75,28 @@ export default function LoginView() {
     handleGoogleRedirectHash();
   }, []);
 
-  // Google OAuth Trigger with Redirect Mode (Eliminates Popup Blocker Errors)
-  const googleLoginTrigger = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setAuthErrorBanner(null);
-      setGoogleLoading(true);
-      const result = await loginWithGoogle({
-        access_token: tokenResponse.access_token,
-        id_token: tokenResponse.id_token,
-      });
-      setGoogleLoading(false);
+  // Standard Google OAuth 2.0 direct authorization handler (Opens in NEW TAB / WINDOW)
+  const handleGoogleLogin = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.warn('Google OAuth Client ID is not configured.');
+      showToast('Google OAuth Client ID is not configured.', 'warning');
+      return;
+    }
 
-      if (result.success) {
-        showToast('Signed in with Google successfully!', 'success');
-        navigate('/');
-      } else {
-        const err = result.error || 'Google sign-in failed.';
-        setAuthErrorBanner(err);
-        showToast(err, 'error');
-      }
-    },
-    onError: (error) => {
-      setGoogleLoading(false);
-      console.warn('Google OAuth login error:', error);
-      const err = 'Google sign-in error occurred.';
-      setAuthErrorBanner(err);
-      showToast(err, 'warning');
-    },
-    ux_mode: 'redirect',
-    redirect_uri: window.location.origin,
-  });
+    const redirectUri = window.location.origin;
+    const scope = encodeURIComponent('openid email profile');
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${clientId}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=token&` +
+      `scope=${scope}&` +
+      `prompt=select_account`;
+
+    // Open directly in a NEW TAB / WINDOW from direct user gesture
+    window.open(googleAuthUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 font-sans text-zinc-100 selection:bg-sky-500 selection:text-zinc-950">
@@ -141,7 +133,7 @@ export default function LoginView() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => googleLoginTrigger()}
+            onClick={handleGoogleLogin}
             disabled={googleLoading}
             className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border border-zinc-800 font-medium py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer disabled:opacity-50"
           >
