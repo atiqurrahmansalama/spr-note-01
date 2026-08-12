@@ -44,40 +44,7 @@ export default function LoginView() {
     }
   };
 
-  // Handle return from Google OAuth Redirect (Catches code query param OR access_token hash)
-  useEffect(() => {
-    const handleGoogleRedirect = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
 
-      const hash = window.location.hash;
-      const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
-      const accessToken = hashParams?.get('access_token');
-      const idToken = hashParams?.get('id_token');
-
-      if (code || accessToken || idToken) {
-        // Clear code/hash from URL immediately so it doesn't re-trigger
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setGoogleLoading(true);
-        const payload = code
-          ? { code: code, redirect_uri: window.location.origin }
-          : { access_token: accessToken, id_token: idToken };
-
-        const result = await loginWithGoogle(payload);
-        setGoogleLoading(false);
-        if (result.success) {
-          showToast('Signed in with Google successfully!', 'success');
-          navigate('/');
-        } else {
-          const err = result.error || 'Google Sign-In failed on backend.';
-          setAuthErrorBanner(err);
-          showToast(err, 'error');
-        }
-      }
-    };
-
-    handleGoogleRedirect();
-  }, []);
 
   // Standard Google OAuth 2.0 direct authorization handler (Top-Level Window Navigation)
   const handleGoogleLogin = () => {

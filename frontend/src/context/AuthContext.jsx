@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
       const googleId = hashParams?.get('id_token');
 
       if (googleCode || googleAccess || googleId) {
-        // Clear code/hash from URL immediately so it doesn't re-trigger
+        // Clear code and hash parameters from URL bar immediately so it never re-triggers
         window.history.replaceState({}, document.title, window.location.pathname);
         try {
           const payload = googleCode
@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
           const data = res.data;
           const newAccess = data.tokens?.access || data.access;
           const newRefresh = data.tokens?.refresh || data.refresh;
+          const userData = data.user;
 
           if (newAccess) {
             authStore.saveTokens(newAccess, newRefresh);
@@ -41,12 +42,20 @@ export function AuthProvider({ children }) {
             if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
             setAccessToken(newAccess);
           }
-          if (data.user) {
-            authStore.saveUserProfile(data.user);
-            setUser(data.user);
+          if (userData) {
+            authStore.saveUserProfile(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
+          } else {
+            setUser(true);
           }
+
+          setIsLoading(false);
+          // Force clean top-level reload to ensure React Router guards hydrate cleanly with non-empty auth state
+          window.location.href = '/';
+          return;
         } catch (e) {
-          console.error('[AuthProvider] Google Auth Exchange Error:', e);
+          console.error('[AuthProvider] Google Auth Exchange Error:', e?.response?.data || e?.message);
         }
         setIsLoading(false);
         return;
