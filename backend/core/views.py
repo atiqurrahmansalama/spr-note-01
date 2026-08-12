@@ -163,27 +163,32 @@ class GoogleOAuthExchangeView(APIView):
 
             # 0. Exchange authorization code with Google if code parameter is provided
             if code_input:
-                try:
-                    import requests as http_requests
-                    client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '')
-                    token_res = http_requests.post(
-                        'https://oauth2.googleapis.com/token',
-                        data={
-                            'code': code_input,
-                            'client_id': client_id,
-                            'client_secret': client_secret,
-                            'redirect_uri': redirect_uri_input or 'https://spr-note.vercel.app',
-                            'grant_type': 'authorization_code',
-                        },
-                        timeout=10
-                    )
-                    if token_res.ok:
-                        token_data = token_res.json()
-                        access_token_input = token_data.get('access_token') or access_token_input
-                        id_token_input = token_data.get('id_token') or id_token_input
-                except Exception as ex:
-                    import logging
-                    logging.getLogger('core').warning(f"Google authorization code exchange failed: {ex}")
+                import os
+                import requests as http_requests
+                client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', None) or os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+                if not client_id:
+                    client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+
+                token_res = http_requests.post(
+                    'https://oauth2.googleapis.com/token',
+                    data={
+                        'code': code_input,
+                        'client_id': client_id,
+                        'client_secret': client_secret,
+                        'redirect_uri': redirect_uri_input or 'https://spr-note.vercel.app',
+                        'grant_type': 'authorization_code',
+                    },
+                    timeout=10
+                )
+                token_json = token_res.json() if token_res.content else {}
+                if not token_res.ok or 'error' in token_json:
+                    return Response({
+                        'error': 'Google Token Exchange Failed',
+                        'details': token_json
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                access_token_input = token_json.get('access_token') or access_token_input
+                id_token_input = token_json.get('id_token') or id_token_input
 
             sub = None
             email = None
@@ -332,7 +337,10 @@ class GoogleOAuthExchangeView(APIView):
         except Exception as e:
             import logging
             logging.getLogger('core').error("Google OAuth Error: %s", str(e), exc_info=True)
-            return Response({'error': f'Google authentication failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': 'Database User Creation Failed',
+                'exception': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class RegisterView(generics.CreateAPIView):
