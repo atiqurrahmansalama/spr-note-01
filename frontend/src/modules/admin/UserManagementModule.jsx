@@ -324,14 +324,46 @@ export default function UserManagementModule() {
   // Helper API Candidate Invoker
   const apiCallCandidate = async (candidatePaths, options = {}) => {
     let lastError = null;
+    let lastRes = null;
+
     for (const path of candidatePaths) {
       try {
         const res = await fetchWithAuth(path, options);
         if (res.ok) return res;
+        lastRes = res;
+        if (res.status >= 400 && res.status < 500) {
+          break;
+        }
       } catch (err) {
         lastError = err;
       }
     }
+
+    if (lastRes) {
+      let errorMsg = `Server Error (${lastRes.status})`;
+      try {
+        const errData = await lastRes.json();
+        if (errData) {
+          if (typeof errData === "string") {
+            errorMsg = errData;
+          } else if (errData.error) {
+            errorMsg = errData.error;
+          } else if (errData.detail) {
+            errorMsg = errData.detail;
+          } else {
+            const msgs = Object.entries(errData)
+              .map(([key, val]) => {
+                const text = Array.isArray(val) ? val.join(" ") : String(val);
+                return `${key !== "detail" && key !== "error" ? key + ": " : ""}${text}`;
+              })
+              .join(" | ");
+            if (msgs) errorMsg = msgs;
+          }
+        }
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
     throw lastError || new Error("Failed to reach API endpoint");
   };
 

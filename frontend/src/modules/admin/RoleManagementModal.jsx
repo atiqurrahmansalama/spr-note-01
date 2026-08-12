@@ -174,6 +174,13 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
       return;
     }
 
+    const targetCode = formData.code.trim().toUpperCase();
+    const existingCodeRole = roles.find((r) => r.code.toUpperCase() === targetCode && r.id !== editingRoleId);
+    if (existingCodeRole) {
+      showToast(`Role code '${targetCode}' already exists (${existingCodeRole.name}). Please use a unique role code.`, "warning");
+      return;
+    }
+
     setSaving(true);
     try {
       const isEdit = Boolean(editingRoleId);
@@ -196,7 +203,18 @@ export default function RoleManagementModal({ isOpen, onClose, onRoleUpdated }) 
         resetForm();
       } else {
         const errData = await res.json();
-        const msg = errData.error || Object.values(errData).flat().join(" ") || "Failed to save role";
+        let msg = "Failed to save role";
+        if (errData) {
+          if (typeof errData === "string") msg = errData;
+          else if (errData.error) msg = errData.error;
+          else if (errData.detail) msg = errData.detail;
+          else {
+            const msgs = Object.entries(errData)
+              .map(([key, val]) => `${key !== "detail" && key !== "error" ? key + ": " : ""}${Array.isArray(val) ? val.join(" ") : String(val)}`)
+              .join(" | ");
+            if (msgs) msg = msgs;
+          }
+        }
         showToast(msg, "error");
       }
     } catch {
