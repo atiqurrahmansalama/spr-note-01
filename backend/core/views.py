@@ -787,7 +787,7 @@ class ChangePasswordView(APIView):
         return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(Q(status='Active') | Q(status__isnull=True)).select_related('details').order_by('roll_number', 'name_en')
+    queryset = Student.objects.filter(Q(status='Active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
     permission_classes = [AllowAny]
 

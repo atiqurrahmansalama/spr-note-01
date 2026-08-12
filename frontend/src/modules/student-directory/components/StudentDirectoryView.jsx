@@ -87,18 +87,27 @@ export default function StudentDirectoryView() {
     value: g,
   }));
 
-  // Filter and sort logic
-  const filteredStudents = studentList.filter((student) => {
-    const nameMatch = (student.label || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const groupMatch = (student.sub || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const passesSearch = nameMatch || groupMatch;
+  // Filter, deduplicate, and sort logic
+  const filteredStudents = (() => {
+    const seen = new Set();
+    return studentList.filter((student) => {
+      const key = student.id
+        ? `id_${student.id}`
+        : `key_${(student.label || "").trim().toLowerCase()}_${(student.sub || "").trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
 
-    const passesGroup =
-      selectedGroupFilter === "ALL" ||
-      (student.sub || "General Group").toLowerCase() === selectedGroupFilter.toLowerCase();
+      const nameMatch = (student.label || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const groupMatch = (student.sub || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const passesSearch = nameMatch || groupMatch;
 
-    return passesSearch && passesGroup;
-  }).sort((a, b) => (a.label || "").localeCompare(b.label || ""));
+      const passesGroup =
+        selectedGroupFilter === "ALL" ||
+        (student.sub || "General Group").toLowerCase() === selectedGroupFilter.toLowerCase();
+
+      return passesSearch && passesGroup;
+    }).sort((a, b) => (a.label || "").localeCompare(b.label || ""));
+  })();
 
   // Save student callback (from StudentSavePanel)
   const handleSaveStudent = async (result) => {

@@ -253,19 +253,45 @@ export const students = {
  */
 export function mergeStudents(apiStudents, localStudents) {
   const apiList = (Array.isArray(apiStudents) ? apiStudents : []).map((s) => ({
-    id: s.id,
+    id: s.id ?? null,
     label: s.label || s.name || s.student_name || String(s),
     sub: s.sub || s.group_name || s.group || "General Group",
   }));
 
-  const apiIds = new Set(apiList.map((s) => String(s.id)).filter(Boolean));
+  const apiIds = new Set(apiList.map((s) => String(s.id)).filter((id) => id && id !== "null" && id !== "undefined"));
+  const apiKeys = new Set(apiList.map((s) => `${(s.label || "").trim().toLowerCase()}_${(s.sub || "").trim().toLowerCase()}`));
 
-  // Preserve local additions
+  // Preserve ONLY local additions that are NOT in API (neither by ID nor by name+group key)
   const localOnly = (Array.isArray(localStudents) ? localStudents : [])
-    .filter((s) => s && (s.label || s.name) && (s._local || (s.id && !apiIds.has(String(s.id)))))
+    .filter((s) => {
+      if (!s || (!s.label && !s.name)) return false;
+      const sId = s.id ? String(s.id) : null;
+      const sKey = `${(s.label || s.name || "").trim().toLowerCase()}_${(s.sub || s.group || s.group_name || "General Group").trim().toLowerCase()}`;
+      
+      // If student ID is in API, it is NOT local-only
+      if (sId && apiIds.has(sId)) return false;
+      // If student name+group key is in API, it is NOT local-only
+      if (apiKeys.has(sKey)) return false;
+      
+      // Keep only if it's marked _local
+      return Boolean(s._local);
+    })
     .map((s) => ({ ...s, _local: true }));
 
-  const merged = [...apiList, ...localOnly];
+  // Final deduplicated list
+  const seenKeys = new Set();
+  const merged = [];
+
+  for (const s of [...apiList, ...localOnly]) {
+    const key = s.id
+      ? `id_${s.id}`
+      : `key_${(s.label || "").trim().toLowerCase()}_${(s.sub || "").trim().toLowerCase()}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      merged.push(s);
+    }
+  }
+
   writeJSON(KEYS.STUDENTS, merged);
   return merged;
 }
