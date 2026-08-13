@@ -747,7 +747,7 @@ export default function UserManagementModule() {
               <h1 className="text-xl font-bold tracking-tight theme-text-primary flex items-center gap-2.5">
                 <span>User Management</span>
                 <span className="theme-bg-sub theme-text-secondary text-xs font-mono px-2.5 py-0.5 rounded-full border theme-border">
-                  {currentView === "roles" ? `${dbRoles.length} Roles` : `${users.length} Total Users`}
+                  {users.length} Total Users
                 </span>
               </h1>
               <p className="text-xs theme-text-secondary">
