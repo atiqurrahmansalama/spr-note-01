@@ -9,7 +9,20 @@ export default defineConfig({
   ],
   server: {
     watch: {
-      ignored: ['**/backend/**', '**/dist/**', '**/.git/**'],
+      ignored: (p) => {
+        const normalized = p.replace(/\\/g, '/');
+        return (
+          normalized.includes('/backend/') ||
+          normalized.endsWith('/backend') ||
+          normalized.includes('/dist/') ||
+          normalized.endsWith('/dist') ||
+          normalized.includes('/.git/') ||
+          normalized.endsWith('/.git') ||
+          normalized.includes('/venv/') ||
+          normalized.endsWith('/venv') ||
+          normalized.includes('db.sqlite3')
+        );
+      }
     },
     proxy: {
       '^/api($|/)': {
