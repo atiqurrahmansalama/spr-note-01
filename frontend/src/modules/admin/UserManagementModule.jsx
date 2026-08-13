@@ -275,7 +275,9 @@ export default function UserManagementModule() {
 
   // API Loader for Users, Roles, and Halqa Groups
   const loadUsersAndRoles = async () => {
-    setLoading(true);
+    if (!users || users.length === 0) {
+      setLoading(true);
+    }
     try {
       const [rRes, uRes, gRes] = await Promise.all([
         fetchWithAuth("/api/v1/roles/").catch(() => null),
