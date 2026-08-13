@@ -159,7 +159,9 @@ export default function SectionToggleControlPanel() {
     setSaving(true);
     try {
       const payload = {
+        scope_type: activeScope.toUpperCase(),
         scope: activeScope,
+        target_identifier: currentTargetId,
         target_id: currentTargetId,
         updates: keys.map((k) => ({
           section_key: k,
@@ -167,10 +169,17 @@ export default function SectionToggleControlPanel() {
         })),
       };
 
-      const res = await fetchWithAuth("/api/v1/control-panel/rules/batch-update/", {
+      let res = await fetchWithAuth("/api/v1/admin/section-control/update/", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        res = await fetchWithAuth("/api/v1/control-panel/rules/batch-update/", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (res.ok) {
         const data = await res.json();

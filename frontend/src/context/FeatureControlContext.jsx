@@ -28,6 +28,7 @@ export function FeatureControlProvider({ children }) {
   const fetchEvaluatedConfig = useCallback(async () => {
     try {
       const candidatePaths = [
+        "/api/v1/section-control/evaluate/",
         "/api/v1/control-panel/evaluated-config/",
         "/control-panel/evaluated-config/",
       ];
@@ -94,6 +95,7 @@ export function FeatureControlProvider({ children }) {
         origins,
         loading,
         isFeatureEnabled,
+        isSectionEnabled: isFeatureEnabled,
         getFeatureOrigin,
         refetchConfig: fetchEvaluatedConfig,
       }}

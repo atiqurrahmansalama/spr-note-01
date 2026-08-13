@@ -63,6 +63,7 @@ from .views import (
     Enable2FAView,
     Disable2FAView,
     Verify2FAView,
+    SetGoogleDefaultRoleAdminView,
 )
 
 router = DefaultRouter()
@@ -92,6 +93,8 @@ urlpatterns = [
     path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     # Control Panel & Feature Flagging Endpoints
+    path('api/v1/section-control/evaluate/', EvaluatedConfigView.as_view(), name='section_control_evaluate'),
+    path('api/v1/admin/section-control/update/', ControlPanelBatchUpdateView.as_view(), name='admin_section_control_update'),
     path('api/v1/control-panel/evaluated-config/', EvaluatedConfigView.as_view(), name='control_panel_evaluated_config'),
     path('api/v1/control-panel/rules/', ControlPanelRulesView.as_view(), name='control_panel_rules'),
     path('api/v1/control-panel/rules/batch-update/', ControlPanelBatchUpdateView.as_view(), name='control_panel_batch_update'),
@@ -99,6 +102,9 @@ urlpatterns = [
     path('api/v1/control-panel/audit-logs/', ControlPanelAuditLogView.as_view(), name='control_panel_audit_logs'),
 
     # Dynamic Role Management Endpoints
+    path('api/v1/admin/roles/', UserRoleListCreateView.as_view(), name='admin_role_list_create'),
+    path('api/v1/admin/roles/clone/', UserRoleCloneView.as_view(), name='admin_role_clone'),
+    path('api/v1/admin/roles/set-google-default/', SetGoogleDefaultRoleAdminView.as_view(), name='admin_role_set_google_default'),
     path('api/v1/roles/', UserRoleListCreateView.as_view(), name='role_list_create'),
     path('roles/', UserRoleListCreateView.as_view(), name='role_list_create_legacy'),
     path('api/v1/roles/<int:pk>/', UserRoleDetailView.as_view(), name='role_detail'),

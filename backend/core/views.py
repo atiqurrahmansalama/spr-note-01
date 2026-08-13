@@ -276,14 +276,15 @@ class GoogleOAuthExchangeView(APIView):
                     user.last_name = last_name
                 user.save()
             else:
-                # Resilient Default Role Retrieval/Creation
+                # Dynamic Google OAuth Default Role Retrieval/Creation
+                default_role_code = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
                 default_role = None
                 try:
                     default_role, _ = UserRole.objects.get_or_create(
-                        code='GUARDIAN',
+                        code=default_role_code,
                         defaults={
-                            'name': 'Guardian',
-                            'description': 'Default role for Google OAuth users',
+                            'name': default_role_code.replace('_', ' ').title(),
+                            'description': f'Default role for Google OAuth users ({default_role_code})',
                             'hierarchy_level': 50,
                             'color_theme': 'purple',
                             'is_system_role': False,
@@ -302,7 +303,7 @@ class GoogleOAuthExchangeView(APIView):
                     'auth_provider': 'google',
                     'is_email_verified': True,
                     'google_sub_id': sub,
-                    'user_type': 'GUARDIAN',
+                    'user_type': default_role_code,
                     'role': default_role,
                     'is_active': True,
                     'is_deactivated': False,
@@ -2820,5 +2821,404 @@ class Verify2FAView(APIView):
                         'refresh': str(token),
                         'user': {'id': user.id, 'name': user.name, 'email': user.email}
                     }, status=status.HTTP_200_OK)
+
+        return Response({'error': 'Invalid 2FA code'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ─── Role & Access Control Management Views ─────────────────────────────────
+
+class UserRoleListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
+        roles = UserRole.objects.all().prefetch_related('action_permissions')
+        data = []
+        for role in roles:
+            perm = getattr(role, 'action_permissions', None)
+            user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+            data.append({
+                'id': role.id,
+                'name': role.name,
+                'code': role.code,
+                'description': role.description,
+                'hierarchy_level': role.hierarchy_level,
+                'color_theme': role.color_theme,
+                'is_system_role': role.is_system_role or role.code == 'SUPER_ADMIN',
+                'is_google_default': role.code == default_google_role,
+                'user_count': user_count,
+                'action_permissions': {
+                    'can_create_student': perm.can_create_student if perm else True,
+                    'can_edit_student': perm.can_edit_student if perm else True,
+                    'can_delete_report': perm.can_delete_report if perm else False,
+                    'can_export_reports': perm.can_export_reports if perm else True,
+                    'can_manage_users': perm.can_manage_users if perm else False,
+                }
+            })
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        code = request.data.get('code', '').strip().upper()
+        description = request.data.get('description', '').strip()
+        hierarchy_level = request.data.get('hierarchy_level', 5)
+        color_theme = request.data.get('color_theme', 'blue')
+        action_permissions = request.data.get('action_permissions', {})
+
+        if not name or not code:
+            return Response({'error': 'Name and Code are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if UserRole.objects.filter(code=code).exists():
+            return Response({'error': f'Role with code "{code}" already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        role = UserRole.objects.create(
+            name=name,
+            code=code,
+            description=description,
+            hierarchy_level=hierarchy_level,
+            color_theme=color_theme,
+            is_system_role=False,
+        )
+
+        RoleActionPermission.objects.create(
+            role=role,
+            can_create_student=action_permissions.get('can_create_student', True),
+            can_edit_student=action_permissions.get('can_edit_student', True),
+            can_delete_report=action_permissions.get('can_delete_report', False),
+            can_export_reports=action_permissions.get('can_export_reports', True),
+            can_manage_users=action_permissions.get('can_manage_users', False),
+        )
+
+        return Response({'message': 'Role created successfully', 'role_id': role.id}, status=status.HTTP_201_CREATED)
+
+
+class UserRoleDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        role = UserRole.objects.filter(pk=pk).first()
+        if not role:
+            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
+        perm = getattr(role, 'action_permissions', None)
+        user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+
+        return Response({
+            'id': role.id,
+            'name': role.name,
+            'code': role.code,
+            'description': role.description,
+            'hierarchy_level': role.hierarchy_level,
+            'color_theme': role.color_theme,
+            'is_system_role': role.is_system_role or role.code == 'SUPER_ADMIN',
+            'is_google_default': role.code == default_google_role,
+            'user_count': user_count,
+            'action_permissions': {
+                'can_create_student': perm.can_create_student if perm else True,
+                'can_edit_student': perm.can_edit_student if perm else True,
+                'can_delete_report': perm.can_delete_report if perm else False,
+                'can_export_reports': perm.can_export_reports if perm else True,
+                'can_manage_users': perm.can_manage_users if perm else False,
+            }
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        role = UserRole.objects.filter(pk=pk).first()
+        if not role:
+            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        role.name = request.data.get('name', role.name).strip()
+        role.description = request.data.get('description', role.description).strip()
+        role.hierarchy_level = request.data.get('hierarchy_level', role.hierarchy_level)
+        role.color_theme = request.data.get('color_theme', role.color_theme)
+        role.save()
+
+        action_permissions = request.data.get('action_permissions')
+        if action_permissions and isinstance(action_permissions, dict):
+            perm, _ = RoleActionPermission.objects.get_or_create(role=role)
+            if 'can_create_student' in action_permissions: perm.can_create_student = action_permissions['can_create_student']
+            if 'can_edit_student' in action_permissions: perm.can_edit_student = action_permissions['can_edit_student']
+            if 'can_delete_report' in action_permissions: perm.can_delete_report = action_permissions['can_delete_report']
+            if 'can_export_reports' in action_permissions: perm.can_export_reports = action_permissions['can_export_reports']
+            if 'can_manage_users' in action_permissions: perm.can_manage_users = action_permissions['can_manage_users']
+            perm.save()
+
+        return Response({'message': 'Role updated successfully'}, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        role = UserRole.objects.filter(pk=pk).first()
+        if not role:
+            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if role.code == 'SUPER_ADMIN' or role.is_system_role:
+            return Response({'error': 'System role cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+        if user_count > 0:
+            return Response({'error': f'Cannot delete role assigned to {user_count} active user(s)'}, status=status.HTTP_400_BAD_REQUEST)
+
+        role.delete()
+        return Response({'message': 'Role deleted successfully'}, status=status.HTTP_200_OK)
+
+
+class UserRoleCloneView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        source_role_id = pk or request.data.get('source_role_id')
+        source_role_code = request.data.get('source_role_code')
+        new_name = request.data.get('new_role_name') or request.data.get('name', '').strip()
+        new_code = (request.data.get('new_role_code') or request.data.get('code', '')).strip().upper()
+
+        source_role = None
+        if source_role_id:
+            source_role = UserRole.objects.filter(pk=source_role_id).first()
+        elif source_role_code:
+            source_role = UserRole.objects.filter(code=source_role_code).first()
+
+        if not source_role:
+            return Response({'error': 'Source role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not new_name or not new_code:
+            return Response({'error': 'New role name and code are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if UserRole.objects.filter(code=new_code).exists():
+            return Response({'error': f'Role with code "{new_code}" already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cloned_role = UserRole.objects.create(
+            name=new_name,
+            code=new_code,
+            description=f'Cloned from {source_role.name}',
+            hierarchy_level=source_role.hierarchy_level,
+            color_theme=source_role.color_theme,
+            is_system_role=False,
+        )
+
+        source_perm = getattr(source_role, 'action_permissions', None)
+        RoleActionPermission.objects.create(
+            role=cloned_role,
+            can_create_student=source_perm.can_create_student if source_perm else True,
+            can_edit_student=source_perm.can_edit_student if source_perm else True,
+            can_delete_report=source_perm.can_delete_report if source_perm else False,
+            can_export_reports=source_perm.can_export_reports if source_perm else True,
+            can_manage_users=source_perm.can_manage_users if source_perm else False,
+        )
+
+        return Response({'message': 'Role cloned successfully', 'role_id': cloned_role.id}, status=status.HTTP_201_CREATED)
+
+
+class SetGoogleDefaultRoleAdminView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        role_code = request.data.get('role_code', '').strip().upper()
+        if not role_code:
+            return Response({'error': 'Role code is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        SystemSetting.set_val('DEFAULT_GOOGLE_ROLE', role_code, description='Default role assigned to new Google OAuth users')
+        return Response({
+            'message': f'Default Google OAuth role set to {role_code}',
+            'default_google_role': role_code
+        }, status=status.HTTP_200_OK)
+
+    def get(self, request):
+        role_code = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
+        return Response({'default_google_role': role_code}, status=status.HTTP_200_OK)
+
+
+# ─── Enterprise 4-Tier Section Control & Feature Flagging Views ──────────────
+
+class EvaluatedConfigView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user if request.user and request.user.is_authenticated else None
+        sections = AppSection.objects.all().select_related('category')
+
+        default_keys = {
+            'headerDate': True,
+            'studentSelect': True,
+            'sessionSelect': True,
+            'juzPageInput': True,
+            'mistakeTracker': True,
+            'stuckTracker': True,
+            'commentSection': True,
+            'actionButtons': True,
+            'pdfExport': True,
+        }
+
+        resolved = dict(default_keys)
+        origins = {k: "GLOBAL" for k in default_keys}
+
+        if user:
+            user_overrides = {
+                o.section.section_key: o.is_enabled
+                for o in UserSectionOverride.objects.filter(user=user).select_related('section')
+            }
+            group_overrides = {}
+            if getattr(user, 'assigned_group', None):
+                group_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in GroupSectionPermission.objects.filter(group_id=user.assigned_group).select_related('section')
+                }
+
+            role_overrides = {}
+            if getattr(user, 'user_type', None):
+                role_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in RoleSectionPermission.objects.filter(role=user.user_type).select_related('section')
+                }
+
+            for sec in sections:
+                key = sec.section_key
+                # 1. User Override
+                if key in user_overrides:
+                    resolved[key] = user_overrides[key]
+                    origins[key] = "USER"
+                    continue
+
+                # 2. Group Override
+                if key in group_overrides:
+                    resolved[key] = group_overrides[key]
+                    origins[key] = "GROUP"
+                    continue
+
+                # 3. Role Override
+                if key in role_overrides:
+                    resolved[key] = role_overrides[key]
+                    origins[key] = "ROLE"
+                    continue
+
+                # 4. Fallback to Global Default
+                resolved[key] = sec.is_globally_enabled
+                origins[key] = "GLOBAL"
+        else:
+            for sec in sections:
+                resolved[sec.section_key] = sec.is_globally_enabled
+                origins[sec.section_key] = "GLOBAL"
+
+        default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
+        return Response({
+            'config': resolved,
+            'origins': origins,
+            'default_google_role': default_google_role
+        }, status=status.HTTP_200_OK)
+
+
+class ControlPanelRulesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        sections = AppSection.objects.all().select_related('category')
+        data = []
+        for sec in sections:
+            data.append({
+                'id': sec.id,
+                'section_key': sec.section_key,
+                'title': sec.title,
+                'description': sec.description,
+                'category': sec.category.title if sec.category else "General",
+                'is_globally_enabled': sec.is_globally_enabled,
+            })
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ControlPanelBatchUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        scope_type = request.data.get('scope_type', 'GLOBAL').upper()
+        target_identifier = request.data.get('target_identifier', '')
+        updates = request.data.get('updates', [])
+
+        if not isinstance(updates, list) or len(updates) == 0:
+            section_key = request.data.get('section_key')
+            is_enabled = request.data.get('is_enabled')
+            if section_key is not None and is_enabled is not None:
+                updates = [{'section_key': section_key, 'is_enabled': is_enabled}]
+
+        changed_count = 0
+        for item in updates:
+            s_key = item.get('section_key')
+            enabled = item.get('is_enabled', True)
+            if not s_key:
+                continue
+
+            sec, _ = AppSection.objects.get_or_create(
+                section_key=s_key,
+                defaults={'title': s_key.title(), 'is_globally_enabled': True}
+            )
+
+            prev_state = sec.is_globally_enabled
+
+            if scope_type == 'GLOBAL':
+                sec.is_globally_enabled = enabled
+                sec.save()
+                changed_count += 1
+            elif scope_type == 'ROLE':
+                role_code = target_identifier or request.data.get('selected_role', 'TEACHER')
+                perm, _ = RoleSectionPermission.objects.get_or_create(section=sec, role=role_code)
+                prev_state = perm.is_enabled
+                perm.is_enabled = enabled
+                perm.save()
+                changed_count += 1
+            elif scope_type == 'GROUP':
+                group_id = target_identifier or request.data.get('selected_group', 'All Groups')
+                perm, _ = GroupSectionPermission.objects.get_or_create(section=sec, group_id=group_id)
+                prev_state = perm.is_enabled
+                perm.is_enabled = enabled
+                perm.save()
+                changed_count += 1
+            elif scope_type == 'USER':
+                user_obj = User.objects.filter(models.Q(pk=target_identifier) | models.Q(phone_number=target_identifier)).first()
+                if user_obj:
+                    perm, _ = UserSectionOverride.objects.get_or_create(section=sec, user=user_obj)
+                    prev_state = perm.is_enabled
+                    perm.is_enabled = enabled
+                    perm.save()
+                    changed_count += 1
+
+            FeatureFlagAuditLog.objects.create(
+                changed_by=request.user,
+                scope_type=scope_type,
+                target_identifier=target_identifier or "GLOBAL",
+                section_key=s_key,
+                previous_state=prev_state,
+                new_state=enabled
+            )
+
+        return Response({'message': f'Successfully updated {changed_count} section rule(s)'}, status=status.HTTP_200_OK)
+
+
+class ControlPanelResetRulesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        AppSection.objects.all().update(is_globally_enabled=True)
+        RoleSectionPermission.objects.all().delete()
+        GroupSectionPermission.objects.all().delete()
+        UserSectionOverride.objects.all().delete()
+        return Response({'message': 'All section control rules reset to global defaults'}, status=status.HTTP_200_OK)
+
+
+class ControlPanelAuditLogView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        logs = FeatureFlagAuditLog.objects.all().select_related('changed_by')[:100]
+        data = []
+        for log in logs:
+            data.append({
+                'id': log.id,
+                'changed_by': log.changed_by.name or log.changed_by.phone_number if log.changed_by else "System",
+                'scope_type': log.scope_type,
+                'target_identifier': log.target_identifier,
+                'section_key': log.section_key,
+                'previous_state': log.previous_state,
+                'new_state': log.new_state,
+                'timestamp': log.timestamp.isoformat(),
+            })
+        return Response(data, status=status.HTTP_200_OK)
 
         return Response({'error': 'Invalid 6-digit TOTP code or backup recovery code.'}, status=status.HTTP_400_BAD_REQUEST)

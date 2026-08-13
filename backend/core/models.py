@@ -924,3 +924,36 @@ class QRSessionTicket(models.Model):
 
     def __str__(self):
         return f"QRTicket [{self.ticket_id}] - {self.status}"
+
+
+class SystemSetting(models.Model):
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField(default='')
+    description = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "System Setting"
+        verbose_name_plural = "System Settings"
+
+    def __str__(self):
+        return f"{self.key} = {self.value}"
+
+    @classmethod
+    def get_val(cls, key, default=''):
+        try:
+            setting = cls.objects.filter(key=key).first()
+            if setting and setting.value:
+                return setting.value
+        except Exception:
+            pass
+        return default
+
+    @classmethod
+    def set_val(cls, key, value, description=''):
+        setting, _ = cls.objects.get_or_create(key=key)
+        setting.value = str(value)
+        if description:
+            setting.description = description
+        setting.save()
+        return setting
