@@ -3214,8 +3214,8 @@ class ControlPanelBatchUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        scope_type = request.data.get('scope_type', 'GLOBAL').upper()
-        target_identifier = request.data.get('target_identifier', '')
+        scope_type = (request.data.get('scope_type') or request.data.get('scope') or 'GLOBAL').upper()
+        target_identifier = str(request.data.get('target_identifier') or request.data.get('target_id') or '').strip()
         updates = request.data.get('updates', [])
 
         if not isinstance(updates, list) or len(updates) == 0:
