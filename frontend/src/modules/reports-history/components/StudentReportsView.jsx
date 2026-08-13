@@ -221,7 +221,12 @@ export default function StudentReportsView() {
 
         const apiKeys = new Set(apiReports.map((r) => String(r.id || r.report_unique_id || "")).filter(Boolean));
         const localOnly = localReps
-          .filter((r) => !apiKeys.has(String(r.id || r.report_unique_id || "")))
+          .filter((r) => {
+            const hasDbId = r.id && !isNaN(Number(r.id)) && !String(r.id).includes("-");
+            const existsOnServer = apiKeys.has(String(r.id || r.report_unique_id || ""));
+            // Keep locally only if it is a pure offline draft (has no database integer ID) and not present on server
+            return !existsOnServer && !hasDbId;
+          })
           .map(normalizeReport);
 
         const finalMerged = [...merged, ...localOnly];
