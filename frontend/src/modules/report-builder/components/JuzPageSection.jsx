@@ -58,11 +58,18 @@ export default function JuzPageSection({ data, onChange, onReset }) {
   };
 
   const totalPages = data.reduce((sum, row) => {
+    const hasJuz = row.juz && String(row.juz).trim() !== "";
+    if (!hasJuz) return sum;
+
     const rowSum = row.ranges.reduce((rSum, range) => {
-      const start = parseInt(range.start, 10);
-      const end = parseInt(range.end, 10);
-      if (!isNaN(start) && !isNaN(end) && end >= start) {
-        return rSum + (end - start + 1);
+      const hasStart = range.start !== undefined && String(range.start).trim() !== "";
+      const hasEnd = range.end !== undefined && String(range.end).trim() !== "";
+      if (hasStart && hasEnd) {
+        const start = parseInt(range.start, 10);
+        const end = parseInt(range.end, 10);
+        if (!isNaN(start) && !isNaN(end) && end >= start) {
+          return rSum + (end - start + 1);
+        }
       }
       return rSum;
     }, 0);
@@ -76,7 +83,7 @@ export default function JuzPageSection({ data, onChange, onReset }) {
         <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
           JUZ / PAGE DETAILS
           {totalPages > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold theme-bg-accent-soft theme-accent border theme-border font-mono shadow-sm">
               {totalPages}
             </span>
           )}

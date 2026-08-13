@@ -209,8 +209,10 @@ export const fetchWithAuth = async (url, options = {}) => {
     if (newToken) {
       response = await makeRequest(newToken);
     } else {
-      authStore.clear();
-      response = await makeRequest(null);
+      if (!authStore.getRefreshToken()) {
+        authStore.clear();
+        response = await makeRequest(null);
+      }
     }
   }
 
