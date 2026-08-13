@@ -2,10 +2,26 @@ import { useState, useEffect, useRef } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
 
+const DEFAULT_SYSTEM_ROLES = [
+  { id: 1, name: "Super Administrator", code: "SUPER_ADMIN", hierarchy_level: 1, description: "Full system access & section control", action_permissions: { can_create_student: true, can_edit_student: true, can_delete_report: true, can_export_reports: true, can_manage_users: true } },
+  { id: 2, name: "Administrator", code: "ADMIN", hierarchy_level: 2, description: "Institute admin with user & report controls", action_permissions: { can_create_student: true, can_edit_student: true, can_delete_report: true, can_export_reports: true, can_manage_users: true } },
+  { id: 3, name: "Hifz Teacher / Ustadh", code: "TEACHER", hierarchy_level: 5, description: "Evaluates daily Sabaq, Sabqi & Amukhta", action_permissions: { can_create_student: true, can_edit_student: true, can_delete_report: false, can_export_reports: true, can_manage_users: false } },
+  { id: 4, name: "Guardian / Parent", code: "GUARDIAN", hierarchy_level: 10, description: "View student progress reports & copy cards", action_permissions: { can_create_student: false, can_edit_student: false, can_delete_report: false, can_export_reports: true, can_manage_users: false } },
+];
+
 export default function RoleManagementPanel({ onBack, onRoleUpdated, showHeaderCard = true }) {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState("list"); // 'list' | 'editor'
-  const [roles, setRoles] = useState([]);
+  const [roles, setRoles] = useState(() => {
+    try {
+      const saved = localStorage.getItem("spr_local_roles_v1");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_SYSTEM_ROLES;
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
@@ -84,13 +100,16 @@ export default function RoleManagementPanel({ onBack, onRoleUpdated, showHeaderC
   }, []);
 
   const loadRoles = async () => {
-    setLoading(true);
     try {
       const res = await apiCallCandidate(["/api/v1/roles/", "/api/roles/", "/roles/"]);
       const data = await res.json();
-      setRoles(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      if (list.length > 0) {
+        setRoles(list);
+        localStorage.setItem("spr_local_roles_v1", JSON.stringify(list));
+      }
     } catch {
-      showToast("Failed to load roles from backend", "error");
+      // Keep cached or default roles silently
     } finally {
       setLoading(false);
     }

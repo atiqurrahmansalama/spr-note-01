@@ -127,11 +127,24 @@ function getRoleBadgeStyle(colorTheme = "blue") {
 export default function UserManagementModule() {
   const { showToast } = useToast();
 
-  const [currentView, setCurrentView] = useState("users"); // 'users' | 'roles'
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem("spr_local_users_v1");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [groups, setGroups] = useState([]);
-  const [dbRoles, setDbRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dbRoles, setDbRoles] = useState(() => {
+    try {
+      const saved = localStorage.getItem("spr_local_roles_v1");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => users.length === 0);
   const [roleFilter, setRoleFilter] = useState("ALL");
   
   // Search state with 300ms Debounce
@@ -272,19 +285,24 @@ export default function UserManagementModule() {
 
       if (rRes && rRes.ok) {
         const rData = await rRes.json();
-        setDbRoles(Array.isArray(rData) ? rData : []);
+        const rList = Array.isArray(rData) ? rData : [];
+        setDbRoles(rList);
+        localStorage.setItem("spr_local_roles_v1", JSON.stringify(rList));
       }
 
       if (uRes && uRes.ok) {
         const data = await uRes.json();
         const fetchedUsers = Array.isArray(data) ? data : data.results || [];
         setUsers(fetchedUsers);
+        localStorage.setItem("spr_local_users_v1", JSON.stringify(fetchedUsers));
       } else {
         try {
           const fb = await fetchWithAuth("/users/");
           if (fb.ok) {
             const data = await fb.json();
-            setUsers(Array.isArray(data) ? data : data.results || []);
+            const fetchedUsers = Array.isArray(data) ? data : data.results || [];
+            setUsers(fetchedUsers);
+            localStorage.setItem("spr_local_users_v1", JSON.stringify(fetchedUsers));
           }
         } catch {}
       }
