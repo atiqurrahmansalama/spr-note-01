@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "../utils/authService";
 import { getSectionConfig } from "../config/defaultSectionConfig";
 
@@ -24,6 +24,7 @@ export function FeatureControlProvider({ children }) {
 
   const [origins, setOrigins] = useState({});
   const [loading, setLoading] = useState(false);
+  const currentVersionRef = useRef(0);
 
   const fetchEvaluatedConfig = useCallback(async () => {
     try {
@@ -57,10 +58,27 @@ export function FeatureControlProvider({ children }) {
     }
   }, []);
 
+  const checkVersionAndSync = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth("/api/v1/section-control/version/");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.version && data.version > currentVersionRef.current) {
+          currentVersionRef.current = data.version;
+          fetchEvaluatedConfig();
+        }
+      }
+    } catch {}
+  }, [fetchEvaluatedConfig]);
+
   useEffect(() => {
     fetchEvaluatedConfig();
+    checkVersionAndSync();
 
-    const handleUpdate = () => fetchEvaluatedConfig();
+    const handleUpdate = () => {
+      fetchEvaluatedConfig();
+      checkVersionAndSync();
+    };
 
     // 1. BroadcastChannel across browser tabs
     let broadcastChannel = null;
@@ -82,12 +100,15 @@ export function FeatureControlProvider({ children }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         fetchEvaluatedConfig();
+        checkVersionAndSync();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 3. 15-Second Background Polling Interval for live updates across logged-in accounts
-    const intervalId = setInterval(handleUpdate, 15000);
+    // 3. 10-Second Feature Version Polling Interval for live updates across all active sessions
+    const intervalId = setInterval(() => {
+      checkVersionAndSync();
+    }, 10000);
 
     return () => {
       if (broadcastChannel) {
@@ -100,7 +121,7 @@ export function FeatureControlProvider({ children }) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(intervalId);
     };
-  }, [fetchEvaluatedConfig]);
+  }, [fetchEvaluatedConfig, checkVersionAndSync]);
 
   const isFeatureEnabled = useCallback(
     (featureKey) => {

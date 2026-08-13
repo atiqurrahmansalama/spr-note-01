@@ -3222,12 +3222,20 @@ class ControlPanelRulesView(APIView):
         return Response({"categories": result}, status=status.HTTP_200_OK)
 
 
+class SectionControlVersionView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        version = int(SystemSetting.get_val('SYSTEM_FEATURE_VERSION', '1'))
+        return Response({'version': version}, status=status.HTTP_200_OK)
+
+
 class ControlPanelBatchUpdateView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         scope_type = (request.data.get('scope_type') or request.data.get('scope') or 'GLOBAL').upper()
-        target_identifier = str(request.data.get('target_identifier') or request.data.get('target_id') or '').strip()
+        target_identifier = str(request.data.get('target_identifier') or request.data.get('target_id') or request.data.get('target_user_id') or request.data.get('target_role') or request.data.get('target_group_id') or '').strip()
         updates = request.data.get('updates', [])
 
         if not isinstance(updates, list) or len(updates) == 0:
@@ -3255,7 +3263,7 @@ class ControlPanelBatchUpdateView(APIView):
                 sec.save()
                 changed_count += 1
             elif scope_type == 'ROLE':
-                role_code = target_identifier or request.data.get('selected_role', 'TEACHER')
+                role_code = (target_identifier or request.data.get('selected_role', 'TEACHER')).upper().strip()
                 perm, _ = RoleSectionPermission.objects.get_or_create(section=sec, role=role_code)
                 prev_state = perm.is_enabled
                 perm.is_enabled = enabled
@@ -3286,7 +3294,11 @@ class ControlPanelBatchUpdateView(APIView):
                 new_state=enabled
             )
 
-        return Response({'message': f'Successfully updated {changed_count} section rule(s)'}, status=status.HTTP_200_OK)
+        # Increment global feature version dynamically
+        current_version = int(SystemSetting.get_val('SYSTEM_FEATURE_VERSION', '1'))
+        SystemSetting.set_val('SYSTEM_FEATURE_VERSION', str(current_version + 1))
+
+        return Response({'message': f'Successfully updated {changed_count} section rule(s)', 'version': current_version + 1}, status=status.HTTP_200_OK)
 
 
 class ControlPanelResetRulesView(APIView):

@@ -41,6 +41,7 @@ from .views import (
     DeactivateAccountView,
     DeleteAccountView,
     EvaluatedConfigView,
+    SectionControlVersionView,
     ControlPanelRulesView,
     ControlPanelBatchUpdateView,
     ControlPanelResetRulesView,
@@ -94,7 +95,9 @@ urlpatterns = [
 
     # Control Panel & Feature Flagging Endpoints
     path('api/v1/section-control/evaluate/', EvaluatedConfigView.as_view(), name='section_control_evaluate'),
+    path('api/v1/section-control/version/', SectionControlVersionView.as_view(), name='section_control_version'),
     path('api/v1/admin/section-control/update/', ControlPanelBatchUpdateView.as_view(), name='admin_section_control_update'),
+    path('api/v1/admin/section-control/override/', ControlPanelBatchUpdateView.as_view(), name='admin_section_control_override'),
     path('api/v1/control-panel/evaluated-config/', EvaluatedConfigView.as_view(), name='control_panel_evaluated_config'),
     path('api/v1/control-panel/rules/', ControlPanelRulesView.as_view(), name='control_panel_rules'),
     path('api/v1/control-panel/rules/batch-update/', ControlPanelBatchUpdateView.as_view(), name='control_panel_batch_update'),
