@@ -21,6 +21,8 @@ from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from django.db import models
 from django.db.models import Q
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.views.decorators.cache import never_cache
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample, extend_schema_view
@@ -3043,6 +3045,7 @@ class SetGoogleDefaultRoleAdminView(APIView):
 @method_decorator(never_cache, name='dispatch')
 class EvaluatedConfigView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
 
     def get(self, request):
         user = request.user if request.user and request.user.is_authenticated else None
@@ -3060,15 +3063,27 @@ class EvaluatedConfigView(APIView):
             'pdfExport': True,
         }
 
-        resolved = dict(default_keys)
-        origins = {k: "GLOBAL" for k in default_keys}
+        # Build comprehensive map of all DB and default sections
+        sec_map = {}
+        for sec in sections:
+            sec_map[sec.section_key] = sec.is_globally_enabled
+
+        for k, def_val in default_keys.items():
+            if k not in sec_map:
+                sec_map[k] = def_val
+
+        resolved = {}
+        origins = {}
+
+        user_overrides = {}
+        group_overrides = {}
+        role_overrides = {}
 
         if user:
             user_overrides = {
                 o.section.section_key: o.is_enabled
                 for o in UserSectionOverride.objects.filter(user=user).select_related('section')
             }
-            group_overrides = {}
             assigned_group = getattr(user, 'assigned_group', None) or getattr(user, 'group_name', None) or getattr(user, 'group', None)
             if assigned_group:
                 group_overrides = {
@@ -3076,41 +3091,34 @@ class EvaluatedConfigView(APIView):
                     for o in GroupSectionPermission.objects.filter(group_id=assigned_group).select_related('section')
                 }
 
-            role_overrides = {}
-            user_role = str(getattr(user, 'user_type', '')).upper().strip()
-            if user_role:
-                role_overrides = {
-                    o.section.section_key: o.is_enabled
-                    for o in RoleSectionPermission.objects.filter(role__iexact=user_role).select_related('section')
-                }
+            role_codes = set()
+            if getattr(user, 'user_type', None):
+                role_codes.add(str(user.user_type).upper().strip())
+            if getattr(user, 'role', None):
+                r_val = getattr(user.role, 'code', None) or str(user.role)
+                role_codes.add(str(r_val).upper().strip())
 
-            for sec in sections:
-                key = sec.section_key
-                # 1. User Override
-                if key in user_overrides:
-                    resolved[key] = user_overrides[key]
-                    origins[key] = "USER"
-                    continue
+            if role_codes:
+                q_expr = Q()
+                for r_code in role_codes:
+                    q_expr |= Q(role__iexact=r_code)
+                role_perms = RoleSectionPermission.objects.filter(q_expr).select_related('section')
+                for o in role_perms:
+                    role_overrides[o.section.section_key] = o.is_enabled
 
-                # 2. Group Override
-                if key in group_overrides:
-                    resolved[key] = group_overrides[key]
-                    origins[key] = "GROUP"
-                    continue
-
-                # 3. Role Override
-                if key in role_overrides:
-                    resolved[key] = role_overrides[key]
-                    origins[key] = "ROLE"
-                    continue
-
-                # 4. Fallback to Global Default
-                resolved[key] = sec.is_globally_enabled
+        for key, global_val in sec_map.items():
+            if user and key in user_overrides:
+                resolved[key] = user_overrides[key]
+                origins[key] = "USER"
+            elif user and key in group_overrides:
+                resolved[key] = group_overrides[key]
+                origins[key] = "GROUP"
+            elif user and key in role_overrides:
+                resolved[key] = role_overrides[key]
+                origins[key] = "ROLE"
+            else:
+                resolved[key] = global_val
                 origins[key] = "GLOBAL"
-        else:
-            for sec in sections:
-                resolved[sec.section_key] = sec.is_globally_enabled
-                origins[sec.section_key] = "GLOBAL"
 
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
         response = Response({
