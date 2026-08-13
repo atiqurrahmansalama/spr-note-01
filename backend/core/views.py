@@ -1712,6 +1712,15 @@ class UserViewSet(viewsets.ModelViewSet):
         if role_code:
             if role_code.upper() != 'ALL':
                 qs = qs.filter(Q(role__code__iexact=role_code) | Q(user_type__iexact=role_code))
+        
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(name__icontains=search) |
+                Q(phone_number__icontains=search) |
+                Q(email__icontains=search)
+            )
         return qs
 
     def perform_create(self, serializer):
@@ -3417,7 +3426,7 @@ class ControlPanelAuditLogView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        logs = FeatureFlagAuditLog.objects.all().select_related('changed_by')[:100]
+        logs = FeatureFlagAuditLog.objects.all().select_related('changed_by').order_by('-timestamp')[:100]
         data = []
         for log in logs:
             data.append({
@@ -3428,8 +3437,11 @@ class ControlPanelAuditLogView(APIView):
                 'section_key': log.section_key,
                 'previous_state': log.previous_state,
                 'new_state': log.new_state,
-                'timestamp': log.timestamp.isoformat(),
+                'timestamp': log.timestamp.strftime("%Y-%m-%d %I:%M:%S %p"),
             })
-        return Response(data, status=status.HTTP_200_OK)
+        return Response({
+            'status': 'success',
+            'logs': data
+        }, status=status.HTTP_200_OK)
 
         return Response({'error': 'Invalid 6-digit TOTP code or backup recovery code.'}, status=status.HTTP_400_BAD_REQUEST)

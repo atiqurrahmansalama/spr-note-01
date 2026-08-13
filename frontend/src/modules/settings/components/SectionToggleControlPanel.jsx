@@ -3,6 +3,7 @@ import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import { getSectionConfig, saveSectionConfig } from "../../../config/defaultSectionConfig";
+import CustomSelect from "../../../components/ui/CustomSelect";
 
 const DEFAULT_PANEL_CATEGORIES = [
   {
@@ -133,7 +134,10 @@ export default function SectionToggleControlPanel() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const res = await fetchWithAuth("/api/groups/");
+        let res = await fetchWithAuth("/api/v1/groups/");
+        if (!res.ok) {
+          res = await fetchWithAuth("/groups/");
+        }
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.results || [];
@@ -213,7 +217,7 @@ export default function SectionToggleControlPanel() {
       const res = await fetchWithAuth(`/api/v1/control-panel/audit-logs/?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        setAuditLogs(data.logs || []);
+        setAuditLogs(Array.isArray(data) ? data : data.logs || []);
       }
     } catch {
       showToast("Failed to load audit logs", "error");
@@ -524,7 +528,7 @@ export default function SectionToggleControlPanel() {
           {[
             { id: "global", label: "Global Defaults", icon: "🌐" },
             { id: "role", label: "Role Overrides", icon: "🛡️" },
-            { id: "group", label: "Group / Halqa Overrides", icon: "👥" },
+            { id: "group", label: "Group Overrides", icon: "👥" },
             { id: "user", label: "User Overrides", icon: "👤" },
             { id: "audit", label: "Audit Logs", icon: "📜" },
           ].map((tab) => {
@@ -598,18 +602,14 @@ export default function SectionToggleControlPanel() {
 
       {activeScope === "group" && (
         <div className="p-4 theme-bg-surface border theme-border rounded-xl flex items-center gap-3">
-          <span className="text-xs font-semibold theme-text-secondary">Target Halqa Group:</span>
-          <select
+          <span className="text-xs font-semibold theme-text-secondary">Target Group:</span>
+          <CustomSelect
+            options={groupOptions.map((grp) => ({ value: grp, label: grp }))}
             value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className="theme-bg-sub border theme-border theme-text-primary px-3 py-1.5 rounded-xl text-xs focus:outline-none"
-          >
-            {groupOptions.map((grp) => (
-              <option key={grp} value={grp}>
-                {grp}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setSelectedGroup(val)}
+            className="w-72"
+            buttonClassName="w-full h-9 theme-bg-sub border theme-border rounded-xl px-3 theme-text-primary text-xs flex items-center justify-between cursor-pointer hover:theme-border transition-colors select-none font-medium shadow-sm"
+          />
         </div>
       )}
 
@@ -623,7 +623,7 @@ export default function SectionToggleControlPanel() {
                 type="text"
                 value={userSearchQuery}
                 onChange={(e) => setUserSearchQuery(e.target.value)}
-                placeholder="Search user by phone or name..."
+                placeholder="Search user by name, phone, or email..."
                 className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
               />
 
@@ -635,12 +635,14 @@ export default function SectionToggleControlPanel() {
                       type="button"
                       onClick={() => {
                         setSelectedUser(String(u.id));
-                        setUserSearchQuery(`${u.first_name || u.phone_number} (ID: ${u.id})`);
+                        setUserSearchQuery(`${u.first_name || u.name || u.phone_number || "User"} (ID: ${u.id})`);
                         setUserSearchResults([]);
                       }}
                       className="w-full px-3 py-2 rounded-lg text-left hover:theme-bg-elevated theme-text-primary transition-colors flex items-center justify-between"
                     >
-                      <span className="font-semibold">{u.first_name || "User"} ({u.phone_number})</span>
+                      <span className="font-semibold">
+                        {u.first_name || u.name || "User"} ({u.phone_number || "No Phone"}){u.email && ` - ${u.email}`}
+                      </span>
                       <span className="theme-text-secondary font-mono text-[10px]">ID #{u.id}</span>
                     </button>
                   ))}
