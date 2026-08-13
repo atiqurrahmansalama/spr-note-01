@@ -26,8 +26,6 @@ import AppGuideView from "./modules/settings/components/AppGuideView";
 import AboutAppView from "./modules/settings/components/AboutAppView";
 import SectionToggleControlPanel from "./modules/settings/components/SectionToggleControlPanel";
 
-import { FeatureControlProvider } from "./context/FeatureControlContext";
-
 function ProtectedRoute({ children }) {
   const urlParams = new URLSearchParams(window.location.search);
   const isGoogleCallback = urlParams.has("code") || urlParams.has("access_token") || urlParams.has("id_token");
@@ -53,8 +51,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <FeatureControlProvider>
-      <BrowserRouter>
+    <BrowserRouter>
       <Routes>
         {/* Standalone Public Auth & Verification Routes */}
         <Route path="/login" element={<LoginView />} />
@@ -96,6 +93,5 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-    </FeatureControlProvider>
   );
 }

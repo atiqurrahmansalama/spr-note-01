@@ -7,6 +7,7 @@ import { ToastProvider } from './context/ToastContext'
 import { FontProvider } from './context/FontContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
+import { FeatureControlProvider } from './context/FeatureControlContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -16,13 +17,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider>
-          <ToastProvider>
-            <ThemeProvider>
-              <FontProvider>
-                <App />
-              </FontProvider>
-            </ThemeProvider>
-          </ToastProvider>
+          <FeatureControlProvider>
+            <ToastProvider>
+              <ThemeProvider>
+                <FontProvider>
+                  <App />
+                </FontProvider>
+              </ThemeProvider>
+            </ToastProvider>
+          </FeatureControlProvider>
         </AuthProvider>
       </GoogleOAuthProvider>
     </ErrorBoundary>

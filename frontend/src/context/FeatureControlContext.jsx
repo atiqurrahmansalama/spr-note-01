@@ -1,37 +1,47 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "../utils/authService";
 import { getSectionConfig } from "../config/defaultSectionConfig";
+import { useAuth } from "./AuthContext";
 
 const FeatureControlContext = createContext({
   config: {},
   origins: {},
   loading: true,
   isFeatureEnabled: () => true,
+  isSectionEnabled: () => true,
   getFeatureOrigin: () => "GLOBAL",
   refetchConfig: async () => {},
 });
 
 export function FeatureControlProvider({ children }) {
-  const [config, setConfig] = useState(() => {
-    // Default fallback from local section config
-    const local = getSectionConfig();
-    const map = {};
-    Object.keys(local).forEach((k) => {
-      map[k] = local[k].enabled;
-    });
-    return map;
-  });
+  const { user, accessToken } = useAuth();
 
+  const getLocalDefaults = () => {
+    try {
+      const local = getSectionConfig();
+      const map = {};
+      Object.keys(local).forEach((k) => {
+        map[k] = local[k].enabled;
+      });
+      return map;
+    } catch {
+      return {};
+    }
+  };
+
+  const [config, setConfig] = useState(getLocalDefaults);
   const [origins, setOrigins] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const currentVersionRef = useRef(0);
+  // Track the last user id we fetched for, to detect user switches
+  const lastUserIdRef = useRef(null);
 
   const fetchEvaluatedConfig = useCallback(async () => {
+    setLoading(true);
     try {
       const candidatePaths = [
         "/api/v1/section-control/evaluate/",
         "/api/v1/control-panel/evaluated-config/",
-        "/control-panel/evaluated-config/",
       ];
 
       let resData = null;
@@ -72,7 +82,34 @@ export function FeatureControlProvider({ children }) {
     } catch {}
   }, [fetchEvaluatedConfig]);
 
+  // ── CRITICAL: Re-evaluate flags whenever user identity changes ──────────────
+  // This is what makes admin changes apply to OTHER accounts:
+  //   - When a different user logs in, their JWT is sent to /evaluate/ and the
+  //     backend returns THEIR 4-tier resolved config (their role, group, user overrides).
+  //   - When user logs out, reset to local defaults.
   useEffect(() => {
+    const currentUserId = user?.id ?? null;
+
+    if (currentUserId !== lastUserIdRef.current) {
+      // User identity changed (login, logout, switch account)
+      lastUserIdRef.current = currentUserId;
+
+      if (currentUserId === null) {
+        // Logged out — reset to local defaults immediately
+        setConfig(getLocalDefaults());
+        setOrigins({});
+        currentVersionRef.current = 0;
+      } else {
+        // New user logged in — immediately reset version ref and re-fetch for this user
+        currentVersionRef.current = 0;
+        fetchEvaluatedConfig();
+      }
+    }
+  }, [user?.id, fetchEvaluatedConfig]);
+
+  // ── INITIAL MOUNT + EVENT LISTENERS + POLLING ──────────────────────────────
+  useEffect(() => {
+    // Initial fetch on mount (handles page refresh with existing session)
     fetchEvaluatedConfig();
     checkVersionAndSync();
 
@@ -81,32 +118,39 @@ export function FeatureControlProvider({ children }) {
       checkVersionAndSync();
     };
 
-    // 1. BroadcastChannel across browser tabs
+    // 1. BroadcastChannel: instant update across tabs in the same browser
     let broadcastChannel = null;
     try {
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
         broadcastChannel = new BroadcastChannel("spr_section_control_channel");
         broadcastChannel.onmessage = () => {
+          // Reset version ref so we always get fresh data after admin change
+          currentVersionRef.current = 0;
           fetchEvaluatedConfig();
         };
       }
     } catch {}
 
-    // 2. Custom DOM Events & Storage Sync
-    window.addEventListener("spr_section_config_updated", handleUpdate);
+    // 2. Auth change event — triggers re-fetch for new user immediately
     window.addEventListener("spr_auth_updated", handleUpdate);
+    // 3. Section config updated event (fired by control panel after save)
+    window.addEventListener("spr_section_config_updated", handleUpdate);
+    // 4. Storage sync (cross-tab auth changes)
     window.addEventListener("storage", handleUpdate);
-    window.addEventListener("focus", handleUpdate);
+    // 5. Window focus — re-check version when user switches back to tab
+    window.addEventListener("focus", checkVersionAndSync);
 
+    // 6. Page visibility — re-check when tab becomes visible again
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        fetchEvaluatedConfig();
         checkVersionAndSync();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 3. 10-Second Feature Version Polling Interval for live updates across all active sessions
+    // 7. 10-second polling: propagates admin changes to all live sessions worldwide
+    //    Works for users on different devices/browsers — they pick up version bump
+    //    and immediately re-fetch their own per-user evaluated config from the server.
     const intervalId = setInterval(() => {
       checkVersionAndSync();
     }, 10000);
@@ -115,10 +159,10 @@ export function FeatureControlProvider({ children }) {
       if (broadcastChannel) {
         try { broadcastChannel.close(); } catch {}
       }
-      window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("spr_auth_updated", handleUpdate);
+      window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
-      window.removeEventListener("focus", handleUpdate);
+      window.removeEventListener("focus", checkVersionAndSync);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(intervalId);
     };

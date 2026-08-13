@@ -111,6 +111,8 @@ export function AuthProvider({ children }) {
     } else if (access) {
       setUser(user || true);
     }
+    // Notify FeatureControlContext to re-evaluate flags for this user
+    window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: userData?.id } }));
   };
 
   // Standard Email/Phone Login
@@ -149,6 +151,8 @@ export function AuthProvider({ children }) {
 
         setUser(finalUser);
         authStore.saveUserProfile(finalUser);
+        // Signal FeatureControlContext to re-evaluate flags for this newly logged-in user
+        window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: finalUser?.id } }));
         return { success: true, user: finalUser };
       }
       return { success: false, error: 'Login failed' };
@@ -184,6 +188,8 @@ export function AuthProvider({ children }) {
 
         setUser(userData);
         authStore.saveUserProfile(userData);
+        // Signal FeatureControlContext to re-evaluate flags for this newly logged-in user
+        window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: userData?.id } }));
         return { success: true, user: userData };
       }
       return { success: false, error: 'Google OAuth exchange failed' };
@@ -293,6 +299,8 @@ export function AuthProvider({ children }) {
     authStore.clearTokens();
     setAccessToken(null);
     setUser(null);
+    // Signal FeatureControlContext to clear flags and re-evaluate as anonymous
+    window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: null } }));
   };
 
   const value = {
