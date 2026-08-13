@@ -21,40 +21,8 @@ export function AuthProvider({ children }) {
     const googleAccess = hashParams?.get('access_token');
     const googleId = hashParams?.get('id_token');
 
-    // 1. IF WE ARE INSIDE THE POPUP WINDOW RETURNING FROM GOOGLE:
-    if ((googleCode || googleAccess || googleId) && window.opener && !isProcessingCode.current) {
-      isProcessingCode.current = true;
-      window.history.replaceState({}, document.title, window.location.pathname);
-
-      const payload = googleCode
-        ? { code: googleCode, redirect_uri: window.location.origin }
-        : { access_token: googleAccess, id_token: googleId };
-
-      apiClient.post('/api/v1/auth/google/', payload)
-        .then(res => {
-          if (window.opener) {
-            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', payload: res.data }, window.location.origin);
-          }
-          window.close();
-        })
-        .catch(err => {
-          console.error('Database/Backend Google Exchange Failed:', err?.response?.data || err?.message);
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'GOOGLE_AUTH_ERROR',
-              error: err?.response?.data || 'Backend database update failed'
-            }, window.location.origin);
-          }
-          window.close();
-        })
-        .finally(() => {
-          isProcessingCode.current = false;
-        });
-      return;
-    }
-
-    // 2. IF WE ARE IN MAIN WINDOW RETURNING VIA DIRECT REDIRECT (no opener):
-    if ((googleCode || googleAccess || googleId) && !window.opener && !isProcessingCode.current) {
+    // 1. IF RETURNING FROM GOOGLE VIA DIRECT SAME-WINDOW REDIRECT:
+    if ((googleCode || googleAccess || googleId) && !isProcessingCode.current) {
       isProcessingCode.current = true;
       window.history.replaceState({}, document.title, window.location.pathname);
       const payload = googleCode
@@ -63,22 +31,7 @@ export function AuthProvider({ children }) {
 
       apiClient.post('/api/v1/auth/google/', payload)
         .then(res => {
-          const data = res.data;
-          const newAccess = data.tokens?.access || data.access;
-          const newRefresh = data.tokens?.refresh || data.refresh;
-          const userData = data.user;
-
-          if (newAccess) {
-            authStore.saveTokens(newAccess, newRefresh);
-            localStorage.setItem('access_token', newAccess);
-            if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
-            setAccessToken(newAccess);
-          }
-          if (userData) {
-            authStore.saveUserProfile(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
-            setUser(userData);
-          }
+          saveTokens(res.data);
           window.location.href = '/';
         })
         .catch(err => {
@@ -91,37 +44,7 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // 3. IF WE ARE IN THE MAIN WINDOW: Listen for postMessage from popup window
-    const handleMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        const payload = event.data.payload || {};
-        const newAccess = payload.tokens?.access || payload.access;
-        const newRefresh = payload.tokens?.refresh || payload.refresh;
-        const userData = payload.user;
-
-        if (newAccess) {
-          authStore.saveTokens(newAccess, newRefresh);
-          localStorage.setItem('access_token', newAccess);
-          if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
-          setAccessToken(newAccess);
-        }
-        if (userData) {
-          authStore.saveUserProfile(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
-          setUser(userData);
-        }
-
-        window.location.href = '/';
-      }
-
-      if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
-        console.error('Google Login Error from Popup:', event.data.error);
-      }
-    };
-
-    // 4. LISTEN FOR STORAGE SYNC EVENTS ACROSS TABS
+    // 2. LISTEN FOR STORAGE SYNC EVENTS ACROSS TABS
     const handleStorageChange = (e) => {
       if (e.key === 'auth_sync_event') {
         const token = authStore.getAccessToken() || localStorage.getItem('access_token');
@@ -141,7 +64,7 @@ export function AuthProvider({ children }) {
 
     window.addEventListener('storage', handleStorageChange);
 
-    // 5. Normal initial token verification
+    // 3. Normal initial token verification
     const initAuth = async () => {
       const token = authStore.getAccessToken();
       if (token) {
@@ -162,10 +85,30 @@ export function AuthProvider({ children }) {
     initAuth();
 
     return () => {
-      window.removeEventListener('message', handleMessage);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
+
+  const saveTokens = (data) => {
+    if (!data) return;
+    const access = data.access || data.tokens?.access;
+    const refresh = data.refresh || data.tokens?.refresh;
+    const userData = data.user;
+
+    if (access) {
+      authStore.saveTokens(access, refresh);
+      localStorage.setItem('access_token', access);
+      if (refresh) localStorage.setItem('refresh_token', refresh);
+      setAccessToken(access);
+    }
+    if (userData) {
+      authStore.saveUserProfile(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    } else if (access) {
+      setUser(user || true);
+    }
+  };
 
   // Standard Email/Phone Login
   const login = async (usernameOrEmail, password) => {
@@ -351,6 +294,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    setUser,
     accessToken,
     isAuthenticated,
     isLoading,
@@ -358,6 +302,7 @@ export function AuthProvider({ children }) {
     loginWithGoogle,
     register,
     logout,
+    saveTokens,
     verifyEmail,
     resendVerification,
     requestPasswordReset,

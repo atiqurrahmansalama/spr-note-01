@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
@@ -94,7 +93,7 @@ export default function RegisterView() {
 
 
 
-  // Standard Google OAuth 2.0 direct authorization handler (Opens dedicated Popup Window)
+  // Standard Google OAuth 2.0 direct authorization handler (Same-Window Redirection)
   const handleGoogleSignUp = () => {
     console.log('[Google Auth] Sign up with Google clicked.');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -108,18 +107,14 @@ export default function RegisterView() {
     const scope = encodeURIComponent('openid email profile');
 
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(clientId)}&` +
+      `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `scope=${scope}&` +
       `prompt=select_account`;
 
-    console.log('[Google Auth] Opening Google OAuth in popup window:', googleAuthUrl);
-    window.open(
-      googleAuthUrl,
-      'GoogleLoginPopup',
-      'width=500,height=600,scrollbars=yes'
-    );
+    console.log('[Google Auth] Redirecting directly in same window:', googleAuthUrl);
+    window.location.href = googleAuthUrl;
   };
 
   const handleChange = (e) => {

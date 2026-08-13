@@ -94,6 +94,10 @@ export const auth = {
   saveAccessToken: (t)   => writeString(KEYS.ACCESS_TOKEN, t),
   getRefreshToken: ()    => readString(KEYS.REFRESH_TOKEN),
   saveRefreshToken:(t)   => writeString(KEYS.REFRESH_TOKEN, t),
+  saveTokens: (access, refresh) => {
+    if (access) writeString(KEYS.ACCESS_TOKEN, access);
+    if (refresh) writeString(KEYS.REFRESH_TOKEN, refresh);
+  },
   clearTokens: () => {
     localStorage.removeItem(KEYS.ACCESS_TOKEN);
     localStorage.removeItem(KEYS.REFRESH_TOKEN);
