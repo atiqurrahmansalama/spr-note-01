@@ -39,6 +39,13 @@ from .models import (
     RoleActionPermission,
     EmailVerificationToken,
     PasswordResetToken,
+    SystemSetting,
+    AppSectionCategory,
+    AppSection,
+    RoleSectionPermission,
+    GroupSectionPermission,
+    UserSectionOverride,
+    FeatureFlagAuditLog,
 )
 from .permissions import IsAdminUserRole
 from .middleware import detect_device_type, detect_device_info, get_client_ip
