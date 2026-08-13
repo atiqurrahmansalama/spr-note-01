@@ -57,12 +57,29 @@ export default function JuzPageSection({ data, onChange, onReset }) {
     }, 100);
   };
 
+  const totalPages = data.reduce((sum, row) => {
+    const rowSum = row.ranges.reduce((rSum, range) => {
+      const start = parseInt(range.start, 10);
+      const end = parseInt(range.end, 10);
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        return rSum + (end - start + 1);
+      }
+      return rSum;
+    }, 0);
+    return sum + rowSum;
+  }, 0);
+
   return (
     <div className="relative">
       {/* Title Header Row with Refresh Icon */}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
           JUZ / PAGE DETAILS
+          {totalPages > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              {totalPages}
+            </span>
+          )}
         </h3>
         <button
           type="button"

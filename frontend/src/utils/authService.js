@@ -177,12 +177,13 @@ export const refreshToken = async () => {
         authStore.saveAccessToken(data.access);
         return data.access;
       }
+    } else if (response.status === 400 || response.status === 401 || response.status === 403) {
+      authStore.clear();
     }
   } catch (err) {
-    console.warn('[authService] Token refresh failed:', err.message);
+    console.warn('[authService] Token refresh failed (network/server error):', err.message);
   }
 
-  authStore.clear();
   return null;
 };
 

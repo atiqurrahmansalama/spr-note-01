@@ -108,9 +108,15 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         isRefreshing = false;
-        authStore.clearTokens();
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
+        
+        // Only clear tokens and redirect to login if the server explicitly rejected the refresh token (e.g. 400, 401, 403).
+        // Avoid logging out on temporary network/connection drop.
+        const status = refreshErr.response?.status;
+        if (status && (status === 400 || status === 401 || status === 403)) {
+          authStore.clearTokens();
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(refreshErr);
       }

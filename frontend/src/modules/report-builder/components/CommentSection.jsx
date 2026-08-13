@@ -66,12 +66,17 @@ export default function CommentSection({
     showToast("Comment template saved locally", "info");
   };
 
-  const handleDeleteComment = async (e, msgItem, index) => {
+  const handleDeleteComment = async (e, msgItem) => {
     e.stopPropagation();
     const text = typeof msgItem === "object" && msgItem !== null ? msgItem.text : String(msgItem);
     const id = typeof msgItem === "object" && msgItem !== null ? msgItem.id : null;
 
-    setSavedComments((prev) => prev.filter((_, i) => i !== index));
+    setSavedComments((prev) => prev.filter((c) => {
+      const cText = typeof c === "object" && c !== null ? c.text : String(c);
+      const cId = typeof c === "object" && c !== null ? c.id : null;
+      if (id && cId) return cId !== id;
+      return cText.toLowerCase() !== text.toLowerCase();
+    }));
     commentStore.remove(id || text);
 
     if (isOnline()) {
@@ -100,6 +105,37 @@ export default function CommentSection({
 
     showToast("Template message deleted", "info");
   };
+
+  const handlePickTemplate = (text, id) => {
+    try {
+      const pickedMap = JSON.parse(localStorage.getItem("spr_last_picked_templates") || "{}");
+      pickedMap[id || text] = Date.now();
+      localStorage.setItem("spr_last_picked_templates", JSON.stringify(pickedMap));
+    } catch {}
+
+    setComment((prev) => {
+      if (!prev.trim()) return text;
+      return `${prev}\n${text}`;
+    });
+    setIsSavedDropdownOpen(false);
+  };
+
+  const getSortedTemplates = () => {
+    try {
+      const pickedMap = JSON.parse(localStorage.getItem("spr_last_picked_templates") || "{}");
+      return [...savedComments].sort((a, b) => {
+        const keyA = typeof a === "object" && a !== null ? (a.id || a.text) : String(a);
+        const keyB = typeof b === "object" && b !== null ? (b.id || b.text) : String(b);
+        const timeA = pickedMap[keyA] || 0;
+        const timeB = pickedMap[keyB] || 0;
+        return timeB - timeA;
+      });
+    } catch {
+      return savedComments;
+    }
+  };
+
+  const sortedTemplates = getSortedTemplates();
 
   const handleClearComment = () => {
     setComment("");
@@ -173,14 +209,14 @@ export default function CommentSection({
           />
 
           {isSavedDropdownOpen && (
-            <div className="absolute inset-0 theme-bg-sub border theme-border rounded-xl z-20 p-3 flex flex-col space-y-2">
+            <div className="absolute top-0 left-0 right-0 h-[280px] theme-bg-sub border theme-border rounded-xl z-20 p-3 flex flex-col space-y-2 shadow-2xl">
               <div className="flex items-center justify-between border-b theme-border pb-2 px-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
                     Saved Templates
                   </span>
                   <span className="theme-bg-accent-soft theme-accent text-[10px] font-semibold px-2 py-0.5 rounded-full font-mono">
-                    {savedComments.length}
+                    {sortedTemplates.length}
                   </span>
                 </div>
                 <button
@@ -194,27 +230,21 @@ export default function CommentSection({
               </div>
 
               <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5">
-                {savedComments.length > 0 ? (
-                  savedComments.map((msg, index) => {
+                {sortedTemplates.length > 0 ? (
+                  sortedTemplates.map((msg, index) => {
                     const text = typeof msg === "object" && msg !== null ? msg.text : String(msg);
                     const msgId = typeof msg === "object" && msg !== null ? msg.id : index;
                     return (
                       <div
                         key={msgId || index}
-                        onClick={() => {
-                          setComment((prev) => {
-                            if (!prev.trim()) return text;
-                            return `${prev}\n${text}`;
-                          });
-                          setIsSavedDropdownOpen(false);
-                        }}
+                        onClick={() => handlePickTemplate(text, msgId || text)}
                         className="px-3.5 py-2.5 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2 group"
                         title={text}
                       >
                         <span className="truncate flex-1 font-medium">{text}</span>
                         <button
                           type="button"
-                          onClick={(e) => handleDeleteComment(e, msg, index)}
+                          onClick={(e) => handleDeleteComment(e, msg)}
                           className="p-1 rounded text-xs theme-text-secondary hover:text-red-400 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
                           title="Delete template message"
                         >

@@ -76,6 +76,26 @@ export default function DetailSection({
     }
   };
 
+  const calculateTotalCount = () => {
+    if (!data || !Array.isArray(data)) return 0;
+    let count = 0;
+    data.forEach((row) => {
+      const hasPage = row.page && String(row.page).trim() !== "";
+      const filledAyahs = row.ayahs?.filter(a => a.value && String(a.value).trim() !== "") || [];
+      if (filledAyahs.length > 0) {
+        count += filledAyahs.length;
+      } else if (hasPage) {
+        count += 1;
+      }
+    });
+    return count;
+  };
+
+  const totalCount = calculateTotalCount();
+  const badgeColorClass = listType === "mistake"
+    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+    : "bg-amber-500/10 text-amber-500 border border-amber-500/20";
+
   return (
     <div 
       data-list-type={listType}
@@ -86,6 +106,11 @@ export default function DetailSection({
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
           {title}
+          {totalCount > 0 && (
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${badgeColorClass}`}>
+              {totalCount}
+            </span>
+          )}
         </h3>
         {onReset && (
           <button
