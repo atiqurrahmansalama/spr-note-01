@@ -11,6 +11,7 @@ import StudentReportsView from "./modules/reports-history/ReportsHistoryModule";
 import StudentDirectoryView from "./modules/student-directory/StudentDirectoryModule";
 import SessionManager from "./modules/student-directory/components/SessionManager";
 import UserManagementModule from "./modules/admin/UserManagementModule";
+import RoleManagementModule from "./modules/admin/RoleManagementModule";
 import ActivityAnalyticsView from "./modules/admin/ActivityAnalyticsView";
 import TrashRestorationView from "./modules/admin/TrashRestorationView";
 import UserProfileSettingsView from "./modules/settings/components/UserProfileSettingsView";
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="groups-students" element={<StudentDirectoryView />} />
           <Route path="sessions-comments" element={<SessionManager />} />
           <Route path="user-management" element={<UserManagementModule />} />
+          <Route path="role-management" element={<RoleManagementModule />} />
           <Route path="activity-analytics" element={<ActivityAnalyticsView />} />
           <Route path="trash-restoration" element={<TrashRestorationView />} />
           <Route path="profile-settings" element={<UserProfileSettingsView />} />

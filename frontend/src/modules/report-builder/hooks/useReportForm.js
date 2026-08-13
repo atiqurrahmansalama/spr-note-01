@@ -391,7 +391,13 @@ export function useReportForm() {
       setSessionList(cachedSessions);
     }
 
+    // Immediately unblock UI if local cache exists
+    if (cachedStudents.length > 0 || cachedSessions.length > 0) {
+      setIsLoading(false);
+    }
+
     if (!isOnline()) {
+      setIsLoading(false);
       return;
     }
 

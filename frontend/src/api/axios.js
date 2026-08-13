@@ -3,8 +3,15 @@ import { auth as authStore } from '../utils/localStore';
 
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/+$/, '');
-  return '';
+  if (
+    envUrl &&
+    !envUrl.includes("your-production-domain.com") &&
+    !envUrl.includes("127.0.0.1") &&
+    !envUrl.includes("localhost")
+  ) {
+    return envUrl.replace(/\/+$/, "");
+  }
+  return "";
 };
 
 const apiClient = axios.create({

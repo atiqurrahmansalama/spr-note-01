@@ -264,56 +264,56 @@ export default function UserManagementModule() {
   const loadUsersAndRoles = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Dynamic Roles
-      try {
-        const rRes = await fetchWithAuth("/api/v1/roles/");
-        if (rRes.ok) {
-          const rData = await rRes.json();
-          setDbRoles(Array.isArray(rData) ? rData : []);
-        }
-      } catch {
-        setDbRoles([]);
+      const [rRes, uRes, gRes] = await Promise.all([
+        fetchWithAuth("/api/v1/roles/").catch(() => null),
+        fetchWithAuth("/api/v1/users/").catch(() => null),
+        fetchWithAuth("/api/v1/groups/").catch(() => null),
+      ]);
+
+      if (rRes && rRes.ok) {
+        const rData = await rRes.json();
+        setDbRoles(Array.isArray(rData) ? rData : []);
       }
 
-      // 2. Fetch Users
-      let fetchedUsers = [];
-      const userEndpoints = ["/api/v1/users/", "/api/users/", "/users/"];
-      for (const ep of userEndpoints) {
+      if (uRes && uRes.ok) {
+        const data = await uRes.json();
+        const fetchedUsers = Array.isArray(data) ? data : data.results || [];
+        setUsers(fetchedUsers);
+      } else {
         try {
-          const res = await fetchWithAuth(ep);
-          if (res.ok) {
-            const data = await res.json();
-            fetchedUsers = Array.isArray(data) ? data : data.results || [];
-            if (fetchedUsers && fetchedUsers.length > 0) break;
+          const fb = await fetchWithAuth("/users/");
+          if (fb.ok) {
+            const data = await fb.json();
+            setUsers(Array.isArray(data) ? data : data.results || []);
           }
-        } catch {
-          // continue
-        }
+        } catch {}
       }
-      setUsers(fetchedUsers);
 
-      // 3. Fetch Halqa Groups
-      let fetchedGroups = [];
-      const groupEndpoints = ["/api/v1/groups/", "/api/groups/", "/groups/"];
-      for (const ep of groupEndpoints) {
+      if (gRes && gRes.ok) {
+        const gData = await gRes.json();
+        const rawGroups = Array.isArray(gData) ? gData : gData.results || [];
+        const fetchedGroups = rawGroups.map((g) =>
+          typeof g === "string"
+            ? { id: g, name: g }
+            : { id: g.id || g.name, name: g.name || g.group_name || "General Group" }
+        );
+        setGroups(fetchedGroups);
+      } else {
         try {
-          const res = await fetchWithAuth(ep);
-          if (res.ok) {
-            const gData = await res.json();
+          const fbG = await fetchWithAuth("/groups/");
+          if (fbG.ok) {
+            const gData = await fbG.json();
             const rawGroups = Array.isArray(gData) ? gData : gData.results || [];
-            fetchedGroups = rawGroups.map((g) =>
-              typeof g === "string"
-                ? { id: g, name: g }
-                : { id: g.id || g.name, name: g.name || g.group_name || "General Group" }
+            setGroups(
+              rawGroups.map((g) =>
+                typeof g === "string"
+                  ? { id: g, name: g }
+                  : { id: g.id || g.name, name: g.name || g.group_name || "General Group" }
+              )
             );
-            if (fetchedGroups.length > 0) break;
           }
-        } catch {
-          // continue
-        }
+        } catch {}
       }
-      setGroups(fetchedGroups);
-
     } catch {
       showToast("Error loading user management data", "error");
     } finally {
@@ -743,60 +743,17 @@ export default function UserManagementModule() {
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
           <button
             type="button"
-            onClick={() => setCurrentView("users")}
-            className={`flex-1 md:flex-none h-11 px-4 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap border flex items-center justify-center gap-2 ${
-              currentView === "users"
-                ? "theme-bg-accent theme-accent-text shadow-md border-transparent"
-                : "theme-bg-sub theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated theme-border"
-            }`}
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex-1 md:flex-none h-11 theme-bg-accent hover:opacity-90 theme-accent-text font-semibold px-4 rounded-xl text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            <svg className="w-4 h-4 stroke-[2.5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            User Accounts ({users.length})
+            + Add User
           </button>
-
-          <button
-            type="button"
-            onClick={() => setCurrentView("roles")}
-            className={`flex-1 md:flex-none h-11 px-4 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap border flex items-center justify-center gap-2 ${
-              currentView === "roles"
-                ? "theme-bg-accent theme-accent-text shadow-md border-transparent"
-                : "theme-bg-sub theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated theme-border"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Manage Roles ({dbRoles.length || 5})
-          </button>
-
-          {currentView === "users" && (
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex-1 md:flex-none h-11 theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border font-semibold px-4 rounded-xl text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-            >
-              <svg className="w-4 h-4 stroke-[2.5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              + Add User
-            </button>
-          )}
         </div>
       </div>
 
-      {currentView === "roles" ? (
-        <RoleManagementPanel
-          onBack={() => {
-            setCurrentView("users");
-            loadUsersAndRoles();
-          }}
-          onRoleUpdated={() => loadUsersAndRoles()}
-          showHeaderCard={false}
-        />
-      ) : (
-        <>
       {/* ── STATS METRICS CARDS ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="theme-bg-surface border theme-border rounded-xl p-4 shadow-sm flex items-center justify-between">
@@ -1333,8 +1290,6 @@ export default function UserManagementModule() {
             );
           })()}
         </div>
-      )}
-      </>
       )}
 
       {/* Modal: Create User Account */}

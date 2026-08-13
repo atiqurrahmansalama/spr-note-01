@@ -89,12 +89,16 @@ export default function SessionManager() {
     if (!isOnline()) return;
 
     try {
-      // Sync local changes to backend first
-      await syncSessionsAndComments();
+      // Trigger local sync in background non-blocking
+      syncSessionsAndComments().catch(() => {});
 
-      // Load sessions
-      const res = await fetchWithAuth("/sessions/");
-      if (res.ok) {
+      // Parallel fetch sessions and comments
+      const [res, commentsRes] = await Promise.all([
+        fetchWithAuth("/sessions/").catch(() => null),
+        fetchWithAuth("/messages/").catch(() => null),
+      ]);
+
+      if (res && res.ok) {
         const apiData = await res.json();
         const formattedApi = (Array.isArray(apiData) ? apiData : []).map((s, idx) => ({
           id: typeof s === "object" ? (s.id || `api-${idx}`) : `api-${idx}`,
@@ -106,9 +110,7 @@ export default function SessionManager() {
         setSessions(normalizeSessionList(merged));
       }
 
-      // Load comments
-      const commentsRes = await fetchWithAuth("/messages/");
-      if (commentsRes.ok) {
+      if (commentsRes && commentsRes.ok) {
         const rawMessages = await commentsRes.json();
         const apiComments = normalizeCommentList(rawMessages);
         const localComments = normalizeCommentList(commentStore.getAll());

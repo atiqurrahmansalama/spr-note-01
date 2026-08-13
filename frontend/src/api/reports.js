@@ -3,9 +3,18 @@ import { fetchWithAuth } from "../utils/authService";
 
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/+$/, "");
+  if (
+    envUrl &&
+    !envUrl.includes("your-production-domain.com") &&
+    !envUrl.includes("127.0.0.1") &&
+    !envUrl.includes("localhost")
+  ) {
+    return envUrl.replace(/\/+$/, "");
+  }
   return "";
 };
+
+const API_BASE_URL = getApiBaseUrl();
 
 const fetchApi = async (path, options = {}) => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -21,27 +30,25 @@ const fetchApi = async (path, options = {}) => {
   }
 
   const reqOptions = { ...options, headers };
+  const targetUrl = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
 
-  // Primary relative proxy try
   try {
-    const res = await fetch(cleanPath, reqOptions);
+    const res = await fetch(targetUrl, reqOptions);
     if (res.ok || res.status < 500) return res;
-  } catch {
-    console.warn(`[reportsApi] Proxy fetch to ${cleanPath} failed, trying 127.0.0.1 fallback...`);
+  } catch (err) {
+    console.warn(`[reportsApi] Fetch to ${targetUrl} failed:`, err);
   }
 
-  // Fallback try 1: 127.0.0.1:8000
-  try {
-    const fallbackUrl = `http://127.0.0.1:8000${cleanPath}`;
-    const res = await fetch(fallbackUrl, reqOptions);
-    if (res.ok || res.status < 500) return res;
-  } catch {
-    console.warn(`[reportsApi] Direct 127.0.0.1 fetch failed, trying localhost...`);
+  if (API_BASE_URL) {
+    try {
+      const res = await fetch(cleanPath, reqOptions);
+      if (res.ok || res.status < 500) return res;
+    } catch {
+      // ignore
+    }
   }
 
-  // Fallback try 2: localhost:8000
-  const localhostUrl = `http://localhost:8000${cleanPath}`;
-  return fetch(localhostUrl, reqOptions);
+  throw new Error("Server is offline or unreachable.");
 };
 
 /**

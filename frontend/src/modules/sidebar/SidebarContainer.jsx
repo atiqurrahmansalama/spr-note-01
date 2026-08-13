@@ -49,6 +49,7 @@ export default function SidebarContainer({
     { id: "Dashboard", name: "Dashboard", path: "/", Icon: DashboardIcon },
     { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
     { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
+    { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
     { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
     { id: "Groups & Students", name: "Groups & Students", path: "/groups-students", Icon: GroupsIcon },
     { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },

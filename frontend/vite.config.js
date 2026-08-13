@@ -9,47 +9,62 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/api': {
+      '^/api($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/token': {
+      '^/token($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/students': {
+      '^/students($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/reports': {
+      '^/reports($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/sessions': {
+      '^/sessions($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/groups': {
+      '^/groups($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/messages': {
+      '^/messages($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/users': {
+      '^/users($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
-      '/roles': {
+      '^/roles($|/)': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '^/activity($|/)': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '^/auth($|/)': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '^/control-panel($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,

@@ -23,7 +23,7 @@ export function FeatureControlProvider({ children }) {
   });
 
   const [origins, setOrigins] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const fetchEvaluatedConfig = useCallback(async () => {
     try {

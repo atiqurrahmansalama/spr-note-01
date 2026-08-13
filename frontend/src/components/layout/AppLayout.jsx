@@ -17,6 +17,7 @@ export const ROUTE_TITLE_MAP = {
   "/groups-students": { title: "Groups & Students Directory" },
   "/sessions-comments": { title: "Sessions & Saved Comments" },
   "/user-management": { title: "User Management" },
+  "/role-management": { title: "Role Management & Hierarchy Permissions" },
   "/activity-analytics": { title: "Teacher Activity & Session Analytics" },
   "/trash-restoration": { title: "Trash & Soft-Deleted Reports" },
   "/profile-settings": { title: "User Profile Settings" },

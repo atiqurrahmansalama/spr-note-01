@@ -36,7 +36,8 @@ export default function StudentDirectoryView() {
     if (!isOnline()) return;
 
     try {
-      await syncLocalStudentsToBackend();
+      // Background sync without blocking student list fetch
+      syncLocalStudentsToBackend().catch(() => {});
 
       const res = await fetchWithAuth("/students/");
       if (res.ok) {

@@ -2,50 +2,41 @@ import { auth as authStore } from "./localStore";
 
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/+$/, "");
-  return ""; // empty string uses Vite dev server proxy or current origin
+  if (
+    envUrl &&
+    !envUrl.includes("your-production-domain.com") &&
+    !envUrl.includes("127.0.0.1") &&
+    !envUrl.includes("localhost")
+  ) {
+    return envUrl.replace(/\/+$/, "");
+  }
+  return "";
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Helper to make fetch request with relative proxy & absolute fallback
+// Helper to make fetch request with relative proxy & fast resolution
 const fetchApi = async (path, options = {}) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const targetUrl = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
   
+  try {
+    const res = await fetch(targetUrl, options);
+    if (res.ok || res.status < 500) return res;
+  } catch (err) {
+    console.warn(`[authService] Fetch to ${targetUrl} failed:`, err);
+  }
+
   if (API_BASE_URL) {
     try {
-      const res = await fetch(`${API_BASE_URL}${cleanPath}`, options);
+      const res = await fetch(cleanPath, options);
       if (res.ok || res.status < 500) return res;
     } catch {
-      console.warn(`[authService] Direct API_BASE_URL fetch to ${cleanPath} failed...`);
+      // ignore
     }
   }
 
-  // Primary try with relative path (Vite proxy / same origin)
-  try {
-    const res = await fetch(cleanPath, options);
-    if (res.ok || res.status < 500) return res;
-  } catch {
-    console.warn(`[authService] Proxy fetch to ${cleanPath} failed, attempting direct target...`);
-  }
-
-  // Fallback try 1: 127.0.0.1:8000
-  try {
-    const fallbackUrl = `http://127.0.0.1:8000${cleanPath}`;
-    const res = await fetch(fallbackUrl, options);
-    if (res.ok || res.status < 500) return res;
-  } catch {
-    console.warn(`[authService] Direct 127.0.0.1 fetch failed, trying localhost fallback...`);
-  }
-
-  // Fallback try 2: localhost:8000
-  try {
-    const localhostUrl = `http://localhost:8000${cleanPath}`;
-    return await fetch(localhostUrl, options);
-  } catch (err) {
-    console.warn(`[authService] All API targets failed for ${cleanPath}:`, err.message);
-    throw new Error("Server is offline or unreachable.", { cause: err });
-  }
+  throw new Error("Server is offline or unreachable.");
 };
 
 // Register User (Sign Up)
