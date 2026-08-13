@@ -501,9 +501,30 @@ export function useReportForm() {
     };
 
     let updatedList;
+    let oldStudentId = null;
     if (result.mode === "REPLACE" && result.oldStudent) {
+      const oldStudentObj = studentDatabase.find(s => s.label === result.oldStudent || s.name === result.oldStudent);
+      if (oldStudentObj) {
+        oldStudentId = oldStudentObj.id;
+      }
       studentStore.remove(result.oldStudent);
       updatedList = studentStore.add(newStudent);
+
+      // Propagate student name to local reports list
+      const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+      const updatedReps = localReps.map(rep => {
+        if (rep.student_name === result.oldStudent) {
+          return {
+            ...rep,
+            student_name: result.name,
+            student_group: result.group || rep.student_group,
+          };
+        }
+        return rep;
+      });
+      localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReps));
+      window.dispatchEvent(new CustomEvent("spr_report_saved"));
+      window.dispatchEvent(new CustomEvent("spr_project_changed"));
     } else {
       updatedList = studentStore.add(newStudent);
     }
@@ -512,15 +533,17 @@ export function useReportForm() {
     setStudentName(result.name);
     setGroupName(result.group || "General Group");
 
-
     if (isOnline()) {
       try {
+        const isReplace = result.mode === "REPLACE" && result.oldStudent && oldStudentId && !String(oldStudentId).startsWith("stu_");
+        const endpoint = isReplace ? `/students/${oldStudentId}/` : "/students/";
+        const method = isReplace ? "PATCH" : "POST";
         const payload = {
           name: result.name,
           group: result.group || "General Group",
         };
-        const response = await fetchWithAuth("/students/", {
-          method: "POST",
+        const response = await fetchWithAuth(endpoint, {
+          method: method,
           body: JSON.stringify(payload),
         });
 

@@ -10,17 +10,23 @@ import {
 import { SessionsIcon, ChatIcon, TrashIcon, CopyIcon, EditIcon } from "../../../components/ui/Icons";
 import { syncSessionsAndComments } from "../../../utils/syncEngine";
 
-// Helper to normalize any comment structure into a clean array of strings
+// Helper to normalize any comment structure into a clean array of objects
 function normalizeCommentList(rawList) {
   if (!Array.isArray(rawList)) return [];
   return rawList
     .map((c) => {
-      if (!c) return "";
-      if (typeof c === "string") return c;
-      if (typeof c === "object") return c.text || c.comment || String(c);
-      return String(c);
+      if (!c) return null;
+      if (typeof c === "string") return { id: crypto.randomUUID(), text: c };
+      if (typeof c === "object") {
+        return {
+          id: c.id || c.uniq_id || crypto.randomUUID(),
+          text: c.text || c.comment || "",
+          _local: !!c._local
+        };
+      }
+      return null;
     })
-    .filter((str) => typeof str === "string" && str.trim().length > 0);
+    .filter((c) => c !== null && typeof c.text === "string" && c.text.trim().length > 0);
 }
 
 // Helper to normalize session structure
@@ -51,7 +57,7 @@ export default function SessionManager() {
   // Editing states
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editSessionNameInput, setEditSessionNameInput] = useState("");
-  const [editingCommentIndex, setEditingCommentIndex] = useState(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentTextInput, setEditCommentTextInput] = useState("");
 
   // Monitor online status
@@ -114,7 +120,15 @@ export default function SessionManager() {
         const rawMessages = await commentsRes.json();
         const apiComments = normalizeCommentList(rawMessages);
         const localComments = normalizeCommentList(commentStore.getAll());
-        const mergedComments = Array.from(new Set([...apiComments, ...localComments]));
+        const seen = new Set();
+        const mergedComments = [];
+        for (const c of [...apiComments, ...localComments]) {
+          const lowerText = c.text.toLowerCase().trim();
+          if (!seen.has(lowerText)) {
+            seen.add(lowerText);
+            mergedComments.push(c);
+          }
+        }
         setComments(mergedComments);
         commentStore.saveAll(mergedComments);
       }
@@ -185,10 +199,12 @@ export default function SessionManager() {
       s.id === session.id ? { ...s, name: trimmed, _local: true } : s
     );
     setSessions(normalizeSessionList(updated));
+    sessionStore.saveAll(updated);
     setEditingSessionId(null);
     showToast(`Updated session to "${trimmed}" locally`, "success");
 
-    if (isOnline() && session.id && !String(session.id).startsWith("local-")) {
+    const isDbId = session.id && /^\d+$/.test(String(session.id));
+    if (isOnline() && isDbId) {
       try {
         const res = await fetchWithAuth(`/sessions/${session.id}/`, {
           method: "PATCH",
@@ -215,7 +231,8 @@ export default function SessionManager() {
     window.dispatchEvent(new CustomEvent("spr_session_updated"));
     window.dispatchEvent(new CustomEvent("spr_project_changed"));
 
-    if (isOnline() && id && !String(id).startsWith("local-")) {
+    const isDbId = id && /^\d+$/.test(String(id));
+    if (isOnline() && isDbId) {
       try {
         const res = await fetchWithAuth(`/sessions/${id}/`, {
           method: "DELETE",
@@ -244,7 +261,7 @@ export default function SessionManager() {
     }
 
     const currentList = normalizeCommentList(comments);
-    if (currentList.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+    if (currentList.some((c) => c.text.toLowerCase() === trimmed.toLowerCase())) {
       showToast("Comment template already exists!", "warning");
       return;
     }
@@ -257,10 +274,13 @@ export default function SessionManager() {
 
     if (isOnline()) {
       try {
-        await fetchWithAuth("/messages/", {
+        const postRes = await fetchWithAuth("/messages/", {
           method: "POST",
           body: JSON.stringify({ text: trimmed }),
         });
+        if (postRes.ok) {
+          await loadSessionsAndComments();
+        }
       } catch (err) {
         console.warn("[SessionManager] Online comment save error:", err.message);
       }
@@ -268,13 +288,13 @@ export default function SessionManager() {
   };
 
   // Start edit comment template
-  const startEditComment = (index, text) => {
-    setEditingCommentIndex(index);
+  const startEditComment = (commentId, text) => {
+    setEditingCommentId(commentId);
     setEditCommentTextInput(text);
   };
 
   // Save edited comment template
-  const handleSaveEditComment = async (index, oldText) => {
+  const handleSaveEditComment = async (commentId, oldText) => {
     const trimmed = editCommentTextInput.trim();
     if (!trimmed) {
       showToast("Comment template text cannot be empty!", "error");
@@ -282,27 +302,24 @@ export default function SessionManager() {
     }
 
     const currentComments = normalizeCommentList(comments);
-    const updated = currentComments.map((c, i) => (i === index ? trimmed : c));
+    const updated = currentComments.map((c) => 
+      c.id === commentId ? { ...c, text: trimmed, _local: true } : c
+    );
     setComments(updated);
-    setEditingCommentIndex(null);
+    commentStore.saveAll(updated);
+    setEditingCommentId(null);
     showToast("Comment template updated locally!", "success");
 
-    if (isOnline()) {
+    const isDbId = commentId && /^\d+$/.test(String(commentId));
+    if (isOnline() && isDbId) {
       try {
-        const res = await fetchWithAuth("/messages/");
+        const res = await fetchWithAuth(`/messages/${commentId}/`, {
+          method: "PATCH",
+          body: JSON.stringify({ text: trimmed }),
+        });
         if (res.ok) {
-          const rawMessages = await res.json();
-          const serverMsg = (Array.isArray(rawMessages) ? rawMessages : []).find((m) => 
-            (typeof m === "object" ? (m.text || m.comment) : String(m)) === oldText
-          );
-          if (serverMsg && serverMsg.id) {
-            await fetchWithAuth(`/messages/${serverMsg.id}/`, {
-              method: "PATCH",
-              body: JSON.stringify({ text: trimmed }),
-            });
-            showToast("Comment template synced with database!", "success");
-            await loadSessionsAndComments();
-          }
+          showToast("Comment template synced with database!", "success");
+          await loadSessionsAndComments();
         }
       } catch (err) {
         console.warn("Failed to sync edited comment:", err.message);
@@ -311,31 +328,23 @@ export default function SessionManager() {
   };
 
   // Handle Delete Comment
-  const handleDeleteComment = async (index, commentText) => {
+  const handleDeleteComment = async (commentId, commentText) => {
     if (!window.confirm(`Are you sure you want to delete comment template "${commentText}"?`)) {
       return;
     }
 
     const currentComments = normalizeCommentList(comments);
-    const updated = currentComments.filter((_, idx) => idx !== index);
+    const updated = currentComments.filter((c) => c.id !== commentId);
     setComments(updated);
     commentStore.saveAll(updated);
     showToast("Comment template deleted", "info");
 
-    if (isOnline()) {
+    const isDbId = commentId && /^\d+$/.test(String(commentId));
+    if (isOnline() && isDbId) {
       try {
-        const res = await fetchWithAuth("/messages/");
-        if (res.ok) {
-          const rawMessages = await res.json();
-          const serverMsg = (Array.isArray(rawMessages) ? rawMessages : []).find((m) => 
-            (typeof m === "object" ? (m.text || m.comment) : String(m)) === commentText
-          );
-          if (serverMsg && serverMsg.id) {
-            await fetchWithAuth(`/messages/${serverMsg.id}/`, {
-              method: "DELETE",
-            });
-          }
-        }
+        await fetchWithAuth(`/messages/${commentId}/`, {
+          method: "DELETE",
+        });
       } catch (err) {
         console.warn("Failed to delete comment from server:", err.message);
       }
@@ -351,8 +360,8 @@ export default function SessionManager() {
   // Filtered and sorted Comments (A-Z)
   const safeComments = normalizeCommentList(comments);
   const filteredComments = safeComments
-    .filter((c) => (c || "").toLowerCase().includes(commentSearch.toLowerCase()))
-    .sort((a, b) => (a || "").localeCompare(b || ""));
+    .filter((c) => (c.text || "").toLowerCase().includes(commentSearch.toLowerCase()))
+    .sort((a, b) => (a.text || "").localeCompare(b.text || ""));
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-5 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
@@ -555,12 +564,14 @@ export default function SessionManager() {
                   No comment templates found.
                 </p>
               ) : (
-                filteredComments.map((commentText, idx) => {
-                  const isEditing = editingCommentIndex === idx;
+                filteredComments.map((commentObj) => {
+                  const commentText = commentObj.text;
+                  const commentId = commentObj.id;
+                  const isEditing = editingCommentId === commentId;
 
                   if (isEditing) {
                     return (
-                      <div key={idx} className="theme-bg-sub border theme-border rounded-xl p-3 space-y-2 shadow-sm animate-fade-in">
+                      <div key={commentId} className="theme-bg-sub border theme-border rounded-xl p-3 space-y-2 shadow-sm animate-fade-in">
                         <textarea
                           rows={2}
                           value={editCommentTextInput}
@@ -571,14 +582,14 @@ export default function SessionManager() {
                         <div className="flex justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setEditingCommentIndex(null)}
+                            onClick={() => setEditingCommentId(null)}
                             className="px-2 py-0.5 text-[10px] font-semibold theme-text-secondary hover:theme-text-primary"
                           >
                             Cancel
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleSaveEditComment(idx, commentText)}
+                            onClick={() => handleSaveEditComment(commentId, commentText)}
                             className="px-2.5 py-0.5 text-[10px] font-semibold theme-accent-text theme-bg-accent rounded-md"
                           >
                             Save
@@ -590,7 +601,7 @@ export default function SessionManager() {
 
                   return (
                     <div
-                      key={idx}
+                      key={commentId}
                       className="theme-bg-sub border theme-border rounded-xl px-3 py-2 flex items-center justify-between gap-3 hover:theme-bg-elevated transition group select-none cursor-pointer"
                     >
                       <span className="text-xs theme-text-primary truncate flex-1 font-medium">
@@ -611,7 +622,7 @@ export default function SessionManager() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => startEditComment(idx, commentText)}
+                          onClick={() => startEditComment(commentId, commentText)}
                           className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-app transition"
                           title="Edit Comment"
                         >
@@ -619,7 +630,7 @@ export default function SessionManager() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteComment(idx, commentText)}
+                          onClick={() => handleDeleteComment(commentId, commentText)}
                           className="p-1 rounded-md theme-text-secondary hover:text-red-400 hover:theme-bg-app transition"
                           title="Delete Comment"
                         >

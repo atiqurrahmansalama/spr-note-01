@@ -465,6 +465,9 @@ class Student(models.Model):
 
         super().save(*args, **kwargs)
 
+        # Propagate student name to all linked reports
+        self.daily_reports.all().update(student_name=self.name)
+
         # Auto-register group in StudentGroup model if it doesn't exist
         if self.group_name and str(self.group_name).strip():
             StudentGroup.objects.get_or_create(name=self.group_name.strip())

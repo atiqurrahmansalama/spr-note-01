@@ -121,8 +121,29 @@ export default function StudentDirectoryView() {
     };
 
     let updated;
+    let oldStudentId = null;
     if (result.mode === "REPLACE" && result.oldStudent) {
+      const oldStudentObj = studentList.find(s => s.label === result.oldStudent || s.name === result.oldStudent);
+      if (oldStudentObj) {
+        oldStudentId = oldStudentObj.id;
+      }
       updated = studentStore.replace(result.oldStudent, newStudent);
+
+      // Propagate student name to local reports list
+      const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+      const updatedReps = localReps.map(rep => {
+        if (rep.student_name === result.oldStudent) {
+          return {
+            ...rep,
+            student_name: result.name,
+            student_group: result.group || rep.student_group,
+          };
+        }
+        return rep;
+      });
+      localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReps));
+      window.dispatchEvent(new CustomEvent("spr_report_saved"));
+      window.dispatchEvent(new CustomEvent("spr_project_changed"));
     } else {
       updated = studentStore.add(newStudent);
     }
@@ -130,8 +151,11 @@ export default function StudentDirectoryView() {
 
     if (isOnline()) {
       try {
-        const res = await fetchWithAuth("/students/", {
-          method: "POST",
+        const isReplace = result.mode === "REPLACE" && result.oldStudent && oldStudentId && !String(oldStudentId).startsWith("stu_");
+        const endpoint = isReplace ? `/students/${oldStudentId}/` : "/students/";
+        const method = isReplace ? "PATCH" : "POST";
+        const res = await fetchWithAuth(endpoint, {
+          method: method,
           body: JSON.stringify({
             name: result.name,
             group: result.group || "General Group",
@@ -214,6 +238,22 @@ export default function StudentDirectoryView() {
     setStudentList(updated);
     setEditingStudentLabel(null);
     showToast(`Updated student "${trimmedName}"!`, "success");
+
+    // Propagate student name to local reports list
+    const localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+    const updatedReps = localReps.map(rep => {
+      if (rep.student_name === student.label) {
+        return {
+          ...rep,
+          student_name: trimmedName,
+          student_group: trimmedGroup || rep.student_group,
+        };
+      }
+      return rep;
+    });
+    localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReps));
+    window.dispatchEvent(new CustomEvent("spr_report_saved"));
+    window.dispatchEvent(new CustomEvent("spr_project_changed"));
 
     if (isOnline()) {
       try {
