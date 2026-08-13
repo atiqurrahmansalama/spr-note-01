@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import CustomSelect from "../ui/CustomSelect";
-import NumberScrollInput from "../ui/NumberScrollInput";
-import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
-import { QURAN_CONSTANTS } from "../../constants/quranConstants";
+import CustomSelect from "../../../../components/ui/CustomSelect";
+import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
+import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
+import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";
 
 export default function DetailRow({
   rowData,
@@ -146,12 +146,9 @@ export default function DetailRow({
   };
 
   const hasJuz = availableJuzs && availableJuzs.length > 1;
-  // Line 1: on mobile multi-Juz: 1 (keeps 1 Ayah box on line 1 and prevents overlap with x button); on mobile single-Juz: 3; on desktop: 3 or 4
   const line1Max = isMobile ? (hasJuz ? 1 : 3) : (hasJuz ? 3 : 4);
-  // Extra lines (mobile multi-Juz only): 3 per line aligned under the Page box (prevents right-side overflow on narrow screens)
   const extraLineMax = 3;
 
-  // Group ayahs: first chunk uses line1Max, subsequent chunks use extraLineMax if mobile+multiJuz
   const ayahChunks = [];
   let i = 0;
   while (i < rowData.ayahs.length) {
@@ -163,7 +160,6 @@ export default function DetailRow({
     i += chunkSize;
   }
 
-  // On Mobile when multiple Juzs exist, extra Ayah rows (Line 2+) align EXACTLY under the Page Box
   const isMobileMultiJuzExtraRows = isMobile && hasJuz && ayahChunks.length > 1;
   const line1Chunk = ayahChunks[0] || { items: [], startIndex: 0 };
   const extraChunks = isMobileMultiJuzExtraRows ? ayahChunks.slice(1) : [];

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronIcon, CalendarIcon, CheckIcon } from "../../../components/ui/Icons";
-import ReusableCalendar from "../../../components/common/Calendar/ReusableCalendar";
+import ReusableCalendar from "../../../components/common/ReusableCalendar";
 
 export default function ReportDateRangePicker({
   startDate,

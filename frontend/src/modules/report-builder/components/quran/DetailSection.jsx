@@ -1,5 +1,5 @@
 import DetailRow from "./DetailRow";
-import { RefreshIcon } from "../ui/Icons";
+import { RefreshIcon } from "../../../../components/ui/Icons";
 
 export default function DetailSection({ 
   title, 
@@ -153,7 +153,6 @@ export default function DetailSection({
           className="px-4 py-1.5 rounded-full border theme-border border-dashed hover:border-solid theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-sm"
         >
           + Add More
-          {/* {title.split(" ")[0]} */}
         </button>
       </div>
     </div>

@@ -23,6 +23,7 @@ from django.db import models
 from django.db.models import Q
 from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from .authentication import FlexibleJWTAuthentication
 from django.views.decorators.cache import never_cache
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample, extend_schema_view
@@ -170,172 +171,18 @@ class GoogleOAuthExchangeView(APIView):
             id_token_input = serializer.validated_data.get('id_token') or serializer.validated_data.get('credential')
             access_token_input = serializer.validated_data.get('access_token')
             code_input = serializer.validated_data.get('code')
-            redirect_uri_input = serializer.validated_data.get('redirect_uri')
-            client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '')
+            redirect_uri_input = serializer.validated_data.get('redirect_uri') or request.META.get('HTTP_ORIGIN') or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
 
-            # 0. Exchange authorization code with Google if code parameter is provided
-            if code_input:
-                import os
-                import requests as http_requests
-                client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', None) or os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
-                if not client_id:
-                    client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+            from .services import verify_google_token_or_code, get_or_create_google_user
 
-                token_res = http_requests.post(
-                    'https://oauth2.googleapis.com/token',
-                    data={
-                        'code': code_input,
-                        'client_id': client_id,
-                        'client_secret': client_secret,
-                        'redirect_uri': redirect_uri_input or 'https://spr-note.vercel.app',
-                        'grant_type': 'authorization_code',
-                    },
-                    timeout=10
-                )
-                token_json = token_res.json() if token_res.content else {}
-                if not token_res.ok or 'error' in token_json:
-                    return Response({
-                        'error': 'Google Token Exchange Failed',
-                        'details': token_json
-                    }, status=status.HTTP_400_BAD_REQUEST)
+            profile_data = verify_google_token_or_code(
+                id_token_input=id_token_input,
+                access_token_input=access_token_input,
+                code_input=code_input,
+                redirect_uri_input=redirect_uri_input
+            )
 
-                access_token_input = token_json.get('access_token') or access_token_input
-                id_token_input = token_json.get('id_token') or id_token_input
-
-            sub = None
-            email = None
-            first_name = ""
-            last_name = ""
-            picture = ""
-
-            # 1. Verify ID token or credential if present
-            if id_token_input:
-                try:
-                    id_info = google_id_token.verify_oauth2_token(
-                        id_token_input,
-                        google_requests.Request(),
-                        client_id if client_id else None,
-                        clock_skew_in_seconds=10
-                    )
-                    sub = id_info.get('sub')
-                    email = id_info.get('email')
-                    first_name = id_info.get('given_name', '')
-                    last_name = id_info.get('family_name', '')
-                    picture = id_info.get('picture', '')
-                except Exception as e:
-                    import logging
-                    logging.getLogger('core').warning(f"Google verify_oauth2_token warning: {e}")
-                    try:
-                        import jwt
-                        decoded = jwt.decode(id_token_input, options={"verify_signature": False})
-                        sub = decoded.get('sub')
-                        email = decoded.get('email')
-                        first_name = decoded.get('given_name', '')
-                        last_name = decoded.get('family_name', '')
-                        picture = decoded.get('picture', '')
-                    except Exception:
-                        pass
-
-            # 2. If sub/email not resolved via ID token, try Google UserInfo API using access_token
-            if (not email or not sub) and access_token_input:
-                try:
-                    import requests as http_requests
-                    userinfo_res = http_requests.get(
-                        'https://www.googleapis.com/oauth2/v3/userinfo',
-                        headers={'Authorization': f'Bearer {access_token_input}'},
-                        timeout=5
-                    )
-                    if userinfo_res.ok:
-                        info = userinfo_res.json()
-                        sub = info.get('sub')
-                        email = info.get('email')
-                        first_name = info.get('given_name', '')
-                        last_name = info.get('family_name', '')
-                        picture = info.get('picture', '')
-                except Exception as ex:
-                    import logging
-                    logging.getLogger('core').warning(f"Google userinfo request failed: {ex}")
-
-            if not email and not sub:
-                return Response({'error': 'Failed to verify Google token or extract user profile.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            if email:
-                email = email.strip().lower()
-
-            user = None
-            if sub:
-                user = User.objects.filter(google_sub_id=sub).first()
-            if not user and email:
-                user = User.objects.filter(email__iexact=email).first()
-
-            if user:
-                # Active & Deactivation Check
-                if not user.is_active or getattr(user, 'is_deactivated', False):
-                    return Response({
-                        "error": "Account Deactivated",
-                        "detail": "Your account has been deactivated. Please contact support."
-                    }, status=status.HTTP_403_FORBIDDEN)
-
-                user.auth_provider = 'google'
-                user.is_email_verified = True
-                if sub and not user.google_sub_id:
-                    user.google_sub_id = sub
-                if picture and not user.avatar_url:
-                    user.avatar_url = picture
-                if first_name and not user.first_name:
-                    user.first_name = first_name
-                if last_name and not user.last_name:
-                    user.last_name = last_name
-                user.save()
-            else:
-                # Dynamic Google OAuth Default Role Retrieval/Creation
-                # pyrefly: ignore [unknown-name]
-                default_role_code = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
-                default_role = None
-                try:
-                    default_role, _ = UserRole.objects.get_or_create(
-                        code=default_role_code,
-                        defaults={
-                            'name': default_role_code.replace('_', ' ').title(),
-                            'description': f'Default role for Google OAuth users ({default_role_code})',
-                            'hierarchy_level': 50,
-                            'color_theme': 'purple',
-                            'is_system_role': False,
-                        }
-                    )
-                except Exception as role_ex:
-                    import logging
-                    logging.getLogger('core').warning(f"Default UserRole fetch warning: {role_ex}")
-
-                phone_dummy = f"g_{sub[:12]}" if sub else f"g_{uuid.uuid4().hex[:10]}"
-                defaults_dict = {
-                    'phone_number': phone_dummy,
-                    'first_name': first_name or '',
-                    'last_name': last_name or '',
-                    'avatar_url': picture or '',
-                    'auth_provider': 'google',
-                    'is_email_verified': True,
-                    'google_sub_id': sub,
-                    'user_type': default_role_code,
-                    'role': default_role,
-                    'is_active': True,
-                    'is_deactivated': False,
-                }
-
-                if email:
-                    user, created = User.objects.get_or_create(
-                        email=email,
-                        defaults=defaults_dict
-                    )
-                else:
-                    user = User.objects.create_user(**defaults_dict)
-
-                # Active & Deactivation Check for newly created or fetched user
-                if not user.is_active or getattr(user, 'is_deactivated', False):
-                    return Response({
-                        "error": "Account Deactivated",
-                        "detail": "Your account has been deactivated. Please contact support."
-                    }, status=status.HTTP_403_FORBIDDEN)
+            user, created = get_or_create_google_user(profile_data)
 
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
@@ -378,6 +225,16 @@ class GoogleOAuthExchangeView(APIView):
                 'user': user_data
             }, status=status.HTTP_200_OK)
 
+        except PermissionError as pe:
+            return Response({
+                "error": "Account Deactivated",
+                "detail": str(pe)
+            }, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as ve:
+            return Response({
+                "error": "Google Authentication Failed",
+                "detail": str(ve)
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             import logging
             logging.getLogger('core').error("Google OAuth Error: %s", str(e), exc_info=True)
@@ -1583,136 +1440,6 @@ class LogoutAllOtherSessionsView(APIView):
         return Response({"status": "success", "logged_out_count": count}, status=status.HTTP_200_OK)
 
 
-def seed_system_roles():
-    system_roles = [
-        {
-            'code': 'SUPER_ADMIN',
-            'name': 'Super Admin',
-            'description': 'Full System & Security Control',
-            'hierarchy_level': 1,
-            'color_theme': 'rose',
-            'is_system_role': True,
-            'perms': {'can_create_student': True, 'can_edit_student': True, 'can_delete_report': True, 'can_export_reports': True, 'can_manage_users': True}
-        },
-        {
-            'code': 'ADMIN',
-            'name': 'Admin / Nazim',
-            'description': 'Administrative & Institutional Control',
-            'hierarchy_level': 2,
-            'color_theme': 'amber',
-            'is_system_role': False,
-            'perms': {'can_create_student': True, 'can_edit_student': True, 'can_delete_report': False, 'can_export_reports': True, 'can_manage_users': True}
-        },
-        {
-            'code': 'STAFF',
-            'name': 'Staff / Accountant',
-            'description': 'Staff & Administrative Support',
-            'hierarchy_level': 3,
-            'color_theme': 'purple',
-            'is_system_role': False,
-            'perms': {'can_create_student': False, 'can_edit_student': False, 'can_delete_report': False, 'can_export_reports': True, 'can_manage_users': False}
-        },
-        {
-            'code': 'TEACHER',
-            'name': 'Teacher / Ustadh',
-            'description': 'Classroom & Student Evaluation Access',
-            'hierarchy_level': 4,
-            'color_theme': 'emerald',
-            'is_system_role': False,
-            'perms': {'can_create_student': True, 'can_edit_student': True, 'can_delete_report': False, 'can_export_reports': True, 'can_manage_users': False}
-        },
-        {
-            'code': 'GUARDIAN',
-            'name': 'Guardian / Parent',
-            'description': 'Read-Only Ward Report Access',
-            'hierarchy_level': 10,
-            'color_theme': 'blue',
-            'is_system_role': False,
-            'perms': {'can_create_student': False, 'can_edit_student': False, 'can_delete_report': False, 'can_export_reports': False, 'can_manage_users': False}
-        },
-    ]
-
-    for item in system_roles:
-        perms_data = item.pop('perms')
-        role, created = UserRole.objects.get_or_create(code=item['code'], defaults=item)
-        if created:
-            perm_obj, _ = RoleActionPermission.objects.get_or_create(role=role)
-            for pk, pv in perms_data.items():
-                setattr(perm_obj, pk, pv)
-            perm_obj.save()
-        else:
-            RoleActionPermission.objects.get_or_create(role=role)
-
-    User = get_user_model()
-    for u in User.objects.filter(role__isnull=True):
-        code = u.user_type or 'TEACHER'
-        r = UserRole.objects.filter(code=code).first()
-        if r:
-            u.role = r
-            u.save(update_fields=['role'])
-
-
-class UserRoleListCreateView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        seed_system_roles()
-        roles = UserRole.objects.all().order_by('hierarchy_level', 'name')
-        serializer = UserRoleSerializer(roles, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        serializer = UserRoleSerializer(data=request.data)
-        if serializer.is_valid():
-            role = serializer.save()
-            return Response(UserRoleSerializer(role).data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-class UserRoleCloneView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request, pk):
-        try:
-            source_role = UserRole.objects.get(pk=pk)
-        except UserRole.DoesNotExist:
-            return Response({"error": "Source role not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        base_code = f"{source_role.code}_COPY"
-        new_code = base_code
-        counter = 1
-        while UserRole.objects.filter(code=new_code).exists():
-            new_code = f"{base_code}_{counter}"
-            counter += 1
-
-        new_role = UserRole.objects.create(
-            name=f"Copy of {source_role.name}",
-            code=new_code,
-            description=f"Cloned from {source_role.name}. {source_role.description}",
-            hierarchy_level=min(10, max(1, source_role.hierarchy_level)),
-            color_theme=source_role.color_theme,
-            is_system_role=False,
-        )
-
-        source_perms = getattr(source_role, 'action_permissions', None)
-        if source_perms:
-            RoleActionPermission.objects.create(
-                role=new_role,
-                can_create_student=source_perms.can_create_student,
-                can_edit_student=source_perms.can_edit_student,
-                can_delete_report=source_perms.can_delete_report,
-                can_export_reports=source_perms.can_export_reports,
-                can_manage_users=source_perms.can_manage_users,
-            )
-        else:
-            RoleActionPermission.objects.create(role=new_role)
-
-        return Response(UserRoleSerializer(new_role).data, status=status.HTTP_201_CREATED)
-
-
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
     serializer_class = UserAdminSerializer
@@ -1850,418 +1577,6 @@ class DeleteAccountView(APIView):
         user.deactivated_at = timezone.now()
         user.save()
         return Response({"status": "success", "message": "Account has been soft-deleted/deactivated."}, status=status.HTTP_200_OK)
-
-
-# ─── Feature Flagging & Access Control API Views ─────────────────────────────
-
-def seed_initial_sections():
-    """Seed default section categories and section flags if DB is empty."""
-    from .models import AppSectionCategory, AppSection
-
-    if AppSection.objects.exists():
-        return
-
-    categories_data = [
-        {"key": "form_header", "title": "Form Header & Date Config", "order": 1},
-        {"key": "form_progress", "title": "Student Progress & Trackers", "order": 2},
-        {"key": "form_actions", "title": "Form Actions & Comments", "order": 3},
-        {"key": "sidebar_modules", "title": "Sidebar & Admin Modules", "order": 4},
-    ]
-
-    cat_map = {}
-    for cat in categories_data:
-        c, _ = AppSectionCategory.objects.get_or_create(key=cat["key"], defaults=cat)
-        cat_map[cat["key"]] = c
-
-    sections_data = [
-        {"key": "headerDate", "cat": "form_header", "title": "Header Date & Time Selector", "desc": "Toggle date & time controls in report header", "order": 1},
-        {"key": "studentSelect", "cat": "form_header", "title": "Student Selection Field", "desc": "Toggle student selection dropdown field", "order": 2},
-        {"key": "sessionSelect", "cat": "form_header", "title": "Session Preset Selector", "desc": "Toggle session preset selection dropdown", "order": 3},
-        {"key": "juzPageInput", "cat": "form_progress", "title": "Juz & Para Page Range Inputs", "desc": "Toggle Para/Juz, Page, and Quarter range fields", "order": 1},
-        {"key": "mistakeTracker", "cat": "form_progress", "title": "Mistake & Error Counter", "desc": "Toggle Sabq/Sabqi mistake counter control", "order": 2},
-        {"key": "stuckTracker", "cat": "form_progress", "title": "Stuck / Pause Counter", "desc": "Toggle stuck/pause error counter control", "order": 3},
-        {"key": "commentSection", "cat": "form_actions", "title": "Teacher Comment Box & Presets", "desc": "Toggle teacher remarks and comment templates", "order": 1},
-        {"key": "pdfExport", "cat": "form_actions", "title": "PDF & Image Export Buttons", "desc": "Toggle PDF export and screenshot action buttons", "order": 2},
-        {"key": "userManagementModule", "cat": "sidebar_modules", "title": "User & Teacher Management Module", "desc": "Toggle User & Teacher Management dashboard access", "order": 1},
-        {"key": "activityAnalyticsModule", "cat": "sidebar_modules", "title": "Teacher Activity Analytics Module", "desc": "Toggle Activity Analytics dashboard access", "order": 2},
-        {"key": "trashRestorationModule", "cat": "sidebar_modules", "title": "Trash & Soft-Deleted Reports Module", "desc": "Toggle Trash & Soft-Deleted Reports module access", "order": 3},
-    ]
-
-    for sec in sections_data:
-        AppSection.objects.get_or_create(
-            section_key=sec["key"],
-            defaults={
-                "category": cat_map[sec["cat"]],
-                "title": sec["title"],
-                "description": sec["desc"],
-                "order": sec["order"],
-                "is_globally_enabled": True,
-            }
-        )
-
-
-class EvaluatedConfigView(APIView):
-    """
-    Computes final boolean flags for current user using 4-Tier Precedence:
-    User Override > Group Override > Role Override > Global Default
-    """
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        seed_initial_sections()
-        from .models import AppSection, UserSectionOverride, GroupSectionPermission, RoleSectionPermission
-
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        
-        all_sections = AppSection.objects.select_related('category').all()
-        config = {}
-        origins = {}
-
-        for section in all_sections:
-            key = section.section_key
-            val = section.is_globally_enabled
-            origin = "GLOBAL"
-
-            if user:
-                # 3. Role Check
-                user_role = (getattr(user, 'user_type', None) or getattr(user, 'role', None) or 'TEACHER').upper()
-                role_perm = RoleSectionPermission.objects.filter(section=section, role=user_role).first()
-                if role_perm:
-                    val = role_perm.is_enabled
-                    origin = "ROLE"
-
-                # 2. Group Check
-                if user.assigned_group:
-                    grp_perm = GroupSectionPermission.objects.filter(section=section, group_id=user.assigned_group).first()
-                    if grp_perm:
-                        val = grp_perm.is_enabled
-                        origin = "GROUP"
-
-                # 1. User Override Check (Highest Priority)
-                user_override = UserSectionOverride.objects.filter(section=section, user=user).first()
-                if user_override:
-                    val = user_override.is_enabled
-                    origin = "USER"
-
-            config[key] = val
-            origins[key] = origin
-
-        return Response({
-            "status": "success",
-            "config": config,
-            "origins": origins,
-            "user_id": user.id if user else None,
-            "user_role": (getattr(user, 'user_type', None) if user else "ANONYMOUS"),
-            "assigned_group": (getattr(user, 'assigned_group', None) if user else None),
-        }, status=status.HTTP_200_OK)
-
-
-class ControlPanelRulesView(APIView):
-    """
-    Fetches section rules and computed flags under selected scope.
-    Query params: scope (global, role, group, user), target_id
-    """
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        seed_initial_sections()
-        from .models import AppSectionCategory, AppSection, RoleSectionPermission, GroupSectionPermission, UserSectionOverride
-
-        scope = request.query_params.get('scope', 'global').lower()
-        target_id = request.query_params.get('target_id', '')
-
-        categories = AppSectionCategory.objects.prefetch_related('sections').all()
-        result_categories = []
-
-        target_user = None
-        if scope == 'user' and target_id:
-            try:
-                target_user = User.objects.get(id=target_id)
-            except Exception:
-                try:
-                    target_user = User.objects.get(phone_number=target_id)
-                except Exception:
-                    pass
-
-        for cat in categories:
-            sections_list = []
-            for sec in cat.sections.all():
-                key = sec.section_key
-                global_val = sec.is_globally_enabled
-                effective_val = global_val
-                origin = "GLOBAL"
-                override_val = None
-
-                if scope == 'global':
-                    override_val = global_val
-                    effective_val = global_val
-                    origin = "GLOBAL"
-                elif scope == 'role' and target_id:
-                    role_perm = RoleSectionPermission.objects.filter(section=sec, role=target_id.upper()).first()
-                    if role_perm:
-                        override_val = role_perm.is_enabled
-                        effective_val = role_perm.is_enabled
-                        origin = "ROLE"
-                    else:
-                        effective_val = global_val
-                        origin = "GLOBAL"
-                elif scope == 'group' and target_id:
-                    grp_perm = GroupSectionPermission.objects.filter(section=sec, group_id=target_id).first()
-                    if grp_perm:
-                        override_val = grp_perm.is_enabled
-                        effective_val = grp_perm.is_enabled
-                        origin = "GROUP"
-                    else:
-                        effective_val = global_val
-                        origin = "GLOBAL"
-                elif scope == 'user' and target_user:
-                    user_ovr = UserSectionOverride.objects.filter(section=sec, user=target_user).first()
-                    if user_ovr:
-                        override_val = user_ovr.is_enabled
-                        effective_val = user_ovr.is_enabled
-                        origin = "USER"
-                    else:
-                        user_role = (target_user.user_type or 'TEACHER').upper()
-                        role_p = RoleSectionPermission.objects.filter(section=sec, role=user_role).first()
-                        if target_user.assigned_group:
-                            grp_p = GroupSectionPermission.objects.filter(section=sec, group_id=target_user.assigned_group).first()
-                            if grp_p:
-                                effective_val = grp_p.is_enabled
-                                origin = "GROUP"
-                            elif role_p:
-                                effective_val = role_p.is_enabled
-                                origin = "ROLE"
-                            else:
-                                effective_val = global_val
-                                origin = "GLOBAL"
-                        elif role_p:
-                            effective_val = role_p.is_enabled
-                            origin = "ROLE"
-                        else:
-                            effective_val = global_val
-                            origin = "GLOBAL"
-
-                sections_list.append({
-                    "id": sec.id,
-                    "section_key": sec.section_key,
-                    "title": sec.title,
-                    "description": sec.description,
-                    "is_globally_enabled": sec.is_globally_enabled,
-                    "effective_enabled": effective_val,
-                    "override_enabled": override_val,
-                    "inheritance_origin": origin,
-                })
-
-            result_categories.append({
-                "id": cat.id,
-                "key": cat.key,
-                "title": cat.title,
-                "order": cat.order,
-                "sections": sections_list
-            })
-
-        return Response({
-            "status": "success",
-            "scope": scope,
-            "target_id": target_id,
-            "categories": result_categories
-        }, status=status.HTTP_200_OK)
-
-
-class ControlPanelBatchUpdateView(APIView):
-    """
-    Batch updates flags under a specific scope and writes audit logs.
-    """
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        seed_initial_sections()
-        from .models import AppSection, RoleSectionPermission, GroupSectionPermission, UserSectionOverride, FeatureFlagAuditLog
-
-        scope = request.data.get('scope', 'global').lower()
-        target_id = request.data.get('target_id', '')
-        updates = request.data.get('updates', [])
-
-        user = request.user if request.user.is_authenticated else User.objects.first()
-
-        target_user = None
-        if scope == 'user' and target_id:
-            try:
-                target_user = User.objects.get(id=target_id)
-            except Exception:
-                try:
-                    target_user = User.objects.get(phone_number=target_id)
-                except Exception:
-                    pass
-
-        updated_count = 0
-
-        for item in updates:
-            key = item.get('section_key')
-            new_state = item.get('is_enabled')
-            if not key or new_state is None:
-                continue
-
-            try:
-                sec = AppSection.objects.get(section_key=key)
-            except AppSection.DoesNotExist:
-                continue
-
-            if scope == 'global':
-                prev_state = sec.is_globally_enabled
-                if prev_state != new_state:
-                    sec.is_globally_enabled = new_state
-                    sec.save()
-                    FeatureFlagAuditLog.objects.create(
-                        changed_by=user,
-                        scope_type='GLOBAL',
-                        target_identifier='GLOBAL_DEFAULT',
-                        section_key=key,
-                        previous_state=prev_state,
-                        new_state=new_state
-                    )
-                    updated_count += 1
-
-            elif scope == 'role' and target_id:
-                role_key = target_id.upper()
-                obj, created = RoleSectionPermission.objects.get_or_create(section=sec, role=role_key, defaults={'is_enabled': new_state})
-                prev_state = obj.is_enabled if not created else sec.is_globally_enabled
-                if created or prev_state != new_state:
-                    obj.is_enabled = new_state
-                    obj.save()
-                    FeatureFlagAuditLog.objects.create(
-                        changed_by=user,
-                        scope_type='ROLE',
-                        target_identifier=role_key,
-                        section_key=key,
-                        previous_state=prev_state,
-                        new_state=new_state
-                    )
-                    updated_count += 1
-
-            elif scope == 'group' and target_id:
-                obj, created = GroupSectionPermission.objects.get_or_create(section=sec, group_id=target_id, defaults={'is_enabled': new_state})
-                prev_state = obj.is_enabled if not created else sec.is_globally_enabled
-                if created or prev_state != new_state:
-                    obj.is_enabled = new_state
-                    obj.save()
-                    FeatureFlagAuditLog.objects.create(
-                        changed_by=user,
-                        scope_type='GROUP',
-                        target_identifier=target_id,
-                        section_key=key,
-                        previous_state=prev_state,
-                        new_state=new_state
-                    )
-                    updated_count += 1
-
-            elif scope == 'user' and target_user:
-                obj, created = UserSectionOverride.objects.get_or_create(section=sec, user=target_user, defaults={'is_enabled': new_state})
-                prev_state = obj.is_enabled if not created else sec.is_globally_enabled
-                if created or prev_state != new_state:
-                    obj.is_enabled = new_state
-                    obj.save()
-                    FeatureFlagAuditLog.objects.create(
-                        changed_by=user,
-                        scope_type='USER',
-                        target_identifier=f"User #{target_user.id} ({target_user.phone_number or target_user.first_name})",
-                        section_key=key,
-                        previous_state=prev_state,
-                        new_state=new_state
-                    )
-                    updated_count += 1
-
-        return Response({
-            "status": "success",
-            "message": f"Updated {updated_count} section rule(s) for scope '{scope}'",
-            "updated_count": updated_count
-        }, status=status.HTTP_200_OK)
-
-
-class ControlPanelResetRulesView(APIView):
-    """
-    Clears all overrides for a specified scope and target.
-    """
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        from .models import RoleSectionPermission, GroupSectionPermission, UserSectionOverride, FeatureFlagAuditLog
-
-        scope = request.data.get('scope', '').lower()
-        target_id = request.data.get('target_id', '')
-        user = request.user if request.user.is_authenticated else User.objects.first()
-
-        deleted_count = 0
-
-        if scope == 'role' and target_id:
-            role_key = target_id.upper()
-            deleted_count, _ = RoleSectionPermission.objects.filter(role=role_key).delete()
-            FeatureFlagAuditLog.objects.create(
-                changed_by=user,
-                scope_type='ROLE',
-                target_identifier=role_key,
-                section_key='ALL_SECTIONS_RESET',
-                previous_state=False,
-                new_state=True
-            )
-        elif scope == 'group' and target_id:
-            deleted_count, _ = GroupSectionPermission.objects.filter(group_id=target_id).delete()
-            FeatureFlagAuditLog.objects.create(
-                changed_by=user,
-                scope_type='GROUP',
-                target_identifier=target_id,
-                section_key='ALL_SECTIONS_RESET',
-                previous_state=False,
-                new_state=True
-            )
-        elif scope == 'user' and target_id:
-            try:
-                target_user = User.objects.get(id=target_id)
-                deleted_count, _ = UserSectionOverride.objects.filter(user=target_user).delete()
-                FeatureFlagAuditLog.objects.create(
-                    changed_by=user,
-                    scope_type='USER',
-                    target_identifier=f"User #{target_user.id}",
-                    section_key='ALL_SECTIONS_RESET',
-                    previous_state=False,
-                    new_state=True
-                )
-            except Exception:
-                pass
-
-        return Response({
-            "status": "success",
-            "message": f"Reset {deleted_count} override(s) for scope '{scope}'",
-            "deleted_count": deleted_count
-        }, status=status.HTTP_200_OK)
-
-
-class ControlPanelAuditLogView(APIView):
-    """
-    Fetches feature flag audit logs.
-    """
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        from .models import FeatureFlagAuditLog
-        logs = FeatureFlagAuditLog.objects.all()[:50]
-        data = []
-        for log in logs:
-            data.append({
-                "id": log.id,
-                "changed_by": log.changed_by.phone_number if log.changed_by else "System Admin",
-                "scope_type": log.scope_type,
-                "target_identifier": log.target_identifier,
-                "section_key": log.section_key,
-                "previous_state": log.previous_state,
-                "new_state": log.new_state,
-                "timestamp": log.timestamp.strftime("%Y-%m-%d %I:%M:%S %p"),
-            })
-
-        return Response({
-            "status": "success",
-            "logs": data
-        }, status=status.HTTP_200_OK)
 
 
 class SecurityAuditLogView(APIView):
@@ -2827,12 +2142,21 @@ class UserRoleListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from .services import seed_system_roles
+        seed_system_roles()
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
-        roles = UserRole.objects.all().prefetch_related('action_permissions')
+        roles = UserRole.objects.all().prefetch_related('action_permissions').order_by('hierarchy_level', 'name')
+        
+        # Optimize N+1 query: Fetch all active user role allocations in a single query
+        users = list(User.objects.values('role_id', 'user_type'))
+        
         data = []
         for role in roles:
             perm = getattr(role, 'action_permissions', None)
-            user_count = User.objects.filter(Q(role=role) | Q(user_type=role.code)).count()
+            user_count = sum(
+                1 for u in users
+                if u.get('role_id') == role.id or (u.get('user_type') and str(u['user_type']).upper() == role.code.upper())
+            )
             data.append({
                 'id': role.id,
                 'name': role.name,
@@ -3031,80 +2355,12 @@ class SetGoogleDefaultRoleAdminView(APIView):
 @method_decorator(never_cache, name='dispatch')
 class EvaluatedConfigView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    authentication_classes = [FlexibleJWTAuthentication, SessionAuthentication]
 
     def get(self, request):
+        from .services import evaluate_section_config_for_user
         user = request.user if request.user and request.user.is_authenticated else None
-        sections = AppSection.objects.all().select_related('category')
-
-        default_keys = {
-            'headerDate': True,
-            'studentSelect': True,
-            'sessionSelect': True,
-            'juzPageInput': True,
-            'mistakeTracker': True,
-            'stuckTracker': True,
-            'commentSection': True,
-            'actionButtons': True,
-            'pdfExport': True,
-        }
-
-        # Build comprehensive map of all DB and default sections
-        sec_map = {}
-        for sec in sections:
-            sec_map[sec.section_key] = sec.is_globally_enabled
-
-        for k, def_val in default_keys.items():
-            if k not in sec_map:
-                sec_map[k] = def_val
-
-        resolved = {}
-        origins = {}
-
-        user_overrides = {}
-        group_overrides = {}
-        role_overrides = {}
-
-        if user:
-            user_overrides = {
-                o.section.section_key: o.is_enabled
-                for o in UserSectionOverride.objects.filter(user=user).select_related('section')
-            }
-            assigned_group = getattr(user, 'assigned_group', None) or getattr(user, 'group_name', None) or getattr(user, 'group', None)
-            if assigned_group:
-                group_overrides = {
-                    o.section.section_key: o.is_enabled
-                    for o in GroupSectionPermission.objects.filter(group_id=assigned_group).select_related('section')
-                }
-
-            role_codes = set()
-            if getattr(user, 'user_type', None):
-                role_codes.add(str(user.user_type).upper().strip())
-            if getattr(user, 'role', None):
-                r_val = getattr(user.role, 'code', None) or str(user.role)
-                role_codes.add(str(r_val).upper().strip())
-
-            if role_codes:
-                q_expr = Q()
-                for r_code in role_codes:
-                    q_expr |= Q(role__iexact=r_code)
-                role_perms = RoleSectionPermission.objects.filter(q_expr).select_related('section')
-                for o in role_perms:
-                    role_overrides[o.section.section_key] = o.is_enabled
-
-        for key, global_val in sec_map.items():
-            if user and key in user_overrides:
-                resolved[key] = user_overrides[key]
-                origins[key] = "USER"
-            elif user and key in group_overrides:
-                resolved[key] = group_overrides[key]
-                origins[key] = "GROUP"
-            elif user and key in role_overrides:
-                resolved[key] = role_overrides[key]
-                origins[key] = "ROLE"
-            else:
-                resolved[key] = global_val
-                origins[key] = "GLOBAL"
+        resolved, origins = evaluate_section_config_for_user(user)
 
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
         response = Response({
@@ -3455,5 +2711,3 @@ class ControlPanelAuditLogView(APIView):
             'status': 'success',
             'logs': data
         }, status=status.HTTP_200_OK)
-
-        return Response({'error': 'Invalid 6-digit TOTP code or backup recovery code.'}, status=status.HTTP_400_BAD_REQUEST)

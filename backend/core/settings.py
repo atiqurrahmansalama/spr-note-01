@@ -21,7 +21,7 @@ DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() == "true"
 
 ALLOWED_HOSTS = ['*']
 
-
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "core.User"
 
 INSTALLED_APPS = [
@@ -81,10 +81,9 @@ WSGI_APPLICATION = "core.wsgi.application"
 # Fallback: Local Developer SQLite only if USE_SQLITE=True is explicitly specified
 
 USE_SQLITE = os.getenv("USE_SQLITE", "False").lower() in ("true", "1", "t")
-# 2. Database Configuration (Neon PostgreSQL via dj_database_url with Build Phase SQLite Fallback)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL:
+if DATABASE_URL and not USE_SQLITE:
     DATABASES = {
         "default": dj_database_url.config(
             default=DATABASE_URL,
@@ -224,15 +223,9 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", f"Suffah Hifz LMS <{EMAIL_H
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 
-# Force wildcard ALLOWED_HOSTS for Vercel deployment
-ALLOWED_HOSTS = ['*']
-
-# Reverse proxy SSL termination settings for Vercel
+# Reverse proxy SSL termination settings for Vercel / Railway
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
-
-# CORS configuration
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True

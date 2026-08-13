@@ -7,7 +7,7 @@ import MistakeTrackerSection from "./components/MistakeTrackerSection";
 import StuckTrackerSection from "./components/StuckTrackerSection";
 import CommentSection from "./components/CommentSection";
 import ReportModal from "./modals/ReportModal";
-import SkeletonLoader from "../../components/common/SkeletonLoader/SkeletonLoader";
+import SkeletonLoader from "../../components/common/SkeletonLoader";
 
 import { useReportForm } from "./hooks/useReportForm";
 import { useToast } from "../../context/ToastContext";

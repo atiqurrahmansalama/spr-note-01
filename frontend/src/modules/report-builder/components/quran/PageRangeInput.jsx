@@ -1,5 +1,5 @@
-import NumberScrollInput from "../ui/NumberScrollInput";
-import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
+import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
+import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 
 export default function PageRangeInput({ range, onChange, onRemove, juzValue, isLast, onAddNextRange, onAddJuzRow }) {
   const getMaxPage = (juzStr) => {

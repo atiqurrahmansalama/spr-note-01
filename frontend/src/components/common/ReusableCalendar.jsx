@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronIcon, CalendarIcon } from "../../ui/Icons";
+import { ChevronIcon, CalendarIcon } from "../ui/Icons";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",

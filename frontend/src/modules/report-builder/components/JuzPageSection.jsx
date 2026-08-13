@@ -1,4 +1,4 @@
-import JuzRow from "../../../components/quran/JuzRow";
+import JuzRow from "./quran/JuzRow";
 import { RefreshIcon } from "../../../components/ui/Icons";
 
 export default function JuzPageSection({ data, onChange, onReset }) {

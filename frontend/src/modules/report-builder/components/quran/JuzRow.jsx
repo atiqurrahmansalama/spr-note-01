@@ -1,7 +1,7 @@
-import NumberScrollInput from "../ui/NumberScrollInput";
+import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
 import PageRangeInput from "./PageRangeInput";
-import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../utils/keyboardUtils";
-import { QURAN_CONSTANTS } from "../../constants/quranConstants";
+import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
+import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";
 
 const PAGES_PER_LINE = 2; // max page-range boxes per line (like DetailRow)
 

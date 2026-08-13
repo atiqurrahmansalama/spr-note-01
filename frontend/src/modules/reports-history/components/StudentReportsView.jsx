@@ -18,7 +18,7 @@ import RecordReportsList from "./RecordReportsList";
 import StudentGroupedList from "./StudentGroupedList";
 import ReportsAnalytics from "./ReportsAnalytics";
 import ReportContextMenu from "./ReportContextMenu";
-import SkeletonLoader from "../../../components/common/SkeletonLoader/SkeletonLoader";
+import SkeletonLoader from "../../../components/common/SkeletonLoader";
 
 export default function StudentReportsView() {
   const { showToast } = useToast();

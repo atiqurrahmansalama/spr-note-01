@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { SleekCheckIcon, CloudCheckIcon } from "../../ui/Icons";
+import { SleekCheckIcon, CloudCheckIcon } from "../ui/Icons";
 
 export default function SaveStatusBadge() {
   const [status, setStatus] = useState(null);

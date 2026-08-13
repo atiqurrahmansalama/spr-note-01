@@ -22,6 +22,6 @@ class HasSectionAccess(BasePermission):
         if not section_key:
             return True
             
-        from .views import get_resolved_feature_flags_for_user
+        from .services import get_resolved_feature_flags_for_user
         flags, _ = get_resolved_feature_flags_for_user(request.user)
         return flags.get(section_key, True)

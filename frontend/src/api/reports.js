@@ -1,20 +1,6 @@
 import { auth as authStore } from "../utils/localStore";
 import { fetchWithAuth } from "../utils/authService";
-
-const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (
-    envUrl &&
-    !envUrl.includes("your-production-domain.com") &&
-    !envUrl.includes("127.0.0.1") &&
-    !envUrl.includes("localhost")
-  ) {
-    return envUrl.replace(/\/+$/, "");
-  }
-  return "";
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import { API_BASE_URL } from "../config/api";
 
 const fetchApi = async (path, options = {}) => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;

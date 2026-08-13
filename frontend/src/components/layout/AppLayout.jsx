@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore } from "../../utils/localStore";
 import Sidebar from "../../modules/sidebar/SidebarContainer";
 import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
-import SaveStatusBadge from "../common/SaveStatusBadge/SaveStatusBadge";
+import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "../../modules/sidebar/SidebarScreenBlockView";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";

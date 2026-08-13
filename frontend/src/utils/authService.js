@@ -1,19 +1,6 @@
 import { auth as authStore } from "./localStore";
-
-const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (
-    envUrl &&
-    !envUrl.includes("your-production-domain.com") &&
-    !envUrl.includes("127.0.0.1") &&
-    !envUrl.includes("localhost")
-  ) {
-    return envUrl.replace(/\/+$/, "");
-  }
-  return "";
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import { API_BASE_URL } from "../config/api";
+import { sendLoginLog, sendActivityLog } from "./activityTracker";
 
 // Helper to make fetch request with relative proxy & fast resolution
 const fetchApi = async (path, options = {}) => {
@@ -101,10 +88,12 @@ export const loginUser = async (usernameOrEmail, password) => {
         authStore.saveUser(userObj);
         window.dispatchEvent(new CustomEvent("spr_auth_updated"));
 
-        import("./activityTracker").then(({ sendLoginLog, sendActivityLog }) => {
+        try {
           sendLoginLog("LOGIN");
           sendActivityLog("ACTIVE");
-        }).catch(() => {});
+        } catch {
+          // ignore tracking error
+        }
         return { success: true, user: userObj };
       } else {
         let errStr = "Invalid username or password. Please try again.";
@@ -150,9 +139,8 @@ export const loginUser = async (usernameOrEmail, password) => {
 
 export const logoutUser = async () => {
   try {
-    const { sendLoginLog, sendActivityLog } = await import("./activityTracker");
-    await sendActivityLog("INACTIVE");
-    await sendLoginLog("LOGOUT");
+    sendActivityLog("INACTIVE");
+    sendLoginLog("LOGOUT");
   } catch {
     // fallback
   }

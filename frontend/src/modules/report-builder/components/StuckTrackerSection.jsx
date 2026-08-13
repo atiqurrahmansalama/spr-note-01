@@ -1,4 +1,4 @@
-import DetailSection from "../../../components/quran/DetailSection";
+import DetailSection from "./quran/DetailSection";
 
 export default function StuckTrackerSection({
   stuckData,
