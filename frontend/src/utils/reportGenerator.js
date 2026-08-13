@@ -48,6 +48,7 @@ export function generateReportText({
   comment = "",
   includeGroup = true,
   includeTeacher = true,
+  featureConfig = {},
 }) {
   // 1. Date Formatting
   const formattedDate = formatDate(selectedDate);
@@ -81,34 +82,40 @@ export function generateReportText({
   // 3. Header Block
   let lines = [];
   lines.push("Student Daily Progress Report");
-  lines.push(`Date: ${formattedDate}`);
-  lines.push(`Student Name: ${studentName || "N/A"}`);
+  if (featureConfig.headerDate !== false) {
+    lines.push(`Date: ${formattedDate}`);
+  }
+  if (featureConfig.studentSelect !== false) {
+    lines.push(`Student Name: ${studentName || "N/A"}`);
+  }
   lines.push("");
 
   // 4. Juz & Page Block
-  if (validJuzs.length > 0) {
-    lines.push(`Juz Number: ${validJuzs.join(", ")}`);
-    if (isSingleJuz) {
-      const juzNum = validJuzs[0];
-      const rangesStr = juzMap.get(juzNum).join(", ") || "N/A";
-      lines.push(`Page: ${rangesStr}`);
-    } else {
-      validJuzs.forEach((juzNum, idx) => {
+  if (featureConfig.juzPageInput !== false) {
+    if (validJuzs.length > 0) {
+      lines.push(`Juz Number: ${validJuzs.join(", ")}`);
+      if (isSingleJuz) {
+        const juzNum = validJuzs[0];
         const rangesStr = juzMap.get(juzNum).join(", ") || "N/A";
-        if (idx === 0) {
-          lines.push(`Page: ${juzNum.padStart(1)}: ${rangesStr}`);
-        } else {
-          // Align under "Page: " label
-          const indent = " ".repeat(11);
-          lines.push(`${indent}${juzNum}: ${rangesStr}`);
-        }
-      });
+        lines.push(`Page: ${rangesStr}`);
+      } else {
+        validJuzs.forEach((juzNum, idx) => {
+          const rangesStr = juzMap.get(juzNum).join(", ") || "N/A";
+          if (idx === 0) {
+            lines.push(`Page: ${juzNum.padStart(1)}: ${rangesStr}`);
+          } else {
+            // Align under "Page: " label
+            const indent = " ".repeat(11);
+            lines.push(`${indent}${juzNum}: ${rangesStr}`);
+          }
+        });
+      }
+    } else {
+      lines.push("Juz Number: N/A");
+      lines.push("Page: N/A");
     }
-  } else {
-    lines.push("Juz Number: N/A");
-    lines.push("Page: N/A");
+    lines.push("");
   }
-  lines.push("");
 
   // Helper for mistake/stuck items formatting
   const countValidItems = (data) => {
@@ -123,11 +130,23 @@ export function generateReportText({
   const totalStuck = countValidItems(stuckData);
 
   // 5. Session Summary Block
-  lines.push("Session Summary");
-  lines.push(`Session Name: ${selectedSession || "N/A"}`);
-  lines.push(`Mistake: ${totalMistakes}`);
-  lines.push(`Stuck: ${totalStuck}`);
-  lines.push("");
+  const showSessionName = featureConfig.sessionSelect !== false;
+  const showMistakes = featureConfig.mistakeTracker !== false;
+  const showStuck = featureConfig.stuckTracker !== false;
+
+  if (showSessionName || showMistakes || showStuck) {
+    lines.push("Session Summary");
+    if (showSessionName) {
+      lines.push(`Session Name: ${selectedSession || "N/A"}`);
+    }
+    if (showMistakes) {
+      lines.push(`Mistake: ${totalMistakes}`);
+    }
+    if (showStuck) {
+      lines.push(`Stuck: ${totalStuck}`);
+    }
+    lines.push("");
+  }
 
   // Helper to extract detail list grouped by juz
   const formatDetailSection = (title, data) => {
@@ -182,21 +201,25 @@ export function generateReportText({
   };
 
   // 6. Mistake Section
-  const mistakeStr = formatDetailSection("Mistake", mistakeData);
-  if (mistakeStr) {
-    lines.push(mistakeStr);
-    lines.push("");
+  if (showMistakes) {
+    const mistakeStr = formatDetailSection("Mistake", mistakeData);
+    if (mistakeStr) {
+      lines.push(mistakeStr);
+      lines.push("");
+    }
   }
 
   // 7. Stuck Section
-  const stuckStr = formatDetailSection("Stuck", stuckData);
-  if (stuckStr) {
-    lines.push(stuckStr);
-    lines.push("");
+  if (showStuck) {
+    const stuckStr = formatDetailSection("Stuck", stuckData);
+    if (stuckStr) {
+      lines.push(stuckStr);
+      lines.push("");
+    }
   }
 
   // 8. Comment Section
-  if (comment && comment.trim()) {
+  if (featureConfig.commentSection !== false && comment && comment.trim()) {
     lines.push("Comment");
     lines.push(comment.trim());
     lines.push("");
@@ -204,7 +227,7 @@ export function generateReportText({
 
   // 9. Footer Group & Teacher Line
   // Rule: If Group Name is NOT included, Teacher Mention is also omitted!
-  if (includeGroup) {
+  if (includeGroup && featureConfig.studentSelect !== false) {
     let footerParts = [];
     if (includeTeacher) {
       const rawTeacher = typeof window !== "undefined" ? localStorage.getItem("spr_copy_teacher_name") || "Mustafa" : "Mustafa";
@@ -220,6 +243,11 @@ export function generateReportText({
     if (footerParts.length > 0) {
       lines.push(footerParts.join(" "));
     }
+  }
+
+  // Trim trailing blank lines
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
   }
 
   return lines.join("\n");

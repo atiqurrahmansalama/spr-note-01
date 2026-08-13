@@ -24,7 +24,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
   // User Override > Group Override > Role Override > Global Default.
   // When an admin changes a setting it propagates to every account worldwide
   // within 10 seconds via version polling.
-  const { isFeatureEnabled } = useFeatureControl();
+  const { isFeatureEnabled, loading: featureLoading } = useFeatureControl();
 
   // Build a sectionConfig-compatible object from the live server flags.
   // Falls back to `true` for any unknown key (safe default = show everything).
@@ -105,7 +105,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
   }, [handleUndo, handleRedo]);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !featureLoading) {
       setTimeout(() => {
         const studentInput = document.querySelector('input[placeholder*="student"], input[placeholder*="Search"]');
         if (studentInput) {
@@ -113,7 +113,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
         }
       }, 150);
     }
-  }, [isLoading]);
+  }, [isLoading, featureLoading]);
 
   const handleMakeReportClick = () => {
     if (sectionConfig.studentSelect?.enabled && !studentName.trim()) {
@@ -246,7 +246,7 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     )
   );
 
-  if (isLoading) {
+  if (isLoading || featureLoading) {
     return <SkeletonLoader type="form" />;
   }
 

@@ -1,42 +1,66 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "../utils/authService";
-import { getSectionConfig } from "../config/defaultSectionConfig";
 import { useAuth } from "./AuthContext";
 
+// ─── Cache key for per-user evaluated config ────────────────────────────────
+// We cache the last server-evaluated config in localStorage so that on page
+// refresh the correct (server-evaluated) state is shown immediately — no flash.
+const getCacheKey = (userId) => `spr_evaluated_config_${userId || "anon"}_v2`;
+
+const HARD_DEFAULTS = {
+  headerDate: false,     // start false → force server to confirm ON
+  studentSelect: false,
+  sessionSelect: false,
+  juzPageInput: false,
+  mistakeTracker: false,
+  stuckTracker: false,
+  commentSection: false,
+  actionButtons: false,
+  pdfExport: false,
+};
+
+// Read the last cached server-evaluated config for this user id.
+// Falls back to HARD_DEFAULTS (all false) so nothing flashes on first load.
+const getCachedConfig = (userId) => {
+  try {
+    const raw = localStorage.getItem(getCacheKey(userId));
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { ...HARD_DEFAULTS };
+};
+
+const setCachedConfig = (userId, config) => {
+  try {
+    localStorage.setItem(getCacheKey(userId), JSON.stringify(config));
+  } catch {}
+};
+
+// ─── Context ─────────────────────────────────────────────────────────────────
 const FeatureControlContext = createContext({
   config: {},
   origins: {},
   loading: true,
-  isFeatureEnabled: () => true,
-  isSectionEnabled: () => true,
+  isFeatureEnabled: () => false,   // safe default: don't show anything until confirmed
+  isSectionEnabled: () => false,
   getFeatureOrigin: () => "GLOBAL",
   refetchConfig: async () => {},
 });
 
 export function FeatureControlProvider({ children }) {
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
-  const getLocalDefaults = () => {
-    try {
-      const local = getSectionConfig();
-      const map = {};
-      Object.keys(local).forEach((k) => {
-        map[k] = local[k].enabled;
-      });
-      return map;
-    } catch {
-      return {};
-    }
-  };
-
-  const [config, setConfig] = useState(getLocalDefaults);
+  // Initialize from cache (per-user) so refresh shows correct state immediately
+  const [config, setConfig] = useState(() => getCachedConfig(userId));
   const [origins, setOrigins] = useState({});
+  // Start true so components can show a loading skeleton instead of flashing wrong content
   const [loading, setLoading] = useState(true);
-  const currentVersionRef = useRef(0);
-  // Track the last user id we fetched for, to detect user switches
-  const lastUserIdRef = useRef(null);
 
-  const fetchEvaluatedConfig = useCallback(async () => {
+  const currentVersionRef = useRef(0);
+  const lastUserIdRef = useRef(userId);
+
+  // ── Fetch evaluated config from server ────────────────────────────────────
+  const fetchEvaluatedConfig = useCallback(async (forUserId) => {
     setLoading(true);
     try {
       const candidatePaths = [
@@ -53,22 +77,25 @@ export function FeatureControlProvider({ children }) {
             break;
           }
         } catch {
-          // try next candidate
+          // try next path
         }
       }
 
       const evalData = resData?.flags || resData?.config;
-      if (evalData) {
+      if (evalData && typeof evalData === "object") {
         setConfig(evalData);
         setOrigins(resData.origins || {});
+        // Cache so next page load is instant and flash-free
+        setCachedConfig(forUserId ?? userId, evalData);
       }
     } catch (err) {
-      console.warn("[FeatureControlContext] Using local fallback config:", err);
+      console.warn("[FeatureControlContext] Server fetch failed, using cache:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
+  // ── Version check & sync ──────────────────────────────────────────────────
   const checkVersionAndSync = useCallback(async () => {
     try {
       const res = await fetchWithAuth("/api/v1/section-control/version/");
@@ -76,89 +103,73 @@ export function FeatureControlProvider({ children }) {
         const data = await res.json();
         if (data.version && data.version > currentVersionRef.current) {
           currentVersionRef.current = data.version;
-          fetchEvaluatedConfig();
+          fetchEvaluatedConfig(userId);
         }
       }
     } catch {}
-  }, [fetchEvaluatedConfig]);
+  }, [fetchEvaluatedConfig, userId]);
 
-  // ── CRITICAL: Re-evaluate flags whenever user identity changes ──────────────
-  // This is what makes admin changes apply to OTHER accounts:
-  //   - When a different user logs in, their JWT is sent to /evaluate/ and the
-  //     backend returns THEIR 4-tier resolved config (their role, group, user overrides).
-  //   - When user logs out, reset to local defaults.
+  // ── React to user identity changes ────────────────────────────────────────
+  // This is THE critical fix: when a different user logs in, immediately
+  // load their cached config (no flash) then fetch fresh from server.
   useEffect(() => {
-    const currentUserId = user?.id ?? null;
+    if (userId !== lastUserIdRef.current) {
+      lastUserIdRef.current = userId;
 
-    if (currentUserId !== lastUserIdRef.current) {
-      // User identity changed (login, logout, switch account)
-      lastUserIdRef.current = currentUserId;
-
-      if (currentUserId === null) {
-        // Logged out — reset to local defaults immediately
-        setConfig(getLocalDefaults());
+      if (userId === null) {
+        // Logged out — reset to hard defaults (all hidden until re-login)
+        setConfig({ ...HARD_DEFAULTS });
         setOrigins({});
         currentVersionRef.current = 0;
+        setLoading(false);
       } else {
-        // New user logged in — immediately reset version ref and re-fetch for this user
+        // New user — load their cache immediately (no flash) then refresh from server
+        setConfig(getCachedConfig(userId));
         currentVersionRef.current = 0;
-        fetchEvaluatedConfig();
+        fetchEvaluatedConfig(userId);
       }
     }
-  }, [user?.id, fetchEvaluatedConfig]);
+  }, [userId, fetchEvaluatedConfig]);
 
-  // ── INITIAL MOUNT + EVENT LISTENERS + POLLING ──────────────────────────────
+  // ── Initial mount: fetch from server + set up listeners + polling ─────────
   useEffect(() => {
-    // Initial fetch on mount (handles page refresh with existing session)
-    fetchEvaluatedConfig();
-    checkVersionAndSync();
+    // First load — fetch server config
+    fetchEvaluatedConfig(userId);
 
     const handleUpdate = () => {
-      fetchEvaluatedConfig();
-      checkVersionAndSync();
+      currentVersionRef.current = 0;   // force re-fetch on next version check
+      fetchEvaluatedConfig(userId);
     };
 
-    // 1. BroadcastChannel: instant update across tabs in the same browser
+    // 1. BroadcastChannel: instant cross-tab update (same browser)
     let broadcastChannel = null;
     try {
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
         broadcastChannel = new BroadcastChannel("spr_section_control_channel");
-        broadcastChannel.onmessage = () => {
-          // Reset version ref so we always get fresh data after admin change
-          currentVersionRef.current = 0;
-          fetchEvaluatedConfig();
-        };
+        broadcastChannel.onmessage = handleUpdate;
       }
     } catch {}
 
-    // 2. Auth change event — triggers re-fetch for new user immediately
+    // 2. Auth change (login/logout from AuthContext)
     window.addEventListener("spr_auth_updated", handleUpdate);
-    // 3. Section config updated event (fired by control panel after save)
+    // 3. Admin saved new config in control panel
     window.addEventListener("spr_section_config_updated", handleUpdate);
-    // 4. Storage sync (cross-tab auth changes)
+    // 4. localStorage sync across tabs
     window.addEventListener("storage", handleUpdate);
-    // 5. Window focus — re-check version when user switches back to tab
+    // 5. Window regains focus — re-check version
     window.addEventListener("focus", checkVersionAndSync);
 
-    // 6. Page visibility — re-check when tab becomes visible again
+    // 6. Page visibility change — re-check when tab becomes active
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkVersionAndSync();
-      }
+      if (document.visibilityState === "visible") checkVersionAndSync();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 7. 10-second polling: propagates admin changes to all live sessions worldwide
-    //    Works for users on different devices/browsers — they pick up version bump
-    //    and immediately re-fetch their own per-user evaluated config from the server.
-    const intervalId = setInterval(() => {
-      checkVersionAndSync();
-    }, 10000);
+    // 7. 10-second polling — propagates admin changes to ALL live sessions worldwide
+    const intervalId = setInterval(checkVersionAndSync, 10000);
 
     return () => {
-      if (broadcastChannel) {
-        try { broadcastChannel.close(); } catch {}
-      }
+      if (broadcastChannel) { try { broadcastChannel.close(); } catch {} }
       window.removeEventListener("spr_auth_updated", handleUpdate);
       window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
@@ -166,14 +177,18 @@ export function FeatureControlProvider({ children }) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(intervalId);
     };
-  }, [fetchEvaluatedConfig, checkVersionAndSync]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
+  // ── isFeatureEnabled: safe default is FALSE (hide until server confirms ON) ─
   const isFeatureEnabled = useCallback(
     (featureKey) => {
       if (!featureKey) return true;
+      // While loading the very first time (no cache), hide everything
+      if (loading && config[featureKey] === undefined) return false;
       return config[featureKey] !== undefined ? !!config[featureKey] : true;
     },
-    [config]
+    [config, loading]
   );
 
   const getFeatureOrigin = useCallback(
@@ -193,7 +208,7 @@ export function FeatureControlProvider({ children }) {
         isFeatureEnabled,
         isSectionEnabled: isFeatureEnabled,
         getFeatureOrigin,
-        refetchConfig: fetchEvaluatedConfig,
+        refetchConfig: () => fetchEvaluatedConfig(userId),
       }}
     >
       {children}
@@ -209,12 +224,12 @@ export function useFeatureControl() {
   return context;
 }
 
+// ─── FeatureGuard: hide section if disabled; show loading skeleton if loading ─
 export function FeatureGuard({ featureKey, children, fallback = null }) {
   const { isFeatureEnabled, loading } = useFeatureControl();
 
-  if (loading) {
-    return children;
-  }
+  // While server config loads, render nothing (prevents flash of hidden content)
+  if (loading) return null;
 
   if (!isFeatureEnabled(featureKey)) {
     if (fallback !== null) return fallback;

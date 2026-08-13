@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { formatDate } from "../../../utils/reportGenerator";
 import QrCodeBadge from "../../../components/common/QrCodeBadge";
+import { useFeatureControl } from "../../../context/FeatureControlContext";
 
 export const PdfReportPreview = forwardRef(function PdfReportPreview({
   reportData,
@@ -9,6 +10,16 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
   isPdfBold = false,
   isPdfItalic = false,
 }, ref) {
+  const { isFeatureEnabled } = useFeatureControl();
+
+  const showHeaderDate = isFeatureEnabled('headerDate');
+  const showStudentSelect = isFeatureEnabled('studentSelect');
+  const showSessionSelect = isFeatureEnabled('sessionSelect');
+  const showJuzPageInput = isFeatureEnabled('juzPageInput');
+  const showMistakeTracker = isFeatureEnabled('mistakeTracker');
+  const showStuckTracker = isFeatureEnabled('stuckTracker');
+  const showCommentSection = isFeatureEnabled('commentSection');
+
   const {
     studentName = "N/A",
     groupName = "",
@@ -97,7 +108,7 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
 
   // Format Group Footer string
   let groupText = "";
-  if (includeGroup) {
+  if (includeGroup && showStudentSelect) {
     let gStr = groupName ? groupName.trim() : "Ml Saqib's Group";
     if (!gStr.toLowerCase().endsWith("group") && !gStr.toLowerCase().includes("'s")) {
       gStr = `${gStr}'s Group`;
@@ -120,60 +131,68 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
             Student Daily Progress Report
           </h1>
           <div className="space-y-0.5 text-[15px]">
-            <div>
-              <span className="font-bold text-[#0f172a]">Date:</span> {formattedDate}
-            </div>
-            <div>
-              <span className="font-bold text-[#0f172a]">Student Name:</span> {studentName}
-            </div>
+            {showHeaderDate && (
+              <div>
+                <span className="font-bold text-[#0f172a]">Date:</span> {formattedDate}
+              </div>
+            )}
+            {showStudentSelect && (
+              <div>
+                <span className="font-bold text-[#0f172a]">Student Name:</span> {studentName}
+              </div>
+            )}
           </div>
         </div>
         <QrCodeBadge reportId={reportId} size={84} />
       </div>
 
       {/* Juz & Page Block */}
-      <div className="pt-1 space-y-0.5">
-        {validJuzs.length > 0 ? (
-          <>
-            <div>
-              <span className="font-bold text-[#0f172a]">Juz Number:</span> {validJuzs.join(", ")}
-            </div>
-            {isSingleJuz ? (
+      {showJuzPageInput && (
+        <div className="pt-1 space-y-0.5 border-b border-slate-100 pb-2 mb-1">
+          {validJuzs.length > 0 ? (
+            <>
               <div>
-                <span className="font-bold text-[#0f172a]">Page:</span> {juzMap.get(validJuzs[0])?.join(", ") || "N/A"}
+                <span className="font-bold text-[#0f172a]">Juz Number:</span> {validJuzs.join(", ")}
               </div>
-            ) : (
-              <div>
-                <span className="font-bold text-[#0f172a]">Page:</span>
-                <div className="pl-4 space-y-0.5">
-                  {validJuzs.map((j) => (
-                    <div key={j}>
-                      <span className="font-bold">{j}:</span> {juzMap.get(j)?.join(", ") || "N/A"}
-                    </div>
-                  ))}
+              {isSingleJuz ? (
+                <div>
+                  <span className="font-bold text-[#0f172a]">Page:</span> {juzMap.get(validJuzs[0])?.join(", ") || "N/A"}
                 </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div>Juz Number: N/A</div>
-            <div>Page: N/A</div>
-          </>
-        )}
-      </div>
+              ) : (
+                <div>
+                  <span className="font-bold text-[#0f172a]">Page:</span>
+                  <div className="pl-4 space-y-0.5">
+                    {validJuzs.map((j) => (
+                      <div key={j}>
+                        <span className="font-bold">{j}:</span> {juzMap.get(j)?.join(", ") || "N/A"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>Juz Number: N/A</div>
+              <div>Page: N/A</div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Session Summary Block */}
-      <div className="pt-1.5 space-y-0.5">
-        <h2 className="text-[16px] font-bold text-[#0f172a]">Session Summary</h2>
-        <div>Session Name: {selectedSession}</div>
-        <div>Mistake: {totalMistakes}</div>
-        <div>Stuck: {totalStuck}</div>
-      </div>
+      {(showSessionSelect || showMistakeTracker || showStuckTracker) && (
+        <div className="pt-1.5 space-y-0.5 border-b border-slate-100 pb-2 mb-1">
+          <h2 className="text-[16px] font-bold text-[#0f172a]">Session Summary</h2>
+          {showSessionSelect && <div>Session Name: {selectedSession}</div>}
+          {showMistakeTracker && <div>Mistake: {totalMistakes}</div>}
+          {showStuckTracker && <div>Stuck: {totalStuck}</div>}
+        </div>
+      )}
 
       {/* Mistake Block */}
-      {mistakeMap.size > 0 && (
-        <div className="pt-1.5 space-y-0.5">
+      {showMistakeTracker && mistakeMap.size > 0 && (
+        <div className="pt-1.5 space-y-0.5 border-b border-slate-100 pb-2 mb-1">
           <h2 className="text-[16px] font-bold text-[#0f172a]">Mistake</h2>
           {isSingleJuz ? (
             Array.from(mistakeMap.values())[0].map((item, idx) => (
@@ -195,8 +214,8 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
       )}
 
       {/* Stuck Block */}
-      {stuckMap.size > 0 && (
-        <div className="pt-1.5 space-y-0.5">
+      {showStuckTracker && stuckMap.size > 0 && (
+        <div className="pt-1.5 space-y-0.5 border-b border-slate-100 pb-2 mb-1">
           <h2 className="text-[16px] font-bold text-[#0f172a]">Stuck</h2>
           {isSingleJuz ? (
             Array.from(stuckMap.values())[0].map((item, idx) => (
@@ -218,8 +237,8 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
       )}
 
       {/* Comment Block */}
-      {comment && comment.trim() !== "" && (
-        <div className="pt-1.5 space-y-0.5">
+      {showCommentSection && comment && comment.trim() !== "" && (
+        <div className="pt-1.5 space-y-0.5 pb-2 mb-1">
           <h2 className="text-[16px] font-bold text-[#0f172a]">Comment</h2>
           <div className="whitespace-pre-wrap">{comment.trim()}</div>
         </div>
@@ -227,7 +246,7 @@ export const PdfReportPreview = forwardRef(function PdfReportPreview({
 
       {/* Footer Group Line */}
       {includeGroup && groupText && (
-        <div className="pt-3 font-normal text-[#1e293b]">
+        <div className="pt-3 font-normal text-[#1e293b] border-t border-slate-200">
           {groupText}
         </div>
       )}

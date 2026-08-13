@@ -78,9 +78,9 @@ export default function SectionToggleControlPanel() {
   const [groupOptions, setGroupOptions] = useState([]);
 
   // Control Rules Data State
-  const [categories, setCategories] = useState(DEFAULT_PANEL_CATEGORIES);
+  const [categories, setCategories] = useState([]);  // start empty — no flash of wrong defaults
   const [modifiedFlags, setModifiedFlags] = useState({}); // { [section_key]: boolean }
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);  // start true so we show skeleton until server responds
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
@@ -135,6 +135,7 @@ export default function SectionToggleControlPanel() {
   // 3. Fetch Rules for selected scope and target
   const loadRules = useCallback(async () => {
     if (activeScope === "audit") return;
+    setLoading(true);
     setModifiedFlags({});
     try {
       let url = `/api/v1/control-panel/rules/?scope=${activeScope}`;
@@ -148,10 +149,15 @@ export default function SectionToggleControlPanel() {
         const resCats = Array.isArray(data) ? data : data.categories || [];
         if (resCats.length > 0) {
           setCategories(resCats);
+        } else {
+          // Fallback: show default panel structure if server returns empty
+          setCategories(DEFAULT_PANEL_CATEGORIES);
         }
+      } else {
+        setCategories(DEFAULT_PANEL_CATEGORIES);
       }
     } catch {
-      // Keep default categories silently
+      setCategories(DEFAULT_PANEL_CATEGORIES);
     } finally {
       setLoading(false);
     }

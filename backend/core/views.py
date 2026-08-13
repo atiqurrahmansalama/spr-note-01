@@ -3146,10 +3146,19 @@ class ResetUserOverridesView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+@method_decorator(never_cache, name='dispatch')
 class ControlPanelRulesView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        response_data = self._handle_get(request)
+        response = Response(response_data, status=status.HTTP_200_OK)
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
+    def _handle_get(self, request):
         scope = request.query_params.get('scope', 'global').upper()
         target_id = request.query_params.get('target_id', '')
 
@@ -3250,7 +3259,7 @@ class ControlPanelRulesView(APIView):
             })
 
         result = [v for v in categories_map.values() if len(v["sections"]) > 0]
-        return Response({"categories": result}, status=status.HTTP_200_OK)
+        return {"categories": result}
 
 
 class SectionControlVersionView(APIView):

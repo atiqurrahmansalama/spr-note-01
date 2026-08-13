@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { jsPDF } from "jspdf";
 import { generateReportText, formatDate } from "../../../utils/reportGenerator";
+import { useFeatureControl } from "../../../context/FeatureControlContext";
 
 export function useReportActions({ isOpen, onClose, reportData }) {
   const { showToast } = useToast();
   const shareDropdownRef = useRef(null);
+  const { isFeatureEnabled } = useFeatureControl();
 
   const [viewMode, setViewMode] = useState("TEXT"); // "TEXT" | "PDF"
   
@@ -52,6 +54,16 @@ export function useReportActions({ isOpen, onClose, reportData }) {
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const featureConfig = {
+    headerDate: isFeatureEnabled('headerDate'),
+    studentSelect: isFeatureEnabled('studentSelect'),
+    sessionSelect: isFeatureEnabled('sessionSelect'),
+    juzPageInput: isFeatureEnabled('juzPageInput'),
+    mistakeTracker: isFeatureEnabled('mistakeTracker'),
+    stuckTracker: isFeatureEnabled('stuckTracker'),
+    commentSection: isFeatureEnabled('commentSection'),
+  };
+
   const [currentText, setCurrentText] = useState(() => {
     let initGroup = true;
     let initTeacher = true;
@@ -65,6 +77,7 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       ...reportData,
       includeGroup: initGroup,
       includeTeacher: initTeacher,
+      featureConfig,
     });
   });
 
@@ -92,8 +105,8 @@ export function useReportActions({ isOpen, onClose, reportData }) {
     localStorage.setItem("spr_pdf_italic", isPdfItalic);
   }, [isPdfItalic]);
 
-  // Synchronize generated text when settings/reportData change, if user is not manually editing
-  const prevDataKey = `${isOpen}-${includeGroup}-${includeTeacher}-${JSON.stringify(reportData)}`;
+  // Synchronize generated text when settings/reportData/featureConfig change, if user is not manually editing
+  const prevDataKey = `${isOpen}-${includeGroup}-${includeTeacher}-${JSON.stringify(reportData)}-${JSON.stringify(featureConfig)}`;
   const [lastSyncKey, setLastSyncKey] = useState(prevDataKey);
 
   if (isOpen && !isEditing && lastSyncKey !== prevDataKey) {
@@ -103,6 +116,7 @@ export function useReportActions({ isOpen, onClose, reportData }) {
         ...reportData,
         includeGroup,
         includeTeacher,
+        featureConfig,
       })
     );
   }
