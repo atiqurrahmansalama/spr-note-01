@@ -135,7 +135,6 @@ export default function SectionToggleControlPanel() {
   // 3. Fetch Rules for selected scope and target
   const loadRules = useCallback(async () => {
     if (activeScope === "audit") return;
-    if (categories.length === 0) setLoading(true);
     setModifiedFlags({});
     try {
       let url = `/api/v1/control-panel/rules/?scope=${activeScope}`;
@@ -156,7 +155,7 @@ export default function SectionToggleControlPanel() {
     } finally {
       setLoading(false);
     }
-  }, [activeScope, currentTargetId, categories.length]);
+  }, [activeScope, currentTargetId]);
 
   useEffect(() => {
     loadRules();
@@ -250,15 +249,19 @@ export default function SectionToggleControlPanel() {
         const data = await res.json();
         showToast(data.message || "Section rules saved successfully!", "success");
 
-        try {
-          const currentLocal = getSectionConfig();
-          const updatedLocal = { ...currentLocal };
-          keys.forEach((k) => {
-            updatedLocal[k] = { ...updatedLocal[k], enabled: modifiedFlags[k] };
-          });
-          saveSectionConfig(updatedLocal);
-          window.dispatchEvent(new CustomEvent("spr_section_config_updated", { detail: updatedLocal }));
-        } catch {}
+        if (activeScope === "global") {
+          try {
+            const currentLocal = getSectionConfig();
+            const updatedLocal = { ...currentLocal };
+            keys.forEach((k) => {
+              updatedLocal[k] = { ...updatedLocal[k], enabled: modifiedFlags[k] };
+            });
+            saveSectionConfig(updatedLocal);
+            window.dispatchEvent(new CustomEvent("spr_section_config_updated", { detail: updatedLocal }));
+          } catch {}
+        } else {
+          window.dispatchEvent(new CustomEvent("spr_section_config_updated"));
+        }
 
         setModifiedFlags({});
         refetchConfig();
