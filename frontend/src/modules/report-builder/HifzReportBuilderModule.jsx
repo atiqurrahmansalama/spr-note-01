@@ -282,36 +282,65 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
       )}
 
       {/* 0b. Draft Recovery Notification Banner */}
-      {draftInfo && (
-        <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
-          <div className="flex items-center gap-2 min-w-0 text-left">
-            <div className="p-0.5 rounded-lg theme-accent shrink-0">
-              <ClockIcon className="w-4 h-4" />
-            </div>
-            <div className="text-xs theme-text-primary truncate">
-              Auto-saved Draft Found at{" "}
-              <span className="font-bold theme-accent">
-                {draftInfo.savedAtTime || "session"}
-              </span>
-              . Recover?
-            </div>
+      {draftInfo && Array.isArray(draftInfo) && draftInfo.length > 0 && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 shadow-xl space-y-3 animate-fade-in select-none text-left">
+          <div className="flex items-center gap-2 border-b theme-border pb-2">
+            <ClockIcon className="w-4 h-4 theme-accent" />
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              Unsaved Drafts Found ({draftInfo.length})
+            </h4>
           </div>
+          <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+            {draftInfo.map((draft) => {
+              const infoText = draft.studentName 
+                ? `Student: ${draft.studentName}`
+                : draft.comment 
+                  ? `Comment: "${draft.comment.substring(0, 20)}..."`
+                  : "Empty Draft";
+              const timeStr = `${draft.savedAtTime || ""} (${draft.savedAtDate || ""})`;
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={recoverDraft}
-              className="theme-bg-accent hover:opacity-90 theme-accent-text text-xs px-2.5 py-1 rounded-lg font-semibold transition shadow cursor-pointer"
-            >
-              Recover
-            </button>
-            <button
-              type="button"
-              onClick={discardDraft}
-              className="theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated text-xs px-2 py-1 rounded-lg font-medium transition cursor-pointer"
-            >
-              <CloseIcon className="w-4 h-4" />
-            </button>
+              return (
+                <div key={draft.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 rounded-xl theme-bg-sub border theme-border gap-2 hover:border-[var(--accent-main)]/30 transition-colors">
+                  <div className="min-w-0 text-xs">
+                    <div className="font-bold theme-text-primary truncate">
+                      {infoText}
+                    </div>
+                    <div className="text-[10px] theme-text-secondary mt-0.5">
+                      Auto-saved at {timeStr}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => recoverDraft(draft)}
+                      className="theme-bg-accent hover:opacity-90 theme-accent-text text-[10px] px-2 py-0.5 rounded-lg font-semibold transition shadow cursor-pointer active:scale-95"
+                      title="Load this draft in this window"
+                    >
+                      Recover
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.open(`/?recover_draft_id=${draft.id}`, "_blank");
+                        discardDraft(draft);
+                      }}
+                      className="theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary text-[10px] px-2 py-0.5 rounded-lg font-semibold transition border theme-border cursor-pointer active:scale-95"
+                      title="Open this draft in a new tab"
+                    >
+                      Open in New Tab
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => discardDraft(draft)}
+                      className="p-1 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                      title="Discard Draft"
+                    >
+                      <CloseIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

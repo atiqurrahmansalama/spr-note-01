@@ -138,6 +138,11 @@ export function useReportForm() {
 
   const [draftInfo, setDraftInfo] = useState(null);
 
+  const [currentDraftId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("recover_draft_id") || crypto.randomUUID();
+  });
+
   // Edit Mode state — tracks the report being edited
   const [editingReport, setEditingReport] = useState(null);
 
@@ -225,36 +230,49 @@ export function useReportForm() {
 
     setComment(rep.comment || "");
     setDraftInfo(null);
-    draftReport.clear();
+    draftReport.remove(currentDraftId);
     setEditingReport(rep);
-  }, []);
+  }, [currentDraftId]);
 
   // Mount effect: Check for pending report to edit in localStorage OR auto-recover draft
   useEffect(() => {
-    const existing = draftReport.get();
-    const hasUnsavedDraft = Boolean(
-      existing && (existing.studentName || existing.comment || existing.selectedSession || existing.hasData)
-    );
+    // 1. If URL has recover_draft_id, load it directly
+    const params = new URLSearchParams(window.location.search);
+    const recoverId = params.get("recover_draft_id");
+    if (recoverId) {
+      const recovered = draftReport.getById(recoverId);
+      if (recovered) {
+        if (recovered.studentName !== undefined) setStudentName(recovered.studentName);
+        if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
+        if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
+        if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
+        if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
+        if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
+        if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.comment !== undefined) setComment(recovered.comment);
+
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        showToast("Report draft recovered successfully!", "success");
+      }
+    }
+
+    // 2. Load other unsaved drafts as options in draftInfo
+    const allDrafts = draftReport.getAll();
+    const unsavedDrafts = allDrafts.filter(d => {
+      const hasContent = d.studentName || d.comment || d.selectedSession || d.hasData;
+      return hasContent && d.id !== currentDraftId;
+    });
+
+    if (unsavedDrafts.length > 0) {
+      setDraftInfo(unsavedDrafts);
+    }
 
     const pendingEditRaw = localStorage.getItem("spr_editing_report");
     if (pendingEditRaw) {
       try {
         const pendingEdit = JSON.parse(pendingEditRaw);
         if (pendingEdit && typeof pendingEdit === "object") {
-          // If there is existing unsaved draft data, ask user for confirmation before discarding
-          if (hasUnsavedDraft) {
-            const stuName = existing.studentName || "a student";
-            const targetName = pendingEdit.student_name || pendingEdit.student || "selected student";
-            const confirmed = window.confirm(
-              `The report form currently has unsaved draft data for "${stuName}".\n\nDo you want to discard this draft and load "${targetName}"'s report for editing?`
-            );
-            if (!confirmed) {
-              localStorage.removeItem("spr_editing_report");
-              setDraftInfo(existing);
-              return;
-            }
-          }
-
           localStorage.removeItem("spr_editing_report");
           applyReportToForm(pendingEdit);
           return;
@@ -263,13 +281,8 @@ export function useReportForm() {
         console.error("Failed to parse pending edit report:", err);
       }
     }
-
-    if (!hasUnsavedDraft) return;
-
-    // Always show the recovery banner — let the user decide to recover or discard
-    setDraftInfo(existing);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentDraftId]);
 
   useEffect(() => {
     commentStore.saveAll(savedComments);
@@ -282,11 +295,9 @@ export function useReportForm() {
       selectedSession || 
       comment.trim() || 
       juzPageData.some(d => d.juz || d.ranges.some(r => r.start || r.end)) ||
-      mistakeData.some(m => m.page || m.ayahs.some(a => a.value)) ||
-      stuckData.some(s => s.page || s.ayahs.some(a => a.value))
+      mistakeData.some(m => m.page || m.juz || m.ayahs.some(a => a.value)) ||
+      stuckData.some(s => s.page || s.juz || s.ayahs.some(a => a.value))
     );
-
-    if (!hasAnyContent) return;
 
     const draftPayload = {
       studentName,
@@ -297,40 +308,50 @@ export function useReportForm() {
       mistakeData,
       stuckData,
       comment,
-      hasData: true,
+      hasData: hasAnyContent,
     };
 
-    draftReport.save(draftPayload);
-    saveStatusStore.set("local", "Saved");
+    if (hasAnyContent) {
+      draftReport.save(currentDraftId, draftPayload);
+      saveStatusStore.set("local", "Saved");
+    } else {
+      draftReport.remove(currentDraftId);
+    }
 
     const interval = setInterval(() => {
-      draftReport.save(draftPayload);
-      saveStatusStore.set("local", "Saved");
+      if (hasAnyContent) {
+        draftReport.save(currentDraftId, draftPayload);
+        saveStatusStore.set("local", "Saved");
+      }
     }, 90000);
 
     return () => clearInterval(interval);
-  }, [studentName, groupName, selectedSession, selectedDate, juzPageData, mistakeData, stuckData, comment]);
+  }, [studentName, groupName, selectedSession, selectedDate, juzPageData, mistakeData, stuckData, comment, currentDraftId]);
 
-  const recoverDraft = () => {
-    if (!draftInfo) return;
-    if (draftInfo.studentName !== undefined) setStudentName(draftInfo.studentName);
-    if (draftInfo.groupName !== undefined) setGroupName(draftInfo.groupName);
-    if (draftInfo.selectedSession !== undefined) setSelectedSession(draftInfo.selectedSession);
-    if (draftInfo.selectedDate !== undefined) setSelectedDate(draftInfo.selectedDate);
-    if (draftInfo.juzPageData?.length) setJuzPageData(draftInfo.juzPageData);
-    if (draftInfo.mistakeData?.length) setMistakeData(draftInfo.mistakeData);
-    if (draftInfo.stuckData?.length) setStuckData(draftInfo.stuckData);
-    if (draftInfo.comment !== undefined) setComment(draftInfo.comment);
+  const recoverDraft = (draft) => {
+    if (!draft) return;
+    if (draft.studentName !== undefined) setStudentName(draft.studentName);
+    if (draft.groupName !== undefined) setGroupName(draft.groupName);
+    if (draft.selectedSession !== undefined) setSelectedSession(draft.selectedSession);
+    if (draft.selectedDate !== undefined) setSelectedDate(draft.selectedDate);
+    if (draft.juzPageData?.length) setJuzPageData(draft.juzPageData);
+    if (draft.mistakeData?.length) setMistakeData(draft.mistakeData);
+    if (draft.stuckData?.length) setStuckData(draft.stuckData);
+    if (draft.comment !== undefined) setComment(draft.comment);
 
-    setDraftInfo(null);
-    draftReport.clear();
+    setDraftInfo((prev) => (prev ? prev.filter((d) => d.id !== draft.id) : null));
+    draftReport.remove(draft.id);
     showToast("Report draft recovered successfully!", "success");
     saveStatusStore.set("local", "Saved (Local)");
   };
 
-  const discardDraft = () => {
-    setDraftInfo(null);
-    draftReport.clear();
+  const discardDraft = (draft) => {
+    if (!draft) return;
+    setDraftInfo((prev) => {
+      const updated = prev ? prev.filter((d) => d.id !== draft.id) : null;
+      return updated && updated.length > 0 ? updated : null;
+    });
+    draftReport.remove(draft.id);
     showToast("Report draft discarded", "info");
   };
 
@@ -552,7 +573,7 @@ export function useReportForm() {
     setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
     setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
     setComment("");
-    draftReport.clear();
+    draftReport.remove(currentDraftId);
     setDraftInfo(null);
     setEditingReport(null);
   };

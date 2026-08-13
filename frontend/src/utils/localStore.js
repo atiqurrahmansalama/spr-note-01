@@ -528,18 +528,45 @@ export const isOnline = () => navigator.onLine;
 // ─── Draft Report & Live Save Status ─────────────────────────────────────────
 
 export const draftReport = {
-  get: () => readJSON(KEYS.DRAFT_REPORT, null),
-  save: (formData) => {
+  getAll: () => readJSON("spr_draft_reports_list", []),
+  getById: (id) => {
+    const list = readJSON("spr_draft_reports_list", []);
+    return list.find(d => d.id === id) || null;
+  },
+  save: (id, formData) => {
+    if (!id) return null;
+    const list = readJSON("spr_draft_reports_list", []);
     const payload = {
+      id,
       ...formData,
       timestamp: new Date().toISOString(),
       savedAtTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       savedAtDate: new Date().toLocaleDateString(),
     };
-    writeJSON(KEYS.DRAFT_REPORT, payload);
+    const idx = list.findIndex(d => d.id === id);
+    if (idx > -1) {
+      list[idx] = payload;
+    } else {
+      list.push(payload);
+    }
+    if (list.length > 10) {
+      list.shift();
+    }
+    writeJSON("spr_draft_reports_list", list);
     return payload;
   },
-  clear: () => localStorage.removeItem(KEYS.DRAFT_REPORT),
+  remove: (id) => {
+    const list = readJSON("spr_draft_reports_list", []);
+    const updated = list.filter(d => d.id !== id);
+    writeJSON("spr_draft_reports_list", updated);
+  },
+  clear: () => {
+    localStorage.removeItem("spr_draft_reports_list");
+  },
+  get: () => {
+    const list = readJSON("spr_draft_reports_list", []);
+    return list[list.length - 1] || null;
+  }
 };
 
 export const saveStatusStore = {
