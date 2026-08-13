@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import HeaderDateSection from "./components/HeaderDateSection";
 import StudentInputSection from "./components/StudentInputSection";
 import SessionInputSection from "./components/SessionInputSection";
@@ -13,21 +13,32 @@ import { useReportForm } from "./hooks/useReportForm";
 import { useToast } from "../../context/ToastContext";
 import { useFont } from "../../context/useFont";
 import { ClockIcon, CloseIcon, EditIcon } from "../../components/ui/Icons";
-import { getSectionConfig } from "../../config/defaultSectionConfig";
+import { useFeatureControl } from "../../context/FeatureControlContext";
 
 export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
   const { showToast } = useToast();
   const { activeFont, activeFontSize } = useFont();
 
-  const [sectionConfig, setSectionConfig] = useState(() => getSectionConfig());
+  // ── Pull section visibility flags from the live server-evaluated context.
+  // This is the single source of truth — it respects the 4-tier hierarchy:
+  // User Override > Group Override > Role Override > Global Default.
+  // When an admin changes a setting it propagates to every account worldwide
+  // within 10 seconds via version polling.
+  const { isFeatureEnabled } = useFeatureControl();
 
-  useEffect(() => {
-    const handleConfigUpdate = (e) => {
-      if (e.detail) setSectionConfig(e.detail);
-    };
-    window.addEventListener("spr_section_config_updated", handleConfigUpdate);
-    return () => window.removeEventListener("spr_section_config_updated", handleConfigUpdate);
-  }, []);
+  // Build a sectionConfig-compatible object from the live server flags.
+  // Falls back to `true` for any unknown key (safe default = show everything).
+  const sectionConfig = useMemo(() => ({
+    headerDate:     { enabled: isFeatureEnabled('headerDate') },
+    studentSelect:  { enabled: isFeatureEnabled('studentSelect') },
+    sessionSelect:  { enabled: isFeatureEnabled('sessionSelect') },
+    juzPageInput:   { enabled: isFeatureEnabled('juzPageInput') },
+    mistakeTracker: { enabled: isFeatureEnabled('mistakeTracker') },
+    stuckTracker:   { enabled: isFeatureEnabled('stuckTracker') },
+    commentSection: { enabled: isFeatureEnabled('commentSection') },
+    actionButtons:  { enabled: isFeatureEnabled('actionButtons') },
+    pdfExport:      { enabled: isFeatureEnabled('pdfExport') },
+  }), [isFeatureEnabled]);
 
   const {
     selectedDate,
