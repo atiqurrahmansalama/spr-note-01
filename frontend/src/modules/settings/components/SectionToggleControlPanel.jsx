@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
+import { getSectionConfig, saveSectionConfig } from "../../../config/defaultSectionConfig";
 
 const DEFAULT_PANEL_CATEGORIES = [
   {
@@ -248,8 +249,18 @@ export default function SectionToggleControlPanel() {
       if (res.ok) {
         const data = await res.json();
         showToast(data.message || "Section rules saved successfully!", "success");
+
+        try {
+          const currentLocal = getSectionConfig();
+          const updatedLocal = { ...currentLocal };
+          keys.forEach((k) => {
+            updatedLocal[k] = { ...updatedLocal[k], enabled: modifiedFlags[k] };
+          });
+          saveSectionConfig(updatedLocal);
+          window.dispatchEvent(new CustomEvent("spr_section_config_updated", { detail: updatedLocal }));
+        } catch {}
+
         setModifiedFlags({});
-        window.dispatchEvent(new CustomEvent("spr_section_config_updated"));
         refetchConfig();
         loadRules();
       } else {

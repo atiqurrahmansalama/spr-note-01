@@ -49,6 +49,16 @@ export function FeatureControlProvider({ children }) {
       if (resData && resData.config) {
         setConfig(resData.config);
         setOrigins(resData.origins || {});
+
+        // Sync evaluated flags with local section config
+        try {
+          const currentLocal = getSectionConfig();
+          const updatedLocal = { ...currentLocal };
+          Object.keys(resData.config).forEach((k) => {
+            updatedLocal[k] = { ...updatedLocal[k], enabled: !!resData.config[k] };
+          });
+          saveSectionConfig(updatedLocal);
+        } catch {}
       }
     } catch (err) {
       console.warn("[FeatureControlContext] Using local fallback config:", err);
