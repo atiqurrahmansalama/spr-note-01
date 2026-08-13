@@ -64,8 +64,8 @@ export function FeatureControlProvider({ children }) {
     setLoading(true);
     try {
       const candidatePaths = [
-        "/api/v1/section-control/evaluate/",
-        "/api/v1/control-panel/evaluated-config/",
+        `/api/v1/section-control/evaluate/?_t=${Date.now()}`,
+        `/api/v1/control-panel/evaluated-config/?_t=${Date.now()}`,
       ];
 
       let resData = null;
@@ -98,7 +98,7 @@ export function FeatureControlProvider({ children }) {
   // ── Version check & sync ──────────────────────────────────────────────────
   const checkVersionAndSync = useCallback(async () => {
     try {
-      const res = await fetchWithAuth("/api/v1/section-control/version/");
+      const res = await fetchWithAuth(`/api/v1/section-control/version/?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.version && data.version > currentVersionRef.current) {

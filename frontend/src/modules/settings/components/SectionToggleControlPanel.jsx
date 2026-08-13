@@ -138,7 +138,7 @@ export default function SectionToggleControlPanel() {
     setLoading(true);
     setModifiedFlags({});
     try {
-      let url = `/api/v1/control-panel/rules/?scope=${activeScope}`;
+      let url = `/api/v1/control-panel/rules/?scope=${activeScope}&_t=${Date.now()}`;
       if (currentTargetId) {
         url += `&target_id=${encodeURIComponent(currentTargetId)}`;
       }
@@ -172,7 +172,7 @@ export default function SectionToggleControlPanel() {
     if (activeScope !== "audit") return;
     setLoadingLogs(true);
     try {
-      const res = await fetchWithAuth("/api/v1/control-panel/audit-logs/");
+      const res = await fetchWithAuth(`/api/v1/control-panel/audit-logs/?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data.logs || []);
