@@ -263,6 +263,15 @@ export default function SectionToggleControlPanel() {
           window.dispatchEvent(new CustomEvent("spr_section_config_updated"));
         }
 
+        // Broadcast to all active browser tabs
+        try {
+          if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+            const bc = new BroadcastChannel("spr_section_control_channel");
+            bc.postMessage({ type: "SECTION_CONTROL_UPDATED", timestamp: Date.now() });
+            bc.close();
+          }
+        } catch {}
+
         setModifiedFlags({});
         refetchConfig();
         loadRules();

@@ -61,14 +61,44 @@ export function FeatureControlProvider({ children }) {
     fetchEvaluatedConfig();
 
     const handleUpdate = () => fetchEvaluatedConfig();
+
+    // 1. BroadcastChannel across browser tabs
+    let broadcastChannel = null;
+    try {
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        broadcastChannel = new BroadcastChannel("spr_section_control_channel");
+        broadcastChannel.onmessage = () => {
+          fetchEvaluatedConfig();
+        };
+      }
+    } catch {}
+
+    // 2. Custom DOM Events & Storage Sync
     window.addEventListener("spr_section_config_updated", handleUpdate);
     window.addEventListener("spr_auth_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+    window.addEventListener("focus", handleUpdate);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchEvaluatedConfig();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 3. 15-Second Background Polling Interval for live updates across logged-in accounts
+    const intervalId = setInterval(handleUpdate, 15000);
 
     return () => {
+      if (broadcastChannel) {
+        try { broadcastChannel.close(); } catch {}
+      }
       window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("spr_auth_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("focus", handleUpdate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(intervalId);
     };
   }, [fetchEvaluatedConfig]);
 
