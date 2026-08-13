@@ -19,6 +19,7 @@ from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
+from django.db import models
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample, extend_schema_view
 from drf_spectacular.types import OpenApiTypes
@@ -2844,7 +2845,7 @@ class UserRoleListCreateView(APIView):
         data = []
         for role in roles:
             perm = getattr(role, 'action_permissions', None)
-            user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+            user_count = User.objects.filter(Q(role=role) | Q(user_type=role.code)).count()
             data.append({
                 'id': role.id,
                 'name': role.name,
@@ -2910,7 +2911,7 @@ class UserRoleDetailView(APIView):
 
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
         perm = getattr(role, 'action_permissions', None)
-        user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+        user_count = User.objects.filter(Q(role=role) | Q(user_type=role.code)).count()
 
         return Response({
             'id': role.id,
@@ -2962,7 +2963,7 @@ class UserRoleDetailView(APIView):
         if role.code == 'SUPER_ADMIN' or role.is_system_role:
             return Response({'error': 'System role cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_count = User.objects.filter(models.Q(role=role) | models.Q(user_type=role.code)).count()
+        user_count = User.objects.filter(Q(role=role) | Q(user_type=role.code)).count()
         if user_count > 0:
             return Response({'error': f'Cannot delete role assigned to {user_count} active user(s)'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3123,7 +3124,7 @@ class ControlPanelRulesView(APIView):
 
         user_obj = None
         if scope == 'USER' and target_id:
-            user_obj = User.objects.filter(models.Q(pk=target_id) | models.Q(phone_number=target_id)).first()
+            user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
 
         categories_map = {
             "Header": {"id": 1, "key": "header", "title": "Header & Timestamps", "sections": []},
@@ -3256,7 +3257,7 @@ class ControlPanelBatchUpdateView(APIView):
                 perm.save()
                 changed_count += 1
             elif scope_type == 'USER':
-                user_obj = User.objects.filter(models.Q(pk=target_identifier) | models.Q(phone_number=target_identifier)).first()
+                user_obj = User.objects.filter(Q(pk=target_identifier) | Q(phone_number=target_identifier)).first()
                 if user_obj:
                     perm, _ = UserSectionOverride.objects.get_or_create(section=sec, user=user_obj)
                     prev_state = perm.is_enabled
