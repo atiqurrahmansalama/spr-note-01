@@ -47,8 +47,9 @@ export function FeatureControlProvider({ children }) {
         }
       }
 
-      if (resData && resData.config) {
-        setConfig(resData.config);
+      const evalData = resData?.flags || resData?.config;
+      if (evalData) {
+        setConfig(evalData);
         setOrigins(resData.origins || {});
       }
     } catch (err) {

@@ -21,6 +21,8 @@ from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from django.db import models
 from django.db.models import Q
+from django.views.decorators.cache import never_cache
+from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample, extend_schema_view
 from drf_spectacular.types import OpenApiTypes
 from .models import (
@@ -3038,6 +3040,7 @@ class SetGoogleDefaultRoleAdminView(APIView):
 
 # ─── Enterprise 4-Tier Section Control & Feature Flagging Views ──────────────
 
+@method_decorator(never_cache, name='dispatch')
 class EvaluatedConfigView(APIView):
     permission_classes = [AllowAny]
 
@@ -3066,17 +3069,19 @@ class EvaluatedConfigView(APIView):
                 for o in UserSectionOverride.objects.filter(user=user).select_related('section')
             }
             group_overrides = {}
-            if getattr(user, 'assigned_group', None):
+            assigned_group = getattr(user, 'assigned_group', None) or getattr(user, 'group_name', None) or getattr(user, 'group', None)
+            if assigned_group:
                 group_overrides = {
                     o.section.section_key: o.is_enabled
-                    for o in GroupSectionPermission.objects.filter(group_id=user.assigned_group).select_related('section')
+                    for o in GroupSectionPermission.objects.filter(group_id=assigned_group).select_related('section')
                 }
 
             role_overrides = {}
-            if getattr(user, 'user_type', None):
+            user_role = str(getattr(user, 'user_type', '')).upper().strip()
+            if user_role:
                 role_overrides = {
                     o.section.section_key: o.is_enabled
-                    for o in RoleSectionPermission.objects.filter(role=user.user_type).select_related('section')
+                    for o in RoleSectionPermission.objects.filter(role__iexact=user_role).select_related('section')
                 }
 
             for sec in sections:
@@ -3108,10 +3113,28 @@ class EvaluatedConfigView(APIView):
                 origins[sec.section_key] = "GLOBAL"
 
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
-        return Response({
+        response = Response({
+            'flags': resolved,
             'config': resolved,
             'origins': origins,
             'default_google_role': default_google_role
+        }, status=status.HTTP_200_OK)
+
+        # Set strict anti-caching HTTP headers for cross-account isolation
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
+
+class ResetUserOverridesView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        count, _ = UserSectionOverride.objects.all().delete()
+        return Response({
+            'message': 'Purged stale user overrides successfully',
+            'count': count
         }, status=status.HTTP_200_OK)
 
 
