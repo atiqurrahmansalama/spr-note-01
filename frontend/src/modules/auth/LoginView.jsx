@@ -59,6 +59,23 @@ export default function LoginView() {
       `prompt=select_account`;
   };
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isExchangingCode = urlParams.has('code') || urlParams.has('access_token');
+
+  if (isExchangingCode) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-sky-400 font-sans p-4">
+        <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-6 py-4 rounded-2xl shadow-2xl">
+          <svg className="animate-spin w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <span className="text-sm font-medium text-zinc-200">Completing Google Authentication...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 font-sans text-zinc-100 selection:bg-sky-500 selection:text-zinc-950">
       

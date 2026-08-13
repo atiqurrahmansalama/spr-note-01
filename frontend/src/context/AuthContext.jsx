@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
     // 1. IF RETURNING FROM GOOGLE VIA DIRECT SAME-WINDOW REDIRECT:
     if ((googleCode || googleAccess || googleId) && !isProcessingCode.current) {
       isProcessingCode.current = true;
-      window.history.replaceState({}, document.title, window.location.pathname);
+      setIsLoading(true);
       const payload = googleCode
         ? { code: googleCode, redirect_uri: window.location.origin }
         : { access_token: googleAccess, id_token: googleId };
@@ -32,10 +32,13 @@ export function AuthProvider({ children }) {
       apiClient.post('/api/v1/auth/google/', payload)
         .then(res => {
           saveTokens(res.data);
+          window.history.replaceState({}, document.title, window.location.pathname);
           window.location.href = '/';
         })
         .catch(err => {
           console.error('[AuthProvider] Direct Google Exchange Error:', err?.response?.data || err?.message);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          window.location.href = '/login';
         })
         .finally(() => {
           isProcessingCode.current = false;
