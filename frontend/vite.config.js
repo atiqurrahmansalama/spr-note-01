@@ -8,6 +8,9 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    hmr: {
+      timeout: 120000,
+    },
     watch: {
       ignored: (p) => {
         const normalized = p.replace(/\\/g, '/');

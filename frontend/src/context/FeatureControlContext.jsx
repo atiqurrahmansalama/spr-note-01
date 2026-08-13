@@ -163,16 +163,12 @@ export function FeatureControlProvider({ children }) {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 6. 10-second polling — propagates admin changes to ALL live sessions worldwide
-    const intervalId = setInterval(checkVersionAndSync, 10000);
-
     return () => {
       if (broadcastChannel) { try { broadcastChannel.close(); } catch {} }
       window.removeEventListener("spr_auth_updated", handleUpdate);
       window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("focus", checkVersionAndSync);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(intervalId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
