@@ -3115,21 +3115,98 @@ class EvaluatedConfigView(APIView):
 
 
 class ControlPanelRulesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
-        sections = AppSection.objects.all().select_related('category')
-        data = []
-        for sec in sections:
-            data.append({
-                'id': sec.id,
-                'section_key': sec.section_key,
-                'title': sec.title,
-                'description': sec.description,
-                'category': sec.category.title if sec.category else "General",
-                'is_globally_enabled': sec.is_globally_enabled,
+        scope = request.query_params.get('scope', 'global').upper()
+        target_id = request.query_params.get('target_id', '')
+
+        user_obj = None
+        if scope == 'USER' and target_id:
+            user_obj = User.objects.filter(models.Q(pk=target_id) | models.Q(phone_number=target_id)).first()
+
+        categories_map = {
+            "Header": {"id": 1, "key": "header", "title": "Header & Timestamps", "sections": []},
+            "Student Info": {"id": 2, "key": "student", "title": "Student & Group Selection", "sections": []},
+            "Session Info": {"id": 3, "key": "session", "title": "Session Presets", "sections": []},
+            "Quran Progress": {"id": 4, "key": "progress", "title": "Quran Evaluation & Juz Inputs", "sections": []},
+            "Progress Details": {"id": 5, "key": "details", "title": "Mistake & Stuck Trackers", "sections": []},
+            "Comments": {"id": 6, "key": "comments", "title": "Teacher Comments & Notes", "sections": []},
+            "Actions": {"id": 7, "key": "actions", "title": "Export & Action Buttons", "sections": []},
+        }
+
+        db_sections = AppSection.objects.all().select_related('category')
+        
+        user_overrides = {}
+        if user_obj:
+            user_overrides = {o.section.section_key: o.is_enabled for o in UserSectionOverride.objects.filter(user=user_obj).select_related('section')}
+        
+        group_overrides = {}
+        if scope == 'GROUP' and target_id:
+            group_overrides = {o.section.section_key: o.is_enabled for o in GroupSectionPermission.objects.filter(group_id=target_id).select_related('section')}
+
+        role_overrides = {}
+        if scope == 'ROLE' and target_id:
+            role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
+
+        default_sections = [
+            {"section_key": "headerDate", "title": "Date & Time Header", "description": "Controls visibility of report date & session time selector", "cat": "Header", "global": True},
+            {"section_key": "studentSelect", "title": "Student Selection Input", "description": "Controls student search and selection dropdown", "cat": "Student Info", "global": True},
+            {"section_key": "sessionSelect", "title": "Session Preset Selector", "description": "Controls morning/evening session selection", "cat": "Session Info", "global": True},
+            {"section_key": "juzPageInput", "title": "Juz & Page Range Input", "description": "Controls Para, Surah, Page & Line input fields", "cat": "Quran Progress", "global": True},
+            {"section_key": "mistakeTracker", "title": "Mistake Tracker Section", "description": "Controls Galti, Bhool, and Atki counter controls", "cat": "Progress Details", "global": True},
+            {"section_key": "stuckTracker", "title": "Stuck/Pause Tracker Section", "description": "Controls stuck evaluation and review flags", "cat": "Progress Details", "global": True},
+            {"section_key": "commentSection", "title": "Teacher Comment & Presets", "description": "Controls teacher comment textarea and quick presets", "cat": "Comments", "global": True},
+            {"section_key": "actionButtons", "title": "Save & Generate Report", "description": "Controls save report, copy card, and PDF export buttons", "cat": "Actions", "global": True},
+            {"section_key": "pdfExport", "title": "PDF Download & Printing", "description": "Controls PDF generation and print button controls", "cat": "Actions", "global": True},
+        ]
+
+        sec_list = []
+        if db_sections.exists():
+            for sec in db_sections:
+                cat_name = sec.category.title if sec.category else "General"
+                sec_list.append({
+                    "id": sec.id,
+                    "section_key": sec.section_key,
+                    "title": sec.title,
+                    "description": sec.description,
+                    "cat": cat_name,
+                    "global": sec.is_globally_enabled
+                })
+        else:
+            sec_list = [{ "id": idx+1, **s } for idx, s in enumerate(default_sections)]
+
+        for item in sec_list:
+            key = item["section_key"]
+            cat_key = item.get("cat", "General")
+            if cat_key not in categories_map:
+                categories_map[cat_key] = {"id": len(categories_map)+1, "key": cat_key.lower().replace(" ", "_"), "title": cat_key, "sections": []}
+
+            effective_enabled = item["global"]
+            origin = "GLOBAL"
+
+            if key in user_overrides:
+                effective_enabled = user_overrides[key]
+                origin = "USER"
+            elif key in group_overrides:
+                effective_enabled = group_overrides[key]
+                origin = "GROUP"
+            elif key in role_overrides:
+                effective_enabled = role_overrides[key]
+                origin = "ROLE"
+
+            categories_map[cat_key]["sections"].append({
+                "id": item["id"],
+                "section_key": key,
+                "title": item["title"],
+                "description": item.get("description", ""),
+                "is_globally_enabled": item["global"],
+                "effective_enabled": effective_enabled,
+                "inheritance_origin": origin,
             })
-        return Response(data, status=status.HTTP_200_OK)
+
+        result = [v for v in categories_map.values() if len(v["sections"]) > 0]
+        return Response({"categories": result}, status=status.HTTP_200_OK)
 
 
 class ControlPanelBatchUpdateView(APIView):

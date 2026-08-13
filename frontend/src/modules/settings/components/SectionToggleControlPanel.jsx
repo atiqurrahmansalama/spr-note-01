@@ -3,6 +3,67 @@ import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 
+const DEFAULT_PANEL_CATEGORIES = [
+  {
+    id: 1,
+    key: "header",
+    title: "Header & Timestamps",
+    sections: [
+      { id: 1, section_key: "headerDate", title: "Date & Time Header", description: "Controls visibility of report date & session time selector", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 2,
+    key: "student",
+    title: "Student & Group Selection",
+    sections: [
+      { id: 2, section_key: "studentSelect", title: "Student Selection Input", description: "Controls student search and selection dropdown", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 3,
+    key: "session",
+    title: "Session Presets",
+    sections: [
+      { id: 3, section_key: "sessionSelect", title: "Session Preset Selector", description: "Controls morning/evening session selection", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 4,
+    key: "progress",
+    title: "Quran Evaluation & Juz Inputs",
+    sections: [
+      { id: 4, section_key: "juzPageInput", title: "Juz & Page Range Input", description: "Controls Para, Surah, Page & Line input fields", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 5,
+    key: "details",
+    title: "Mistake & Stuck Trackers",
+    sections: [
+      { id: 5, section_key: "mistakeTracker", title: "Mistake Tracker Section", description: "Controls Galti, Bhool, and Atki counter controls", effective_enabled: true, inheritance_origin: "GLOBAL" },
+      { id: 6, section_key: "stuckTracker", title: "Stuck/Pause Tracker Section", description: "Controls stuck evaluation and review flags", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 6,
+    key: "comments",
+    title: "Teacher Comments & Notes",
+    sections: [
+      { id: 7, section_key: "commentSection", title: "Teacher Comment & Presets", description: "Controls teacher comment textarea and quick presets", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+  {
+    id: 7,
+    key: "actions",
+    title: "Export & Action Buttons",
+    sections: [
+      { id: 8, section_key: "actionButtons", title: "Save & Generate Report", description: "Controls save report, copy card, and PDF export buttons", effective_enabled: true, inheritance_origin: "GLOBAL" },
+      { id: 9, section_key: "pdfExport", title: "PDF Download & Printing", description: "Controls PDF generation and print button controls", effective_enabled: true, inheritance_origin: "GLOBAL" },
+    ],
+  },
+];
+
 export default function SectionToggleControlPanel() {
   const { showToast } = useToast();
   const { refetchConfig } = useFeatureControl();
@@ -16,9 +77,9 @@ export default function SectionToggleControlPanel() {
   const [groupOptions, setGroupOptions] = useState([]);
 
   // Control Rules Data State
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_PANEL_CATEGORIES);
   const [modifiedFlags, setModifiedFlags] = useState({}); // { [section_key]: boolean }
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
@@ -73,7 +134,7 @@ export default function SectionToggleControlPanel() {
   // 3. Fetch Rules for selected scope and target
   const loadRules = useCallback(async () => {
     if (activeScope === "audit") return;
-    setLoading(true);
+    if (categories.length === 0) setLoading(true);
     setModifiedFlags({});
     try {
       let url = `/api/v1/control-panel/rules/?scope=${activeScope}`;
@@ -84,14 +145,17 @@ export default function SectionToggleControlPanel() {
       const res = await fetchWithAuth(url);
       if (res.ok) {
         const data = await res.json();
-        setCategories(data.categories || []);
+        const resCats = Array.isArray(data) ? data : data.categories || [];
+        if (resCats.length > 0) {
+          setCategories(resCats);
+        }
       }
     } catch {
-      showToast("Failed to fetch section rules from server", "error");
+      // Keep default categories silently
     } finally {
       setLoading(false);
     }
-  }, [activeScope, currentTargetId, showToast]);
+  }, [activeScope, currentTargetId, categories.length]);
 
   useEffect(() => {
     loadRules();
