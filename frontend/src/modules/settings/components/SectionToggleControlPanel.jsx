@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
@@ -90,6 +90,44 @@ export default function SectionToggleControlPanel() {
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   const [dbRoles, setDbRoles] = useState([]);
+
+  const tabsRef = useRef(null);
+  const rolesRef = useRef(null);
+
+  // Enable horizontal scrolling with vertical mouse wheel on Scope Selector Tabs
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  // Callback ref to attach wheel listener to conditionally rendered roles list
+  const rolesRefCallback = useCallback((node) => {
+    if (rolesRef.current && rolesRef.current._cleanupWheel) {
+      rolesRef.current._cleanupWheel();
+      rolesRef.current._cleanupWheel = null;
+    }
+    rolesRef.current = node;
+    if (node) {
+      const handleWheel = (e) => {
+        if (e.deltaY !== 0) {
+          e.preventDefault();
+          node.scrollLeft += e.deltaY;
+        }
+      };
+      node.addEventListener("wheel", handleWheel, { passive: false });
+      node._cleanupWheel = () => {
+        node.removeEventListener("wheel", handleWheel);
+      };
+    }
+  }, []);
 
   // 1. Fetch available Halqa Groups & Dynamic Roles for Scope Selectors
   useEffect(() => {
@@ -481,7 +519,7 @@ export default function SectionToggleControlPanel() {
       </div>
 
       {/* 2. 4-TIER SCOPE SELECTOR TABS */}
-      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none border-b theme-border">
+      <div ref={tabsRef} className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none border-b theme-border">
         <div className="flex items-center gap-2">
           {[
             { id: "global", label: "Global Defaults", icon: "🌐" },
@@ -528,7 +566,10 @@ export default function SectionToggleControlPanel() {
       {activeScope === "role" && (
         <div className="p-4 theme-bg-surface border theme-border rounded-xl flex items-center gap-3">
           <span className="text-xs font-semibold theme-text-secondary shrink-0">Target Role:</span>
-          <div className="flex items-center gap-2 overflow-x-auto">
+          <div
+            ref={rolesRefCallback}
+            className="flex items-center gap-2 overflow-x-auto min-w-0 flex-1 scrollbar-none"
+          >
             {(dbRoles.length > 0
               ? dbRoles.map((r) => ({ id: r.code, label: `${r.code} (${r.name})` }))
               : [
@@ -687,8 +728,7 @@ export default function SectionToggleControlPanel() {
           {loading ? (
             <div className="p-8 theme-bg-surface border theme-border rounded-2xl space-y-4 animate-pulse">
               <div className="h-6 theme-bg-sub rounded-lg w-48" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="h-20 theme-bg-sub rounded-xl" />
+              <div className="grid grid-cols-1 gap-4">
                 <div className="h-20 theme-bg-sub rounded-xl" />
               </div>
             </div>
@@ -719,7 +759,7 @@ export default function SectionToggleControlPanel() {
                     </span>
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     {filteredSections.map((sec) => {
                       const hasLocalMod = modifiedFlags[sec.section_key] !== undefined;
                       const activeValue = hasLocalMod ? modifiedFlags[sec.section_key] : sec.effective_enabled;

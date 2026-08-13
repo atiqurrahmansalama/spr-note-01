@@ -68,6 +68,13 @@ body {
 @utility theme-bg-app {
   background-color: var(--bg-app);
 }
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 @utility theme-bg-surface {
   background-color: var(--bg-surface);
 }
