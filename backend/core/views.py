@@ -277,6 +277,7 @@ class GoogleOAuthExchangeView(APIView):
                 user.save()
             else:
                 # Dynamic Google OAuth Default Role Retrieval/Creation
+                # pyrefly: ignore [unknown-name]
                 default_role_code = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
                 default_role = None
                 try:
