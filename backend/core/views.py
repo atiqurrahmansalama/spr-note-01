@@ -874,6 +874,18 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
     serializer_class = StudentGroupSerializer
     permission_classes = [AllowAny]
 
+    def list(self, request, *args, **kwargs):
+        if StudentGroup.objects.exists():
+            return super().list(request, *args, **kwargs)
+        
+        from .models import Student, GroupSectionPermission
+        student_groups = set(Student.objects.exclude(group_name__isnull=True).exclude(group_name='').values_list('group_name', flat=True))
+        perm_groups = set(GroupSectionPermission.objects.exclude(group_id__isnull=True).exclude(group_id='').values_list('group_id', flat=True))
+        merged_groups = sorted(list(student_groups.union(perm_groups)))
+        
+        data = [{'id': name, 'name': name} for name in merged_groups if name and name != 'All Groups']
+        return Response(data)
+
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all().order_by('id')
     serializer_class = SessionSerializer
