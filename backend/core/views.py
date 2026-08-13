@@ -1657,45 +1657,7 @@ class UserRoleListCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserRoleDetailView(APIView):
-    permission_classes = [AllowAny]
 
-    def get(self, request, pk):
-        try:
-            role = UserRole.objects.get(pk=pk)
-        except UserRole.DoesNotExist:
-            return Response({"error": "Role not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = UserRoleSerializer(role)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def patch(self, request, pk):
-        try:
-            role = UserRole.objects.get(pk=pk)
-        except UserRole.DoesNotExist:
-            return Response({"error": "Role not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = UserRoleSerializer(role, data=request.data, partial=True)
-        if serializer.is_valid():
-            updated_role = serializer.save()
-            return Response(UserRoleSerializer(updated_role).data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        try:
-            role = UserRole.objects.get(pk=pk)
-        except UserRole.DoesNotExist:
-            return Response({"error": "Role not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        if role.code == 'SUPER_ADMIN':
-            return Response({"error": "Super Admin role is system protected and cannot be deleted."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Unlink users if assigned, assigning them to fallback role if needed
-        User = get_user_model()
-        teacher_role = UserRole.objects.filter(code='TEACHER').first()
-        User.objects.filter(role=role).update(role=teacher_role)
-
-        role.delete()
-        return Response({"status": "success", "message": f"Role '{role.name}' deleted successfully."}, status=status.HTTP_200_OK)
 
 
 class UserRoleCloneView(APIView):
@@ -2958,6 +2920,9 @@ class UserRoleDetailView(APIView):
             perm.save()
 
         return Response({'message': 'Role updated successfully'}, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         role = UserRole.objects.filter(pk=pk).first()
