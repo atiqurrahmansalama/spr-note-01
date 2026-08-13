@@ -93,28 +93,18 @@ export default function RegisterView() {
 
 
 
-  // Standard Google OAuth 2.0 direct authorization handler (Same-Window Redirection)
-  const handleGoogleSignUp = () => {
-    console.log('[Google Auth] Sign up with Google clicked.');
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      console.warn('[Google Auth] VITE_GOOGLE_CLIENT_ID is not configured in environment variables.');
-      showToast('Google OAuth Client ID is not configured.', 'warning');
-      return;
-    }
-
+  // Standard Google OAuth 2.0 direct authorization URL (Same-Window Anchor Navigation)
+  const getGoogleAuthUrl = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '923073525317-71l2q5h0u3rbat0rnpmsunaaged0m3sa.apps.googleusercontent.com';
     const redirectUri = window.location.origin;
     const scope = encodeURIComponent('openid email profile');
 
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    return `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `scope=${scope}&` +
       `prompt=select_account`;
-
-    console.log('[Google Auth] Redirecting directly in same window:', googleAuthUrl);
-    window.location.href = googleAuthUrl;
   };
 
   const handleChange = (e) => {
@@ -171,11 +161,11 @@ export default function RegisterView() {
 
         {/* Google Sign-Up Action */}
         <div className="space-y-3">
-          <button
-            type="button"
-            onClick={handleGoogleSignUp}
-            disabled={googleLoading}
-            className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-white font-medium text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 cursor-pointer active:scale-98 disabled:opacity-50"
+          <a
+            href={getGoogleAuthUrl()}
+            target="_self"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-white font-medium text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -195,8 +185,8 @@ export default function RegisterView() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{googleLoading ? "Connecting Google..." : "Sign up with Google"}</span>
-          </button>
+            <span>Sign up with Google</span>
+          </a>
 
           <div className="flex items-center gap-3 pt-1">
             <div className="flex-1 h-px bg-zinc-800" />
