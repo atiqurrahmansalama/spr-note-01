@@ -154,25 +154,22 @@ export function FeatureControlProvider({ children }) {
     window.addEventListener("spr_auth_updated", handleUpdate);
     // 3. Admin saved new config in control panel
     window.addEventListener("spr_section_config_updated", handleUpdate);
-    // 4. localStorage sync across tabs
-    window.addEventListener("storage", handleUpdate);
-    // 5. Window regains focus — re-check version
+    // 4. Window regains focus — re-check version
     window.addEventListener("focus", checkVersionAndSync);
 
-    // 6. Page visibility change — re-check when tab becomes active
+    // 5. Page visibility change — re-check when tab becomes active
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") checkVersionAndSync();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 7. 10-second polling — propagates admin changes to ALL live sessions worldwide
+    // 6. 10-second polling — propagates admin changes to ALL live sessions worldwide
     const intervalId = setInterval(checkVersionAndSync, 10000);
 
     return () => {
       if (broadcastChannel) { try { broadcastChannel.close(); } catch {} }
       window.removeEventListener("spr_auth_updated", handleUpdate);
       window.removeEventListener("spr_section_config_updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("focus", checkVersionAndSync);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(intervalId);
