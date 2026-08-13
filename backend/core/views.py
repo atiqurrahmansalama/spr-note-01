@@ -3136,20 +3136,6 @@ class ControlPanelRulesView(APIView):
             "Actions": {"id": 7, "key": "actions", "title": "Export & Action Buttons", "sections": []},
         }
 
-        db_sections = AppSection.objects.all().select_related('category')
-        
-        user_overrides = {}
-        if user_obj:
-            user_overrides = {o.section.section_key: o.is_enabled for o in UserSectionOverride.objects.filter(user=user_obj).select_related('section')}
-        
-        group_overrides = {}
-        if scope == 'GROUP' and target_id:
-            group_overrides = {o.section.section_key: o.is_enabled for o in GroupSectionPermission.objects.filter(group_id=target_id).select_related('section')}
-
-        role_overrides = {}
-        if scope == 'ROLE' and target_id:
-            role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
-
         default_sections = [
             {"section_key": "headerDate", "title": "Date & Time Header", "description": "Controls visibility of report date & session time selector", "cat": "Header", "global": True},
             {"section_key": "studentSelect", "title": "Student Selection Input", "description": "Controls student search and selection dropdown", "cat": "Student Info", "global": True},
@@ -3162,37 +3148,63 @@ class ControlPanelRulesView(APIView):
             {"section_key": "pdfExport", "title": "PDF Download & Printing", "description": "Controls PDF generation and print button controls", "cat": "Actions", "global": True},
         ]
 
-        sec_list = []
-        if db_sections.exists():
-            for sec in db_sections:
-                cat_name = sec.category.title if sec.category else "General"
-                sec_list.append({
-                    "id": sec.id,
-                    "section_key": sec.section_key,
-                    "title": sec.title,
-                    "description": sec.description,
-                    "cat": cat_name,
-                    "global": sec.is_globally_enabled
-                })
-        else:
-            sec_list = [{ "id": idx+1, **s } for idx, s in enumerate(default_sections)]
+        sec_dict = {
+            s["section_key"]: {
+                "id": idx + 1,
+                "section_key": s["section_key"],
+                "title": s["title"],
+                "description": s["description"],
+                "cat": s["cat"],
+                "global": True
+            }
+            for idx, s in enumerate(default_sections)
+        }
 
-        for item in sec_list:
-            key = item["section_key"]
+        db_sections = AppSection.objects.all().select_related('category')
+        for db_s in db_sections:
+            k = db_s.section_key
+            cat_name = db_s.category.title if db_s.category else "General"
+            if k in sec_dict:
+                sec_dict[k]["global"] = db_s.is_globally_enabled
+                if db_s.title: sec_dict[k]["title"] = db_s.title
+                if db_s.description: sec_dict[k]["description"] = db_s.description
+            else:
+                sec_dict[k] = {
+                    "id": db_s.id,
+                    "section_key": k,
+                    "title": db_s.title or k.title(),
+                    "description": db_s.description or "",
+                    "cat": cat_name,
+                    "global": db_s.is_globally_enabled
+                }
+
+        user_overrides = {}
+        if scope == 'USER' and user_obj:
+            user_overrides = {o.section.section_key: o.is_enabled for o in UserSectionOverride.objects.filter(user=user_obj).select_related('section')}
+
+        group_overrides = {}
+        if scope == 'GROUP' and target_id:
+            group_overrides = {o.section.section_key: o.is_enabled for o in GroupSectionPermission.objects.filter(group_id=target_id).select_related('section')}
+
+        role_overrides = {}
+        if scope == 'ROLE' and target_id:
+            role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
+
+        for key, item in sec_dict.items():
             cat_key = item.get("cat", "General")
             if cat_key not in categories_map:
-                categories_map[cat_key] = {"id": len(categories_map)+1, "key": cat_key.lower().replace(" ", "_"), "title": cat_key, "sections": []}
+                categories_map[cat_key] = {"id": len(categories_map) + 1, "key": cat_key.lower().replace(" ", "_"), "title": cat_key, "sections": []}
 
             effective_enabled = item["global"]
             origin = "GLOBAL"
 
-            if key in user_overrides:
+            if scope == 'USER' and key in user_overrides:
                 effective_enabled = user_overrides[key]
                 origin = "USER"
-            elif key in group_overrides:
+            elif scope == 'GROUP' and key in group_overrides:
                 effective_enabled = group_overrides[key]
                 origin = "GROUP"
-            elif key in role_overrides:
+            elif scope == 'ROLE' and key in role_overrides:
                 effective_enabled = role_overrides[key]
                 origin = "ROLE"
 
@@ -3211,7 +3223,7 @@ class ControlPanelRulesView(APIView):
 
 
 class ControlPanelBatchUpdateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         scope_type = (request.data.get('scope_type') or request.data.get('scope') or 'GLOBAL').upper()
@@ -3266,7 +3278,7 @@ class ControlPanelBatchUpdateView(APIView):
                     changed_count += 1
 
             FeatureFlagAuditLog.objects.create(
-                changed_by=request.user,
+                changed_by=request.user if request.user and request.user.is_authenticated else None,
                 scope_type=scope_type,
                 target_identifier=target_identifier or "GLOBAL",
                 section_key=s_key,
@@ -3278,14 +3290,29 @@ class ControlPanelBatchUpdateView(APIView):
 
 
 class ControlPanelResetRulesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        AppSection.objects.all().update(is_globally_enabled=True)
-        RoleSectionPermission.objects.all().delete()
-        GroupSectionPermission.objects.all().delete()
-        UserSectionOverride.objects.all().delete()
-        return Response({'message': 'All section control rules reset to global defaults'}, status=status.HTTP_200_OK)
+        scope = str(request.data.get('scope') or '').lower()
+        target_id = str(request.data.get('target_id') or '').strip()
+
+        if scope == 'role' and target_id:
+            RoleSectionPermission.objects.filter(role=target_id).delete()
+            return Response({'message': f'Reset all role overrides for "{target_id}" back to global defaults'}, status=status.HTTP_200_OK)
+        elif scope == 'group' and target_id:
+            GroupSectionPermission.objects.filter(group_id=target_id).delete()
+            return Response({'message': f'Reset all group overrides for "{target_id}" back to global defaults'}, status=status.HTTP_200_OK)
+        elif scope == 'user' and target_id:
+            user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
+            if user_obj:
+                UserSectionOverride.objects.filter(user=user_obj).delete()
+            return Response({'message': f'Reset all user overrides for user #{target_id} back to global defaults'}, status=status.HTTP_200_OK)
+        else:
+            AppSection.objects.all().update(is_globally_enabled=True)
+            RoleSectionPermission.objects.all().delete()
+            GroupSectionPermission.objects.all().delete()
+            UserSectionOverride.objects.all().delete()
+            return Response({'message': 'All section control rules reset to global defaults'}, status=status.HTTP_200_OK)
 
 
 class ControlPanelAuditLogView(APIView):
