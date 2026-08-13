@@ -3268,6 +3268,8 @@ class ControlPanelBatchUpdateView(APIView):
         scope_type = (request.data.get('scope_type') or request.data.get('scope') or 'GLOBAL').upper()
         target_identifier = str(request.data.get('target_identifier') or request.data.get('target_id') or request.data.get('target_user_id') or request.data.get('target_role') or request.data.get('target_group_id') or '').strip()
         updates = request.data.get('updates', [])
+        # When True, a GLOBAL save will also purge any conflicting Role/User overrides for those keys
+        cascade_clear_overrides = bool(request.data.get('cascade_clear_overrides', False))
 
         if not isinstance(updates, list) or len(updates) == 0:
             section_key = request.data.get('section_key')
@@ -3276,6 +3278,8 @@ class ControlPanelBatchUpdateView(APIView):
                 updates = [{'section_key': section_key, 'is_enabled': is_enabled}]
 
         changed_count = 0
+        cleared_overrides = 0
+
         for item in updates:
             s_key = item.get('section_key')
             enabled = item.get('is_enabled', True)
@@ -3290,30 +3294,48 @@ class ControlPanelBatchUpdateView(APIView):
             prev_state = sec.is_globally_enabled
 
             if scope_type == 'GLOBAL':
-                sec.is_globally_enabled = enabled
-                sec.save()
+                # Update the single source of truth: AppSection.is_globally_enabled
+                AppSection.objects.filter(section_key=s_key).update(is_globally_enabled=enabled)
+                sec.refresh_from_db()
                 changed_count += 1
+
+                # Cascade: optionally purge conflicting higher-tier overrides so the global default
+                # actually takes effect for ALL accounts with Role or User overrides for this key.
+                if cascade_clear_overrides:
+                    r_del, _ = RoleSectionPermission.objects.filter(section=sec).delete()
+                    u_del, _ = UserSectionOverride.objects.filter(section=sec).delete()
+                    cleared_overrides += r_del + u_del
+
             elif scope_type == 'ROLE':
                 role_code = (target_identifier or request.data.get('selected_role', 'TEACHER')).upper().strip()
-                perm, _ = RoleSectionPermission.objects.get_or_create(section=sec, role=role_code)
-                prev_state = perm.is_enabled
-                perm.is_enabled = enabled
-                perm.save()
+                perm, created = RoleSectionPermission.objects.update_or_create(
+                    section=sec, role=role_code,
+                    defaults={'is_enabled': enabled}
+                )
+                prev_state = not enabled if created else (not perm.is_enabled)
                 changed_count += 1
+
             elif scope_type == 'GROUP':
                 group_id = target_identifier or request.data.get('selected_group', 'All Groups')
-                perm, _ = GroupSectionPermission.objects.get_or_create(section=sec, group_id=group_id)
-                prev_state = perm.is_enabled
-                perm.is_enabled = enabled
-                perm.save()
+                perm, created = GroupSectionPermission.objects.update_or_create(
+                    section=sec, group_id=group_id,
+                    defaults={'is_enabled': enabled}
+                )
+                prev_state = not enabled if created else (not perm.is_enabled)
                 changed_count += 1
+
             elif scope_type == 'USER':
-                user_obj = User.objects.filter(Q(pk=target_identifier) | Q(phone_number=target_identifier)).first()
+                # NEVER use request.user here — always use the target_user_id from payload
+                target_user_id = target_identifier or request.data.get('target_user_id', '')
+                user_obj = User.objects.filter(
+                    Q(pk=target_user_id) | Q(phone_number=target_user_id)
+                ).first()
                 if user_obj:
-                    perm, _ = UserSectionOverride.objects.get_or_create(section=sec, user=user_obj)
-                    prev_state = perm.is_enabled
-                    perm.is_enabled = enabled
-                    perm.save()
+                    perm, created = UserSectionOverride.objects.update_or_create(
+                        section=sec, user=user_obj,
+                        defaults={'is_enabled': enabled}
+                    )
+                    prev_state = not enabled if created else (not perm.is_enabled)
                     changed_count += 1
 
             FeatureFlagAuditLog.objects.create(
@@ -3325,11 +3347,70 @@ class ControlPanelBatchUpdateView(APIView):
                 new_state=enabled
             )
 
-        # Increment global feature version dynamically
+        # Increment global feature version so all polling clients re-fetch immediately
         current_version = int(SystemSetting.get_val('SYSTEM_FEATURE_VERSION', '1'))
         SystemSetting.set_val('SYSTEM_FEATURE_VERSION', str(current_version + 1))
 
-        return Response({'message': f'Successfully updated {changed_count} section rule(s)', 'version': current_version + 1}, status=status.HTTP_200_OK)
+        msg = f'Updated {changed_count} section rule(s)'
+        if cleared_overrides:
+            msg += f'; cleared {cleared_overrides} higher-tier override(s) for clean global inheritance'
+
+        return Response({'message': msg, 'version': current_version + 1, 'cleared_overrides': cleared_overrides}, status=status.HTTP_200_OK)
+
+
+class ClearSectionOverridesView(APIView):
+    """
+    DELETE Role and/or User overrides for specific section_keys so those sections
+    cleanly fall back to the Tier-4 Global Default.
+
+    POST body:
+      {
+        "section_keys": ["sessionSelect", "juzPageInput"],   // required; use ["*"] for all
+        "clear_role_overrides": true,
+        "clear_user_overrides": true,
+        "role_code": "TEACHER"   // optional: limit role deletion to a specific role
+      }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        raw_keys = request.data.get('section_keys', [])
+        clear_role = bool(request.data.get('clear_role_overrides', True))
+        clear_user = bool(request.data.get('clear_user_overrides', True))
+        role_code = str(request.data.get('role_code') or '').upper().strip()
+
+        if not isinstance(raw_keys, list) or len(raw_keys) == 0:
+            return Response({'error': 'section_keys must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        all_sections = raw_keys == ['*']
+        role_deleted = 0
+        user_deleted = 0
+
+        if all_sections:
+            sections_qs = AppSection.objects.all()
+        else:
+            sections_qs = AppSection.objects.filter(section_key__in=raw_keys)
+
+        if clear_role:
+            role_qs = RoleSectionPermission.objects.filter(section__in=sections_qs)
+            if role_code:
+                role_qs = role_qs.filter(role__iexact=role_code)
+            role_deleted, _ = role_qs.delete()
+
+        if clear_user:
+            user_qs = UserSectionOverride.objects.filter(section__in=sections_qs)
+            user_deleted, _ = user_qs.delete()
+
+        # Bump version so live clients re-evaluate immediately
+        current_version = int(SystemSetting.get_val('SYSTEM_FEATURE_VERSION', '1'))
+        SystemSetting.set_val('SYSTEM_FEATURE_VERSION', str(current_version + 1))
+
+        return Response({
+            'message': f'Cleared {role_deleted} role override(s) and {user_deleted} user override(s). All affected sections now inherit Global Defaults.',
+            'role_overrides_deleted': role_deleted,
+            'user_overrides_deleted': user_deleted,
+            'version': current_version + 1,
+        }, status=status.HTTP_200_OK)
 
 
 class ControlPanelResetRulesView(APIView):

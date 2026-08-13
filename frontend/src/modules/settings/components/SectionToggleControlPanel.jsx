@@ -319,6 +319,65 @@ export default function SectionToggleControlPanel() {
     }
   };
 
+  // Force-apply Global Default to ALL accounts by clearing conflicting Role & User overrides
+  const handleClearOverridesGlobally = async () => {
+    const targetKeys = Object.keys(modifiedFlags);
+    if (targetKeys.length === 0) {
+      showToast("Toggle sections first, then click this to force-apply globally.", "info");
+      return;
+    }
+    if (!window.confirm(
+      `This will SAVE the current Global changes AND delete all Role/User overrides for:\n\n${targetKeys.join(", ")}\n\nAll accounts will immediately inherit the new Global defaults. Proceed?`
+    )) return;
+
+    setSaving(true);
+    try {
+      // 1. Save the Global Default changes first (with cascade_clear_overrides=true)
+      const payload = {
+        scope_type: "GLOBAL",
+        scope: "global",
+        cascade_clear_overrides: true,
+        updates: targetKeys.map((k) => ({ section_key: k, is_enabled: modifiedFlags[k] })),
+      };
+
+      const res = await fetchWithAuth("/api/v1/admin/section-control/update/", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const clearedCount = data.cleared_overrides ?? 0;
+        showToast(
+          clearedCount > 0
+            ? `Saved & cleared ${clearedCount} conflicting override(s). All accounts now use Global Defaults!`
+            : `Global defaults saved. No conflicting overrides found.`,
+          "success"
+        );
+        setModifiedFlags({});
+
+        // Broadcast to all open tabs
+        try {
+          if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+            const bc = new BroadcastChannel("spr_section_control_channel");
+            bc.postMessage({ type: "SECTION_CONTROL_UPDATED", timestamp: Date.now() });
+            bc.close();
+          }
+        } catch {}
+
+        window.dispatchEvent(new CustomEvent("spr_section_config_updated"));
+        refetchConfig();
+        loadRules();
+      } else {
+        showToast("Failed to force-apply global defaults.", "error");
+      }
+    } catch {
+      showToast("Error applying global defaults across all accounts.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Render Origin Inheritance Badges
   const renderOriginBadge = (origin) => {
     switch (origin) {
@@ -373,6 +432,21 @@ export default function SectionToggleControlPanel() {
         </div>
 
         <div className="flex items-center gap-2">
+          {activeScope === "global" && modifiedCount > 0 && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleClearOverridesGlobally}
+              title="Save Global changes AND delete all conflicting Role/User overrides, so every account inherits the new default immediately."
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              {saving ? "Applying..." : "Force Apply to All Accounts"}
+            </button>
+          )}
+
           {activeScope !== "global" && activeScope !== "audit" && (
             <button
               type="button"
