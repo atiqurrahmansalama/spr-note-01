@@ -130,27 +130,24 @@ export const transformFormToApiPayload = (reportData) => {
   return payload;
 };
 
-/**
- * 1. Create Report API Integration (POST /api/reports/)
- */
 export const createReport = async (reportData) => {
   const payload = transformFormToApiPayload(reportData);
 
   try {
-    let res = await fetchWithAuth("/api/v1/reports/", {
+    let res = await fetchWithAuth("/reports/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
     if (res && !res.ok && res.status === 404) {
-      res = await fetchWithAuth("/api/reports/", {
+      res = await fetchWithAuth("/api/v1/reports/", {
         method: "POST",
         body: JSON.stringify(payload),
       });
     }
 
     if (res && !res.ok && res.status === 404) {
-      res = await fetchWithAuth("/reports/", {
+      res = await fetchWithAuth("/api/reports/", {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -186,7 +183,10 @@ export const createReport = async (reportData) => {
  */
 export const fetchReports = async () => {
   try {
-    let res = await fetchApi("/api/v1/reports/");
+    let res = await fetchApi("/reports/");
+    if (!res.ok) {
+      res = await fetchApi("/api/v1/reports/");
+    }
     if (!res.ok) {
       res = await fetchApi("/api/reports/");
     }
@@ -213,9 +213,9 @@ export const verifyReport = async (reportId) => {
   };
 
   try {
-    let res = await fetchApi(`/api/v1/hifz/verify-report/${cleanId}/`, options);
+    let res = await fetchApi(`/hifz/verify-report/${cleanId}/`, options);
     if (!res.ok && res.status === 404) {
-      res = await fetchApi(`/hifz/verify-report/${cleanId}/`, options);
+      res = await fetchApi(`/api/v1/hifz/verify-report/${cleanId}/`, options);
     }
 
     const data = await res.json();
