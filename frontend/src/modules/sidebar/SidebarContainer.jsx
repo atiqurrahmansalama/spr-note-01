@@ -33,11 +33,10 @@ export default function SidebarContainer({
   const currentPath = propActivePath || location.pathname;
 
   const [openSubMenus, setOpenSubMenus] = useState({
+    "Report Generator": false,
     "App Management": false,
     "Student Management": false,
-    Settings: true,
-    Groups: false,
-    Sessions: false,
+    Settings: false,
   });
 
   const toggleSubMenu = (menuName) => {
@@ -48,7 +47,29 @@ export default function SidebarContainer({
   };
 
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard", path: "/", Icon: DashboardIcon },
+    { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon },
+    {
+      id: "Report Generator",
+      name: "Report Generator",
+      Icon: SavedMessagesIcon,
+      hasSub: true,
+      subItems: [
+        { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon },
+        { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
+      ]
+    },
+    {
+      id: "Student Management",
+      name: "Student Management",
+      Icon: GroupsIcon,
+      hasSub: true,
+      subItems: [
+        { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
+        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon },
+        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon },
+        { id: "Student Admission", name: "Student Admission & Profile Registration", path: "/admission", Icon: GroupsIcon },
+      ]
+    },
     {
       id: "App Management",
       name: "App Management",
@@ -58,22 +79,9 @@ export default function SidebarContainer({
         { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
         { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
         { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
+        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
       ]
     },
-    { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
-    {
-      id: "Student Management",
-      name: "Student Management",
-      Icon: GroupsIcon,
-      hasSub: true,
-      subItems: [
-        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon },
-        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon },
-        { id: "Student Admission", name: "Student Admission & Profile Registration", path: "/admission", Icon: GroupsIcon },
-      ]
-    },
-    { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
-    { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
     { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
     { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon },
     { 
@@ -87,9 +95,9 @@ export default function SidebarContainer({
         { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon },
         { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon },
         { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon },
+        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon },
       ]
     },
-    { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon },
     { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon },
     { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon },
     { id: "About", name: "About", path: "/about", Icon: AboutIcon },

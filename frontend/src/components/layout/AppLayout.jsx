@@ -13,6 +13,7 @@ import { initActivityTracker } from "../../utils/activityTracker";
 export const ROUTE_TITLE_MAP = {
   "/": { title: "Dashboard", isDashboard: true },
   "/dashboard": { title: "Dashboard", isDashboard: true },
+  "/report-builder": { title: "Report Generator" },
   "/student-reports": { title: "Student Progress & Daily Reports" },
   "/groups-students": { title: "Groups & Students Directory" },
   "/student-roster": { title: "Student Roster" },
@@ -170,7 +171,7 @@ export default function AppLayout() {
 
   // Programmatic navigation event listener (e.g. from Edit button)
   useEffect(() => {
-    const handleNavDashboard = () => navigate("/");
+    const handleNavDashboard = () => navigate("/report-builder");
     window.addEventListener("spr_navigate_dashboard", handleNavDashboard);
     return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, [navigate]);
@@ -274,8 +275,8 @@ export default function AppLayout() {
           setIsProfileOpen(false);
         } else if (isSidebarOpen) {
           setIsSidebarOpen(false);
-        } else if (location.pathname !== "/" && location.pathname !== "/dashboard") {
-          navigate("/");
+        } else if (location.pathname !== "/" && location.pathname !== "/dashboard" && location.pathname !== "/report-builder") {
+          navigate("/report-builder");
         }
       }
     };
@@ -304,6 +305,9 @@ export default function AppLayout() {
 
   const currentPath = location.pathname;
   const isDashboardRoute = currentPath === "/" || currentPath === "/dashboard";
+  const isReportBuilderRoute = currentPath === "/report-builder";
+  const isMainFormView = isReportBuilderRoute || (isRightDock && !isDashboardRoute);
+  const showRoutePanel = !isDashboardRoute && !isReportBuilderRoute;
   const routeMeta = ROUTE_TITLE_MAP[currentPath] || { title: "Navigation View" };
 
   const handleToggleMenu = () => {
@@ -387,8 +391,14 @@ export default function AppLayout() {
           setIsProfileOpen={setIsProfileOpen}
         />
 
-        {/* Center / Dashboard Main Form Area */}
-        {(isDashboardRoute || isRightDock) && (
+        {/* Center / Dashboard Main Form Area or Coming Soon Dashboard */}
+        {isDashboardRoute && (
+          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-center">
+            <DashboardComingSoon />
+          </main>
+        )}
+
+        {isMainFormView && (
           <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
             <div className="w-full max-w-xl mx-auto">
               <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
@@ -397,7 +407,7 @@ export default function AppLayout() {
         )}
 
         {/* Route Content Panel */}
-        {!isDashboardRoute && (
+        {showRoutePanel && (
           <div 
             className={
               isRightDock
@@ -438,5 +448,25 @@ export default function AppLayout() {
       </div>
     </div>
   );
+}
 
+function DashboardComingSoon() {
+  return (
+    <div className="flex flex-col items-center justify-center text-center font-sans space-y-5 select-none p-6 py-12 theme-bg-surface border theme-border rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in">
+      <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-md">
+        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-base font-bold theme-text-primary">Dashboard Coming Soon</h2>
+        <p className="text-xs theme-text-secondary leading-relaxed max-w-xs mx-auto">
+          We are currently building advanced analytics, key performance indicators, and data visualizations. Stay tuned!
+        </p>
+      </div>
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent border theme-border shadow-sm">
+        Under Development
+      </span>
+    </div>
+  );
 }

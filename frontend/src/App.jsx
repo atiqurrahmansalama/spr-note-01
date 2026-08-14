@@ -71,6 +71,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          <Route path="report-builder" element={null} />
           <Route path="student-reports" element={<StudentReportsView />} />
           <Route path="groups-students" element={<StudentDirectoryView />} />
           <Route path="student-roster" element={<StudentDirectoryView viewMode="students" />} />
