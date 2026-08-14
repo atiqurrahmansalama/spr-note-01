@@ -175,6 +175,22 @@ export default function AppLayout() {
     return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, [navigate]);
 
+  // Automatic Offline-to-Online Sync triggers
+  useEffect(() => {
+    import("../../utils/syncEngine").then(({ triggerCloudSync }) => {
+      triggerCloudSync();
+    });
+
+    const handleOnline = () => {
+      import("../../utils/syncEngine").then(({ triggerCloudSync }) => {
+        triggerCloudSync();
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
+
   // Calendar settings synchronization
   const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());
   const [dateFormat, setDateFormat] = useState(() => calendarSettings.getDateFormat());

@@ -127,6 +127,10 @@ export const transformFormToApiPayload = (reportData) => {
     payload.student = studentId;
   }
 
+  if (reportData.report_unique_id) {
+    payload.report_unique_id = reportData.report_unique_id;
+  }
+
   return payload;
 };
 

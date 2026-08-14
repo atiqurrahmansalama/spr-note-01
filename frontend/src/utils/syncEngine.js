@@ -15,9 +15,12 @@ export const saveReportLocally = (reportData) => {
   const pendingQueue = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
 
   const now = new Date().toISOString();
+  const report_unique_id = reportData.report_unique_id || `REP-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+
   const updatedReport = {
     ...reportData,
     id: reportData.id || crypto.randomUUID(),
+    report_unique_id,
     client_updated_at: now,
     sync_status: "PENDING",
   };
@@ -50,7 +53,7 @@ export const getLocalReports = () => {
 };
 
 // 3. Trigger Delta Cloud Sync with DRF Backend API
-export const triggerCloudSync = async (apiClient) => {
+export const triggerCloudSync = async () => {
   if (!navigator.onLine) {
     console.warn("[SyncEngine] Network offline. Sync postponed.");
     return;
@@ -58,41 +61,42 @@ export const triggerCloudSync = async (apiClient) => {
 
   const reports = getLocalReports();
   const pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
-  const lastSyncedAt = localStorage.getItem("spr_last_synced_at");
 
-  if (pendingIds.length === 0 && !lastSyncedAt) return;
+  if (pendingIds.length === 0) {
+    console.log("[SyncEngine] Local storage is in sync.");
+    return;
+  }
 
   const pendingItems = reports.filter((r) => pendingIds.includes(r.id));
+  let updatedIds = [...pendingIds];
 
-  try {
-    const response = await apiClient.post("/api/reports/sync/", {
-      changes: pendingItems,
-      last_synced_at: lastSyncedAt,
-    });
+  const { createReport } = await import("../api/reports");
 
-    const { applied_changes, server_updates, conflicts, sync_timestamp } = response.data;
+  for (const item of pendingItems) {
+    try {
+      const apiResult = await createReport(item);
 
-    let updatedList = [...reports];
-
-    [...applied_changes, ...server_updates, ...conflicts].forEach((serverReport) => {
-      const idx = updatedList.findIndex((r) => r.id === serverReport.id);
-      const cleanItem = { ...serverReport, sync_status: "SYNCED" };
-
-      if (idx > -1) {
-        updatedList[idx] = cleanItem;
-      } else {
-        updatedList.unshift(cleanItem);
+      if (apiResult.success && apiResult.data) {
+        const serverReport = apiResult.data;
+        const itemIdx = reports.findIndex((r) => r.id === item.id);
+        if (itemIdx > -1) {
+          reports[itemIdx] = {
+            ...reports[itemIdx],
+            id: serverReport.id,
+            report_unique_id: serverReport.report_unique_id,
+            sync_status: "SYNCED",
+          };
+        }
+        updatedIds = updatedIds.filter((id) => id !== item.id);
       }
-    });
-
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([]));
-    localStorage.setItem("spr_last_synced_at", sync_timestamp);
-
-    console.log("[SyncEngine] Hybrid sync completed successfully.");
-  } catch (error) {
-    console.error("[SyncEngine] Cloud sync failed:", error);
+    } catch (error) {
+      console.error("[SyncEngine] Failed to sync item:", item.id, error);
+    }
   }
+
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedIds));
+  window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "sync" } }));
 };
 
 // 4. Sync local students, sessions & comment templates to the database

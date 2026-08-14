@@ -925,6 +925,13 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         error_details_data = validated_data.pop('error_details', [])
 
         initial = self.initial_data or {}
+        client_uid = initial.get('report_unique_id')
+        if client_uid:
+            existing = StudentDailyReport.objects.filter(report_unique_id=client_uid).first()
+            if existing:
+                return existing
+            validated_data['report_unique_id'] = str(client_uid).strip()
+
         mistakes_input = initial.get('mistake_details') or initial.get('mistakes') or []
         stucks_input   = initial.get('stuck_details')   or initial.get('stucks')   or []
 
