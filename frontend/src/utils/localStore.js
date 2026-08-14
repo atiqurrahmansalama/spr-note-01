@@ -312,9 +312,19 @@ const DEFAULT_SESSIONS = [
 export const sessions = {
   getAll: () => {
     const list = readJSON(KEYS.SESSIONS, []);
-    if (list.length === 0) {
-      writeJSON(KEYS.SESSIONS, DEFAULT_SESSIONS);
-      return DEFAULT_SESSIONS;
+    try {
+      if (typeof window !== "undefined") {
+        const initialized = localStorage.getItem("spr_sessions_initialized_v2");
+        if (!initialized) {
+          localStorage.setItem("spr_sessions_initialized_v2", "true");
+          if (list.length === 0) {
+            writeJSON(KEYS.SESSIONS, DEFAULT_SESSIONS);
+            return DEFAULT_SESSIONS;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Storage initialization failed:", e);
     }
     return list;
   },
