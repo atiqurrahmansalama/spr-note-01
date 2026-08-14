@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
+import LandingPageView from "./modules/landing/LandingPageView";
 import LoginView from "./modules/auth/LoginView";
 import RegisterView from "./modules/auth/RegisterView";
 import VerifyEmailView from "./modules/auth/VerifyEmailView";
@@ -55,6 +56,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Standalone Public Auth & Verification Routes */}
+        <Route path="/" element={<LandingPageView />} />
         <Route path="/login" element={<LoginView />} />
         <Route path="/register" element={<RegisterView />} />
         <Route path="/verify-email/:token" element={<VerifyEmailView />} />
@@ -64,36 +66,35 @@ export default function App() {
 
         {/* Protected Dashboard Layout with Nested Page Routes */}
         <Route
-          path="/"
           element={
             <ProtectedRoute>
               <AppLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="report-builder" element={null} />
-          <Route path="student-reports" element={<StudentReportsView />} />
-          <Route path="groups-students" element={<StudentDirectoryView />} />
-          <Route path="student-roster" element={<StudentDirectoryView viewMode="students" />} />
-          <Route path="group-roster" element={<StudentDirectoryView viewMode="groups" />} />
-          <Route path="admission" element={<StudentAdmissionView />} />
-          <Route path="sessions-comments" element={<SessionManager />} />
-          <Route path="user-management" element={<UserManagementModule />} />
-          <Route path="role-management" element={<RoleManagementModule />} />
-          <Route path="activity-analytics" element={<ActivityAnalyticsView />} />
-          <Route path="trash-restoration" element={<TrashRestorationView />} />
-          <Route path="profile-settings" element={<UserProfileSettingsView />} />
-          <Route path="security-sessions" element={<SecuritySessionsView />} />
-          <Route path="appearance" element={<AppearanceSettings />} />
-          <Route path="date-time" element={<CalendarSettings />} />
-          <Route path="copy-report" element={<CopyReportSettingsView />} />
-          <Route path="language" element={<LanguageSettingsView />} />
-          <Route path="data-backup" element={<DataBackupView />} />
-          <Route path="shortcuts" element={<ShortcutsGuide />} />
-          <Route path="guide" element={<AppGuideView />} />
-          <Route path="about" element={<AboutAppView />} />
-          <Route path="section-control" element={<SectionToggleControlPanel />} />
-          <Route path="dashboard" element={<Navigate to="/" replace />} />
+          <Route path="/report-builder" element={null} />
+          <Route path="/student-reports" element={<StudentReportsView />} />
+          <Route path="/groups-students" element={<StudentDirectoryView />} />
+          <Route path="/student-roster" element={<StudentDirectoryView viewMode="students" />} />
+          <Route path="/group-roster" element={<StudentDirectoryView viewMode="groups" />} />
+          <Route path="/admission" element={<StudentAdmissionView />} />
+          <Route path="/sessions-comments" element={<SessionManager />} />
+          <Route path="/user-management" element={<UserManagementModule />} />
+          <Route path="/role-management" element={<RoleManagementModule />} />
+          <Route path="/activity-analytics" element={<ActivityAnalyticsView />} />
+          <Route path="/trash-restoration" element={<TrashRestorationView />} />
+          <Route path="/profile-settings" element={<UserProfileSettingsView />} />
+          <Route path="/security-sessions" element={<SecuritySessionsView />} />
+          <Route path="/appearance" element={<AppearanceSettings />} />
+          <Route path="/date-time" element={<CalendarSettings />} />
+          <Route path="/copy-report" element={<CopyReportSettingsView />} />
+          <Route path="/language" element={<LanguageSettingsView />} />
+          <Route path="/data-backup" element={<DataBackupView />} />
+          <Route path="/shortcuts" element={<ShortcutsGuide />} />
+          <Route path="/guide" element={<AppGuideView />} />
+          <Route path="/about" element={<AboutAppView />} />
+          <Route path="/section-control" element={<SectionToggleControlPanel />} />
+          <Route path="/dashboard" element={null} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

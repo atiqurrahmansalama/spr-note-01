@@ -304,7 +304,7 @@ export default function AppLayout() {
 
 
   const currentPath = location.pathname;
-  const isDashboardRoute = currentPath === "/" || currentPath === "/dashboard";
+  const isDashboardRoute = currentPath === "/dashboard";
   const isReportBuilderRoute = currentPath === "/report-builder";
   const isMainFormView = isReportBuilderRoute || (isRightDock && !isDashboardRoute);
   const showRoutePanel = !isDashboardRoute && !isReportBuilderRoute;
