@@ -4,14 +4,92 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
 
   if (!report) return null;
 
-  // Filter mistakes and stucks so items without page or ayah (just Juz) are ignored
-  const validMistakes = (report.mistake_details || []).filter((m) => {
+  // Extract recitation ranges in a standard format: [{ juz, ranges: [{ start, end }] }]
+  const getPortions = () => {
+    if (Array.isArray(report.juz_and_pages) && report.juz_and_pages.length > 0) {
+      return report.juz_and_pages;
+    }
+    if (Array.isArray(report.portions) && report.portions.length > 0) {
+      const juzMap = new Map();
+      report.portions.forEach((p) => {
+        const j = p.start_juz || p.juz || 1;
+        if (!juzMap.has(j)) {
+          juzMap.set(j, []);
+        }
+        juzMap.get(j).push({
+          start: p.start_page,
+          end: p.end_page || p.start_page,
+        });
+      });
+      return Array.from(juzMap.entries()).map(([juz, ranges]) => ({
+        juz,
+        ranges,
+      }));
+    }
+    return [];
+  };
+
+  // Extract mistakes in a standard format: [{ juz, page, ayah }]
+  const getMistakes = () => {
+    if (Array.isArray(report.mistake_details) && report.mistake_details.length > 0) {
+      return report.mistake_details;
+    }
+    if (Array.isArray(report.error_details)) {
+      const serverMistakes = report.error_details.filter((e) => e.type === "Mistake");
+      if (serverMistakes.length > 0) return serverMistakes;
+    }
+    if (Array.isArray(report.mistakes)) {
+      const list = [];
+      report.mistakes.forEach((row) => {
+        const juz = row.juz || "";
+        const page = row.page || "";
+        (row.ayahs || []).forEach((a) => {
+          const val = a.value || a.ayah || "";
+          if (val && String(val).trim()) {
+            list.push({ juz, page, ayah: val });
+          }
+        });
+      });
+      return list;
+    }
+    return [];
+  };
+
+  // Extract stucks in a standard format: [{ juz, page, ayah }]
+  const getStucks = () => {
+    if (Array.isArray(report.stuck_details) && report.stuck_details.length > 0) {
+      return report.stuck_details;
+    }
+    if (Array.isArray(report.error_details)) {
+      const serverStucks = report.error_details.filter((e) => e.type === "Stuck");
+      if (serverStucks.length > 0) return serverStucks;
+    }
+    if (Array.isArray(report.stucks)) {
+      const list = [];
+      report.stucks.forEach((row) => {
+        const juz = row.juz || "";
+        const page = row.page || "";
+        (row.ayahs || []).forEach((a) => {
+          const val = a.value || a.ayah || "";
+          if (val && String(val).trim()) {
+            list.push({ juz, page, ayah: val });
+          }
+        });
+      });
+      return list;
+    }
+    return [];
+  };
+
+  const displayPortions = getPortions();
+
+  const validMistakes = getMistakes().filter((m) => {
     const hasPage = m.page !== undefined && m.page !== null && String(m.page).trim() !== "";
     const hasAyah = m.ayah !== undefined && m.ayah !== null && String(m.ayah).trim() !== "";
     return hasPage || hasAyah;
   });
 
-  const validStucks = (report.stuck_details || []).filter((s) => {
+  const validStucks = getStucks().filter((s) => {
     const hasPage = s.page !== undefined && s.page !== null && String(s.page).trim() !== "";
     const hasAyah = s.ayah !== undefined && s.ayah !== null && String(s.ayah).trim() !== "";
     return hasPage || hasAyah;
@@ -64,13 +142,13 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
       </div>
 
       {/* 2. Recitation Juz & Page Badges */}
-      {Array.isArray(report.juz_and_pages) && report.juz_and_pages.length > 0 && (
+      {displayPortions.length > 0 && (
         <div className="space-y-2 text-left">
           <span className="font-bold text-[10px] uppercase tracking-wider theme-text-secondary block">
             Juz & Page Recited
           </span>
           <div className="flex flex-wrap gap-2">
-            {report.juz_and_pages.map((jp, idx) => (
+            {displayPortions.map((jp, idx) => (
               <div
                 key={idx}
                 className="theme-bg-surface border theme-border rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm"
