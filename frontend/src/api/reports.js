@@ -25,15 +25,6 @@ const fetchApi = async (path, options = {}) => {
     console.warn(`[reportsApi] Fetch to ${targetUrl} failed:`, err);
   }
 
-  if (API_BASE_URL) {
-    try {
-      const res = await fetch(cleanPath, reqOptions);
-      if (res.ok || res.status < 500) return res;
-    } catch {
-      // ignore
-    }
-  }
-
   throw new Error("Server is offline or unreachable.");
 };
 
