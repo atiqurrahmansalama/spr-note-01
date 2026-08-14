@@ -103,7 +103,16 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     window.addEventListener("keydown", handleUndoRedoKeys);
     return () => window.removeEventListener("keydown", handleUndoRedoKeys);
   }, [handleUndo, handleRedo]);
-
+  useEffect(() => {
+    const handleGlobalUndo = () => handleUndo();
+    const handleGlobalRedo = () => handleRedo();
+    window.addEventListener("spr_undo", handleGlobalUndo);
+    window.addEventListener("spr_redo", handleGlobalRedo);
+    return () => {
+      window.removeEventListener("spr_undo", handleGlobalUndo);
+      window.removeEventListener("spr_redo", handleGlobalRedo);
+    };
+  }, [handleUndo, handleRedo]);
   useEffect(() => {
     if (!isLoading && !featureLoading) {
       setTimeout(() => {

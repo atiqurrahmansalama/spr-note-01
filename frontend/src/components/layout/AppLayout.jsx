@@ -358,6 +358,53 @@ export default function AppLayout() {
         <div className="flex items-center gap-3">
           <SaveStatusBadge />
 
+          {/* Undo / Redo Buttons (Only visible on report builder route) */}
+          {isReportBuilderRoute && (
+            <div className="flex items-center gap-1 theme-bg-sub border theme-border rounded-xl p-0.5 shadow-inner">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("spr_undo"))}
+                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
+                title="Undo (Ctrl+Z)"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("spr_redo"))}
+                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
+                title="Redo (Ctrl+Y)"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 10h-10a8 8 0 00-8 8v2m18-12l-6 6m6-6l-6-6" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Dark / Light Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const nextMode = themeContext.modeId === "dark" ? "light" : "dark";
+              themeContext.setModeId(nextMode);
+            }}
+            className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent flex items-center justify-center cursor-pointer active:scale-95"
+            title={themeContext.modeId === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {themeContext.modeId === "dark" ? (
+              <svg className="w-4 h-4 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+
           <button 
             type="button"
             onClick={() => navigate("/profile-settings")}
