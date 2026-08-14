@@ -17,6 +17,23 @@ from .models import (
     ReportErrorDetail,
     UserSession,
     ActivityLog,
+    UserRole,
+    RoleActionPermission,
+    EmailVerificationToken,
+    PasswordResetToken,
+    UserLoginLog,
+    UserActivityLog,
+    Address,
+    UserNotificationPreference,
+    UserSecurity,
+    AppSectionCategory,
+    AppSection,
+    RoleSectionPermission,
+    GroupSectionPermission,
+    UserSectionOverride,
+    FeatureFlagAuditLog,
+    UserPasskey,
+    QRSessionTicket,
 )
 
 try:
@@ -455,3 +472,130 @@ class ActivityLogAdmin(admin.ModelAdmin):
         ('📝 Action & Endpoint', {'fields': ('action_name', 'http_method', 'endpoint')}),
         ('📅 Timestamp', {'fields': ('timestamp',)}),
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# ADDITIONAL CORE & ACCESS CONTROL ADMINS
+# ─────────────────────────────────────────────────────────────
+
+@admin.register(UserRole)
+class UserRoleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'hierarchy_level', 'color_theme', 'is_system_role', 'created_at')
+    list_filter = ('is_system_role', 'color_theme')
+    search_fields = ('name', 'code')
+
+
+@admin.register(RoleActionPermission)
+class RoleActionPermissionAdmin(admin.ModelAdmin):
+    list_display = ('role', 'can_create_student', 'can_edit_student', 'can_delete_report', 'can_export_reports', 'can_manage_users')
+    list_filter = ('can_create_student', 'can_edit_student', 'can_delete_report', 'can_export_reports', 'can_manage_users')
+    search_fields = ('role__name', 'role__code')
+
+
+@admin.register(EmailVerificationToken)
+class EmailVerificationTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'token', 'expires_at', 'created_at')
+    search_fields = ('user__phone_number', 'user__email', 'token')
+    readonly_fields = ('token', 'created_at')
+
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'token', 'is_used', 'expires_at', 'created_at')
+    list_filter = ('is_used',)
+    search_fields = ('user__phone_number', 'user__email', 'token')
+    readonly_fields = ('token', 'created_at')
+
+
+@admin.register(UserLoginLog)
+class UserLoginLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'status', 'ip_address', 'country', 'city', 'timestamp')
+    list_filter = ('status', 'timestamp')
+    search_fields = ('user__phone_number', 'user__email', 'ip_address', 'country', 'city')
+    readonly_fields = ('user', 'status', 'ip_address', 'country', 'city', 'timestamp')
+
+
+@admin.register(UserActivityLog)
+class UserActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'status', 'timestamp')
+    list_filter = ('status', 'timestamp')
+    search_fields = ('user__phone_number', 'user__email')
+    readonly_fields = ('user', 'status', 'timestamp')
+
+
+@admin.register(Address)
+class AddressAdmin(admin.ModelAdmin):
+    list_display = ('address_type', 'street_address', 'thana_or_upazila', 'district', 'division', 'country', 'created_by', 'created_at')
+    list_filter = ('address_type', 'country', 'created_at')
+    search_fields = ('street_address', 'post_office', 'thana_or_upazila', 'district', 'division', 'created_by__phone_number')
+
+
+@admin.register(UserNotificationPreference)
+class UserNotificationPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('user', 'email_notifications', 'push_notifications', 'sms_notifications')
+    list_filter = ('email_notifications', 'push_notifications', 'sms_notifications')
+    search_fields = ('user__phone_number', 'user__email')
+
+
+@admin.register(UserSecurity)
+class UserSecurityAdmin(admin.ModelAdmin):
+    list_display = ('user', 'is_2fa_enabled')
+    list_filter = ('is_2fa_enabled',)
+    search_fields = ('user__phone_number', 'user__email')
+
+
+@admin.register(AppSectionCategory)
+class AppSectionCategoryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'key', 'order')
+    search_fields = ('title', 'key')
+
+
+@admin.register(AppSection)
+class AppSectionAdmin(admin.ModelAdmin):
+    list_display = ('title', 'section_key', 'category', 'is_globally_enabled', 'order')
+    list_filter = ('category', 'is_globally_enabled')
+    search_fields = ('title', 'section_key')
+
+
+@admin.register(RoleSectionPermission)
+class RoleSectionPermissionAdmin(admin.ModelAdmin):
+    list_display = ('section', 'role', 'is_enabled')
+    list_filter = ('role', 'is_enabled')
+    search_fields = ('section__title', 'section__section_key')
+
+
+@admin.register(GroupSectionPermission)
+class GroupSectionPermissionAdmin(admin.ModelAdmin):
+    list_display = ('section', 'group_id', 'is_enabled')
+    list_filter = ('is_enabled',)
+    search_fields = ('section__title', 'section__section_key', 'group_id')
+
+
+@admin.register(UserSectionOverride)
+class UserSectionOverrideAdmin(admin.ModelAdmin):
+    list_display = ('user', 'section', 'is_enabled')
+    list_filter = ('is_enabled',)
+    search_fields = ('user__phone_number', 'user__email', 'section__title', 'section__section_key')
+
+
+@admin.register(FeatureFlagAuditLog)
+class FeatureFlagAuditLogAdmin(admin.ModelAdmin):
+    list_display = ('changed_by', 'scope_type', 'target_identifier', 'section_key', 'previous_state', 'new_state', 'timestamp')
+    list_filter = ('scope_type', 'timestamp')
+    search_fields = ('target_identifier', 'section_key')
+    readonly_fields = ('changed_by', 'scope_type', 'target_identifier', 'section_key', 'previous_state', 'new_state', 'timestamp')
+
+
+@admin.register(UserPasskey)
+class UserPasskeyAdmin(admin.ModelAdmin):
+    list_display = ('user', 'device_name', 'credential_id', 'sign_count', 'created_at')
+    search_fields = ('user__phone_number', 'user__email', 'device_name')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(QRSessionTicket)
+class QRSessionTicketAdmin(admin.ModelAdmin):
+    list_display = ('ticket_id', 'status', 'authorized_user', 'expires_at', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('authorized_user__phone_number', 'authorized_user__email')
+    readonly_fields = ('created_at',)
