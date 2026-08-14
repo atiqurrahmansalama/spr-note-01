@@ -31,6 +31,10 @@ from .models import (
     UserSecurity,
     EmailVerificationToken,
     PasswordResetToken,
+    Address,
+    StudentAcademicDetail,
+    StudentGuardian,
+    StudentDocument,
 )
 
 
@@ -1177,3 +1181,186 @@ class UserSecuritySerializer(serializers.ModelSerializer):
         model = UserSecurity
         fields = ['id', 'is_2fa_enabled', 'two_factor_secret', 'backup_codes']
         read_only_fields = ['two_factor_secret', 'backup_codes']
+
+
+# 🎯 Unified Address Serializer
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            'id', 'address_type', 'street_address', 'post_office', 
+            'post_code', 'thana_or_upazila', 'district', 'division', 'country'
+        ]
+
+
+# 🎯 Student Guardian Details Serializer
+class StudentGuardianSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentGuardian
+        fields = [
+            'id', 'father_name', 'father_phone', 'father_occupation',
+            'mother_name', 'mother_phone', 'primary_guardian_name',
+            'primary_guardian_phone', 'guardian_relation', 'guardian_nid',
+            'emergency_contact_phone'
+        ]
+
+
+# 🎯 Student Academic Detail Serializer
+class StudentAcademicDetailSerializer(serializers.ModelSerializer):
+    class_or_group_id = serializers.PrimaryKeyRelatedField(
+        queryset=StudentGroup.objects.all(),
+        source='class_or_group',
+        required=False,
+        allow_null=True
+    )
+    class_or_group_name = serializers.CharField(source='class_or_group.name', read_only=True)
+
+    class Meta:
+        model = StudentAcademicDetail
+        fields = [
+            'id', 'session_year', 'class_or_group_id', 'class_or_group_name',
+            'roll_number', 'admission_date', 'previous_school_name', 'tc_number'
+        ]
+
+
+# 🎯 Student Document Upload Serializer
+class StudentDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentDocument
+        fields = ['id', 'doc_type', 'file', 'title', 'uploaded_at']
+
+
+# 🎯 Unified Admission Master Serializer (Supports Quick & Full Modes)
+class StudentAdmissionSerializer(serializers.ModelSerializer):
+    present_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
+    permanent_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
+    academic_data = StudentAcademicDetailSerializer(write_only=True, required=False, allow_null=True)
+    guardian_data = StudentGuardianSerializer(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Student
+        fields = [
+            'id', 'name', 'bangla_name', 'student_id_card_number', 'gender', 'dob',
+            'blood_group', 'birth_certificate_no', 'photo', 'present_address_data',
+            'permanent_address_data', 'academic_data', 'guardian_data',
+            'admission_mode', 'status', 'group_name', 'roll_number'
+        ]
+
+    @transaction.atomic
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+
+        present_address_data = validated_data.pop('present_address_data', None)
+        permanent_address_data = validated_data.pop('permanent_address_data', None)
+        academic_data = validated_data.pop('academic_data', None)
+        guardian_data = validated_data.pop('guardian_data', None)
+
+        # Create Addresses if supplied
+        present_address = None
+        if present_address_data:
+            present_address = Address.objects.create(created_by=user, **present_address_data)
+
+        permanent_address = None
+        if permanent_address_data:
+            permanent_address = Address.objects.create(created_by=user, **permanent_address_data)
+
+        # Create Student
+        validated_data['present_address'] = present_address
+        validated_data['permanent_address'] = permanent_address
+        if user:
+            validated_data['created_by'] = user
+        
+        student = Student.objects.create(**validated_data)
+
+        # Create StudentAcademicDetail (always exists, blank defaults if not in payload)
+        academic_kwargs = academic_data if academic_data else {}
+        academic_kwargs['student'] = student
+        academic_kwargs['created_by'] = user
+        StudentAcademicDetail.objects.create(**academic_kwargs)
+
+        # Create StudentGuardian (always exists, blank defaults if not in payload)
+        guardian_kwargs = guardian_data if guardian_data else {}
+        guardian_kwargs['student'] = student
+        guardian_kwargs['created_by'] = user
+        StudentGuardian.objects.create(**guardian_kwargs)
+
+        return student
+
+
+# 🎯 Comprehensive Student Profile Serializer (Read & Deep Update)
+class StudentFullProfileSerializer(serializers.ModelSerializer):
+    present_address = AddressSerializer(read_only=True)
+    permanent_address = AddressSerializer(read_only=True)
+    academic_detail = StudentAcademicDetailSerializer(read_only=True)
+    guardian_detail = StudentGuardianSerializer(read_only=True)
+    documents = StudentDocumentSerializer(many=True, read_only=True)
+
+    present_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
+    permanent_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
+    academic_data = StudentAcademicDetailSerializer(write_only=True, required=False, allow_null=True)
+    guardian_data = StudentGuardianSerializer(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Student
+        fields = [
+            'id', 'uniq_id', 'roll_number', 'name', 'name_en', 'bangla_name', 
+            'student_id_card_number', 'gender', 'dob', 'blood_group', 
+            'birth_certificate_no', 'photo', 'present_address', 'permanent_address', 
+            'academic_detail', 'guardian_detail', 'documents', 'admission_mode', 
+            'status', 'group_name', 'created_at', 'updated_at',
+            'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data'
+        ]
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+
+        present_address_data = validated_data.pop('present_address_data', None)
+        permanent_address_data = validated_data.pop('permanent_address_data', None)
+        academic_data = validated_data.pop('academic_data', None)
+        guardian_data = validated_data.pop('guardian_data', None)
+
+        # Update core student fields
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+        instance.save()
+
+        # Deep Update present address
+        if present_address_data is not None:
+            if instance.present_address:
+                for k, v in present_address_data.items():
+                    setattr(instance.present_address, k, v)
+                instance.present_address.save()
+            else:
+                addr = Address.objects.create(created_by=user, **present_address_data)
+                instance.present_address = addr
+                instance.save(update_fields=['present_address'])
+
+        # Deep Update permanent address
+        if permanent_address_data is not None:
+            if instance.permanent_address:
+                for k, v in permanent_address_data.items():
+                    setattr(instance.permanent_address, k, v)
+                instance.permanent_address.save()
+            else:
+                addr = Address.objects.create(created_by=user, **permanent_address_data)
+                instance.permanent_address = addr
+                instance.save(update_fields=['permanent_address'])
+
+        # Deep Update academic details
+        if academic_data is not None:
+            academic_detail, _ = StudentAcademicDetail.objects.get_or_create(student=instance, defaults={'created_by': user})
+            for k, v in academic_data.items():
+                setattr(academic_detail, k, v)
+            academic_detail.save()
+
+        # Deep Update guardian details
+        if guardian_data is not None:
+            guardian_detail, _ = StudentGuardian.objects.get_or_create(student=instance, defaults={'created_by': user})
+            for k, v in guardian_data.items():
+                setattr(guardian_detail, k, v)
+            guardian_detail.save()
+
+        return instance

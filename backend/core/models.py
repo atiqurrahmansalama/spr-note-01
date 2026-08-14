@@ -409,6 +409,33 @@ class ActivityLog(models.Model):
         return f"{user_str} - {self.action_name} ({self.http_method} {self.endpoint})"
 
 
+# 🎯 0. Address Table
+class Address(models.Model):
+    ADDRESS_TYPE_CHOICES = (
+        ('PRESENT', 'Present Address'),
+        ('PERMANENT', 'Permanent Address'),
+        ('OFFICE', 'Office/Work Address'),
+    )
+    address_type = models.CharField(max_length=20, choices=ADDRESS_TYPE_CHOICES)
+    street_address = models.CharField(max_length=255, blank=True, null=True)
+    post_office = models.CharField(max_length=100, blank=True, null=True)
+    post_code = models.CharField(max_length=20, blank=True, null=True)
+    thana_or_upazila = models.CharField(max_length=100, blank=True, null=True)
+    district = models.CharField(max_length=100, blank=True, null=True)
+    division = models.CharField(max_length=100, blank=True, null=True)
+    country = models.CharField(max_length=100, default='Bangladesh')
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='created_addresses'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        parts = [self.street_address, self.thana_or_upazila, self.district]
+        return ", ".join([p for p in parts if p]) or f"Address #{self.id}"
+
+
 # 🎯 1. Group Table
 class StudentGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -477,9 +504,35 @@ class Student(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Extended fields
+    name = models.CharField(max_length=255, blank=True, null=True)
+    bangla_name = models.CharField(max_length=255, blank=True, null=True)
+    student_id_card_number = models.CharField(max_length=64, blank=True, null=True)
+    gender = models.CharField(max_length=20, choices=[('MALE', 'Male'), ('FEMALE', 'Female'), ('OTHER', 'Other')], default='MALE')
+    dob = models.DateField(null=True, blank=True)
+    blood_group = models.CharField(max_length=10, choices=[
+        ('A+', 'A+'), ('A-', 'A-'),
+        ('B+', 'B+'), ('B-', 'B-'),
+        ('O+', 'O+'), ('O-', 'O-'),
+        ('AB+', 'AB+'), ('AB-', 'AB-')
+    ], blank=True, null=True)
+    birth_certificate_no = models.CharField(max_length=64, blank=True, null=True)
+    photo = models.ImageField(upload_to='students/photos/', blank=True, null=True)
+    present_address = models.ForeignKey('Address', related_name='student_present_addresses', on_delete=models.SET_NULL, null=True, blank=True)
+    permanent_address = models.ForeignKey('Address', related_name='student_permanent_addresses', on_delete=models.SET_NULL, null=True, blank=True)
+    admission_mode = models.CharField(max_length=20, choices=[('QUICK', 'Quick Admission'), ('FULL', 'Full Institutional')], default='QUICK')
+
     def save(self, *args, **kwargs):
+        if self.name and not self.name_en:
+            self.name_en = self.name
+        elif self.name_en and not self.name:
+            self.name = self.name_en
+
         if not self.uniq_id or not str(self.uniq_id).strip():
             self.uniq_id = f"STU-{uuid.uuid4().hex[:8].upper()}"
+
+        if not self.student_id_card_number:
+            self.student_id_card_number = self.uniq_id
 
         if not self.group_name or not str(self.group_name).strip():
             self.group_name = "General Group"
@@ -493,22 +546,17 @@ class Student(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Propagate student name to all linked reports
-        self.daily_reports.all().update(student_name=self.name)
+        # Propagate student name to all linked daily reports
+        try:
+            self.daily_reports.all().update(student_name=self.name)
+        except Exception:
+            pass
 
         # Auto-register group in StudentGroup model if it doesn't exist
         if self.group_name and str(self.group_name).strip():
             StudentGroup.objects.get_or_create(name=self.group_name.strip())
 
     # ── Backward compatibility properties ────────────────────────
-    @property
-    def name(self):
-        return self.name_en or ""
-
-    @name.setter
-    def name(self, val):
-        self.name_en = val
-
     @property
     def roll(self):
         return self.roll_number or 0
@@ -527,11 +575,11 @@ class Student(models.Model):
 
     @property
     def is_active(self):
-        return self.status == 'Active' if self.status else True
+        return self.status in ['Active', 'ACTIVE'] if self.status else True
 
     @is_active.setter
     def is_active(self, val):
-        self.status = 'Active' if val else 'Inactive'
+        self.status = 'ACTIVE' if val else 'INACTIVE'
 
     @property
     def group(self):
@@ -998,3 +1046,69 @@ class SystemSetting(models.Model):
             setting.description = description
         setting.save()
         return setting
+
+
+# 🎯 4c. Student Academic Detail
+class StudentAcademicDetail(models.Model):
+    student = models.OneToOneField(Student, related_name='academic_detail', on_delete=models.CASCADE)
+    session_year = models.CharField(max_length=32, blank=True, null=True)
+    class_or_group = models.ForeignKey(StudentGroup, on_delete=models.SET_NULL, null=True, blank=True)
+    roll_number = models.CharField(max_length=32, blank=True, null=True)
+    admission_date = models.DateField(default=timezone.now)
+    previous_school_name = models.CharField(max_length=255, blank=True, null=True)
+    tc_number = models.CharField(max_length=64, blank=True, null=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='created_academic_details'
+    )
+
+    def __str__(self):
+        return f"Academic Detail for {self.student.name_en or self.student.uniq_id}"
+
+
+# 🎯 4d. Student Guardian Detail
+class StudentGuardian(models.Model):
+    student = models.OneToOneField(Student, related_name='guardian_detail', on_delete=models.CASCADE)
+    father_name = models.CharField(max_length=255, blank=True, null=True)
+    father_phone = models.CharField(max_length=32, blank=True, null=True)
+    father_occupation = models.CharField(max_length=128, blank=True, null=True)
+    mother_name = models.CharField(max_length=255, blank=True, null=True)
+    mother_phone = models.CharField(max_length=32, blank=True, null=True)
+    primary_guardian_name = models.CharField(max_length=255, blank=True, null=True)
+    primary_guardian_phone = models.CharField(max_length=32, blank=True, null=True)
+    guardian_relation = models.CharField(max_length=64, default='Father')
+    guardian_nid = models.CharField(max_length=64, blank=True, null=True)
+    emergency_contact_phone = models.CharField(max_length=32, blank=True, null=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='created_guardians'
+    )
+
+    def __str__(self):
+        return f"Guardian Detail for {self.student.name_en or self.student.uniq_id}"
+
+
+# 🎯 4e. Student Documents & Attachments
+class StudentDocument(models.Model):
+    DOC_TYPE_CHOICES = (
+        ('BIRTH_CERTIFICATE', 'Birth Certificate'),
+        ('NID_CARD', 'Guardian NID'),
+        ('PREVIOUS_MARKSHEET', 'Previous Marksheet'),
+        ('TC', 'Transfer Certificate'),
+        ('OTHER', 'Other'),
+    )
+    student = models.ForeignKey(Student, related_name='documents', on_delete=models.CASCADE)
+    doc_type = models.CharField(max_length=30, choices=DOC_TYPE_CHOICES)
+    file = models.FileField(upload_to='students/documents/')
+    title = models.CharField(max_length=255, blank=True, null=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='created_documents'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_doc_type_display()} for {self.student.name_en or self.student.uniq_id}"

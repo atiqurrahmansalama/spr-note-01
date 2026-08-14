@@ -722,7 +722,7 @@ class ChangePasswordView(APIView):
         return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(Q(status='Active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
+    queryset = Student.objects.filter(Q(status__iexact='active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
 
@@ -738,6 +738,40 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['post'], url_path='admission')
+    def admission(self, request):
+        from .serializers import StudentAdmissionSerializer, StudentFullProfileSerializer
+        serializer = StudentAdmissionSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            student = serializer.save()
+            res_serializer = StudentFullProfileSerializer(student, context={'request': request})
+            return Response(res_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get', 'patch'], url_path='full-profile')
+    def full_profile(self, request, pk=None):
+        from .serializers import StudentFullProfileSerializer
+        student = self.get_object()
+        if request.method == 'GET':
+            serializer = StudentFullProfileSerializer(student, context={'request': request})
+            return Response(serializer.data)
+        elif request.method == 'PATCH':
+            serializer = StudentFullProfileSerializer(student, data=request.data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                student = serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='upload-document')
+    def upload_document(self, request, pk=None):
+        from .serializers import StudentDocumentSerializer
+        student = self.get_object()
+        serializer = StudentDocumentSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(student=student, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class StudentGroupViewSet(viewsets.ModelViewSet):
     queryset = StudentGroup.objects.all().order_by('name')

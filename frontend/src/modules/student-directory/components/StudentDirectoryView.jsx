@@ -9,6 +9,7 @@ import {
 import { syncLocalStudentsToBackend } from "../../../utils/syncEngine";
 import StudentSavePanel from "./StudentSavePanel";
 import StudentProfileModal from "./StudentProfileModal";
+import StudentAdmissionModal from "../admission/StudentAdmissionModal";
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
 import { GroupsIcon, UsersIcon, TrashIcon, EditIcon, CloudIcon } from "../../../components/ui/Icons";
 
@@ -19,6 +20,7 @@ export default function StudentDirectoryView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
+  const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
   const [profileModalStudent, setProfileModalStudent] = useState(null);
   const [offline, setOffline] = useState(!isOnline());
 
@@ -369,10 +371,10 @@ export default function StudentDirectoryView() {
 
             <button
               type="button"
-              onClick={() => setIsAddPanelOpen(!isAddPanelOpen)}
+              onClick={() => setIsAdmissionModalOpen(true)}
               className="px-3.5 py-1.5 text-xs font-semibold theme-accent-text theme-bg-accent hover:opacity-90 rounded-xl transition cursor-pointer shadow-sm"
             >
-              {isAddPanelOpen ? "Close Panel" : "+ Add Student"}
+              + Add Student
             </button>
           </div>
         </div>
@@ -385,16 +387,12 @@ export default function StudentDirectoryView() {
           </div>
         )}
 
-        {/* 2. Add Student Panel Drawer */}
-        {isAddPanelOpen && (
-          <StudentSavePanel
-            isOpen={true}
-            onClose={() => setIsAddPanelOpen(false)}
-            studentOptions={studentList}
-            groups={groupsList}
-            onSave={handleSaveStudent}
-          />
-        )}
+        {/* 2. Unified Student Admission Modal */}
+        <StudentAdmissionModal
+          isOpen={isAdmissionModalOpen}
+          onClose={() => setIsAdmissionModalOpen(false)}
+          onSuccess={loadStudents}
+        />
 
         {/* 3. Group List Roster Section (With In-Column Edit & Expanded Scroll Area) */}
         <div className="space-y-3 pt-1">
