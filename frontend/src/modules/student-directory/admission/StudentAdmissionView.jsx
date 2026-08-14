@@ -96,7 +96,7 @@ export default function StudentAdmissionView() {
   };
 
   return (
-    <div className="w-full max-w-6xl md:max-w-7xl xl:max-w-[85vw] mx-auto py-6 px-4 space-y-6">
+    <div className="w-full max-w-6xl mx-auto py-6 px-4 space-y-6">
       {/* Premium Styled Header (similar to User Management header) */}
       <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
         <div className="space-y-1">

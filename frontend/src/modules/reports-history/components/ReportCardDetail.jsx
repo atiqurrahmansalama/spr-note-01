@@ -147,24 +147,21 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
           <span className="font-bold text-[10px] uppercase tracking-wider theme-text-secondary block">
             Juz & Page Recited
           </span>
-          <div className="flex flex-wrap gap-2">
-            {displayPortions.map((jp, idx) => (
-              <div
-                key={idx}
-                className="theme-bg-surface border theme-border rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm"
-              >
-                <span className="font-bold text-xs theme-accent px-2 py-0.5 rounded-md theme-bg-accent-soft font-mono">
-                  Juz {jp.juz}
-                </span>
-                <span className="font-mono text-xs theme-text-primary font-medium">
-                  {Array.isArray(jp.ranges) && jp.ranges.map((r, rIdx) => (
-                    <span key={rIdx}>
-                      Pages {r.start || r.page_start || 0} – {r.end || r.page_end || 0}
-                    </span>
-                  ))}
-                </span>
-              </div>
-            ))}
+          <div className="flex flex-col items-start gap-1.5">
+            {displayPortions.map((jp, idx) => {
+              const rangesStr = Array.isArray(jp.ranges)
+                ? jp.ranges.map((r) => `Pages ${r.start || r.page_start || 0} – ${r.end || r.page_end || 0}`).join(", ")
+                : "";
+              return (
+                <div
+                  key={idx}
+                  className="w-64 theme-bg-surface border theme-border rounded-xl px-3 py-1.5 text-xs font-mono theme-text-primary shadow-sm flex items-center justify-between"
+                >
+                  <span className="font-bold theme-accent">Juz {jp.juz}</span>
+                  <span className="theme-text-secondary">{rangesStr}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -184,7 +181,7 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
               return (
                 <div
                   key={idx}
-                  className="w-52 theme-bg-surface border theme-border rounded-xl px-3 py-1.5 text-xs font-mono theme-text-primary shadow-sm"
+                  className="w-64 theme-bg-surface border theme-border rounded-xl px-3 py-1.5 text-xs font-mono theme-text-primary shadow-sm"
                 >
                   {parts.join(" · ")}
                 </div>
@@ -209,7 +206,7 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
               return (
                 <div
                   key={idx}
-                  className="w-52 theme-bg-surface border theme-border rounded-xl px-3 py-1.5 text-xs font-mono theme-text-primary shadow-sm"
+                  className="w-64 theme-bg-surface border theme-border rounded-xl px-3 py-1.5 text-xs font-mono theme-text-primary shadow-sm"
                 >
                   {parts.join(" · ")}
                 </div>

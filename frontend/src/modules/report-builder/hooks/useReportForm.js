@@ -140,7 +140,7 @@ export function useReportForm() {
 
   const [currentDraftId] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("recover_draft_id") || crypto.randomUUID();
+    return params.get("recover_draft_id") || "active_report_draft";
   });
 
   // Edit Mode state — tracks the report being edited
@@ -255,13 +255,26 @@ export function useReportForm() {
         window.history.replaceState({}, document.title, newUrl);
         showToast("Report draft recovered successfully!", "success");
       }
+    } else {
+      // Auto-recover active draft if present
+      const recovered = draftReport.getById("active_report_draft");
+      if (recovered) {
+        if (recovered.studentName !== undefined) setStudentName(recovered.studentName);
+        if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
+        if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
+        if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
+        if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
+        if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
+        if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.comment !== undefined) setComment(recovered.comment);
+      }
     }
 
     // 2. Load other unsaved drafts as options in draftInfo
     const allDrafts = draftReport.getAll();
     const unsavedDrafts = allDrafts.filter(d => {
       const hasContent = d.studentName || d.comment || d.selectedSession || d.hasData;
-      return hasContent && d.id !== currentDraftId;
+      return hasContent && d.id !== currentDraftId && d.id !== "active_report_draft";
     });
 
     if (unsavedDrafts.length > 0) {

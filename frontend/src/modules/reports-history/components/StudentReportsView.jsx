@@ -125,7 +125,7 @@ export default function StudentReportsView() {
     }
 
     let calculatedPages = 0;
-    if (Array.isArray(rep.juz_and_pages)) {
+    if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
       rep.juz_and_pages.forEach((jp) => {
         if (Array.isArray(jp.ranges)) {
           jp.ranges.forEach((r) => {
@@ -139,14 +139,24 @@ export default function StudentReportsView() {
           });
         }
       });
+    } else if (Array.isArray(rep.portions) && rep.portions.length > 0) {
+      rep.portions.forEach((p) => {
+        const start = parseInt(p.start_page || 0, 10);
+        const end = parseInt(p.end_page || p.start_page || 0, 10);
+        if (end >= start && start > 0) {
+          calculatedPages += end - start + 1;
+        } else if (start > 0) {
+          calculatedPages += 1;
+        }
+      });
     }
 
     const hasEditedFlag = Boolean(
       rep.is_edited ||
       rep.edited_at ||
-      (rep.updated_at && rep.created_at && rep.updated_at !== rep.created_at)
+      (rep.updated_at && rep.created_at && Math.abs(new Date(rep.updated_at) - new Date(rep.created_at)) > 5000)
     );
-    const editedAtTime = rep.edited_at || rep.updated_at || rep.client_updated_at || null;
+    const editedAtTime = rep.edited_at || (hasEditedFlag ? rep.updated_at : null) || rep.client_updated_at || null;
 
     return {
       ...rep,
@@ -169,7 +179,7 @@ export default function StudentReportsView() {
       isoDateOnly,
       is_edited: hasEditedFlag,
       edited_at: editedAtTime,
-      totalPages: calculatedPages || rep.total_pages || rep.pages || 0,
+      totalPages: calculatedPages || rep.total_page || rep.total_pages || rep.pages || 0,
       mistakesCount: rep.total_mistake ?? (rep.mistakes_count || rep.mistakes?.length || 0),
       stucksCount: rep.total_stuck ?? (rep.stucks_count || rep.stucks?.length || 0),
     };

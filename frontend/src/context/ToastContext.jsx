@@ -31,7 +31,10 @@ export function ToastProvider({ children }) {
   const showToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
     const formattedMsg = formatErrorMessage(message);
-    setToasts((prev) => [...prev, { id, message: formattedMsg, type }]);
+    setToasts((prev) => {
+      const next = [...prev, { id, message: formattedMsg, type }];
+      return next.slice(-3); // Keep only the 3 most recent toasts
+    });
 
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
