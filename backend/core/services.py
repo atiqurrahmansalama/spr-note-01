@@ -268,7 +268,11 @@ def evaluate_section_config_for_user(user=None):
 
     # 4-Tier Resolution Evaluation
     for key, global_val in sec_map.items():
-        if user and user.is_authenticated and key in user_overrides:
+        if not global_val:
+            # If globally disabled, it is OFF everywhere (cannot be overridden to ON)
+            resolved[key] = False
+            origins[key] = "GLOBAL"
+        elif user and user.is_authenticated and key in user_overrides:
             resolved[key] = user_overrides[key]
             origins[key] = "USER"
         elif user and user.is_authenticated and key in group_overrides:

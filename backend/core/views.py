@@ -2547,15 +2547,19 @@ class ControlPanelRulesView(APIView):
             effective_enabled = item["global"]
             origin = "GLOBAL"
 
-            if scope == 'USER' and key in user_overrides:
-                effective_enabled = user_overrides[key]
-                origin = "USER"
-            elif scope == 'GROUP' and key in group_overrides:
-                effective_enabled = group_overrides[key]
-                origin = "GROUP"
-            elif scope == 'ROLE' and key in role_overrides:
-                effective_enabled = role_overrides[key]
-                origin = "ROLE"
+            if not item["global"]:
+                effective_enabled = False
+                origin = "GLOBAL"
+            else:
+                if scope == 'USER' and key in user_overrides:
+                    effective_enabled = user_overrides[key]
+                    origin = "USER"
+                elif scope == 'GROUP' and key in group_overrides:
+                    effective_enabled = group_overrides[key]
+                    origin = "GROUP"
+                elif scope == 'ROLE' and key in role_overrides:
+                    effective_enabled = role_overrides[key]
+                    origin = "ROLE"
 
             categories_map[cat_key]["sections"].append({
                 "id": item["id"],
