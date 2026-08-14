@@ -12,6 +12,7 @@ export default function ReportDateRangePicker({
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showCustomCalendar, setShowCustomCalendar] = useState(false);
+  const [isCustomPicking, setIsCustomPicking] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -19,6 +20,7 @@ export default function ReportDateRangePicker({
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsDropdownOpen(false);
         setShowCustomCalendar(false);
+        setIsCustomPicking(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -68,8 +70,9 @@ export default function ReportDateRangePicker({
 
   const handleSelectPreset = (presetKey) => {
     if (presetKey === "custom") {
-      // Toggle custom calendar inline within dropdown
-      setShowCustomCalendar((prev) => !prev);
+      setIsCustomPicking(true);
+      setIsDropdownOpen(false);
+      setShowCustomCalendar(true);
       return;
     }
 
@@ -81,6 +84,7 @@ export default function ReportDateRangePicker({
     }
     setIsDropdownOpen(false);
     setShowCustomCalendar(false);
+    setIsCustomPicking(false);
   };
 
   const formatDateDisplay = (dStr) => {
@@ -90,6 +94,7 @@ export default function ReportDateRangePicker({
   };
 
   const getActivePresetKey = () => {
+    if (isCustomPicking) return "custom";
     if (!startDate && !endDate) return "all_time";
 
     const today = new Date();
@@ -126,6 +131,7 @@ export default function ReportDateRangePicker({
   const activeKey = getActivePresetKey();
 
   const getLabel = () => {
+    if (isCustomPicking) return "Pick custom range";
     if (activeKey === "today") return "Today";
     if (activeKey === "yesterday") return "Yesterday";
     if (activeKey === "past_week") return "Past Week (Last 7 Days)";
@@ -148,8 +154,8 @@ export default function ReportDateRangePicker({
     { key: "this_month", label: "This Month" },
     { key: "past_month", label: "Past 1 Month (30 Days)" },
     { key: "past_3months", label: "Past 3 Months" },
-    { key: "custom", label: "Custom Date Range…" },
     { key: "all_time", label: "All Time (Clear Filter)" },
+    { key: "custom", label: "Custom Date Range…" },
   ];
 
   return (
@@ -165,6 +171,7 @@ export default function ReportDateRangePicker({
               onReset();
               setIsDropdownOpen(false);
               setShowCustomCalendar(false);
+              setIsCustomPicking(false);
             }}
             className="text-[10px] theme-bg-sub border theme-border hover:theme-bg-elevated px-2 py-0.5 rounded-lg text-rose-400 font-bold uppercase tracking-wider cursor-pointer transition active:scale-95 shadow-sm"
             title="Reset date filter"
@@ -178,8 +185,12 @@ export default function ReportDateRangePicker({
       <button
         type="button"
         onClick={() => {
-          setIsDropdownOpen((prev) => !prev);
-          if (isDropdownOpen) setShowCustomCalendar(false);
+          if (showCustomCalendar) {
+            setShowCustomCalendar(false);
+            setIsCustomPicking(false);
+          } else {
+            setIsDropdownOpen((prev) => !prev);
+          }
         }}
         className="w-full h-[42px] flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-semibold hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm"
       >
@@ -187,7 +198,7 @@ export default function ReportDateRangePicker({
           <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
           <span className="truncate">{getLabel()}</span>
         </div>
-        <ChevronIcon isOpen={isDropdownOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
+        <ChevronIcon isOpen={isDropdownOpen || showCustomCalendar} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
       </button>
 
       {/* Dropdown Options Popup Menu */}
@@ -220,26 +231,27 @@ export default function ReportDateRangePicker({
               </button>
             );
           })}
+        </div>
+      )}
 
-          {/* Inline Custom Calendar — appears inside the dropdown when Custom is chosen */}
-          {showCustomCalendar && (
-            <div className="pt-1 pb-0.5 px-1 border-t theme-border mt-1 animate-fade-in">
-              <ReusableCalendar
-                isRange={true}
-                startDate={startDate}
-                endDate={endDate}
-                onRangeSelect={(start, end) => {
-                  if (onRangeSelect) onRangeSelect(start, end);
-                  setIsDropdownOpen(false);
-                  setShowCustomCalendar(false);
-                }}
-                minDate={minDate}
-                maxDate={maxDate}
-                placeholder="Pick custom range"
-                className="w-full"
-              />
-            </div>
-          )}
+      {/* Custom Calendar Popup below input */}
+      {showCustomCalendar && (
+        <div className="absolute z-50 left-0 right-0 mt-1.5 w-full theme-bg-surface border theme-border rounded-2xl shadow-2xl p-3 animate-fade-in">
+          <ReusableCalendar
+            isRange={true}
+            startDate={startDate}
+            endDate={endDate}
+            onRangeSelect={(start, end) => {
+              if (onRangeSelect) onRangeSelect(start, end);
+              setIsDropdownOpen(false);
+              setShowCustomCalendar(false);
+              setIsCustomPicking(false);
+            }}
+            minDate={minDate}
+            maxDate={maxDate}
+            placeholder="Pick custom range"
+            className="w-full"
+          />
         </div>
       )}
     </div>

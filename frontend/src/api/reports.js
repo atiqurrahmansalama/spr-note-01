@@ -32,18 +32,17 @@ const fetchApi = async (path, options = {}) => {
  * Format local report form state into nested Django REST API payload
  */
 export const transformFormToApiPayload = (reportData) => {
-  const {
-    studentId,
-    studentName,
-    selectedSession,
-    selectedDate,
-    juzPageData = [],
-    mistakeData = [],
-    stuckData = [],
-    comment = "",
-    status = "Completed",
-    score = 100,
-  } = reportData || {};
+  const studentId = reportData?.studentId || reportData?.student_id;
+  const studentName = reportData?.studentName || reportData?.student || "N/A";
+  const groupName = reportData?.groupName || reportData?.subject_course || "General Group";
+  const selectedSession = reportData?.selectedSession || reportData?.session || "Subah";
+  const selectedDate = reportData?.selectedDate || reportData?.report_date || reportData?.date;
+  const juzPageData = reportData?.juzPageData || reportData?.juz_and_pages || [];
+  const mistakeData = reportData?.mistakeData || reportData?.mistakes || [];
+  const stuckData = reportData?.stuckData || reportData?.stucks || [];
+  const comment = reportData?.comment || "";
+  const status = reportData?.status || reportData?.overall_status || "Completed";
+  const score = reportData?.score !== undefined ? reportData.score : 100;
 
   // 1. Transform Juz Page Data into `portions` array
   const portions = [];

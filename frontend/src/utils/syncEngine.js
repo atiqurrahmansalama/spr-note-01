@@ -73,6 +73,22 @@ export const triggerCloudSync = async () => {
   const { createReport } = await import("../api/reports");
 
   for (const item of pendingItems) {
+    // Safety check: skip completely blank or default empty reports (student is N/A/empty and no pages/errors)
+    const isBlank = (
+      (!item.student || item.student === "N/A") &&
+      (!item.student_name || item.student_name === "N/A") &&
+      (!item.juz_and_pages || item.juz_and_pages.length === 0) &&
+      (!item.portions || item.portions.length === 0) &&
+      (!item.mistakes || item.mistakes.length === 0) &&
+      (!item.stucks || item.stucks.length === 0)
+    );
+
+    if (isBlank) {
+      console.warn("[SyncEngine] Skipping blank pending report:", item.id);
+      updatedIds = updatedIds.filter((id) => id !== item.id);
+      continue;
+    }
+
     try {
       const apiResult = await createReport(item);
 
