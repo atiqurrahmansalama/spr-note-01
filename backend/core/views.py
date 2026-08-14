@@ -53,7 +53,7 @@ from .models import (
     UserSectionOverride,
     FeatureFlagAuditLog,
 )
-from .permissions import IsAdminUserRole
+from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin
 from .middleware import detect_device_type, detect_device_info, get_client_ip
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -724,19 +724,52 @@ class ChangePasswordView(APIView):
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.filter(Q(status='Active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
+            return self.queryset.all()
+
+        return self.queryset.filter(created_by=user)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 class StudentGroupViewSet(viewsets.ModelViewSet):
     queryset = StudentGroup.objects.all().order_by('name')
     serializer_class = StudentGroupSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
+            return self.queryset.all()
+
+        return self.queryset.filter(created_by=user)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
     def list(self, request, *args, **kwargs):
-        if StudentGroup.objects.exists():
-            return super().list(request, *args, **kwargs)
+        queryset = self.filter_queryset(self.get_queryset())
+        if queryset.exists():
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
         
         from .models import Student, GroupSectionPermission
-        student_groups = set(Student.objects.exclude(group_name__isnull=True).exclude(group_name='').values_list('group_name', flat=True))
+        user = request.user
+        student_qs = Student.objects.exclude(group_name__isnull=True).exclude(group_name='')
+        if not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            student_qs = student_qs.filter(created_by=user)
+            
+        student_groups = set(student_qs.values_list('group_name', flat=True))
         perm_groups = set(GroupSectionPermission.objects.exclude(group_id__isnull=True).exclude(group_id='').values_list('group_id', flat=True))
         merged_groups = sorted(list(student_groups.union(perm_groups)))
         
@@ -746,12 +779,38 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all().order_by('id')
     serializer_class = SessionSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
+            return self.queryset.all()
+
+        return self.queryset.filter(created_by=user)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 class SavedMessageViewSet(viewsets.ModelViewSet):
     queryset = SavedMessage.objects.all().order_by('-created_at')
     serializer_class = SavedMessageSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
+            return self.queryset.all()
+
+        return self.queryset.filter(created_by=user)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 from rest_framework.pagination import PageNumberPagination
 
@@ -816,7 +875,7 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
     Supports filtering by: student_name, date (report date), session_name, status.
     """
     serializer_class = StudentDailyReportSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
@@ -876,6 +935,14 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
         status_filter = params.get('status')
         if status_filter:
             qs = qs.filter(status__iexact=status_filter)
+
+        # Apply strict Row-Level Isolation (except for Super Admin)
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return StudentDailyReport.objects.none()
+
+        if not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            qs = qs.filter(created_by=user)
 
         return qs
 

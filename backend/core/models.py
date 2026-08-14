@@ -412,6 +412,13 @@ class ActivityLog(models.Model):
 # 🎯 1. Group Table
 class StudentGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='created_groups'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -421,6 +428,13 @@ class StudentGroup(models.Model):
 # 🎯 2. Session Table
 class Session(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='created_sessions'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -430,6 +444,13 @@ class Session(models.Model):
 # 🎯 3. Template Message Table
 class SavedMessage(models.Model):
     text = models.TextField()
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='created_messages'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -446,6 +467,13 @@ class Student(models.Model):
     status = models.CharField(max_length=30, null=True, blank=True, default='Active')
     education_status = models.CharField(max_length=50, null=True, blank=True)
     target_status = models.CharField(max_length=100, null=True, blank=True)
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='created_students'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -534,7 +562,13 @@ class StudentDetail(models.Model):
     cur_address = models.TextField(null=True, blank=True)
     per_address = models.TextField(null=True, blank=True)
     initial_completed_juz = models.IntegerField(default=0, null=True, blank=True)
-
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='created_student_details'
+    )
 
     def __str__(self):
         return f"Details for Student {self.student.uniq_id or self.student.id}"
@@ -584,7 +618,7 @@ class StudentDailyReport(models.Model):
     # Tracking & Metadata
     created_by = models.ForeignKey(
         User,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='created_reports'

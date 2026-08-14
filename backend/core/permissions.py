@@ -25,3 +25,23 @@ class HasSectionAccess(BasePermission):
         from .services import get_resolved_feature_flags_for_user
         flags, _ = get_resolved_feature_flags_for_user(request.user)
         return flags.get(section_key, True)
+
+
+class IsOwnerOrSuperAdmin(BasePermission):
+    """
+    Object-level permission to only allow owners of an object or Super Admins to access/edit it.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        # Super Admins have absolute access
+        if getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or request.user.is_superuser:
+            return True
+
+        # Check ownership field
+        owner = getattr(obj, 'created_by', None) or getattr(obj, 'user', None) or getattr(obj, 'owner', None)
+        if owner and owner == request.user:
+            return True
+
+        return False

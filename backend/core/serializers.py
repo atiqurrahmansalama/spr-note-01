@@ -620,6 +620,8 @@ class StudentSerializer(serializers.ModelSerializer):
 
         # Automatically create linked StudentDetail
         details_kwargs = details_data if isinstance(details_data, dict) else {}
+        if 'created_by' in validated_data:
+            details_kwargs['created_by'] = validated_data['created_by']
         StudentDetail.objects.get_or_create(student=student, defaults=details_kwargs)
 
         return student
@@ -638,6 +640,9 @@ class StudentSerializer(serializers.ModelSerializer):
 
         if details_data is not None and isinstance(details_data, dict):
             detail_obj, _ = StudentDetail.objects.get_or_create(student=instance)
+            if not detail_obj.created_by and instance.created_by:
+                detail_obj.created_by = instance.created_by
+                detail_obj.save(update_fields=['created_by'])
             for attr, val in details_data.items():
                 setattr(detail_obj, attr, val)
             detail_obj.save()
