@@ -146,10 +146,17 @@ export const createReport = async (reportData) => {
   const payload = transformFormToApiPayload(reportData);
 
   try {
-    let res = await fetchWithAuth("/api/reports/", {
+    let res = await fetchWithAuth("/api/v1/reports/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
+
+    if (res && !res.ok && res.status === 404) {
+      res = await fetchWithAuth("/api/reports/", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    }
 
     if (res && !res.ok && res.status === 404) {
       res = await fetchWithAuth("/reports/", {
@@ -188,7 +195,10 @@ export const createReport = async (reportData) => {
  */
 export const fetchReports = async () => {
   try {
-    let res = await fetchApi("/api/reports/");
+    let res = await fetchApi("/api/v1/reports/");
+    if (!res.ok) {
+      res = await fetchApi("/api/reports/");
+    }
     if (!res.ok) {
       res = await fetchApi("/api/v1/hifz/reports/");
     }

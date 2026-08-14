@@ -96,24 +96,36 @@ export default function StudentAdmissionView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 space-y-6">
-      <div className="theme-bg-surface border theme-border rounded-2xl shadow-xl p-6">
-        <div className="border-b theme-border pb-4 mb-4">
-          <h2 className="text-lg font-bold theme-text-primary uppercase tracking-wide">
-            Student Admission and Registration
-          </h2>
-          <p className="text-xs theme-text-secondary mt-1">
-            Enroll new students under quick mode or full institutional mode.
-          </p>
+    <div className="w-full max-w-6xl md:max-w-7xl xl:max-w-[85vw] mx-auto py-6 px-4 space-y-6">
+      {/* Premium Styled Header (similar to User Management header) */}
+      <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-inner">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-bold tracking-tight theme-text-primary flex items-center gap-2.5">
+                <span>Student Admission and Registration</span>
+              </h1>
+              <p className="text-xs theme-text-secondary">
+                Enroll new students under quick mode or full institutional mode.
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="theme-bg-surface border theme-border rounded-2xl shadow-xl p-6 md:p-8 space-y-6 md:space-y-8">
         {/* Tab Switcher */}
         {!admittedStudent && (
           <div className="flex bg-neutral-100 dark:theme-bg-sub p-1 mb-6 rounded-xl">
             <button
               type="button"
               onClick={() => setActiveMode("QUICK")}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeMode === "QUICK"
                   ? "bg-white dark:theme-bg-surface theme-text-primary shadow-sm"
                   : "theme-text-secondary hover:theme-text-primary"
@@ -124,7 +136,7 @@ export default function StudentAdmissionView() {
             <button
               type="button"
               onClick={() => setActiveMode("FULL")}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeMode === "FULL"
                   ? "bg-white dark:theme-bg-surface theme-text-primary shadow-sm"
                   : "theme-text-secondary hover:theme-text-primary"

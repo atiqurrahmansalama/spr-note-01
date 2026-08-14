@@ -33,6 +33,8 @@ export default function SidebarContainer({
   const currentPath = propActivePath || location.pathname;
 
   const [openSubMenus, setOpenSubMenus] = useState({
+    "App Management": false,
+    "Student Management": false,
     Settings: true,
     Groups: false,
     Sessions: false,
@@ -47,12 +49,29 @@ export default function SidebarContainer({
 
   const menuItems = [
     { id: "Dashboard", name: "Dashboard", path: "/", Icon: DashboardIcon },
-    { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
-    { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
-    { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
+    {
+      id: "App Management",
+      name: "App Management",
+      Icon: SettingsIcon,
+      hasSub: true,
+      subItems: [
+        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
+        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
+        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
+      ]
+    },
     { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
-    { id: "Groups & Students", name: "Groups & Students", path: "/groups-students", Icon: GroupsIcon },
-    { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: GroupsIcon },
+    {
+      id: "Student Management",
+      name: "Student Management",
+      Icon: GroupsIcon,
+      hasSub: true,
+      subItems: [
+        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon },
+        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon },
+        { id: "Student Admission", name: "Student Admission & Profile Registration", path: "/admission", Icon: GroupsIcon },
+      ]
+    },
     { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
     { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
     { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
@@ -147,10 +166,10 @@ export default function SidebarContainer({
           {displayMenuItems.map((item) => {
             const isParentActive = checkIsActive(item.path);
             const ItemIcon = item.Icon;
-            const isSubOpen = openSubMenus[item.id] || false;
+            const isAnySubActive = item.hasSub ? item.subItems.some((sub) => checkIsActive(sub.path)) : false;
+            const isSubOpen = openSubMenus[item.id] || isAnySubActive || false;
 
             if (item.hasSub) {
-              const isAnySubActive = item.subItems.some((sub) => checkIsActive(sub.path));
 
               return (
                 <div key={item.id} className="space-y-1.5">

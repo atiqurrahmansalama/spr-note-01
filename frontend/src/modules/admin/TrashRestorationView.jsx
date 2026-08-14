@@ -16,7 +16,10 @@ export default function TrashRestorationView() {
   const loadTrashedReports = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/reports/?trash=true");
+      let res = await fetchWithAuth("/api/v1/reports/?trash=true");
+      if (res && !res.ok && res.status === 404) {
+        res = await fetchWithAuth("/api/reports/?trash=true");
+      }
       if (res.ok) {
         const raw = await res.json();
         const items = Array.isArray(raw) ? raw : raw.results || [];
@@ -61,9 +64,14 @@ export default function TrashRestorationView() {
 
     setRestoringId(report.id);
     try {
-      const res = await fetchWithAuth(`/api/reports/${report.id}/restore/`, {
+      let res = await fetchWithAuth(`/api/v1/reports/${report.id}/restore/`, {
         method: "POST",
       });
+      if (res && !res.ok && res.status === 404) {
+        res = await fetchWithAuth(`/api/reports/${report.id}/restore/`, {
+          method: "POST",
+        });
+      }
 
       if (res.ok) {
         showToast(`Report ${report.report_unique_id} successfully restored!`, "success");

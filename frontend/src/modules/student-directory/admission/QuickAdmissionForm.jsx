@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import apiClient from "../../../api/axios";
 import { useToast } from "../../../context/ToastContext";
+import CustomSelect from "../../../components/ui/CustomSelect";
+
+const CLASS_CHOICES = ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Hifz", "Nazera", "Play", "Nursery", "Qaida", "Ampara"];
 
 export default function QuickAdmissionForm({ onCancel, onSuccess, sharedData, setSharedData }) {
   const { showToast } = useToast();
@@ -32,7 +35,16 @@ export default function QuickAdmissionForm({ onCancel, onSuccess, sharedData, se
   const handleEnroll = async (e) => {
     e.preventDefault();
     if (!sharedData.name?.trim()) {
-      showToast("Student English Name is required", "warning");
+      showToast("Student Name is required", "warning");
+      return;
+    }
+    if (!sharedData.education_status) {
+      showToast("Class is required", "warning");
+      return;
+    }
+    const finalGroupName = newGroupActive ? newGroupName : (sharedData.group_name || "General Group");
+    if (!finalGroupName?.trim()) {
+      showToast("Group / Section is required", "warning");
       return;
     }
     if (!sharedData.guardian_phone?.trim()) {
@@ -41,12 +53,12 @@ export default function QuickAdmissionForm({ onCancel, onSuccess, sharedData, se
     }
 
     setLoading(true);
-    const finalGroupName = newGroupActive ? newGroupName : (sharedData.group_name || "General Group");
 
     const payload = {
       name: sharedData.name,
       student_id_card_number: sharedData.student_id_card_number || null,
       group_name: finalGroupName,
+      education_status: sharedData.education_status,
       admission_mode: "QUICK",
       status: "ACTIVE",
       guardian_data: {
@@ -123,59 +135,53 @@ export default function QuickAdmissionForm({ onCancel, onSuccess, sharedData, se
         </div>
       </div>
 
-      <div>
-        <div className="flex justify-between items-center mb-1">
-          <label className="block text-xs font-semibold theme-text-secondary">
-            Class / Group *
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Class Selector */}
+        <div>
+          <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
+            Class *
           </label>
-          <button
-            type="button"
-            onClick={() => setNewGroupActive(!newGroupActive)}
-            className="text-[11px] text-[var(--accent-main)] hover:underline focus:outline-none cursor-pointer"
-          >
-            {newGroupActive ? "Select Existing Class" : "Create New Class"}
-          </button>
+          <CustomSelect
+            options={CLASS_CHOICES}
+            value={sharedData.education_status || ""}
+            onChange={(val) => handleChange("education_status", val)}
+            placeholder="Select Class..."
+          />
         </div>
 
-        {newGroupActive ? (
-          <input
-            type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            required
-            placeholder="Enter new class/group name..."
-            className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-          />
-        ) : (
-          <select
-            value={sharedData.group_name || ""}
-            onChange={(e) => handleChange("group_name", e.target.value)}
-            className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-          >
-            <option value="">Select a Group/Class</option>
-            {groups.map((grp) => (
-              <option key={grp.id} value={grp.name}>
-                {grp.name}
-              </option>
-            ))}
-            {groups.length === 0 && <option value="General Group">General Group</option>}
-          </select>
-        )}
-      </div>
+        {/* Group Selector */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-xs font-semibold theme-text-secondary">
+              Group / Section *
+            </label>
+            <button
+              type="button"
+              onClick={() => setNewGroupActive(!newGroupActive)}
+              className="text-[11px] text-[var(--accent-main)] hover:underline focus:outline-none cursor-pointer"
+            >
+              {newGroupActive ? "Select Existing Group" : "Create New Group"}
+            </button>
+          </div>
 
-      <div>
-        <label className="block text-xs font-semibold theme-text-secondary mb-1">
-          Initial Juz / Completion Level (Optional)
-        </label>
-        <input
-          type="number"
-          min="0"
-          max="30"
-          value={sharedData.initial_completed_juz || 0}
-          onChange={(e) => handleChange("initial_completed_juz", e.target.value)}
-          placeholder="e.g. 5"
-          className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-        />
+          {newGroupActive ? (
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              required
+              placeholder="Enter new group name..."
+              className="w-full h-11 theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+            />
+          ) : (
+            <CustomSelect
+              options={groups.map((grp) => grp.name)}
+              value={sharedData.group_name || ""}
+              onChange={(val) => handleChange("group_name", val)}
+              placeholder="Select Group..."
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-3 border-t theme-border">

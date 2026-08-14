@@ -13,7 +13,7 @@ import StudentAdmissionModal from "../admission/StudentAdmissionModal";
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
 import { GroupsIcon, UsersIcon, TrashIcon, EditIcon, CloudIcon } from "../../../components/ui/Icons";
 
-export default function StudentDirectoryView() {
+export default function StudentDirectoryView({ viewMode = "all" }) {
   const { showToast } = useToast();
 
   const [studentList, setStudentList] = useState(() => studentStore.getAll());
@@ -395,7 +395,8 @@ export default function StudentDirectoryView() {
         />
 
         {/* 3. Group List Roster Section (With In-Column Edit & Expanded Scroll Area) */}
-        <div className="space-y-3 pt-1">
+        {viewMode !== "students" && (
+          <div className="space-y-3 pt-1">
           <div className="flex items-center justify-between pb-1 border-b theme-border">
             <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
               <GroupsIcon className="w-4 h-4 theme-accent" />
@@ -623,7 +624,11 @@ export default function StudentDirectoryView() {
 
             </div>
           </div>
-        </div>          {/* 4. Student Roster Section */}
+        </div>
+      )}
+
+      {/* 4. Student Roster Section */}
+      {viewMode !== "groups" && (
           <div className="space-y-3 pt-3 border-t theme-border">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-1">
               <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
@@ -907,6 +912,7 @@ export default function StudentDirectoryView() {
               </div>
             )}
           </div>
+        )}
 
       </div>
 

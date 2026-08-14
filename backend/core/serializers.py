@@ -1199,7 +1199,7 @@ class StudentGuardianSerializer(serializers.ModelSerializer):
         model = StudentGuardian
         fields = [
             'id', 'father_name', 'father_phone', 'father_occupation',
-            'mother_name', 'mother_phone', 'primary_guardian_name',
+            'mother_name', 'mother_phone', 'mother_occupation', 'primary_guardian_name',
             'primary_guardian_phone', 'guardian_relation', 'guardian_nid',
             'emergency_contact_phone'
         ]
@@ -1219,7 +1219,7 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
         model = StudentAcademicDetail
         fields = [
             'id', 'session_year', 'class_or_group_id', 'class_or_group_name',
-            'roll_number', 'admission_date', 'previous_school_name', 'tc_number'
+            'roll_number', 'admission_date', 'previous_school_name', 'previous_school_address', 'tc_number'
         ]
 
 
@@ -1241,9 +1241,9 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'name', 'bangla_name', 'student_id_card_number', 'gender', 'dob',
-            'blood_group', 'birth_certificate_no', 'photo', 'present_address_data',
+            'blood_group', 'birth_certificate_no', 'nid_no', 'photo', 'present_address_data',
             'permanent_address_data', 'academic_data', 'guardian_data',
-            'admission_mode', 'status', 'group_name', 'roll_number'
+            'admission_mode', 'status', 'group_name', 'roll_number', 'education_status'
         ]
 
     @transaction.atomic
@@ -1306,9 +1306,9 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'uniq_id', 'roll_number', 'name', 'name_en', 'bangla_name', 
             'student_id_card_number', 'gender', 'dob', 'blood_group', 
-            'birth_certificate_no', 'photo', 'present_address', 'permanent_address', 
+            'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
             'academic_detail', 'guardian_detail', 'documents', 'admission_mode', 
-            'status', 'group_name', 'created_at', 'updated_at',
+            'status', 'group_name', 'created_at', 'updated_at', 'education_status',
             'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data'
         ]
 

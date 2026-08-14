@@ -73,6 +73,8 @@ export default function App() {
         >
           <Route path="student-reports" element={<StudentReportsView />} />
           <Route path="groups-students" element={<StudentDirectoryView />} />
+          <Route path="student-roster" element={<StudentDirectoryView viewMode="students" />} />
+          <Route path="group-roster" element={<StudentDirectoryView viewMode="groups" />} />
           <Route path="admission" element={<StudentAdmissionView />} />
           <Route path="sessions-comments" element={<SessionManager />} />
           <Route path="user-management" element={<UserManagementModule />} />

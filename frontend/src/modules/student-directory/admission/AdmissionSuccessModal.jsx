@@ -49,7 +49,11 @@ export default function AdmissionSuccessModal({ student, onReset, onClose }) {
     doc.close();
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
-    document.body.removeChild(iframe);
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 2000);
   };
 
   return (

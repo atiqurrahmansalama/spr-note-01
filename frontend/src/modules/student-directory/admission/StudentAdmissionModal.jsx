@@ -107,7 +107,7 @@ export default function StudentAdmissionModal({ isOpen, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-2xl theme-bg-surface border theme-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="w-full max-w-6xl md:max-w-7xl xl:max-w-[85vw] theme-bg-surface border theme-border rounded-2xl shadow-2xl flex flex-col h-[85vh] max-h-[85vh] overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b theme-border shrink-0">
           <h2 className="text-sm font-bold theme-text-primary uppercase tracking-wider">

@@ -8,15 +8,15 @@ import { useAuth } from "./AuthContext";
 const getCacheKey = (userId) => `spr_evaluated_config_${userId || "anon"}_v2`;
 
 const HARD_DEFAULTS = {
-  headerDate: false,     // start false → force server to confirm ON
-  studentSelect: false,
-  sessionSelect: false,
-  juzPageInput: false,
-  mistakeTracker: false,
-  stuckTracker: false,
-  commentSection: false,
-  actionButtons: false,
-  pdfExport: false,
+  headerDate: true,
+  studentSelect: true,
+  sessionSelect: true,
+  juzPageInput: true,
+  mistakeTracker: true,
+  stuckTracker: true,
+  commentSection: true,
+  actionButtons: true,
+  pdfExport: true,
 };
 
 // Read the last cached server-evaluated config for this user id.

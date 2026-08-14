@@ -517,6 +517,7 @@ class Student(models.Model):
         ('AB+', 'AB+'), ('AB-', 'AB-')
     ], blank=True, null=True)
     birth_certificate_no = models.CharField(max_length=64, blank=True, null=True)
+    nid_no = models.CharField(max_length=64, blank=True, null=True)
     photo = models.ImageField(upload_to='students/photos/', blank=True, null=True)
     present_address = models.ForeignKey('Address', related_name='student_present_addresses', on_delete=models.SET_NULL, null=True, blank=True)
     permanent_address = models.ForeignKey('Address', related_name='student_permanent_addresses', on_delete=models.SET_NULL, null=True, blank=True)
@@ -1056,6 +1057,7 @@ class StudentAcademicDetail(models.Model):
     roll_number = models.CharField(max_length=32, blank=True, null=True)
     admission_date = models.DateField(default=timezone.now)
     previous_school_name = models.CharField(max_length=255, blank=True, null=True)
+    previous_school_address = models.CharField(max_length=255, blank=True, null=True)
     tc_number = models.CharField(max_length=64, blank=True, null=True)
     created_by = models.ForeignKey(
         'User',
@@ -1075,6 +1077,7 @@ class StudentGuardian(models.Model):
     father_occupation = models.CharField(max_length=128, blank=True, null=True)
     mother_name = models.CharField(max_length=255, blank=True, null=True)
     mother_phone = models.CharField(max_length=32, blank=True, null=True)
+    mother_occupation = models.CharField(max_length=128, blank=True, null=True)
     primary_guardian_name = models.CharField(max_length=255, blank=True, null=True)
     primary_guardian_phone = models.CharField(max_length=32, blank=True, null=True)
     guardian_relation = models.CharField(max_length=64, default='Father')
