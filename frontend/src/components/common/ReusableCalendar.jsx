@@ -18,6 +18,7 @@ export default function ReusableCalendar({
   maxDate = "",
   placeholder = "Select Date",
   className = "",
+  isInline = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [tempStart, setTempStart] = useState(startDate || selectedDate);
@@ -44,11 +45,11 @@ export default function ReusableCalendar({
         setIsOpen(false);
       }
     };
-    if (isOpen) {
+    if (isOpen && !isInline) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, isInline]);
 
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -146,20 +147,22 @@ export default function ReusableCalendar({
 
   return (
     <div ref={containerRef} className={`relative w-full inline-block ${className}`}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full h-[42px] flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-medium hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm"
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
-          <span className="truncate font-semibold">{getLabel()}</span>
-        </div>
-        <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
-      </button>
+      {!isInline && (
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="w-full h-[42px] flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-medium hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+            <span className="truncate font-semibold">{getLabel()}</span>
+          </div>
+          <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
+        </button>
+      )}
 
-      {isOpen && (
-        <div className="absolute z-50 left-0 mt-2 w-72 p-3 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-3 animate-fade-in select-none">
+      {(isOpen || isInline) && (
+        <div className={isInline ? "w-full p-1 space-y-3 select-none" : "absolute z-50 left-0 mt-2 w-72 p-3 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-3 animate-fade-in select-none"}>
 
           {/* Month/Year Header */}
           <div className="flex items-center justify-between text-xs font-bold theme-text-primary px-1">

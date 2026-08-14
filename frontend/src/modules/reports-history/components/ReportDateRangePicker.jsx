@@ -238,6 +238,7 @@ export default function ReportDateRangePicker({
       {showCustomCalendar && (
         <div className="absolute z-50 left-0 right-0 mt-1.5 w-full theme-bg-surface border theme-border rounded-2xl shadow-2xl p-3 animate-fade-in">
           <ReusableCalendar
+            isInline={true}
             isRange={true}
             startDate={startDate}
             endDate={endDate}
@@ -250,7 +251,7 @@ export default function ReportDateRangePicker({
             minDate={minDate}
             maxDate={maxDate}
             placeholder="Pick custom range"
-            className="w-full"
+            className="w-full flex justify-center"
           />
         </div>
       )}

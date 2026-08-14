@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { SessionsIcon, GroupsIcon } from "../../../components/ui/Icons";
 
 export default function ReportsAnalytics({ filteredReports, reportsList, reports }) {
   const activeReports = filteredReports || reportsList || reports || [];
@@ -13,19 +12,13 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
 
     const avgPagesPerReport = totalReports > 0 ? (totalPages / totalReports).toFixed(1) : "0";
     const avgMistakesPerReport = totalReports > 0 ? (totalMistakes / totalReports).toFixed(1) : "0";
+    const avgStucksPerReport = totalReports > 0 ? (totalStucks / totalReports).toFixed(1) : "0";
 
-    const groupMap = {};
-    const sessionMap = {};
+    const avgMistakesPerPage = totalPages > 0 ? (totalMistakes / totalPages).toFixed(2) : "0.00";
+    const avgStucksPerPage = totalPages > 0 ? (totalStucks / totalPages).toFixed(2) : "0.00";
 
-    activeReports.forEach((r) => {
-      groupMap[r.student_group] = (groupMap[r.student_group] || 0) + 1;
-      sessionMap[r.session_name] = (sessionMap[r.session_name] || 0) + 1;
-    });
-
-    // Score calculation (Overall accuracy rating based on mistake/page ratio)
-    const accuracyScore = totalPages > 0 
-      ? Math.max(0, 100 - Math.round((totalMistakes / totalPages) * 15))
-      : 100;
+    const pagesPerMistake = totalMistakes > 0 ? (totalPages / totalMistakes).toFixed(1) : totalPages.toFixed(1);
+    const pagesPerStuck = totalStucks > 0 ? (totalPages / totalStucks).toFixed(1) : totalPages.toFixed(1);
 
     return {
       totalReports,
@@ -35,11 +28,13 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
       uniqueStudents,
       avgPagesPerReport,
       avgMistakesPerReport,
-      groupMap,
-      sessionMap,
-      accuracyScore,
+      avgStucksPerReport,
+      avgMistakesPerPage,
+      avgStucksPerPage,
+      pagesPerMistake,
+      pagesPerStuck,
     };
-  }, [filteredReports]);
+  }, [activeReports]);
 
   return (
     <div className="w-full space-y-5 animate-fade-in select-none">
@@ -91,40 +86,57 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
             {analyticsData.totalStucks}
           </div>
           <span className="text-[10px] theme-text-secondary block">
-            Hesitation markers
+            Avg {analyticsData.avgStucksPerReport} / report
           </span>
         </div>
 
       </div>
 
-      {/* Progress & Quality Score Gauge */}
-      <div className="theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold theme-text-primary">Overall Recitation Quality Index</h3>
-            <p className="text-[10px] sm:text-[11px] theme-text-secondary">Estimated accuracy score based on pages and mistake frequency</p>
-          </div>
-          <div className="text-lg sm:text-xl font-bold font-mono theme-accent px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl theme-bg-sub border theme-border shrink-0">
-            {analyticsData.accuracyScore}%
-          </div>
+      {/* Recitation Mistakes & Stucks Density Progress */}
+      <div className="theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+        <div>
+          <h3 className="text-xs sm:text-sm font-bold theme-text-primary">Recitation Error Density Index</h3>
+          <p className="text-[10px] sm:text-[11px] theme-text-secondary">Average mistakes and stucks incurred per recited page</p>
         </div>
-        <div className="w-full bg-slate-700/40 h-3 rounded-full overflow-hidden">
-          <div
-            className="theme-bg-accent h-full rounded-full transition-all duration-500"
-            style={{ width: `${analyticsData.accuracyScore}%` }}
-          />
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="theme-text-primary">Average Mistakes Per Page</span>
+              <span className="text-rose-400 font-mono font-bold">{analyticsData.avgMistakesPerPage}</span>
+            </div>
+            <div className="w-full bg-slate-700/40 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="bg-rose-500 h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, parseFloat(analyticsData.avgMistakesPerPage) * 50)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="theme-text-primary">Average Stucks Per Page</span>
+              <span className="text-amber-400 font-mono font-bold">{analyticsData.avgStucksPerPage}</span>
+            </div>
+            <div className="w-full bg-slate-700/40 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, parseFloat(analyticsData.avgStucksPerPage) * 50)}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Detailed Analysis Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         
-        {/* Recitation Volume */}
+        {/* Mistakes Metrics */}
         <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b theme-border pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary flex items-center gap-2">
-              <SessionsIcon className="w-4 h-4 theme-accent" />
-              <span>Volume & Session Frequency</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>Mistakes Frequency Analysis</span>
             </h3>
           </div>
 
@@ -134,49 +146,42 @@ export default function ReportsAnalytics({ filteredReports, reportsList, reports
               <span className="font-bold font-mono theme-accent text-sm">{analyticsData.totalPages} Pages</span>
             </div>
             <div className="flex justify-between items-center py-1 border-b theme-border">
-              <span className="theme-text-secondary font-medium">Avg Pages Per Report:</span>
-              <span className="font-bold font-mono theme-text-primary">{analyticsData.avgPagesPerReport} Pages</span>
+              <span className="theme-text-secondary font-medium">Average Mistakes Per Page:</span>
+              <span className="font-bold font-mono text-rose-400 text-sm">{analyticsData.avgMistakesPerPage}</span>
             </div>
             <div className="flex justify-between items-center py-1 border-b theme-border">
-              <span className="theme-text-secondary font-medium">Mistake to Stuck Ratio:</span>
-              <span className="font-bold font-mono theme-text-primary">
-                {analyticsData.totalStucks > 0 ? (analyticsData.totalMistakes / analyticsData.totalStucks).toFixed(2) : '1.00'}
+              <span className="theme-text-secondary font-medium">Pages Recited Per Mistake:</span>
+              <span className="font-bold font-mono theme-text-primary text-sm">
+                Every {analyticsData.pagesPerMistake} page(s)
               </span>
             </div>
           </div>
         </div>
 
-        {/* Group Distribution */}
+        {/* Stucks Metrics */}
         <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b theme-border pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary flex items-center gap-2">
-              <GroupsIcon className="w-4 h-4 theme-accent" />
-              <span>Reports Per Group</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>Stucks Frequency Analysis</span>
             </h3>
           </div>
 
-          <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-            {Object.entries(analyticsData.groupMap).length === 0 ? (
-              <p className="text-xs theme-text-secondary italic">No group data available.</p>
-            ) : (
-              Object.entries(analyticsData.groupMap).map(([group, count]) => {
-                const pct = analyticsData.totalReports > 0 ? ((count / analyticsData.totalReports) * 100).toFixed(0) : 0;
-                return (
-                  <div key={group} className="space-y-1">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="theme-text-primary">{group}</span>
-                      <span className="theme-accent font-mono font-bold">{count} ({pct}%)</span>
-                    </div>
-                    <div className="w-full bg-slate-700/40 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="theme-bg-accent h-full rounded-full transition-all duration-300"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between items-center py-1 border-b theme-border">
+              <span className="theme-text-secondary font-medium">Total Recited Pages:</span>
+              <span className="font-bold font-mono theme-accent text-sm">{analyticsData.totalPages} Pages</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b theme-border">
+              <span className="theme-text-secondary font-medium">Average Stucks Per Page:</span>
+              <span className="font-bold font-mono text-amber-400 text-sm">{analyticsData.avgStucksPerPage}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b theme-border">
+              <span className="theme-text-secondary font-medium">Pages Recited Per Stuck:</span>
+              <span className="font-bold font-mono theme-text-primary text-sm">
+                Every {analyticsData.pagesPerStuck} page(s)
+              </span>
+            </div>
           </div>
         </div>
 
