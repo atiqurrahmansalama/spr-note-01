@@ -9,6 +9,7 @@ import { auth as authStore } from "./utils/localStore";
 
 import StudentReportsView from "./modules/reports-history/ReportsHistoryModule";
 import StudentDirectoryView from "./modules/student-directory/StudentDirectoryModule";
+import StudentAdmissionView from "./modules/student-directory/admission/StudentAdmissionView";
 import SessionManager from "./modules/student-directory/components/SessionManager";
 import UserManagementModule from "./modules/admin/UserManagementModule";
 import RoleManagementModule from "./modules/admin/RoleManagementModule";
@@ -72,6 +73,7 @@ export default function App() {
         >
           <Route path="student-reports" element={<StudentReportsView />} />
           <Route path="groups-students" element={<StudentDirectoryView />} />
+          <Route path="admission" element={<StudentAdmissionView />} />
           <Route path="sessions-comments" element={<SessionManager />} />
           <Route path="user-management" element={<UserManagementModule />} />
           <Route path="role-management" element={<RoleManagementModule />} />

@@ -15,6 +15,7 @@ export const ROUTE_TITLE_MAP = {
   "/dashboard": { title: "Dashboard", isDashboard: true },
   "/student-reports": { title: "Student Progress & Daily Reports" },
   "/groups-students": { title: "Groups & Students Directory" },
+  "/admission": { title: "Student Admission & Profile Registration" },
   "/sessions-comments": { title: "Sessions & Saved Comments" },
   "/user-management": { title: "User Management" },
   "/role-management": { title: "Role Management & Hierarchy Permissions" },

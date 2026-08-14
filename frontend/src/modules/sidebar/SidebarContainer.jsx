@@ -52,6 +52,7 @@ export default function SidebarContainer({
     { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
     { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
     { id: "Groups & Students", name: "Groups & Students", path: "/groups-students", Icon: GroupsIcon },
+    { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: GroupsIcon },
     { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
     { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
     { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
