@@ -19,7 +19,7 @@ FEATURE_REGISTRY = [
         "description": "Master administrative controls and tools",
         "is_parent": True,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 20,
     },
     {
@@ -29,7 +29,7 @@ FEATURE_REGISTRY = [
         "description": "Enterprise 4-tier feature flag manager",
         "is_parent": False,
         "parent_key": "nav_app_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 21,
     },
     {
@@ -39,7 +39,7 @@ FEATURE_REGISTRY = [
         "description": "Global user directories and accounts",
         "is_parent": False,
         "parent_key": "nav_app_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 22,
     },
     {
@@ -49,7 +49,7 @@ FEATURE_REGISTRY = [
         "description": "Custom role creation and permissions",
         "is_parent": False,
         "parent_key": "nav_app_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 23,
     },
     {
@@ -59,8 +59,18 @@ FEATURE_REGISTRY = [
         "description": "User sessions and security log audits",
         "is_parent": False,
         "parent_key": "nav_app_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 24,
+    },
+    {
+        "key": "app_role_invites",
+        "label": "Role QR & Invite Links",
+        "category": "ADMIN",
+        "description": "Generate role-based onboarding QR codes and instant join links",
+        "is_parent": False,
+        "parent_key": "nav_app_management",
+        "default_enabled": False,
+        "sort_order": 25,
     },
 
     # --- STUDENT MANAGEMENT (PARENT) ---
@@ -71,7 +81,7 @@ FEATURE_REGISTRY = [
         "description": "Student admission, rosters, and halqa/group management",
         "is_parent": True,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 30,
     },
     {
@@ -81,7 +91,7 @@ FEATURE_REGISTRY = [
         "description": "Directory of enrolled students",
         "is_parent": False,
         "parent_key": "nav_student_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 31,
     },
     {
@@ -91,7 +101,7 @@ FEATURE_REGISTRY = [
         "description": "Halqa and class group management",
         "is_parent": False,
         "parent_key": "nav_student_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 32,
     },
     {
@@ -101,7 +111,7 @@ FEATURE_REGISTRY = [
         "description": "Quick & full institutional admission wizard",
         "is_parent": False,
         "parent_key": "nav_student_management",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 33,
     },
 
@@ -113,7 +123,7 @@ FEATURE_REGISTRY = [
         "description": "Daily Hifz & academic progress report builder",
         "is_parent": True,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 40,
     },
     {
@@ -123,7 +133,7 @@ FEATURE_REGISTRY = [
         "description": "Hifz daily progress input builder",
         "is_parent": False,
         "parent_key": "nav_report_generator",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 41,
     },
     {
@@ -133,7 +143,7 @@ FEATURE_REGISTRY = [
         "description": "Session presets and quick comment library",
         "is_parent": False,
         "parent_key": "nav_report_generator",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 42,
     },
     {
@@ -143,7 +153,7 @@ FEATURE_REGISTRY = [
         "description": "Historical log of generated progress reports",
         "is_parent": False,
         "parent_key": "nav_report_generator",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 43,
     },
     {
@@ -153,7 +163,7 @@ FEATURE_REGISTRY = [
         "description": "WhatsApp/Clipboard sharing format customizer",
         "is_parent": False,
         "parent_key": "nav_report_generator",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 44,
     },
 
@@ -185,7 +195,7 @@ FEATURE_REGISTRY = [
         "description": "2FA, Passkeys, active sessions, and password management",
         "is_parent": False,
         "parent_key": "nav_settings",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 52,
     },
     {
@@ -195,7 +205,7 @@ FEATURE_REGISTRY = [
         "description": "Calendar format and timezone preferences",
         "is_parent": False,
         "parent_key": "nav_settings",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 53,
     },
     {
@@ -215,7 +225,7 @@ FEATURE_REGISTRY = [
         "description": "Multilingual UI translations",
         "is_parent": False,
         "parent_key": "nav_settings",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 55,
     },
     {
@@ -225,7 +235,7 @@ FEATURE_REGISTRY = [
         "description": "Export data and local backups",
         "is_parent": False,
         "parent_key": "nav_settings",
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 56,
     },
 
@@ -237,7 +247,7 @@ FEATURE_REGISTRY = [
         "description": "Recycle bin for deleted records",
         "is_parent": False,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 60,
     },
     {
@@ -247,7 +257,7 @@ FEATURE_REGISTRY = [
         "description": "Keyboard hotkeys and accessibility reference",
         "is_parent": False,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 70,
     },
     {
@@ -257,7 +267,7 @@ FEATURE_REGISTRY = [
         "description": "Instruction manuals and video tutorials",
         "is_parent": False,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 80,
     },
     {
@@ -267,7 +277,7 @@ FEATURE_REGISTRY = [
         "description": "Version information and developer credits",
         "is_parent": False,
         "parent_key": None,
-        "default_enabled": True,
+        "default_enabled": False,
         "sort_order": 90,
     },
 ]

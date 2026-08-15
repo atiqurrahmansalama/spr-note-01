@@ -13,6 +13,7 @@ class IsAdminUserRole(BasePermission):
 class HasSectionAccess(BasePermission):
     """
     DRF Permission Class to block unauthorized API execution if a section is disabled for that user.
+    Enforces strict default-deny (defaulting to False).
     Usage on DRF APIViews:
         permission_classes = [IsAuthenticated, HasSectionAccess]
         required_section_key = 'pdfExport'
@@ -22,9 +23,15 @@ class HasSectionAccess(BasePermission):
         if not section_key:
             return True
             
+        # Allow self-profile updates even if general user management feature is disabled
+        if request.user and request.user.is_authenticated:
+            pk = view.kwargs.get('pk')
+            if pk == 'me' or str(pk) == str(request.user.id):
+                return True
+                
         from .services import get_resolved_feature_flags_for_user
         flags, _ = get_resolved_feature_flags_for_user(request.user)
-        return flags.get(section_key, True)
+        return flags.get(section_key, False)
 
 
 class IsOwnerOrSuperAdmin(BasePermission):

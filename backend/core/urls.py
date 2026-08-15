@@ -68,6 +68,9 @@ from .views import (
     Disable2FAView,
     Verify2FAView,
     SetGoogleDefaultRoleAdminView,
+    RoleInviteTokenViewSet,
+    PublicInviteVerificationView,
+    PublicInviteClaimView,
 )
 
 router = DefaultRouter()
@@ -77,6 +80,7 @@ router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
+router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
 
 from django.http import JsonResponse
 
@@ -158,6 +162,8 @@ urlpatterns = [
     path('api/v1/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh_v1'),
 
     # IAM & Security Suite Endpoints
+    path('api/v1/invites/verify/', PublicInviteVerificationView.as_view(), name='invite_verify'),
+    path('api/v1/invites/claim/', PublicInviteClaimView.as_view(), name='invite_claim'),
     path('api/v1/auth/accounts/verify-session/', VerifySessionView.as_view(), name='auth_verify_session'),
     path('api/v1/auth/qr/generate/', QRGenerateView.as_view(), name='auth_qr_generate'),
     path('api/v1/auth/qr/status/<uuid:ticket_id>/', QRStatusView.as_view(), name='auth_qr_status'),

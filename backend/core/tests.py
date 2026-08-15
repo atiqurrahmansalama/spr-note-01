@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -539,6 +539,7 @@ class UserSecurityAndIsolationTestCase(APITestCase):
         self.assertEqual(response.data["id"], self.teacher1.id)
 
 
+@override_settings(STRICT_FEATURE_FLAGS=True)
 class FeatureRegistryAndPrecedenceTestCase(APITestCase):
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -570,7 +571,13 @@ class FeatureRegistryAndPrecedenceTestCase(APITestCase):
         from core.services import evaluate_section_config_for_user
 
         parent_sec = AppSection.objects.get(section_key="nav_app_management")
+        # Ensure parent is globally ON first for testing child OFF state
+        parent_sec.is_globally_enabled = True
+        parent_sec.save()
+
         child_sec = AppSection.objects.get(section_key="app_section_control")
+        child_sec.is_globally_enabled = True
+        child_sec.save()
 
         # 1. Child OFF, Parent remains ON
         UserSectionOverride.objects.create(user=self.user, section=child_sec, is_enabled=False)
@@ -586,3 +593,56 @@ class FeatureRegistryAndPrecedenceTestCase(APITestCase):
         resolved, origins = evaluate_section_config_for_user(self.user)
         self.assertFalse(resolved["nav_app_management"])
         self.assertFalse(resolved["app_section_control"])
+
+
+class RoleInviteTokenTestCase(APITestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from core.models import UserRole
+        from core.services import sync_feature_registry_to_db
+        User = get_user_model()
+        
+        sync_feature_registry_to_db()
+        
+        self.admin = User.objects.create_superuser(phone_number="01799999999", password="password123")
+        self.user = User.objects.create_user(phone_number="01711111111", password="password123")
+        self.target_role = UserRole.objects.create(name="Special Teacher", code="SPECIAL_TEACHER")
+
+    def test_invite_generation_verification_and_claim_flow(self):
+        # 1. Admin generates invite
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post("/api/v1/admin/invites/", data={
+            "title": "Batch 2026",
+            "target_role": self.target_role.id,
+            "max_uses": 2,
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        token = response.data["token"]
+        self.assertIsNotNone(token)
+        invite_id = response.data["id"]
+
+        # 2. Public verification
+        self.client.force_authenticate(user=None)
+        response = self.client.get(f"/api/v1/invites/verify/?token={token}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["target_role_code"], "SPECIAL_TEACHER")
+
+        # 3. Standard user claims invite
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/v1/invites/claim/", data={"token": token})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["role"], "SPECIAL_TEACHER")
+        
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.role, self.target_role)
+
+        # 4. Super Admin claims invite (Super Admin bypass check)
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post("/api/v1/invites/claim/", data={"token": token})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["role"], "SUPER_ADMIN")
+
+        # 5. Check max usage limit exceeded
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/v1/invites/claim/", data={"token": token})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "../../context/ToastContext";
 import { fetchWithAuth, logoutUser } from "../../utils/authService";
 import { auth as authStore, multiAccount } from "../../utils/localStore";
+import { useFeatureControl } from "../../context/FeatureControlContext";
 
 import ProfileHeroCard from "./components/ProfileHeroCard";
 import ProfileOptionGroup from "./components/ProfileOptionGroup";
@@ -28,6 +29,7 @@ import {
 
 export default function ProfileSettingsView() {
   const { showToast } = useToast();
+  const { isSectionEnabled } = useFeatureControl();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -178,14 +180,16 @@ export default function ProfileSettingsView() {
           onClick={handleGoogleToggle}
         />
 
-        <ProfileOptionRow
-          icon={<LockIcon />}
-          title="Two-Factor Authentication (2FA)"
-          subtitle="Protect account with Google Authenticator or Authy"
-          badgeText={is2FAEnabled ? "Enabled" : "Disabled"}
-          badgeStyle={is2FAEnabled ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}
-          onClick={() => setShow2FAModal(true)}
-        />
+        {isSectionEnabled("settings_security") && (
+          <ProfileOptionRow
+            icon={<LockIcon />}
+            title="Two-Factor Authentication (2FA)"
+            subtitle="Protect account with Google Authenticator or Authy"
+            badgeText={is2FAEnabled ? "Enabled" : "Disabled"}
+            badgeStyle={is2FAEnabled ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}
+            onClick={() => setShow2FAModal(true)}
+          />
+        )}
       </ProfileOptionGroup>
 
       {/* 3. Group 2: Multi-Account & Quick Access */}
@@ -208,50 +212,56 @@ export default function ProfileSettingsView() {
           onClick={() => setShowQRSyncModal(true)}
         />
 
-        <ProfileOptionRow
-          icon={<KeyRoundIcon />}
-          title="Passkeys &amp; Biometrics"
-          subtitle="Passwordless login using Windows Hello or Touch ID"
-          badgeText={`${passkeysCount} Registered Key${passkeysCount !== 1 ? "s" : ""}`}
-          badgeStyle="bg-purple-500/10 text-purple-400 border border-purple-500/20"
-          onClick={() => setShowPasskeysModal(true)}
-        />
+        {isSectionEnabled("settings_security") && (
+          <ProfileOptionRow
+            icon={<KeyRoundIcon />}
+            title="Passkeys &amp; Biometrics"
+            subtitle="Passwordless login using Windows Hello or Touch ID"
+            badgeText={`${passkeysCount} Registered Key${passkeysCount !== 1 ? "s" : ""}`}
+            badgeStyle="bg-purple-500/10 text-purple-400 border border-purple-500/20"
+            onClick={() => setShowPasskeysModal(true)}
+          />
+        )}
       </ProfileOptionGroup>
 
       {/* 4. Group 3: Security & Device Management */}
-      <ProfileOptionGroup title="Security &amp; Device Management">
-        <ProfileOptionRow
-          icon={<KeyRoundIcon />}
-          title="Change Password"
-          subtitle="Update account security credentials"
-          onClick={() => setShowPasswordModal(true)}
-        />
+      {isSectionEnabled("settings_security") && (
+        <ProfileOptionGroup title="Security &amp; Device Management">
+          <ProfileOptionRow
+            icon={<KeyRoundIcon />}
+            title="Change Password"
+            subtitle="Update account security credentials"
+            onClick={() => setShowPasswordModal(true)}
+          />
 
-        <ProfileOptionRow
-          icon={<SmartphoneIcon />}
-          title="Active Devices &amp; Sessions"
-          subtitle="View and revoke logged in devices"
-          badgeText="Active"
-          badgeStyle="theme-bg-accent-soft theme-accent border theme-border"
-          onClick={() => setShowSessionsModal(true)}
-        />
+          <ProfileOptionRow
+            icon={<SmartphoneIcon />}
+            title="Active Devices &amp; Sessions"
+            subtitle="View and revoke logged in devices"
+            badgeText="Active"
+            badgeStyle="theme-bg-accent-soft theme-accent border theme-border"
+            onClick={() => setShowSessionsModal(true)}
+          />
 
-        <ProfileOptionRow
-          icon={<ShieldCheckIcon />}
-          title="Security &amp; Activity Logs"
-          subtitle="View recent account logins &amp; events"
-          onClick={() => setShowSecurityLogsModal(true)}
-        />
-      </ProfileOptionGroup>
+          <ProfileOptionRow
+            icon={<ShieldCheckIcon />}
+            title="Security &amp; Activity Logs"
+            subtitle="View recent account logins &amp; events"
+            onClick={() => setShowSecurityLogsModal(true)}
+          />
+        </ProfileOptionGroup>
+      )}
 
       {/* 5. Danger Zone / System Actions */}
       <ProfileOptionGroup title="Danger Zone / System Actions">
-        <ProfileOptionRow
-          icon={<DownloadIcon />}
-          title="Export Account Data"
-          subtitle="Download profile JSON archive"
-          onClick={handleExportData}
-        />
+        {isSectionEnabled("settings_backup") && (
+          <ProfileOptionRow
+            icon={<DownloadIcon />}
+            title="Export Account Data"
+            subtitle="Download profile JSON archive"
+            onClick={handleExportData}
+          />
+        )}
 
         <ProfileOptionRow
           icon={<LogOutIcon />}

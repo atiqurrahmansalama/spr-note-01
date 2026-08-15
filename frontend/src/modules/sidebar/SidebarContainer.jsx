@@ -62,6 +62,7 @@ export default function SidebarContainer({
         { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon, key: "app_user_management" },
         { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
         { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
+        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", Icon: SectionControlIcon, key: "app_role_invites" },
       ]
     },
     {

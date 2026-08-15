@@ -52,8 +52,9 @@ from .models import (
     GroupSectionPermission,
     UserSectionOverride,
     FeatureFlagAuditLog,
+    RoleInviteToken,
 )
-from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin, IsAdminOrSelf
+from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin, IsAdminOrSelf, HasSectionAccess
 from .middleware import detect_device_type, detect_device_info, get_client_ip
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -78,6 +79,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
     UserSessionSerializer,
+    RoleInviteTokenSerializer,
 )
 
 
@@ -732,7 +734,8 @@ class ChangePasswordView(APIView):
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.filter(Q(status__iexact='active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    required_section_key = 'student_roster'
 
     def get_queryset(self):
         user = self.request.user
@@ -784,7 +787,8 @@ class StudentViewSet(viewsets.ModelViewSet):
 class StudentGroupViewSet(viewsets.ModelViewSet):
     queryset = StudentGroup.objects.all().order_by('name')
     serializer_class = StudentGroupSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    required_section_key = 'student_groups'
 
     def get_queryset(self):
         user = self.request.user
@@ -917,7 +921,8 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
     Supports filtering by: student_name, date (report date), session_name, status.
     """
     serializer_class = StudentDailyReportSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    required_section_key = 'report_builder'
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
@@ -1199,7 +1204,8 @@ class UserActivityAnalyticsView(APIView):
     GET /api/v1/analytics/user-activity/
     Admin-only API endpoint to fetch active time windows and total active duration per user/teacher.
     """
-    permission_classes = [IsAdminUserRole]
+    permission_classes = [IsAdminUserRole, HasSectionAccess]
+    required_section_key = 'app_activity_analytics'
 
     @extend_schema(
         summary="User Activity & Time Monitoring Analytics (Admin Only)",
@@ -1532,7 +1538,8 @@ class LogoutAllOtherSessionsView(APIView):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAdminOrSelf]
+    permission_classes = [IsAdminOrSelf, HasSectionAccess]
+    required_section_key = 'app_user_management'
     serializer_class = UserAdminSerializer
     queryset = User.objects.all().select_related('role').order_by('-date_joined')
 
@@ -2196,7 +2203,8 @@ class Verify2FAView(APIView):
 # ─── Role & Access Control Management Views ─────────────────────────────────
 
 class UserRoleListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasSectionAccess]
+    required_section_key = 'app_role_management'
 
     def get(self, request):
         from .services import seed_system_roles
@@ -2270,7 +2278,8 @@ class UserRoleListCreateView(APIView):
 
 
 class UserRoleDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasSectionAccess]
+    required_section_key = 'app_role_management'
 
     def get(self, request, pk):
         role = UserRole.objects.filter(pk=pk).first()
@@ -2343,7 +2352,8 @@ class UserRoleDetailView(APIView):
 
 
 class UserRoleCloneView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasSectionAccess]
+    required_section_key = 'app_role_management'
 
     def post(self, request, pk=None):
         source_role_id = pk or request.data.get('source_role_id')
@@ -2415,9 +2425,9 @@ class EvaluatedConfigView(APIView):
     authentication_classes = [FlexibleJWTAuthentication, SessionAuthentication]
 
     def get(self, request):
-        from .services import evaluate_section_config_for_user
+        from .services import get_resolved_feature_flags_for_user
         user = request.user if request.user and request.user.is_authenticated else None
-        resolved, origins = evaluate_section_config_for_user(user)
+        resolved, origins = get_resolved_feature_flags_for_user(user)
 
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
         response = Response({
@@ -2871,4 +2881,93 @@ class ControlPanelAuditLogView(APIView):
         return Response({
             'status': 'success',
             'logs': data
+        }, status=status.HTTP_200_OK)
+
+
+import secrets
+from rest_framework import viewsets
+from rest_framework.decorators import action
+
+class RoleInviteTokenViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsAdminUserRole, HasSectionAccess]
+    required_section_key = 'app_role_invites'
+    serializer_class = RoleInviteTokenSerializer
+    queryset = RoleInviteToken.objects.all().order_by('-created_at')
+
+    def perform_create(self, serializer):
+        token_str = secrets.token_urlsafe(32)
+        serializer.save(
+            token=token_str,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['post'])
+    def revoke(self, request, pk=None):
+        invite = self.get_object()
+        invite.is_active = False
+        invite.save()
+        return Response({"status": "success", "message": "Invitation revoked successfully"}, status=status.HTTP_200_OK)
+
+
+class PublicInviteVerificationView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        token_str = request.query_params.get('token')
+        if not token_str:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        invite = RoleInviteToken.objects.filter(token=token_str).first()
+        if not invite or not invite.is_valid():
+            return Response({"error": "Invalid, expired, or revoked invitation"}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "title": invite.title,
+            "target_role_name": invite.target_role.name,
+            "target_role_code": invite.target_role.code,
+            "inviter_name": invite.created_by.name or invite.created_by.phone_number,
+            "expires_at": invite.expires_at,
+        }, status=status.HTTP_200_OK)
+
+
+class PublicInviteClaimView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token_str = request.data.get('token')
+        if not token_str:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        is_super_admin = getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser
+
+        from django.db import transaction
+        with transaction.atomic():
+            # Concurrency race conditions lock
+            invite = RoleInviteToken.objects.select_for_update().filter(token=token_str).first()
+            if not invite or not invite.is_valid():
+                return Response({"error": "Invalid, expired, or revoked invitation"}, status=status.HTTP_400_BAD_REQUEST)
+
+            if is_super_admin:
+                invite.used_count += 1
+                invite.save()
+                return Response({
+                    "status": "success",
+                    "message": "You are a Super Admin. Your high privilege role is preserved, but invitation token has been counted.",
+                    "role": "SUPER_ADMIN"
+                }, status=status.HTTP_200_OK)
+
+            user.role = invite.target_role
+            role_code = invite.target_role.code.upper()
+            if role_code in ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'GUARDIAN']:
+                user.user_type = role_code
+            user.save()
+
+            invite.used_count += 1
+            invite.save()
+
+        return Response({
+            "status": "success",
+            "message": f"Successfully joined as {invite.target_role.name}",
+            "role": invite.target_role.code
         }, status=status.HTTP_200_OK)

@@ -1117,3 +1117,31 @@ class StudentDocument(models.Model):
 
     def __str__(self):
         return f"{self.get_doc_type_display()} for {self.student.name_en or self.student.uniq_id}"
+
+
+class RoleInviteToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    title = models.CharField(max_length=150, help_text="e.g. Hifz Teachers Batch 2026")
+    target_role = models.ForeignKey(UserRole, on_delete=models.CASCADE, related_name='invite_tokens')
+    max_uses = models.PositiveIntegerField(default=1, help_text="0 for unlimited uses")
+    used_count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_invites')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        if self.max_uses > 0 and self.used_count >= self.max_uses:
+            return False
+        return True
+
+    def __str__(self):
+        return f"Invite: {self.title} ({self.target_role.name})"

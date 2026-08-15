@@ -35,6 +35,7 @@ from .models import (
     StudentAcademicDetail,
     StudentGuardian,
     StudentDocument,
+    RoleInviteToken,
 )
 
 
@@ -1371,3 +1372,20 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             guardian_detail.save()
 
         return instance
+
+
+class RoleInviteTokenSerializer(serializers.ModelSerializer):
+    target_role_name = serializers.CharField(source='target_role.name', read_only=True)
+    target_role_code = serializers.CharField(source='target_role.code', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
+    is_active = serializers.BooleanField(default=True)
+    is_valid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = RoleInviteToken
+        fields = [
+            'id', 'token', 'title', 'target_role', 'target_role_name', 
+            'target_role_code', 'max_uses', 'used_count', 'expires_at', 
+            'is_active', 'created_by', 'created_by_name', 'created_at', 'is_valid'
+        ]
+        read_only_fields = ['id', 'token', 'used_count', 'created_by', 'created_at', 'is_valid']
