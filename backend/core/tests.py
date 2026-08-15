@@ -646,3 +646,83 @@ class RoleInviteTokenTestCase(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.post("/api/v1/invites/claim/", data={"token": token})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class Student360TestCase(APITestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from core.models import Student, StudentDetail, StudentGroup
+        from core.services import sync_feature_registry_to_db
+        User = get_user_model()
+        sync_feature_registry_to_db()
+
+        self.admin = User.objects.create_superuser(phone_number="01799999999", password="password123")
+        self.client.force_authenticate(user=self.admin)
+
+        self.student1 = Student.objects.create(name_en="Abdur Rahman", group_name="Hifz Group", status="Active", created_by=self.admin)
+        self.student2 = Student.objects.create(name_en="Abdullah", group_name="General Group", status="Active", created_by=self.admin)
+        StudentDetail.objects.create(student=self.student1, initial_completed_juz=5, created_by=self.admin)
+
+    def test_student_metrics(self):
+        response = self.client.get("/api/v1/students/metrics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total_students"], 2)
+        self.assertEqual(response.data["active_students"], 2)
+        self.assertEqual(response.data["avg_juz_completed"], 5.0)
+
+    def test_bulk_actions(self):
+        # 1. Bulk Assign Group
+        response = self.client.post("/api/v1/students/bulk-action/", data={
+            "action": "assign_group",
+            "group_name": "New Hifz Halqa",
+            "student_ids": [self.student1.id, self.student2.id]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.student1.refresh_from_db()
+        self.student2.refresh_from_db()
+        self.assertEqual(self.student1.group_name, "New Hifz Halqa")
+        self.assertEqual(self.student2.group_name, "New Hifz Halqa")
+
+        # 2. Bulk Change Status
+        response = self.client.post("/api/v1/students/bulk-action/", data={
+            "action": "change_status",
+            "status": "Alumni",
+            "student_ids": [self.student1.id]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.student1.refresh_from_db()
+        self.assertEqual(self.student1.status, "Alumni")
+
+        # 3. Bulk Delete
+        response = self.client.post("/api/v1/students/bulk-action/", data={
+            "action": "bulk_delete",
+            "student_ids": [self.student1.id, self.student2.id]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        from core.models import Student
+        self.assertEqual(Student.objects.filter(id__in=[self.student1.id, self.student2.id]).count(), 0)
+
+    def test_guardian_lookup_and_verification(self):
+        from core.models import StudentGuardian
+        StudentGuardian.objects.create(
+            student=self.student1,
+            father_name="Abu Hanifa",
+            primary_guardian_phone="01711111111",
+            created_by=self.admin
+        )
+        
+        response = self.client.get("/api/v1/students/guardian-lookup/?phone=01711111111")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["guardian"]["father_name"], "Abu Hanifa")
+        self.assertEqual(len(response.data["siblings"]), 1)
+        self.assertEqual(response.data["siblings"][0]["id"], self.student1.id)
+        
+        # Assign a uniq_id to test verification
+        self.student1.uniq_id = "STU-12345"
+        self.student1.save()
+        
+        # Access verify-admission (unauthenticated)
+        self.client.force_authenticate(user=None)
+        response = self.client.get("/api/v1/students/verify-admission/STU-12345/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "Abdur Rahman")

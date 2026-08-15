@@ -114,6 +114,16 @@ FEATURE_REGISTRY = [
         "default_enabled": False,
         "sort_order": 33,
     },
+    {
+        "key": "quran_hifz_tracker",
+        "label": "Quran Hifz Tracker",
+        "category": "STUDENTS",
+        "description": "30 Juz interactive visual progress grids and Sabq/Sabqi recitation logs",
+        "is_parent": False,
+        "parent_key": "nav_student_management",
+        "default_enabled": False,
+        "sort_order": 34,
+    },
 
     # --- REPORT GENERATOR (PARENT) ---
     {

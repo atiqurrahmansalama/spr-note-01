@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
+import AdmissionSlipDocument from "./AdmissionSlipDocument";
 
 export default function AdmissionSuccessModal({ student, onReset, onClose }) {
+  const [showPrintSlip, setShowPrintSlip] = useState(false);
+
   if (!student) return null;
 
   const handlePrint = () => {
@@ -91,7 +94,7 @@ export default function AdmissionSuccessModal({ student, onReset, onClose }) {
       <div className="flex flex-col gap-2 max-w-xs mx-auto pt-4">
         <button
           type="button"
-          onClick={handlePrint}
+          onClick={() => setShowPrintSlip(true)}
           className="w-full py-2.5 text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 rounded-xl transition cursor-pointer"
         >
           Print Admission Slip / Profile Card
@@ -113,6 +116,10 @@ export default function AdmissionSuccessModal({ student, onReset, onClose }) {
           View in Student Directory
         </button>
       </div>
+
+      {showPrintSlip && (
+        <AdmissionSlipDocument student={student} onClose={() => setShowPrintSlip(false)} />
+      )}
     </div>
   );
 }

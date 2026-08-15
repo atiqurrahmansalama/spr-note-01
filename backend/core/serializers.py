@@ -1304,6 +1304,12 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     guardian_detail = StudentGuardianSerializer(read_only=True)
     documents = StudentDocumentSerializer(many=True, read_only=True)
 
+    completed_juz_count = serializers.SerializerMethodField()
+    active_juz = serializers.SerializerMethodField()
+    recent_error_average = serializers.SerializerMethodField()
+    quran_progress = serializers.SerializerMethodField()
+    department_type = serializers.SerializerMethodField()
+
     present_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
     permanent_address_data = AddressSerializer(write_only=True, required=False, allow_null=True)
     academic_data = StudentAcademicDetailSerializer(write_only=True, required=False, allow_null=True)
@@ -1317,7 +1323,8 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
             'academic_detail', 'guardian_detail', 'documents', 'admission_mode', 
             'status', 'group_name', 'created_at', 'updated_at', 'education_status',
-            'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data'
+            'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data',
+            'completed_juz_count', 'active_juz', 'recent_error_average', 'quran_progress', 'department_type'
         ]
 
     @transaction.atomic
@@ -1372,6 +1379,69 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             guardian_detail.save()
 
         return instance
+
+    def get_quran_progress(self, obj):
+        initial = 0
+        try:
+            if hasattr(obj, 'details') and obj.details:
+                initial = obj.details.initial_completed_juz or 0
+        except Exception:
+            pass
+
+        juz_statuses = {i: "upcoming" for i in range(1, 31)}
+        for i in range(1, min(initial + 1, 31)):
+            juz_statuses[i] = "completed"
+
+        # Fetch portions
+        from core.models import ReportPortion
+        portions = ReportPortion.objects.filter(report__student=obj).select_related('report').order_by('report__date')
+        
+        for p in portions:
+            session_type = str(p.report.session_name or '').upper()
+            for j in range(p.start_juz, p.end_juz + 1):
+                if 1 <= j <= 30:
+                    if j <= initial:
+                        continue
+                    if 'SABQ' in session_type or 'SABAQ' in session_type:
+                        if juz_statuses[j] == "upcoming":
+                            juz_statuses[j] = "in_progress"
+                    elif 'SABQI' in session_type or 'MANZIL' in session_type or 'PORTION' in session_type:
+                        juz_statuses[j] = "completed"
+                    else:
+                        if juz_statuses[j] == "upcoming":
+                            juz_statuses[j] = "in_progress"
+
+        max_completed = initial
+        for j, status in juz_statuses.items():
+            if status == "completed":
+                max_completed = max(max_completed, j)
+        for i in range(1, max_completed + 1):
+            juz_statuses[i] = "completed"
+
+        return [{"juz": i, "status": juz_statuses[i]} for i in range(1, 31)]
+
+    def get_completed_juz_count(self, obj):
+        progress = self.get_quran_progress(obj)
+        return sum(1 for item in progress if item["status"] == "completed")
+
+    def get_active_juz(self, obj):
+        progress = self.get_quran_progress(obj)
+        return [item["juz"] for item in progress if item["status"] == "in_progress"]
+
+    def get_recent_error_average(self, obj):
+        reports = obj.daily_reports.all().order_by('-date')[:10]
+        if not reports:
+            return 0.0
+        total_errors = sum((r.total_mistake + r.total_stuck) for r in reports)
+        return round(total_errors / len(reports), 2)
+
+    def get_department_type(self, obj):
+        group = str(obj.group_name or '').upper()
+        if any(w in group for w in ['HIFZ', 'NAZERA', 'SABAQ', 'QURAN', 'HALQA']):
+            return 'HIFZ'
+        if any(w in group for w in ['GENERAL', 'CLASS', 'KINDERGARTEN', 'PRIMARY']):
+            return 'GENERAL'
+        return 'HIFZ'
 
 
 class RoleInviteTokenSerializer(serializers.ModelSerializer):

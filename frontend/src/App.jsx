@@ -29,6 +29,7 @@ import AboutAppView from "./modules/settings/components/AboutAppView";
 import SectionToggleControlPanel from "./modules/settings/components/SectionToggleControlPanel";
 import RoleInviteManagerView from "./modules/app-management/invites/RoleInviteManagerView";
 import JoinWithInviteView from "./modules/auth/JoinWithInviteView";
+import StudentProfileHubView from "./modules/student-profile/StudentProfileHubView";
 import { FeatureGuard } from "./components/common/FeatureGuard";
 
 function ProtectedRoute({ children }) {
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="/student-roster" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
           <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="groups" /></FeatureGuard>} />
           <Route path="/admission" element={<FeatureGuard sectionKey="student_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView /></FeatureGuard>} />
+          <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentProfileHubView /></FeatureGuard>} />
           <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments" fallback={<Navigate to="/dashboard" replace />}><SessionManager /></FeatureGuard>} />
           <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management" fallback={<Navigate to="/dashboard" replace />}><UserManagementModule /></FeatureGuard>} />
           <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management" fallback={<Navigate to="/dashboard" replace />}><RoleManagementModule /></FeatureGuard>} />

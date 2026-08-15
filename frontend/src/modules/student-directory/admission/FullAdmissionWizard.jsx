@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import apiClient from "../../../api/axios";
+import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import ReusableCalendar from "../../../components/common/ReusableCalendar";
+import { BD_GEO_DATA } from "../../../utils/bdGeoData";
+import { calculateAge, validateBDPhone, validateBRN, validateNID } from "../../../utils/admissionValidators";
 
 const CLASS_CHOICES = ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Hifz", "Nazera", "Play", "Nursery", "Qaida", "Ampara"];
 
@@ -12,14 +15,23 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState([]);
 
-  // File states
+  // File objects for document vault
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [birthCertificateFile, setBirthCertificateFile] = useState(null);
-  const [marksheetFile, setMarksheetFile] = useState(null);
+  
+  const [birthCertFile, setBirthCertFile] = useState(null);
+  const [prevTcFile, setPrevTcFile] = useState(null);
+  const [guardianNidFile, setGuardianNidFile] = useState(null);
 
-  // Address sync
+  // Drag and drop states
+  const [activeDragField, setActiveDragField] = useState(null);
+
+  // Address checkbox
   const [sameAddress, setSameAddress] = useState(true);
+
+  // Guardian Sibling Lookup State
+  const [lookupResults, setLookupResults] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   useEffect(() => {
     apiClient.get("/groups/")
@@ -33,11 +45,57 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       });
   }, []);
 
+  // Guardian Debounce Sibling Lookup
+  useEffect(() => {
+    const phone = sharedData.guardian_phone || "";
+    const digitsOnly = phone.replace(/[^\d]/g, "");
+    
+    if (digitsOnly.length === 11) {
+      setLookupLoading(true);
+      fetchWithAuth(`/api/v1/students/guardian-lookup/?phone=${digitsOnly}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.guardian) {
+            setLookupResults(data);
+          } else {
+            setLookupResults(null);
+          }
+        })
+        .catch(() => setLookupResults(null))
+        .finally(() => setLookupLoading(false));
+    } else {
+      setLookupResults(null);
+    }
+  }, [sharedData.guardian_phone]);
+
+  const handleAutoFillGuardian = () => {
+    if (lookupResults && lookupResults.guardian) {
+      const g = lookupResults.guardian;
+      setSharedData((prev) => ({
+        ...prev,
+        father_name: g.father_name || prev.father_name,
+        father_phone: g.father_phone || prev.father_phone,
+        father_occupation: g.father_occupation || prev.father_occupation,
+        mother_name: g.mother_name || prev.mother_name,
+        mother_phone: g.mother_phone || prev.mother_phone,
+        mother_occupation: g.mother_occupation || prev.mother_occupation,
+        primary_guardian_name: g.primary_guardian_name || prev.primary_guardian_name,
+        guardian_nid: g.guardian_nid || prev.guardian_nid,
+        emergency_contact_phone: g.emergency_contact_phone || prev.emergency_contact_phone
+      }));
+      showToast("Guardian information auto-filled successfully.", "success");
+    }
+  };
+
   const handleChange = (field, val) => {
-    setSharedData((prev) => ({
-      ...prev,
-      [field]: val,
-    }));
+    setSharedData((prev) => {
+      const updated = { ...prev, [field]: val };
+      // Capitalize English name
+      if (field === "name" && val) {
+        updated.name = val.replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+      return updated;
+    });
   };
 
   const handlePhotoChange = (e) => {
@@ -58,7 +116,6 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       setSharedData((prev) => ({
         ...prev,
         perm_street: prev.street_address,
-        perm_post_office: prev.post_office,
         perm_post_code: prev.post_code,
         perm_thana: prev.thana_or_upazila,
         perm_district: prev.district,
@@ -73,8 +130,16 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
         showToast("Student Name is required", "warning");
         return;
       }
+      if (sharedData.birth_certificate_no && !validateBRN(sharedData.birth_certificate_no)) {
+        showToast("Birth Certificate must be exactly 17 digits", "warning");
+        return;
+      }
+      if (sharedData.nid_no && !validateNID(sharedData.nid_no)) {
+        showToast("National ID (NID) must be 10, 13 or 17 digits", "warning");
+        return;
+      }
       if (!sharedData.birth_certificate_no?.trim() && !sharedData.nid_no?.trim()) {
-        showToast("Either Birth Certificate Number or National ID (NID) is required", "warning");
+        showToast("Either Birth Registration Number or National ID is required", "warning");
         return;
       }
     }
@@ -89,8 +154,8 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       }
     }
     if (currentStep === 3) {
-      if (!sharedData.guardian_phone?.trim()) {
-        showToast("Guardian Phone is required", "warning");
+      if (!sharedData.guardian_phone?.trim() || !validateBDPhone(sharedData.guardian_phone)) {
+        showToast("Valid 11-digit Bangladesh Guardian Phone is required", "warning");
         return;
       }
       if (!sharedData.guardian_relation?.trim()) {
@@ -105,14 +170,34 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
+  const handleDrag = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setActiveDragField(field);
+    } else if (e.type === "dragleave") {
+      setActiveDragField(null);
+    }
+  };
+
+  const handleDrop = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveDragField(null);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (field === "birth_certificate") setBirthCertFile(file);
+      if (field === "tc_marksheet") setPrevTcFile(file);
+      if (field === "guardian_nid") setGuardianNidFile(file);
+    }
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
 
-    // Build nested structure
     const presentAddressData = {
       address_type: "PRESENT",
       street_address: sharedData.street_address || "",
-      post_office: sharedData.post_office || "",
       post_code: sharedData.post_code || "",
       thana_or_upazila: sharedData.thana_or_upazila || "",
       district: sharedData.district || "",
@@ -124,7 +209,6 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       : {
           address_type: "PERMANENT",
           street_address: sharedData.perm_street || "",
-          post_office: sharedData.perm_post_office || "",
           post_code: sharedData.perm_post_code || "",
           thana_or_upazila: sharedData.perm_thana || "",
           district: sharedData.perm_district || "",
@@ -175,89 +259,104 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
     };
 
     try {
-      // 1. Submit admission JSON data
+      // 1. Submit admission base details
       const res = await apiClient.post("/students/admission/", payload);
       const studentId = res.data.id;
 
-      // 2. Upload photo if present
+      // 2. Upload student profile picture
       if (photoFile && studentId) {
         const photoFormData = new FormData();
         photoFormData.append("photo", photoFile);
         await apiClient.patch(`/students/${studentId}/full-profile/`, photoFormData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      // 3. Upload Birth Certificate document if present
-      if (birthCertificateFile && studentId) {
+      // 3. Upload Birth Certificate
+      if (birthCertFile && studentId) {
         const bcFormData = new FormData();
         bcFormData.append("doc_type", "BIRTH_CERTIFICATE");
-        bcFormData.append("file", birthCertificateFile);
-        bcFormData.append("title", "Birth Certificate of " + sharedData.name);
+        bcFormData.append("file", birthCertFile);
+        bcFormData.append("title", `Birth Certificate of ${sharedData.name}`);
         await apiClient.post(`/students/${studentId}/upload-document/`, bcFormData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      // 4. Upload Marksheet document if present
-      if (marksheetFile && studentId) {
-        const msFormData = new FormData();
-        msFormData.append("doc_type", "PREVIOUS_MARKSHEET");
-        msFormData.append("file", marksheetFile);
-        msFormData.append("title", "Previous Marksheet of " + sharedData.name);
-        await apiClient.post(`/students/${studentId}/upload-document/`, msFormData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+      // 4. Upload TC/Marksheet
+      if (prevTcFile && studentId) {
+        const tcFormData = new FormData();
+        tcFormData.append("doc_type", "TRANSFER_CERTIFICATE");
+        tcFormData.append("file", prevTcFile);
+        tcFormData.append("title", `Transfer Certificate of ${sharedData.name}`);
+        await apiClient.post(`/students/${studentId}/upload-document/`, tcFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      showToast("Student enrolled and profile saved successfully", "success");
+      // 5. Upload Guardian NID Copy
+      if (guardianNidFile && studentId) {
+        const gnidFormData = new FormData();
+        gnidFormData.append("doc_type", "GUARDIAN_NID");
+        gnidFormData.append("file", guardianNidFile);
+        gnidFormData.append("title", `Guardian NID copy of ${sharedData.name}`);
+        await apiClient.post(`/students/${studentId}/upload-document/`, gnidFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      showToast("Student profile successfully registered", "success");
       if (onSuccess) {
-        // Fetch full profile and trigger callback
         const profileRes = await apiClient.get(`/students/${studentId}/full-profile/`);
         onSuccess(profileRes.data);
       }
     } catch (err) {
       console.error(err);
-      showToast("Failed to complete full admission. Check fields.", "error");
+      showToast("Failed to complete full admission registration. Check form fields.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // BD Geo Cascading Lists Helper
+  const getDistrictsForDivision = (div) => {
+    if (!div || !BD_GEO_DATA[div]) return [];
+    return Object.keys(BD_GEO_DATA[div]);
+  };
+
+  const getUpazilasForDistrict = (div, dist) => {
+    if (!div || !dist || !BD_GEO_DATA[div] || !BD_GEO_DATA[div][dist]) return [];
+    return BD_GEO_DATA[div][dist];
+  };
+
   return (
-    <div className="space-y-6 w-full min-h-[480px] flex flex-col justify-between">
+    <div className="space-y-6 w-full min-h-[480px] flex flex-col justify-between select-none">
       <div>
-        {/* Stepper Header */}
-        <div className="flex justify-between items-center text-xs font-semibold theme-text-secondary border-b theme-border pb-3 mb-6 select-none">
-          <span className={currentStep === 1 ? "theme-accent font-bold" : ""}>1. Personal</span>
+        {/* Stepper Headers */}
+        <div className="flex justify-between items-center text-xs font-semibold theme-text-secondary border-b theme-border pb-3 mb-6">
+          <span className={currentStep === 1 ? "theme-accent font-bold" : ""}>1. Personal Info</span>
           <span className={currentStep === 2 ? "theme-accent font-bold" : ""}>2. Academic</span>
           <span className={currentStep === 3 ? "theme-accent font-bold" : ""}>3. Guardian</span>
-          <span className={currentStep === 4 ? "theme-accent font-bold" : ""}>4. Address</span>
-          <span className={currentStep === 5 ? "theme-accent font-bold" : ""}>5. Verification</span>
+          <span className={currentStep === 4 ? "theme-accent font-bold" : ""}>4. Residential</span>
+          <span className={currentStep === 5 ? "theme-accent font-bold" : ""}>5. Vault &amp; Review</span>
         </div>
 
-        {/* Step 1: Personal Details */}
+        {/* STEP 1: PERSONAL INFORMATION */}
         {currentStep === 1 && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-4 animate-fade-in text-left">
             <div className="flex flex-col items-center space-y-3">
-              <div className="relative w-24 h-24 rounded-full border theme-border overflow-hidden bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center">
+              <div className="relative w-24 h-24 rounded-full border theme-border overflow-hidden bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shadow-md">
                 {photoPreview ? (
                   <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-[10px] theme-text-secondary text-center px-2">No Photo</span>
                 )}
               </div>
-              <label className="cursor-pointer px-3 py-1.5 text-xs font-semibold theme-bg-sub theme-text-primary rounded-lg border theme-border hover:theme-bg-sub-hover transition-colors">
-                Choose Photo
+              <label className="cursor-pointer px-3.5 py-2 text-xs font-semibold theme-bg-sub theme-text-primary rounded-xl border theme-border hover:theme-bg-sub-hover transition-colors shadow-sm">
+                Select Photo
                 <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
               </label>
-              <span className="text-[10px] theme-text-secondary">JPEG/PNG under 2MB</span>
+              <span className="text-[10px] theme-text-secondary font-medium">JPEG/PNG, max size 2MB</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,7 +372,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">Bangla Name</label>
+                <label className="block text-xs font-semibold theme-text-secondary mb-1">Bangla Full Name</label>
                 <input
                   type="text"
                   value={sharedData.bangla_name || ""}
@@ -298,7 +397,14 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Date of Birth</label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-semibold theme-text-secondary">Date of Birth</label>
+                  {sharedData.dob && (
+                    <span className="text-[10px] font-bold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">
+                      Age: {calculateAge(sharedData.dob)}
+                    </span>
+                  )}
+                </div>
                 <ReusableCalendar
                   selectedDate={sharedData.dob || ""}
                   onSelectDate={(val) => handleChange("dob", val)}
@@ -327,35 +433,41 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">Birth Certificate No</label>
+                <label className="block text-xs font-semibold theme-text-secondary mb-1">Birth Registration No (BRN)</label>
                 <input
                   type="text"
                   value={sharedData.birth_certificate_no || ""}
-                  onChange={(e) => handleChange("birth_certificate_no", e.target.value)}
+                  onChange={(e) => handleChange("birth_certificate_no", e.target.value.replace(/[^\d]/g, ""))}
                   placeholder="17 Digit Certificate Number"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
+                {sharedData.birth_certificate_no && !validateBRN(sharedData.birth_certificate_no) && (
+                  <span className="text-[10px] text-rose-400 block mt-1 font-bold">Must be exactly 17 digits.</span>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold theme-text-secondary mb-1">National ID (NID)</label>
                 <input
                   type="text"
                   value={sharedData.nid_no || ""}
-                  onChange={(e) => handleChange("nid_no", e.target.value)}
-                  placeholder="National ID Card Number"
+                  onChange={(e) => handleChange("nid_no", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="10, 13, or 17 Digit NID Card Number"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
+                {sharedData.nid_no && !validateNID(sharedData.nid_no) && (
+                  <span className="text-[10px] text-rose-400 block mt-1 font-bold">Must be 10, 13, or 17 digits.</span>
+                )}
               </div>
             </div>
-            <p className="text-[10px] theme-text-secondary italic">
-              * Note: Either Birth Certificate Number or National ID (NID) is strictly required to move to next step.
+            <p className="text-[10px] theme-text-secondary italic pt-2">
+              * Note: Valid BRN or NID is strictly required to proceed.
             </p>
           </div>
         )}
 
-        {/* Step 2: Academic Details */}
+        {/* STEP 2: ACADEMIC ASSIGNMENT */}
         {currentStep === 2 && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-4 animate-fade-in text-left">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold theme-text-secondary mb-1">Session Year</label>
@@ -368,7 +480,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Class *</label>
+                <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Class / Track *</label>
                 <CustomSelect
                   options={CLASS_CHOICES}
                   value={sharedData.education_status || ""}
@@ -401,7 +513,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                   type="text"
                   value={sharedData.roll_number || ""}
                   onChange={(e) => handleChange("roll_number", e.target.value)}
-                  placeholder="Class Roll Number"
+                  placeholder="Roll Number"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>
@@ -415,7 +527,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t theme-border pt-4">
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold theme-text-secondary mb-1">Previous School Name</label>
                 <input
@@ -432,28 +544,43 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                   type="text"
                   value={sharedData.tc_number || ""}
                   onChange={(e) => handleChange("tc_number", e.target.value)}
-                  placeholder="TC Number"
+                  placeholder="Transfer Certificate No"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold theme-text-secondary mb-1">Previous School Address</label>
-              <input
-                type="text"
-                value={sharedData.previous_school_address || ""}
-                onChange={(e) => handleChange("previous_school_address", e.target.value)}
-                placeholder="e.g. Uttara, Dhaka"
-                className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-              />
-            </div>
           </div>
         )}
 
-        {/* Step 3: Guardian Details */}
+        {/* STEP 3: GUARDIAN INFORMATION & AUTO-FILL */}
         {currentStep === 3 && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-4 animate-fade-in text-left">
+            
+            {/* Guardian Sibling Lookup Notification Banner */}
+            {lookupLoading && (
+              <div className="p-3 bg-zinc-800 border theme-border rounded-xl text-xs text-sky-400 animate-pulse font-semibold">
+                Searching parent profile database...
+              </div>
+            )}
+            {lookupResults && lookupResults.guardian && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <span className="font-bold">Database Match Found:</span>{" "}
+                  Registered siblings:{" "}
+                  <span className="underline font-semibold">
+                    {lookupResults.siblings.map((sib) => sib.name).join(", ")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoFillGuardian}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  Auto-fill Parent Info
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold theme-text-secondary mb-1">Father Name</label>
@@ -470,8 +597,8 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 <input
                   type="text"
                   value={sharedData.father_phone || ""}
-                  onChange={(e) => handleChange("father_phone", e.target.value)}
-                  placeholder="Father's Mobile No"
+                  onChange={(e) => handleChange("father_phone", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="e.g. 01712345678"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>
@@ -503,8 +630,8 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 <input
                   type="text"
                   value={sharedData.mother_phone || ""}
-                  onChange={(e) => handleChange("mother_phone", e.target.value)}
-                  placeholder="Mother's Mobile No"
+                  onChange={(e) => handleChange("mother_phone", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="e.g. 01712345678"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>
@@ -526,11 +653,14 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 <input
                   type="text"
                   value={sharedData.guardian_phone || ""}
-                  onChange={(e) => handleChange("guardian_phone", e.target.value)}
+                  onChange={(e) => handleChange("guardian_phone", e.target.value.replace(/[^\d]/g, ""))}
                   required
-                  placeholder="Mobile number for official SMS/Alerts"
+                  placeholder="Official SMS alert mobile number"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
+                {sharedData.guardian_phone && !validateBDPhone(sharedData.guardian_phone) && (
+                  <span className="text-[10px] text-rose-400 block mt-1 font-bold">Must be 11 digit mobile starting with 01.</span>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Select Relation</label>
@@ -551,7 +681,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                   type="text"
                   value={sharedData.guardian_relation || ""}
                   onChange={(e) => handleChange("guardian_relation", e.target.value)}
-                  placeholder="Type relation to student..."
+                  placeholder="e.g. Uncle"
                   required
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
@@ -564,18 +694,21 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 <input
                   type="text"
                   value={sharedData.guardian_nid || ""}
-                  onChange={(e) => handleChange("guardian_nid", e.target.value)}
-                  placeholder="Guardian's National ID No"
+                  onChange={(e) => handleChange("guardian_nid", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="National ID Number"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
+                {sharedData.guardian_nid && !validateNID(sharedData.guardian_nid) && (
+                  <span className="text-[10px] text-rose-400 block mt-1 font-bold">Must be 10, 13, or 17 digits.</span>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold theme-text-secondary mb-1">Emergency Contact Phone</label>
                 <input
                   type="text"
                   value={sharedData.emergency_contact_phone || ""}
-                  onChange={(e) => handleChange("emergency_contact_phone", e.target.value)}
-                  placeholder="Alternate Mobile No"
+                  onChange={(e) => handleChange("emergency_contact_phone", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="Emergency Alternate Phone"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>
@@ -583,40 +716,50 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
           </div>
         )}
 
-        {/* Step 4: Addresses */}
+        {/* STEP 4: RESIDENTIAL ADDRESSES (CASCADING DROPDOWNS) */}
         {currentStep === 4 && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-fade-in text-left">
             <div className="space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">Present Address</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary border-b theme-border pb-1">Present Address</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Division</label>
-                  <input
-                    type="text"
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Division</label>
+                  <CustomSelect
+                    options={Object.keys(BD_GEO_DATA).map((d) => ({ label: d, value: d }))}
                     value={sharedData.division || ""}
-                    onChange={(e) => handleChange("division", e.target.value)}
-                    placeholder="e.g. Dhaka"
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                    onChange={(val) => {
+                      setSharedData((prev) => ({
+                        ...prev,
+                        division: val,
+                        district: "",
+                        thana_or_upazila: "",
+                      }));
+                    }}
+                    placeholder="Select Division..."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">District</label>
-                  <input
-                    type="text"
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1.5">District</label>
+                  <CustomSelect
+                    options={getDistrictsForDivision(sharedData.division).map((d) => ({ label: d, value: d }))}
                     value={sharedData.district || ""}
-                    onChange={(e) => handleChange("district", e.target.value)}
-                    placeholder="e.g. Dhaka"
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                    onChange={(val) => {
+                      setSharedData((prev) => ({
+                        ...prev,
+                        district: val,
+                        thana_or_upazila: "",
+                      }));
+                    }}
+                    placeholder="Select District..."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Thana / Upazila</label>
-                  <input
-                    type="text"
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Thana / Upazila</label>
+                  <CustomSelect
+                    options={getUpazilasForDistrict(sharedData.division, sharedData.district).map((u) => ({ label: u, value: u }))}
                     value={sharedData.thana_or_upazila || ""}
-                    onChange={(e) => handleChange("thana_or_upazila", e.target.value)}
-                    placeholder="e.g. Uttara"
-                    className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                    onChange={(val) => handleChange("thana_or_upazila", val)}
+                    placeholder="Select Upazila..."
                   />
                 </div>
               </div>
@@ -627,17 +770,17 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                     type="text"
                     value={sharedData.street_address || ""}
                     onChange={(e) => handleChange("street_address", e.target.value)}
-                    placeholder="House, Road, Block, Village Address details"
+                    placeholder="Street, Road, House, and Village detail"
                     className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Post Code</label>
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Postal Code</label>
                   <input
                     type="text"
                     value={sharedData.post_code || ""}
                     onChange={(e) => handleChange("post_code", e.target.value)}
-                    placeholder="e.g. 1230"
+                    placeholder="Post Code"
                     className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                   />
                 </div>
@@ -659,36 +802,46 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
 
             {!sameAddress && (
               <div className="space-y-4 animate-fade-in">
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">Permanent Address</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary border-b theme-border pb-1">Permanent Address</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold theme-text-secondary mb-1">Division</label>
-                    <input
-                      type="text"
+                    <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Division</label>
+                    <CustomSelect
+                      options={Object.keys(BD_GEO_DATA).map((d) => ({ label: d, value: d }))}
                       value={sharedData.perm_division || ""}
-                      onChange={(e) => handleChange("perm_division", e.target.value)}
-                      placeholder="e.g. Dhaka"
-                      className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                      onChange={(val) => {
+                        setSharedData((prev) => ({
+                          ...prev,
+                          perm_division: val,
+                          perm_district: "",
+                          perm_thana: "",
+                        }));
+                      }}
+                      placeholder="Select Division..."
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold theme-text-secondary mb-1">District</label>
-                    <input
-                      type="text"
+                    <label className="block text-xs font-semibold theme-text-secondary mb-1.5">District</label>
+                    <CustomSelect
+                      options={getDistrictsForDivision(sharedData.perm_division).map((d) => ({ label: d, value: d }))}
                       value={sharedData.perm_district || ""}
-                      onChange={(e) => handleChange("perm_district", e.target.value)}
-                      placeholder="e.g. Dhaka"
-                      className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                      onChange={(val) => {
+                        setSharedData((prev) => ({
+                          ...prev,
+                          perm_district: val,
+                          perm_thana: "",
+                        }));
+                      }}
+                      placeholder="Select District..."
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold theme-text-secondary mb-1">Thana / Upazila</label>
-                    <input
-                      type="text"
+                    <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Thana / Upazila</label>
+                    <CustomSelect
+                      options={getUpazilasForDistrict(sharedData.perm_division, sharedData.perm_district).map((u) => ({ label: u, value: u }))}
                       value={sharedData.perm_thana || ""}
-                      onChange={(e) => handleChange("perm_thana", e.target.value)}
-                      placeholder="e.g. Uttara"
-                      className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
+                      onChange={(val) => handleChange("perm_thana", val)}
+                      placeholder="Select Upazila..."
                     />
                   </div>
                 </div>
@@ -699,17 +852,17 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                       type="text"
                       value={sharedData.perm_street || ""}
                       onChange={(e) => handleChange("perm_street", e.target.value)}
-                      placeholder="Address details"
+                      placeholder="Street, Road, House, and Village detail"
                       className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold theme-text-secondary mb-1">Post Code</label>
+                    <label className="block text-xs font-semibold theme-text-secondary mb-1">Postal Code</label>
                     <input
                       type="text"
                       value={sharedData.perm_post_code || ""}
                       onChange={(e) => handleChange("perm_post_code", e.target.value)}
-                      placeholder="e.g. 1230"
+                      placeholder="Post Code"
                       className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                     />
                   </div>
@@ -719,70 +872,158 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
           </div>
         )}
 
-        {/* Step 5: Verification & Files */}
+        {/* STEP 5: DOCUMENT VAULT & REVIEW SUMMARY */}
         {currentStep === 5 && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-fade-in text-left">
+            
+            {/* Drag & Drop Document Vault */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">Attach Verification Documents</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Birth Certificate Attachment</label>
+              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary border-b theme-border pb-1">Document Repository Vault</h4>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                
+                {/* File 1: Birth Cert */}
+                <div
+                  onDragEnter={(e) => handleDrag(e, "birth_cert")}
+                  onDragOver={(e) => handleDrag(e, "birth_cert")}
+                  onDragLeave={(e) => handleDrag(e, "birth_cert")}
+                  onDrop={(e) => handleDrop(e, "birth_cert")}
+                  className={`p-4 rounded-2xl border-2 border-dashed text-center flex flex-col justify-center items-center transition-all ${
+                    activeDragField === "birth_cert" ? "border-sky-500 bg-sky-500/10" : "border-zinc-800 hover:border-zinc-700 bg-zinc-950/20"
+                  }`}
+                >
+                  <span className="text-xl mb-1">Document</span>
+                  <span className="text-xs font-bold">Birth Certificate</span>
+                  <span className="text-[10px] theme-text-secondary mt-1">
+                    {birthCertFile ? birthCertFile.name : "Drag & Drop or Click"}
+                  </span>
                   <input
                     type="file"
-                    accept=".pdf,image/*"
-                    onChange={(e) => setBirthCertificateFile(e.target.files[0])}
-                    className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:theme-bg-sub file:theme-text-primary hover:file:opacity-90"
+                    id="bc-input"
+                    className="hidden"
+                    onChange={(e) => setBirthCertFile(e.target.files[0])}
                   />
+                  <label htmlFor="bc-input" className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-[10px] font-bold rounded-lg border theme-border hover:theme-bg-sub cursor-pointer">
+                    Browse File
+                  </label>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">Previous Marksheet Attachment</label>
+
+                {/* File 2: Previous TC */}
+                <div
+                  onDragEnter={(e) => handleDrag(e, "tc_marksheet")}
+                  onDragOver={(e) => handleDrag(e, "tc_marksheet")}
+                  onDragLeave={(e) => handleDrag(e, "tc_marksheet")}
+                  onDrop={(e) => handleDrop(e, "tc_marksheet")}
+                  className={`p-4 rounded-2xl border-2 border-dashed text-center flex flex-col justify-center items-center transition-all ${
+                    activeDragField === "tc_marksheet" ? "border-sky-500 bg-sky-500/10" : "border-zinc-800 hover:border-zinc-700 bg-zinc-950/20"
+                  }`}
+                >
+                  <span className="text-xl mb-1">Document</span>
+                  <span className="text-xs font-bold">Transfer Slip / TC</span>
+                  <span className="text-[10px] theme-text-secondary mt-1">
+                    {prevTcFile ? prevTcFile.name : "Drag & Drop or Click"}
+                  </span>
                   <input
                     type="file"
-                    accept=".pdf,image/*"
-                    onChange={(e) => setMarksheetFile(e.target.files[0])}
-                    className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:theme-bg-sub file:theme-text-primary hover:file:opacity-90"
+                    id="tc-input"
+                    className="hidden"
+                    onChange={(e) => setPrevTcFile(e.target.files[0])}
                   />
+                  <label htmlFor="tc-input" className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-[10px] font-bold rounded-lg border theme-border hover:theme-bg-sub cursor-pointer">
+                    Browse File
+                  </label>
                 </div>
+
+                {/* File 3: Guardian NID */}
+                <div
+                  onDragEnter={(e) => handleDrag(e, "guardian_nid")}
+                  onDragOver={(e) => handleDrag(e, "guardian_nid")}
+                  onDragLeave={(e) => handleDrag(e, "guardian_nid")}
+                  onDrop={(e) => handleDrop(e, "guardian_nid")}
+                  className={`p-4 rounded-2xl border-2 border-dashed text-center flex flex-col justify-center items-center transition-all ${
+                    activeDragField === "guardian_nid" ? "border-sky-500 bg-sky-500/10" : "border-zinc-800 hover:border-zinc-700 bg-zinc-950/20"
+                  }`}
+                >
+                  <span className="text-xl mb-1">Document</span>
+                  <span className="text-xs font-bold">Guardian NID</span>
+                  <span className="text-[10px] theme-text-secondary mt-1">
+                    {guardianNidFile ? guardianNidFile.name : "Drag & Drop or Click"}
+                  </span>
+                  <input
+                    type="file"
+                    id="gnid-input"
+                    className="hidden"
+                    onChange={(e) => setGuardianNidFile(e.target.files[0])}
+                  />
+                  <label htmlFor="gnid-input" className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-[10px] font-bold rounded-lg border theme-border hover:theme-bg-sub cursor-pointer">
+                    Browse File
+                  </label>
+                </div>
+
               </div>
             </div>
 
+            {/* Information Summary Review (Fixed Theme & Emojis) */}
             <div className="space-y-4 border-t theme-border pt-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">Information Summary Review</h4>
-              <div className="overflow-x-auto max-h-60 rounded-xl border theme-border">
-                <table className="w-full text-xs text-left">
-                  <tbody>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900 w-1/3">Student Name</td>
-                      <td className="px-4 py-2 theme-text-primary">{sharedData.name}</td>
-                    </tr>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900">Bangla Name</td>
-                      <td className="px-4 py-2 theme-text-primary">{sharedData.bangla_name || "-"}</td>
-                    </tr>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900">Gender &amp; DOB</td>
-                      <td className="px-4 py-2 theme-text-primary">{sharedData.gender || "MALE"} / {sharedData.dob || "-"}</td>
-                    </tr>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900">Class &amp; Group</td>
-                      <td className="px-4 py-2 theme-text-primary">{sharedData.education_status || "-"} / {sharedData.group_name || "General Group"}</td>
-                    </tr>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900">Guardian Phone</td>
-                      <td className="px-4 py-2 theme-text-primary">{sharedData.guardian_phone}</td>
-                    </tr>
-                    <tr className="border-b theme-border">
-                      <td className="px-4 py-2 font-bold theme-text-secondary bg-neutral-50 dark:bg-neutral-900">Street Address</td>
-                      <td className="px-4 py-2 theme-text-primary">
-                        {sharedData.street_address || "-"}, {sharedData.thana_or_upazila || "-"}, {sharedData.district || "-"}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary border-b theme-border pb-1">Review Registration Details</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium">
+                
+                {/* Column 1: Personal & Academic */}
+                <div className="theme-bg-surface border theme-border p-4 rounded-2xl space-y-2">
+                  <h5 className="font-bold text-sky-400 uppercase tracking-wider text-[10px] mb-2">Personal &amp; Academic</h5>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Student Name</span>
+                    <span className="font-bold theme-text-primary">{sharedData.name || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Bangla Name</span>
+                    <span className="font-bold theme-text-primary">{sharedData.bangla_name || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Gender &amp; DOB</span>
+                    <span className="theme-text-primary">{sharedData.gender || "MALE"} / {sharedData.dob || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="theme-text-secondary">Class &amp; Group</span>
+                    <span className="theme-text-primary">{sharedData.education_status || "--"} / {sharedData.group_name || "--"}</span>
+                  </div>
+                </div>
+
+                {/* Column 2: Guardian & Address */}
+                <div className="theme-bg-surface border theme-border p-4 rounded-2xl space-y-2">
+                  <h5 className="font-bold text-sky-400 uppercase tracking-wider text-[10px] mb-2">Guardian &amp; Address</h5>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Guardian Phone</span>
+                    <span className="font-bold theme-text-primary">{sharedData.guardian_phone || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Relation</span>
+                    <span className="theme-text-primary">{sharedData.guardian_relation || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Present Address</span>
+                    <span className="theme-text-primary truncate max-w-[200px]" title={sharedData.street_address}>
+                      {sharedData.street_address 
+                        ? `${sharedData.street_address}, ${sharedData.thana_or_upazila || ""}, ${sharedData.district || ""}`
+                        : "--"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="theme-text-secondary">Permanent Address</span>
+                    <span className="theme-text-primary truncate max-w-[200px]" title={sharedData.perm_street}>
+                      {sameAddress 
+                        ? "Same as Present" 
+                        : (sharedData.perm_street ? `${sharedData.perm_street}, ${sharedData.perm_thana || ""}, ${sharedData.perm_district || ""}` : "--")}
+                    </span>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
         )}
+
       </div>
 
       {/* Control Buttons */}
@@ -819,9 +1060,9 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="px-6 py-2.5 text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 rounded-xl transition cursor-pointer disabled:opacity-50"
+            className="px-6 py-2.5 text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 rounded-xl transition cursor-pointer disabled:opacity-50 shadow-md"
           >
-            {loading ? "Registering Profile..." : "Enroll Student"}
+            {loading ? "Registering Student..." : "Enroll Student"}
           </button>
         )}
       </div>

@@ -732,7 +732,7 @@ class ChangePasswordView(APIView):
         return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(Q(status__iexact='active') | Q(status__isnull=True)).select_related('details').distinct().order_by('roll_number', 'name_en')
+    queryset = Student.objects.all().select_related('details').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
     required_section_key = 'student_roster'
@@ -783,6 +783,155 @@ class StudentViewSet(viewsets.ModelViewSet):
             serializer.save(student=student, created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        queryset = self.get_queryset()
+        total_students = queryset.count()
+        active_students = queryset.filter(status__iexact='active').count()
+
+        from django.utils import timezone
+        start_of_month = timezone.now().date().replace(day=1)
+        new_admissions = queryset.filter(admission_date__gte=start_of_month).count()
+
+        total_juz = 0
+        hifz_count = 0
+        students = list(queryset.prefetch_related('details'))
+        for s in students:
+            group = str(s.group_name or '').upper()
+            is_hifz = any(w in group for w in ['HIFZ', 'NAZERA', 'SABAQ', 'QURAN', 'HALQA']) or not group
+            if is_hifz:
+                hifz_count += 1
+                initial = getattr(s, 'details', None).initial_completed_juz if getattr(s, 'details', None) else 0
+                total_juz += (initial or 0)
+        
+        avg_juz = round(total_juz / hifz_count, 1) if hifz_count > 0 else 0.0
+
+        return Response({
+            "total_students": total_students,
+            "active_students": active_students,
+            "new_admissions_this_month": new_admissions,
+            "avg_juz_completed": avg_juz
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='bulk-action')
+    def bulk_action(self, request):
+        action_type = request.data.get('action')
+        student_ids = request.data.get('student_ids', [])
+
+        if not student_ids:
+            return Response({"error": "No students selected"}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset().filter(id__in=student_ids)
+
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                if action_type == 'assign_group':
+                    group_name = request.data.get('group_name')
+                    if not group_name:
+                        return Response({"error": "Group name is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    from core.models import StudentGroup
+                    StudentGroup.objects.get_or_create(name=group_name.strip())
+                    queryset.update(group_name=group_name.strip())
+                elif action_type == 'change_status':
+                    status_val = request.data.get('status')
+                    if not status_val:
+                        return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    queryset.update(status=status_val.strip().title())
+                elif action_type == 'bulk_delete':
+                    queryset.delete()
+                else:
+                    return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"status": "success", "message": f"Successfully performed bulk action: {action_type}"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], url_path='guardian-lookup')
+    def guardian_lookup(self, request):
+        phone = request.query_params.get('phone')
+        if not phone:
+            return Response({"error": "Phone parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        import re
+        cleaned_phone = re.sub(r'[^\d]', '', phone)
+        if len(cleaned_phone) < 10:
+            return Response({"siblings": [], "guardian": None})
+            
+        from django.db.models import Q
+        from core.models import StudentGuardian, Student
+        
+        guardians = StudentGuardian.objects.filter(
+            Q(primary_guardian_phone__contains=cleaned_phone) |
+            Q(father_phone__contains=cleaned_phone) |
+            Q(mother_phone__contains=cleaned_phone)
+        ).select_related('student')
+        
+        if not guardians.exists():
+            return Response({"siblings": [], "guardian": None})
+            
+        first_guardian = guardians.first()
+        
+        sibling_students = Student.objects.filter(
+            Q(guardian_detail__primary_guardian_phone__contains=cleaned_phone) |
+            Q(guardian_detail__father_phone__contains=cleaned_phone) |
+            Q(guardian_detail__mother_phone__contains=cleaned_phone)
+        ).distinct()
+        
+        siblings_data = []
+        for s in sibling_students:
+            siblings_data.append({
+                "id": s.id,
+                "name": s.name_en or s.name or "Unnamed",
+                "roll": s.roll_number or "",
+                "group_name": s.group_name or "General Group"
+            })
+            
+        guardian_data = {
+            "father_name": first_guardian.father_name or "",
+            "father_phone": first_guardian.father_phone or "",
+            "father_occupation": first_guardian.father_occupation or "",
+            "mother_name": first_guardian.mother_name or "",
+            "mother_phone": first_guardian.mother_phone or "",
+            "mother_occupation": first_guardian.mother_occupation or "",
+            "primary_guardian_name": first_guardian.primary_guardian_name or "",
+            "primary_guardian_phone": first_guardian.primary_guardian_phone or "",
+            "guardian_relation": first_guardian.guardian_relation or "",
+            "guardian_nid": first_guardian.guardian_nid or "",
+            "emergency_contact_phone": first_guardian.emergency_contact_phone or ""
+        }
+        
+        return Response({
+            "siblings": siblings_data,
+            "guardian": guardian_data
+        })
+
+    @action(detail=False, methods=['get'], url_path=r'verify-admission/(?P<student_id>[^/]+)', permission_classes=[AllowAny], authentication_classes=[])
+    def verify_admission(self, request, student_id=None):
+        from core.models import Student
+        from django.db.models import Q
+        
+        try:
+            student = Student.objects.filter(
+                Q(uniq_id=student_id) | 
+                Q(id=student_id if student_id.isdigit() else -1) |
+                Q(student_id_card_number=student_id)
+            ).first()
+        except Exception:
+            student = None
+            
+        if not student:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        return Response({
+            "name": student.name_en or student.name or "Unnamed",
+            "bangla_name": student.bangla_name or "",
+            "uniq_id": student.uniq_id or "",
+            "enrollment_date": student.admission_date or student.created_at.strftime('%Y-%m-%d') if student.created_at else "",
+            "department": student.group_name or "General Group",
+            "status": student.status or "Active"
+        }, status=status.HTTP_200_OK)
 
 class StudentGroupViewSet(viewsets.ModelViewSet):
     queryset = StudentGroup.objects.all().order_by('name')
@@ -2911,17 +3060,19 @@ class RoleInviteTokenViewSet(viewsets.ModelViewSet):
 
 class PublicInviteVerificationView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = [] # Allow unauthenticated guest lookups
 
     def get(self, request):
         token_str = request.query_params.get('token')
         if not token_str:
-            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"valid": False, "error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
         
         invite = RoleInviteToken.objects.filter(token=token_str).first()
         if not invite or not invite.is_valid():
-            return Response({"error": "Invalid, expired, or revoked invitation"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"valid": False, "error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
+            "valid": True,
             "title": invite.title,
             "target_role_name": invite.target_role.name,
             "target_role_code": invite.target_role.code,
