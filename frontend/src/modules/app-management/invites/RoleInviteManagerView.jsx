@@ -122,8 +122,8 @@ export default function RoleInviteManagerView() {
   };
 
   const getJoinUrl = (token) => {
-    const base = window.location.origin;
-    return `${base}/join?token=${token}`;
+    const baseUrl = window.location.origin; // Dynamically uses spr-note.vercel.app in production
+    return `${baseUrl}/join?token=${token}`;
   };
 
   const copyLinkToClipboard = (token) => {

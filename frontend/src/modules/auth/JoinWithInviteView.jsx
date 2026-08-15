@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
 import { fetchWithAuth } from "../../utils/authService";
 import { auth as authStore } from "../../utils/localStore";
+import { API_BASE_URL } from "../../config/api";
 
 export default function JoinWithInviteView() {
   const { showToast } = useToast();
@@ -39,16 +40,25 @@ export default function JoinWithInviteView() {
     setLoading(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`/api/v1/invites/verify/?token=${t}`);
+      const targetUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/invites/verify/?token=${t}` : `/api/v1/invites/verify/?token=${t}`;
+      const res = await fetch(targetUrl);
       if (res.ok) {
         const data = await res.json();
         setInviteDetails(data);
       } else {
-        const errData = await res.json();
-        setErrorMsg(errData.error || "This invitation is invalid, expired, or has been revoked.");
+        let reason = "This invitation is invalid, expired, or has been revoked.";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            reason = errData.error;
+          }
+        } catch (e) {
+          // JSON parsing failed (e.g. HTML response)
+        }
+        setErrorMsg(reason);
         sessionStorage.removeItem("pending_invite_token");
       }
-    } catch {
+    } catch (err) {
       setErrorMsg("Failed to connect to the verification server.");
     } finally {
       setLoading(false);
