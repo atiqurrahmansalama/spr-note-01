@@ -909,6 +909,8 @@ class AppSection(models.Model):
     description = models.TextField(blank=True, default='')
     is_globally_enabled = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
+    is_parent = models.BooleanField(default=False, help_text="True if this is a master category menu")
+    parent_key = models.CharField(max_length=100, null=True, blank=True, help_text="Key of parent section")
 
     class Meta:
         ordering = ['category__order', 'order', 'title']

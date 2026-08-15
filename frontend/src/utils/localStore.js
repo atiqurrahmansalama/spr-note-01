@@ -301,32 +301,9 @@ export function mergeStudents(apiStudents, localStudents) {
 }
 
 
-const DEFAULT_SESSIONS = [
-  { id: "sess-1", name: "সবক (Sabaq)" },
-  { id: "sess-2", name: "সবকী (Sabqi)" },
-  { id: "sess-3", name: "আমুখতা (Amukhta)" },
-  { id: "sess-4", name: "নাজেরা (Nazera)" },
-  { id: "sess-5", name: "হিফজ (Hifz)" },
-];
-
 export const sessions = {
   getAll: () => {
-    const list = readJSON(KEYS.SESSIONS, []);
-    try {
-      if (typeof window !== "undefined") {
-        const initialized = localStorage.getItem("spr_sessions_initialized_v2");
-        if (!initialized) {
-          localStorage.setItem("spr_sessions_initialized_v2", "true");
-          if (list.length === 0) {
-            writeJSON(KEYS.SESSIONS, DEFAULT_SESSIONS);
-            return DEFAULT_SESSIONS;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Storage initialization failed:", e);
-    }
-    return list;
+    return readJSON(KEYS.SESSIONS, []);
   },
 
   saveAll: (list) => writeJSON(KEYS.SESSIONS, list),

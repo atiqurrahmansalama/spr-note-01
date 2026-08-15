@@ -131,53 +131,59 @@ def seed_system_roles():
             u.save(update_fields=['role'])
 
 
-def seed_initial_sections():
+def sync_feature_registry_to_db():
     """
-    Seeds default section categories and baseline section flags if DB is empty.
+    Syncs the FEATURE_REGISTRY definition manifest to the AppSection database table.
     """
     from .models import AppSectionCategory, AppSection
+    from .feature_registry import FEATURE_REGISTRY
 
-    if AppSection.objects.exists():
-        return
+    # Automatically map categories keys to titles
+    category_titles = {
+        "NAVIGATION": "Navigation",
+        "ADMIN": "Admin Tools",
+        "STUDENTS": "Student Management",
+        "REPORTS": "Report Generator",
+        "SETTINGS": "Settings",
+        "SYSTEM": "System & Standalone",
+    }
 
-    categories_data = [
-        {"key": "form_header", "title": "Form Header & Date Config", "order": 1},
-        {"key": "form_progress", "title": "Student Progress & Trackers", "order": 2},
-        {"key": "form_actions", "title": "Form Actions & Comments", "order": 3},
-        {"key": "sidebar_modules", "title": "Sidebar & Admin Modules", "order": 4},
-    ]
-
+    # Ensure all baseline categories exist
     cat_map = {}
-    for cat in categories_data:
-        c, _ = AppSectionCategory.objects.get_or_create(key=cat["key"], defaults=cat)
-        cat_map[cat["key"]] = c
+    for idx, (cat_key, cat_title) in enumerate(category_titles.items(), 1):
+        c, _ = AppSectionCategory.objects.get_or_create(
+            key=cat_key,
+            defaults={"title": cat_title, "order": idx}
+        )
+        cat_map[cat_key] = c
 
-    sections_data = [
-        {"key": "headerDate", "cat": "form_header", "title": "Header Date & Time Selector", "desc": "Toggle date & time controls in report header", "order": 1},
-        {"key": "studentSelect", "cat": "form_header", "title": "Student Selection Field", "desc": "Toggle student selection dropdown field", "order": 2},
-        {"key": "sessionSelect", "cat": "form_header", "title": "Session Preset Selector", "desc": "Toggle session preset selection dropdown", "order": 3},
-        {"key": "juzPageInput", "cat": "form_progress", "title": "Juz & Para Page Range Inputs", "desc": "Toggle Para/Juz, Page, and Quarter range fields", "order": 1},
-        {"key": "mistakeTracker", "cat": "form_progress", "title": "Mistake & Error Counter", "desc": "Toggle Sabq/Sabqi mistake counter control", "order": 2},
-        {"key": "stuckTracker", "cat": "form_progress", "title": "Stuck / Pause Counter", "desc": "Toggle stuck/pause error counter control", "order": 3},
-        {"key": "commentSection", "cat": "form_actions", "title": "Teacher Comment Box & Presets", "desc": "Toggle teacher remarks and comment templates", "order": 1},
-        {"key": "actionButtons", "cat": "form_actions", "title": "Save & Generate Report", "desc": "Controls save report, copy card, and PDF export buttons", "order": 2},
-        {"key": "pdfExport", "cat": "form_actions", "title": "PDF & Image Export Buttons", "desc": "Toggle PDF export and screenshot action buttons", "order": 3},
-        {"key": "userManagementModule", "cat": "sidebar_modules", "title": "User & Teacher Management Module", "desc": "Toggle User & Teacher Management dashboard access", "order": 1},
-        {"key": "activityAnalyticsModule", "cat": "sidebar_modules", "title": "Teacher Activity Analytics Module", "desc": "Toggle Activity Analytics dashboard access", "order": 2},
-        {"key": "trashRestorationModule", "cat": "sidebar_modules", "title": "Trash & Soft-Deleted Reports Module", "desc": "Toggle Trash & Soft-Deleted Reports module access", "order": 3},
-    ]
+    # Sync FEATURE_REGISTRY to AppSection
+    registry_keys = set()
+    for item in FEATURE_REGISTRY:
+        registry_keys.add(item["key"])
+        cat_obj = cat_map.get(item["category"])
+        if not cat_obj:
+            cat_obj, _ = AppSectionCategory.objects.get_or_create(
+                key=item["category"],
+                defaults={"title": item["category"].title(), "order": 100}
+            )
+            cat_map[item["category"]] = cat_obj
 
-    for sec in sections_data:
-        AppSection.objects.get_or_create(
-            section_key=sec["key"],
+        AppSection.objects.update_or_create(
+            section_key=item["key"],
             defaults={
-                "category": cat_map.get(sec["cat"]),
-                "title": sec["title"],
-                "description": sec["desc"],
-                "order": sec["order"],
-                "is_globally_enabled": True,
+                "category": cat_obj,
+                "title": item["label"],
+                "description": item["description"],
+                "is_parent": item["is_parent"],
+                "parent_key": item["parent_key"],
+                "is_globally_enabled": item["default_enabled"],
+                "order": item["sort_order"],
             }
         )
+
+    # Delete any AppSection rows in database that are NOT in FEATURE_REGISTRY
+    AppSection.objects.exclude(section_key__in=registry_keys).delete()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -192,8 +198,8 @@ def evaluate_section_config_for_user(user=None):
     Tier 3: User Role Permission Override
     Tier 4 (Lowest): Global Default Config
 
-    Returns:
-        (resolved_flags_dict, origins_dict)
+    And applies One-Way Top-Down Cascading rule:
+    If a parent section is OFF, all its children are forced OFF.
     """
     from .models import (
         AppSection,
@@ -201,34 +207,14 @@ def evaluate_section_config_for_user(user=None):
         GroupSectionPermission,
         RoleSectionPermission,
     )
+    from .services import sync_feature_registry_to_db
 
-    seed_initial_sections()
+    if not AppSection.objects.exists():
+        sync_feature_registry_to_db()
 
     sections = AppSection.objects.all().select_related('category')
-    default_keys = {
-        'headerDate': True,
-        'studentSelect': True,
-        'sessionSelect': True,
-        'juzPageInput': True,
-        'mistakeTracker': True,
-        'stuckTracker': True,
-        'commentSection': True,
-        'actionButtons': True,
-        'pdfExport': True,
-        'userManagementModule': True,
-        'activityAnalyticsModule': True,
-        'trashRestorationModule': True,
-    }
-
-    sec_map = {}
-    for sec in sections:
-        sec_map[sec.section_key] = sec.is_globally_enabled
-
-    for k, def_val in default_keys.items():
-        if k not in sec_map:
-            sec_map[k] = def_val
-
-    resolved = {}
+    
+    resolved_raw = {}
     origins = {}
 
     user_overrides = {}
@@ -266,24 +252,40 @@ def evaluate_section_config_for_user(user=None):
             for o in role_perms:
                 role_overrides[o.section.section_key] = o.is_enabled
 
-    # 4-Tier Resolution Evaluation
-    for key, global_val in sec_map.items():
+    # 4-Tier Resolution Evaluation (Independent of hierarchy first)
+    for sec in sections:
+        key = sec.section_key
+        global_val = sec.is_globally_enabled
+
         if not global_val:
-            # If globally disabled, it is OFF everywhere (cannot be overridden to ON)
-            resolved[key] = False
+            resolved_raw[key] = False
             origins[key] = "GLOBAL"
         elif user and user.is_authenticated and key in user_overrides:
-            resolved[key] = user_overrides[key]
+            resolved_raw[key] = user_overrides[key]
             origins[key] = "USER"
         elif user and user.is_authenticated and key in group_overrides:
-            resolved[key] = group_overrides[key]
+            resolved_raw[key] = group_overrides[key]
             origins[key] = "GROUP"
         elif user and user.is_authenticated and key in role_overrides:
-            resolved[key] = role_overrides[key]
+            resolved_raw[key] = role_overrides[key]
             origins[key] = "ROLE"
         else:
-            resolved[key] = global_val
+            resolved_raw[key] = global_val
             origins[key] = "GLOBAL"
+
+    # Apply strict Top-Down cascading rule:
+    # Child is active ONLY if parent is ON and child is ON
+    resolved = {}
+    for sec in sections:
+        key = sec.section_key
+        if sec.parent_key:
+            parent_state = resolved_raw.get(sec.parent_key, True)
+            child_state = resolved_raw.get(key, True)
+            resolved[key] = parent_state and child_state
+            if not parent_state and child_state:
+                origins[key] = f"PARENT_DISABLED ({sec.parent_key})"
+        else:
+            resolved[key] = resolved_raw.get(key, True)
 
     return resolved, origins
 

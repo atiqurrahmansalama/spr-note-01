@@ -53,7 +53,7 @@ from .models import (
     UserSectionOverride,
     FeatureFlagAuditLog,
 )
-from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin
+from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin, IsAdminOrSelf
 from .middleware import detect_device_type, detect_device_info, get_client_ip
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -389,31 +389,33 @@ class PasswordResetConfirmView(APIView):
 
 
 class UserProfileView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_target_user(self, request):
-        user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
-        if user_id:
-            u = User.objects.filter(pk=user_id).first()
-            if u:
-                return u
+        if not request.user or not request.user.is_authenticated:
+            return None
 
-        phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
-        if phone:
-            u = User.objects.filter(phone_number=str(phone).strip()).first()
-            if u:
-                return u
+        is_admin = request.user.is_staff or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or request.user.is_superuser
+        if is_admin:
+            user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
+            if user_id:
+                u = User.objects.filter(pk=user_id).first()
+                if u:
+                    return u
 
-        email = request.data.get('email') or request.query_params.get('email')
-        if email:
-            u = User.objects.filter(email__iexact=str(email).strip()).first()
-            if u:
-                return u
+            phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
+            if phone:
+                u = User.objects.filter(phone_number=str(phone).strip()).first()
+                if u:
+                    return u
 
-        if request.user and request.user.is_authenticated:
-            return request.user
+            email = request.data.get('email') or request.query_params.get('email')
+            if email:
+                u = User.objects.filter(email__iexact=str(email).strip()).first()
+                if u:
+                    return u
 
-        return User.objects.filter(is_superuser=True).first() or User.objects.first()
+        return request.user
 
     def get(self, request):
         user = self.get_target_user(request)
@@ -543,27 +545,30 @@ class LogoutView(APIView):
 
 
 class UserSessionsView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_target_user(self, request):
-        user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
-        if user_id:
-            u = User.objects.filter(pk=user_id).first()
-            if u:
-                return u
-        phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
-        if phone:
-            u = User.objects.filter(phone_number=str(phone).strip()).first()
-            if u:
-                return u
-        email = request.data.get('email') or request.query_params.get('email')
-        if email:
-            u = User.objects.filter(email__iexact=str(email).strip()).first()
-            if u:
-                return u
-        if request.user and request.user.is_authenticated:
-            return request.user
-        return User.objects.filter(is_superuser=True).first() or User.objects.first()
+        if not request.user or not request.user.is_authenticated:
+            return None
+
+        is_admin = request.user.is_staff or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or request.user.is_superuser
+        if is_admin:
+            user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
+            if user_id:
+                u = User.objects.filter(pk=user_id).first()
+                if u:
+                    return u
+            phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
+            if phone:
+                u = User.objects.filter(phone_number=str(phone).strip()).first()
+                if u:
+                    return u
+            email = request.data.get('email') or request.query_params.get('email')
+            if email:
+                u = User.objects.filter(email__iexact=str(email).strip()).first()
+                if u:
+                    return u
+        return request.user
 
     def get(self, request):
         user = self.get_target_user(request)
@@ -615,27 +620,30 @@ class UserSessionsView(APIView):
 
 
 class RevokeSessionView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_target_user(self, request):
-        user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
-        if user_id:
-            u = User.objects.filter(pk=user_id).first()
-            if u:
-                return u
-        phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
-        if phone:
-            u = User.objects.filter(phone_number=str(phone).strip()).first()
-            if u:
-                return u
-        email = request.data.get('email') or request.query_params.get('email')
-        if email:
-            u = User.objects.filter(email__iexact=str(email).strip()).first()
-            if u:
-                return u
-        if request.user and request.user.is_authenticated:
-            return request.user
-        return User.objects.filter(is_superuser=True).first() or User.objects.first()
+        if not request.user or not request.user.is_authenticated:
+            return None
+
+        is_admin = request.user.is_staff or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or request.user.is_superuser
+        if is_admin:
+            user_id = request.data.get('user_id') or request.data.get('id') or request.query_params.get('user_id') or request.query_params.get('id')
+            if user_id:
+                u = User.objects.filter(pk=user_id).first()
+                if u:
+                    return u
+            phone = request.data.get('phone_number') or request.data.get('phone') or request.query_params.get('phone_number')
+            if phone:
+                u = User.objects.filter(phone_number=str(phone).strip()).first()
+                if u:
+                    return u
+            email = request.data.get('email') or request.query_params.get('email')
+            if email:
+                u = User.objects.filter(email__iexact=str(email).strip()).first()
+                if u:
+                    return u
+        return request.user
 
     def post(self, request):
         user = self.get_target_user(request)
@@ -1093,7 +1101,7 @@ class LogActivityView(APIView):
 
 
 class UserActivitySummaryView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     serializer_class = UserActivitySummarySerializer
 
     @extend_schema(
@@ -1101,21 +1109,7 @@ class UserActivitySummaryView(APIView):
         responses={200: UserActivitySummarySerializer}
     )
     def get(self, request):
-        if request.user.is_authenticated:
-            user_obj = request.user
-        else:
-            username = request.query_params.get("username")
-            if username:
-                try:
-                    user_obj = User.objects.get(username=username)
-                except User.DoesNotExist:
-                    user_obj = User.objects.first()
-            else:
-                user_obj = User.objects.first()
-
-        if not user_obj:
-            return Response({"detail": "No users found"}, status=status.HTTP_404_NOT_FOUND)
-
+        user_obj = request.user
         serializer = UserActivitySummarySerializer(user_obj)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1499,12 +1493,10 @@ class VerifyReportView(APIView):
 
 
 class UserSessionView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response([], status=status.HTTP_200_OK)
+        user = request.user
         sessions = UserSession.objects.filter(user=user).order_by('-last_activity')
         data = [
             {
@@ -1523,12 +1515,10 @@ class UserSessionView(APIView):
 
 
 class LogoutAllOtherSessionsView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"status": "success", "logged_out_count": 0}, status=status.HTTP_200_OK)
+        user = request.user
         current_session_id = request.data.get('current_session_id')
         qs = UserSession.objects.filter(user=user, is_active=True)
         if current_session_id:
@@ -1542,12 +1532,21 @@ class LogoutAllOtherSessionsView(APIView):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminOrSelf]
     serializer_class = UserAdminSerializer
     queryset = User.objects.all().select_related('role').order_by('-date_joined')
 
     def get_queryset(self):
-        qs = User.objects.all().select_related('role').order_by('-date_joined')
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return User.objects.none()
+
+        is_admin = user.is_staff or getattr(user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or user.is_superuser
+        if is_admin:
+            qs = User.objects.all().select_related('role').order_by('-date_joined')
+        else:
+            qs = User.objects.filter(id=user.id).select_related('role')
+
         role_code = self.request.query_params.get('role_code') or self.request.query_params.get('user_type') or self.request.query_params.get('role')
         if role_code:
             if role_code.upper() != 'ALL':
@@ -1590,20 +1589,16 @@ class UserViewSet(viewsets.ModelViewSet):
 import secrets
 
 class UserNotificationPreferenceView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         pref, _ = UserNotificationPreference.objects.get_or_create(user=user)
         serializer = UserNotificationPreferenceSerializer(pref)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         pref, _ = UserNotificationPreference.objects.get_or_create(user=user)
         serializer = UserNotificationPreferenceSerializer(pref, data=request.data, partial=True)
         if serializer.is_valid():
@@ -1613,12 +1608,10 @@ class UserNotificationPreferenceView(APIView):
 
 
 class Toggle2FAView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         sec, _ = UserSecurity.objects.get_or_create(user=user)
         sec.is_2fa_enabled = not sec.is_2fa_enabled
         if sec.is_2fa_enabled and not sec.two_factor_secret:
@@ -1632,12 +1625,10 @@ class Toggle2FAView(APIView):
 
 
 class GenerateBackupCodesView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         sec, _ = UserSecurity.objects.get_or_create(user=user)
         codes = [str(secrets.randbelow(90000000) + 10000000) for _ in range(8)]
         sec.backup_codes = codes
@@ -1649,12 +1640,10 @@ class GenerateBackupCodesView(APIView):
 
 
 class DeactivateAccountView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         user.is_deactivated = True
         user.deactivated_at = timezone.now()
         user.is_active = False
@@ -1663,15 +1652,14 @@ class DeactivateAccountView(APIView):
 
 
 class DeleteAccountView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
         password = request.data.get("password") or request.query_params.get("password")
-        if password and not user.check_password(password):
-            return Response({"error": "Invalid password confirmation."}, status=status.HTTP_400_BAD_REQUEST)
+        if user.has_usable_password():
+            if not password or not user.check_password(password):
+                return Response({"error": "Invalid or missing password confirmation."}, status=status.HTTP_400_BAD_REQUEST)
         
         user.is_active = False
         user.is_deactivated = True
@@ -1884,17 +1872,20 @@ class PasskeysListView(APIView):
     """
     Lists and registers WebAuthn Passkeys for user.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_target_user(self, request):
-        if request.user and request.user.is_authenticated:
-            return request.user
-        user_id = request.query_params.get('user_id') or request.query_params.get('id')
-        if user_id:
-            u = User.objects.filter(pk=user_id).first()
-            if u:
-                return u
-        return User.objects.filter(is_superuser=True).first() or User.objects.first()
+        if not request.user or not request.user.is_authenticated:
+            return None
+
+        is_admin = request.user.is_staff or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or request.user.is_superuser
+        if is_admin:
+            user_id = request.query_params.get('user_id') or request.query_params.get('id')
+            if user_id:
+                u = User.objects.filter(pk=user_id).first()
+                if u:
+                    return u
+        return request.user
 
     def get(self, request):
         user = self.get_target_user(request)
@@ -1915,11 +1906,16 @@ class PasskeyDeleteView(APIView):
     """
     Deletes a registered passkey.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         try:
             p = UserPasskey.objects.get(pk=pk)
+            
+            is_admin = request.user.is_staff or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or request.user.is_superuser
+            if p.user != request.user and not is_admin:
+                return Response({'error': 'You do not have permission to delete this passkey.'}, status=status.HTTP_403_FORBIDDEN)
+                
             p.delete()
             return Response({'message': 'Passkey deleted successfully.'}, status=status.HTTP_200_OK)
         except UserPasskey.DoesNotExist:
@@ -1930,10 +1926,10 @@ class PasskeyRegisterOptionsView(APIView):
     """
     Generates WebAuthn registration challenge options.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.first()
+        user = request.user
         username = user.email or user.phone_number or "user" if user else "user"
         user_id_b64 = base64.b64encode(str(user.id if user else 1).encode()).decode()
 
@@ -1964,16 +1960,10 @@ class PasskeyRegisterVerifyView(APIView):
     """
     Verifies WebAuthn challenge and saves UserPasskey.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         cred_id = request.data.get('credential_id') or request.data.get('id') or f"cred_{uuid.uuid4().hex[:16]}"
         pub_key = request.data.get('public_key') or "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
@@ -2001,20 +1991,10 @@ class GoogleLinkView(APIView):
     """
     Binds Google sub_id / account to current authenticated user.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            phone = request.data.get('phone_number') or request.data.get('phone')
-            if phone:
-                user = User.objects.filter(phone_number=str(phone).strip()).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         google_sub = request.data.get('google_sub_id') or request.data.get('sub') or request.data.get('email')
         if not google_sub:
@@ -2039,16 +2019,10 @@ class GoogleUnlinkView(APIView):
     """
     Unbinds Google account with guardrail check for password existence.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         # Guardrail: Check if user has usable password
         if not user.has_usable_password():
@@ -2069,16 +2043,10 @@ class Setup2FAView(APIView):
     """
     Generates TOTP secret & QR Code Base64 URI.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         secret = pyotp.random_base32()
         user.totp_secret = secret
@@ -2105,16 +2073,10 @@ class Enable2FAView(APIView):
     """
     Verifies 6-digit TOTP code, enables 2FA, and generates 8 emergency recovery codes.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         code = str(request.data.get('code', '')).strip()
         if not user.totp_secret:
@@ -2143,16 +2105,10 @@ class Disable2FAView(APIView):
     """
     Disables 2FA after password or TOTP verification.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user and request.user.is_authenticated else None
-        if not user:
-            user_id = request.data.get('user_id') or request.data.get('id')
-            if user_id:
-                user = User.objects.filter(pk=user_id).first()
-        if not user:
-            user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+        user = request.user
 
         password = request.data.get('current_password') or request.data.get('password')
         code = request.data.get('code')
@@ -2509,58 +2465,11 @@ class ControlPanelRulesView(APIView):
         if scope == 'USER' and target_id:
             user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
 
-        categories_map = {
-            "Header": {"id": 1, "key": "header", "title": "Header & Timestamps", "sections": []},
-            "Student Info": {"id": 2, "key": "student", "title": "Student & Group Selection", "sections": []},
-            "Session Info": {"id": 3, "key": "session", "title": "Session Presets", "sections": []},
-            "Quran Progress": {"id": 4, "key": "progress", "title": "Quran Evaluation & Juz Inputs", "sections": []},
-            "Progress Details": {"id": 5, "key": "details", "title": "Mistake & Stuck Trackers", "sections": []},
-            "Comments": {"id": 6, "key": "comments", "title": "Teacher Comments & Notes", "sections": []},
-            "Actions": {"id": 7, "key": "actions", "title": "Export & Action Buttons", "sections": []},
-        }
+        categories_map = {}
 
-        default_sections = [
-            {"section_key": "headerDate", "title": "Date & Time Header", "description": "Controls visibility of report date & session time selector", "cat": "Header", "global": True},
-            {"section_key": "studentSelect", "title": "Student Selection Input", "description": "Controls student search and selection dropdown", "cat": "Student Info", "global": True},
-            {"section_key": "sessionSelect", "title": "Session Preset Selector", "description": "Controls morning/evening session selection", "cat": "Session Info", "global": True},
-            {"section_key": "juzPageInput", "title": "Juz & Page Range Input", "description": "Controls Para, Surah, Page & Line input fields", "cat": "Quran Progress", "global": True},
-            {"section_key": "mistakeTracker", "title": "Mistake Tracker Section", "description": "Controls Galti, Bhool, and Atki counter controls", "cat": "Progress Details", "global": True},
-            {"section_key": "stuckTracker", "title": "Stuck/Pause Tracker Section", "description": "Controls stuck evaluation and review flags", "cat": "Progress Details", "global": True},
-            {"section_key": "commentSection", "title": "Teacher Comment & Presets", "description": "Controls teacher comment textarea and quick presets", "cat": "Comments", "global": True},
-            {"section_key": "actionButtons", "title": "Save & Generate Report", "description": "Controls save report, copy card, and PDF export buttons", "cat": "Actions", "global": True},
-            {"section_key": "pdfExport", "title": "PDF Download & Printing", "description": "Controls PDF generation and print button controls", "cat": "Actions", "global": True},
-        ]
+        db_sections = AppSection.objects.all().select_related('category').order_by('category__order', 'order', 'title')
 
-        sec_dict = {
-            s["section_key"]: {
-                "id": idx + 1,
-                "section_key": s["section_key"],
-                "title": s["title"],
-                "description": s["description"],
-                "cat": s["cat"],
-                "global": True
-            }
-            for idx, s in enumerate(default_sections)
-        }
-
-        db_sections = AppSection.objects.all().select_related('category')
-        for db_s in db_sections:
-            k = db_s.section_key
-            cat_name = db_s.category.title if db_s.category else "General"
-            if k in sec_dict:
-                sec_dict[k]["global"] = db_s.is_globally_enabled
-                if db_s.title: sec_dict[k]["title"] = db_s.title
-                if db_s.description: sec_dict[k]["description"] = db_s.description
-            else:
-                sec_dict[k] = {
-                    "id": db_s.id,
-                    "section_key": k,
-                    "title": db_s.title or k.title(),
-                    "description": db_s.description or "",
-                    "cat": cat_name,
-                    "global": db_s.is_globally_enabled
-                }
-
+        # Fetch overrides
         user_overrides = {}
         if scope == 'USER' and user_obj:
             user_overrides = {o.section.section_key: o.is_enabled for o in UserSectionOverride.objects.filter(user=user_obj).select_related('section')}
@@ -2573,40 +2482,187 @@ class ControlPanelRulesView(APIView):
         if scope == 'ROLE' and target_id:
             role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
 
-        for key, item in sec_dict.items():
-            cat_key = item.get("cat", "General")
-            if cat_key not in categories_map:
-                categories_map[cat_key] = {"id": len(categories_map) + 1, "key": cat_key.lower().replace(" ", "_"), "title": cat_key, "sections": []}
+        # 4-Tier Resolution Evaluation (Independent of hierarchy first)
+        resolved_raw = {}
+        origins = {}
+        for sec in db_sections:
+            key = sec.section_key
+            global_val = sec.is_globally_enabled
 
-            effective_enabled = item["global"]
-            origin = "GLOBAL"
-
-            if not item["global"]:
-                effective_enabled = False
-                origin = "GLOBAL"
+            if not global_val:
+                resolved_raw[key] = False
+                origins[key] = "GLOBAL"
+            elif scope == 'USER' and key in user_overrides:
+                resolved_raw[key] = user_overrides[key]
+                origins[key] = "USER"
+            elif scope == 'GROUP' and key in group_overrides:
+                resolved_raw[key] = group_overrides[key]
+                origins[key] = "GROUP"
+            elif scope == 'ROLE' and key in role_overrides:
+                resolved_raw[key] = role_overrides[key]
+                origins[key] = "ROLE"
             else:
-                if scope == 'USER' and key in user_overrides:
-                    effective_enabled = user_overrides[key]
-                    origin = "USER"
-                elif scope == 'GROUP' and key in group_overrides:
-                    effective_enabled = group_overrides[key]
-                    origin = "GROUP"
-                elif scope == 'ROLE' and key in role_overrides:
-                    effective_enabled = role_overrides[key]
-                    origin = "ROLE"
+                resolved_raw[key] = global_val
+                origins[key] = "GLOBAL"
 
-            categories_map[cat_key]["sections"].append({
-                "id": item["id"],
+        # Apply strict Top-Down cascading rule:
+        # Child is active ONLY if parent is ON and child is ON
+        resolved_effective = {}
+        for sec in db_sections:
+            key = sec.section_key
+            if sec.parent_key:
+                parent_state = resolved_raw.get(sec.parent_key, True)
+                child_state = resolved_raw.get(key, True)
+                resolved_effective[key] = parent_state and child_state
+                if not parent_state and child_state:
+                    origins[key] = f"PARENT_DISABLED ({sec.parent_key})"
+            else:
+                resolved_effective[key] = resolved_raw.get(key, True)
+
+        for sec in db_sections:
+            key = sec.section_key
+            cat_obj = sec.category
+            cat_title = cat_obj.title if cat_obj else "System & Standalone"
+            cat_key = cat_obj.key if cat_obj else "SYSTEM"
+
+            if cat_title not in categories_map:
+                categories_map[cat_title] = {
+                    "id": cat_obj.id if cat_obj else 999,
+                    "key": cat_key,
+                    "title": cat_title,
+                    "sections": []
+                }
+
+            categories_map[cat_title]["sections"].append({
+                "id": sec.id,
                 "section_key": key,
-                "title": item["title"],
-                "description": item.get("description", ""),
-                "is_globally_enabled": item["global"],
-                "effective_enabled": effective_enabled,
-                "inheritance_origin": origin,
+                "title": sec.title,
+                "description": sec.description,
+                "is_globally_enabled": sec.is_globally_enabled,
+                "effective_enabled": resolved_effective[key],
+                "raw_enabled": resolved_raw[key],
+                "inheritance_origin": origins[key],
+                "is_parent": sec.is_parent,
+                "parent_key": sec.parent_key,
             })
 
-        result = [v for v in categories_map.values() if len(v["sections"]) > 0]
+        result = sorted(categories_map.values(), key=lambda c: c["id"])
         return {"categories": result}
+
+
+@method_decorator(never_cache, name='dispatch')
+class ControlPanelSectionTreeView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        scope = (request.query_params.get('scope') or request.query_params.get('scope_type') or 'global').upper()
+        target_id = request.query_params.get('target_id', '')
+
+        user_obj = None
+        if scope == 'USER' and target_id:
+            user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
+
+        # 1. Fetch all sections
+        sections = AppSection.objects.all().select_related('category').order_by('category__order', 'order', 'title')
+
+        # 2. Fetch overrides
+        user_overrides = {}
+        if scope == 'USER' and user_obj:
+            user_overrides = {o.section.section_key: o.is_enabled for o in UserSectionOverride.objects.filter(user=user_obj).select_related('section')}
+
+        group_overrides = {}
+        if scope == 'GROUP' and target_id:
+            group_overrides = {o.section.section_key: o.is_enabled for o in GroupSectionPermission.objects.filter(group_id=target_id).select_related('section')}
+
+        role_overrides = {}
+        if scope == 'ROLE' and target_id:
+            role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
+
+        # 3. Resolve raw values (independent of hierarchy)
+        resolved_raw = {}
+        origins = {}
+        for sec in sections:
+            key = sec.section_key
+            global_val = sec.is_globally_enabled
+
+            if not global_val:
+                resolved_raw[key] = False
+                origins[key] = "GLOBAL"
+            elif scope == 'USER' and key in user_overrides:
+                resolved_raw[key] = user_overrides[key]
+                origins[key] = "USER"
+            elif scope == 'GROUP' and key in group_overrides:
+                resolved_raw[key] = group_overrides[key]
+                origins[key] = "GROUP"
+            elif scope == 'ROLE' and key in role_overrides:
+                resolved_raw[key] = role_overrides[key]
+                origins[key] = "ROLE"
+            else:
+                resolved_raw[key] = global_val
+                origins[key] = "GLOBAL"
+
+        # 4. Resolve effective values with Top-Down cascading
+        resolved_effective = {}
+        for sec in sections:
+            key = sec.section_key
+            if sec.parent_key:
+                parent_state = resolved_raw.get(sec.parent_key, True)
+                child_state = resolved_raw.get(key, True)
+                resolved_effective[key] = parent_state and child_state
+                if not parent_state and child_state:
+                    origins[key] = f"PARENT_DISABLED ({sec.parent_key})"
+            else:
+                resolved_effective[key] = resolved_raw.get(key, True)
+
+        # 5. Build hierarchical tree: Category -> Parent Section -> Child Sections
+        categories_dict = {}
+        for sec in sections:
+            cat = sec.category
+            cat_key = cat.key if cat else "SYSTEM"
+            cat_title = cat.title if cat else "System & Standalone"
+            cat_order = cat.order if cat else 999
+
+            if cat_key not in categories_dict:
+                categories_dict[cat_key] = {
+                    "id": cat.id if cat else 999,
+                    "key": cat_key,
+                    "title": cat_title,
+                    "order": cat_order,
+                    "sections": []
+                }
+
+            sec_data = {
+                "id": sec.id,
+                "section_key": sec.section_key,
+                "title": sec.title,
+                "description": sec.description,
+                "is_parent": sec.is_parent,
+                "parent_key": sec.parent_key,
+                "is_globally_enabled": sec.is_globally_enabled,
+                "effective_enabled": resolved_effective[sec.section_key],
+                "raw_enabled": resolved_raw[sec.section_key],
+                "inheritance_origin": origins[sec.section_key],
+                "children": []
+            }
+            categories_dict[cat_key]["sections"].append(sec_data)
+
+        # Nest children under their parents
+        for cat_key, cat_data in categories_dict.items():
+            all_sec_list = cat_data["sections"]
+            parent_map = {s["section_key"]: s for s in all_sec_list if s["is_parent"]}
+            
+            roots = []
+            for s in all_sec_list:
+                p_key = s["parent_key"]
+                if p_key and p_key in parent_map:
+                    parent_map[p_key]["children"].append(s)
+                else:
+                    roots.append(s)
+            
+            cat_data["sections"] = roots
+
+        categories_tree = sorted(categories_dict.values(), key=lambda c: c["order"])
+        return Response({"categories": categories_tree}, status=status.HTTP_200_OK)
 
 
 class SectionControlVersionView(APIView):

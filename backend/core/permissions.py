@@ -45,3 +45,34 @@ class IsOwnerOrSuperAdmin(BasePermission):
             return True
 
         return False
+
+
+class IsAdminOrSelf(BasePermission):
+    """
+    Permission class to allow Admins full access, and regular users to retrieve/update only themselves.
+    """
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+
+        action = getattr(view, 'action', None)
+        if action == 'create':
+            return (
+                request.user.is_staff or 
+                getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or 
+                request.user.is_superuser
+            )
+
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        is_admin = (
+            request.user.is_staff or 
+            getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or 
+            request.user.is_superuser
+        )
+        if is_admin:
+            return True
+
+        return obj == request.user
+

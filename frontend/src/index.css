@@ -64,51 +64,51 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom theme utility classes (Tailwind v4 @utility layer) */
-@utility theme-bg-app {
+/* Custom theme utility classes (Standard CSS class selectors) */
+.theme-bg-app {
   background-color: var(--bg-app);
 }
-@utility scrollbar-none {
+.scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
   }
 }
-@utility theme-bg-surface {
+.theme-bg-surface {
   background-color: var(--bg-surface);
 }
-@utility theme-bg-sub {
+.theme-bg-sub {
   background-color: var(--bg-surface-sub);
 }
-@utility theme-bg-elevated {
+.theme-bg-elevated {
   background-color: var(--bg-elevated);
 }
-@utility theme-border {
+.theme-border {
   border-color: var(--border-color);
 }
-@utility theme-text-primary {
+.theme-text-primary {
   color: var(--text-primary);
 }
-@utility theme-text-secondary {
+.theme-text-secondary {
   color: var(--text-secondary);
 }
-@utility theme-accent {
+.theme-accent {
   color: var(--accent-main);
 }
-@utility theme-bg-accent {
+.theme-bg-accent {
   background-color: var(--accent-main);
 }
-@utility theme-bg-accent-soft {
+.theme-bg-accent-soft {
   background-color: var(--accent-soft);
 }
-@utility theme-accent-text {
+.theme-accent-text {
   color: var(--accent-text);
 }
-@utility theme-danger {
+.theme-danger {
   color: var(--danger-text);
 }
-@utility theme-bg-danger-soft {
+.theme-bg-danger-soft {
   background-color: var(--danger-soft);
 }
 

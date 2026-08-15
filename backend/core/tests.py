@@ -437,3 +437,152 @@ class GoogleOAuthAPITestCase(APITestCase):
     def test_google_oauth_missing_credentials_returns_400(self):
         response = self.client.post("/api/v1/auth/google/", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+from core.models import UserPasskey
+
+class UserSecurityAndIsolationTestCase(APITestCase):
+    """
+    Tests enforcing authentication, roles, and user-level isolation
+    for all core user management, profile, session, and security views.
+    """
+
+    def setUp(self):
+        self.teacher1 = User.objects.create_user(
+            phone_number="01811111111",
+            password="password123",
+            user_type="TEACHER"
+        )
+        self.teacher2 = User.objects.create_user(
+            phone_number="01822222222",
+            password="password123",
+            user_type="TEACHER"
+        )
+        self.admin = User.objects.create_superuser(
+            phone_number="01899999999",
+            password="password123",
+            user_type="SUPER_ADMIN"
+        )
+
+    def test_unauthenticated_requests_return_401(self):
+        endpoints = [
+            ("/api/v1/user/profile/", "get"),
+            ("/api/v1/user/profile/", "patch"),
+            ("/api/v1/users/", "get"),
+            ("/api/v1/user/sessions/", "get"),
+            ("/api/v1/user/notification-preferences/", "get"),
+        ]
+        for url, method in endpoints:
+            if method == "get":
+                res = self.client.get(url)
+            else:
+                res = self.client.patch(url, data={})
+            self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED, f"Endpoint {url} did not enforce auth.")
+
+    def test_non_admin_user_isolation_on_list(self):
+        self.client.force_authenticate(user=self.teacher1)
+        response = self.client.get("/api/v1/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Results should only contain teacher1, not teacher2 or admin
+        data = response.data.get('results') if isinstance(response.data, dict) else response.data
+        user_ids = [u['id'] for u in data]
+        self.assertIn(self.teacher1.id, user_ids)
+        self.assertNotIn(self.teacher2.id, user_ids)
+        self.assertNotIn(self.admin.id, user_ids)
+
+    def test_non_admin_cannot_target_other_user_profile(self):
+        self.client.force_authenticate(user=self.teacher1)
+        # Request teacher2's profile via query param
+        response = self.client.get(f"/api/v1/user/profile/?id={self.teacher2.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # It should fall back to teacher1's own profile
+        self.assertEqual(response.data["id"], self.teacher1.id)
+
+    def test_non_admin_patch_forbidden_on_other_user(self):
+        self.client.force_authenticate(user=self.teacher1)
+        response = self.client.patch(f"/api/v1/users/{self.teacher2.id}/", data={"name": "Hacked Name"})
+        # Filtering querysets restricts users to only see themselves, so modifying another user returns 404
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_passkey_deletion_isolated(self):
+        # Create passkey for teacher2
+        pk2 = UserPasskey.objects.create(
+            user=self.teacher2,
+            credential_id="cred123",
+            public_key="key123",
+            device_name="device"
+        )
+        
+        # teacher1 tries to delete it
+        self.client.force_authenticate(user=self.teacher1)
+        response = self.client.delete(f"/api/v1/auth/passkeys/{pk2.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # teacher2 (owner) deletes it successfully
+        self.client.force_authenticate(user=self.teacher2)
+        response = self.client.delete(f"/api/v1/auth/passkeys/{pk2.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_admin_has_full_access(self):
+        self.client.force_authenticate(user=self.admin)
+        # Admin can list all users
+        response = self.client.get("/api/v1/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data.get('results') if isinstance(response.data, dict) else response.data
+        user_ids = [u['id'] for u in data]
+        self.assertIn(self.teacher1.id, user_ids)
+        self.assertIn(self.teacher2.id, user_ids)
+        
+        # Admin can fetch other user profile
+        response = self.client.get(f"/api/v1/user/profile/?id={self.teacher1.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.teacher1.id)
+
+
+class FeatureRegistryAndPrecedenceTestCase(APITestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from core.services import sync_feature_registry_to_db
+        User = get_user_model()
+        self.user = User.objects.create_user(phone_number="01711111111", password="password123")
+        sync_feature_registry_to_db()
+
+    def test_tree_api_endpoint(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/v1/admin/section-control/tree/?scope=global")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("categories", response.data)
+        
+        cats = response.data["categories"]
+        admin_cat = next((c for c in cats if c["key"] == "ADMIN"), None)
+        self.assertIsNotNone(admin_cat)
+        
+        parent = next((s for s in admin_cat["sections"] if s["section_key"] == "nav_app_management"), None)
+        self.assertIsNotNone(parent)
+        self.assertTrue(parent["is_parent"])
+        
+        child = next((c for c in parent["children"] if c["section_key"] == "app_section_control"), None)
+        self.assertIsNotNone(child)
+        self.assertEqual(child["parent_key"], "nav_app_management")
+
+    def test_one_way_cascading_inheritance(self):
+        from core.models import AppSection, UserSectionOverride
+        from core.services import evaluate_section_config_for_user
+
+        parent_sec = AppSection.objects.get(section_key="nav_app_management")
+        child_sec = AppSection.objects.get(section_key="app_section_control")
+
+        # 1. Child OFF, Parent remains ON
+        UserSectionOverride.objects.create(user=self.user, section=child_sec, is_enabled=False)
+        resolved, origins = evaluate_section_config_for_user(self.user)
+        self.assertFalse(resolved["app_section_control"])
+        self.assertTrue(resolved["nav_app_management"])
+
+        # Clean overrides
+        UserSectionOverride.objects.all().delete()
+
+        # 2. Parent OFF, Child is forced OFF
+        UserSectionOverride.objects.create(user=self.user, section=parent_sec, is_enabled=False)
+        resolved, origins = evaluate_section_config_for_user(self.user)
+        self.assertFalse(resolved["nav_app_management"])
+        self.assertFalse(resolved["app_section_control"])

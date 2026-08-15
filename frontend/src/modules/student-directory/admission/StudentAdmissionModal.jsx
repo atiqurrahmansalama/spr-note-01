@@ -124,14 +124,14 @@ export default function StudentAdmissionModal({ isOpen, onClose, onSuccess }) {
 
         {/* Tab Switcher (Only visible if not yet admitted) */}
         {!admittedStudent && (
-          <div className="flex bg-neutral-100 dark:theme-bg-sub p-1 mx-6 mt-4 rounded-xl shrink-0">
+          <div className="flex theme-bg-sub border theme-border p-1.5 mx-6 mt-4.5 rounded-2xl shrink-0 gap-1.5">
             <button
               type="button"
               onClick={() => setActiveMode("QUICK")}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
                 activeMode === "QUICK"
-                  ? "bg-white dark:theme-bg-surface theme-text-primary shadow-sm"
-                  : "theme-text-secondary hover:theme-text-primary"
+                  ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
+                  : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
               }`}
             >
               Quick Admission
@@ -139,10 +139,10 @@ export default function StudentAdmissionModal({ isOpen, onClose, onSuccess }) {
             <button
               type="button"
               onClick={() => setActiveMode("FULL")}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
                 activeMode === "FULL"
-                  ? "bg-white dark:theme-bg-surface theme-text-primary shadow-sm"
-                  : "theme-text-secondary hover:theme-text-primary"
+                  ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
+                  : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
               }`}
             >
               Full Institutional Admission

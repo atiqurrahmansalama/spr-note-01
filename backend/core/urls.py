@@ -45,6 +45,7 @@ from .views import (
     ResetUserOverridesView,
     ClearSectionOverridesView,
     ControlPanelRulesView,
+    ControlPanelSectionTreeView,
     ControlPanelBatchUpdateView,
     ControlPanelResetRulesView,
     ControlPanelAuditLogView,
@@ -98,6 +99,7 @@ urlpatterns = [
     # Control Panel & Feature Flagging Endpoints
     path('api/v1/section-control/evaluate/', EvaluatedConfigView.as_view(), name='section_control_evaluate'),
     path('api/v1/section-control/version/', SectionControlVersionView.as_view(), name='section_control_version'),
+    path('api/v1/admin/section-control/tree/', ControlPanelSectionTreeView.as_view(), name='admin_section_control_tree'),
     path('api/v1/admin/section-control/update/', ControlPanelBatchUpdateView.as_view(), name='admin_section_control_update'),
     path('api/v1/admin/section-control/override/', ControlPanelBatchUpdateView.as_view(), name='admin_section_control_override'),
     path('api/v1/admin/section-control/reset-user-overrides/', ResetUserOverridesView.as_view(), name='admin_section_control_reset_user_overrides'),

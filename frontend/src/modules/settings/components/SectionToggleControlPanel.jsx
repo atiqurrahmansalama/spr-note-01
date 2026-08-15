@@ -180,7 +180,7 @@ export default function SectionToggleControlPanel() {
     setLoading(true);
     setModifiedFlags({});
     try {
-      let url = `/api/v1/control-panel/rules/?scope=${activeScope}&_t=${Date.now()}`;
+      let url = `/api/v1/admin/section-control/tree/?scope=${activeScope}&_t=${Date.now()}`;
       if (currentTargetId) {
         url += `&target_id=${encodeURIComponent(currentTargetId)}`;
       }
@@ -189,17 +189,12 @@ export default function SectionToggleControlPanel() {
       if (res.ok) {
         const data = await res.json();
         const resCats = Array.isArray(data) ? data : data.categories || [];
-        if (resCats.length > 0) {
-          setCategories(resCats);
-        } else {
-          // Fallback: show default panel structure if server returns empty
-          setCategories(DEFAULT_PANEL_CATEGORIES);
-        }
+        setCategories(resCats);
       } else {
-        setCategories(DEFAULT_PANEL_CATEGORIES);
+        setCategories([]);
       }
     } catch {
-      setCategories(DEFAULT_PANEL_CATEGORIES);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -743,69 +738,158 @@ export default function SectionToggleControlPanel() {
               const filteredSections = cat.sections.filter((sec) => {
                 if (!searchFilter.trim()) return true;
                 const search = searchFilter.toLowerCase();
-                return (
+                const matchSelf = (
                   sec.section_key.toLowerCase().includes(search) ||
                   sec.title.toLowerCase().includes(search) ||
                   sec.description.toLowerCase().includes(search)
                 );
+                if (matchSelf) return true;
+
+                if (sec.children && sec.children.length > 0) {
+                  return sec.children.some(child => 
+                    child.section_key.toLowerCase().includes(search) ||
+                    child.title.toLowerCase().includes(search) ||
+                    child.description.toLowerCase().includes(search)
+                  );
+                }
+                return false;
               });
 
               if (filteredSections.length === 0) return null;
 
               return (
                 <div key={cat.id} className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary px-1 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary px-1 flex items-center justify-between border-b theme-border pb-1">
                     <span>{cat.title}</span>
                     <span className="font-mono text-[10px] theme-accent opacity-80">
                       Category Key: {cat.key}
                     </span>
                   </h3>
 
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-4">
                     {filteredSections.map((sec) => {
                       const hasLocalMod = modifiedFlags[sec.section_key] !== undefined;
-                      const activeValue = hasLocalMod ? modifiedFlags[sec.section_key] : sec.effective_enabled;
+                      const dbValue = sec.effective_enabled;
+                      const isEnabled = hasLocalMod ? modifiedFlags[sec.section_key] : dbValue;
+                      const isParent = sec.is_parent;
 
                       return (
-                        <div
-                          key={sec.id}
-                          onClick={() => handleToggle(sec.section_key, activeValue)}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer select-none flex items-start justify-between gap-4 ${
-                            activeValue
-                              ? "theme-bg-surface border-[var(--accent-main)]/50 shadow-sm"
-                              : "theme-bg-sub border-transparent opacity-60 hover:opacity-80"
-                          } ${hasLocalMod ? "ring-2 ring-[var(--accent-main)]/70" : ""}`}
-                        >
-                          <div className="space-y-1.5 min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-bold theme-text-primary truncate">
-                                {sec.title}
-                              </span>
-                              {renderOriginBadge(sec.inheritance_origin)}
-                              {hasLocalMod && (
-                                <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold">
-                                  Unsaved
+                        <div key={sec.id} className="space-y-3">
+                          {/* Main card */}
+                          <div
+                            onClick={() => handleToggle(sec.section_key, isEnabled)}
+                            className={`p-4 rounded-xl border transition-all cursor-pointer select-none flex items-start justify-between gap-4 ${
+                              isEnabled
+                                ? "theme-bg-surface border-[var(--accent-main)]/50 shadow-sm"
+                                : "theme-bg-sub border-transparent opacity-75 hover:opacity-85"
+                            } ${hasLocalMod ? "ring-2 ring-[var(--accent-main)]/70" : ""}`}
+                          >
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold theme-text-primary truncate">
+                                  {sec.title}
                                 </span>
-                              )}
+                                {isParent && (
+                                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] px-1.5 py-0.5 rounded font-semibold font-mono">
+                                    Parent Module
+                                  </span>
+                                )}
+                                {renderOriginBadge(sec.inheritance_origin)}
+                                {hasLocalMod && (
+                                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold">
+                                    Unsaved
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] theme-text-secondary leading-snug">
+                                {sec.description || "No description provided."}
+                              </p>
+
+                              <p className="text-[10px] font-mono theme-text-secondary opacity-70">
+                                Key: <span className="theme-accent font-semibold">{sec.section_key}</span>
+                              </p>
                             </div>
 
-                            <p className="text-[11px] theme-text-secondary leading-snug">
-                              {sec.description || "No description provided."}
-                            </p>
-
-                            <p className="text-[10px] font-mono theme-text-secondary opacity-70">
-                              Key: <span className="theme-accent font-semibold">{sec.section_key}</span>
-                            </p>
+                            {/* Custom Styled Switch Control */}
+                            <div
+                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors shrink-0 ${
+                                isEnabled ? "theme-bg-accent justify-end" : "bg-zinc-700 justify-start"
+                              }`}
+                            >
+                              <div className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                            </div>
                           </div>
 
-                          {/* Custom Styled Switch Control */}
-                          <div
-                            className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors shrink-0 ${
-                              activeValue ? "theme-bg-accent justify-end" : "bg-zinc-700 justify-start"
-                            }`}
-                          >
-                            <div className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
-                          </div>
+                          {/* Children list (if any) */}
+                          {isParent && sec.children && sec.children.length > 0 && (
+                            <div className="pl-6 sm:pl-8 border-l-2 theme-border space-y-3 mt-2">
+                              {sec.children.map((child) => {
+                                const parentActive = isEnabled;
+                                const childHasLocalMod = modifiedFlags[child.section_key] !== undefined;
+                                const childDbValue = child.effective_enabled;
+                                const childRawValue = childHasLocalMod ? modifiedFlags[child.section_key] : childDbValue;
+                                
+                                // Child is effectively enabled ONLY if parent is active and child itself is toggled ON
+                                const childEffectiveActive = parentActive && childRawValue;
+
+                                return (
+                                  <div
+                                    key={child.id}
+                                    onClick={() => {
+                                      if (parentActive) {
+                                        handleToggle(child.section_key, childRawValue);
+                                      }
+                                    }}
+                                    className={`p-3.5 rounded-xl border transition-all select-none flex items-start justify-between gap-4 ${
+                                      !parentActive
+                                        ? "theme-bg-sub border-transparent opacity-40 pointer-events-none"
+                                        : childEffectiveActive
+                                        ? "theme-bg-surface border-[var(--accent-main)]/30 shadow-sm cursor-pointer"
+                                        : "theme-bg-sub border-transparent opacity-75 hover:opacity-85 cursor-pointer"
+                                    } ${childHasLocalMod && parentActive ? "ring-2 ring-[var(--accent-main)]/50" : ""}`}
+                                  >
+                                    <div className="space-y-1.5 min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[11px] font-bold theme-text-primary truncate">
+                                          {child.title}
+                                        </span>
+                                        {!parentActive ? (
+                                          <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold">
+                                            Disabled by Parent
+                                          </span>
+                                        ) : (
+                                          renderOriginBadge(child.inheritance_origin)
+                                        )}
+                                        {childHasLocalMod && parentActive && (
+                                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold">
+                                            Unsaved
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <p className="text-[10px] theme-text-secondary leading-snug">
+                                        {child.description || "No description provided."}
+                                      </p>
+
+                                      <p className="text-[9px] font-mono theme-text-secondary opacity-70">
+                                        Key: <span className="theme-accent font-semibold">{child.section_key}</span>
+                                      </p>
+                                    </div>
+
+                                    {/* Custom Styled Switch Control */}
+                                    <div
+                                      className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors shrink-0 ${
+                                        childEffectiveActive ? "theme-bg-accent justify-end" : "bg-zinc-700 justify-start"
+                                      }`}
+                                    >
+                                      <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform" />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

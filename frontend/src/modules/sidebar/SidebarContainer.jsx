@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import UserProfileCard from "./UserProfileCard";
+import { useFeatureControl } from "../../context/FeatureControlContext";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -46,16 +47,21 @@ export default function SidebarContainer({
     }));
   };
 
+  const { isSectionEnabled } = useFeatureControl();
+
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon },
+    { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
     {
-      id: "Report Generator",
-      name: "Report Generator",
-      Icon: SavedMessagesIcon,
+      id: "App Management",
+      name: "App Management",
+      Icon: SettingsIcon,
       hasSub: true,
+      key: "nav_app_management",
       subItems: [
-        { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon },
-        { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon },
+        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon, key: "app_section_control" },
+        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon, key: "app_user_management" },
+        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
+        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
       ]
     },
     {
@@ -63,44 +69,45 @@ export default function SidebarContainer({
       name: "Student Management",
       Icon: GroupsIcon,
       hasSub: true,
+      key: "nav_student_management",
       subItems: [
-        { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon },
-        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon },
-        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon },
-        { id: "Student Admission", name: "Student Admission & Profile Registration", path: "/admission", Icon: GroupsIcon },
+        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon, key: "student_roster" },
+        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon, key: "student_groups" },
+        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: GroupsIcon, key: "student_admission" },
       ]
     },
     {
-      id: "App Management",
-      name: "App Management",
-      Icon: SettingsIcon,
+      id: "Report Generator",
+      name: "Report Generator",
+      Icon: SavedMessagesIcon,
       hasSub: true,
+      key: "nav_report_generator",
       subItems: [
-        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon },
-        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon },
-        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon },
-        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon },
+        { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon, key: "report_builder" },
+        { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon, key: "report_sessions_comments" },
+        { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
+        { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon, key: "report_copy_settings" },
       ]
     },
-    { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon },
-    { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon },
     { 
       id: "Settings", 
       name: "Settings", 
       Icon: SettingsIcon, 
       hasSub: true,
+      key: "nav_settings",
       subItems: [
-        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon },
-        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon },
-        { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon },
-        { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon },
-        { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon },
-        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon },
+        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon, key: "settings_profile" },
+        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon, key: "settings_security" },
+        { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon, key: "settings_datetime" },
+        { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon, key: "settings_appearance" },
+        { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon, key: "settings_language" },
+        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
       ]
     },
-    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon },
-    { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon },
-    { id: "About", name: "About", path: "/about", Icon: AboutIcon },
+    { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
+    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon, key: "nav_shortcuts" },
+    { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon, key: "nav_app_guide" },
+    { id: "About", name: "About", path: "/about", Icon: AboutIcon, key: "nav_about" },
   ];
 
   const handleNavigate = (path) => {
@@ -118,10 +125,24 @@ export default function SidebarContainer({
   const isOverlay = sidebarMode === "overlay";
   const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
 
-  const displayMenuItems = menuItems.filter((item) => {
-    if (isMobileScreen && item.id === "Shortcuts") return false;
-    return true;
-  });
+  const displayMenuItems = menuItems
+    .map((item) => {
+      if (item.hasSub) {
+        const visibleSubItems = item.subItems.filter((sub) => isSectionEnabled(sub.key));
+        return { ...item, subItems: visibleSubItems };
+      }
+      return item;
+    })
+    .filter((item) => {
+      if (isMobileScreen && item.id === "Shortcuts") return false;
+      
+      const isVisible = isSectionEnabled(item.key);
+      if (!isVisible) return false;
+      
+      if (item.hasSub && item.subItems.length === 0) return false;
+      
+      return true;
+    });
 
   const checkIsActive = (path) => {
     if (!path) return false;

@@ -342,6 +342,54 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     showToast(`Group "${grpName}" and its students deleted!`, "success");
   };
 
+  // Add new group
+  const handleAddGroup = async () => {
+    const grpName = window.prompt("Enter new group name:");
+    if (!grpName) return;
+    const trimmed = grpName.trim();
+    if (!trimmed) {
+      showToast("Group name cannot be empty", "error");
+      return;
+    }
+    
+    // Check if group already exists
+    if (groupsList.some(g => g.toLowerCase() === trimmed.toLowerCase())) {
+      showToast("Group already exists", "error");
+      return;
+    }
+
+    // Add a placeholder student in this group so that the group appears in groupsList
+    const placeholderStudent = {
+      label: `Placeholder Student (${trimmed})`,
+      sub: trimmed,
+      _local: true
+    };
+    
+    const updated = studentStore.add(placeholderStudent);
+    setStudentList(updated);
+    showToast(`Group "${trimmed}" added successfully!`, "success");
+
+    if (isOnline()) {
+      try {
+        await fetchWithAuth("/groups/", {
+          method: "POST",
+          body: JSON.stringify({ name: trimmed }),
+        });
+        
+        await fetchWithAuth("/students/", {
+          method: "POST",
+          body: JSON.stringify({
+            name: placeholderStudent.label,
+            group: placeholderStudent.sub,
+          }),
+        });
+        await loadStudents();
+      } catch (err) {
+        console.warn("[StudentDirectory] Add group API warning:", err.message);
+      }
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-5 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6">
       
@@ -369,13 +417,23 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               {filteredStudents.length} Students
             </span>
 
-            <button
-              type="button"
-              onClick={() => setIsAdmissionModalOpen(true)}
-              className="px-3.5 py-1.5 text-xs font-semibold theme-accent-text theme-bg-accent hover:opacity-90 rounded-xl transition cursor-pointer shadow-sm"
-            >
-              + Add Student
-            </button>
+            {viewMode === "groups" ? (
+              <button
+                type="button"
+                onClick={handleAddGroup}
+                className="px-3.5 py-1.5 text-xs font-semibold theme-accent-text theme-bg-accent hover:opacity-90 rounded-xl transition cursor-pointer shadow-sm"
+              >
+                + Add Group
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAdmissionModalOpen(true)}
+                className="px-3.5 py-1.5 text-xs font-semibold theme-accent-text theme-bg-accent hover:opacity-90 rounded-xl transition cursor-pointer shadow-sm"
+              >
+                + Add Student
+              </button>
+            )}
           </div>
         </div>
 
@@ -397,43 +455,20 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         {/* 3. Group List Roster Section (With In-Column Edit & Expanded Scroll Area) */}
         {viewMode !== "students" && (
           <div className="space-y-3 pt-1">
-          <div className="flex items-center justify-between pb-1 border-b theme-border">
-            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
-              <GroupsIcon className="w-4 h-4 theme-accent" />
-              <span>Group Roster</span>
-            </h3>
-            <span className="text-[11px] font-mono theme-text-secondary">
-              Total {groupsList.length} Groups
-            </span>
-          </div>
+            <div className="flex items-center justify-between pb-1 border-b theme-border">
+              <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
+                <GroupsIcon className="w-4 h-4 theme-accent" />
+                <span>Group Roster</span>
+              </h3>
+              <span className="text-[11px] font-mono theme-text-secondary">
+                Total {groupsList.length} Groups
+              </span>
+            </div>
 
-          {/* Group Roster Cards with Dual Independent Column Layout */}
-          <div className="max-h-72 overflow-y-auto overflow-x-hidden pr-1" style={{ scrollbarGutter: "stable" }}>
-            <div className="flex flex-col sm:flex-row gap-3 items-start">
-              
-              {/* Left Column (All Groups Filter + Even Indices) */}
-              <div className="flex-1 w-full flex flex-col gap-3">
-                {/* All Groups Filter Card */}
-                <div
-                  onClick={() => setSelectedGroupFilter("ALL")}
-                  className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none ${
-                    selectedGroupFilter === "ALL"
-                      ? "theme-bg-sub theme-accent shadow-sm font-bold"
-                      : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-2 h-2 rounded-full ${selectedGroupFilter === "ALL" ? "theme-bg-accent" : "theme-bg-sub opacity-50"}`} />
-                    <span className="text-xs font-semibold">All Groups</span>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-accent font-semibold">
-                    {studentList.length} students
-                  </span>
-                </div>
-
-                {/* Even Group Cards */}
-                {groupsList.filter((_, idx) => idx % 2 === 0).map((grp, idx) => {
-                  const isSelected = selectedGroupFilter.toLowerCase() === grp.toLowerCase();
+            {/* Group Roster Cards with Single Column Layout */}
+            <div className="max-h-96 overflow-y-auto overflow-x-hidden pr-1" style={{ scrollbarGutter: "stable" }}>
+              <div className="w-full flex flex-col gap-3">
+                {groupsList.map((grp, idx) => {
                   const count = studentList.filter((s) => (s.sub || "General Group").toLowerCase() === grp.toLowerCase()).length;
                   const isEditingThisGroup = editingGroupName === grp;
 
@@ -479,19 +514,13 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                   return (
                     <div
                       key={grp + idx}
-                      onClick={() => setSelectedGroupFilter(grp)}
-                      className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none group/grp ${
-                        isSelected
-                          ? "theme-bg-sub theme-accent shadow-sm font-bold"
-                          : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
-                      }`}
+                      className="w-full p-3.5 rounded-xl border theme-border theme-bg-sub theme-text-primary hover:theme-bg-elevated transition flex items-center justify-between select-none group/grp"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? "theme-bg-accent" : "theme-bg-sub opacity-50"}`} />
                         <span className="text-xs font-semibold truncate">{grp}</span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-4 shrink-0">
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-accent font-semibold">
                           {count} students
                         </span>
@@ -525,137 +554,63 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                   );
                 })}
               </div>
-
-              {/* Right Column (Odd Indices) */}
-              <div className="flex-1 w-full flex flex-col gap-3">
-                {groupsList.filter((_, idx) => idx % 2 === 1).map((grp, idx) => {
-                  const isSelected = selectedGroupFilter.toLowerCase() === grp.toLowerCase();
-                  const count = studentList.filter((s) => (s.sub || "General Group").toLowerCase() === grp.toLowerCase()).length;
-                  const isEditingThisGroup = editingGroupName === grp;
-
-                  if (isEditingThisGroup) {
-                    return (
-                      <div key={grp + idx} className="w-full theme-bg-sub border theme-border rounded-xl p-3.5 space-y-3 shadow-sm animate-fade-in">
-                        <div className="text-xs font-bold theme-text-primary pb-1 border-b theme-border">
-                          Edit Group Name
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
-                            Group Name
-                          </label>
-                          <input
-                            type="text"
-                            value={newGroupNameInput}
-                            onChange={(e) => setNewGroupNameInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') saveEditGroup(grp); }}
-                            autoFocus
-                            className="w-full theme-bg-app border theme-border theme-text-primary px-3 py-1.5 rounded-lg text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50"
-                          />
-                        </div>
-                        <div className="flex items-center justify-end gap-2 pt-1 border-t theme-border">
-                          <button
-                            type="button"
-                            onClick={() => setEditingGroupName(null)}
-                            className="px-3 py-1 text-xs font-semibold theme-text-secondary hover:theme-text-primary rounded-lg theme-bg-surface cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => saveEditGroup(grp)}
-                            className="px-3 py-1 text-xs font-semibold theme-accent-text theme-bg-accent rounded-lg cursor-pointer shadow-sm"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={grp + idx}
-                      onClick={() => setSelectedGroupFilter(grp)}
-                      className={`w-full p-3.5 rounded-xl border theme-border transition cursor-pointer flex items-center justify-between select-none group/grp ${
-                        isSelected
-                          ? "theme-bg-sub theme-accent shadow-sm font-bold"
-                          : "theme-bg-sub theme-text-primary hover:theme-bg-elevated"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? "theme-bg-accent" : "theme-bg-sub opacity-50"}`} />
-                        <span className="text-xs font-semibold truncate">{grp}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-accent font-semibold">
-                          {count} students
-                        </span>
-
-                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/grp:opacity-100 group-active/grp:opacity-100 group-focus-within/grp:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startEditGroup(grp);
-                            }}
-                            className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-surface transition cursor-pointer"
-                            title="Edit Group Name"
-                          >
-                            <EditIcon className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteGroup(grp);
-                            }}
-                            className="p-1 rounded-lg theme-text-secondary hover:text-rose-400 hover:theme-bg-surface transition cursor-pointer"
-                            title="Delete Group"
-                          >
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* 4. Student Roster Section */}
       {viewMode !== "groups" && (
-          <div className="space-y-3 pt-3 border-t theme-border">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-1">
-              <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
-                <UsersIcon className="w-4 h-4 theme-accent" />
-                <span>Student Roster</span>
-              </h3>
+        <div className="space-y-4 pt-3 border-t theme-border">
+          <div className="flex items-center justify-between pb-1 border-b theme-border">
+            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
+              <UsersIcon className="w-4 h-4 theme-accent" />
+              <span>Student Roster</span>
+            </h3>
+            <span className="text-[11px] font-mono theme-text-secondary">
+              Total {filteredStudents.length} Students
+            </span>
+          </div>
 
-              {/* Search Input for Students */}
-              <div className="relative w-full sm:w-64">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search students..."
-                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-1.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2.5 top-1.5 text-xs theme-text-secondary hover:theme-text-primary"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+            {/* Search Input for Students */}
+            <div className="relative flex-1 w-full">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search students..."
+                className="w-full theme-bg-sub border theme-border theme-text-primary px-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-10"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs theme-text-secondary hover:theme-text-primary cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
             </div>
+
+            {/* Group Filter Dropdown */}
+            <div className="w-full sm:w-56 shrink-0">
+              <AutocompleteDropdown
+                options={[
+                  { label: "All Groups", value: "ALL" },
+                  ...groupsList.map(g => ({ label: g, value: g }))
+                ]}
+                value={selectedGroupFilter === "ALL" ? "All Groups" : selectedGroupFilter}
+                onChange={(val) => {
+                  const groupVal = typeof val === "object" ? val.value : val;
+                  setSelectedGroupFilter(groupVal === "All Groups" ? "ALL" : groupVal);
+                }}
+                placeholder="Filter by Group"
+                disableSaveButton={true}
+                showAllOptionsOnFocus={true}
+                readOnly={true}
+              />
+            </div>
+          </div>
 
             {filteredStudents.length === 0 ? (
               <div className="text-center py-8 theme-text-secondary text-xs space-y-2">
