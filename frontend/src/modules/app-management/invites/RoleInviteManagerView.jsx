@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "../../../context/ToastContext";
@@ -33,29 +33,12 @@ export default function RoleInviteManagerView() {
   const [deletingInvite, setDeletingInvite] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Action Menu Dropdown State
+  // Action Menu Portal State
   const [activeMenuId, setActiveMenuId] = useState(null);
-  const [menuDirection, setMenuDirection] = useState("down");
-  const menuContainerRef = useRef(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, openUpward: false });
+  const menuRef = useRef(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Close 3-dots action menu on outside click
-  useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target)) {
-        setActiveMenuId(null);
-      }
-    };
-    if (activeMenuId) {
-      document.addEventListener("mousedown", handleOutsideClick);
-    }
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [activeMenuId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [invRes, roleRes] = await Promise.all([
@@ -77,7 +60,34 @@ export default function RoleInviteManagerView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Close 3-dots action menu on outside click or scroll
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setActiveMenuId(null);
+      }
+    };
+    const handleScrollOrResize = () => {
+      if (activeMenuId) setActiveMenuId(null);
+    };
+
+    if (activeMenuId) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      window.addEventListener("scroll", handleScrollOrResize, true);
+      window.addEventListener("resize", handleScrollOrResize);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [activeMenuId]);
 
   const handleOpenCreateInSidebar = () => {
     openRightSidebar({
@@ -147,6 +157,7 @@ export default function RoleInviteManagerView() {
     showToast("Join link copied to clipboard!", "success");
   };
 
+  // Trigger 3-dots menu with precise viewport coordinates
   const handleToggleMenu = (e, inviteId) => {
     e.stopPropagation();
     if (activeMenuId === inviteId) {
@@ -154,14 +165,16 @@ export default function RoleInviteManagerView() {
       return;
     }
 
-    // Detect if click is near bottom of viewport to open menu upward
     const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 190;
+    const menuHeight = 180;
     const spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow < 220) {
-      setMenuDirection("up");
-    } else {
-      setMenuDirection("down");
-    }
+    const openUpward = spaceBelow < menuHeight;
+
+    const top = openUpward ? rect.top - 6 : rect.bottom + 6;
+    const left = Math.max(12, rect.right - menuWidth);
+
+    setMenuPosition({ top, left, openUpward });
     setActiveMenuId(inviteId);
   };
 
@@ -277,11 +290,10 @@ export default function RoleInviteManagerView() {
     }
   };
 
+  const activeInvite = invites.find((i) => i.id === activeMenuId);
+
   return (
-    <div
-      className="w-full max-w-6xl mx-auto py-6 px-4 font-sans theme-text-primary animate-fade-in select-none"
-      ref={menuContainerRef}
-    >
+    <div className="w-full max-w-6xl mx-auto py-6 px-4 font-sans theme-text-primary animate-fade-in select-none">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-3">
@@ -309,12 +321,12 @@ export default function RoleInviteManagerView() {
 
       {/* Content List Table */}
       {loading ? (
-        <div className="w-full theme-bg-elevated border theme-border rounded-3xl p-12 text-center animate-pulse shadow-xs">
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-12 text-center animate-pulse shadow-xs">
           <div className="w-8 h-8 border-3 border-[var(--accent-main)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <div className="text-xs font-bold theme-text-secondary">Loading onboarding invite tokens...</div>
         </div>
       ) : invites.length === 0 ? (
-        <div className="w-full theme-bg-elevated border theme-border rounded-3xl p-12 text-center shadow-xs space-y-3">
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-12 text-center shadow-xs space-y-3">
           <div className="w-12 h-12 rounded-2xl theme-bg-sub flex items-center justify-center mx-auto text-[var(--accent-main)] shadow-inner">
             <QrCodeIcon className="w-6 h-6" />
           </div>
@@ -324,11 +336,12 @@ export default function RoleInviteManagerView() {
           </p>
         </div>
       ) : (
-        <div className="rounded-3xl theme-bg-elevated border theme-border shadow-xs pb-32">
+        /* Natural height table card (no artificial bottom padding) */
+        <div className="rounded-2xl theme-bg-surface border theme-border shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b theme-border/40 theme-bg-sub/50 text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
+                <tr className="border-b theme-border theme-bg-sub text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
                   <th className="px-5 py-3.5">Title / Batch Label</th>
                   <th className="px-5 py-3.5">Target Role</th>
                   <th className="px-5 py-3.5 text-center">Usages</th>
@@ -337,7 +350,7 @@ export default function RoleInviteManagerView() {
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y theme-border/30">
+              <tbody className="divide-y theme-border">
                 {invites.map((invite) => {
                   const isValid = invite.is_valid && invite.is_active;
                   const isMenuOpen = activeMenuId === invite.id;
@@ -345,17 +358,17 @@ export default function RoleInviteManagerView() {
                   return (
                     <tr
                       key={invite.id}
-                      className="hover:theme-bg-sub/40 transition-colors group"
+                      className="hover:theme-bg-sub/60 transition-colors"
                     >
                       <td className="px-5 py-3.5">
                         <span className="font-bold theme-text-primary block">{invite.title}</span>
-                        <span className="text-[10px] font-mono text-[var(--accent-main)]">
+                        <span className="text-[10px] font-mono theme-text-secondary opacity-75">
                           {invite.token?.slice(0, 16)}...
                         </span>
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold theme-bg-sub text-[var(--accent-main)] border theme-border uppercase tracking-wider">
+                        <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border uppercase tracking-wider">
                           {invite.target_role_name}
                         </span>
                       </td>
@@ -372,7 +385,7 @@ export default function RoleInviteManagerView() {
 
                       <td className="px-5 py-3.5">
                         {invite.expires_at ? (
-                          <span className={new Date(invite.expires_at) < new Date() ? "text-rose-400 font-bold" : "theme-text-primary"}>
+                          <span className={new Date(invite.expires_at) < new Date() ? "theme-danger font-bold" : "theme-text-primary"}>
                             {new Date(invite.expires_at).toLocaleDateString()}
                           </span>
                         ) : (
@@ -382,90 +395,35 @@ export default function RoleInviteManagerView() {
 
                       <td className="px-5 py-3.5 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border theme-border ${
                             isValid
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                              : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                              ? "theme-bg-accent-soft theme-accent"
+                              : "theme-bg-danger-soft theme-danger"
                           }`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isValid ? "bg-emerald-400" : "bg-rose-400"}`}></span>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isValid ? "theme-bg-accent" : "bg-[var(--danger-main)]"
+                            }`}
+                          ></span>
                           {isValid ? "Active" : "Revoked"}
                         </span>
                       </td>
 
-                      {/* 3-Dots Action Menu Dropdown with Smart Up/Down Orientation */}
-                      <td className="px-5 py-3.5 text-right relative">
-                        <div className="inline-block text-left relative">
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleMenu(e, invite.id)}
-                            className={`p-1.5 rounded-xl border transition-all cursor-pointer shadow-xs ${
-                              isMenuOpen
-                                ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
-                                : "theme-bg-sub hover:theme-bg-elevated theme-border theme-text-secondary hover:theme-text-primary"
-                            }`}
-                            title="Actions Menu"
-                          >
-                            <DotsVerticalIcon className="w-4 h-4" />
-                          </button>
-
-                          {/* Action Menu Popup (Opens Upward if near bottom) */}
-                          {isMenuOpen && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className={`absolute right-0 z-[100] w-48 rounded-2xl theme-bg-elevated border theme-border shadow-2xl p-1.5 space-y-1 animate-fade-in text-left ${
-                                menuDirection === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedInvite(invite);
-                                  setShowQRModal(true);
-                                  setActiveMenuId(null);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer"
-                              >
-                                <QrCodeIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
-                                <span>View &amp; Share QR</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => copyLinkToClipboard(invite.token)}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer"
-                              >
-                                <CopyIcon className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Copy Join Link</span>
-                              </button>
-
-                              {isValid && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevoke(invite.id)}
-                                  className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition flex items-center gap-2 cursor-pointer"
-                                >
-                                  <BanIcon className="w-3.5 h-3.5" />
-                                  <span>Revoke Invite</span>
-                                </button>
-                              )}
-
-                              <div className="border-t theme-border/40 my-1"></div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuId(null);
-                                  setDeletingInvite(invite);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition flex items-center gap-2 cursor-pointer"
-                              >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                                <span>Delete Invite</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                      {/* 3-Dots Action Menu Trigger Button */}
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleMenu(e, invite.id)}
+                          className={`p-1.5 rounded-xl border transition-all cursor-pointer shadow-xs ${
+                            isMenuOpen
+                              ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
+                              : "theme-bg-sub hover:theme-bg-elevated theme-border theme-text-secondary hover:theme-text-primary"
+                          }`}
+                          title="Actions Menu"
+                        >
+                          <DotsVerticalIcon className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -476,21 +434,85 @@ export default function RoleInviteManagerView() {
         </div>
       )}
 
+      {/* --- 3-DOTS ACTION MENU PORTAL (Rendered at root with z-[9999], never clipped!) --- */}
+      {activeMenuId && activeInvite && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: menuPosition.openUpward ? undefined : `${menuPosition.top}px`,
+            bottom: menuPosition.openUpward ? `${window.innerHeight - menuPosition.top}px` : undefined,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 rounded-2xl theme-bg-elevated border theme-border shadow-2xl p-1.5 space-y-1 animate-fade-in select-none text-left"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedInvite(activeInvite);
+              setShowQRModal(true);
+              setActiveMenuId(null);
+            }}
+            className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer group"
+          >
+            <QrCodeIcon className="w-3.5 h-3.5 theme-text-secondary group-hover:theme-text-primary" />
+            <span>View &amp; Share QR</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => copyLinkToClipboard(activeInvite.token)}
+            className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer group"
+          >
+            <CopyIcon className="w-3.5 h-3.5 theme-text-secondary group-hover:theme-text-primary" />
+            <span>Copy Join Link</span>
+          </button>
+
+          {activeInvite.is_valid && activeInvite.is_active && (
+            <button
+              type="button"
+              onClick={() => handleRevoke(activeInvite.id)}
+              className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer"
+            >
+              <BanIcon className="w-3.5 h-3.5" />
+              <span>Revoke Invite</span>
+            </button>
+          )}
+
+          <div className="border-t theme-border my-1"></div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMenuId(null);
+              setDeletingInvite(activeInvite);
+            }}
+            className="w-full px-3 py-2 rounded-xl text-left text-xs font-bold theme-danger hover:theme-bg-danger-soft transition flex items-center gap-2 cursor-pointer"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+            <span>Delete Invite</span>
+          </button>
+        </div>,
+        document.body
+      )}
+
       {/* --- QR VIEWER, DOWNLOADER & SHARER MODAL (Portaled with z-[9999]) --- */}
       {showQRModal && selectedInvite && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 select-none animate-fade-in">
           <div className="w-full max-w-md theme-bg-elevated border theme-border rounded-3xl shadow-2xl overflow-hidden animate-zoom-in">
             {/* Header */}
-            <div className="px-6 py-4 border-b theme-border flex justify-between items-center bg-black/10">
+            <div className="px-6 py-4 border-b theme-border flex justify-between items-center theme-bg-sub">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)]">
+                <div className="w-8 h-8 rounded-xl theme-bg-elevated border theme-border flex items-center justify-center theme-text-primary">
                   <QrCodeIcon className="w-4 h-4" />
                 </div>
                 <h3 className="font-bold text-sm theme-text-primary">Onboarding QR Code</h3>
               </div>
               <button
                 onClick={() => setShowQRModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer"
               >
                 <CloseIcon className="w-4 h-4" />
               </button>
@@ -500,11 +522,11 @@ export default function RoleInviteManagerView() {
             <div className="p-6 text-center space-y-4">
               <div className="flex flex-col items-center">
                 <h4 className="font-bold text-base theme-text-primary">{selectedInvite.title}</h4>
-                <span className="px-2.5 py-0.5 rounded-full theme-bg-sub text-[var(--accent-main)] border theme-border text-[10px] font-bold uppercase tracking-wider mt-1 mb-4">
+                <span className="px-2.5 py-0.5 rounded-full theme-bg-sub theme-text-secondary border theme-border text-[10px] font-bold uppercase tracking-wider mt-1 mb-4">
                   {selectedInvite.target_role_name}
                 </span>
 
-                {/* High Contrast White QR Card Container */}
+                {/* High Contrast QR Card Container */}
                 <div className="p-5 bg-white border border-zinc-200 rounded-3xl shadow-xl flex items-center justify-center">
                   <QRCodeSVG
                     id="invite-qr-svg"
@@ -533,7 +555,7 @@ export default function RoleInviteManagerView() {
                   onClick={() => downloadQR("png")}
                   className="px-4 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub transition text-xs font-bold theme-text-primary cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <DownloadIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
+                  <DownloadIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span>Download PNG</span>
                 </button>
                 <button
@@ -541,7 +563,7 @@ export default function RoleInviteManagerView() {
                   onClick={() => downloadQR("svg")}
                   className="px-4 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub transition text-xs font-bold theme-text-primary cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <DownloadIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
+                  <DownloadIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span>Download SVG</span>
                 </button>
               </div>
@@ -554,9 +576,9 @@ export default function RoleInviteManagerView() {
       {/* --- DELETE INVITE CONFIRMATION MODAL (Portaled with z-[9999]) --- */}
       {deletingInvite && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 select-none animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-elevated border border-rose-500/40 rounded-3xl shadow-2xl p-6 space-y-4 animate-zoom-in">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center">
+          <div className="w-full max-w-sm theme-bg-elevated border theme-border rounded-3xl shadow-2xl p-6 space-y-4 animate-zoom-in">
+            <div className="flex items-center gap-3 theme-danger">
+              <div className="w-10 h-10 rounded-2xl theme-bg-danger-soft border theme-border flex items-center justify-center">
                 <AlertTriangleIcon className="w-5 h-5" />
               </div>
               <div>
@@ -582,7 +604,7 @@ export default function RoleInviteManagerView() {
                 type="button"
                 onClick={handleDeleteInvite}
                 disabled={isDeleting}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer transition shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-[var(--danger-main)] hover:opacity-90 text-white text-xs font-bold cursor-pointer transition shadow-md disabled:opacity-50 flex items-center gap-1.5"
               >
                 <TrashIcon className="w-3.5 h-3.5" />
                 <span>{isDeleting ? "Deleting..." : "Delete"}</span>
