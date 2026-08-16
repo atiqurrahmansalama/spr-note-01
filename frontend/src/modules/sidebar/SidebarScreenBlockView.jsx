@@ -1,14 +1,17 @@
 import { CloseIcon } from "../../components/ui/Icons";
-import { useRightDrawer } from "../../context/RightDrawerContext";
+import { useRightSidebar } from "../../context/RightSidebarContext";
 
 export default function SidebarScreenBlockView({ 
   title, 
   onClose, 
   children, 
   dockPosition = "left", 
-  onToggleDock 
+  onToggleDock,
+  isDockDisabled = false,
+  dockDisabledReason = "Right sidebar dock is disabled while an active action panel is open"
 }) {
-  const { isRightDrawerOpen } = useRightDrawer();
+  const { isRightSidebarOpen } = useRightSidebar();
+  const shouldDisableDock = isDockDisabled || isRightSidebarOpen;
 
   return (
     <div className={`w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20 @container ${
@@ -27,16 +30,16 @@ export default function SidebarScreenBlockView({
           {onToggleDock && (
             <button
               type="button"
-              onClick={isRightDrawerOpen ? undefined : onToggleDock}
-              disabled={isRightDrawerOpen}
+              onClick={shouldDisableDock ? undefined : onToggleDock}
+              disabled={shouldDisableDock}
               className={`hidden md:flex p-1.5 rounded-lg transition-colors items-center justify-center ${
-                isRightDrawerOpen
+                shouldDisableDock
                   ? "opacity-30 cursor-not-allowed theme-text-secondary"
                   : "theme-text-secondary hover:theme-text-primary hover:theme-bg-sub cursor-pointer"
               }`}
               title={
-                isRightDrawerOpen
-                  ? "Right sidebar dock is disabled while an active side drawer is open"
+                shouldDisableDock
+                  ? dockDisabledReason
                   : dockPosition === "right"
                   ? "Dock Panel to Left Main Area"
                   : "Dock Panel to Right Sidebar"

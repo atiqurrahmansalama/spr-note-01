@@ -23,13 +23,15 @@ import {
 } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
-import InstitutionOnboardingDrawer from './InstitutionOnboardingDrawer';
-import InstitutionEditDrawer from './InstitutionEditDrawer';
+import { useRightSidebar } from '../../../context/RightSidebarContext';
+import InstitutionOnboardingForm from './InstitutionOnboardingForm';
+import InstitutionEditForm from './InstitutionEditForm';
 
 export default function InstitutionListView() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions } = useTenant();
+  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('spr_inst_view_mode') || 'grid';
@@ -45,11 +47,6 @@ export default function InstitutionListView() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-
-  // Edit Modal State
-  const [editingInst, setEditingInst] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // Delete Confirmation State
   const [deletingInst, setDeletingInst] = useState(null);
@@ -97,31 +94,37 @@ export default function InstitutionListView() {
     showToast(`Switched active workspace to ${inst.name}`, 'success');
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    if (!editingInst) return;
-    try {
-      setIsUpdating(true);
-      await updateInstitution(editingInst.id, {
-        name: editingInst.name,
-        bangla_name: editingInst.bangla_name,
-        phone: editingInst.phone,
-        email: editingInst.email,
-        district: editingInst.district,
-        address: editingInst.address,
-        institution_type: editingInst.institution_type,
-        eiin_or_reg_no: editingInst.eiin_or_reg_no,
-      });
-      showToast('Institution updated successfully!', 'success');
-      setEditingInst(null);
-      loadData();
-      refreshInstitutions();
-    } catch (err) {
-      console.error('[Update Institution Error]:', err);
-      showToast(err.response?.data?.error || 'Failed to update institution.', 'error');
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleOpenOnboarding = () => {
+    openRightSidebar({
+      title: 'Onboard New Academic Institution',
+      content: (
+        <InstitutionOnboardingForm
+          onSuccess={() => {
+            loadData();
+            refreshInstitutions();
+            closeRightSidebar();
+          }}
+          onCancel={closeRightSidebar}
+        />
+      ),
+    });
+  };
+
+  const handleOpenEdit = (inst) => {
+    openRightSidebar({
+      title: `Edit: ${inst.name}`,
+      content: (
+        <InstitutionEditForm
+          institution={inst}
+          onSuccess={() => {
+            loadData();
+            refreshInstitutions();
+            closeRightSidebar();
+          }}
+          onCancel={closeRightSidebar}
+        />
+      ),
+    });
   };
 
   const handleDeleteConfirm = async () => {
@@ -162,7 +165,7 @@ export default function InstitutionListView() {
         {isMultiTenantAdmin && (
           <button
             type="button"
-            onClick={() => setIsOnboardingOpen(true)}
+            onClick={handleOpenOnboarding}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold shadow-md hover:shadow-sky-500/20 transition cursor-pointer flex items-center gap-2"
           >
             <PlusIcon className="w-4 h-4" />
@@ -428,7 +431,7 @@ export default function InstitutionListView() {
                   <div className="flex items-center gap-1.5 ml-auto">
                     <button
                       type="button"
-                      onClick={() => setEditingInst(inst)}
+                      onClick={() => handleOpenEdit(inst)}
                       className="p-2 rounded-xl theme-bg-elevated hover:theme-bg-app theme-text-secondary hover:theme-text-primary border theme-border transition cursor-pointer shadow-xs"
                       title="Edit Institution Profile"
                     >
@@ -562,7 +565,7 @@ export default function InstitutionListView() {
 
                           <button
                             type="button"
-                            onClick={() => setEditingInst(inst)}
+                            onClick={() => handleOpenEdit(inst)}
                             className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent cursor-pointer"
                             title="Edit Institution Details"
                           >
@@ -587,27 +590,6 @@ export default function InstitutionListView() {
           </div>
         </div>
       )}
-
-      {/* Onboarding Right Sidebar Drawer */}
-      <InstitutionOnboardingDrawer
-        isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
-        onSuccess={() => {
-          loadData();
-          refreshInstitutions();
-        }}
-      />
-
-      {/* Edit Institution Right Sidebar Drawer */}
-      <InstitutionEditDrawer
-        isOpen={Boolean(editingInst)}
-        onClose={() => setEditingInst(null)}
-        institution={editingInst}
-        onUpdated={() => {
-          loadData();
-          refreshInstitutions();
-        }}
-      />
 
       {/* Delete / Decommission Modal */}
       {deletingInst && (

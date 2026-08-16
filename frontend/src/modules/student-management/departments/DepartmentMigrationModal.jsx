@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
-import { AlertTriangleIcon, ShieldIcon, TransferIcon } from "../../../components/ui/Icons";
-import RightDrawer from "../../../components/ui/RightDrawer";
+import { AlertTriangleIcon, ShieldIcon, TransferIcon, CloseIcon } from "../../../components/ui/Icons";
 
 export default function DepartmentMigrationModal({ isOpen, onClose, department, onMigrated }) {
   const { showToast } = useToast();
@@ -25,7 +24,6 @@ export default function DepartmentMigrationModal({ isOpen, onClose, department, 
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.results || [];
-        // Guardrail 1: Strictly exclude the source department (Self-Target Prevention)
         const available = list.filter((d) => String(d.id) !== String(department?.id) && !d.is_deleted);
         setDepartments(available);
         if (available.length > 0) {
@@ -78,95 +76,106 @@ export default function DepartmentMigrationModal({ isOpen, onClose, department, 
 
   if (!isOpen || !department) return null;
 
-  const footerContent = (
-    <div className="w-full flex items-center justify-end gap-3">
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={migrating}
-        className="px-4 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        disabled={migrating || departments.length === 0 || !targetDepartmentId}
-        onClick={handleDecommission}
-        className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg cursor-pointer disabled:opacity-50 transition-all flex items-center gap-1.5"
-      >
-        <TransferIcon className="w-3.5 h-3.5" />
-        <span>{migrating ? "Migrating & Decommissioning..." : "Migrate Classes & Decommission"}</span>
-      </button>
-    </div>
-  );
-
   return (
-    <RightDrawer
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Decommission Department"
-      subtitle="Atomic Class & Roster Safe Migration"
-      icon={AlertTriangleIcon}
-      badge="Safe Migration"
-      width="max-w-xl"
-      footer={footerContent}
-    >
-      <div className="space-y-5">
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
-            <ShieldIcon className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Zero-Downtime Safe Decommission</span>
-          </div>
-          <p className="text-[11px] text-amber-200/90 leading-relaxed">
-            Decommissioning <strong>"{department.name}"</strong> will reassign all active classes to your chosen target department. Existing student profiles and class structures will be completely preserved.
-          </p>
-        </div>
-
-        {/* Impact Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
-            <span className="text-[10px] uppercase font-bold theme-text-secondary block">Assigned Classes</span>
-            <span className="text-xl font-extrabold text-sky-400 mt-0.5 block">
-              {department.classes_count ?? 0}
-            </span>
-          </div>
-          <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
-            <span className="text-[10px] uppercase font-bold theme-text-secondary block">Enrolled Students</span>
-            <span className="text-xl font-extrabold text-emerald-400 mt-0.5 block">
-              {department.students_count ?? 0}
-            </span>
-          </div>
-        </div>
-
-        {/* Destination Department Selector */}
-        <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Select Destination Department <span className="text-rose-400">*</span>
-          </label>
-          {loading ? (
-            <div className="h-10 w-full theme-bg-sub animate-pulse rounded-xl" />
-          ) : departments.length === 0 ? (
-            <div className="p-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
-              No alternative active departments found. Please create another department before decommissioning this one.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in select-none">
+      <div className="w-full max-w-md theme-bg-surface border theme-border rounded-3xl shadow-2xl overflow-hidden animate-zoom-in">
+        {/* Header */}
+        <div className="px-6 py-5 border-b theme-border flex justify-between items-center bg-rose-500/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center">
+              <AlertTriangleIcon className="w-5 h-5" />
             </div>
-          ) : (
-            <select
-              value={targetDepartmentId}
-              onChange={(e) => setTargetDepartmentId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-medium cursor-pointer theme-text-primary"
+            <div>
+              <h2 className="text-base font-bold text-rose-400">Decommission Department</h2>
+              <p className="text-xs theme-text-secondary mt-0.5">Atomic Class &amp; Roster Safe Migration</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 space-y-5">
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <ShieldIcon className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Zero-Downtime Safe Decommission</span>
+            </div>
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              Decommissioning <strong>"{department.name}"</strong> will reassign all active classes to your chosen target department. Existing student profiles and class structures will be completely preserved.
+            </p>
+          </div>
+
+          {/* Impact Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
+              <span className="text-[10px] uppercase font-bold theme-text-secondary block">Assigned Classes</span>
+              <span className="text-xl font-extrabold text-sky-400 mt-0.5 block">
+                {department.classes_count ?? 0}
+              </span>
+            </div>
+            <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
+              <span className="text-[10px] uppercase font-bold theme-text-secondary block">Enrolled Students</span>
+              <span className="text-xl font-extrabold text-emerald-400 mt-0.5 block">
+                {department.students_count ?? 0}
+              </span>
+            </div>
+          </div>
+
+          {/* Destination Department Selector */}
+          <div>
+            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+              Select Destination Department <span className="text-rose-400">*</span>
+            </label>
+            {loading ? (
+              <div className="h-10 w-full theme-bg-sub animate-pulse rounded-xl" />
+            ) : departments.length === 0 ? (
+              <div className="p-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
+                No alternative active departments found. Please create another department before decommissioning this one.
+              </div>
+            ) : (
+              <select
+                value={targetDepartmentId}
+                onChange={(e) => setTargetDepartmentId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-medium cursor-pointer theme-text-primary"
+              >
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} {d.code ? `(${d.code})` : ""} • {d.classes_count || 0} classes
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="text-[10px] theme-text-secondary mt-1">
+              Self-migration is prohibited. All classes from "{department.name}" will move to this target.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="pt-4 border-t theme-border flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-elevated text-xs font-bold transition-colors cursor-pointer theme-text-primary"
             >
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} {d.code ? `(${d.code})` : ""} • {d.classes_count || 0} classes
-                </option>
-              ))}
-            </select>
-          )}
-          <p className="text-[10px] theme-text-secondary mt-1">
-            Self-migration is prohibited. All classes from "{department.name}" will move to this target.
-          </p>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={migrating || departments.length === 0 || !targetDepartmentId}
+              onClick={handleDecommission}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg cursor-pointer disabled:opacity-50 transition-all flex items-center gap-1.5"
+            >
+              <TransferIcon className="w-3.5 h-3.5" />
+              <span>{migrating ? "Migrating & Decommissioning..." : "Migrate Classes & Decommission"}</span>
+            </button>
+          </div>
         </div>
       </div>
-    </RightDrawer>
+    </div>
   );
 }

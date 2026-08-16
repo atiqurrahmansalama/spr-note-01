@@ -8,6 +8,7 @@ import SidebarScreenBlockView from "../../modules/sidebar/SidebarScreenBlockView
 import InstitutionSwitcher from "./InstitutionSwitcher";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";
+import { useRightSidebar } from "../../context/RightSidebarContext";
 import { initActivityTracker } from "../../utils/activityTracker";
 
 // Route details mapping for titles and path lookup
@@ -165,7 +166,8 @@ export default function AppLayout() {
     claimPendingInvite();
   }, [showToast]);
 
-  const isRightDock = panelDockPosition === "right" && !isMobile;
+  const { isRightSidebarOpen, rightSidebarConfig, closeRightSidebar } = useRightSidebar();
+  const isRightDock = panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
   // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)
   useEffect(() => {
@@ -522,8 +524,38 @@ export default function AppLayout() {
                 onClose={() => navigate("/")}
                 dockPosition={isRightDock ? "right" : "left"}
                 onToggleDock={!isMobile ? togglePanelDock : undefined}
+                isDockDisabled={isRightSidebarOpen}
+                dockDisabledReason="Right sidebar is currently occupied by active action panel"
               >
                 <Outlet context={{ timeZone, setTimeZone, dateFormat, setDateFormat }} />
+              </SidebarScreenBlockView>
+            </div>
+          </div>
+        )}
+
+        {/* Secondary Right Sidebar Panel (Opened by Sub-Views / Forms) */}
+        {isRightSidebarOpen && (
+          <div 
+            className="h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in"
+            style={{ width: `${Math.max(340, rightPanelWidth)}px`, transition: isResizing ? "none" : "width 0.15s ease-out" }}
+          >
+            {/* Resizer Handle */}
+            <div
+              onMouseDown={startResizing}
+              onTouchStart={startResizing}
+              className="hidden md:flex absolute top-0 left-0 bottom-0 w-3 -ml-1.5 cursor-col-resize z-10 group items-center justify-center hover:bg-[var(--accent-main)]/20 active:bg-[var(--accent-main)]/40 transition-colors"
+              title="Drag left or right to resize sidebar width"
+            >
+              <div className="w-1 h-12 rounded-full theme-bg-accent opacity-60 group-hover:opacity-100 transition-opacity shadow-sm" />
+            </div>
+
+            <div className="w-full h-full flex-1 overflow-hidden">
+              <SidebarScreenBlockView
+                title={rightSidebarConfig?.title || "Action Panel"}
+                onClose={closeRightSidebar}
+                dockPosition="right"
+              >
+                {rightSidebarConfig?.content}
               </SidebarScreenBlockView>
             </div>
           </div>
