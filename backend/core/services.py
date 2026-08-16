@@ -13,6 +13,7 @@ import uuid
 import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from google.oauth2 import id_token as google_id_token
@@ -141,6 +142,7 @@ def sync_feature_registry_to_db():
     # Automatically map categories keys to titles
     category_titles = {
         "NAVIGATION": "Navigation",
+        "INSTITUTIONS": "Academic Institution",
         "ADMIN": "Admin Tools",
         "STUDENTS": "Student Management",
         "REPORTS": "Report Generator",
@@ -505,3 +507,327 @@ def get_or_create_google_user(profile_data):
         raise PermissionError("Your account has been deactivated. Please contact support.")
 
     return user, created
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Enterprise Class & Group Migration and Academic History Services
+# ─────────────────────────────────────────────────────────────────────────────
+
+def delete_class_with_migration(source_class_id, target_class_id, performed_by=None):
+    """
+    Safely decommissions a StudentClass by atomically migrating all its active students
+    and groups to a target destination class, closing active Academic History records,
+    and soft-deleting the source class.
+    
+    Guardrail 1: Enforces strict self-target prevention (target_class_id != source_class_id).
+    """
+    from django.db import transaction
+    from rest_framework.exceptions import ValidationError, NotFound
+    from .models import StudentClass, StudentGroup, Student, StudentAcademicHistory
+
+    if not target_class_id:
+        raise ValidationError({"target_class_id": "Target destination class ID is required."})
+
+    if str(source_class_id) == str(target_class_id):
+        raise ValidationError({"target_class_id": "Destination class cannot be the same as the class being deleted (Self-Migration Prohibited)."})
+
+    try:
+        source_class = StudentClass.objects.get(id=source_class_id)
+    except StudentClass.DoesNotExist:
+        raise NotFound("Source class not found.")
+
+    try:
+        target_class = StudentClass.objects.get(id=target_class_id, is_deleted=False)
+    except StudentClass.DoesNotExist:
+        raise ValidationError({"target_class_id": "Target destination class does not exist or has been deleted."})
+
+    today = timezone.now().date()
+
+    with transaction.atomic():
+        # 1. Reassign all groups under source_class to target_class
+        affected_groups = StudentGroup.objects.filter(student_class=source_class, is_deleted=False)
+        group_count = affected_groups.count()
+        affected_groups.update(student_class=target_class)
+
+        # 2. Reassign all active students under source_class to target_class
+        affected_students = Student.objects.filter(student_class=source_class, is_deleted=False)
+        student_count = affected_students.count()
+
+        for student in affected_students:
+            # Close active academic history
+            StudentAcademicHistory.objects.filter(student=student, is_current=True).update(
+                end_date=today,
+                is_current=False
+            )
+            # Create new history record for destination class
+            StudentAcademicHistory.objects.create(
+                student=student,
+                student_class=target_class,
+                student_group=student.student_group,
+                start_date=today,
+                is_current=True,
+                transition_reason=f"Class Reassignment: '{source_class.name}' decommissioned -> Migrated to '{target_class.name}'",
+                transferred_by=performed_by
+            )
+            # Update student record
+            student.student_class = target_class
+            student.save(update_fields=['student_class', 'updated_at'])
+
+        # 3. Soft-delete the source class
+        source_class.is_deleted = True
+        source_class.is_active = False
+        source_class.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+
+    return {
+        "status": "success",
+        "message": f"Class '{source_class.name}' successfully decommissioned. Migrated {student_count} students and {group_count} groups to '{target_class.name}'.",
+        "migrated_students": student_count,
+        "migrated_groups": group_count,
+        "source_class": source_class.name,
+        "target_class": target_class.name
+    }
+
+
+def delete_group_with_migration(source_group_id, target_group_id, performed_by=None):
+    """
+    Safely decommissions a StudentGroup by atomically migrating all its active students
+    to a target destination group, closing active Academic History records,
+    and soft-deleting the source group.
+    
+    Guardrail 1: Enforces strict self-target prevention (target_group_id != source_group_id).
+    """
+    from django.db import transaction
+    from rest_framework.exceptions import ValidationError, NotFound
+    from .models import StudentGroup, Student, StudentAcademicHistory
+
+    if not target_group_id:
+        raise ValidationError({"target_group_id": "Target destination group ID is required."})
+
+    if str(source_group_id) == str(target_group_id):
+        raise ValidationError({"target_group_id": "Destination group cannot be the same as the group being deleted (Self-Migration Prohibited)."})
+
+    try:
+        source_group = StudentGroup.objects.get(id=source_group_id)
+    except StudentGroup.DoesNotExist:
+        raise NotFound("Source group not found.")
+
+    try:
+        target_group = StudentGroup.objects.get(id=target_group_id, is_deleted=False)
+    except StudentGroup.DoesNotExist:
+        raise ValidationError({"target_group_id": "Target destination group does not exist or has been deleted."})
+
+    today = timezone.now().date()
+
+    with transaction.atomic():
+        # Find all active students in source group (via ForeignKey or group_name)
+        affected_students = Student.objects.filter(
+            Q(student_group=source_group) | Q(group_name__iexact=source_group.name),
+            is_deleted=False
+        )
+        student_count = affected_students.count()
+
+        for student in affected_students:
+            # Close active academic history
+            StudentAcademicHistory.objects.filter(student=student, is_current=True).update(
+                end_date=today,
+                is_current=False
+            )
+            
+            # Destination class resolution (Guardrail 2: Class-Group Auto Sync)
+            dest_class = target_group.student_class or student.student_class
+
+            # Create new academic progression record
+            StudentAcademicHistory.objects.create(
+                student=student,
+                student_class=dest_class,
+                student_group=target_group,
+                start_date=today,
+                is_current=True,
+                transition_reason=f"Group Reassignment: '{source_group.name}' decommissioned -> Migrated to '{target_group.name}'",
+                transferred_by=performed_by
+            )
+
+            # Update student record (Guardrail 2 & 3: Auto-sync group_name and class)
+            student.student_group = target_group
+            student.group_name = target_group.name
+            if target_group.student_class:
+                student.student_class = target_group.student_class
+            student.save(update_fields=['student_group', 'group_name', 'student_class', 'updated_at'])
+
+        # Soft-delete the source group
+        source_group.is_deleted = True
+        source_group.is_active = False
+        source_group.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+
+    return {
+        "status": "success",
+        "message": f"Group '{source_group.name}' successfully decommissioned. Migrated {student_count} students to '{target_group.name}'.",
+        "migrated_students": student_count,
+        "source_group": source_group.name,
+        "target_group": target_group.name
+    }
+
+
+def transfer_student_academic(student_id, target_class_id=None, target_group_id=None, transition_date=None, transition_reason="", performed_by=None):
+    """
+    Transfers a single student between classes and groups with custom transition date
+    and audit reason, maintaining chronological lifecycle timelines and auto-syncing classes.
+    """
+    from django.db import transaction
+    from rest_framework.exceptions import ValidationError, NotFound
+    from .models import Student, StudentClass, StudentGroup, StudentAcademicHistory
+
+    try:
+        student = Student.objects.get(id=student_id, is_deleted=False)
+    except Student.DoesNotExist:
+        raise NotFound("Student not found.")
+
+    target_class = None
+    if target_class_id:
+        try:
+            target_class = StudentClass.objects.get(id=target_class_id, is_deleted=False)
+        except StudentClass.DoesNotExist:
+            raise ValidationError({"target_class_id": "Target class not found or inactive."})
+
+    target_group = None
+    if target_group_id:
+        try:
+            target_group = StudentGroup.objects.get(id=target_group_id, is_deleted=False)
+        except StudentGroup.DoesNotExist:
+            raise ValidationError({"target_group_id": "Target group not found or inactive."})
+
+    if not target_class and not target_group:
+        raise ValidationError("At least one destination (target class or target group) must be specified.")
+
+    # Guardrail 2: If group specified has a parent class, auto-sync target class
+    if target_group and target_group.student_class and not target_class:
+        target_class = target_group.student_class
+
+    effective_date = transition_date or timezone.now().date()
+    reason = transition_reason.strip() or "Academic Reassignment / Level Promotion"
+
+    with transaction.atomic():
+        # Close any current active academic history
+        StudentAcademicHistory.objects.filter(student=student, is_current=True).update(
+            end_date=effective_date,
+            is_current=False
+        )
+
+        # Update student class and group
+        if target_class:
+            student.student_class = target_class
+        if target_group:
+            student.student_group = target_group
+            student.group_name = target_group.name
+
+        student.save()
+
+        # Create new active academic progression log
+        new_history = StudentAcademicHistory.objects.create(
+            student=student,
+            student_class=student.student_class,
+            student_group=student.student_group,
+            start_date=effective_date,
+            is_current=True,
+            transition_reason=reason,
+            transferred_by=performed_by
+        )
+
+    return {
+        "status": "success",
+        "message": f"Student '{student.name_en or student.name}' successfully transferred.",
+        "student_id": student.id,
+        "student_class": student.student_class.name if student.student_class else None,
+        "student_group": student.student_group.name if student.student_group else student.group_name,
+        "transition_date": str(effective_date),
+        "transition_reason": reason,
+        "history_id": new_history.id
+    }
+
+
+def delete_department_with_migration(source_dept_id, target_dept_id, performed_by=None):
+    """
+    Atomic enterprise department decommission with safe class migration.
+    Guardrail 1: Enforces that target_dept_id != source_dept_id.
+    Reassigns all active classes from source department to target department.
+    Soft-deletes the source department (is_deleted=True, is_active=False).
+    """
+    from .models import AcademicDepartment, StudentClass
+    from rest_framework.exceptions import ValidationError
+
+    if not target_dept_id:
+        raise ValidationError({"target_department_id": "Target destination department is required for migration."})
+
+    if str(source_dept_id).strip().lower() == str(target_dept_id).strip().lower():
+        raise ValidationError({
+            "target_department_id": "Destination department cannot be the same as the department being deleted (Self-Migration Prohibited)."
+        })
+
+    with transaction.atomic():
+        try:
+            source_dept = AcademicDepartment.objects.select_for_update().get(id=source_dept_id, is_deleted=False)
+        except AcademicDepartment.DoesNotExist:
+            raise ValidationError({"error": "Source department does not exist or is already deleted."})
+
+        try:
+            target_dept = AcademicDepartment.objects.select_for_update().get(id=target_dept_id, is_deleted=False)
+        except AcademicDepartment.DoesNotExist:
+            raise ValidationError({"target_department_id": "Target destination department does not exist or is inactive."})
+
+        # Fetch active classes under source department
+        classes_to_migrate = StudentClass.objects.filter(department=source_dept, is_deleted=False)
+        migrated_classes_count = classes_to_migrate.count()
+
+        # Reassign all classes to target department
+        classes_to_migrate.update(department=target_dept)
+
+        # Soft-delete the source department
+        source_dept.is_deleted = True
+        source_dept.is_active = False
+        source_dept.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+
+    return {
+        "status": "success",
+        "message": f"Department '{source_dept.name}' successfully decommissioned. {migrated_classes_count} classes migrated to '{target_dept.name}'.",
+        "source_department": source_dept.name,
+        "target_department": target_dept.name,
+        "migrated_classes": migrated_classes_count,
+    }
+
+
+def seed_default_departments():
+    """
+    Seed standard default academic departments and link existing unassigned classes.
+    """
+    from .models import AcademicDepartment, StudentClass
+
+    defaults = [
+        {"name": "Hifz Division", "code": "HIFZ", "has_quran_tracker": True, "order_rank": 1},
+        {"name": "General Academic", "code": "GEN", "has_quran_tracker": False, "order_rank": 2},
+        {"name": "Specialized / Other", "code": "OTHER", "has_quran_tracker": False, "order_rank": 3},
+    ]
+
+    created_or_found = {}
+    for d in defaults:
+        dept, _ = AcademicDepartment.objects.get_or_create(
+            code=d["code"],
+            defaults={
+                "name": d["name"],
+                "has_quran_tracker": d["has_quran_tracker"],
+                "order_rank": d["order_rank"],
+                "is_active": True,
+                "is_deleted": False,
+            }
+        )
+        created_or_found[d["code"]] = dept
+
+    # Link existing classes with null department
+    for s_class in StudentClass.objects.filter(department__isnull=True):
+        dtype = (s_class.department_type or "HIFZ").upper()
+        if dtype == "HIFZ" and "HIFZ" in created_or_found:
+            s_class.department = created_or_found["HIFZ"]
+        elif dtype == "GENERAL" and "GEN" in created_or_found:
+            s_class.department = created_or_found["GEN"]
+        elif "OTHER" in created_or_found:
+            s_class.department = created_or_found["OTHER"]
+        s_class.save(update_fields=['department'])

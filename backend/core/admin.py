@@ -7,8 +7,11 @@ from .models import (
     GuardianProfile,
     UserDevice,
     Student,
+    AcademicDepartment,
+    StudentClass,
     StudentDetail,
     StudentGroup,
+    StudentAcademicHistory,
     Session,
     SavedMessage,
     StudentDailyReport,
@@ -128,10 +131,34 @@ class UserDeviceAdmin(admin.ModelAdmin):
 # SUPPORT TABLE ADMINS
 # ─────────────────────────────────────────────────────────────
 
+@admin.register(AcademicDepartment)
+class AcademicDepartmentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'department_head', 'has_quran_tracker', 'order_rank', 'is_active', 'is_deleted', 'created_at')
+    list_filter = ('has_quran_tracker', 'is_active', 'is_deleted')
+    search_fields = ('name', 'code')
+    ordering = ('order_rank', 'name')
+
+
+@admin.register(StudentClass)
+class StudentClassAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'department', 'department_type', 'class_teacher', 'order_rank', 'is_active', 'is_deleted', 'created_at')
+    list_filter = ('department', 'department_type', 'is_active', 'is_deleted')
+    search_fields = ('name', 'code')
+    ordering = ('order_rank', 'name')
+
+
 @admin.register(StudentGroup)
 class StudentGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_at')
+    list_display = ('name', 'student_class', 'mentor_teacher', 'capacity', 'is_active', 'is_deleted', 'created_at')
+    list_filter = ('student_class', 'is_active', 'is_deleted')
     search_fields = ('name',)
+
+
+@admin.register(StudentAcademicHistory)
+class StudentAcademicHistoryAdmin(admin.ModelAdmin):
+    list_display = ('student', 'student_class', 'student_group', 'start_date', 'end_date', 'is_current', 'transition_reason')
+    list_filter = ('is_current', 'student_class', 'student_group')
+    search_fields = ('student__name_en', 'student__uniq_id', 'transition_reason')
 
 
 @admin.register(Session)

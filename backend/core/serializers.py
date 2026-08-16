@@ -9,12 +9,16 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import transaction
 from .models import (
+    AcademicInstitution,
     TeacherProfile,
     GuardianProfile,
     UserDevice,
     Student,
+    AcademicDepartment,
+    StudentClass,
     StudentDetail,
     StudentGroup,
+    StudentAcademicHistory,
     Session,
     SavedMessage,
     StudentDailyReport,
@@ -305,6 +309,7 @@ class UserRoleSerializer(serializers.ModelSerializer):
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     role = serializers.SerializerMethodField()
     role_info = serializers.SerializerMethodField()
     formatted_created_at = serializers.SerializerMethodField()
@@ -314,6 +319,8 @@ class UserAdminSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id',
+            'institution',
+            'institution_name',
             'phone_number',
             'email',
             'name',
@@ -333,7 +340,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
             'formatted_created_at',
             'password',
         ]
-        read_only_fields = ['id', 'formatted_created_at']
+        read_only_fields = ['id', 'formatted_created_at', 'institution_name']
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
             'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
@@ -450,16 +457,344 @@ class ChangePasswordSerializer(serializers.Serializer):
 # CORE ENTITY SERIALIZERS
 # ─────────────────────────────────────────────────────────────
 
+class AcademicInstitutionSerializer(serializers.ModelSerializer):
+    total_students_count = serializers.SerializerMethodField()
+    total_classes_count = serializers.SerializerMethodField()
+    total_staff_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicInstitution
+        fields = [
+            'id', 'name', 'bangla_name', 'slug', 'institution_type',
+            'eiin_or_reg_no', 'logo_url', 'phone', 'email', 'address',
+            'district', 'is_verified', 'is_active', 'is_deleted',
+            'total_students_count', 'total_classes_count', 'total_staff_count',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students_count', 'total_classes_count', 'total_staff_count']
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_students_count(self, obj):
+        from core.models import Student
+        return Student.objects.filter(institution=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_classes_count(self, obj):
+        from core.models import StudentClass
+        return StudentClass.objects.filter(institution=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_staff_count(self, obj):
+        from core.models import User
+        return User.objects.filter(institution=obj, is_active=True).count()
+
+
+class InstitutionOnboardingSerializer(serializers.Serializer):
+    # Step 1: Basic Details
+    name = serializers.CharField(max_length=200, required=True)
+    bangla_name = serializers.CharField(max_length=250, required=False, allow_blank=True, default='')
+    institution_type = serializers.ChoiceField(
+        choices=AcademicInstitution.INSTITUTION_TYPE_CHOICES,
+        default='MADRASA'
+    )
+    eiin_or_reg_no = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    phone = serializers.CharField(max_length=30, required=True)
+    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+
+    # Step 2: Branding & Address
+    slug = serializers.SlugField(max_length=100, required=True)
+    logo_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
+    address = serializers.CharField(required=False, allow_blank=True, default='')
+
+    # Step 3: Admin & Presets
+    admin_name = serializers.CharField(max_length=150, required=True)
+    admin_phone = serializers.CharField(max_length=20, required=True)
+    admin_email = serializers.EmailField(required=False, allow_blank=True, default='')
+    admin_password = serializers.CharField(write_only=True, required=True, min_length=6)
+    preset_type = serializers.ChoiceField(
+        choices=[('HIFZ', 'Hifz Focus'), ('GENERAL', 'General School'), ('BOTH', 'Dual Curriculum / Comprehensive')],
+        default='HIFZ'
+    )
+
+    def validate_slug(self, value):
+        val = str(value).lower().strip()
+        if AcademicInstitution.objects.filter(slug=val).exists():
+            raise serializers.ValidationError("An institution with this web identifier (slug) already exists.")
+        return val
+
+    def validate_admin_phone(self, value):
+        phone_clean = str(value).strip()
+        if User.objects.filter(phone_number=phone_clean).exists():
+            raise serializers.ValidationError("A user account with this phone number already exists.")
+        return phone_clean
+
+    def validate_admin_email(self, value):
+        if value:
+            email_clean = str(value).strip().lower()
+            if User.objects.filter(email__iexact=email_clean).exists():
+                raise serializers.ValidationError("A user account with this email address already exists.")
+            return email_clean
+        return ''
+
+    def create(self, validated_data):
+        from core.models import AcademicDepartment
+
+        name = validated_data['name']
+        bangla_name = validated_data.get('bangla_name', '')
+        slug = validated_data['slug']
+        institution_type = validated_data.get('institution_type', 'MADRASA')
+        eiin_or_reg_no = validated_data.get('eiin_or_reg_no', '')
+        phone = validated_data['phone']
+        district = validated_data.get('district', '')
+        logo_url = validated_data.get('logo_url') or None
+        email = validated_data.get('email', '')
+        address = validated_data.get('address', '')
+
+        admin_name = validated_data['admin_name']
+        admin_phone = validated_data['admin_phone']
+        admin_email = validated_data.get('admin_email', '')
+        admin_password = validated_data['admin_password']
+        preset_type = validated_data.get('preset_type', 'HIFZ')
+
+        with transaction.atomic():
+            # 1. Create Institution
+            institution = AcademicInstitution.objects.create(
+                name=name,
+                bangla_name=bangla_name,
+                slug=slug,
+                institution_type=institution_type,
+                eiin_or_reg_no=eiin_or_reg_no,
+                phone=phone,
+                email=email,
+                address=address,
+                district=district,
+                logo_url=logo_url,
+                is_verified=True,
+                is_active=True,
+            )
+
+            # 2. Create Admin User
+            admin_user = User.objects.create_user(
+                phone_number=admin_phone,
+                email=admin_email or None,
+                name=admin_name,
+                password=admin_password,
+                user_type='ADMIN',
+                institution=institution,
+                is_active=True,
+            )
+
+            # 3. Seed Preset Departments
+            if preset_type == 'HIFZ':
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="Hifzul Quran Department",
+                    code="HIFZ",
+                    has_quran_tracker=True,
+                    order_rank=1,
+                    is_active=True,
+                )
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="Nazera & Noorani Department",
+                    code="NAZERA",
+                    has_quran_tracker=True,
+                    order_rank=2,
+                    is_active=True,
+                )
+            elif preset_type == 'GENERAL':
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="Primary & General Education",
+                    code="GEN-PRI",
+                    has_quran_tracker=False,
+                    order_rank=1,
+                    is_active=True,
+                )
+            elif preset_type == 'BOTH':
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="Hifzul Quran Department",
+                    code="HIFZ",
+                    has_quran_tracker=True,
+                    order_rank=1,
+                    is_active=True,
+                )
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="Nazera & Noorani Department",
+                    code="NAZERA",
+                    has_quran_tracker=True,
+                    order_rank=2,
+                    is_active=True,
+                )
+                AcademicDepartment.objects.create(
+                    institution=institution,
+                    name="General Education Department",
+                    code="GEN",
+                    has_quran_tracker=False,
+                    order_rank=3,
+                    is_active=True,
+                )
+
+            return {
+                'institution': AcademicInstitutionSerializer(institution).data,
+                'admin_user': {
+                    'id': admin_user.id,
+                    'name': admin_user.name,
+                    'phone_number': admin_user.phone_number,
+                    'email': admin_user.email,
+                    'user_type': admin_user.user_type,
+                }
+            }
+
+
+class AcademicDepartmentSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    department_head_name = serializers.CharField(source='department_head.name', read_only=True, default='')
+    department_head_phone = serializers.CharField(source='department_head.phone_number', read_only=True, default='')
+    classes_count = serializers.SerializerMethodField()
+    students_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicDepartment
+        fields = [
+            'id', 'institution', 'institution_name', 'name', 'code', 'department_head',
+            'department_head_name', 'department_head_phone',
+            'has_quran_tracker', 'order_rank', 'is_active', 'is_deleted',
+            'classes_count', 'students_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'classes_count', 'students_count', 'institution_name']
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_classes_count(self, obj):
+        return obj.classes.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_students_count(self, obj):
+        from core.models import Student
+        return Student.objects.filter(
+            student_class__department=obj,
+            is_deleted=False
+        ).count()
+
+
+class StudentClassSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    department_code = serializers.CharField(source='department.code', read_only=True, default='')
+    has_quran_tracker = serializers.BooleanField(source='department.has_quran_tracker', read_only=True, default=False)
+    class_teacher_name = serializers.CharField(source='class_teacher.name', read_only=True, default='')
+    class_teacher_phone = serializers.CharField(source='class_teacher.phone_number', read_only=True, default='')
+    student_count = serializers.SerializerMethodField()
+    group_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentClass
+        fields = [
+            'id', 'institution', 'institution_name', 'department', 'department_name', 'department_code', 'has_quran_tracker',
+            'name', 'code', 'department_type',
+            'class_teacher', 'class_teacher_name', 'class_teacher_phone',
+            'order_rank', 'is_active', 'is_deleted',
+            'student_count', 'group_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'student_count', 'group_count',
+            'institution_name', 'department_name', 'department_code', 'has_quran_tracker'
+        ]
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_student_count(self, obj):
+        return obj.students.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_group_count(self, obj):
+        return obj.groups.filter(is_deleted=False).count()
+
+
 class StudentGroupSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_class_code = serializers.CharField(source='student_class.code', read_only=True, default='')
+    department_type = serializers.CharField(source='student_class.department_type', read_only=True, default='HIFZ')
+    mentor_teacher_name = serializers.CharField(source='mentor_teacher.name', read_only=True, default='')
+    mentor_teacher_phone = serializers.CharField(source='mentor_teacher.phone_number', read_only=True, default='')
+    student_count = serializers.SerializerMethodField()
+    available_seats = serializers.SerializerMethodField()
+    capacity_percentage = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentGroup
-        fields = '__all__'
+        fields = [
+            'id', 'institution', 'institution_name', 'name', 'student_class', 'student_class_name', 'student_class_code',
+            'department_type', 'mentor_teacher', 'mentor_teacher_name', 'mentor_teacher_phone',
+            'capacity', 'is_active', 'is_deleted', 'student_count', 'available_seats',
+            'capacity_percentage', 'created_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'institution_name', 'student_count', 'available_seats', 'capacity_percentage']
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
         if 'group_name' in mutable_data and 'name' not in mutable_data:
             mutable_data['name'] = mutable_data['group_name']
         return super().to_internal_value(mutable_data)
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_student_count(self, obj):
+        from core.models import Student
+        return Student.objects.filter(
+            Q(student_group=obj) | Q(group_name__iexact=obj.name),
+            is_deleted=False
+        ).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_available_seats(self, obj):
+        if obj.capacity <= 0:
+            return 999
+        count = self.get_student_count(obj)
+        return max(0, obj.capacity - count)
+
+    @extend_schema_field(OpenApiTypes.FLOAT)
+    def get_capacity_percentage(self, obj):
+        if obj.capacity <= 0:
+            return 0.0
+        count = self.get_student_count(obj)
+        return round(min(100.0, (count / obj.capacity) * 100), 1)
+
+
+class StudentAcademicHistorySerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.name_en', read_only=True, default='')
+    student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True, default='')
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+    transferred_by_name = serializers.CharField(source='transferred_by.name', read_only=True, default='')
+
+    class Meta:
+        model = StudentAcademicHistory
+        fields = [
+            'id', 'student', 'student_name', 'student_uniq_id',
+            'student_class', 'student_class_name',
+            'student_group', 'student_group_name',
+            'start_date', 'end_date', 'is_current',
+            'transition_reason', 'transferred_by', 'transferred_by_name',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class StudentTransferAcademicSerializer(serializers.Serializer):
+    target_class_id = serializers.UUIDField(required=False, allow_null=True)
+    target_group_id = serializers.IntegerField(required=False, allow_null=True)
+    transition_date = serializers.DateField(required=False, allow_null=True)
+    transition_reason = serializers.CharField(required=False, allow_blank=True, max_length=255)
+
+    def validate(self, attrs):
+        if not attrs.get('target_class_id') and not attrs.get('target_group_id'):
+            raise serializers.ValidationError("At least one destination (target_class_id or target_group_id) must be specified.")
+        return attrs
 
 
 class SessionSerializer(serializers.ModelSerializer):
@@ -503,24 +838,48 @@ class UserProfileSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     name_bn = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     assigned_group = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    institution_bangla_name = serializers.CharField(source='institution.bangla_name', read_only=True, default='')
+    institution_slug = serializers.CharField(source='institution.slug', read_only=True, default='')
+    institution_details = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'phone_number', 'email', 'first_name', 'last_name',
             'name_bn', 'avatar_url', 'user_type', 'assigned_group',
+            'institution', 'institution_name', 'institution_bangla_name', 'institution_slug',
+            'institution_details',
         ]
-        read_only_fields = ['id', 'phone_number', 'user_type']
+        read_only_fields = ['id', 'phone_number', 'user_type', 'institution', 'institution_name', 'institution_bangla_name', 'institution_slug', 'institution_details']
 
-
-
-
-
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_institution_details(self, obj):
+        if obj.institution:
+            return {
+                'id': str(obj.institution.id),
+                'name': obj.institution.name,
+                'bangla_name': obj.institution.bangla_name,
+                'slug': obj.institution.slug,
+                'institution_type': obj.institution.institution_type,
+                'logo_url': obj.institution.logo_url,
+                'phone': obj.institution.phone,
+                'email': obj.institution.email,
+                'address': obj.institution.address,
+                'district': obj.institution.district,
+                'is_verified': obj.institution.is_verified,
+            }
+        return None
 
 
 class StudentSerializer(serializers.ModelSerializer):
     # Nested detail serializer
     details = StudentDetailSerializer(required=False, allow_null=True)
+
+    # Class & Group relationships
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
 
     # Backward compatibility aliases for legacy API consumers & frontend
     name = serializers.CharField(source='name_en', required=False, allow_blank=True, allow_null=True)
@@ -532,11 +891,13 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
-            'id', 'uniq_id', 'unique_id',
+            'id', 'institution', 'institution_name', 'uniq_id', 'unique_id',
             'roll_number', 'roll',
             'name_en', 'name',
+            'student_class', 'student_class_name',
+            'student_group', 'student_group_name',
             'group_name', 'group',
-            'admission_date', 'status', 'is_active',
+            'admission_date', 'status', 'is_active', 'is_deleted',
             'education_status', 'target_status',
             'details',
             'created_at', 'updated_at',
@@ -545,6 +906,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'uniq_id': {'required': False, 'allow_null': True},
             'roll_number': {'required': False, 'allow_null': True},
             'name_en': {'required': False, 'allow_null': True},
+            'student_class': {'required': False, 'allow_null': True},
+            'student_group': {'required': False, 'allow_null': True},
             'group_name': {'required': False, 'allow_null': True},
             'status': {'required': False, 'allow_null': True},
             'education_status': {'required': False, 'allow_null': True},
@@ -1303,6 +1666,10 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     academic_detail = StudentAcademicDetailSerializer(read_only=True)
     guardian_detail = StudentGuardianSerializer(read_only=True)
     documents = StudentDocumentSerializer(many=True, read_only=True)
+    academic_history = StudentAcademicHistorySerializer(many=True, read_only=True)
+
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
 
     completed_juz_count = serializers.SerializerMethodField()
     active_juz = serializers.SerializerMethodField()
@@ -1321,8 +1688,9 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'id', 'uniq_id', 'roll_number', 'name', 'name_en', 'bangla_name', 
             'student_id_card_number', 'gender', 'dob', 'blood_group', 
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
-            'academic_detail', 'guardian_detail', 'documents', 'admission_mode', 
-            'status', 'group_name', 'created_at', 'updated_at', 'education_status',
+            'academic_detail', 'guardian_detail', 'documents', 'academic_history', 'admission_mode', 
+            'status', 'student_class', 'student_class_name', 'student_group', 'student_group_name',
+            'group_name', 'created_at', 'updated_at', 'education_status',
             'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data',
             'completed_juz_count', 'active_juz', 'recent_error_average', 'quran_progress', 'department_type'
         ]

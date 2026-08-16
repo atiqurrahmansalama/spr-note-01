@@ -693,14 +693,14 @@ class Student360TestCase(APITestCase):
         self.student1.refresh_from_db()
         self.assertEqual(self.student1.status, "Alumni")
 
-        # 3. Bulk Delete
+        # 3. Bulk Delete (Soft-Delete)
         response = self.client.post("/api/v1/students/bulk-action/", data={
             "action": "bulk_delete",
             "student_ids": [self.student1.id, self.student2.id]
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         from core.models import Student
-        self.assertEqual(Student.objects.filter(id__in=[self.student1.id, self.student2.id]).count(), 0)
+        self.assertEqual(Student.objects.filter(id__in=[self.student1.id, self.student2.id], is_deleted=False).count(), 0)
 
     def test_guardian_lookup_and_verification(self):
         from core.models import StudentGuardian
@@ -726,3 +726,583 @@ class Student360TestCase(APITestCase):
         response = self.client.get("/api/v1/students/verify-admission/STU-12345/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["name"], "Abdur Rahman")
+
+
+class ClassAndGroupManagementTestCase(APITestCase):
+    """
+    Comprehensive verification for:
+    1. Soft-delete filtering (is_deleted=True items excluded from standard listings)
+    2. Self-target prevention in migration endpoints (Guardrail 1)
+    3. Atomic class migration on deletion (students, groups, and academic history)
+    4. Atomic group migration on deletion (students and academic history)
+    5. Single student academic transfer endpoint and chronological timelines
+    6. Group & Class auto-sync and backward compatibility with group_name (Guardrails 2 & 3)
+    """
+
+    def setUp(self):
+        from core.models import StudentClass, StudentGroup, Student, StudentAcademicHistory, UserRole
+        
+        self.admin_role = UserRole.objects.create(
+            name="Super Admin",
+            code="SUPER_ADMIN",
+            hierarchy_level=1,
+            is_system_role=True
+        )
+        self.admin = User.objects.create_superuser(
+            phone_number="01888888888",
+            password="adminpassword123",
+            user_type="SUPER_ADMIN",
+            role=self.admin_role
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        # Create Classes
+        self.class_a = StudentClass.objects.create(
+            name="Hifz Division Alpha",
+            code="HIFZ-A",
+            department_type="HIFZ",
+            order_rank=1
+        )
+        self.class_b = StudentClass.objects.create(
+            name="Hifz Division Beta",
+            code="HIFZ-B",
+            department_type="HIFZ",
+            order_rank=2
+        )
+
+        # Create Groups
+        self.group_1 = StudentGroup.objects.create(
+            name="Halqa Abu Bakr",
+            student_class=self.class_a,
+            capacity=20,
+            created_by=self.admin
+        )
+        self.group_2 = StudentGroup.objects.create(
+            name="Halqa Umar",
+            student_class=self.class_b,
+            capacity=25,
+            created_by=self.admin
+        )
+
+        # Create Students
+        self.student_1 = Student.objects.create(
+            name_en="Zaid ibn Harithah",
+            student_class=self.class_a,
+            student_group=self.group_1,
+            group_name=self.group_1.name,
+            created_by=self.admin
+        )
+        self.student_2 = Student.objects.create(
+            name_en="Usama ibn Zaid",
+            student_class=self.class_a,
+            student_group=self.group_1,
+            group_name=self.group_1.name,
+            created_by=self.admin
+        )
+
+    def test_soft_delete_filtering(self):
+        from core.models import StudentClass, StudentGroup, Student
+        
+        # Create a deleted class and group
+        deleted_class = StudentClass.objects.create(
+            name="Decommissioned Class",
+            is_deleted=True,
+            is_active=False
+        )
+        deleted_group = StudentGroup.objects.create(
+            name="Decommissioned Group",
+            is_deleted=True,
+            is_active=False
+        )
+
+        # Query class listing
+        res_class = self.client.get("/api/v1/classes/")
+        self.assertEqual(res_class.status_code, status.HTTP_200_OK)
+        class_ids = [c["id"] for c in res_class.data]
+        self.assertIn(str(self.class_a.id), class_ids)
+        self.assertNotIn(str(deleted_class.id), class_ids)
+
+        # Query group listing
+        res_group = self.client.get("/api/v1/groups/")
+        self.assertEqual(res_group.status_code, status.HTTP_200_OK)
+        group_ids = [g["id"] for g in res_group.data]
+        self.assertIn(self.group_1.id, group_ids)
+        self.assertNotIn(deleted_group.id, group_ids)
+
+    def test_self_target_migration_prevention(self):
+        """Guardrail 1: Enforces that destination cannot be the entity being deleted."""
+        # Class self-target attempt
+        res = self.client.post(f"/api/v1/classes/{self.class_a.id}/delete-with-migration/", data={
+            "target_class_id": str(self.class_a.id)
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Self-Migration Prohibited", str(res.data))
+
+        # Group self-target attempt
+        res = self.client.post(f"/api/v1/groups/{self.group_1.id}/delete-with-migration/", data={
+            "target_group_id": self.group_1.id
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Self-Migration Prohibited", str(res.data))
+
+    def test_atomic_class_deletion_with_migration(self):
+        from core.models import StudentClass, StudentGroup, Student, StudentAcademicHistory
+
+        res = self.client.post(f"/api/v1/classes/{self.class_a.id}/delete-with-migration/", data={
+            "target_class_id": str(self.class_b.id)
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["migrated_students"], 2)
+        self.assertEqual(res.data["migrated_groups"], 1)
+
+        # Verify source class is soft-deleted
+        self.class_a.refresh_from_db()
+        self.assertTrue(self.class_a.is_deleted)
+        self.assertFalse(self.class_a.is_active)
+
+        # Verify group moved to class_b
+        self.group_1.refresh_from_db()
+        self.assertEqual(self.group_1.student_class, self.class_b)
+
+        # Verify students moved to class_b
+        self.student_1.refresh_from_db()
+        self.student_2.refresh_from_db()
+        self.assertEqual(self.student_1.student_class, self.class_b)
+        self.assertEqual(self.student_2.student_class, self.class_b)
+
+        # Verify academic history updated
+        active_hist = StudentAcademicHistory.objects.filter(student=self.student_1, is_current=True).first()
+        self.assertIsNotNone(active_hist)
+        self.assertEqual(active_hist.student_class, self.class_b)
+        self.assertIn("Class Reassignment", active_hist.transition_reason)
+
+        # Verify closed history exists
+        closed_hist = StudentAcademicHistory.objects.filter(student=self.student_1, is_current=False).first()
+        self.assertIsNotNone(closed_hist)
+        self.assertIsNotNone(closed_hist.end_date)
+
+    def test_atomic_group_deletion_with_migration(self):
+        from core.models import StudentGroup, Student, StudentAcademicHistory
+
+        res = self.client.post(f"/api/v1/groups/{self.group_1.id}/delete-with-migration/", data={
+            "target_group_id": self.group_2.id
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["migrated_students"], 2)
+
+        # Verify group_1 is soft-deleted
+        self.group_1.refresh_from_db()
+        self.assertTrue(self.group_1.is_deleted)
+        self.assertFalse(self.group_1.is_active)
+
+        # Verify students moved to group_2 and auto-synced class
+        self.student_1.refresh_from_db()
+        self.assertEqual(self.student_1.student_group, self.group_2)
+        self.assertEqual(self.student_1.group_name, self.group_2.name)
+        self.assertEqual(self.student_1.student_class, self.class_b)
+
+        # Verify academic history
+        active_hist = StudentAcademicHistory.objects.filter(student=self.student_1, is_current=True).first()
+        self.assertIsNotNone(active_hist)
+        self.assertEqual(active_hist.student_group, self.group_2)
+
+    def test_individual_student_academic_transfer(self):
+        from core.models import StudentAcademicHistory
+
+        res = self.client.post(f"/api/v1/students/{self.student_1.id}/transfer-academic/", data={
+            "target_class_id": str(self.class_b.id),
+            "target_group_id": self.group_2.id,
+            "transition_date": "2026-08-16",
+            "transition_reason": "Annual Promotion & Advancement"
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.student_1.refresh_from_db()
+        self.assertEqual(self.student_1.student_class, self.class_b)
+        self.assertEqual(self.student_1.student_group, self.group_2)
+        self.assertEqual(self.student_1.group_name, self.group_2.name)
+
+        # Check history endpoint
+        hist_res = self.client.get(f"/api/v1/students/{self.student_1.id}/academic-history/")
+        self.assertEqual(hist_res.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(hist_res.data), 2)
+        current = [h for h in hist_res.data if h["is_current"]][0]
+        self.assertEqual(current["student_class_name"], "Hifz Division Beta")
+        self.assertEqual(current["student_group_name"], "Halqa Umar")
+        self.assertEqual(current["transition_reason"], "Annual Promotion & Advancement")
+
+    def test_auto_sync_and_backward_compatibility(self):
+        """Guardrails 2 & 3: Student.save() auto-syncs group_name and class from group."""
+        from core.models import Student
+
+        # Creating student with group_name creates/links StudentGroup
+        stu = Student.objects.create(
+            name_en="Talha ibn Ubaydullah",
+            group_name="Halqa Abu Bakr",
+            created_by=self.admin
+        )
+        stu.refresh_from_db()
+        self.assertIsNotNone(stu.student_group)
+        self.assertEqual(stu.student_group.name, "Halqa Abu Bakr")
+        self.assertEqual(stu.student_class, self.class_a)
+
+
+class AcademicDepartmentManagementTestCase(APITestCase):
+    def setUp(self):
+        from core.models import User, AcademicDepartment, StudentClass, StudentGroup, Student, UserRole, RoleActionPermission, AppSectionCategory, AppSection, RoleSectionPermission
+
+        self.admin = User.objects.create_user(
+            phone_number="01711999888",
+            password="StrongPassword123!",
+            name="Super Admin",
+            is_active=True,
+            is_staff=True,
+            is_superuser=True
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        # Create sample departments
+        self.dept_hifz = AcademicDepartment.objects.create(
+            name="Hifz Division",
+            code="HIFZ",
+            has_quran_tracker=True,
+            order_rank=1
+        )
+        self.dept_general = AcademicDepartment.objects.create(
+            name="General Academic",
+            code="GEN",
+            has_quran_tracker=False,
+            order_rank=2
+        )
+
+        # Create classes under dept_hifz
+        self.class_1 = StudentClass.objects.create(
+            name="Hifz Class 1",
+            code="H1",
+            department=self.dept_hifz,
+            department_type="HIFZ"
+        )
+        self.class_2 = StudentClass.objects.create(
+            name="Hifz Class 2",
+            code="H2",
+            department=self.dept_hifz,
+            department_type="HIFZ"
+        )
+
+    def test_department_crud_and_soft_delete_filter(self):
+        from core.models import AcademicDepartment
+
+        res = self.client.get("/api/v1/departments/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        items = res.data.get("results") if isinstance(res.data, dict) else res.data
+        self.assertGreaterEqual(len(items), 2)
+
+        # Create new department
+        create_res = self.client.post("/api/v1/departments/", data={
+            "name": "Noorani Division",
+            "code": "NOOR",
+            "has_quran_tracker": True,
+            "order_rank": 4
+        }, format='json')
+        self.assertEqual(create_res.status_code, status.HTTP_201_CREATED)
+        new_id = create_res.data["id"]
+
+        # Soft delete department without classes
+        del_res = self.client.delete(f"/api/v1/departments/{new_id}/")
+        self.assertEqual(del_res.status_code, status.HTTP_200_OK)
+
+        # Verify not in active list
+        list_res = self.client.get("/api/v1/departments/")
+        active_items = list_res.data.get("results") if isinstance(list_res.data, dict) else list_res.data
+        active_ids = [d["id"] for d in active_items]
+        self.assertNotIn(new_id, active_ids)
+
+    def test_department_self_migration_prevention(self):
+        """Guardrail: Self-Target Prevention in department migration."""
+        res = self.client.post(f"/api/v1/departments/{self.dept_hifz.id}/delete-with-migration/", data={
+            "target_department_id": str(self.dept_hifz.id)
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("target_department_id", str(res.data))
+
+    def test_atomic_department_decommission_with_class_migration(self):
+        """Decommission department migrates all active classes to target department."""
+        from core.models import StudentClass, AcademicDepartment
+
+        res = self.client.post(f"/api/v1/departments/{self.dept_hifz.id}/delete-with-migration/", data={
+            "target_department_id": str(self.dept_general.id)
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["migrated_classes"], 2)
+
+        # Classes should now belong to dept_general
+        self.class_1.refresh_from_db()
+        self.class_2.refresh_from_db()
+        self.assertEqual(self.class_1.department, self.dept_general)
+        self.assertEqual(self.class_2.department, self.dept_general)
+
+        # Source department should be soft-deleted
+        self.dept_hifz.refresh_from_db()
+        self.assertTrue(self.dept_hifz.is_deleted)
+        self.assertFalse(self.dept_hifz.is_active)
+
+    def test_department_destroy_blocked_with_active_classes(self):
+        """Standard DELETE on department with active classes should reject."""
+        res = self.client.delete(f"/api/v1/departments/{self.dept_hifz.id}/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", res.data)
+
+    def test_department_metrics_endpoint(self):
+        res = self.client.get("/api/v1/departments/metrics/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("total_departments", res.data)
+        self.assertIn("total_classes", res.data)
+        self.assertIn("total_enrolled_students", res.data)
+
+
+class AcademicInstitutionMultiTenantTestCase(APITestCase):
+    """
+    Enterprise Multi-Tenancy Architecture Tests:
+    1. Tenant data isolation (User from Inst A cannot query records of Inst B).
+    2. Self-service onboarding atomic transaction with validation guards.
+    3. Super admin context switching via X-Tenant-ID header.
+    """
+
+    def setUp(self):
+        from core.models import (
+            AcademicInstitution, AcademicDepartment, StudentClass,
+            StudentGroup, Student
+        )
+
+        # 1. Create Institution A
+        self.inst_a = AcademicInstitution.objects.create(
+            name="Madrasa Al-Hikmah",
+            bangla_name="Madrasa Al-Hikmah",
+            slug="al-hikmah",
+            institution_type="MADRASA",
+            phone="01710000001",
+            district="Dhaka",
+        )
+
+        # 2. Create Institution B
+        self.inst_b = AcademicInstitution.objects.create(
+            name="Suffah Model Academy",
+            bangla_name="Suffah Model Academy",
+            slug="suffah-academy",
+            institution_type="SCHOOL",
+            phone="01710000002",
+            district="Chittagong",
+        )
+
+        # 3. Create Admin Users for each tenant
+        self.admin_a = User.objects.create_user(
+            phone_number="01810000001",
+            password="Password123!",
+            name="Admin Hikmah",
+            user_type="ADMIN",
+            institution=self.inst_a,
+        )
+
+        self.admin_b = User.objects.create_user(
+            phone_number="01810000002",
+            password="Password123!",
+            name="Admin Suffah",
+            user_type="ADMIN",
+            institution=self.inst_b,
+        )
+
+        # 4. Create Platform Super Admin
+        self.super_admin = User.objects.create_user(
+            phone_number="01999999999",
+            password="SuperPassword123!",
+            name="Platform Super Admin",
+            user_type="SUPER_ADMIN",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        # 5. Populate Hierarchy for Institution A
+        self.dept_a = AcademicDepartment.objects.create(
+            institution=self.inst_a,
+            name="Hifz Division A",
+            code="HIFZ-A",
+            has_quran_tracker=True,
+        )
+        self.class_a = StudentClass.objects.create(
+            institution=self.inst_a,
+            department=self.dept_a,
+            name="Class A1",
+            code="C-A1",
+        )
+        self.group_a = StudentGroup.objects.create(
+            institution=self.inst_a,
+            student_class=self.class_a,
+            name="Halqa A1",
+            capacity=15,
+            created_by=self.admin_a,
+        )
+        self.student_a = Student.objects.create(
+            institution=self.inst_a,
+            student_class=self.class_a,
+            student_group=self.group_a,
+            name_en="Student Alpha",
+            created_by=self.admin_a,
+        )
+
+        # 6. Populate Hierarchy for Institution B
+        self.dept_b = AcademicDepartment.objects.create(
+            institution=self.inst_b,
+            name="General Division B",
+            code="GEN-B",
+            has_quran_tracker=False,
+        )
+        self.class_b = StudentClass.objects.create(
+            institution=self.inst_b,
+            department=self.dept_b,
+            name="Class B1",
+            code="C-B1",
+        )
+        self.group_b = StudentGroup.objects.create(
+            institution=self.inst_b,
+            student_class=self.class_b,
+            name="Section B1",
+            capacity=25,
+            created_by=self.admin_b,
+        )
+        self.student_b = Student.objects.create(
+            institution=self.inst_b,
+            student_class=self.class_b,
+            student_group=self.group_b,
+            name_en="Student Beta",
+            created_by=self.admin_b,
+        )
+
+    def _get_items(self, data):
+        if isinstance(data, dict):
+            return data.get("results", [])
+        return data if isinstance(data, list) else []
+
+    def test_tenant_data_isolation(self):
+        """User from Institution A cannot view records of Institution B."""
+        self.client.force_authenticate(user=self.admin_a)
+
+        # Test Department isolation
+        res_dept = self.client.get("/api/v1/departments/")
+        self.assertEqual(res_dept.status_code, status.HTTP_200_OK)
+        dept_ids = [str(d["id"]) for d in self._get_items(res_dept.data)]
+        self.assertIn(str(self.dept_a.id), dept_ids)
+        self.assertNotIn(str(self.dept_b.id), dept_ids)
+
+        # Test Class isolation
+        res_class = self.client.get("/api/v1/classes/")
+        self.assertEqual(res_class.status_code, status.HTTP_200_OK)
+        class_ids = [str(c["id"]) for c in self._get_items(res_class.data)]
+        self.assertIn(str(self.class_a.id), class_ids)
+        self.assertNotIn(str(self.class_b.id), class_ids)
+
+        # Test Group isolation
+        res_group = self.client.get("/api/v1/groups/")
+        self.assertEqual(res_group.status_code, status.HTTP_200_OK)
+        group_ids = [g["id"] for g in self._get_items(res_group.data)]
+        self.assertIn(self.group_a.id, group_ids)
+        self.assertNotIn(self.group_b.id, group_ids)
+
+        # Test Student isolation
+        res_student = self.client.get("/api/v1/students/")
+        self.assertEqual(res_student.status_code, status.HTTP_200_OK)
+        student_ids = [s["id"] for s in self._get_items(res_student.data)]
+        self.assertIn(self.student_a.id, student_ids)
+        self.assertNotIn(self.student_b.id, student_ids)
+
+    def test_self_service_onboarding_atomic_transaction(self):
+        """Self-service onboarding creates Institution, Admin User, and Presets in one atomic transaction."""
+        from core.models import AcademicInstitution, AcademicDepartment
+
+        payload = {
+            "name": "Iqra International Madrasa",
+            "bangla_name": "Iqra International Madrasa",
+            "slug": "iqra-intl",
+            "institution_type": "MADRASA",
+            "phone": "01755555555",
+            "district": "Sylhet",
+            "admin_name": "Maulana Abdullah",
+            "admin_phone": "01855555555",
+            "admin_email": "abdullah@iqra.edu",
+            "admin_password": "SecurePassword123!",
+            "preset_type": "BOTH",
+        }
+
+        res = self.client.post("/api/v1/institutions/register/", data=payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        inst = AcademicInstitution.objects.get(slug="iqra-intl")
+        self.assertEqual(inst.name, "Iqra International Madrasa")
+        self.assertEqual(inst.district, "Sylhet")
+
+        admin = User.objects.get(phone_number="01855555555")
+        self.assertEqual(admin.name, "Maulana Abdullah")
+        self.assertEqual(admin.institution, inst)
+        self.assertEqual(admin.user_type, "ADMIN")
+        self.assertTrue(admin.check_password("SecurePassword123!"))
+
+        # Check departments seeded
+        depts = AcademicDepartment.objects.filter(institution=inst)
+        self.assertEqual(depts.count(), 3)
+        self.assertTrue(depts.filter(code="HIFZ").exists())
+        self.assertTrue(depts.filter(code="NAZERA").exists())
+        self.assertTrue(depts.filter(code="GEN").exists())
+
+        # Guardrail test: Duplicate phone number returns clean 400 Bad Request
+        dup_payload = payload.copy()
+        dup_payload["slug"] = "another-slug"
+        res_dup = self.client.post("/api/v1/institutions/register/", data=dup_payload, format='json')
+        self.assertEqual(res_dup.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("admin_phone", str(res_dup.data))
+
+        # Guardrail test: Duplicate slug returns clean 400 Bad Request
+        dup_slug_payload = payload.copy()
+        dup_slug_payload["admin_phone"] = "01911112222"
+        res_dup_slug = self.client.post("/api/v1/institutions/register/", data=dup_slug_payload, format='json')
+        self.assertEqual(res_dup_slug.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("slug", str(res_dup_slug.data))
+
+    def test_super_admin_context_switching_with_header(self):
+        """SUPER_ADMIN can list all institutions and filter by X-Tenant-ID header."""
+        self.client.force_authenticate(user=self.super_admin)
+
+        # 1. Super admin can list all institutions
+        res_insts = self.client.get("/api/v1/institutions/")
+        self.assertEqual(res_insts.status_code, status.HTTP_200_OK)
+        slugs = [i["slug"] for i in self._get_items(res_insts.data)]
+        self.assertIn("al-hikmah", slugs)
+        self.assertIn("suffah-academy", slugs)
+
+        # 2. Super admin querying without header sees all students
+        res_all_students = self.client.get("/api/v1/students/")
+        self.assertEqual(res_all_students.status_code, status.HTTP_200_OK)
+        all_ids = [s["id"] for s in self._get_items(res_all_students.data)]
+        self.assertIn(self.student_a.id, all_ids)
+        self.assertIn(self.student_b.id, all_ids)
+
+        # 3. Super admin passing X-Tenant-ID for Institution A
+        res_inst_a_students = self.client.get(
+            "/api/v1/students/",
+            HTTP_X_TENANT_ID=str(self.inst_a.id)
+        )
+        self.assertEqual(res_inst_a_students.status_code, status.HTTP_200_OK)
+        inst_a_ids = [s["id"] for s in self._get_items(res_inst_a_students.data)]
+        self.assertIn(self.student_a.id, inst_a_ids)
+        self.assertNotIn(self.student_b.id, inst_a_ids)
+
+        # 4. Super admin passing X-Tenant-ID for Institution B
+        res_inst_b_students = self.client.get(
+            "/api/v1/students/",
+            HTTP_X_TENANT_ID=str(self.inst_b.id)
+        )
+        self.assertEqual(res_inst_b_students.status_code, status.HTTP_200_OK)
+        inst_b_ids = [s["id"] for s in self._get_items(res_inst_b_students.data)]
+        self.assertIn(self.student_b.id, inst_b_ids)
+        self.assertNotIn(self.student_a.id, inst_b_ids)
+
+
+

@@ -67,6 +67,45 @@ class RoleActionPermission(models.Model):
         return f"Permissions for {self.role.code}"
 
 
+class AcademicInstitution(models.Model):
+    INSTITUTION_TYPE_CHOICES = (
+        ('MADRASA', 'Madrasa / Maktab'),
+        ('SCHOOL', 'General School'),
+        ('COLLEGE', 'College'),
+        ('COACHING', 'Coaching / Academy'),
+        ('OTHER', 'Other'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    bangla_name = models.CharField(max_length=250, blank=True, default='')
+    slug = models.SlugField(unique=True, max_length=100, db_index=True)
+    institution_type = models.CharField(
+        max_length=50,
+        choices=INSTITUTION_TYPE_CHOICES,
+        default='MADRASA'
+    )
+    eiin_or_reg_no = models.CharField(max_length=100, blank=True, default='')
+    logo_url = models.URLField(blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    address = models.TextField(blank=True, default='')
+    district = models.CharField(max_length=100, blank=True, default='')
+    is_verified = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Academic Institution"
+        verbose_name_plural = "Academic Institutions"
+
+    def __str__(self):
+        return f"{self.name} ({self.slug})"
+
+
 class User(AbstractUser):
     USER_TYPE_CHOICES = (
         ('SUPER_ADMIN', 'Super Admin'),
@@ -80,6 +119,13 @@ class User(AbstractUser):
         ('google', 'Google OAuth2'),
     )
 
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='members'
+    )
     username = None  # Phone number is primary credential
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
@@ -436,9 +482,129 @@ class Address(models.Model):
         return ", ".join([p for p in parts if p]) or f"Address #{self.id}"
 
 
+# 🎯 0a. Department Table
+class AcademicDepartment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='departments'
+    )
+    name = models.CharField(max_length=150)
+    code = models.CharField(max_length=50, blank=True)
+    department_head = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='headed_departments'
+    )
+    has_quran_tracker = models.BooleanField(
+        default=False,
+        help_text="Enable 30 Juz Quran evaluation for classes under this department"
+    )
+    order_rank = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order_rank', 'name']
+        verbose_name = "Academic Department"
+        verbose_name_plural = "Academic Departments"
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.code else self.name
+
+
+# 🎯 0b. Class / Grade Table
+class StudentClass(models.Model):
+    DEPARTMENT_CHOICES = (
+        ('HIFZ', 'Hifz'),
+        ('GENERAL', 'General'),
+        ('OTHER', 'Other'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='classes'
+    )
+    department = models.ForeignKey(
+        AcademicDepartment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='classes'
+    )
+    name = models.CharField(max_length=150)
+    code = models.CharField(max_length=50, blank=True)
+    department_type = models.CharField(max_length=20, choices=DEPARTMENT_CHOICES, default='HIFZ')
+    class_teacher = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_classes'
+    )
+    order_rank = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order_rank', 'name']
+        verbose_name = "Student Class"
+        verbose_name_plural = "Student Classes"
+
+    def save(self, *args, **kwargs):
+        if self.department:
+            if not self.institution and self.department.institution:
+                self.institution = self.department.institution
+            if self.department.has_quran_tracker:
+                self.department_type = 'HIFZ'
+            elif self.department.code and 'GEN' in self.department.code.upper():
+                self.department_type = 'GENERAL'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.code else self.name
+
+
 # 🎯 1. Group Table
 class StudentGroup(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='groups'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='groups'
+    )
+    name = models.CharField(max_length=150)
+    mentor_teacher = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='mentored_groups'
+    )
+    capacity = models.PositiveIntegerField(default=20, help_text="0 for unlimited")
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
     created_by = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,
@@ -447,9 +613,24 @@ class StudentGroup(models.Model):
         related_name='created_groups'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Student Group"
+        verbose_name_plural = "Student Groups"
+
+    def save(self, *args, **kwargs):
+        if not self.institution:
+            if self.student_class and self.student_class.institution:
+                self.institution = self.student_class.institution
+            elif self.created_by and self.created_by.institution:
+                self.institution = self.created_by.institution
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.name
+        class_name = self.student_class.name if self.student_class else "No Class"
+        return f"{self.name} [{class_name}]"
 
 
 # 🎯 2. Session Table
@@ -486,14 +667,36 @@ class SavedMessage(models.Model):
 
 # 🎯 4. Student Table (Main Table)
 class Student(models.Model):
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
     uniq_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
     roll_number = models.IntegerField(null=True, blank=True)
     name_en = models.CharField(max_length=150, null=True, blank=True)
+    student_class = models.ForeignKey(
+        StudentClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
+    student_group = models.ForeignKey(
+        StudentGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
     group_name = models.CharField(max_length=50, null=True, blank=True)
     admission_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=30, null=True, blank=True, default='Active')
     education_status = models.CharField(max_length=50, null=True, blank=True)
     target_status = models.CharField(max_length=100, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
     created_by = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,
@@ -535,16 +738,41 @@ class Student(models.Model):
         if not self.student_id_card_number:
             self.student_id_card_number = self.uniq_id
 
-        if not self.group_name or not str(self.group_name).strip():
+        if not self.institution:
+            if self.student_class and self.student_class.institution:
+                self.institution = self.student_class.institution
+            elif self.student_group and self.student_group.institution:
+                self.institution = self.student_group.institution
+            elif self.created_by and self.created_by.institution:
+                self.institution = self.created_by.institution
+
+        # ── Guardrail 2 & 3: Group & Class Auto-Sync and Backward Compatibility ──
+        if self.student_group:
+            self.group_name = self.student_group.name
+            if self.student_group.student_class and not self.student_class:
+                self.student_class = self.student_group.student_class
+        elif self.group_name and str(self.group_name).strip():
+            grp, _ = StudentGroup.objects.get_or_create(
+                name=self.group_name.strip(),
+                defaults={'created_by': self.created_by}
+            )
+            self.student_group = grp
+            if grp.student_class and not self.student_class:
+                self.student_class = grp.student_class
+        else:
             self.group_name = "General Group"
 
         if not self.name_en or not str(self.name_en).strip():
             self.name_en = "Unnamed Student"
 
         if not self.roll_number or self.roll_number <= 0:
-            max_roll = Student.objects.filter(group_name=self.group_name).aggregate(Max('roll_number'))['roll_number__max'] or 0
+            filter_kwargs = {'group_name': self.group_name}
+            if self.student_class_id:
+                filter_kwargs = {'student_class_id': self.student_class_id}
+            max_roll = Student.objects.filter(**filter_kwargs).aggregate(Max('roll_number'))['roll_number__max'] or 0
             self.roll_number = max_roll + 1
 
+        is_new = self._state.adding
         super().save(*args, **kwargs)
 
         # Propagate student name to all linked daily reports
@@ -553,9 +781,22 @@ class Student(models.Model):
         except Exception:
             pass
 
-        # Auto-register group in StudentGroup model if it doesn't exist
-        if self.group_name and str(self.group_name).strip():
-            StudentGroup.objects.get_or_create(name=self.group_name.strip())
+        # Auto-create initial Academic History record for newly registered student
+        try:
+            if is_new or not self.academic_history.filter(is_current=True).exists():
+                if self.student_class or self.student_group:
+                    adm_date = self.admission_date or timezone.now().date()
+                    StudentAcademicHistory.objects.create(
+                        student=self,
+                        student_class=self.student_class,
+                        student_group=self.student_group,
+                        start_date=adm_date,
+                        is_current=True,
+                        transition_reason="Initial Admission / Enrollment",
+                        transferred_by=self.created_by
+                    )
+        except Exception:
+            pass
 
     # ── Backward compatibility properties ────────────────────────
     @property
@@ -621,6 +862,52 @@ class StudentDetail(models.Model):
 
     def __str__(self):
         return f"Details for Student {self.student.uniq_id or self.student.id}"
+
+
+# 🎯 4f. Student Academic Progression History (Audit Timeline)
+class StudentAcademicHistory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='academic_history'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historical_movements'
+    )
+    student_group = models.ForeignKey(
+        StudentGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historical_movements'
+    )
+    start_date = models.DateField(default=timezone.now)
+    end_date = models.DateField(null=True, blank=True)
+    is_current = models.BooleanField(default=True)
+    transition_reason = models.CharField(max_length=255, blank=True)
+    transferred_by = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='initiated_student_transfers'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-start_date', '-created_at']
+        verbose_name = "Student Academic History"
+        verbose_name_plural = "Student Academic Histories"
+
+    def __str__(self):
+        cls_name = self.student_class.name if self.student_class else "None"
+        grp_name = self.student_group.name if self.student_group else "None"
+        return f"{self.student.name_en or self.student.name} -> {cls_name} / {grp_name} ({self.start_date})"
 
 
 from django.utils import timezone

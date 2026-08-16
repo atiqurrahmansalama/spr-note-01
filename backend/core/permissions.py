@@ -83,3 +83,28 @@ class IsAdminOrSelf(BasePermission):
 
         return obj == request.user
 
+
+class IsSuperAdmin(BasePermission):
+    """
+    Permission class allowing access only to SUPER_ADMIN or is_superuser users.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
+
+
+class IsInstitutionAdmin(BasePermission):
+    """
+    Permission class allowing access to SUPER_ADMIN or ADMIN of an institution.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return (
+            request.user.is_superuser or 
+            getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or
+            request.user.is_staff
+        )
+
+

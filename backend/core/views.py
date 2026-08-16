@@ -29,8 +29,12 @@ from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample, extend_schema_view
 from drf_spectacular.types import OpenApiTypes
 from .models import (
+    AcademicInstitution,
     Student,
+    AcademicDepartment,
+    StudentClass,
     StudentGroup,
+    StudentAcademicHistory,
     Session,
     SavedMessage,
     StudentDailyReport,
@@ -54,14 +58,20 @@ from .models import (
     FeatureFlagAuditLog,
     RoleInviteToken,
 )
-from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin, IsAdminOrSelf, HasSectionAccess
+from .permissions import IsAdminUserRole, IsOwnerOrSuperAdmin, IsAdminOrSelf, HasSectionAccess, IsSuperAdmin, IsInstitutionAdmin
 from .middleware import detect_device_type, detect_device_info, get_client_ip
 from .serializers import (
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
     ChangePasswordSerializer,
+    AcademicInstitutionSerializer,
+    InstitutionOnboardingSerializer,
     StudentSerializer,
+    AcademicDepartmentSerializer,
+    StudentClassSerializer,
     StudentGroupSerializer,
+    StudentAcademicHistorySerializer,
+    StudentTransferAcademicSerializer,
     SessionSerializer,
     SavedMessageSerializer,
     StudentDailyReportSerializer,
@@ -731,8 +741,27 @@ class ChangePasswordView(APIView):
 
         return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
 
+def get_scoped_tenant_id(request):
+    """
+    Helper to extract tenant isolation filter.
+    - If regular user: returns request.user.institution_id
+    - If superuser/SUPER_ADMIN: checks X-Tenant-ID header or ?institution_id query param
+    """
+    if not request.user or not request.user.is_authenticated:
+        return None
+    is_super = request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
+    if is_super:
+        header_tenant = request.headers.get('X-Tenant-ID') or request.META.get('HTTP_X_TENANT_ID')
+        param_tenant = request.query_params.get('institution_id') or request.query_params.get('institution')
+        target_tenant = header_tenant or param_tenant
+        if target_tenant and str(target_tenant).upper() not in ['ALL', 'NULL', 'UNDEFINED', 'NONE', '']:
+            return target_tenant
+        return None
+    return getattr(request.user, 'institution_id', None)
+
+
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.all().select_related('details').distinct().order_by('roll_number', 'name_en')
+    queryset = Student.objects.filter(is_deleted=False).select_related('details', 'student_class', 'student_group').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
     required_section_key = 'student_roster'
@@ -742,13 +771,51 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not user or not user.is_authenticated:
             return self.queryset.none()
 
-        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
-            return self.queryset.all()
+        show_trash = self.request.query_params.get('trash') == 'true'
+        base_qs = Student.objects.filter(is_deleted=True) if show_trash else Student.objects.filter(is_deleted=False)
+        base_qs = base_qs.select_related('details', 'student_class', 'student_group', 'institution').distinct()
 
-        return self.queryset.filter(created_by=user)
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            base_qs = base_qs.filter(institution_id=tenant_id)
+        elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            if user.institution_id:
+                base_qs = base_qs.filter(institution_id=user.institution_id)
+            else:
+                base_qs = base_qs.filter(created_by=user)
+
+        # Optional class or group filter
+        class_param = self.request.query_params.get('student_class') or self.request.query_params.get('class')
+        if class_param and class_param != 'ALL':
+            from django.db.models import Q
+            try:
+                base_qs = base_qs.filter(Q(student_class_id=class_param) | Q(student_class__name__iexact=class_param))
+            except Exception:
+                base_qs = base_qs.filter(student_class__name__iexact=class_param)
+
+        group_param = self.request.query_params.get('student_group') or self.request.query_params.get('group')
+        if group_param and group_param != 'ALL':
+            from django.db.models import Q
+            if str(group_param).isdigit():
+                base_qs = base_qs.filter(
+                    Q(student_group_id=int(group_param)) | 
+                    Q(group_name__iexact=group_param) | 
+                    Q(student_group__name__iexact=group_param)
+                )
+            else:
+                base_qs = base_qs.filter(
+                    Q(group_name__iexact=group_param) | 
+                    Q(student_group__name__iexact=group_param)
+                )
+
+        return base_qs.order_by('roll_number', 'name_en')
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(created_by=self.request.user, institution_id=tenant_id)
+        else:
+            serializer.save(created_by=self.request.user)
 
     @action(detail=False, methods=['post'], url_path='admission')
     def admission(self, request):
@@ -773,6 +840,31 @@ class StudentViewSet(viewsets.ModelViewSet):
                 student = serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='transfer-academic')
+    def transfer_academic(self, request, pk=None):
+        from .services import transfer_student_academic
+        from .serializers import StudentTransferAcademicSerializer
+        serializer = StudentTransferAcademicSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        result = transfer_student_academic(
+            student_id=pk,
+            target_class_id=serializer.validated_data.get('target_class_id'),
+            target_group_id=serializer.validated_data.get('target_group_id'),
+            transition_date=serializer.validated_data.get('transition_date'),
+            transition_reason=serializer.validated_data.get('transition_reason', ''),
+            performed_by=request.user
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='academic-history')
+    def academic_history(self, request, pk=None):
+        student = self.get_object()
+        from .serializers import StudentAcademicHistorySerializer
+        history_records = student.academic_history.all().order_by('-start_date', '-created_at')
+        serializer = StudentAcademicHistorySerializer(history_records, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='upload-document')
     def upload_document(self, request, pk=None):
@@ -832,15 +924,15 @@ class StudentViewSet(viewsets.ModelViewSet):
                     if not group_name:
                         return Response({"error": "Group name is required"}, status=status.HTTP_400_BAD_REQUEST)
                     from core.models import StudentGroup
-                    StudentGroup.objects.get_or_create(name=group_name.strip())
-                    queryset.update(group_name=group_name.strip())
+                    grp, _ = StudentGroup.objects.get_or_create(name=group_name.strip())
+                    queryset.update(group_name=group_name.strip(), student_group=grp)
                 elif action_type == 'change_status':
                     status_val = request.data.get('status')
                     if not status_val:
                         return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
                     queryset.update(status=status_val.strip().title())
                 elif action_type == 'bulk_delete':
-                    queryset.delete()
+                    queryset.update(is_deleted=True, status='INACTIVE')
                 else:
                     return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -876,7 +968,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         sibling_students = Student.objects.filter(
             Q(guardian_detail__primary_guardian_phone__contains=cleaned_phone) |
             Q(guardian_detail__father_phone__contains=cleaned_phone) |
-            Q(guardian_detail__mother_phone__contains=cleaned_phone)
+            Q(guardian_detail__mother_phone__contains=cleaned_phone),
+            is_deleted=False
         ).distinct()
         
         siblings_data = []
@@ -933,8 +1026,269 @@ class StudentViewSet(viewsets.ModelViewSet):
             "status": student.status or "Active"
         }, status=status.HTTP_200_OK)
 
+
+class InstitutionViewSet(viewsets.ModelViewSet):
+    queryset = AcademicInstitution.objects.filter(is_deleted=False).order_by('name')
+    serializer_class = AcademicInstitutionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = AcademicInstitution.objects.filter(is_deleted=True) if show_trash else AcademicInstitution.objects.filter(is_deleted=False)
+
+        is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
+        if not is_super:
+            if user.institution_id:
+                qs = qs.filter(id=user.institution_id)
+            else:
+                qs = qs.none()
+        else:
+            search = self.request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(name__icontains=search) | 
+                    Q(bangla_name__icontains=search) | 
+                    Q(slug__icontains=search) | 
+                    Q(district__icontains=search)
+                )
+
+        return qs.order_by('name')
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        user = request.user
+        is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
+        if is_super:
+            total_institutions = AcademicInstitution.objects.filter(is_deleted=False).count()
+            verified_institutions = AcademicInstitution.objects.filter(is_deleted=False, is_verified=True).count()
+            total_students = Student.objects.filter(is_deleted=False).count()
+            total_staff = User.objects.filter(is_active=True).count()
+        else:
+            inst = user.institution
+            total_institutions = 1 if inst else 0
+            verified_institutions = 1 if (inst and inst.is_verified) else 0
+            total_students = Student.objects.filter(institution=inst, is_deleted=False).count() if inst else 0
+            total_staff = User.objects.filter(institution=inst, is_active=True).count() if inst else 0
+
+        return Response({
+            "total_institutions": total_institutions,
+            "verified_institutions": verified_institutions,
+            "total_active_students": total_students,
+            "total_staff": total_staff,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get', 'patch', 'put'], url_path='current')
+    def current(self, request):
+        user = request.user
+        tenant_id = get_scoped_tenant_id(request)
+        if not tenant_id and user.institution_id:
+            tenant_id = user.institution_id
+
+        if not tenant_id:
+            return Response({"error": "No active institution context found."}, status=status.HTTP_404_NOT_FOUND)
+
+        inst = AcademicInstitution.objects.filter(id=tenant_id, is_deleted=False).first()
+        if not inst:
+            return Response({"error": "Institution not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'GET':
+            serializer = AcademicInstitutionSerializer(inst)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            serializer = AcademicInstitutionSerializer(inst, data=request.data, partial=True)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='register')
+    def register(self, request):
+        serializer = InstitutionOnboardingSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        result = serializer.save()
+        return Response(result, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Institution '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+
+
+class AcademicDepartmentViewSet(viewsets.ModelViewSet):
+    queryset = AcademicDepartment.objects.filter(is_deleted=False).select_related('department_head', 'institution').order_by('order_rank', 'name')
+    serializer_class = AcademicDepartmentSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    required_section_key = 'student_departments'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = AcademicDepartment.objects.filter(is_deleted=True) if show_trash else AcademicDepartment.objects.filter(is_deleted=False)
+
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search))
+
+        return qs.select_related('department_head', 'institution').order_by('order_rank', 'name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(institution_id=tenant_id)
+        else:
+            serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        tenant_id = get_scoped_tenant_id(request)
+        filter_kwargs = {'is_deleted': False}
+        if tenant_id:
+            filter_kwargs['institution_id'] = tenant_id
+
+        total_depts = AcademicDepartment.objects.filter(**filter_kwargs).count()
+        total_classes = StudentClass.objects.filter(**filter_kwargs).count()
+        total_enrolled = Student.objects.filter(**filter_kwargs).count()
+        return Response({
+            "total_departments": total_depts,
+            "total_classes": total_classes,
+            "total_enrolled_students": total_enrolled
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='delete-with-migration')
+    def delete_with_migration(self, request, pk=None):
+        from .services import delete_department_with_migration
+        target_dept_id = request.data.get('target_department_id')
+        result = delete_department_with_migration(
+            source_dept_id=pk,
+            target_dept_id=target_dept_id,
+            performed_by=request.user
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        has_classes = instance.classes.filter(is_deleted=False).exists()
+        if has_classes:
+            return Response({
+                "error": f"Department '{instance.name}' has {instance.classes.filter(is_deleted=False).count()} active classes assigned. Please use 'delete-with-migration' to safely migrate them."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Department '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+
+
+class StudentClassViewSet(viewsets.ModelViewSet):
+    queryset = StudentClass.objects.filter(is_deleted=False).select_related('department', 'class_teacher', 'institution').order_by('order_rank', 'name')
+    serializer_class = StudentClassSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    required_section_key = 'student_classes'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = StudentClass.objects.filter(is_deleted=True) if show_trash else StudentClass.objects.filter(is_deleted=False)
+        
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        dept_id = self.request.query_params.get('department')
+        if dept_id and dept_id != 'ALL':
+            qs = qs.filter(department_id=dept_id)
+
+        dept_type = self.request.query_params.get('department_type')
+        if dept_type and dept_type != 'ALL':
+            qs = qs.filter(department_type=dept_type.upper())
+            
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search))
+            
+        return qs.select_related('department', 'class_teacher', 'institution').order_by('order_rank', 'name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(institution_id=tenant_id)
+        else:
+            serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        tenant_id = get_scoped_tenant_id(request)
+        filter_kwargs = {'is_deleted': False}
+        if tenant_id:
+            filter_kwargs['institution_id'] = tenant_id
+
+        total_classes = StudentClass.objects.filter(**filter_kwargs).count()
+        total_enrolled = Student.objects.filter(student_class__isnull=False, **filter_kwargs).count()
+        avg_students = round(total_enrolled / total_classes, 1) if total_classes > 0 else 0.0
+        return Response({
+            "total_classes": total_classes,
+            "total_enrolled_students": total_enrolled,
+            "avg_students_per_class": avg_students
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='delete-with-migration')
+    def delete_with_migration(self, request, pk=None):
+        from .services import delete_class_with_migration
+        target_class_id = request.data.get('target_class_id')
+        result = delete_class_with_migration(
+            source_class_id=pk,
+            target_class_id=target_class_id,
+            performed_by=request.user
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        has_students = instance.students.filter(is_deleted=False).exists()
+        has_groups = instance.groups.filter(is_deleted=False).exists()
+        if has_students or has_groups:
+            return Response({
+                "error": f"Class '{instance.name}' has active students ({instance.students.filter(is_deleted=False).count()}) or groups ({instance.groups.filter(is_deleted=False).count()}). Please use 'delete-with-migration' to safely migrate them."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Class '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+
+
 class StudentGroupViewSet(viewsets.ModelViewSet):
-    queryset = StudentGroup.objects.all().order_by('name')
+    queryset = StudentGroup.objects.filter(is_deleted=False).select_related('student_class', 'mentor_teacher', 'institution').order_by('name')
     serializer_class = StudentGroupSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
     required_section_key = 'student_groups'
@@ -944,32 +1298,85 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
         if not user or not user.is_authenticated:
             return self.queryset.none()
 
-        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
-            return self.queryset.all()
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = StudentGroup.objects.filter(is_deleted=True) if show_trash else StudentGroup.objects.filter(is_deleted=False)
 
-        return self.queryset.filter(created_by=user)
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        class_id = self.request.query_params.get('student_class')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student_class_id=class_id)
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(student_class__name__icontains=search))
+
+        return qs.select_related('student_class', 'mentor_teacher', 'institution').order_by('name')
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(created_by=self.request.user, institution_id=tenant_id)
+        else:
+            serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        tenant_id = get_scoped_tenant_id(request)
+        filter_kwargs = {'is_deleted': False}
+        if tenant_id:
+            filter_kwargs['institution_id'] = tenant_id
+
+        active_groups = StudentGroup.objects.filter(**filter_kwargs)
+        total_groups = active_groups.count()
+        total_assigned = Student.objects.filter(student_group__isnull=False, **filter_kwargs).count()
+        total_capacity = sum(g.capacity for g in active_groups if g.capacity > 0)
+        available_seats = max(0, total_capacity - total_assigned)
+        return Response({
+            "total_groups": total_groups,
+            "total_assigned_students": total_assigned,
+            "total_capacity": total_capacity,
+            "available_seats": available_seats
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='delete-with-migration')
+    def delete_with_migration(self, request, pk=None):
+        from .services import delete_group_with_migration
+        target_group_id = request.data.get('target_group_id')
+        result = delete_group_with_migration(
+            source_group_id=pk,
+            target_group_id=target_group_id,
+            performed_by=request.user
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        has_students = Student.objects.filter(
+            Q(student_group=instance) | Q(group_name__iexact=instance.name),
+            is_deleted=False
+        ).exists()
+        if has_students:
+            return Response({
+                "error": f"Group '{instance.name}' has active students assigned. Please use 'delete-with-migration' to safely migrate them."
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Group '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        if queryset.exists():
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
-        
-        from .models import Student, GroupSectionPermission
-        user = request.user
-        student_qs = Student.objects.exclude(group_name__isnull=True).exclude(group_name='')
-        if not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
-            student_qs = student_qs.filter(created_by=user)
-            
-        student_groups = set(student_qs.values_list('group_name', flat=True))
-        perm_groups = set(GroupSectionPermission.objects.exclude(group_id__isnull=True).exclude(group_id='').values_list('group_id', flat=True))
-        merged_groups = sorted(list(student_groups.union(perm_groups)))
-        
-        data = [{'id': name, 'name': name} for name in merged_groups if name and name != 'All Groups']
-        return Response(data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all().order_by('id')
@@ -1697,16 +2104,25 @@ class UserViewSet(viewsets.ModelViewSet):
         if not user or not user.is_authenticated:
             return User.objects.none()
 
+        is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
         is_admin = user.is_staff or getattr(user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or user.is_superuser
-        if is_admin:
-            qs = User.objects.all().select_related('role').order_by('-date_joined')
+        
+        if is_super:
+            qs = User.objects.all().select_related('role', 'institution').order_by('-date_joined')
+            tenant_id = get_scoped_tenant_id(self.request)
+            if tenant_id:
+                qs = qs.filter(institution_id=tenant_id)
+        elif is_admin:
+            if user.institution_id:
+                qs = User.objects.filter(institution_id=user.institution_id).select_related('role', 'institution').order_by('-date_joined')
+            else:
+                qs = User.objects.filter(id=user.id).select_related('role', 'institution')
         else:
-            qs = User.objects.filter(id=user.id).select_related('role')
+            qs = User.objects.filter(id=user.id).select_related('role', 'institution')
 
         role_code = self.request.query_params.get('role_code') or self.request.query_params.get('user_type') or self.request.query_params.get('role')
-        if role_code:
-            if role_code.upper() != 'ALL':
-                qs = qs.filter(Q(role__code__iexact=role_code) | Q(user_type__iexact=role_code))
+        if role_code and role_code.upper() != 'ALL':
+            qs = qs.filter(Q(role__code__iexact=role_code) | Q(user_type__iexact=role_code))
         
         search = self.request.query_params.get('search')
         if search:
@@ -1726,7 +2142,12 @@ class UserViewSet(viewsets.ModelViewSet):
                 role_obj = UserRole.objects.filter(pk=int(user_type)).first()
             if not role_obj and isinstance(user_type, str):
                 role_obj = UserRole.objects.filter(code__iexact=user_type).first()
-        serializer.save(role=role_obj)
+
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id and not serializer.validated_data.get('institution'):
+            serializer.save(role=role_obj, institution_id=tenant_id)
+        else:
+            serializer.save(role=role_obj)
 
     def perform_update(self, serializer):
         user_type = self.request.data.get('user_type') or self.request.data.get('role') or self.request.data.get('role_code')
