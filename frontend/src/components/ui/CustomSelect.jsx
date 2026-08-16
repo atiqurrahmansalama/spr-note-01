@@ -11,11 +11,34 @@ export default function CustomSelect({
   required = false,
   searchable = false,
   disabled = false,
+  direction = 'auto', // 'auto', 'up', 'down'
   icon: Icon,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef(null);
+
+  // Determine if popup should open upward or downward
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      if (direction === 'up') {
+        setOpenUpward(true);
+      } else if (direction === 'down') {
+        setOpenUpward(false);
+      } else {
+        const rect = containerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        // If less than 240px space below and more space above, open upward
+        if (spaceBelow < 250 && spaceAbove > 200) {
+          setOpenUpward(true);
+        } else {
+          setOpenUpward(false);
+        }
+      }
+    }
+  }, [isOpen, direction]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -94,7 +117,7 @@ export default function CustomSelect({
         <div className="shrink-0 ml-2">
           <svg
             className={`w-4 h-4 theme-text-secondary transition-transform duration-200 ${
-              isOpen ? 'rotate-180 text-sky-400' : ''
+              isOpen ? (openUpward ? 'rotate-0' : 'rotate-180') : 'rotate-0'
             }`}
             fill="none"
             viewBox="0 0 24 24"
@@ -107,9 +130,13 @@ export default function CustomSelect({
 
       {error && <p className="mt-1 text-[11px] text-rose-400 font-medium">{error}</p>}
 
-      {/* Dropdown Menu Popup */}
+      {/* Dropdown Menu Popup with Auto Upward/Downward Orientation */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl theme-bg-elevated border theme-border shadow-2xl overflow-hidden animate-fade-in">
+        <div
+          className={`absolute left-0 right-0 z-[100] rounded-2xl theme-bg-elevated border theme-border shadow-2xl overflow-hidden animate-fade-in ${
+            openUpward ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
           {/* Search Box if Searchable or options > 6 */}
           {(searchable || options.length > 6) && (
             <div className="p-2 border-b theme-border theme-bg-sub/60">
@@ -145,7 +172,7 @@ export default function CustomSelect({
                     key={idx}
                     type="button"
                     onClick={() => handleSelect(opt)}
-                    className={`w-full px-3.5 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer ${
                       isSelected
                         ? 'theme-bg-accent theme-accent-text font-bold shadow-xs'
                         : 'hover:theme-bg-sub theme-text-primary'

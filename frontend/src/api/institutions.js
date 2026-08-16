@@ -102,13 +102,19 @@ export const updateInstitution = async (id, data) => {
   return await response.json();
 };
 
-export const deleteInstitution = async (id) => {
+export const deleteInstitution = async (id, payload = {}) => {
   const response = await fetchWithAuth(`/api/v1/institutions/${id}/`, {
     method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(payload.password ? { 'X-Admin-Password': payload.password } : {}),
+    },
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || 'Failed to delete institution');
+    throw new Error(errData.error || errData.detail || 'Failed to delete institution');
   }
   return true;
 };
+

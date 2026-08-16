@@ -5,9 +5,6 @@ import {
   BookOpenIcon,
   BuildingOfficeIcon,
   UsersIcon,
-  PhoneIcon,
-  MailIcon,
-  GlobeIcon,
   LocationIcon,
 } from '../../../components/ui/Icons';
 import CustomSelect from '../../../components/ui/CustomSelect';
@@ -17,7 +14,7 @@ import { useToast } from '../../../context/ToastContext';
 import {
   BANGLADESH_DIVISIONS,
   BANGLADESH_DISTRICTS_BY_DIVISION,
-  MAJOR_THANAS_BY_DISTRICT,
+  BD_GEO_DATA,
 } from '../../../utils/bangladeshGeoData';
 
 const INSTITUTION_TYPES = [
@@ -83,7 +80,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
   const handleDivisionChange = (newDivision) => {
     const districtsForDiv = BANGLADESH_DISTRICTS_BY_DIVISION[newDivision] || [];
     const firstDistrict = districtsForDiv[0] || '';
-    const thanasForDist = MAJOR_THANAS_BY_DISTRICT[firstDistrict] || [];
+    const thanasForDist = (BD_GEO_DATA[newDivision] && BD_GEO_DATA[newDivision][firstDistrict]) || [];
     setFormData((prev) => ({
       ...prev,
       division: newDivision,
@@ -93,7 +90,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
   };
 
   const handleDistrictChange = (newDistrict) => {
-    const thanasForDist = MAJOR_THANAS_BY_DISTRICT[newDistrict] || [];
+    const thanasForDist = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][newDistrict]) || [];
     setFormData((prev) => ({
       ...prev,
       district: newDistrict,
@@ -178,13 +175,13 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
   };
 
   const availableDistricts = BANGLADESH_DISTRICTS_BY_DIVISION[formData.division] || [];
-  const availableThanas = MAJOR_THANAS_BY_DISTRICT[formData.district] || [];
+  const availableThanas = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][formData.district]) || [];
 
   return (
-    <div className="flex flex-col h-full theme-text-primary select-none font-sans min-h-[620px]">
+    <div className="flex flex-col h-full w-full theme-text-primary select-none font-sans min-h-[660px]">
       {/* Stepper Progress Bar */}
       <div className="p-4 sm:p-5 border-b theme-border theme-bg-sub/60 shrink-0">
-        <div className="flex items-center justify-between gap-2 max-w-xl mx-auto">
+        <div className="flex items-center justify-between gap-2 max-w-2xl mx-auto">
           {[
             { num: 1, title: 'Identity & Info', desc: 'Basic Details' },
             { num: 2, title: 'Location & Brand', desc: 'Address & Logo' },
@@ -195,7 +192,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             return (
               <div key={s.num} className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
                     isCompleted
                       ? 'bg-emerald-500 text-white shadow-emerald-500/20'
                       : isActive
@@ -219,11 +216,11 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
         </div>
       </div>
 
-      {/* Form Body with generous vertical height and spacing */}
-      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6">
+      {/* Form Body with generous vertical height, extra bottom padding (pb-36) and locked width */}
+      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 pb-36 w-full">
         {/* STEP 1: Basic Identity (No District) */}
         {step === 1 && (
-          <div className="space-y-6 animate-fade-in max-w-xl mx-auto">
+          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto min-h-[480px]">
             {/* Institution English Name */}
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
@@ -329,14 +326,14 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
         {/* STEP 2: Branding & Structured Address */}
         {step === 2 && (
-          <div className="space-y-6 animate-fade-in max-w-xl mx-auto">
+          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto min-h-[480px]">
             {/* Slug Identifier */}
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Unique Tenant Slug (Web Identifier) <span className="text-rose-400">*</span>
               </label>
               <div className="flex items-center">
-                <span className="px-4 py-3 rounded-l-2xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-xs font-mono">
+                <span className="px-4 py-3 rounded-l-2xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-xs font-mono font-bold">
                   app/
                 </span>
                 <input
@@ -356,11 +353,11 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                 <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.slug}</p>
               )}
               <p className="mt-1.5 text-[11px] theme-text-secondary">
-                Unique URL identifier used for isolated tenant routing and links.
+                Unique URL identifier used for isolated tenant routing and multi-branch isolation.
               </p>
             </div>
 
-            {/* Logo File Upload Zone (SVG, PNG, JPG, PDF with preview) */}
+            {/* Logo File Upload Zone (With Prominent Large Preview at Top) */}
             <div>
               <FileUploadZone
                 label="Institution Logo / Emblem"
@@ -371,8 +368,8 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             </div>
 
             {/* Address Group Header */}
-            <div className="pt-2 border-t theme-border">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="pt-3 border-t theme-border space-y-5">
+              <div className="flex items-center gap-2 mb-2">
                 <LocationIcon className="w-4 h-4 text-sky-400" />
                 <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
                   Campus Address & Geographic Location
@@ -380,7 +377,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
 
               {/* Division & District Cascading Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <CustomSelect
                     label="Division / বিভাগ"
@@ -412,7 +409,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
 
               {/* Thana/Upazila & Post Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   {availableThanas.length > 0 ? (
                     <CustomSelect
@@ -422,6 +419,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                       options={availableThanas}
                       placeholder="Select Thana"
                       searchable
+                      direction="auto"
                     />
                   ) : (
                     <div>
@@ -472,13 +470,15 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
         {/* STEP 3: Admin & Presets */}
         {step === 3 && (
-          <div className="space-y-6 animate-fade-in max-w-xl mx-auto">
-            <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs theme-text-primary flex items-start gap-3">
-              <UsersIcon className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto min-h-[480px]">
+            <div className="p-4 rounded-3xl theme-bg-sub border theme-border text-xs theme-text-primary flex items-start gap-3.5 shadow-xs">
+              <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
+                <UsersIcon className="w-5 h-5" />
+              </div>
               <div>
-                <p className="font-bold text-sm">Head Administrator Account</p>
+                <p className="font-bold text-sm theme-text-primary">Root Institutional Admin Credentials</p>
                 <p className="text-[11px] theme-text-secondary mt-0.5 leading-relaxed">
-                  This user will be registered as the root institutional supervisor with full control over academic departments, faculty rosters, and billing.
+                  This user account will have root permissions to manage academic departments, staff rosters, and financial permissions for this tenant.
                 </p>
               </div>
             </div>
@@ -571,12 +571,12 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
             </div>
 
-            {/* Department Starter Presets */}
+            {/* Department Starter Presets with flexible and stable layout */}
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-3">
                 Academic Department Starter Presets
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 {[
                   {
                     id: 'HIFZ',
@@ -604,17 +604,17 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                       key={preset.id}
                       type="button"
                       onClick={() => setFormData({ ...formData, preset_type: preset.id })}
-                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      className={`p-4 rounded-3xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-sky-500/15 border-sky-500 text-sky-300 ring-2 ring-sky-500/20 shadow-md'
+                          ? 'bg-[var(--accent-main)]/15 border-[var(--accent-main)] text-[var(--accent-main)] ring-2 ring-[var(--accent-main)]/20 shadow-md'
                           : 'theme-bg-sub theme-border hover:theme-bg-elevated theme-text-secondary'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <div className={`p-2 rounded-xl ${isSelected ? 'bg-sky-500/20 text-sky-400' : 'theme-bg-app theme-text-secondary'}`}>
+                        <div className={`p-2 rounded-2xl ${isSelected ? 'bg-[var(--accent-main)]/20 text-[var(--accent-main)]' : 'theme-bg-app theme-text-secondary'}`}>
                           <Icon className="w-4 h-4" />
                         </div>
-                        {isSelected && <CheckCircleIcon className="w-4 h-4 text-sky-400" />}
+                        {isSelected && <CheckCircleIcon className="w-4 h-4 text-emerald-400" />}
                       </div>
                       <div>
                         <div className="font-bold text-xs theme-text-primary">{preset.title}</div>

@@ -1168,10 +1168,23 @@ class InstitutionViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        password = request.data.get('password') or request.query_params.get('password')
+        if password:
+            if not request.user.check_password(password):
+                return Response({"error": "Incorrect password. Security authorization failed."}, status=status.HTTP_400_BAD_REQUEST)
+        elif not request.user.is_superuser:
+            # If not superuser, require password
+            password_header = request.headers.get('X-Admin-Password')
+            if password_header:
+                if not request.user.check_password(password_header):
+                    return Response({"error": "Incorrect password. Security authorization failed."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"error": "Administrator password confirmation is required to decommission an institution."}, status=status.HTTP_400_BAD_REQUEST)
+
         instance.is_deleted = True
         instance.is_active = False
         instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
-        return Response({"status": "success", "message": f"Institution '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+        return Response({"status": "success", "message": f"Institution '{instance.name}' has been safely decommissioned."}, status=status.HTTP_200_OK)
 
 
 class AcademicDepartmentViewSet(viewsets.ModelViewSet):

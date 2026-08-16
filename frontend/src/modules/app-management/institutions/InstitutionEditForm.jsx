@@ -11,7 +11,7 @@ import { useToast } from '../../../context/ToastContext';
 import {
   BANGLADESH_DIVISIONS,
   BANGLADESH_DISTRICTS_BY_DIVISION,
-  MAJOR_THANAS_BY_DISTRICT,
+  BD_GEO_DATA,
 } from '../../../utils/bangladeshGeoData';
 
 const INSTITUTION_TYPES = [
@@ -66,7 +66,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
   const handleDivisionChange = (newDivision) => {
     const districtsForDiv = BANGLADESH_DISTRICTS_BY_DIVISION[newDivision] || [];
     const firstDistrict = districtsForDiv[0] || '';
-    const thanasForDist = MAJOR_THANAS_BY_DISTRICT[firstDistrict] || [];
+    const thanasForDist = (BD_GEO_DATA[newDivision] && BD_GEO_DATA[newDivision][firstDistrict]) || [];
     setFormData((prev) => ({
       ...prev,
       division: newDivision,
@@ -76,7 +76,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
   };
 
   const handleDistrictChange = (newDistrict) => {
-    const thanasForDist = MAJOR_THANAS_BY_DISTRICT[newDistrict] || [];
+    const thanasForDist = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][newDistrict]) || [];
     setFormData((prev) => ({
       ...prev,
       district: newDistrict,
@@ -119,12 +119,12 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
   };
 
   const availableDistricts = BANGLADESH_DISTRICTS_BY_DIVISION[formData.division] || [];
-  const availableThanas = MAJOR_THANAS_BY_DISTRICT[formData.district] || [];
+  const availableThanas = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][formData.district]) || [];
 
   return (
-    <div className="flex flex-col h-full theme-text-primary select-none font-sans min-h-[580px]">
-      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-xl mx-auto">
+    <div className="flex flex-col h-full w-full theme-text-primary select-none font-sans min-h-[660px]">
+      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 pb-36 w-full">
+        <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
           {/* Identity Names */}
           <div className="space-y-5">
             <div>
@@ -206,7 +206,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
             </div>
           </div>
 
-          {/* Logo File Upload */}
+          {/* Logo File Upload with Prominent Large Preview */}
           <div>
             <FileUploadZone
               label="Institution Logo / Emblem"
@@ -260,6 +260,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                     options={availableThanas}
                     placeholder="Select Thana"
                     searchable
+                    direction="auto"
                   />
                 ) : (
                   <div>

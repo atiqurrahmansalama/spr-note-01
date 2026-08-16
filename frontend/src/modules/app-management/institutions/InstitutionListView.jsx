@@ -53,12 +53,14 @@ export default function InstitutionListView() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
   const [deleteCountdown, setDeleteCountdown] = useState(3);
 
   const handleOpenDelete = (inst) => {
     setDeletingInst(inst);
     setDeleteConfirmText('');
     setDeleteAcknowledged(false);
+    setAdminPassword('');
     setDeleteCountdown(3);
   };
 
@@ -151,21 +153,26 @@ export default function InstitutionListView() {
 
   const handleDeleteConfirm = async () => {
     if (!deletingInst) return;
-    if (deleteConfirmText.trim() !== deletingInst.name.trim() || !deleteAcknowledged || deleteCountdown > 0) {
-      showToast('Please fulfill all security confirmation steps.', 'warning');
+    if (
+      deleteConfirmText.trim() !== deletingInst.name.trim() ||
+      !deleteAcknowledged ||
+      !adminPassword.trim() ||
+      deleteCountdown > 0
+    ) {
+      showToast('Please fulfill all security confirmation steps including your password.', 'warning');
       return;
     }
 
     try {
       setIsDeleting(true);
-      await deleteInstitution(deletingInst.id);
+      await deleteInstitution(deletingInst.id, { password: adminPassword.trim() });
       showToast(`Institution '${deletingInst.name}' has been safely decommissioned.`, 'success');
       setDeletingInst(null);
       loadData();
       refreshInstitutions();
     } catch (err) {
       console.error('[Delete Institution Error]:', err);
-      showToast(err.response?.data?.error || 'Failed to decommission institution.', 'error');
+      showToast(err.response?.data?.error || err.message || 'Failed to decommission institution.', 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -599,9 +606,9 @@ export default function InstitutionListView() {
         </div>
       )}
 
-      {/* Enterprise-Grade High-Security Decommission Safety Barrier Modal */}
-      {deletingInst && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
+      {/* Enterprise-Grade High-Security Decommission Safety Barrier Modal (Portaled to root with z-[9999]) */}
+      {deletingInst && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs select-none">
           <div className="relative w-full max-w-lg rounded-3xl theme-bg-elevated border border-rose-500/40 shadow-2xl p-6 sm:p-7 space-y-5 animate-zoom-in">
             {/* Header with Hazard Icon */}
             <div className="flex items-start gap-3.5 pb-4 border-b theme-border">
@@ -658,6 +665,20 @@ export default function InstitutionListView() {
               />
             </div>
 
+            {/* Step 3: Admin Account Password Authorization */}
+            <div>
+              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                Your Admin Account Password <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Enter your account login password to authorize"
+                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+              />
+            </div>
+
             {/* Actions Bar */}
             <div className="pt-4 border-t theme-border flex items-center justify-between gap-3">
               <button
@@ -675,6 +696,7 @@ export default function InstitutionListView() {
                   isDeleting ||
                   deleteConfirmText.trim() !== deletingInst.name.trim() ||
                   !deleteAcknowledged ||
+                  !adminPassword.trim() ||
                   deleteCountdown > 0
                 }
                 className="px-6 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
@@ -695,7 +717,8 @@ export default function InstitutionListView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
