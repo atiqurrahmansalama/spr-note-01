@@ -224,70 +224,66 @@ export default function RoleInviteManagerView() {
   const handleShareInviteAndQR = async () => {
     if (!selectedInvite) return;
     const url = getJoinUrl(selectedInvite.token);
-    const shareText = `You're invited to join "${selectedInvite.title}" on Suffah Notes.\nRole: ${selectedInvite.target_role_name}\nDirect link to claim role: ${url}`;
+    const shareText = `You're invited to join "${selectedInvite.title}" on SPR App.\nRole: ${selectedInvite.target_role_name}\nDirect link to claim role: ${url}`;
 
-    // 1. Copy message and link to clipboard first
-    try {
-      await navigator.clipboard.writeText(shareText);
-    } catch {
-      // fallback
-    }
-
-    // 2. Prepare QR Image Blob for Native Web Share API if supported
     const svgEl = document.getElementById("invite-qr-svg");
-    if (svgEl) {
-      const svgString = new XMLSerializer().serializeToString(svgEl);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const svgUrl = URL.createObjectURL(svgBlob);
+    if (!svgEl) return;
 
-      img.onload = async () => {
-        canvas.width = 512;
-        canvas.height = 512;
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, 512, 512);
-        ctx.drawImage(img, 24, 24, 464, 464);
-        URL.revokeObjectURL(svgUrl);
+    const svgString = new XMLSerializer().serializeToString(svgEl);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const svgUrl = URL.createObjectURL(svgBlob);
 
-        canvas.toBlob(async (blob) => {
-          if (!blob) {
-            showToast("Invite text & link copied to clipboard!", "success");
-            return;
-          }
+    img.onload = () => {
+      canvas.width = 512;
+      canvas.height = 512;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.drawImage(img, 24, 24, 464, 464);
+      URL.revokeObjectURL(svgUrl);
 
-          const file = new File([blob], `invite_${selectedInvite.title.replace(/\s+/g, "_")}.png`, {
-            type: "image/png",
-          });
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
 
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
+        const file = new File([blob], `invite_${selectedInvite.title.replace(/\s+/g, "_")}.png`, {
+          type: "image/png",
+        });
+
+        if (navigator.share) {
+          try {
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
               await navigator.share({
-                title: selectedInvite.title,
                 text: shareText,
-                url: url,
                 files: [file],
               });
-              showToast("Shared successfully!", "success");
-              return;
-            } catch (err) {
-              if (err.name !== "AbortError") {
-                showToast("Invite message & link copied to clipboard!", "success");
-              }
+            } else {
+              await navigator.share({
+                text: shareText,
+              });
+            }
+            showToast("Shared successfully!", "success");
+            return;
+          } catch (err) {
+            if (err.name === "AbortError") {
+              // User cancelled share dialog
               return;
             }
           }
+        }
 
-          // Desktop fallback: Download image and announce text copy
-          downloadQR("png");
-          showToast("Invite link copied & QR image downloaded!", "success");
-        }, "image/png");
-      };
-      img.src = svgUrl;
-    } else {
-      showToast("Invite text & link copied to clipboard!", "success");
-    }
+        // Fallback for browsers without Web Share: copy concise text and download QR
+        try {
+          await navigator.clipboard.writeText(shareText);
+        } catch {
+          // ignore
+        }
+        downloadQR("png");
+        showToast("QR image downloaded & invite text copied!", "success");
+      }, "image/png");
+    };
+    img.src = svgUrl;
   };
 
   const activeInvite = invites.find((i) => i.id === activeMenuId);
