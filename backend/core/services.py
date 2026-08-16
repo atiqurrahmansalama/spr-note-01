@@ -145,6 +145,7 @@ def sync_feature_registry_to_db():
         "INSTITUTIONS": "Academic Institution",
         "ADMIN": "Admin Tools",
         "STUDENTS": "Student Management",
+        "STAFF": "Teacher & Staff Management",
         "REPORTS": "Report Generator",
         "SETTINGS": "Settings",
         "SYSTEM": "System & Standalone",
@@ -831,3 +832,390 @@ def seed_default_departments():
         elif "OTHER" in created_or_found:
             s_class.department = created_or_found["OTHER"]
         s_class.save(update_fields=['department'])
+
+
+# ==============================================================================
+# 🎯 7. ENTERPRISE TEACHER & STAFF MANAGEMENT SERVICES
+# ==============================================================================
+
+class StaffOnboardingService:
+    @staticmethod
+    def generate_employee_id(institution, staff_type='TEACHING'):
+        from .models import StaffProfile
+        import random
+        from datetime import datetime
+        prefix = 'TEA' if staff_type == 'TEACHING' else 'STF'
+        year = datetime.now().year
+        for _ in range(20):
+            rand_suffix = random.randint(1000, 9999)
+            emp_id = f"{prefix}-{year}-{rand_suffix}"
+            if not StaffProfile.objects.filter(employee_id=emp_id).exists():
+                return emp_id
+        import uuid
+        return f"{prefix}-{year}-{uuid.uuid4().hex[:6].upper()}"
+
+    @classmethod
+    def invite_staff(cls, institution, creator_user, data):
+        from .models import User, UserRole, RoleInviteToken, StaffProfile, TeacherDetail, GeneralStaffDetail, ActivityLog
+        from django.db import transaction
+        from datetime import timedelta
+
+        phone_number = str(data.get('phone_number', '')).strip()
+        name = str(data.get('name', '')).strip()
+        email = str(data.get('email', '')).strip()
+        staff_type = data.get('staff_type', 'TEACHING')
+        designation = str(data.get('designation', '')).strip()
+        department_id = data.get('department_id')
+        role_id = data.get('role_id')
+        employee_id = str(data.get('employee_id', '')).strip() or cls.generate_employee_id(institution, staff_type)
+
+        with transaction.atomic():
+            # Resolve target role
+            target_role = None
+            if role_id:
+                target_role = UserRole.objects.filter(id=role_id).first()
+            if not target_role:
+                default_code = 'TEACHER' if staff_type == 'TEACHING' else 'STAFF'
+                target_role, _ = UserRole.objects.get_or_create(
+                    code=default_code,
+                    defaults={'name': default_code.title(), 'hierarchy_level': 4}
+                )
+
+            # Find or prepare user account
+            user = User.objects.filter(phone_number=phone_number).first()
+            if not user and email:
+                user = User.objects.filter(email=email).first()
+
+            if not user:
+                user = User.objects.create(
+                    phone_number=phone_number,
+                    name=name,
+                    email=email if email else None,
+                    institution=institution,
+                    user_type='TEACHER' if staff_type == 'TEACHING' else 'STAFF',
+                    role=target_role,
+                    is_active=True
+                )
+                user.set_unusable_password()
+                user.save()
+            else:
+                if not user.institution:
+                    user.institution = institution
+                if not user.role:
+                    user.role = target_role
+                user.save(update_fields=['institution', 'role'])
+
+            # Create or update StaffProfile
+            staff_profile, created = StaffProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    'institution': institution,
+                    'employee_id': employee_id,
+                    'staff_type': staff_type,
+                    'designation': designation,
+                    'department_id': department_id,
+                    'is_active': True,
+                    'is_deleted': False
+                }
+            )
+
+            if not created:
+                staff_profile.institution = institution
+                staff_profile.employee_id = employee_id
+                staff_profile.staff_type = staff_type
+                staff_profile.designation = designation
+                staff_profile.department_id = department_id
+                staff_profile.is_deleted = False
+                staff_profile.is_active = True
+                staff_profile.save()
+
+            # Initialize Polymorphic Detail
+            if staff_type == 'TEACHING':
+                TeacherDetail.objects.get_or_create(
+                    staff=staff_profile,
+                    defaults={
+                        'highest_degree': data.get('highest_degree', ''),
+                        'specialization': data.get('specialization', '')
+                    }
+                )
+            else:
+                GeneralStaffDetail.objects.get_or_create(
+                    staff=staff_profile,
+                    defaults={
+                        'assigned_zone': data.get('assigned_zone', ''),
+                        'shift_type': data.get('shift_type', 'MORNING')
+                    }
+                )
+
+            # Generate invite token
+            import uuid
+            token_str = uuid.uuid4().hex[:12].upper()
+            invite_token = RoleInviteToken.objects.create(
+                token=token_str,
+                title=f"Staff Invite: {name} ({designation})",
+                target_role=target_role,
+                max_uses=1,
+                expires_at=timezone.now() + timedelta(days=7),
+                is_active=True,
+                created_by=creator_user
+            )
+
+            # Activity audit logging
+            if creator_user and creator_user.is_authenticated:
+                ActivityLog.objects.create(
+                    user=creator_user,
+                    action_name=f"STAFF_INVITED_{staff_type}",
+                    endpoint="/api/v1/staff/invite/",
+                    http_method="POST"
+                )
+
+            return {
+                'status': 'success',
+                'staff_id': str(staff_profile.id),
+                'employee_id': staff_profile.employee_id,
+                'user_id': user.id,
+                'invite_token': invite_token.token,
+                'invite_url': f"/join?token={invite_token.token}",
+                'message': f"Successfully generated invitation for {name}."
+            }
+
+
+class StaffAttendanceService:
+    @staticmethod
+    def bulk_punch_attendance(institution, date_val, records, recorded_by=None, source='WEB_PORTAL'):
+        from .models import StaffProfile, StaffAttendance, ActivityLog
+        from django.db import transaction
+        from datetime import datetime, time
+
+        success_count = 0
+        updated_records = []
+
+        with transaction.atomic():
+            for rec in records:
+                staff_id = rec.get('staff_id') or rec.get('id')
+                if not staff_id:
+                    continue
+
+                staff = StaffProfile.objects.filter(
+                    id=staff_id,
+                    institution=institution,
+                    is_deleted=False
+                ).first()
+                if not staff:
+                    continue
+
+                status_val = rec.get('status', 'PRESENT').upper()
+                in_time_raw = rec.get('in_time')
+                out_time_raw = rec.get('out_time')
+                remarks = rec.get('remarks', '')
+
+                # Parse times
+                in_time_obj = None
+                if in_time_raw:
+                    try:
+                        in_time_obj = datetime.strptime(str(in_time_raw)[:8], "%H:%M:%S").time()
+                    except ValueError:
+                        try:
+                            in_time_obj = datetime.strptime(str(in_time_raw)[:5], "%H:%M").time()
+                        except ValueError:
+                            pass
+
+                out_time_obj = None
+                if out_time_raw:
+                    try:
+                        out_time_obj = datetime.strptime(str(out_time_raw)[:8], "%H:%M:%S").time()
+                    except ValueError:
+                        try:
+                            out_time_obj = datetime.strptime(str(out_time_raw)[:5], "%H:%M").time()
+                        except ValueError:
+                            pass
+
+                # Automatic Late calculation (if arriving past 09:15 AM and marked PRESENT)
+                if status_val == 'PRESENT' and in_time_obj and in_time_obj > time(9, 15):
+                    status_val = 'LATE'
+
+                att, created = StaffAttendance.objects.update_or_create(
+                    staff=staff,
+                    date=date_val,
+                    defaults={
+                        'status': status_val,
+                        'in_time': in_time_obj,
+                        'out_time': out_time_obj,
+                        'source': source,
+                        'remarks': remarks
+                    }
+                )
+                success_count += 1
+                updated_records.append(att)
+
+            if recorded_by and recorded_by.is_authenticated:
+                ActivityLog.objects.create(
+                    user=recorded_by,
+                    action_name="STAFF_ATTENDANCE_BULK_PUNCH",
+                    endpoint="/api/v1/staff/attendance/bulk-punch/",
+                    http_method="POST"
+                )
+
+        return {
+            'status': 'success',
+            'date': str(date_val),
+            'processed_count': success_count
+        }
+
+    @staticmethod
+    def get_monthly_analytics_summary(institution, year, month, staff_id=None, department_id=None):
+        from .models import StaffProfile, StaffAttendance
+        from django.db.models import Count, Q
+        import calendar
+
+        num_days = calendar.monthrange(year, month)[1]
+        start_date = f"{year:04d}-{month:02d}-01"
+        end_date = f"{year:04d}-{month:02d}-{num_days:02d}"
+
+        base_staff_qs = StaffProfile.objects.filter(
+            institution=institution,
+            is_deleted=False,
+            is_active=True
+        )
+        if staff_id:
+            base_staff_qs = base_staff_qs.filter(id=staff_id)
+        if department_id:
+            base_staff_qs = base_staff_qs.filter(department_id=department_id)
+
+        total_staff = base_staff_qs.count()
+
+        attendance_qs = StaffAttendance.objects.filter(
+            staff__in=base_staff_qs,
+            date__range=[start_date, end_date]
+        )
+
+        aggregates = attendance_qs.aggregate(
+            present_count=Count('id', filter=Q(status='PRESENT')),
+            late_count=Count('id', filter=Q(status='LATE')),
+            absent_count=Count('id', filter=Q(status='ABSENT')),
+            half_day_count=Count('id', filter=Q(status='HALF_DAY')),
+            on_leave_count=Count('id', filter=Q(status='ON_LEAVE')),
+        )
+
+        present = aggregates['present_count'] or 0
+        late = aggregates['late_count'] or 0
+        absent = aggregates['absent_count'] or 0
+        half_day = aggregates['half_day_count'] or 0
+        on_leave = aggregates['on_leave_count'] or 0
+        total_logs = present + late + absent + half_day + on_leave
+
+        effective_present = present + late + (half_day * 0.5)
+        attendance_percentage = round((effective_present / total_logs * 100), 1) if total_logs > 0 else 0.0
+
+        return {
+            'year': year,
+            'month': month,
+            'total_staff_count': total_staff,
+            'total_recorded_logs': total_logs,
+            'present_count': present,
+            'late_count': late,
+            'absent_count': absent,
+            'half_day_count': half_day,
+            'on_leave_count': on_leave,
+            'attendance_percentage': attendance_percentage,
+            'month_name': calendar.month_name[month]
+        }
+
+
+class StaffLeaveService:
+    @staticmethod
+    def apply_leave(staff, leave_data):
+        from .models import StaffLeaveRequest, ActivityLog
+
+        leave_req = StaffLeaveRequest.objects.create(
+            staff=staff,
+            leave_type=leave_data.get('leave_type', 'CASUAL'),
+            start_date=leave_data.get('start_date'),
+            end_date=leave_data.get('end_date'),
+            reason=leave_data.get('reason', ''),
+            status='PENDING'
+        )
+
+        if staff.user and staff.user.is_authenticated:
+            ActivityLog.objects.create(
+                user=staff.user,
+                action_name=f"STAFF_LEAVE_APPLIED_{leave_req.leave_type}",
+                endpoint="/api/v1/staff/leaves/apply/",
+                http_method="POST"
+            )
+
+        return leave_req
+
+    @staticmethod
+    def action_leave(leave_request, action_status, admin_user, admin_remarks=''):
+        from .models import StaffAttendance, ActivityLog
+        from django.db import transaction
+        from datetime import timedelta
+
+        with transaction.atomic():
+            leave_request.status = action_status
+            leave_request.approved_by = admin_user
+            leave_request.admin_remarks = admin_remarks
+            leave_request.action_date = timezone.now()
+            leave_request.save(update_fields=['status', 'approved_by', 'admin_remarks', 'action_date', 'updated_at'])
+
+            # 🎯 CRITICAL SYNC: Auto-sync ON_LEAVE status to StaffAttendance records upon approval
+            if action_status == 'APPROVED':
+                curr_date = leave_request.start_date
+                while curr_date <= leave_request.end_date:
+                    StaffAttendance.objects.update_or_create(
+                        staff=leave_request.staff,
+                        date=curr_date,
+                        defaults={
+                            'status': 'ON_LEAVE',
+                            'source': 'LEAVE_APPROVAL',
+                            'remarks': f"Approved {leave_request.get_leave_type_display()}: {leave_request.reason}"
+                        }
+                    )
+                    curr_date += timedelta(days=1)
+
+            if admin_user and admin_user.is_authenticated:
+                ActivityLog.objects.create(
+                    user=admin_user,
+                    action_name=f"STAFF_LEAVE_{action_status}",
+                    endpoint="/api/v1/staff/leaves/action/",
+                    http_method="PATCH"
+                )
+
+        return leave_request
+
+
+def delete_staff_profile_with_cascading(staff_profile, performed_by=None):
+    """
+    Soft-deletes a StaffProfile and automatically deactivates all active
+    TeacherAssignments and GeneralStaffDuties to prevent orphaned assignments.
+    """
+    from .models import ActivityLog
+    from django.db import transaction
+
+    with transaction.atomic():
+        staff_profile.is_deleted = True
+        staff_profile.is_active = False
+        staff_profile.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+
+        # Deactivate all active assignments
+        deactivated_assignments = staff_profile.assignments.filter(is_active=True).update(is_active=False)
+
+        # Deactivate all active general duties
+        deactivated_duties = staff_profile.duties.filter(is_active=True).update(is_active=False)
+
+        if performed_by and performed_by.is_authenticated:
+            ActivityLog.objects.create(
+                user=performed_by,
+                action_name="STAFF_PROFILE_SOFT_DELETED",
+                endpoint="/api/v1/staff/",
+                http_method="DELETE"
+            )
+
+    return {
+        'status': 'success',
+        'staff_id': str(staff_profile.id),
+        'deactivated_assignments': deactivated_assignments,
+        'deactivated_duties': deactivated_duties
+    }
+

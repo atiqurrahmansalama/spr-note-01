@@ -115,6 +115,48 @@ FEATURE_REGISTRY = [
         "sort_order": 33,
     },
 
+    # --- TEACHER & STAFF MANAGEMENT (PARENT) ---
+    {
+        "key": "nav_staff_management",
+        "label": "Staff & Teachers",
+        "category": "STAFF",
+        "description": "Employee directory, teaching assignments, biometric/web attendance, and leave management",
+        "is_parent": True,
+        "parent_key": None,
+        "default_enabled": True,
+        "sort_order": 35,
+    },
+    {
+        "key": "staff_management",
+        "label": "Staff Directory",
+        "category": "STAFF",
+        "description": "Employee database, designations, teacher/general staff profiles, and onboarding",
+        "is_parent": False,
+        "parent_key": "nav_staff_management",
+        "default_enabled": True,
+        "sort_order": 36,
+    },
+    {
+        "key": "staff_attendance",
+        "label": "Staff Attendance",
+        "category": "STAFF",
+        "description": "Daily employee attendance tracking, bulk punch-in/out, and monthly summary analytics",
+        "is_parent": False,
+        "parent_key": "nav_staff_management",
+        "default_enabled": True,
+        "sort_order": 37,
+    },
+    {
+        "key": "staff_leaves",
+        "label": "Leave Management",
+        "category": "STAFF",
+        "description": "Staff leave applications, administrative approvals, and auto-attendance sync",
+        "is_parent": False,
+        "parent_key": "nav_staff_management",
+        "default_enabled": True,
+        "sort_order": 38,
+    },
+
     # --- APP MANAGEMENT (PARENT) ---
     {
         "key": "nav_app_management",

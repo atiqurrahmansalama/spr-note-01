@@ -116,4 +116,69 @@ class IsInstitutionAdmin(BasePermission):
             request.user.is_staff
         )
 
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN':
+            return True
+        user_inst = getattr(request.user, 'institution_id', None)
+        obj_inst = getattr(obj, 'institution_id', None)
+        if not obj_inst and hasattr(obj, 'staff'):
+            obj_inst = getattr(obj.staff, 'institution_id', None)
+        if not obj_inst and hasattr(obj, 'teacher'):
+            obj_inst = getattr(obj.teacher, 'institution_id', None)
+        return bool(user_inst and obj_inst and str(user_inst) == str(obj_inst))
+
+
+class IsTeacher(BasePermission):
+    """
+    Permission class to allow access to users with TEACHER user_type or TEACHING staff profile.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN']:
+            return True
+        if getattr(request.user, 'user_type', '').upper() == 'TEACHER':
+            return True
+        profile = getattr(request.user, 'staff_profile', None)
+        if profile and profile.staff_type == 'TEACHING':
+            return True
+        return False
+
+
+class IsStaffSelfOrAdmin(BasePermission):
+    """
+    Permission class to allow staff members to read/manage their own records,
+    while permitting Institution Admins and Super Admins full access.
+    """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Super Admin / Staff Admin bypass
+        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN']:
+            if getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or request.user.is_superuser:
+                return True
+            user_inst = getattr(request.user, 'institution_id', None)
+            obj_inst = getattr(obj, 'institution_id', None)
+            if not obj_inst and hasattr(obj, 'staff'):
+                obj_inst = getattr(obj.staff, 'institution_id', None)
+            if not obj_inst and hasattr(obj, 'teacher'):
+                obj_inst = getattr(obj.teacher, 'institution_id', None)
+            return bool(user_inst and obj_inst and str(user_inst) == str(obj_inst))
+
+        # Check self match
+        if hasattr(obj, 'user') and obj.user == request.user:
+            return True
+        if hasattr(obj, 'staff') and obj.staff.user == request.user:
+            return True
+        if hasattr(obj, 'teacher') and obj.teacher.user == request.user:
+            return True
+
+        return False
+
 

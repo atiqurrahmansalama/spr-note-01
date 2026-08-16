@@ -74,6 +74,11 @@ from .views import (
     RoleInviteTokenViewSet,
     PublicInviteVerificationView,
     PublicInviteClaimView,
+    StaffProfileViewSet,
+    TeacherAssignmentViewSet,
+    GeneralStaffDutyViewSet,
+    StaffAttendanceViewSet,
+    StaffLeaveRequestViewSet,
 )
 
 router = DefaultRouter()
@@ -87,6 +92,14 @@ router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
+
+# Enterprise Teacher & Staff Management Routers
+router.register(r'staff/teachers', TeacherAssignmentViewSet, basename='staff-teachers')
+router.register(r'staff/general/duties', GeneralStaffDutyViewSet, basename='staff-general-duties')
+router.register(r'staff/general', GeneralStaffDutyViewSet, basename='staff-general')
+router.register(r'staff/attendance', StaffAttendanceViewSet, basename='staff-attendance')
+router.register(r'staff/leaves', StaffLeaveRequestViewSet, basename='staff-leaves')
+router.register(r'staff', StaffProfileViewSet, basename='staff-profile')
 
 from django.http import JsonResponse
 
