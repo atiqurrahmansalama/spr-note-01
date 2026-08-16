@@ -1,24 +1,31 @@
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useTenant } from "../../../context/TenantContext";
 
 export default function AdmissionSlipDocument({ student, onClose }) {
+  const { currentInstitution } = useTenant();
   if (!student) return null;
+
+  const instName = student.institution_name || currentInstitution?.name || "DARUL ULOOM ISLAMIA";
+  const instBanglaName = currentInstitution?.bangla_name || "";
+  const instAddress = currentInstitution?.address || "Bismillah Road, Sector 10, Uttara, Dhaka";
+  const instPhone = currentInstitution?.phone || "01799999999";
 
   const qrValue = `${window.location.origin}/verify-admission/${student.uniq_id || student.id}`;
 
-  const renderHalf = (title, titleBn) => (
+  const renderHalf = (title, subtitle) => (
     <div className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 p-6 rounded-2xl bg-white text-zinc-900 flex flex-col justify-between min-h-[480px]">
       <div>
         {/* Header */}
         <div className="text-center space-y-1 relative mb-4">
-          <div className="text-xs font-serif font-semibold italic text-zinc-500">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
-          <h2 className="text-lg font-extrabold tracking-tight">DARUL ULOOM ISLAMIA</h2>
-          <p className="text-[10px] text-zinc-500 font-medium">Bismillah Road, Sector 10, Uttara, Dhaka | Contact: 01799999999</p>
+          <div className="text-xs font-serif font-semibold italic text-zinc-500">Bismillahir Rahmanir Rahim</div>
+          <h2 className="text-lg font-extrabold tracking-tight uppercase">{instName}</h2>
+          <p className="text-[10px] text-zinc-500 font-medium">{instAddress} | Contact: {instPhone}</p>
           <div className="absolute right-0 top-0 flex flex-col items-center gap-1.5">
             <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[9px] font-bold uppercase tracking-wider text-zinc-700">
               {title}
             </span>
-            <span className="text-[8px] font-bold text-zinc-400">{titleBn}</span>
+            {subtitle && <span className="text-[8px] font-bold text-zinc-400">{subtitle}</span>}
           </div>
         </div>
 
@@ -114,17 +121,17 @@ export default function AdmissionSlipDocument({ student, onClose }) {
         {/* Print slip content */}
         <div className="w-full flex flex-col gap-8 print:gap-4 font-sans select-none">
           {/* Top Half: Office Copy */}
-          {renderHalf("Office Copy", "অফিস কপি")}
+          {renderHalf("Office Copy", "Institutional Copy")}
 
           {/* Dotted Cut Line */}
           <div className="w-full flex items-center justify-between gap-4 text-zinc-500 dark:text-zinc-600 text-xs font-mono select-none py-1 print:py-2">
             <span className="flex-1 border-t border-dashed border-zinc-400 dark:border-zinc-600" />
-            <span>Cut Line / এখানে কাটুন</span>
+            <span>Cut Line / Tear Off</span>
             <span className="flex-1 border-t border-dashed border-zinc-400 dark:border-zinc-600" />
           </div>
 
           {/* Bottom Half: Student Copy */}
-          {renderHalf("Student Copy", "শিক্ষার্থী কপি")}
+          {renderHalf("Student Copy", "Student / Guardian Copy")}
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import UserProfileSettingsView from "./components/UserProfileSettingsView";
+import InstitutionProfileView from "./components/InstitutionProfileView";
 import SecuritySessionsView from "./components/SecuritySessionsView";
 import AppearanceSettings from "./components/AppearanceSettings";
 import CalendarSettings from "./components/CalendarSettings";
@@ -15,6 +16,10 @@ export default function SettingsModule({ activeTab = "Settings" }) {
     case "Profile Settings":
     case "User Profile":
       return <UserProfileSettingsView />;
+    case "Institution Branding":
+    case "Institution Profile":
+    case "Institution":
+      return <InstitutionProfileView />;
     case "Security & Sessions":
     case "Security":
     case "Active Sessions":

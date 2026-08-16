@@ -17,7 +17,13 @@ import {
   CloudIcon,
   GlobeIcon,
   SavedMessagesIcon,
-  SectionControlIcon
+  SectionControlIcon,
+  DepartmentIcon,
+  ClassIcon,
+  GroupIcon,
+  StudentIcon,
+  AdmissionIcon,
+  BuildingOfficeIcon
 } from "../../components/ui/Icons";
 
 export default function SidebarContainer({ 
@@ -34,9 +40,10 @@ export default function SidebarContainer({
   const currentPath = propActivePath || location.pathname;
 
   const [openSubMenus, setOpenSubMenus] = useState({
+    "Academic Institution": true,
+    "Student Management": true,
     "Report Generator": false,
     "App Management": false,
-    "Student Management": false,
     Settings: false,
   });
 
@@ -52,17 +59,17 @@ export default function SidebarContainer({
   const menuItems = [
     { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
     {
-      id: "App Management",
-      name: "App Management",
-      Icon: SettingsIcon,
+      id: "Academic Institution",
+      name: "Academic Institution",
+      Icon: BuildingOfficeIcon,
       hasSub: true,
-      key: "nav_app_management",
+      key: "nav_institution",
       subItems: [
-        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon, key: "app_section_control" },
-        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon, key: "app_user_management" },
-        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
-        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
-        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", Icon: SectionControlIcon, key: "app_role_invites" },
+        { id: "Institution Directory", name: "Institution Directory", path: "/institutions", Icon: BuildingOfficeIcon, key: "app_institutions" },
+        { id: "Profile & Branding", name: "Profile & Branding", path: "/settings/institution", Icon: DepartmentIcon, key: "settings_institution" },
+        { id: "Department Hierarchy", name: "Department Hierarchy", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
+        { id: "Class Management", name: "Class Management", path: "/student-management/classes", Icon: ClassIcon, key: "student_classes" },
+        { id: "Group Management", name: "Group Management", path: "/student-management/groups", Icon: GroupIcon, key: "student_groups" },
       ]
     },
     {
@@ -72,9 +79,8 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_student_management",
       subItems: [
-        { id: "Student Roster", name: "Student Roster", path: "/student-roster", Icon: GroupsIcon, key: "student_roster" },
-        { id: "Group Roster", name: "Group Roster", path: "/group-roster", Icon: GroupsIcon, key: "student_groups" },
-        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: GroupsIcon, key: "student_admission" },
+        { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
+        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
     {
@@ -90,11 +96,25 @@ export default function SidebarContainer({
         { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon, key: "report_copy_settings" },
       ]
     },
+    {
+      id: "App Management",
+      name: "App Management",
+      Icon: SettingsIcon,
+      hasSub: true,
+      key: "nav_app_management",
+      subItems: [
+        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon, key: "app_section_control" },
+        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon, key: "app_user_management" },
+        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
+        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
+        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", Icon: SectionControlIcon, key: "app_role_invites" },
+      ]
+    },
     { 
       id: "Settings", 
       name: "Settings", 
       Icon: SettingsIcon, 
-      hasSub: true,
+      hasSub: true, 
       key: "nav_settings",
       subItems: [
         { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon, key: "settings_profile" },

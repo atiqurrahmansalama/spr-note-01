@@ -23,13 +23,19 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Request Interceptor: Attach Access Token
+// Request Interceptor: Attach Access Token and X-Tenant-ID
 apiClient.interceptors.request.use(
   (config) => {
     const token = authStore.getAccessToken();
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const activeTenantId = localStorage.getItem('active_tenant_id');
+    if (activeTenantId && activeTenantId !== 'ALL' && activeTenantId !== 'null' && activeTenantId !== 'undefined') {
+      config.headers['X-Tenant-ID'] = activeTenantId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

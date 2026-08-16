@@ -537,7 +537,7 @@ export default function SessionManager() {
                 type="text"
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="Add comment template (e.g. মাশাল্লাহ, বেশ উন্নতি হচ্ছে)..."
+                placeholder="Add comment template (e.g. Excellent recitation progress)..."
                 className="flex-1 theme-bg-sub border theme-border theme-text-primary text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
               />
               <button

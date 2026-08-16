@@ -38,55 +38,16 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '^/students($|/)': {
+      '^/(students|reports|sessions|groups|messages|users|roles|activity|auth|control-panel|institutions)($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
-      },
-      '^/reports($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/sessions($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/groups($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/messages($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/users($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/roles($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/activity($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/auth($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '^/control-panel($|/)': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
+        bypass: (req) => {
+          // Serve index.html to browser navigation/refresh requests
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
       },
     },
   },

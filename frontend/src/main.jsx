@@ -23,6 +23,7 @@ import { ToastProvider } from './context/ToastContext'
 import { FontProvider } from './context/FontContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
+import { TenantProvider } from './context/TenantContext'
 import { FeatureControlProvider } from './context/FeatureControlContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
@@ -33,15 +34,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider>
-          <FeatureControlProvider>
-            <ToastProvider>
-              <ThemeProvider>
-                <FontProvider>
-                  <App />
-                </FontProvider>
-              </ThemeProvider>
-            </ToastProvider>
-          </FeatureControlProvider>
+          <TenantProvider>
+            <FeatureControlProvider>
+              <ToastProvider>
+                <ThemeProvider>
+                  <FontProvider>
+                    <App />
+                  </FontProvider>
+                </ThemeProvider>
+              </ToastProvider>
+            </FeatureControlProvider>
+          </TenantProvider>
         </AuthProvider>
       </GoogleOAuthProvider>
     </ErrorBoundary>

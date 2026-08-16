@@ -27,7 +27,7 @@ function UploadIcon({ className }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** সব LocalStorage ডেটা একটি object এ কালেক্ট করে */
+/** Collects all LocalStorage state into a single exportable object */
 function collectAllData() {
   return {
     // Core data
@@ -61,7 +61,7 @@ function collectAllData() {
   };
 }
 
-/** Import করা JSON ডেটা LocalStorage এ restore করে */
+/** Restores imported JSON data to LocalStorage */
 function restoreAllData(data) {
   if (Array.isArray(data.students))       studentStore.saveAll(data.students);
   if (Array.isArray(data.sessions))       sessionStore.saveAll(data.sessions);
@@ -85,7 +85,7 @@ function restoreAllData(data) {
   if (data.copyAutoCopy !== undefined)       copyReportSettings.saveAutoCopy(data.copyAutoCopy);
 }
 
-/** Import করা ডাটা ব্যাকএন্ড ডাটাবেজে সিঙ্ক করে */
+/** Syncs imported data to backend database */
 async function syncImportedDataToBackend(data) {
   if (!isOnline()) return;
 

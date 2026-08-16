@@ -377,7 +377,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                   type="text"
                   value={sharedData.bangla_name || ""}
                   onChange={(e) => handleChange("bangla_name", e.target.value)}
-                  placeholder="e.g. আব্দুল্লাহ বিন আরিফ"
+                  placeholder="e.g. Local / Native script name"
                   className="w-full theme-bg-sub border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors"
                 />
               </div>

@@ -2,8 +2,8 @@ import { auth as authStore } from "./localStore";
 import { API_BASE_URL } from "../config/api";
 import { sendLoginLog, sendActivityLog } from "./activityTracker";
 
-// Helper to make fetch request with relative proxy & fast resolution
-const fetchApi = async (path, options = {}) => {
+// Helper to make fetch request with relative proxy & fast resolution + resilient retry
+const fetchApi = async (path, options = {}, isRetry = false) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const targetUrl = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
   
@@ -11,6 +11,10 @@ const fetchApi = async (path, options = {}) => {
     const res = await fetch(targetUrl, options);
     if (res.ok || res.status < 500) return res;
   } catch (err) {
+    if (!isRetry) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return fetchApi(path, options, true);
+    }
     console.warn(`[authService] Fetch to ${targetUrl} failed:`, err);
   }
 
@@ -171,9 +175,11 @@ export const fetchWithAuth = async (url, options = {}) => {
   let token = authStore.getAccessToken();
   
   const makeRequest = async (authToken) => {
+    const activeTenantId = typeof localStorage !== 'undefined' ? localStorage.getItem('active_tenant_id') : null;
     const headers = {
       'Content-Type': 'application/json',
       ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+      ...(activeTenantId && activeTenantId !== 'ALL' && activeTenantId !== 'null' && activeTenantId !== 'undefined' && { 'X-Tenant-ID': activeTenantId }),
       ...options.headers,
     };
     return fetchApi(url, { ...options, headers });

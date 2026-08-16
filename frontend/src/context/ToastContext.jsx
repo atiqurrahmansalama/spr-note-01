@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext(null);
 
-// নেস্টেড এরর অবজেক্টকে প্রপার স্ট্রিং এ রূপান্তর করার হেল্পার
+// Helper to format nested error objects into clean strings
 const formatErrorMessage = (err) => {
   if (!err) return "Action updated successfully";
   if (typeof err === 'string') return err.trim() || "An issue occurred";

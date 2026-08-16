@@ -1,9 +1,9 @@
 /**
  * SPR Note — Central LocalStorage Store
  * =======================================
- * সব localStorage key এক জায়গায় managed।
- * Offline-first: API ব্যর্থ হলে এখান থেকে ডেটা নেওয়া হবে।
- * Online sync: API সফল হলে এখানে cache আপডেট হবে।
+ * Centralized localStorage key management.
+ * Offline-first: Data is retrieved from local cache if API is unavailable.
+ * Online sync: Local cache is updated on successful API responses.
  */
 
 // ─── Key Constants ─────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ export const students = {
 
   saveAll: (list) => writeJSON(KEYS.STUDENTS, list),
 
-  /** নতুন স্টুডেন্ট যোগ করে (ইউনিক ID সহ, একই নামের একাধিক ছাত্র সেভ করার সুবিধা). */
+  /** Add new student (with unique ID support). */
   add: (student) => {
     const list = students.getAll();
     const newId = student.id || `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -207,7 +207,7 @@ export const students = {
     return list;
   },
 
-  /** নাম দিয়ে একটি স্টুডেন্ট আপডেট করে (replace mode). */
+  /** Update student by label (replace mode). */
   replace: (oldLabel, newStudent) => {
     const list = students.getAll();
     const updated = list.map((s) =>
@@ -217,7 +217,7 @@ export const students = {
     return updated;
   },
 
-  /** গ্রুপ নাম পরিবর্তন করে সকল স্টুডেন্টের গ্রুপ আপডেট করে */
+  /** Update group name across all associated students. */
   updateGroupName: (oldGroupName, newGroupName) => {
     const list = students.getAll();
     const updated = list.map((s) => {
@@ -230,7 +230,7 @@ export const students = {
     return updated;
   },
 
-  /** একটি নির্দিষ্ট গ্রুপের সকল স্টুডেন্ট ডিলিট করে */
+  /** Remove all students in a specified group. */
   removeGroup: (groupName) => {
     const list = students.getAll();
     const updated = list.filter(
@@ -240,7 +240,7 @@ export const students = {
     return updated;
   },
 
-  /** নাম বা ID দিয়ে ডিলিট করে. */
+  /** Delete student by name or ID. */
   remove: (identifier) => {
     const updated = students.getAll().filter(
       (s) =>
@@ -253,7 +253,7 @@ export const students = {
 };
 
 /**
- * mergeStudents — API ডেটা ও LocalStorage ডেটা মার্জ করে।
+ * mergeStudents — Merges API data with LocalStorage data.
  */
 export function mergeStudents(apiStudents, localStudents) {
   const apiList = (Array.isArray(apiStudents) ? apiStudents : []).map((s) => ({
@@ -308,7 +308,7 @@ export const sessions = {
 
   saveAll: (list) => writeJSON(KEYS.SESSIONS, list),
 
-  /** নতুন সেশন যোগ করে. */
+  /** Add new session. */
   add: (sessionName) => {
     const list = sessions.getAll();
     const exists = list.some(
@@ -327,7 +327,7 @@ export const sessions = {
     return { updated: list, newSession: null };
   },
 
-  /** ID বা name দিয়ে ডিলিট করে. */
+  /** Delete session by ID or name. */
   remove: (idOrName) => {
     const updated = sessions.getAll().filter(
       (s) => s.id !== idOrName && s.name !== idOrName
@@ -338,24 +338,24 @@ export const sessions = {
 };
 
 /**
- * mergeSessions — API ডেটা ও LocalStorage ডেটা মার্জ করে, duplicate ছাড়া।
+ * mergeSessions — Merges API sessions with LocalStorage sessions without duplicates.
  *
- * নিয়ম:
- *  1. API ডেটা authoritative (server ID আছে, _local নেই)
- *  2. Local-only সেশন (API-তে নেই, _local: true) শেষে যোগ হয়
- *  3. একই name দুইবার আসে না
- *  4. Merged result LocalStorage-এ cache হিসেবে সেভ হয়
+ * Rules:
+ *  1. API data is authoritative (server ID present, no _local flag)
+ *  2. Local-only sessions (not in API, _local: true) are appended
+ *  3. No duplicate names
+ *  4. Merged result is persisted to LocalStorage cache
  */
 export function mergeSessions(apiSessions, localSessions) {
-  // API items-এর নামের set তৈরি (case-insensitive)
+  // Set of API item names (case-insensitive)
   const apiNames = new Set(apiSessions.map((s) => s.name?.toLowerCase()));
 
-  // LocalStorage-এ যেগুলো আছে কিন্তু API-তে নেই (offline-only)
+  // LocalStorage items that are not in API (offline-only)
   const localOnly = localSessions
     .filter((s) => !apiNames.has(s.name?.toLowerCase()))
     .map((s) => ({ ...s, _local: true }));
 
-  // API items (clean, _local flag মুছে দাও) + local-only items
+  // API items (clean, remove _local flag) + local-only items
   const merged = [
     ...apiSessions.map((s) => {
       const copy = { ...s };
@@ -365,7 +365,7 @@ export function mergeSessions(apiSessions, localSessions) {
     ...localOnly,
   ];
 
-  // Cache-এ সেভ করো
+  // Save to cache
   writeJSON(KEYS.SESSIONS, merged);
   return merged;
 }
@@ -509,7 +509,7 @@ export const sidebarSettings = {
 
 // ─── Network Utility ────────────────────────────────────────────────────────
 
-/** true হলে ব্রাউজার অনলাইন বলছে */
+/** Returns true if browser is online */
 export const isOnline = () => navigator.onLine;
 
 // ─── Draft Report & Live Save Status ─────────────────────────────────────────

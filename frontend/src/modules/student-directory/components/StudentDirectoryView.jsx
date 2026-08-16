@@ -1,16 +1,34 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import { fetchWithAuth } from "../../../utils/authService";
+import {
+  StudentIcon,
+  ClassIcon,
+  GroupIcon,
+  PlusIcon,
+  SearchIcon,
+  EditIcon,
+  TrashIcon,
+  WhatsAppIcon,
+  CloseIcon,
+  SectionControlIcon
+} from "../../../components/ui/Icons";
 import StudentAdmissionModal from "../admission/StudentAdmissionModal";
 
 export default function StudentDirectoryView({ viewMode = "all" }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isSectionEnabled } = useFeatureControl();
 
+  const urlGroup = searchParams.get("student_group") || searchParams.get("group") || "ALL";
+  const urlClass = searchParams.get("student_class") || searchParams.get("class") || "ALL";
+
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState({
     total_students: 0,
@@ -21,7 +39,8 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
 
   // UI state
   const [searchQuery, setSearchQuery] = useState("");
-  const [groupFilter, setGroupFilter] = useState("ALL");
+  const [groupFilter, setGroupFilter] = useState(urlGroup);
+  const [classFilter, setClassFilter] = useState(urlClass);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [displayMode, setDisplayMode] = useState("table"); // "table" vs "grid"
   const [selectedIds, setSelectedIds] = useState([]);
@@ -35,8 +54,34 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
 
   useEffect(() => {
     loadStudents();
+    loadClassesAndGroups();
     loadMetrics();
   }, []);
+
+  // Sync state when URL searchParams change
+  useEffect(() => {
+    const g = searchParams.get("student_group") || searchParams.get("group") || "ALL";
+    const c = searchParams.get("student_class") || searchParams.get("class") || "ALL";
+    setGroupFilter(g);
+    setClassFilter(c);
+  }, [searchParams]);
+
+  const loadClassesAndGroups = async () => {
+    try {
+      const [cRes, gRes] = await Promise.all([
+        fetchWithAuth("/api/v1/classes/"),
+        fetchWithAuth("/api/v1/groups/")
+      ]);
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        setClasses(Array.isArray(cData) ? cData : cData.results || []);
+      }
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        setGroups(Array.isArray(gData) ? gData : gData.results || []);
+      }
+    } catch {}
+  };
 
   const loadStudents = async () => {
     setLoading(true);
@@ -63,6 +108,38 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     } catch {}
   };
 
+  const handleGroupFilterChange = (val) => {
+    setGroupFilter(val);
+    const newParams = new URLSearchParams(searchParams);
+    if (val === "ALL") {
+      newParams.delete("student_group");
+      newParams.delete("group");
+    } else {
+      newParams.set("student_group", val);
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleClassFilterChange = (val) => {
+    setClassFilter(val);
+    const newParams = new URLSearchParams(searchParams);
+    if (val === "ALL") {
+      newParams.delete("student_class");
+      newParams.delete("class");
+    } else {
+      newParams.set("student_class", val);
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleClearAllFilters = () => {
+    setGroupFilter("ALL");
+    setClassFilter("ALL");
+    setStatusFilter("ALL");
+    setSearchQuery("");
+    setSearchParams({});
+  };
+
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       setSelectedIds(filteredStudents.map((s) => s.id));
@@ -73,82 +150,93 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
 
   const handleSelectRow = (id) => {
     if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((x) => x !== id));
+      setSelectedIds(selectedIds.filter((sid) => sid !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
     }
   };
 
   const handleBulkActionSubmit = async () => {
+    if (!bulkActionType) return;
     if (selectedIds.length === 0) {
       showToast("No students selected.", "warning");
       return;
     }
 
-    const payload = {
-      action: bulkActionType,
-      student_ids: selectedIds,
-    };
-
-    if (bulkActionType === "assign_group") {
-      if (!bulkGroupInput.trim()) {
-        showToast("Please enter a group name.", "warning");
-        return;
-      }
-      payload.group_name = bulkGroupInput.trim();
-    } else if (bulkActionType === "change_status") {
-      payload.status = bulkStatusInput;
-    }
-
-    if (bulkActionType === "bulk_delete") {
-      if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} students permanently?`)) return;
-    }
-
     try {
+      let payload = {
+        action: bulkActionType,
+        student_ids: selectedIds
+      };
+
+      if (bulkActionType === "assign_group") {
+        if (!bulkGroupInput) {
+          showToast("Please specify a group.", "warning");
+          return;
+        }
+        payload.group_name = bulkGroupInput;
+      } else if (bulkActionType === "change_status") {
+        payload.status = bulkStatusInput;
+      }
+
       const res = await fetchWithAuth("/api/v1/students/bulk-action/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        showToast("Bulk operation completed successfully!", "success");
-        setSelectedIds([]);
+        showToast("Bulk operation successful!", "success");
         setShowBulkModal(false);
-        setBulkGroupInput("");
+        setSelectedIds([]);
         loadStudents();
         loadMetrics();
       } else {
-        const errData = await res.json();
-        showToast(errData.error || "Bulk action failed.", "error");
+        const err = await res.json();
+        showToast(err.error || "Bulk action failed.", "error");
       }
     } catch {
-      showToast("Network error.", "error");
+      showToast("Error processing bulk action.", "error");
     }
   };
 
   const handleDeleteSingle = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this student record?")) return;
+    if (!window.confirm("Are you sure you want to delete this student record? This action cannot be undone.")) return;
+
     try {
       const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
-        method: "DELETE",
+        method: "DELETE"
       });
       if (res.ok) {
         showToast("Student record deleted.", "success");
         loadStudents();
         loadMetrics();
+      } else {
+        const err = await res.json();
+        showToast(err.error || "Failed to delete record.", "error");
       }
     } catch {
       showToast("Failed to delete record.", "error");
     }
   };
 
-  // Extract unique groups for filters
-  const uniqueGroups = Array.from(
-    new Set(students.map((s) => s.group_name || s.group || "General Group"))
+  // Find active group or class object
+  const activeGroupObj = groups.find(
+    (g) => String(g.id) === String(groupFilter) || g.name?.toLowerCase() === String(groupFilter).toLowerCase()
+  );
+  const activeClassObj = classes.find(
+    (c) => String(c.id) === String(classFilter) || c.name?.toLowerCase() === String(classFilter).toLowerCase()
+  );
+
+  // Extract unique groups fallback from loaded students
+  const uniqueGroupNames = Array.from(
+    new Set([
+      ...groups.map((g) => g.name),
+      ...students.map((s) => s.group_name || s.group).filter(Boolean)
+    ])
   ).sort();
 
-  // Filter students dynamically based on search, group and status selectors
+  // Filter students dynamically based on search, class, group and status selectors
   const filteredStudents = students.filter((s) => {
     const name = (s.name_en || s.name || "").toLowerCase();
     const bName = (s.bangla_name || "").toLowerCase();
@@ -156,10 +244,31 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     const gPhone = (s.details?.guardian_phone || "").toLowerCase();
     const query = searchQuery.toLowerCase();
 
-    const matchesSearch = name.includes(query) || bName.includes(query) || roll.includes(query) || gPhone.includes(query);
+    const matchesSearch = !query || name.includes(query) || bName.includes(query) || roll.includes(query) || gPhone.includes(query);
     
-    const studentGroup = s.group_name || s.group || "General Group";
-    const matchesGroup = groupFilter === "ALL" || studentGroup === groupFilter;
+    // Group filter matching ID or Name
+    let matchesGroup = true;
+    if (groupFilter !== "ALL") {
+      const targetGroupStr = String(groupFilter).toLowerCase();
+      const sGroupId = s.student_group ? String(s.student_group).toLowerCase() : "";
+      const sGroupName = (s.student_group_name || s.group_name || s.group || "").toLowerCase();
+      matchesGroup =
+        sGroupId === targetGroupStr ||
+        sGroupName === targetGroupStr ||
+        (activeGroupObj && sGroupName === activeGroupObj.name.toLowerCase());
+    }
+
+    // Class filter matching ID or Name
+    let matchesClass = true;
+    if (classFilter !== "ALL") {
+      const targetClassStr = String(classFilter).toLowerCase();
+      const sClassId = s.student_class ? String(s.student_class).toLowerCase() : "";
+      const sClassName = (s.student_class_name || "").toLowerCase();
+      matchesClass =
+        sClassId === targetClassStr ||
+        sClassName === targetClassStr ||
+        (activeClassObj && sClassName === activeClassObj.name.toLowerCase());
+    }
     
     const studentStatus = s.status || "Active";
     const matchesStatus = 
@@ -168,7 +277,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
       (statusFilter === "INACTIVE" && studentStatus.toUpperCase() === "INACTIVE") ||
       (statusFilter === "ALUMNI" && (studentStatus.toUpperCase() === "ALUMNI" || studentStatus.toUpperCase() === "TC"));
 
-    return matchesSearch && matchesGroup && matchesStatus;
+    return matchesSearch && matchesGroup && matchesClass && matchesStatus;
   });
 
   return (
@@ -211,43 +320,116 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               }}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 cursor-pointer transition-all flex items-center gap-1.5"
             >
-              ⚡ Bulk Actions ({selectedIds.length})
+              <SectionControlIcon className="w-3.5 h-3.5" />
+              <span>Bulk Actions ({selectedIds.length})</span>
             </button>
           )}
           <button
             onClick={() => setIsAdmissionModalOpen(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
           >
-            ➕ Add Student
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>Add Student</span>
           </button>
         </div>
       </div>
+
+      {/* --- ACTIVE FILTER PILL BANNER --- */}
+      {(groupFilter !== "ALL" || classFilter !== "ALL" || statusFilter !== "ALL" || searchQuery) && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs animate-fade-in">
+          <span className="font-bold text-sky-400">Active Filters:</span>
+          {groupFilter !== "ALL" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30 shadow-sm">
+              <GroupIcon className="w-3.5 h-3.5 text-sky-300" />
+              <span>Group: {activeGroupObj?.name || groupFilter}</span>
+              <button
+                onClick={() => handleGroupFilterChange("ALL")}
+                className="hover:text-white ml-1 cursor-pointer"
+                title="Remove Group Filter"
+              >
+                <CloseIcon className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+          {classFilter !== "ALL" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 shadow-sm">
+              <ClassIcon className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Class: {activeClassObj?.name || classFilter}</span>
+              <button
+                onClick={() => handleClassFilterChange("ALL")}
+                className="hover:text-white ml-1 cursor-pointer"
+                title="Remove Class Filter"
+              >
+                <CloseIcon className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+          {statusFilter !== "ALL" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 shadow-sm">
+              <span>Status: {statusFilter}</span>
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className="hover:text-white ml-1 cursor-pointer"
+                title="Remove Status Filter"
+              >
+                <CloseIcon className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={handleClearAllFilters}
+            className="text-zinc-400 hover:text-white underline ml-auto text-[11px] font-semibold cursor-pointer"
+          >
+            Reset All Filters
+          </button>
+        </div>
+      )}
 
       {/* --- ADVANCED FILTER TOOLBAR --- */}
       <div className="theme-bg-surface border theme-border p-4 rounded-2xl flex flex-col md:flex-row gap-4 justify-between items-center mb-6 shadow-sm">
         <div className="flex flex-wrap w-full md:w-auto gap-3 items-center">
           {/* Search bar */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-56">
             <input
               type="text"
-              placeholder="Search student, roll, guardian phone..."
+              placeholder="Search student, roll..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-4 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none focus:border-sky-500"
             />
-            <span className="absolute left-2.5 top-2.5 text-zinc-400 text-xs">🔍</span>
+            <span className="absolute left-2.5 top-2.5 text-zinc-400">
+              <SearchIcon className="w-3.5 h-3.5" />
+            </span>
           </div>
+
+          {/* Class Filter */}
+          <select
+            value={classFilter}
+            onChange={(e) => handleClassFilterChange(e.target.value)}
+            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
+          >
+            <option value="ALL">All Classes</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
 
           {/* Group Filter */}
           <select
             value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
+            onChange={(e) => handleGroupFilterChange(e.target.value)}
+            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer font-semibold"
           >
-            <option value="ALL">All Groups</option>
-            {uniqueGroups.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
+            <option value="ALL">All Groups / Halqas</option>
+            {groups.length > 0
+              ? groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} {g.student_class_name ? `(${g.student_class_name})` : ""}
+                  </option>
+                ))
+              : uniqueGroupNames.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
           </select>
 
           {/* Status Filter */}
@@ -271,7 +453,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               displayMode === "table" ? "theme-bg-elevated text-sky-400 shadow-sm" : "theme-text-secondary hover:text-white"
             }`}
           >
-            📋 Table View
+            Table View
           </button>
           <button
             onClick={() => setDisplayMode("grid")}
@@ -279,7 +461,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               displayMode === "grid" ? "theme-bg-elevated text-sky-400 shadow-sm" : "theme-text-secondary hover:text-white"
             }`}
           >
-            🗂️ Grid Cards
+            Grid Cards
           </button>
         </div>
       </div>
@@ -292,7 +474,9 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         </div>
       ) : filteredStudents.length === 0 ? (
         <div className="w-full theme-bg-surface border theme-border rounded-2xl p-12 text-center">
-          <div className="text-4xl mb-4">👥</div>
+          <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center mx-auto mb-4 text-zinc-400">
+            <StudentIcon className="w-6 h-6" />
+          </div>
           <h3 className="text-sm font-bold">No students match the criteria</h3>
           <p className="text-xs theme-text-secondary mt-1">Try adjusting your filters or search query.</p>
         </div>
@@ -339,9 +523,17 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                   </td>
                   <td className="px-6 py-4 font-mono">{s.uniq_id || `STU-${s.id}`}</td>
                   <td className="px-6 py-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      {s.group_name || s.group || "General Group"}
-                    </span>
+                    <div className="space-y-0.5">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 inline-block">
+                        {s.student_group_name || s.group_name || s.group || "General Group"}
+                      </span>
+                      {s.student_class_name && (
+                        <span className="text-[10px] theme-text-secondary flex items-center gap-1 font-semibold">
+                          <ClassIcon className="w-3 h-3 text-sky-400" />
+                          <span>{s.student_class_name}</span>
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     {s.details?.guardian_phone ? (
@@ -351,10 +543,10 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                           href={`https://wa.me/${s.details.guardian_phone.replace(/[^\d]/g, '')}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:scale-110 transition-transform"
+                          className="hover:scale-110 transition-transform text-emerald-400 inline-flex items-center"
                           title="WhatsApp direct chat"
                         >
-                          🟢
+                          <WhatsAppIcon className="w-3.5 h-3.5" />
                         </a>
                       </div>
                     ) : (
@@ -379,15 +571,17 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                     <div className="flex justify-end gap-1.5">
                       <button
                         onClick={() => navigate(`/students/${s.id}/profile`)}
-                        className="px-2 py-1 rounded border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer"
+                        className="px-2 py-1 rounded border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
                       >
-                        🔍 Profile
+                        <SearchIcon className="w-3 h-3" />
+                        <span>Profile</span>
                       </button>
                       <button
                         onClick={() => handleDeleteSingle(s.id)}
-                        className="px-2 py-1 rounded border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors text-[10px] font-bold cursor-pointer"
+                        className="px-2 py-1 rounded border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
                       >
-                        🚫 Delete
+                        <TrashIcon className="w-3 h-3" />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </td>
@@ -417,7 +611,18 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                       Roll #{s.roll_number || s.roll || "--"}
                     </span>
                   </div>
-                  <div className="text-[10px] text-zinc-400 font-semibold">{s.group_name || s.group || "General Group"}</div>
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-[10px] text-zinc-300 font-semibold px-2 py-0.5 rounded bg-zinc-800 border theme-border inline-flex items-center gap-1">
+                      <GroupIcon className="w-3 h-3 text-sky-400" />
+                      <span>{s.student_group_name || s.group_name || s.group || "General Group"}</span>
+                    </span>
+                    {s.student_class_name && (
+                      <span className="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 inline-flex items-center gap-1">
+                        <ClassIcon className="w-3 h-3" />
+                        <span>{s.student_class_name}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -447,15 +652,17 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
                 <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => navigate(`/students/${s.id}/profile`)}
-                    className="p-1.5 rounded-lg border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer"
+                    className="p-1.5 rounded-lg border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
                   >
-                    🔍 View Profile
+                    <SearchIcon className="w-3 h-3" />
+                    <span>Profile</span>
                   </button>
                   <button
                     onClick={() => handleDeleteSingle(s.id)}
-                    className="p-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 transition-colors text-[10px] font-bold cursor-pointer"
+                    className="p-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
                   >
-                    🚫 Delete
+                    <TrashIcon className="w-3 h-3" />
+                    <span>Delete</span>
                   </button>
                 </div>
               </div>

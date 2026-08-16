@@ -5,6 +5,7 @@ import Sidebar from "../../modules/sidebar/SidebarContainer";
 import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "../../modules/sidebar/SidebarScreenBlockView";
+import InstitutionSwitcher from "./InstitutionSwitcher";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";
 import { initActivityTracker } from "../../utils/activityTracker";

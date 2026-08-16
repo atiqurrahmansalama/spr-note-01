@@ -4,6 +4,19 @@ import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import { getSectionConfig, saveSectionConfig } from "../../../config/defaultSectionConfig";
 import CustomSelect from "../../../components/ui/CustomSelect";
+import {
+  GlobeIcon,
+  DepartmentIcon,
+  GroupsIcon,
+  StudentIcon,
+  SavedMessagesIcon,
+  BuildingOfficeIcon,
+  SearchIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
+  RefreshIcon,
+  SaveIcon,
+} from "../../../components/ui/Icons";
 
 const DEFAULT_PANEL_CATEGORIES = [
   {
@@ -521,13 +534,14 @@ export default function SectionToggleControlPanel() {
       <div ref={tabsRef} className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none border-b theme-border">
         <div className="flex items-center gap-2">
           {[
-            { id: "global", label: "Global Defaults", icon: "🌐" },
-            { id: "role", label: "Role Overrides", icon: "🛡️" },
-            { id: "group", label: "Group Overrides", icon: "👥" },
-            { id: "user", label: "User Overrides", icon: "👤" },
-            { id: "audit", label: "Audit Logs", icon: "📜" },
+            { id: "global", label: "Global Defaults", Icon: GlobeIcon },
+            { id: "role", label: "Role Overrides", Icon: DepartmentIcon },
+            { id: "group", label: "Group Overrides", Icon: GroupsIcon },
+            { id: "user", label: "User Overrides", Icon: StudentIcon },
+            { id: "audit", label: "Audit Logs", Icon: SavedMessagesIcon },
           ].map((tab) => {
             const isActive = activeScope === tab.id;
+            const TabIcon = tab.Icon;
             return (
               <button
                 key={tab.id}
@@ -536,12 +550,13 @@ export default function SectionToggleControlPanel() {
                   setActiveScope(tab.id);
                   setModifiedFlags({});
                 }}
-                className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-t border-x ${
+                className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-t border-x flex items-center gap-2 ${
                   isActive
                     ? "theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-sm border-b-transparent"
                     : "theme-bg-sub theme-text-secondary hover:theme-text-primary theme-border border-b-theme-border"
                 }`}
               >
+                <TabIcon className="w-3.5 h-3.5 opacity-80" />
                 <span>{tab.label}</span>
               </button>
             );
