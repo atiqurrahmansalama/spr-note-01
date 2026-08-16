@@ -20,12 +20,11 @@ const fetchApi = async (path, options = {}) => {
 
   try {
     const res = await fetch(targetUrl, reqOptions);
-    if (res.ok || res.status < 500) return res;
+    return res;
   } catch (err) {
     console.warn(`[reportsApi] Fetch to ${targetUrl} failed:`, err);
+    throw new Error("Network connection error.");
   }
-
-  throw new Error("Server is offline or unreachable.");
 };
 
 /**

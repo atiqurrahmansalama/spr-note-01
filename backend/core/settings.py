@@ -152,17 +152,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build', 'static')
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # CORS Configuration
+from corsheaders.defaults import default_headers
+
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-tenant-id',
+    'x-device-id',
+    'x-app-version',
     'x-csrftoken',
-    'x-requested-with',
 ]
 
 # In production, restrict to Vercel frontend URL
