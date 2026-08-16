@@ -223,8 +223,8 @@ export default function RoleInviteManagerView() {
 
   const handleShareInviteAndQR = async () => {
     if (!selectedInvite) return;
-    const url = getJoinUrl(selectedInvite.token);
-    const shareText = `You're invited to join "${selectedInvite.title}" on SPR App.\nRole: ${selectedInvite.target_role_name}\nDirect link to claim role: ${url}`;
+    const baseUrl = window.location.origin;
+    const shareText = `You're invited to join "${selectedInvite.title}" on SPR App.\nRole: ${selectedInvite.target_role_name}\nDirect link to claim role: ${baseUrl}/join`;
 
     const svgEl = document.getElementById("invite-qr-svg");
     if (!svgEl) return;
