@@ -330,9 +330,34 @@ export default function SidebarContainer({
             );
           })}
         </nav>
+
+        {/* Sidebar Bottom Footer: Official Public Website */}
+        <div className="p-3 border-t theme-border shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              if (isOverlay) onClose();
+              navigate("/");
+            }}
+            title="Official Website & Public Portal"
+            className={`w-full flex items-center ${
+              isCollapsed ? "justify-center p-2.5" : "justify-start px-3.5 py-2.5 gap-3"
+            } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-all cursor-pointer shadow-xs group`}
+          >
+            <div className="w-6 h-6 rounded-lg theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+            </div>
+            {!isCollapsed && (
+              <div className="flex flex-col text-left min-w-0">
+                <span className="text-xs font-bold theme-text-primary leading-tight truncate">Official Website</span>
+                <span className="text-[10px] theme-text-secondary leading-tight truncate">Public Portal &amp; Verification</span>
+              </div>
+            )}
+          </button>
+        </div>
       </aside>
-
-
     </>
   );
 }

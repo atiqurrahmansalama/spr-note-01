@@ -404,8 +404,9 @@ export default function AppLayout() {
           
           <button 
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/report-builder")}
             className="flex items-center gap-2 cursor-pointer text-left group"
+            title="Open Report Generator"
           >
             <span className="font-bold theme-text-primary text-lg tracking-wide group-hover:theme-accent transition-colors">SPR Note</span>
           </button>
