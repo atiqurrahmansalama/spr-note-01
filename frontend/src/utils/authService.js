@@ -9,16 +9,15 @@ const fetchApi = async (path, options = {}, isRetry = false) => {
   
   try {
     const res = await fetch(targetUrl, options);
-    if (res.ok || res.status < 500) return res;
+    return res;
   } catch (err) {
     if (!isRetry) {
       await new Promise((resolve) => setTimeout(resolve, 400));
       return fetchApi(path, options, true);
     }
     console.warn(`[authService] Fetch to ${targetUrl} failed:`, err);
+    throw new Error("Server is offline or unreachable.");
   }
-
-  throw new Error("Server is offline or unreachable.");
 };
 
 // Register User (Sign Up)

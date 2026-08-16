@@ -742,11 +742,10 @@ class ChangePasswordView(APIView):
         return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
 
 def get_scoped_tenant_id(request):
-    """
-    Helper to extract tenant isolation filter.
-    - If regular user: returns request.user.institution_id
-    - If superuser/SUPER_ADMIN: checks X-Tenant-ID header or ?institution_id query param
-    """
+    import uuid
+    from django.db.models import Q
+    from .models import AcademicInstitution
+
     if not request.user or not request.user.is_authenticated:
         return None
     is_super = request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
@@ -754,10 +753,26 @@ def get_scoped_tenant_id(request):
         header_tenant = request.headers.get('X-Tenant-ID') or request.META.get('HTTP_X_TENANT_ID')
         param_tenant = request.query_params.get('institution_id') or request.query_params.get('institution')
         target_tenant = header_tenant or param_tenant
-        if target_tenant and str(target_tenant).upper() not in ['ALL', 'NULL', 'UNDEFINED', 'NONE', '']:
-            return target_tenant
+        if target_tenant and str(target_tenant).strip().upper() not in ['ALL', 'NULL', 'UNDEFINED', 'NONE', '', 'FALSE']:
+            try:
+                valid_uuid = uuid.UUID(str(target_tenant).strip())
+                return str(valid_uuid)
+            except (ValueError, AttributeError, TypeError):
+                inst = AcademicInstitution.objects.filter(
+                    Q(slug__iexact=str(target_tenant).strip()) | Q(name__iexact=str(target_tenant).strip())
+                ).first()
+                if inst:
+                    return str(inst.id)
+                return None
         return None
-    return getattr(request.user, 'institution_id', None)
+
+    inst_id = getattr(request.user, 'institution_id', None)
+    if inst_id:
+        try:
+            return str(uuid.UUID(str(inst_id)))
+        except (ValueError, AttributeError, TypeError):
+            return None
+    return None
 
 
 class StudentViewSet(viewsets.ModelViewSet):
