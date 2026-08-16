@@ -51,9 +51,14 @@ export default function DepartmentManagementView() {
       if (res.ok) {
         const data = await res.json();
         setDepartments(Array.isArray(data) ? data : data.results || []);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("[DepartmentManagementView] HTTP Error:", res.status, err);
+        showToast(err.detail || err.error || `Failed to load departments (Status ${res.status}).`, "error");
       }
-    } catch {
-      showToast("Failed to load departments.", "error");
+    } catch (e) {
+      console.error("[DepartmentManagementView] Exception:", e);
+      showToast(e.message || "Failed to load departments.", "error");
     } finally {
       setLoading(false);
     }

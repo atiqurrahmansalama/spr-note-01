@@ -36,17 +36,26 @@ class HasSectionAccess(BasePermission):
 
 class IsOwnerOrSuperAdmin(BasePermission):
     """
-    Object-level permission to only allow owners of an object or Super Admins to access/edit it.
+    Object-level permission to allow owners of an object, members of the same institution, or Super Admins.
     """
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
+        return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
         # Super Admins have absolute access
         if getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or request.user.is_superuser:
             return True
 
-        # Check ownership field
+        # Check institution tenancy
+        obj_inst_id = getattr(obj, 'institution_id', None)
+        user_inst_id = getattr(request.user, 'institution_id', None)
+        if obj_inst_id and user_inst_id and str(obj_inst_id) == str(user_inst_id):
+            return True
+
+        # Check direct ownership field
         owner = getattr(obj, 'created_by', None) or getattr(obj, 'user', None) or getattr(obj, 'owner', None)
         if owner and owner == request.user:
             return True
