@@ -1,4 +1,5 @@
 import { CloseIcon } from "../../components/ui/Icons";
+import { useRightDrawer } from "../../context/RightDrawerContext";
 
 export default function SidebarScreenBlockView({ 
   title, 
@@ -7,6 +8,8 @@ export default function SidebarScreenBlockView({
   dockPosition = "left", 
   onToggleDock 
 }) {
+  const { isRightDrawerOpen } = useRightDrawer();
+
   return (
     <div className={`w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20 @container ${
       dockPosition === "right" ? "border-l theme-border shadow-2xl" : ""
@@ -24,9 +27,20 @@ export default function SidebarScreenBlockView({
           {onToggleDock && (
             <button
               type="button"
-              onClick={onToggleDock}
-              className="hidden md:flex p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer items-center justify-center"
-              title={dockPosition === "right" ? "Dock Panel to Left Main Area" : "Dock Panel to Right Sidebar"}
+              onClick={isRightDrawerOpen ? undefined : onToggleDock}
+              disabled={isRightDrawerOpen}
+              className={`hidden md:flex p-1.5 rounded-lg transition-colors items-center justify-center ${
+                isRightDrawerOpen
+                  ? "opacity-30 cursor-not-allowed theme-text-secondary"
+                  : "theme-text-secondary hover:theme-text-primary hover:theme-bg-sub cursor-pointer"
+              }`}
+              title={
+                isRightDrawerOpen
+                  ? "Right sidebar dock is disabled while an active side drawer is open"
+                  : dockPosition === "right"
+                  ? "Dock Panel to Left Main Area"
+                  : "Dock Panel to Right Sidebar"
+              }
             >
               {dockPosition === "right" ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

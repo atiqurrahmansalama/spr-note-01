@@ -23,7 +23,8 @@ import {
 } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
-import InstitutionOnboardingModal from './InstitutionOnboardingModal';
+import InstitutionOnboardingDrawer from './InstitutionOnboardingDrawer';
+import InstitutionEditDrawer from './InstitutionEditDrawer';
 
 export default function InstitutionListView() {
   const navigate = useNavigate();
@@ -587,8 +588,8 @@ export default function InstitutionListView() {
         </div>
       )}
 
-      {/* Onboarding Modal */}
-      <InstitutionOnboardingModal
+      {/* Onboarding Right Sidebar Drawer */}
+      <InstitutionOnboardingDrawer
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
         onSuccess={() => {
@@ -597,95 +598,16 @@ export default function InstitutionListView() {
         }}
       />
 
-      {/* Edit Institution Modal */}
-      {editingInst && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="relative w-full max-w-lg rounded-2xl theme-bg-elevated border theme-border shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b theme-border">
-              <h3 className="text-base font-bold theme-text-primary">Edit Institution</h3>
-              <button
-                type="button"
-                onClick={() => setEditingInst(null)}
-                className="text-zinc-400 hover:text-zinc-200 cursor-pointer"
-              >
-                <CloseIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">Name (English)</label>
-                  <input
-                    type="text"
-                    value={editingInst.name}
-                    onChange={(e) => setEditingInst({ ...editingInst, name: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">Native / Bengali Name</label>
-                  <input
-                    type="text"
-                    value={editingInst.bangla_name || ''}
-                    onChange={(e) => setEditingInst({ ...editingInst, bangla_name: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={editingInst.phone || ''}
-                    onChange={(e) => setEditingInst({ ...editingInst, phone: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">District</label>
-                  <input
-                    type="text"
-                    value={editingInst.district || ''}
-                    onChange={(e) => setEditingInst({ ...editingInst, district: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">Campus Address</label>
-                <textarea
-                  rows={2}
-                  value={editingInst.address || ''}
-                  onChange={(e) => setEditingInst({ ...editingInst, address: e.target.value })}
-                  className="w-full px-3 py-1.5 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500 resize-none"
-                />
-              </div>
-
-              <div className="pt-3 border-t theme-border flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingInst(null)}
-                  className="px-4 py-1.5 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="px-5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold cursor-pointer"
-                >
-                  {isUpdating ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Edit Institution Right Sidebar Drawer */}
+      <InstitutionEditDrawer
+        isOpen={Boolean(editingInst)}
+        onClose={() => setEditingInst(null)}
+        institution={editingInst}
+        onUpdated={() => {
+          loadData();
+          refreshInstitutions();
+        }}
+      />
 
       {/* Delete / Decommission Modal */}
       {deletingInst && (
