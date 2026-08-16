@@ -23,7 +23,10 @@ import {
   GroupIcon,
   StudentIcon,
   AdmissionIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  TeacherIcon,
+  AttendanceIcon,
+  LeaveIcon,
 } from "../../components/ui/Icons";
 
 export default function SidebarContainer({ 
@@ -42,6 +45,7 @@ export default function SidebarContainer({
   const [openSubMenus, setOpenSubMenus] = useState({
     "Academic Institution": true,
     "Student Management": true,
+    "Staff Management": true,
     "Report Generator": false,
     "App Management": false,
     Settings: false,
@@ -81,6 +85,18 @@ export default function SidebarContainer({
       subItems: [
         { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
         { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
+      ]
+    },
+    {
+      id: "Staff Management",
+      name: "Staff Management",
+      Icon: TeacherIcon,
+      hasSub: true,
+      key: "nav_staff_management",
+      subItems: [
+        { id: "Staff Directory", name: "Staff Directory", path: "/staff", Icon: TeacherIcon, key: "staff_management" },
+        { id: "Staff Attendance", name: "Staff Attendance", path: "/staff/attendance", Icon: AttendanceIcon, key: "staff_attendance" },
+        { id: "Leave Desk", name: "Leave Desk", path: "/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
       ]
     },
     {

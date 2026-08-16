@@ -35,6 +35,10 @@ import ClassManagementView from "./modules/student-management/classes/ClassManag
 import GroupManagementView from "./modules/student-management/groups/GroupManagementView";
 import InstitutionListView from "./modules/app-management/institutions/InstitutionListView";
 import InstitutionProfileView from "./modules/settings/components/InstitutionProfileView";
+import StaffDirectoryView from "./modules/staff-management/StaffDirectoryView";
+import StaffProfileDetailView from "./modules/staff-management/StaffProfileDetailView";
+import StaffAttendanceView from "./modules/staff-management/StaffAttendanceView";
+import StaffLeaveManagementView from "./modules/staff-management/StaffLeaveManagementView";
 import { FeatureGuard } from "./components/common/FeatureGuard";
 
 function ProtectedRoute({ children }) {
@@ -85,6 +89,10 @@ export default function App() {
           <Route path="/report-builder" element={<FeatureGuard sectionKey="report_builder" fallback={<Navigate to="/dashboard" replace />}><div /></FeatureGuard>} />
           <Route path="/student-reports" element={<FeatureGuard sectionKey="report_history" fallback={<Navigate to="/dashboard" replace />}><StudentReportsView /></FeatureGuard>} />
           <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
+          <Route path="/staff" element={<FeatureGuard sectionKey="staff_management" fallback={<Navigate to="/dashboard" replace />}><StaffDirectoryView /></FeatureGuard>} />
+          <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_management" fallback={<Navigate to="/dashboard" replace />}><StaffProfileDetailView /></FeatureGuard>} />
+          <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_attendance" fallback={<Navigate to="/dashboard" replace />}><StaffAttendanceView /></FeatureGuard>} />
+          <Route path="/staff/leaves" element={<FeatureGuard sectionKey="staff_leaves" fallback={<Navigate to="/dashboard" replace />}><StaffLeaveManagementView /></FeatureGuard>} />
           <Route path="/student-management/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
           <Route path="/student-management/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
           <Route path="/student-management/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
