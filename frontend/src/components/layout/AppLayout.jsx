@@ -13,31 +13,49 @@ import { initActivityTracker } from "../../utils/activityTracker";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
-  "/": { title: "Dashboard", isDashboard: true },
-  "/dashboard": { title: "Dashboard", isDashboard: true },
-  "/report-builder": { title: "Report Generator" },
-  "/student-reports": { title: "Student Progress & Daily Reports" },
-  "/groups-students": { title: "Groups & Students Directory" },
-  "/student-roster": { title: "Student Roster" },
-  "/group-roster": { title: "Group Roster" },
-  "/admission": { title: "Student Admission & Profile Registration" },
-  "/sessions-comments": { title: "Sessions & Saved Comments" },
-  "/user-management": { title: "User Management" },
-  "/role-management": { title: "Role Management & Hierarchy Permissions" },
-  "/activity-analytics": { title: "Teacher Activity & Session Analytics" },
-  "/trash-restoration": { title: "Trash & Soft-Deleted Reports" },
-  "/profile-settings": { title: "User Profile Settings" },
-  "/security-sessions": { title: "Security & Active Sessions" },
-  "/appearance": { title: "Appearance & Typography" },
-  "/date-time": { title: "Date & Time Settings" },
-  "/copy-report": { title: "Copy Report Settings" },
-  "/language": { title: "Language Settings" },
-  "/data-backup": { title: "Data & Backup" },
-  "/shortcuts": { title: "Keyboard Shortcuts" },
-  "/guide": { title: "User Guide & Documentation" },
-  "/about": { title: "About Application" },
-  "/section-control": { title: "Super Admin Section Control Panel" },
+  "/": { title: "Dashboard", category: "Navigation", isDashboard: true },
+  "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
+  "/report-builder": { title: "Report Generator", category: "Daily Reports" },
+  "/student-reports": { title: "Student Progress & Daily Reports", category: "Daily Reports" },
+  "/copy-report": { title: "Copy Report Settings", category: "Daily Reports" },
+  "/sessions-comments": { title: "Sessions & Saved Comments", category: "Daily Reports" },
+
+  "/attendance/student": { title: "Student Attendance", category: "Attendance" },
+  "/attendance/monthly-register": { title: "Monthly Attendance Register", category: "Attendance" },
+  "/attendance/settings": { title: "Attendance Policies & Slots", category: "Attendance" },
+  "/calendar": { title: "Academic Calendar", category: "Attendance" },
+
+  "/student-management/departments": { title: "Academic Departments", category: "Student Management" },
+  "/student-management/classes": { title: "Classes & Grades", category: "Student Management" },
+  "/student-management/groups": { title: "Student Groups", category: "Student Management" },
+  "/groups-students": { title: "Groups & Students Directory", category: "Student Management" },
+  "/student-roster": { title: "Student Roster", category: "Student Management" },
+  "/group-roster": { title: "Group Roster", category: "Student Management" },
+  "/admission": { title: "Student Admission & Profile Registration", category: "Student Management" },
+
+  "/app-management/role-invites": { title: "Role QR & Invite", category: "App Management" },
+  "/app-management/institutions": { title: "Academic Institutions", category: "App Management" },
+  "/institutions": { title: "Academic Institutions", category: "App Management" },
+  "/user-management": { title: "User Management", category: "App Management" },
+  "/role-management": { title: "Role Management & Hierarchy Permissions", category: "App Management" },
+  "/activity-analytics": { title: "Teacher Activity & Session Analytics", category: "App Management" },
+  "/section-control": { title: "Super Admin Section Control Panel", category: "App Management" },
+
+  "/profile-settings": { title: "User Profile Settings", category: "Settings" },
+  "/settings/institution": { title: "Institution Profile", category: "Settings" },
+  "/institution-profile": { title: "Institution Profile", category: "Settings" },
+  "/security-sessions": { title: "Security & Active Sessions", category: "Settings" },
+  "/appearance": { title: "Appearance & Typography", category: "Settings" },
+  "/date-time": { title: "Date & Time Settings", category: "Settings" },
+  "/language": { title: "Language Settings", category: "Settings" },
+  "/data-backup": { title: "Data & Backup", category: "Settings" },
+
+  "/shortcuts": { title: "Keyboard Shortcuts", category: "Help & Guide" },
+  "/guide": { title: "User Guide & Documentation", category: "Help & Guide" },
+  "/about": { title: "About Application", category: "Help & Guide" },
+  "/trash-restoration": { title: "Trash & Soft-Deleted Reports", category: "Trash" },
 };
+
 
 export default function AppLayout() {
   const location = useLocation();
@@ -521,6 +539,7 @@ export default function AppLayout() {
             <div className="w-full h-full flex-1 overflow-hidden">
               <SidebarScreenBlockView
                 title={routeMeta.title}
+                category={routeMeta.category || "Navigation"}
                 onClose={() => navigate("/")}
                 dockPosition={isRightDock ? "right" : "left"}
                 onToggleDock={!isMobile ? togglePanelDock : undefined}
