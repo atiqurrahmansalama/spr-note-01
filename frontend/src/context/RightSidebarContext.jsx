@@ -10,10 +10,11 @@ const RightSidebarContext = createContext({
 export function RightSidebarProvider({ children }) {
   const [rightSidebarConfig, setRightSidebarConfig] = useState(null);
 
-  const openRightSidebar = useCallback(({ title, content, onClose }) => {
+  const openRightSidebar = useCallback(({ title, content, width = 600, onClose }) => {
     setRightSidebarConfig({
       title: title || 'Action Panel',
       content: content || null,
+      width: width || 600,
       onClose: onClose || null,
     });
   }, []);

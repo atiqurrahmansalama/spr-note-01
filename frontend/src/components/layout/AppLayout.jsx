@@ -537,7 +537,13 @@ export default function AppLayout() {
         {isRightSidebarOpen && (
           <div 
             className="h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in"
-            style={{ width: `${Math.max(340, rightPanelWidth)}px`, transition: isResizing ? "none" : "width 0.15s ease-out" }}
+            style={{
+              width: `${Math.min(
+                typeof window !== 'undefined' ? window.innerWidth * 0.92 : 620,
+                rightSidebarConfig?.width || Math.max(580, rightPanelWidth)
+              )}px`,
+              transition: isResizing ? "none" : "width 0.15s ease-out"
+            }}
           >
             {/* Resizer Handle */}
             <div

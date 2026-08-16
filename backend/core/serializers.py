@@ -478,8 +478,9 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
         model = AcademicInstitution
         fields = [
             'id', 'name', 'bangla_name', 'slug', 'institution_type',
-            'eiin_or_reg_no', 'logo_url', 'phone', 'email', 'address',
-            'district', 'is_verified', 'is_active', 'is_deleted',
+            'eiin_or_reg_no', 'logo_url', 'logo_data', 'phone', 'email', 'address',
+            'division', 'district', 'upazila_thana', 'post_code', 'street_address',
+            'is_verified', 'is_active', 'is_deleted',
             'total_students_count', 'total_classes_count', 'total_staff_count',
             'created_at', 'updated_at',
         ]
@@ -511,13 +512,18 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
     )
     eiin_or_reg_no = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=30, required=True)
-    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
 
     # Step 2: Branding & Address
     slug = serializers.SlugField(max_length=100, required=True)
     logo_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    logo_data = serializers.CharField(required=False, allow_blank=True, default='')
     email = serializers.EmailField(required=False, allow_blank=True, default='')
     address = serializers.CharField(required=False, allow_blank=True, default='')
+    division = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    upazila_thana = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    post_code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    street_address = serializers.CharField(required=False, allow_blank=True, default='')
 
     # Step 3: Admin & Presets
     admin_name = serializers.CharField(max_length=150, required=True)
@@ -558,10 +564,18 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
         institution_type = validated_data.get('institution_type', 'MADRASA')
         eiin_or_reg_no = validated_data.get('eiin_or_reg_no', '')
         phone = validated_data['phone']
-        district = validated_data.get('district', '')
         logo_url = validated_data.get('logo_url') or None
+        logo_data = validated_data.get('logo_data', '')
         email = validated_data.get('email', '')
+        division = validated_data.get('division', '')
+        district = validated_data.get('district', '')
+        upazila_thana = validated_data.get('upazila_thana', '')
+        post_code = validated_data.get('post_code', '')
+        street_address = validated_data.get('street_address', '')
         address = validated_data.get('address', '')
+        if not address and (street_address or upazila_thana or district or division):
+            parts = [p for p in [street_address, upazila_thana, district, division] if p]
+            address = ", ".join(parts)
 
         admin_name = validated_data['admin_name']
         admin_phone = validated_data['admin_phone']
@@ -580,8 +594,13 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                 phone=phone,
                 email=email,
                 address=address,
+                division=division,
                 district=district,
+                upazila_thana=upazila_thana,
+                post_code=post_code,
+                street_address=street_address,
                 logo_url=logo_url,
+                logo_data=logo_data,
                 is_verified=True,
                 is_active=True,
             )
