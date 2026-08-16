@@ -1770,3 +1770,288 @@ class StaffLeaveRequest(models.Model):
 
     def __str__(self):
         return f"{self.staff.employee_id} - {self.get_leave_type_display()} [{self.start_date} to {self.end_date}] ({self.get_status_display()})"
+
+
+# ---------------------------------------------------------
+# 🎯 20. ATTENDANCE, CALENDAR & TASK ECOSYSTEM MODELS
+# ---------------------------------------------------------
+
+class AcademicCalendarEvent(models.Model):
+    EVENT_TYPE_CHOICES = (
+        ('PUBLIC_HOLIDAY', 'Public / National Holiday'),
+        ('INSTITUTIONAL_HOLIDAY', 'Institutional Holiday'),
+        ('EXAM_PERIOD', 'Examination Period'),
+        ('VACATION', 'Vacation / Semester Break'),
+        ('SPECIAL_EVENT', 'Special Academic Event'),
+        ('TRAINING', 'Faculty / Staff Workshop'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='calendar_events'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default='')
+    event_type = models.CharField(
+        max_length=30,
+        choices=EVENT_TYPE_CHOICES,
+        default='INSTITUTIONAL_HOLIDAY',
+        db_index=True
+    )
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    affects_students = models.BooleanField(default=True)
+    affects_staff = models.BooleanField(default=True)
+    is_residential_active = models.BooleanField(default=False, help_text="True if residential madrasa activities continue")
+    color_code = models.CharField(max_length=20, default='#38bdf8')
+    created_by = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='created_calendar_events'
+    )
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['start_date', 'title']
+        verbose_name = "Academic Calendar Event"
+        verbose_name_plural = "Academic Calendar Events"
+
+    def __str__(self):
+        return f"{self.title} ({self.start_date} -> {self.end_date}) [{self.get_event_type_display()}]"
+
+
+class InstitutionalTask(models.Model):
+    PRIORITY_CHOICES = (
+        ('HIGH', 'High Priority'),
+        ('MEDIUM', 'Medium Priority'),
+        ('LOW', 'Low Priority'),
+    )
+
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+    )
+
+    CATEGORY_CHOICES = (
+        ('GENERAL', 'General Institutional Task'),
+        ('ACADEMIC', 'Academic & Curriculum'),
+        ('EXAMINATION', 'Examination & Result Prep'),
+        ('ADMINISTRATIVE', 'Administrative & Official'),
+        ('FACILITIES', 'Campus & Facilities'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='institutional_tasks'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default='')
+    due_date = models.DateField(null=True, blank=True, db_index=True)
+    due_time = models.TimeField(null=True, blank=True)
+    priority = models.CharField(
+        max_length=20,
+        choices=PRIORITY_CHOICES,
+        default='MEDIUM',
+        db_index=True
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING',
+        db_index=True
+    )
+    category = models.CharField(
+        max_length=30,
+        choices=CATEGORY_CHOICES,
+        default='GENERAL'
+    )
+    assigned_to = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_institutional_tasks'
+    )
+    is_completed = models.BooleanField(default=False, db_index=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='created_institutional_tasks'
+    )
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['is_completed', 'due_date', '-priority', '-created_at']
+        verbose_name = "Institutional Task"
+        verbose_name_plural = "Institutional Tasks"
+
+    def __str__(self):
+        return f"{self.title} [{'DONE' if self.is_completed else self.status}]"
+
+
+class AttendanceSessionSlot(models.Model):
+    SLOT_TYPE_CHOICES = (
+        ('DAILY_GENERAL', 'Full Day General Slot'),
+        ('PERIODIC', 'Periodic Lecture / Class Slot'),
+        ('SESSION_BASED', 'Session Based (Morning / Afternoon / Evening)'),
+        ('RESIDENTIAL_PRAYER', 'Residential / Prayer Sabaq Slot'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='attendance_slots'
+    )
+    name = models.CharField(max_length=100, help_text="e.g. Daily Main, Fajr Sabaq, Period 1, Zuhr Dars")
+    slot_type = models.CharField(
+        max_length=30,
+        choices=SLOT_TYPE_CHOICES,
+        default='DAILY_GENERAL'
+    )
+    department = models.ForeignKey(
+        AcademicDepartment,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='attendance_slots'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='attendance_slots'
+    )
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    late_cutoff_time = models.TimeField(null=True, blank=True)
+    order_rank = models.IntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order_rank', 'start_time', 'name']
+        verbose_name = "Attendance Session Slot"
+        verbose_name_plural = "Attendance Session Slots"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_slot_type_display()})"
+
+
+class StudentAttendance(models.Model):
+    ATTENDANCE_STATUS_CHOICES = (
+        ('PRESENT', 'Present'),
+        ('LATE', 'Late Arrival'),
+        ('ABSENT', 'Absent'),
+        ('HALF_DAY', 'Half Day'),
+        ('ON_LEAVE', 'Approved Leave'),
+        ('HOLIDAY_EXCUSED', 'Holiday / Weekend Excused'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='attendances'
+    )
+    session_slot = models.ForeignKey(
+        AttendanceSessionSlot,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='student_attendances'
+    )
+    date = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=ATTENDANCE_STATUS_CHOICES,
+        default='PRESENT',
+        db_index=True
+    )
+    in_time = models.TimeField(null=True, blank=True)
+    marked_by = models.ForeignKey(
+        'User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='marked_student_attendances'
+    )
+    source = models.CharField(max_length=64, default='WEB_PORTAL')
+    remarks = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', 'student__roll_number', 'student__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'session_slot', 'date'],
+                name='unique_student_slot_date_attendance'
+            )
+        ]
+        verbose_name = "Student Attendance"
+        verbose_name_plural = "Student Attendance Records"
+
+    def __str__(self):
+        slot_str = f" [{self.session_slot.name}]" if self.session_slot else ""
+        return f"Student {self.student.roll_number or self.student.name} - {self.date}{slot_str} ({self.get_status_display()})"
+
+
+class AttendancePolicySetting(models.Model):
+    DEFAULT_MODE_CHOICES = (
+        ('DAILY_SINGLE', 'Single Daily Roll Call'),
+        ('MULTI_SESSION', 'Multi-Session Attendance (e.g. Morning / Afternoon)'),
+        ('PERIOD_WISE', 'Period-by-Period Roll Call'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.OneToOneField(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='attendance_policy'
+    )
+    weekend_days = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of weekday names e.g. ['FRIDAY', 'SATURDAY']"
+    )
+    default_mode = models.CharField(
+        max_length=20,
+        choices=DEFAULT_MODE_CHOICES,
+        default='DAILY_SINGLE'
+    )
+    default_late_cutoff_time = models.TimeField(null=True, blank=True)
+    auto_excuse_holidays = models.BooleanField(
+        default=True,
+        help_text="Automatically set status to HOLIDAY_EXCUSED on scheduled holidays/weekends"
+    )
+    auto_notify_absent = models.BooleanField(
+        default=False,
+        help_text="Send automated SMS / App alerts to guardians on unexcused absence"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Attendance Policy Setting"
+        verbose_name_plural = "Attendance Policy Settings"
+
+    def __str__(self):
+        return f"Attendance Policy for {self.institution.name}"

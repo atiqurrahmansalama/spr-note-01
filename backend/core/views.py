@@ -19,7 +19,7 @@ from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -64,6 +64,11 @@ from .models import (
     GeneralStaffDuty,
     StaffAttendance,
     StaffLeaveRequest,
+    AcademicCalendarEvent,
+    InstitutionalTask,
+    AttendanceSessionSlot,
+    StudentAttendance,
+    AttendancePolicySetting,
 )
 from .permissions import (
     IsAdminUserRole,
@@ -85,6 +90,12 @@ from .serializers import (
     StaffLeaveRequestSerializer,
     StaffLeaveActionSerializer,
     StaffInviteSerializer,
+    AcademicCalendarEventSerializer,
+    InstitutionalTaskSerializer,
+    AttendanceSessionSlotSerializer,
+    StudentAttendanceSerializer,
+    BulkStudentAttendancePunchSerializer,
+    AttendancePolicySettingSerializer,
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
     ChangePasswordSerializer,
@@ -4015,3 +4026,531 @@ class StaffLeaveRequestViewSet(viewsets.ModelViewSet):
             admin_remarks=remarks
         )
         return Response(StaffLeaveRequestSerializer(updated_leave).data, status=status.HTTP_200_OK)
+
+
+# =============================================================================
+# 🎯 ATTENDANCE, CALENDAR & TASK ECOSYSTEM VIEWSETS
+# =============================================================================
+
+class CalendarEventViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AcademicCalendarEventSerializer
+    queryset = AcademicCalendarEvent.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        base_qs = AcademicCalendarEvent.objects.filter(is_deleted=False).select_related('institution', 'created_by')
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            base_qs = base_qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                base_qs = base_qs.filter(institution_id=user.institution_id)
+            else:
+                return base_qs.none()
+
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year:
+            try:
+                base_qs = base_qs.filter(Q(start_date__year=int(year)) | Q(end_date__year=int(year)))
+            except ValueError:
+                pass
+        if month:
+            try:
+                base_qs = base_qs.filter(Q(start_date__month=int(month)) | Q(end_date__month=int(month)))
+            except ValueError:
+                pass
+
+        event_type = self.request.query_params.get('event_type')
+        if event_type and event_type != 'ALL':
+            base_qs = base_qs.filter(event_type=event_type.upper())
+
+        return base_qs.order_by('start_date', 'title')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise serializers.ValidationError({"institution": "Active institution scope is required."})
+        serializer.save(institution_id=tenant_id, created_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response({"status": "Calendar event deleted."}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='check-holiday')
+    def check_holiday(self, request):
+        date_str = request.query_params.get('date')
+        if not date_str:
+            target_date = timezone.localdate()
+        else:
+            try:
+                target_date = datetime.date.fromisoformat(date_str)
+            except ValueError:
+                return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        if not tenant_id:
+            return Response({"is_holiday": False, "reason": ""}, status=status.HTTP_200_OK)
+
+        # 1. Check custom calendar events
+        event = AcademicCalendarEvent.objects.filter(
+            institution_id=tenant_id,
+            is_deleted=False,
+            start_date__lte=target_date,
+            end_date__gte=target_date,
+            event_type__in=['PUBLIC_HOLIDAY', 'INSTITUTIONAL_HOLIDAY', 'VACATION']
+        ).first()
+
+        if event:
+            return Response({
+                "is_holiday": True,
+                "is_weekend": False,
+                "reason": event.title,
+                "event_type": event.event_type,
+                "event_id": event.id,
+                "color_code": event.color_code,
+                "affects_students": event.affects_students,
+                "affects_staff": event.affects_staff,
+            }, status=status.HTTP_200_OK)
+
+        # 2. Check institutional weekend policy
+        policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first()
+        weekday_name = target_date.strftime('%A').upper()
+        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+
+        if weekday_name in weekend_days:
+            return Response({
+                "is_holiday": True,
+                "is_weekend": True,
+                "reason": f"Weekend ({target_date.strftime('%A')})",
+                "event_type": "WEEKEND",
+                "event_id": None,
+                "color_code": "#f59e0b",
+                "affects_students": True,
+                "affects_staff": True,
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "is_holiday": False,
+            "is_weekend": False,
+            "reason": "",
+            "event_type": None,
+            "event_id": None,
+            "color_code": None,
+            "affects_students": False,
+            "affects_staff": False,
+        }, status=status.HTTP_200_OK)
+
+
+class InstitutionalTaskViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = InstitutionalTaskSerializer
+    queryset = InstitutionalTask.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        base_qs = InstitutionalTask.objects.filter(is_deleted=False).select_related('institution', 'assigned_to', 'created_by')
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            base_qs = base_qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                base_qs = base_qs.filter(institution_id=user.institution_id)
+            else:
+                return base_qs.none()
+
+        priority = self.request.query_params.get('priority')
+        if priority and priority != 'ALL':
+            base_qs = base_qs.filter(priority=priority.upper())
+
+        status_val = self.request.query_params.get('status')
+        if status_val and status_val != 'ALL':
+            base_qs = base_qs.filter(status=status_val.upper())
+
+        is_completed = self.request.query_params.get('is_completed')
+        if is_completed is not None and is_completed != 'ALL':
+            base_qs = base_qs.filter(is_completed=(is_completed.lower() == 'true'))
+
+        category = self.request.query_params.get('category')
+        if category and category != 'ALL':
+            base_qs = base_qs.filter(category=category.upper())
+
+        return base_qs.order_by('is_completed', 'due_date', '-created_at')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise serializers.ValidationError({"institution": "Active institution scope is required."})
+        serializer.save(institution_id=tenant_id, created_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response({"status": "Task deleted."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['patch'], url_path='toggle-complete')
+    def toggle_complete(self, request, pk=None):
+        task = self.get_object()
+        task.is_completed = not task.is_completed
+        if task.is_completed:
+            task.status = 'COMPLETED'
+            task.completed_at = timezone.now()
+        else:
+            task.status = 'PENDING'
+            task.completed_at = None
+        task.save()
+        return Response(InstitutionalTaskSerializer(task).data, status=status.HTTP_200_OK)
+
+
+class AttendanceSlotViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AttendanceSessionSlotSerializer
+    queryset = AttendanceSessionSlot.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        base_qs = AttendanceSessionSlot.objects.filter(is_deleted=False).select_related('institution', 'department', 'student_class')
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            base_qs = base_qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                base_qs = base_qs.filter(institution_id=user.institution_id)
+            else:
+                return base_qs.none()
+
+        dept = self.request.query_params.get('department')
+        if dept and dept != 'ALL':
+            base_qs = base_qs.filter(Q(department_id=dept) | Q(department__isnull=True))
+
+        class_id = self.request.query_params.get('student_class')
+        if class_id and class_id != 'ALL':
+            base_qs = base_qs.filter(Q(student_class_id=class_id) | Q(student_class__isnull=True))
+
+        return base_qs.order_by('order_rank', 'start_time', 'name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise serializers.ValidationError({"institution": "Active institution scope is required."})
+        serializer.save(institution_id=tenant_id)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response({"status": "Attendance slot deactivated."}, status=status.HTTP_200_OK)
+
+
+class StudentAttendanceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = StudentAttendanceSerializer
+    queryset = StudentAttendance.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        base_qs = StudentAttendance.objects.select_related(
+            'student__student_class', 'student__student_group', 'student__institution', 'session_slot', 'marked_by'
+        )
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            base_qs = base_qs.filter(student__institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                base_qs = base_qs.filter(student__institution_id=user.institution_id)
+            else:
+                return base_qs.none()
+
+        date_str = self.request.query_params.get('date')
+        if date_str:
+            base_qs = base_qs.filter(date=date_str)
+
+        student_id = self.request.query_params.get('student')
+        if student_id:
+            base_qs = base_qs.filter(student_id=student_id)
+
+        class_id = self.request.query_params.get('class_id')
+        if class_id and class_id != 'ALL':
+            base_qs = base_qs.filter(student__student_class_id=class_id)
+
+        group_id = self.request.query_params.get('group_id')
+        if group_id and group_id != 'ALL':
+            base_qs = base_qs.filter(student__student_group_id=group_id)
+
+        slot_id = self.request.query_params.get('session_slot')
+        if slot_id and slot_id != 'ALL':
+            base_qs = base_qs.filter(session_slot_id=slot_id)
+
+        status_val = self.request.query_params.get('status')
+        if status_val and status_val != 'ALL':
+            base_qs = base_qs.filter(status=status_val.upper())
+
+        return base_qs.order_by('student__roll_number', 'student__name')
+
+    @action(detail=False, methods=['post'], url_path='bulk-mark')
+    def bulk_mark(self, request):
+        serializer = BulkStudentAttendancePunchSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        date_val = serializer.validated_data['date']
+        session_slot_id = serializer.validated_data.get('session_slot_id')
+        override_holiday = serializer.validated_data.get('override_holiday', False)
+        records = serializer.validated_data['records']
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        # Check holiday / weekend if not overriding
+        is_holiday = False
+        if not override_holiday and tenant_id:
+            holiday_event = AcademicCalendarEvent.objects.filter(
+                institution_id=tenant_id,
+                is_deleted=False,
+                start_date__lte=date_val,
+                end_date__gte=date_val,
+                event_type__in=['PUBLIC_HOLIDAY', 'INSTITUTIONAL_HOLIDAY', 'VACATION'],
+                affects_students=True
+            ).first()
+            if holiday_event:
+                is_holiday = True
+
+        slot_obj = None
+        if session_slot_id:
+            slot_obj = AttendanceSessionSlot.objects.filter(id=session_slot_id, is_deleted=False).first()
+
+        created_or_updated = 0
+        with transaction.atomic():
+            for item in records:
+                student_id = item['student_id']
+                target_status = 'HOLIDAY_EXCUSED' if (is_holiday and not override_holiday) else item.get('status', 'PRESENT')
+                in_time = item.get('in_time')
+                remarks = item.get('remarks', '')
+
+                student = Student.objects.filter(id=student_id, is_deleted=False).first()
+                if not student:
+                    continue
+
+                if tenant_id and student.institution_id and str(student.institution_id) != str(tenant_id):
+                    # Tenant isolation check
+                    continue
+
+                StudentAttendance.objects.update_or_create(
+                    student=student,
+                    session_slot=slot_obj,
+                    date=date_val,
+                    defaults={
+                        'status': target_status,
+                        'in_time': in_time,
+                        'remarks': remarks,
+                        'marked_by': request.user if request.user.is_authenticated else None,
+                        'source': 'WEB_PORTAL'
+                    }
+                )
+                created_or_updated += 1
+
+        return Response({
+            "status": "success",
+            "message": f"Recorded attendance for {created_or_updated} students.",
+            "count": created_or_updated,
+            "date": str(date_val),
+            "is_holiday_excused": is_holiday and not override_holiday
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='monthly-matrix')
+    def monthly_matrix(self, request):
+        class_id = request.query_params.get('class_id')
+        group_id = request.query_params.get('group_id')
+        slot_id = request.query_params.get('session_slot_id')
+
+        try:
+            year = int(request.query_params.get('year', timezone.localdate().year))
+            month = int(request.query_params.get('month', timezone.localdate().month))
+        except ValueError:
+            year = timezone.localdate().year
+            month = timezone.localdate().month
+
+        import calendar
+        num_days = calendar.monthrange(year, month)[1]
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        students_qs = Student.objects.filter(is_deleted=False).select_related('student_class', 'student_group')
+        if tenant_id:
+            students_qs = students_qs.filter(institution_id=tenant_id)
+        if class_id and class_id != 'ALL':
+            students_qs = students_qs.filter(student_class_id=class_id)
+        if group_id and group_id != 'ALL':
+            students_qs = students_qs.filter(student_group_id=group_id)
+
+        students = list(students_qs.order_by('roll_number', 'name'))
+
+        start_date = datetime.date(year, month, 1)
+        end_date = datetime.date(year, month, num_days)
+
+        att_qs = StudentAttendance.objects.filter(
+            student__in=students,
+            date__gte=start_date,
+            date__lte=end_date
+        )
+        if slot_id and slot_id != 'ALL':
+            att_qs = att_qs.filter(session_slot_id=slot_id)
+
+        att_map = {}
+        for att in att_qs:
+            if att.student_id not in att_map:
+                att_map[att.student_id] = {}
+            att_map[att.student_id][att.date.day] = att.status
+
+        holidays = []
+        if tenant_id:
+            holidays = list(AcademicCalendarEvent.objects.filter(
+                institution_id=tenant_id,
+                is_deleted=False,
+                start_date__lte=end_date,
+                end_date__gte=start_date,
+                event_type__in=['PUBLIC_HOLIDAY', 'INSTITUTIONAL_HOLIDAY', 'VACATION']
+            ))
+
+        policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first() if tenant_id else None
+        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+
+        days_header = []
+        for day in range(1, num_days + 1):
+            d = datetime.date(year, month, day)
+            weekday_str = d.strftime('%a').upper()
+            is_weekend = d.strftime('%A').upper() in weekend_days
+            matching_holiday = next((h for h in holidays if h.start_date <= d <= h.end_date), None)
+
+            days_header.append({
+                "day": day,
+                "weekday": weekday_str,
+                "is_weekend": is_weekend,
+                "is_holiday": is_weekend or bool(matching_holiday),
+                "holiday_title": matching_holiday.title if matching_holiday else ("Weekend" if is_weekend else "")
+            })
+
+        matrix_rows = []
+        for s in students:
+            s_map = att_map.get(s.id, {})
+            p_count = sum(1 for st in s_map.values() if st == 'PRESENT')
+            l_count = sum(1 for st in s_map.values() if st == 'LATE')
+            a_count = sum(1 for st in s_map.values() if st == 'ABSENT')
+            hd_count = sum(1 for st in s_map.values() if st == 'HALF_DAY')
+            lv_count = sum(1 for st in s_map.values() if st == 'ON_LEAVE')
+            hol_count = sum(1 for st in s_map.values() if st == 'HOLIDAY_EXCUSED')
+
+            total_recorded = p_count + l_count + a_count + hd_count + lv_count
+            effective_present = p_count + l_count + (hd_count * 0.5)
+            attendance_rate = round((effective_present / total_recorded * 100), 1) if total_recorded > 0 else 0.0
+
+            matrix_rows.append({
+                "student_id": s.id,
+                "name": s.name or s.name_en or 'Student',
+                "roll_number": s.roll_number,
+                "class_name": s.student_class.name if s.student_class else '',
+                "group_name": s.student_group.name if s.student_group else '',
+                "daily_statuses": s_map,
+                "totals": {
+                    "present": p_count,
+                    "late": l_count,
+                    "absent": a_count,
+                    "half_day": hd_count,
+                    "on_leave": lv_count,
+                    "holiday_excused": hol_count,
+                    "total_recorded": total_recorded,
+                    "attendance_rate": attendance_rate
+                }
+            })
+
+        return Response({
+            "year": year,
+            "month": month,
+            "total_days": num_days,
+            "days_header": days_header,
+            "students_matrix": matrix_rows,
+            "total_students": len(students)
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='daily-summary')
+    def daily_summary(self, request):
+        date_str = request.query_params.get('date', str(timezone.localdate()))
+        class_id = request.query_params.get('class_id')
+        group_id = request.query_params.get('group_id')
+        slot_id = request.query_params.get('session_slot_id')
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        qs = StudentAttendance.objects.filter(date=date_str)
+        if tenant_id:
+            qs = qs.filter(student__institution_id=tenant_id)
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student__student_class_id=class_id)
+        if group_id and group_id != 'ALL':
+            qs = qs.filter(student__student_group_id=group_id)
+        if slot_id and slot_id != 'ALL':
+            qs = qs.filter(session_slot_id=slot_id)
+
+        present = qs.filter(status='PRESENT').count()
+        late = qs.filter(status='LATE').count()
+        absent = qs.filter(status='ABSENT').count()
+        half_day = qs.filter(status='HALF_DAY').count()
+        on_leave = qs.filter(status='ON_LEAVE').count()
+        holiday = qs.filter(status='HOLIDAY_EXCUSED').count()
+
+        total = present + late + absent + half_day + on_leave
+        rate = round(((present + late + (half_day * 0.5)) / total * 100), 1) if total > 0 else 0.0
+
+        return Response({
+            "date": date_str,
+            "present": present,
+            "late": late,
+            "absent": absent,
+            "half_day": half_day,
+            "on_leave": on_leave,
+            "holiday_excused": holiday,
+            "total_recorded": total,
+            "attendance_rate": rate
+        }, status=status.HTTP_200_OK)
+
+
+class AttendancePolicyViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        if not tenant_id:
+            return Response({"error": "No active institution scope."}, status=status.HTTP_400_BAD_REQUEST)
+
+        policy, _ = AttendancePolicySetting.objects.get_or_create(
+            institution_id=tenant_id,
+            defaults={'weekend_days': ['FRIDAY', 'SATURDAY'], 'default_mode': 'DAILY_SINGLE'}
+        )
+        return Response(AttendancePolicySettingSerializer(policy).data, status=status.HTTP_200_OK)
+
+    def create(self, request):
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        if not tenant_id:
+            return Response({"error": "No active institution scope."}, status=status.HTTP_400_BAD_REQUEST)
+
+        policy, _ = AttendancePolicySetting.objects.get_or_create(institution_id=tenant_id)
+        serializer = AttendancePolicySettingSerializer(policy, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

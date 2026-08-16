@@ -100,6 +100,19 @@ export default function SidebarContainer({
       ]
     },
     {
+      id: "Attendance & Calendar",
+      name: "Attendance & Calendar",
+      Icon: AttendanceIcon,
+      hasSub: true,
+      key: "nav_attendance_management",
+      subItems: [
+        { id: "Student Attendance", name: "Student Attendance", path: "/attendance/student", Icon: AttendanceIcon, key: "student_attendance" },
+        { id: "Monthly Register", name: "Monthly Register", path: "/attendance/monthly-register", Icon: AdmissionIcon, key: "monthly_attendance_matrix" },
+        { id: "Institutional Calendar", name: "Institutional Calendar", path: "/calendar", Icon: CalendarIcon, key: "institutional_calendar" },
+        { id: "Slots & Policies", name: "Slots & Policies", path: "/attendance/settings", Icon: SettingsIcon, key: "attendance_policies_slots" },
+      ]
+    },
+    {
       id: "Report Generator",
       name: "Report Generator",
       Icon: SavedMessagesIcon,

@@ -79,6 +79,11 @@ from .views import (
     GeneralStaffDutyViewSet,
     StaffAttendanceViewSet,
     StaffLeaveRequestViewSet,
+    CalendarEventViewSet,
+    InstitutionalTaskViewSet,
+    AttendanceSlotViewSet,
+    StudentAttendanceViewSet,
+    AttendancePolicyViewSet,
 )
 
 router = DefaultRouter()
@@ -100,6 +105,13 @@ router.register(r'staff/general', GeneralStaffDutyViewSet, basename='staff-gener
 router.register(r'staff/attendance', StaffAttendanceViewSet, basename='staff-attendance')
 router.register(r'staff/leaves', StaffLeaveRequestViewSet, basename='staff-leaves')
 router.register(r'staff', StaffProfileViewSet, basename='staff-profile')
+
+# Enterprise Attendance, Calendar & Task Ecosystem Routers
+router.register(r'calendar/events', CalendarEventViewSet, basename='calendar-events')
+router.register(r'calendar/tasks', InstitutionalTaskViewSet, basename='calendar-tasks')
+router.register(r'attendance/slots', AttendanceSlotViewSet, basename='attendance-slots')
+router.register(r'attendance/students', StudentAttendanceViewSet, basename='attendance-students')
+router.register(r'attendance/policy', AttendancePolicyViewSet, basename='attendance-policy')
 
 from django.http import JsonResponse
 

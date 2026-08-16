@@ -47,6 +47,11 @@ from .models import (
     GeneralStaffDuty,
     StaffAttendance,
     StaffLeaveRequest,
+    AcademicCalendarEvent,
+    InstitutionalTask,
+    AttendanceSessionSlot,
+    StudentAttendance,
+    AttendancePolicySetting,
 )
 
 
@@ -2179,3 +2184,200 @@ class StaffInviteSerializer(serializers.Serializer):
     employee_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     highest_degree = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     specialization = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+
+
+# =============================================================================
+# 🎯 ATTENDANCE, CALENDAR & TASK ECOSYSTEM SERIALIZERS
+# =============================================================================
+
+class AcademicCalendarEventSerializer(serializers.ModelSerializer):
+    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True, default='')
+    duration_days = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicCalendarEvent
+        fields = [
+            'id',
+            'institution',
+            'title',
+            'description',
+            'event_type',
+            'event_type_display',
+            'start_date',
+            'end_date',
+            'duration_days',
+            'affects_students',
+            'affects_staff',
+            'is_residential_active',
+            'color_code',
+            'created_by',
+            'created_by_name',
+            'is_deleted',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'created_by', 'created_by_name', 'duration_days', 'is_deleted', 'created_at', 'updated_at']
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_duration_days(self, obj):
+        if obj.start_date and obj.end_date:
+            return max(1, (obj.end_date - obj.start_date).days + 1)
+        return 1
+
+    def validate(self, attrs):
+        start_date = attrs.get('start_date') or (self.instance.start_date if self.instance else None)
+        end_date = attrs.get('end_date') or (self.instance.end_date if self.instance else None)
+
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
+
+        return attrs
+
+
+class InstitutionalTaskSerializer(serializers.ModelSerializer):
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.name', read_only=True, default='')
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True, default='')
+
+    class Meta:
+        model = InstitutionalTask
+        fields = [
+            'id',
+            'institution',
+            'title',
+            'description',
+            'due_date',
+            'due_time',
+            'priority',
+            'priority_display',
+            'status',
+            'status_display',
+            'category',
+            'category_display',
+            'assigned_to',
+            'assigned_to_name',
+            'is_completed',
+            'completed_at',
+            'created_by',
+            'created_by_name',
+            'is_deleted',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'assigned_to_name', 'created_by', 'created_by_name', 'is_deleted', 'created_at', 'updated_at']
+
+
+class AttendanceSessionSlotSerializer(serializers.ModelSerializer):
+    slot_type_display = serializers.CharField(source='get_slot_type_display', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+
+    class Meta:
+        model = AttendanceSessionSlot
+        fields = [
+            'id',
+            'institution',
+            'name',
+            'slot_type',
+            'slot_type_display',
+            'department',
+            'department_name',
+            'student_class',
+            'class_name',
+            'start_time',
+            'end_time',
+            'late_cutoff_time',
+            'order_rank',
+            'is_active',
+            'is_deleted',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'slot_type_display', 'department_name', 'class_name', 'is_deleted', 'created_at', 'updated_at']
+
+
+class StudentAttendanceSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.name', read_only=True, default='')
+    student_roll = serializers.IntegerField(source='student.roll_number', read_only=True, default=0)
+    student_class_name = serializers.CharField(source='student.student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student.student_group.name', read_only=True, default='')
+    session_slot_name = serializers.CharField(source='session_slot.name', read_only=True, default='')
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    marked_by_name = serializers.CharField(source='marked_by.name', read_only=True, default='')
+
+    class Meta:
+        model = StudentAttendance
+        fields = [
+            'id',
+            'student',
+            'student_name',
+            'student_roll',
+            'student_class_name',
+            'student_group_name',
+            'session_slot',
+            'session_slot_name',
+            'date',
+            'status',
+            'status_display',
+            'in_time',
+            'marked_by',
+            'marked_by_name',
+            'source',
+            'remarks',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'student_name',
+            'student_roll',
+            'student_class_name',
+            'student_group_name',
+            'session_slot_name',
+            'status_display',
+            'marked_by',
+            'marked_by_name',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class BulkStudentAttendanceRecordItemSerializer(serializers.Serializer):
+    student_id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=StudentAttendance.ATTENDANCE_STATUS_CHOICES, default='PRESENT')
+    in_time = serializers.TimeField(required=False, allow_null=True)
+    remarks = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class BulkStudentAttendancePunchSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    session_slot_id = serializers.UUIDField(required=False, allow_null=True)
+    class_id = serializers.IntegerField(required=False, allow_null=True)
+    group_id = serializers.IntegerField(required=False, allow_null=True)
+    override_holiday = serializers.BooleanField(default=False)
+    records = BulkStudentAttendanceRecordItemSerializer(many=True)
+
+
+class AttendancePolicySettingSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+    default_mode_display = serializers.CharField(source='get_default_mode_display', read_only=True)
+
+    class Meta:
+        model = AttendancePolicySetting
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'weekend_days',
+            'default_mode',
+            'default_mode_display',
+            'default_late_cutoff_time',
+            'auto_excuse_holidays',
+            'auto_notify_absent',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'default_mode_display', 'created_at', 'updated_at']
