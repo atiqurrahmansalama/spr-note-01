@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "../../../context/ToastContext";
+import { useRightSidebar } from "../../../context/RightSidebarContext";
 import { fetchWithAuth } from "../../../utils/authService";
 import {
   KeyIcon,
@@ -10,23 +12,22 @@ import {
   BanIcon,
   TrashIcon,
   DownloadIcon,
-  PrinterIcon,
   CloseIcon,
   DotsVerticalIcon,
-  SparklesIcon,
-  CheckCircleIcon,
+  ShareIcon,
   AlertTriangleIcon,
 } from "../../../components/ui/Icons";
-import CustomSelect from "../../../components/ui/CustomSelect";
+import RoleInviteCreateForm from "./RoleInviteCreateForm";
 
 export default function RoleInviteManagerView() {
   const { showToast } = useToast();
+  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+
   const [invites, setInvites] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedInvite, setSelectedInvite] = useState(null);
   const [deletingInvite, setDeletingInvite] = useState(null);
@@ -34,14 +35,8 @@ export default function RoleInviteManagerView() {
 
   // Action Menu Dropdown State
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [menuDirection, setMenuDirection] = useState("down");
   const menuContainerRef = useRef(null);
-
-  // Form states
-  const [title, setTitle] = useState("");
-  const [targetRole, setTargetRole] = useState("");
-  const [maxUses, setMaxUses] = useState(1);
-  const [expiryPreset, setExpiryPreset] = useState("24h");
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -76,9 +71,6 @@ export default function RoleInviteManagerView() {
         const data = await roleRes.json();
         const roleList = data.results || data || [];
         setRoles(roleList);
-        if (roleList.length > 0 && !targetRole) {
-          setTargetRole(String(roleList[0].id));
-        }
       }
     } catch {
       showToast("Failed to load invites and roles.", "error");
@@ -87,55 +79,21 @@ export default function RoleInviteManagerView() {
     }
   };
 
-  const handleCreateInvite = async (e) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      showToast("Please enter a title.", "warning");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      let expires_at = null;
-      if (expiryPreset !== "never") {
-        const now = new Date();
-        if (expiryPreset === "1h") now.setHours(now.getHours() + 1);
-        else if (expiryPreset === "24h") now.setDate(now.getDate() + 1);
-        else if (expiryPreset === "7d") now.setDate(now.getDate() + 7);
-        else if (expiryPreset === "30d") now.setDate(now.getDate() + 30);
-        expires_at = now.toISOString();
-      }
-
-      const payload = {
-        title: title.trim(),
-        target_role: parseInt(targetRole),
-        max_uses: parseInt(maxUses) || 0,
-        expires_at,
-        is_active: true,
-      };
-
-      const res = await fetchWithAuth("/api/v1/admin/invites/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        showToast("Invite generated successfully!", "success");
-        setShowCreateModal(false);
-        setTitle("");
-        setMaxUses(1);
-        setExpiryPreset("24h");
-        loadData();
-      } else {
-        const errData = await res.json();
-        showToast(errData.error || errData.detail || "Failed to generate invite.", "error");
-      }
-    } catch {
-      showToast("Network connection error.", "error");
-    } finally {
-      setSubmitting(false);
-    }
+  const handleOpenCreateInSidebar = () => {
+    openRightSidebar({
+      title: "Generate Role Invite & QR",
+      width: 620,
+      content: (
+        <RoleInviteCreateForm
+          roles={roles}
+          onSaved={() => {
+            loadData();
+            closeRightSidebar();
+          }}
+          onCancel={closeRightSidebar}
+        />
+      ),
+    });
   };
 
   const handleRevoke = async (id) => {
@@ -189,6 +147,24 @@ export default function RoleInviteManagerView() {
     showToast("Join link copied to clipboard!", "success");
   };
 
+  const handleToggleMenu = (e, inviteId) => {
+    e.stopPropagation();
+    if (activeMenuId === inviteId) {
+      setActiveMenuId(null);
+      return;
+    }
+
+    // Detect if click is near bottom of viewport to open menu upward
+    const rect = e.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 220) {
+      setMenuDirection("up");
+    } else {
+      setMenuDirection("down");
+    }
+    setActiveMenuId(inviteId);
+  };
+
   const downloadQR = (format = "png") => {
     const svgEl = document.getElementById("invite-qr-svg");
     if (!svgEl) return;
@@ -232,66 +208,84 @@ export default function RoleInviteManagerView() {
     }
   };
 
-  const printOnboardingCard = () => {
-    const svgEl = document.getElementById("invite-qr-svg");
-    if (!svgEl) return;
-    const svgString = new XMLSerializer().serializeToString(svgEl);
+  const handleShareInviteAndQR = async () => {
+    if (!selectedInvite) return;
+    const url = getJoinUrl(selectedInvite.token);
+    const shareText = `You're invited to join "${selectedInvite.title}" on Suffah Notes.\nRole: ${selectedInvite.target_role_name}\nDirect link to claim role: ${url}`;
 
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Onboarding Card</title>
-          <style>
-            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f8fafc; }
-            .card { width: 340px; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 32px; text-align: center; border: 1px solid #e2e8f0; }
-            .logo { font-size: 20px; font-weight: 800; color: #0284c7; margin-bottom: 20px; letter-spacing: -0.5px; }
-            .qr-container { display: flex; justify-content: center; margin: 20px 0; }
-            .title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
-            .role { display: inline-block; background: #e0f2fe; color: #0369a1; font-weight: 700; padding: 4px 14px; border-radius: 9999px; font-size: 11px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
-            .instructions { font-size: 11px; color: #64748b; line-height: 1.6; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="logo">Suffah Notes</div>
-            <div class="title">${selectedInvite.title}</div>
-            <div class="role">${selectedInvite.target_role_name}</div>
-            <div class="qr-container">${svgString}</div>
-            <div class="instructions">Scan this QR code to claim your role and instantly onboard into the institutional portal.</div>
-          </div>
-          <script>
-            window.onload = () => {
-              window.print();
-              window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    // 1. Copy message and link to clipboard first
+    try {
+      await navigator.clipboard.writeText(shareText);
+    } catch {
+      // fallback
+    }
+
+    // 2. Prepare QR Image Blob for Native Web Share API if supported
+    const svgEl = document.getElementById("invite-qr-svg");
+    if (svgEl) {
+      const svgString = new XMLSerializer().serializeToString(svgEl);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      img.onload = async () => {
+        canvas.width = 512;
+        canvas.height = 512;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, 512, 512);
+        ctx.drawImage(img, 24, 24, 464, 464);
+        URL.revokeObjectURL(svgUrl);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            showToast("Invite text & link copied to clipboard!", "success");
+            return;
+          }
+
+          const file = new File([blob], `invite_${selectedInvite.title.replace(/\s+/g, "_")}.png`, {
+            type: "image/png",
+          });
+
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                title: selectedInvite.title,
+                text: shareText,
+                url: url,
+                files: [file],
+              });
+              showToast("Shared successfully!", "success");
+              return;
+            } catch (err) {
+              if (err.name !== "AbortError") {
+                showToast("Invite message & link copied to clipboard!", "success");
+              }
+              return;
+            }
+          }
+
+          // Desktop fallback: Download image and announce text copy
+          downloadQR("png");
+          showToast("Invite link copied & QR image downloaded!", "success");
+        }, "image/png");
+      };
+      img.src = svgUrl;
+    } else {
+      showToast("Invite text & link copied to clipboard!", "success");
+    }
   };
 
-  const roleOptions = roles.map((r) => ({
-    value: String(r.id),
-    label: `${r.name} (${r.code})`,
-    desc: `Assigns ${r.name} permissions on join`,
-  }));
-
-  const expiryOptions = [
-    { value: "1h", label: "1 Hour Duration" },
-    { value: "24h", label: "24 Hours (1 Day)" },
-    { value: "7d", label: "7 Days (1 Week)" },
-    { value: "30d", label: "30 Days (1 Month)" },
-    { value: "never", label: "Never Expires (Permanent)" },
-  ];
-
   return (
-    <div className="w-full max-w-6xl mx-auto py-6 px-4 font-sans theme-text-primary animate-fade-in select-none" ref={menuContainerRef}>
+    <div
+      className="w-full max-w-6xl mx-auto py-6 px-4 font-sans theme-text-primary animate-fade-in select-none"
+      ref={menuContainerRef}
+    >
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-xs">
+          <div className="w-10 h-10 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)] shadow-xs">
             <KeyIcon className="w-5 h-5" />
           </div>
           <div>
@@ -305,7 +299,7 @@ export default function RoleInviteManagerView() {
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={handleOpenCreateInSidebar}
           className="px-5 py-2.5 rounded-2xl theme-bg-accent theme-accent-text font-bold text-xs shadow-md hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer"
         >
           <PlusIcon className="w-4 h-4" />
@@ -321,7 +315,7 @@ export default function RoleInviteManagerView() {
         </div>
       ) : invites.length === 0 ? (
         <div className="w-full theme-bg-elevated border theme-border rounded-3xl p-12 text-center shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-2xl theme-bg-sub flex items-center justify-center mx-auto text-sky-400 shadow-inner">
+          <div className="w-12 h-12 rounded-2xl theme-bg-sub flex items-center justify-center mx-auto text-[var(--accent-main)] shadow-inner">
             <QrCodeIcon className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold theme-text-primary">No Invite Links Created Yet</h3>
@@ -330,8 +324,8 @@ export default function RoleInviteManagerView() {
           </p>
         </div>
       ) : (
-        <div className="rounded-3xl theme-bg-elevated border theme-border shadow-xs overflow-visible">
-          <div className="overflow-x-auto overflow-y-visible">
+        <div className="rounded-3xl theme-bg-elevated border theme-border shadow-xs pb-32">
+          <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b theme-border/40 theme-bg-sub/50 text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
@@ -355,13 +349,13 @@ export default function RoleInviteManagerView() {
                     >
                       <td className="px-5 py-3.5">
                         <span className="font-bold theme-text-primary block">{invite.title}</span>
-                        <span className="text-[10px] font-mono text-sky-400">
+                        <span className="text-[10px] font-mono text-[var(--accent-main)]">
                           {invite.token?.slice(0, 16)}...
                         </span>
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-wider">
+                        <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold theme-bg-sub text-[var(--accent-main)] border theme-border uppercase tracking-wider">
                           {invite.target_role_name}
                         </span>
                       </td>
@@ -399,15 +393,12 @@ export default function RoleInviteManagerView() {
                         </span>
                       </td>
 
-                      {/* 3-Dots Action Menu Dropdown */}
+                      {/* 3-Dots Action Menu Dropdown with Smart Up/Down Orientation */}
                       <td className="px-5 py-3.5 text-right relative">
                         <div className="inline-block text-left relative">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuId((prev) => (prev === invite.id ? null : invite.id));
-                            }}
+                            onClick={(e) => handleToggleMenu(e, invite.id)}
                             className={`p-1.5 rounded-xl border transition-all cursor-pointer shadow-xs ${
                               isMenuOpen
                                 ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
@@ -418,11 +409,13 @@ export default function RoleInviteManagerView() {
                             <DotsVerticalIcon className="w-4 h-4" />
                           </button>
 
-                          {/* Action Menu Popup */}
+                          {/* Action Menu Popup (Opens Upward if near bottom) */}
                           {isMenuOpen && (
                             <div
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl theme-bg-elevated border theme-border shadow-2xl p-1.5 space-y-1 animate-fade-in text-left"
+                              className={`absolute right-0 z-[100] w-48 rounded-2xl theme-bg-elevated border theme-border shadow-2xl p-1.5 space-y-1 animate-fade-in text-left ${
+                                menuDirection === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"
+                              }`}
                             >
                               <button
                                 type="button"
@@ -433,8 +426,8 @@ export default function RoleInviteManagerView() {
                                 }}
                                 className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer"
                               >
-                                <QrCodeIcon className="w-3.5 h-3.5 text-sky-400" />
-                                <span>View QR Code</span>
+                                <QrCodeIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
+                                <span>View &amp; Share QR</span>
                               </button>
 
                               <button
@@ -443,7 +436,7 @@ export default function RoleInviteManagerView() {
                                 className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold theme-text-primary hover:theme-bg-sub transition flex items-center gap-2 cursor-pointer"
                               >
                                 <CopyIcon className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Copy Link</span>
+                                <span>Copy Join Link</span>
                               </button>
 
                               {isValid && (
@@ -483,122 +476,14 @@ export default function RoleInviteManagerView() {
         </div>
       )}
 
-      {/* --- CREATE INVITE MODAL --- */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 select-none">
-          <div className="w-full max-w-lg theme-bg-elevated border theme-border rounded-3xl shadow-2xl overflow-hidden animate-zoom-in">
-            {/* Header */}
-            <div className="px-6 py-5 border-b theme-border flex justify-between items-center bg-black/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
-                  <KeyIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm theme-text-primary">Generate Role Invite &amp; QR</h3>
-                  <p className="text-[11px] theme-text-secondary mt-0.5">
-                    Create a tokenized URL and printable QR card for onboarding
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
-              >
-                <CloseIcon className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleCreateInvite} className="p-6 space-y-5">
-              <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Title / Batch Label <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Hifz Faculty Induction 2026"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 text-xs font-medium theme-text-primary"
-                  required
-                />
-              </div>
-
-              <div>
-                <CustomSelect
-                  label="Target Assigned Role"
-                  value={targetRole}
-                  onChange={(val) => setTargetRole(val)}
-                  options={roleOptions}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Max Allowed Usages
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0 for unlimited uses"
-                    value={maxUses}
-                    onChange={(e) => setMaxUses(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-4 py-3 rounded-2xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)] text-xs font-medium theme-text-primary"
-                  />
-                  <p className="text-[10px] theme-text-secondary mt-1">
-                    Set 0 for unlimited multi-person registration.
-                  </p>
-                </div>
-
-                <div>
-                  <CustomSelect
-                    label="Token Expiration"
-                    value={expiryPreset}
-                    onChange={(val) => setExpiryPreset(val)}
-                    options={expiryOptions}
-                  />
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="pt-4 border-t theme-border flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-5 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub transition text-xs font-bold theme-text-primary cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2.5 rounded-2xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
-                >
-                  {submitting ? (
-                    <span>Generating...</span>
-                  ) : (
-                    <>
-                      <SparklesIcon className="w-3.5 h-3.5" />
-                      <span>Generate Invite Token</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- QR VIEWER & DOWNLOADER MODAL --- */}
-      {showQRModal && selectedInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 select-none">
+      {/* --- QR VIEWER, DOWNLOADER & SHARER MODAL (Portaled with z-[9999]) --- */}
+      {showQRModal && selectedInvite && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 select-none animate-fade-in">
           <div className="w-full max-w-md theme-bg-elevated border theme-border rounded-3xl shadow-2xl overflow-hidden animate-zoom-in">
             {/* Header */}
             <div className="px-6 py-4 border-b theme-border flex justify-between items-center bg-black/10">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <div className="w-8 h-8 rounded-xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)]">
                   <QrCodeIcon className="w-4 h-4" />
                 </div>
                 <h3 className="font-bold text-sm theme-text-primary">Onboarding QR Code</h3>
@@ -611,15 +496,15 @@ export default function RoleInviteManagerView() {
               </button>
             </div>
 
-            {/* QR Card */}
+            {/* QR Card Body */}
             <div className="p-6 text-center space-y-4">
               <div className="flex flex-col items-center">
                 <h4 className="font-bold text-base theme-text-primary">{selectedInvite.title}</h4>
-                <span className="px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-bold uppercase tracking-wider mt-1 mb-4">
+                <span className="px-2.5 py-0.5 rounded-full theme-bg-sub text-[var(--accent-main)] border theme-border text-[10px] font-bold uppercase tracking-wider mt-1 mb-4">
                   {selectedInvite.target_role_name}
                 </span>
 
-                {/* High Contrast White QR Card */}
+                {/* High Contrast White QR Card Container */}
                 <div className="p-5 bg-white border border-zinc-200 rounded-3xl shadow-xl flex items-center justify-center">
                   <QRCodeSVG
                     id="invite-qr-svg"
@@ -631,14 +516,24 @@ export default function RoleInviteManagerView() {
                 </div>
               </div>
 
-              {/* Download Buttons */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              {/* Direct Share Button (With QR image + Invite Message & Link) */}
+              <button
+                type="button"
+                onClick={handleShareInviteAndQR}
+                className="w-full py-3 rounded-2xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-90 transition cursor-pointer shadow-md flex items-center justify-center gap-2"
+              >
+                <ShareIcon className="w-4 h-4" />
+                <span>Share QR Code &amp; Invite Link</span>
+              </button>
+
+              {/* Download Format Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => downloadQR("png")}
                   className="px-4 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub transition text-xs font-bold theme-text-primary cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <DownloadIcon className="w-3.5 h-3.5 text-sky-400" />
+                  <DownloadIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
                   <span>Download PNG</span>
                 </button>
                 <button
@@ -646,28 +541,19 @@ export default function RoleInviteManagerView() {
                   onClick={() => downloadQR("svg")}
                   className="px-4 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub transition text-xs font-bold theme-text-primary cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <DownloadIcon className="w-3.5 h-3.5 text-purple-400" />
+                  <DownloadIcon className="w-3.5 h-3.5 text-[var(--accent-main)]" />
                   <span>Download SVG</span>
                 </button>
               </div>
-
-              {/* Print Card Button */}
-              <button
-                type="button"
-                onClick={printOnboardingCard}
-                className="w-full py-3 rounded-2xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-90 transition cursor-pointer shadow-md flex items-center justify-center gap-2"
-              >
-                <PrinterIcon className="w-4 h-4" />
-                <span>Print Physical Onboarding Card</span>
-              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* --- DELETE INVITE CONFIRMATION MODAL --- */}
-      {deletingInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 select-none">
+      {/* --- DELETE INVITE CONFIRMATION MODAL (Portaled with z-[9999]) --- */}
+      {deletingInvite && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 select-none animate-fade-in">
           <div className="w-full max-w-sm theme-bg-elevated border border-rose-500/40 rounded-3xl shadow-2xl p-6 space-y-4 animate-zoom-in">
             <div className="flex items-center gap-3 text-rose-400">
               <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center">
@@ -681,7 +567,7 @@ export default function RoleInviteManagerView() {
 
             <p className="text-xs theme-text-secondary leading-relaxed">
               Are you sure you want to permanently delete the invite token for{" "}
-              <strong className="theme-text-primary">"{deletingInvite.title}"</strong>? Any user trying to onboard with this link will be rejected.
+              <strong className="theme-text-primary">"{deletingInvite.title}"</strong>? Any user attempting to onboard with this link will be rejected.
             </p>
 
             <div className="pt-3 border-t theme-border flex items-center justify-end gap-3">
@@ -703,7 +589,8 @@ export default function RoleInviteManagerView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
