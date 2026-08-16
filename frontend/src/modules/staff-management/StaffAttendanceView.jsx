@@ -5,12 +5,7 @@ import {
   RefreshIcon,
   CalendarIcon,
   SearchIcon,
-  FilterIcon,
-  CheckCircleIcon,
-  TeacherIcon,
-  BuildingOfficeIcon,
   SparklesIcon,
-  SleekCheckIcon,
 } from '../../components/ui/Icons';
 import { getStaffList, getStaffAttendance, bulkPunchAttendance, getMonthlyAttendanceSummary } from '../../api/staff';
 import { useTenant } from '../../context/TenantContext';
@@ -72,7 +67,6 @@ export default function StaffAttendanceView() {
 
       // Build sheet mapping
       const sheet = {};
-      // 1. Initialize all active staff with default values
       staffArray.forEach((s) => {
         sheet[s.id] = {
           staff_id: s.id,
@@ -83,7 +77,6 @@ export default function StaffAttendanceView() {
         };
       });
 
-      // 2. Overlay existing recorded punches
       attArray.forEach((a) => {
         if (sheet[a.staff]) {
           sheet[a.staff] = {
@@ -151,7 +144,6 @@ export default function StaffAttendanceView() {
     showToast('All non-leave staff marked PRESENT!', 'info');
   };
 
-  // Row update helper
   const handleRowChange = (staffId, field, value) => {
     setAttendanceSheet((prev) => ({
       ...prev,
@@ -162,7 +154,6 @@ export default function StaffAttendanceView() {
     }));
   };
 
-  // Save Attendance Sheet
   const handleSaveAttendance = async () => {
     setIsSaving(true);
     try {
@@ -180,7 +171,6 @@ export default function StaffAttendanceView() {
     }
   };
 
-  // Compute live counter metrics for the active sheet
   const currentRecords = Object.values(attendanceSheet);
   const countPresent = currentRecords.filter((r) => r.status === 'PRESENT').length;
   const countLate = currentRecords.filter((r) => r.status === 'LATE').length;
@@ -199,7 +189,7 @@ export default function StaffAttendanceView() {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
       {/* 1. Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -207,34 +197,34 @@ export default function StaffAttendanceView() {
             <AttendanceIcon className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-zinc-100 flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
               Staff Daily Attendance Sheet
             </h1>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs theme-text-secondary">
               Bulk daily punch recording, automated late detection, and monthly aggregated metrics
             </p>
           </div>
         </div>
 
-        {/* View Switcher & Actions */}
+        {/* View Switcher */}
         <div className="flex items-center gap-2.5">
-          <div className="inline-flex p-1 bg-zinc-950 border border-zinc-800 rounded-xl">
+          <div className="inline-flex p-1 theme-bg-sub border theme-border rounded-xl">
             <button
               onClick={() => setActiveViewMode('daily')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeViewMode === 'daily'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'theme-bg-accent theme-accent-text shadow'
+                  : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               Daily Punch Sheet
             </button>
             <button
               onClick={() => setActiveViewMode('monthly')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeViewMode === 'monthly'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'theme-bg-accent theme-accent-text shadow'
+                  : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               Monthly Analytics
@@ -246,24 +236,24 @@ export default function StaffAttendanceView() {
       {activeViewMode === 'daily' ? (
         <>
           {/* 2. Date Selector & Summary Counters Bar */}
-          <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+          <div className="p-4 rounded-2xl theme-bg-surface border theme-border space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Date Picker & Dept Selector */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl">
+                <div className="flex items-center gap-2 theme-bg-sub border theme-border px-3 py-1.5 rounded-xl">
                   <CalendarIcon className="w-4 h-4 text-emerald-400" />
                   <input
                     type="date"
                     value={activeDate}
                     onChange={(e) => setActiveDate(e.target.value)}
-                    className="bg-transparent text-xs text-zinc-200 focus:outline-none font-semibold cursor-pointer"
+                    className="bg-transparent text-xs theme-text-primary focus:outline-none font-semibold cursor-pointer"
                   />
                 </div>
 
                 <select
                   value={selectedDept}
                   onChange={(e) => setSelectedDept(e.target.value)}
-                  className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-emerald-500"
+                  className="px-3 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer"
                 >
                   <option value="ALL">All Departments</option>
                   {departments.map((d) => (
@@ -274,13 +264,13 @@ export default function StaffAttendanceView() {
                 </select>
 
                 <div className="relative min-w-[200px]">
-                  <SearchIcon className="absolute left-2.5 top-2 w-3.5 h-3.5 text-zinc-400" />
+                  <SearchIcon className="absolute left-2.5 top-2 w-3.5 h-3.5 theme-text-secondary" />
                   <input
                     type="text"
                     placeholder="Search staff on sheet..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 placeholder-zinc-500"
+                    className="w-full pl-8 pr-3 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 placeholder:theme-text-secondary"
                   />
                 </div>
               </div>
@@ -290,7 +280,7 @@ export default function StaffAttendanceView() {
                 <button
                   type="button"
                   onClick={handleMarkAllPresent}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 theme-bg-sub hover:theme-bg-elevated theme-text-primary text-xs font-semibold rounded-xl border theme-border transition-colors cursor-pointer"
                 >
                   <SparklesIcon className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Mark All Present</span>
@@ -300,7 +290,7 @@ export default function StaffAttendanceView() {
                   type="button"
                   onClick={handleSaveAttendance}
                   disabled={isSaving || staffList.length === 0}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow transition-all cursor-pointer"
                 >
                   <SaveIcon className="w-4 h-4" />
                   <span>{isSaving ? 'Saving Sheet...' : 'Save Attendance Sheet'}</span>
@@ -309,7 +299,7 @@ export default function StaffAttendanceView() {
             </div>
 
             {/* Counter Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-zinc-800/80">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t theme-border">
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                 <div className="text-lg font-bold text-emerald-400">{countPresent}</div>
                 <div className="text-[10px] uppercase font-semibold text-emerald-300">Present</div>
@@ -339,7 +329,7 @@ export default function StaffAttendanceView() {
 
           {/* 3. Bulk Punch Table Sheet */}
           {isLoading ? (
-            <div className="p-12 text-center text-zinc-400 flex flex-col items-center justify-center gap-3">
+            <div className="p-12 text-center theme-text-secondary flex flex-col items-center justify-center gap-3">
               <svg className="animate-spin w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -347,13 +337,13 @@ export default function StaffAttendanceView() {
               <span className="text-sm font-medium">Loading attendance sheet...</span>
             </div>
           ) : filteredStaff.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-zinc-900/40 border border-zinc-800 text-zinc-400 text-xs">
+            <div className="p-12 text-center rounded-2xl theme-bg-surface border theme-border theme-text-secondary text-xs">
               No staff members found for the selected department.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl bg-zinc-900 border border-zinc-800 shadow-xl">
-              <table className="w-full text-left text-xs text-zinc-300">
-                <thead className="bg-zinc-950 text-zinc-400 text-[11px] uppercase tracking-wider border-b border-zinc-800">
+            <div className="overflow-x-auto rounded-2xl theme-bg-surface border theme-border shadow-xl">
+              <table className="w-full text-left text-xs theme-text-primary">
+                <thead className="theme-bg-sub theme-text-secondary text-[11px] uppercase tracking-wider border-b theme-border">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">Employee</th>
                     <th className="py-3.5 px-4 font-semibold text-center">Attendance Status</th>
@@ -362,13 +352,13 @@ export default function StaffAttendanceView() {
                     <th className="py-3.5 px-4 font-semibold">Remarks</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/60">
+                <tbody className="divide-y theme-border">
                   {filteredStaff.map((staff) => {
                     const row = attendanceSheet[staff.id] || { status: 'PRESENT', in_time: '08:30', out_time: '16:30', remarks: '' };
                     const isTeaching = staff.staff_type === 'TEACHING';
 
                     return (
-                      <tr key={staff.id} className="hover:bg-zinc-800/30 transition-colors">
+                      <tr key={staff.id} className="hover:theme-bg-elevated/40 transition-colors">
                         {/* Employee Identity */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
@@ -378,10 +368,10 @@ export default function StaffAttendanceView() {
                               {staff.user_name ? staff.user_name[0] : 'S'}
                             </div>
                             <div>
-                              <div className="font-semibold text-zinc-100">
+                              <div className="font-semibold theme-text-primary">
                                 {staff.user_name || 'Staff Member'}
                               </div>
-                              <div className="text-[11px] text-zinc-500 font-mono">
+                              <div className="text-[11px] theme-text-secondary font-mono">
                                 {staff.employee_id} • {staff.designation}
                               </div>
                             </div>
@@ -411,7 +401,7 @@ export default function StaffAttendanceView() {
                                   onChange={(e) => handleRowChange(staff.id, 'status', e.target.value)}
                                   className="sr-only peer"
                                 />
-                                <span className={`inline-flex items-center justify-center w-8 h-7 rounded-lg text-xs font-bold font-mono bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-zinc-700 transition-all ${pill.color}`}>
+                                <span className={`inline-flex items-center justify-center w-8 h-7 rounded-lg text-xs font-bold font-mono theme-bg-sub border theme-border theme-text-secondary hover:border-[var(--accent-main)]/50 transition-all ${pill.color}`}>
                                   {pill.label}
                                 </span>
                               </label>
@@ -426,7 +416,7 @@ export default function StaffAttendanceView() {
                             value={row.in_time || ''}
                             onChange={(e) => handleRowChange(staff.id, 'in_time', e.target.value)}
                             disabled={row.status === 'ABSENT' || row.status === 'ON_LEAVE'}
-                            className="px-2 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500 disabled:opacity-30"
+                            className="px-2 py-1 theme-bg-sub border theme-border rounded-lg text-xs font-mono theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 disabled:opacity-30"
                           />
                         </td>
 
@@ -437,7 +427,7 @@ export default function StaffAttendanceView() {
                             value={row.out_time || ''}
                             onChange={(e) => handleRowChange(staff.id, 'out_time', e.target.value)}
                             disabled={row.status === 'ABSENT' || row.status === 'ON_LEAVE'}
-                            className="px-2 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500 disabled:opacity-30"
+                            className="px-2 py-1 theme-bg-sub border theme-border rounded-lg text-xs font-mono theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 disabled:opacity-30"
                           />
                         </td>
 
@@ -448,7 +438,7 @@ export default function StaffAttendanceView() {
                             placeholder="Optional notes..."
                             value={row.remarks || ''}
                             onChange={(e) => handleRowChange(staff.id, 'remarks', e.target.value)}
-                            className="w-full px-2.5 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 placeholder-zinc-600"
+                            className="w-full px-2.5 py-1 theme-bg-sub border theme-border rounded-lg text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 placeholder:theme-text-secondary"
                           />
                         </td>
                       </tr>
@@ -461,9 +451,9 @@ export default function StaffAttendanceView() {
         </>
       ) : (
         /* MONTHLY ANALYTICS SUMMARY */
-        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-            <h3 className="text-base font-bold text-zinc-100">
+        <div className="p-6 rounded-2xl theme-bg-surface border theme-border space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b theme-border pb-4">
+            <h3 className="text-base font-bold theme-text-primary">
               Monthly Attendance Analytics Summary
             </h3>
 
@@ -471,7 +461,7 @@ export default function StaffAttendanceView() {
               <select
                 value={monthlyYear}
                 onChange={(e) => setMonthlyYear(parseInt(e.target.value, 10))}
-                className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200"
+                className="px-3 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary cursor-pointer"
               >
                 {[2025, 2026, 2027].map((y) => (
                   <option key={y} value={y}>{y}</option>
@@ -481,7 +471,7 @@ export default function StaffAttendanceView() {
               <select
                 value={monthlyMonth}
                 onChange={(e) => setMonthlyMonth(parseInt(e.target.value, 10))}
-                className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200"
+                className="px-3 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary cursor-pointer"
               >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <option key={m} value={m}>
@@ -492,7 +482,7 @@ export default function StaffAttendanceView() {
 
               <button
                 onClick={loadMonthlySummary}
-                className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-semibold"
+                className="p-2 theme-bg-sub hover:theme-bg-elevated theme-text-primary rounded-xl text-xs font-semibold cursor-pointer border theme-border"
               >
                 <RefreshIcon className="w-4 h-4" />
               </button>
@@ -500,36 +490,36 @@ export default function StaffAttendanceView() {
           </div>
 
           {isLoadingMonthly ? (
-            <div className="p-8 text-center text-zinc-400">Loading analytics...</div>
+            <div className="p-8 text-center theme-text-secondary">Loading analytics...</div>
           ) : monthlyData ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+                <div className="p-5 rounded-3xl theme-bg-sub border theme-border text-center">
                   <div className="text-3xl font-extrabold text-emerald-400">
                     {monthlyData.attendance_percentage}%
                   </div>
-                  <div className="text-xs text-zinc-400 font-semibold mt-1">Attendance Ratio</div>
+                  <div className="text-xs theme-text-secondary font-semibold mt-1">Attendance Ratio</div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
-                  <div className="text-3xl font-extrabold text-zinc-200">
+                <div className="p-5 rounded-3xl theme-bg-sub border theme-border text-center">
+                  <div className="text-3xl font-extrabold theme-text-primary">
                     {monthlyData.total_recorded_logs}
                   </div>
-                  <div className="text-xs text-zinc-400 font-semibold mt-1">Total Logs Punched</div>
+                  <div className="text-xs theme-text-secondary font-semibold mt-1">Total Logs Punched</div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+                <div className="p-5 rounded-3xl theme-bg-sub border theme-border text-center">
                   <div className="text-3xl font-extrabold text-amber-400">
                     {monthlyData.late_count}
                   </div>
-                  <div className="text-xs text-zinc-400 font-semibold mt-1">Late Arrivals</div>
+                  <div className="text-xs theme-text-secondary font-semibold mt-1">Late Arrivals</div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+                <div className="p-5 rounded-3xl theme-bg-sub border theme-border text-center">
                   <div className="text-3xl font-extrabold text-sky-400">
                     {monthlyData.on_leave_count}
                   </div>
-                  <div className="text-xs text-zinc-400 font-semibold mt-1">Approved Leaves</div>
+                  <div className="text-xs theme-text-secondary font-semibold mt-1">Approved Leaves</div>
                 </div>
               </div>
             </div>

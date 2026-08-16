@@ -8,15 +8,12 @@ import {
   SearchIcon,
   PlusIcon,
   QrCodeIcon,
-  FilterIcon,
   EditIcon,
   TrashIcon,
   PhoneIcon,
-  MailIcon,
   RefreshIcon,
   ClassIcon,
   BuildingOfficeIcon,
-  BankIcon,
   SparklesIcon,
 } from '../../components/ui/Icons';
 import { getStaffList, getStaffMetrics, deleteStaff } from '../../api/staff';
@@ -100,7 +97,7 @@ export default function StaffDirectoryView() {
       if (staffTypeFilter === 'TEACHING') {
         params.staff_type = 'TEACHING';
       } else if (staffTypeFilter === 'NON_TEACHING') {
-        params.staff_type = 'SUPPORT'; // backend filter
+        params.staff_type = 'SUPPORT';
       }
 
       const [listRes, metricsRes] = await Promise.all([
@@ -155,7 +152,7 @@ export default function StaffDirectoryView() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
       {/* 1. Header & Navigation Hub */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -164,13 +161,13 @@ export default function StaffDirectoryView() {
               <TeacherIcon className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-zinc-100 flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
                 Teacher & Staff Management
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-medium">
                   Multi-Tenant
                 </span>
               </h1>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs theme-text-secondary mt-0.5">
                 Faculty directory, academic class assignments, attendance punching, and leave desk
               </p>
             </div>
@@ -182,7 +179,7 @@ export default function StaffDirectoryView() {
           <button
             onClick={() => loadData(true)}
             disabled={isRefreshing}
-            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            className="p-2 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
             title="Refresh Directory"
           >
             <RefreshIcon className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -190,7 +187,7 @@ export default function StaffDirectoryView() {
 
           <button
             onClick={() => navigate('/staff/attendance')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl theme-bg-surface border theme-border hover:theme-bg-elevated theme-text-primary text-xs font-semibold transition-colors cursor-pointer"
           >
             <AttendanceIcon className="w-4 h-4 text-emerald-400" />
             <span>Attendance Sheet</span>
@@ -198,7 +195,7 @@ export default function StaffDirectoryView() {
 
           <button
             onClick={() => navigate('/staff/leaves')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl theme-bg-surface border theme-border hover:theme-bg-elevated theme-text-primary text-xs font-semibold transition-colors cursor-pointer"
           >
             <LeaveIcon className="w-4 h-4 text-amber-400" />
             <span>Leave Desk</span>
@@ -206,7 +203,7 @@ export default function StaffDirectoryView() {
 
           <button
             onClick={() => setIsInviteOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm cursor-pointer"
           >
             <QrCodeIcon className="w-4 h-4" />
             <span>Invite via QR</span>
@@ -214,7 +211,7 @@ export default function StaffDirectoryView() {
 
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-600/20 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold shadow transition-all cursor-pointer"
           >
             <PlusIcon className="w-4 h-4" />
             <span>Add Staff Member</span>
@@ -225,81 +222,89 @@ export default function StaffDirectoryView() {
       {/* 2. Top Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {/* Total Staff */}
-        <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur shadow-sm flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <TeacherIcon className="w-5 h-5" />
-          </div>
+        <div className="p-5 rounded-3xl theme-bg-surface border theme-border shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-zinc-100">{metrics.total_staff || 0}</div>
-            <div className="text-[11px] font-medium text-zinc-400">Total Employees</div>
+            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
+              Total Employees
+            </span>
+            <p className="text-2xl font-extrabold mt-1 text-sky-400">{metrics.total_staff || 0}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+            <TeacherIcon className="w-6 h-6" />
           </div>
         </div>
 
         {/* Teaching Faculty */}
-        <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur shadow-sm flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-            <SparklesIcon className="w-5 h-5" />
-          </div>
+        <div className="p-5 rounded-3xl theme-bg-surface border theme-border shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-sky-400">{metrics.teaching_staff || 0}</div>
-            <div className="text-[11px] font-medium text-zinc-400">Teaching Faculty</div>
+            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
+              Teaching Faculty
+            </span>
+            <p className="text-2xl font-extrabold mt-1 text-emerald-400">{metrics.teaching_staff || 0}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+            <SparklesIcon className="w-6 h-6" />
           </div>
         </div>
 
         {/* Non-Academic Operations */}
-        <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur shadow-sm flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-            <BuildingOfficeIcon className="w-5 h-5" />
-          </div>
+        <div className="p-5 rounded-3xl theme-bg-surface border theme-border shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-purple-400">{metrics.general_staff || 0}</div>
-            <div className="text-[11px] font-medium text-zinc-400">General Operations</div>
+            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
+              General Operations
+            </span>
+            <p className="text-2xl font-extrabold mt-1 text-purple-400">{metrics.general_staff || 0}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
+            <BuildingOfficeIcon className="w-6 h-6" />
           </div>
         </div>
 
         {/* On Leave Today */}
-        <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur shadow-sm flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <LeaveIcon className="w-5 h-5" />
-          </div>
+        <div className="p-5 rounded-3xl theme-bg-surface border theme-border shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-amber-400">{metrics.on_leave_today || 0}</div>
-            <div className="text-[11px] font-medium text-zinc-400">On Leave Today</div>
+            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
+              On Leave Today
+            </span>
+            <p className="text-2xl font-extrabold mt-1 text-amber-400">{metrics.on_leave_today || 0}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+            <LeaveIcon className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* 3. Search, Segmented Filters & Display Modes */}
-      <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800/80 space-y-4">
+      <div className="p-4 rounded-2xl theme-bg-surface border theme-border space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Segmented Category Buttons */}
-          <div className="inline-flex p-1 rounded-xl bg-zinc-950 border border-zinc-800 self-start">
+          <div className="inline-flex p-1 rounded-xl theme-bg-sub border theme-border self-start">
             <button
               onClick={() => setStaffTypeFilter('ALL')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 staffTypeFilter === 'ALL'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'theme-bg-accent theme-accent-text shadow'
+                  : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               All Staff ({metrics.total_staff || 0})
             </button>
             <button
               onClick={() => setStaffTypeFilter('TEACHING')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 staffTypeFilter === 'TEACHING'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'theme-bg-accent theme-accent-text shadow'
+                  : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               Teaching ({metrics.teaching_staff || 0})
             </button>
             <button
               onClick={() => setStaffTypeFilter('NON_TEACHING')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 staffTypeFilter === 'NON_TEACHING'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'theme-bg-accent theme-accent-text shadow'
+                  : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               Non-Academic ({metrics.general_staff || 0})
@@ -310,13 +315,13 @@ export default function StaffDirectoryView() {
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search Input */}
             <div className="relative min-w-[220px] flex-1 sm:flex-initial">
-              <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+              <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 theme-text-secondary" />
               <input
                 type="text"
                 placeholder="Search staff, ID, phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500 placeholder-zinc-500"
+                className="w-full pl-9 pr-3 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 placeholder:theme-text-secondary"
               />
             </div>
 
@@ -324,7 +329,7 @@ export default function StaffDirectoryView() {
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-sky-500"
+              className="px-2.5 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer"
             >
               <option value="ALL">All Departments</option>
               {departments.map((d) => (
@@ -338,7 +343,7 @@ export default function StaffDirectoryView() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-sky-500"
+              className="px-2.5 py-1.5 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
               <option value="PERMANENT">Permanent</option>
@@ -352,21 +357,21 @@ export default function StaffDirectoryView() {
             {/* Trash Toggle */}
             <button
               onClick={() => setShowTrash(!showTrash)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 showTrash
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                  : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
               }`}
             >
               {showTrash ? 'Viewing Trash' : 'Trash'}
             </button>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center p-1 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="flex items-center p-1 theme-bg-sub border theme-border rounded-xl">
               <button
                 onClick={() => handleToggleViewMode('grid')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  viewMode === 'grid' ? 'bg-zinc-800 text-zinc-100 shadow' : 'text-zinc-400 hover:text-zinc-200'
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  viewMode === 'grid' ? 'theme-bg-elevated theme-text-primary shadow' : 'theme-text-secondary hover:theme-text-primary'
                 }`}
                 title="Grid Cards"
               >
@@ -374,8 +379,8 @@ export default function StaffDirectoryView() {
               </button>
               <button
                 onClick={() => handleToggleViewMode('table')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  viewMode === 'table' ? 'bg-zinc-800 text-zinc-100 shadow' : 'text-zinc-400 hover:text-zinc-200'
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  viewMode === 'table' ? 'theme-bg-elevated theme-text-primary shadow' : 'theme-text-secondary hover:theme-text-primary'
                 }`}
                 title="Table List"
               >
@@ -388,7 +393,7 @@ export default function StaffDirectoryView() {
 
       {/* 4. Staff Content (Cards or Table) */}
       {isLoading ? (
-        <div className="p-12 text-center text-zinc-400 flex flex-col items-center justify-center gap-3">
+        <div className="p-12 text-center theme-text-secondary flex flex-col items-center justify-center gap-3">
           <svg className="animate-spin w-8 h-8 text-sky-400" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -396,19 +401,19 @@ export default function StaffDirectoryView() {
           <span className="text-sm font-medium">Loading staff directory...</span>
         </div>
       ) : staffList.length === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-zinc-900/30 border border-zinc-800 flex flex-col items-center justify-center gap-3">
-          <div className="p-4 rounded-2xl bg-zinc-800/50 text-zinc-400">
+        <div className="p-12 text-center rounded-2xl theme-bg-surface border theme-border flex flex-col items-center justify-center gap-3">
+          <div className="p-4 rounded-2xl theme-bg-sub text-sky-400 border theme-border">
             <TeacherIcon className="w-8 h-8" />
           </div>
-          <h3 className="text-base font-semibold text-zinc-200">No Staff Members Found</h3>
-          <p className="text-xs text-zinc-400 max-w-sm">
+          <h3 className="text-base font-semibold theme-text-primary">No Staff Members Found</h3>
+          <p className="text-xs theme-text-secondary max-w-sm">
             {searchQuery || staffTypeFilter !== 'ALL' || deptFilter !== 'ALL'
               ? 'No records match your active search filters.'
               : 'Start by adding teaching faculty or onboarding staff via invite token.'}
           </p>
           <button
             onClick={handleOpenCreate}
-            className="mt-2 flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold shadow transition-colors"
+            className="mt-2 flex items-center gap-2 px-4 py-2 theme-bg-accent theme-accent-text hover:opacity-90 rounded-xl text-xs font-semibold shadow transition-colors cursor-pointer"
           >
             <PlusIcon className="w-4 h-4" />
             <span>Add Staff Profile</span>
@@ -426,7 +431,7 @@ export default function StaffDirectoryView() {
             return (
               <div
                 key={staff.id}
-                className="group relative rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-zinc-700 p-5 transition-all hover:shadow-xl hover:shadow-black/40 flex flex-col justify-between"
+                className="group relative rounded-2xl theme-bg-surface border theme-border hover:theme-bg-elevated/40 p-5 transition-all hover:shadow-xl flex flex-col justify-between"
               >
                 <div>
                   {/* Card Header & Avatar */}
@@ -442,13 +447,13 @@ export default function StaffDirectoryView() {
                       <div>
                         <h3
                           onClick={() => navigate(`/staff/${staff.id}`)}
-                          className="text-sm font-semibold text-zinc-100 group-hover:text-sky-400 transition-colors cursor-pointer"
+                          className="text-sm font-semibold theme-text-primary group-hover:text-sky-400 transition-colors cursor-pointer"
                         >
                           {staff.user_name || 'Staff Profile'}
                         </h3>
-                        <div className="text-xs text-zinc-400">{staff.designation}</div>
-                        <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                          ID: <span className="text-zinc-300 font-semibold">{staff.employee_id}</span>
+                        <div className="text-xs theme-text-secondary">{staff.designation}</div>
+                        <div className="text-[11px] font-mono theme-text-secondary mt-0.5">
+                          ID: <span className="theme-text-primary font-semibold">{staff.employee_id}</span>
                         </div>
                       </div>
                     </div>
@@ -458,29 +463,29 @@ export default function StaffDirectoryView() {
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         : staff.employment_status === 'PROBATION'
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        : 'theme-bg-sub theme-text-secondary border theme-border'
                     }`}>
                       {staff.employment_status}
                     </span>
                   </div>
 
                   {/* Attributes & Metadata */}
-                  <div className="mt-4 pt-3 border-t border-zinc-800/80 space-y-2 text-xs text-zinc-400">
+                  <div className="mt-4 pt-3 border-t theme-border space-y-2 text-xs theme-text-secondary">
                     <div className="flex items-center justify-between">
-                      <span className="text-zinc-500">Department:</span>
-                      <span className="text-zinc-200 font-medium">{staff.department_name || 'General / Unassigned'}</span>
+                      <span>Department:</span>
+                      <span className="theme-text-primary font-medium">{staff.department_name || 'General / Unassigned'}</span>
                     </div>
 
                     {isTeaching ? (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="text-zinc-500">Specialization:</span>
-                          <span className="text-zinc-200 font-medium truncate max-w-[160px]">
+                          <span>Specialization:</span>
+                          <span className="theme-text-primary font-medium truncate max-w-[160px]">
                             {staff.teacher_detail?.specialization || 'General Teaching'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-zinc-500">Active Classes:</span>
+                          <span>Active Classes:</span>
                           <span className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 font-mono text-[11px] font-semibold">
                             {staff.active_assignments_count || 0} Assigned
                           </span>
@@ -489,13 +494,13 @@ export default function StaffDirectoryView() {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="text-zinc-500">Assigned Zone:</span>
-                          <span className="text-zinc-200 font-medium">
+                          <span>Assigned Zone:</span>
+                          <span className="theme-text-primary font-medium">
                             {staff.general_detail?.assigned_zone || 'Campus Wide'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-zinc-500">Active Tasks:</span>
+                          <span>Active Tasks:</span>
                           <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-mono text-[11px] font-semibold">
                             {staff.active_duties_count || 0} Duties
                           </span>
@@ -504,8 +509,8 @@ export default function StaffDirectoryView() {
                     )}
 
                     {staff.user_phone && (
-                      <div className="flex items-center gap-1.5 text-zinc-400 pt-1">
-                        <PhoneIcon className="w-3.5 h-3.5 text-zinc-500" />
+                      <div className="flex items-center gap-1.5 theme-text-secondary pt-1">
+                        <PhoneIcon className="w-3.5 h-3.5" />
                         <span className="font-mono text-[11px]">{staff.user_phone}</span>
                       </div>
                     )}
@@ -513,12 +518,12 @@ export default function StaffDirectoryView() {
                 </div>
 
                 {/* Card Action Bar */}
-                <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                <div className="mt-4 pt-3 border-t theme-border flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
                     {isTeaching ? (
                       <button
                         onClick={() => setAssignmentTeacher(staff)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-semibold transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-semibold transition-colors cursor-pointer"
                         title="Manage Assigned Classes"
                       >
                         <ClassIcon className="w-3.5 h-3.5" />
@@ -527,7 +532,7 @@ export default function StaffDirectoryView() {
                     ) : (
                       <button
                         onClick={() => setDutyStaff(staff)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold transition-colors cursor-pointer"
                         title="Manage Operational Duties"
                       >
                         <DutyIcon className="w-3.5 h-3.5" />
@@ -537,7 +542,7 @@ export default function StaffDirectoryView() {
 
                     <button
                       onClick={() => navigate(`/staff/${staff.id}`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                      className="px-2.5 py-1.5 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-primary text-xs font-medium transition-colors cursor-pointer"
                     >
                       Profile
                     </button>
@@ -546,14 +551,14 @@ export default function StaffDirectoryView() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEdit(staff)}
-                      className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-sky-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:text-sky-400 transition-colors cursor-pointer"
                       title="Edit Profile"
                     >
                       <EditIcon className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeletingStaff(staff)}
-                      className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:text-rose-400 transition-colors cursor-pointer"
                       title="Delete Staff"
                     >
                       <TrashIcon className="w-3.5 h-3.5" />
@@ -566,9 +571,9 @@ export default function StaffDirectoryView() {
         </div>
       ) : (
         /* HIGH DENSITY TABLE DISPLAY */
-        <div className="overflow-x-auto rounded-2xl bg-zinc-900 border border-zinc-800">
-          <table className="w-full text-left text-xs text-zinc-300">
-            <thead className="bg-zinc-950/80 text-zinc-400 text-[11px] uppercase tracking-wider border-b border-zinc-800">
+        <div className="overflow-x-auto rounded-2xl theme-bg-surface border theme-border">
+          <table className="w-full text-left text-xs theme-text-primary">
+            <thead className="theme-bg-sub theme-text-secondary text-[11px] uppercase tracking-wider border-b theme-border">
               <tr>
                 <th className="py-3.5 px-4 font-semibold">Employee</th>
                 <th className="py-3.5 px-4 font-semibold">Staff Type</th>
@@ -579,11 +584,11 @@ export default function StaffDirectoryView() {
                 <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y theme-border">
               {staffList.map((staff) => {
                 const isTeaching = staff.staff_type === 'TEACHING';
                 return (
-                  <tr key={staff.id} className="hover:bg-zinc-800/30 transition-colors">
+                  <tr key={staff.id} className="hover:theme-bg-elevated/40 transition-colors">
                     {/* Employee */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
@@ -595,11 +600,11 @@ export default function StaffDirectoryView() {
                         <div>
                           <div
                             onClick={() => navigate(`/staff/${staff.id}`)}
-                            className="font-semibold text-zinc-100 hover:text-sky-400 cursor-pointer"
+                            className="font-semibold theme-text-primary hover:text-sky-400 cursor-pointer"
                           >
                             {staff.user_name || 'Staff Profile'}
                           </div>
-                          <div className="text-[11px] text-zinc-500 font-mono">
+                          <div className="text-[11px] theme-text-secondary font-mono">
                             {staff.employee_id} • {staff.designation}
                           </div>
                         </div>
@@ -616,7 +621,7 @@ export default function StaffDirectoryView() {
                     </td>
 
                     {/* Department */}
-                    <td className="py-3 px-4 text-zinc-300">
+                    <td className="py-3 px-4 theme-text-primary">
                       {staff.department_name || 'General'}
                     </td>
 
@@ -625,7 +630,7 @@ export default function StaffDirectoryView() {
                       <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                         staff.employment_status === 'PERMANENT'
                           ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-zinc-800 text-zinc-400'
+                          : 'theme-bg-sub theme-text-secondary'
                       }`}>
                         {staff.employment_status}
                       </span>
@@ -636,14 +641,14 @@ export default function StaffDirectoryView() {
                       {isTeaching ? (
                         <button
                           onClick={() => setAssignmentTeacher(staff)}
-                          className="px-2 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-mono text-[11px] font-semibold transition-colors"
+                          className="px-2 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-mono text-[11px] font-semibold transition-colors cursor-pointer"
                         >
                           {staff.active_assignments_count || 0} Classes
                         </button>
                       ) : (
                         <button
                           onClick={() => setDutyStaff(staff)}
-                          className="px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-[11px] font-semibold transition-colors"
+                          className="px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-[11px] font-semibold transition-colors cursor-pointer"
                         >
                           {staff.active_duties_count || 0} Duties
                         </button>
@@ -651,7 +656,7 @@ export default function StaffDirectoryView() {
                     </td>
 
                     {/* Contact */}
-                    <td className="py-3 px-4 font-mono text-[11px] text-zinc-400">
+                    <td className="py-3 px-4 font-mono text-[11px] theme-text-secondary">
                       {staff.user_phone || '—'}
                     </td>
 
@@ -660,20 +665,20 @@ export default function StaffDirectoryView() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => navigate(`/staff/${staff.id}`)}
-                          className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium"
+                          className="px-2 py-1 rounded theme-bg-sub hover:theme-bg-elevated theme-text-primary text-[11px] font-medium cursor-pointer"
                         >
                           View
                         </button>
                         <button
                           onClick={() => handleOpenEdit(staff)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-sky-400"
+                          className="p-1 rounded hover:theme-bg-elevated theme-text-secondary hover:text-sky-400 cursor-pointer"
                           title="Edit"
                         >
                           <EditIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingStaff(staff)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-rose-400"
+                          className="p-1 rounded hover:theme-bg-elevated theme-text-secondary hover:text-rose-400 cursor-pointer"
                           title="Delete"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
@@ -733,26 +738,26 @@ export default function StaffDirectoryView() {
       {/* Delete Confirmation Modal */}
       {deletingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-800 p-6 space-y-4 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl theme-bg-surface border theme-border p-6 space-y-4 shadow-2xl theme-text-primary">
             <div className="flex items-center gap-3 text-rose-400">
               <TrashIcon className="w-6 h-6" />
-              <h3 className="text-base font-bold text-zinc-100">Soft-Delete Staff Member?</h3>
+              <h3 className="text-base font-bold theme-text-primary">Soft-Delete Staff Member?</h3>
             </div>
-            <p className="text-xs text-zinc-400">
-              Are you sure you want to deactivate and soft-delete <span className="text-zinc-200 font-semibold">{deletingStaff.user_name || deletingStaff.employee_id}</span>?
+            <p className="text-xs theme-text-secondary">
+              Are you sure you want to deactivate and soft-delete <span className="theme-text-primary font-semibold">{deletingStaff.user_name || deletingStaff.employee_id}</span>?
               All active class assignments and duties will be deactivated immediately.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeletingStaff(null)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 rounded-lg"
+                className="px-3 py-1.5 text-xs theme-text-secondary hover:theme-text-primary rounded-lg cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50 cursor-pointer"
               >
                 {isDeleting ? 'Deleting...' : 'Confirm Delete'}
               </button>
