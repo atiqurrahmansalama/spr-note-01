@@ -17,39 +17,43 @@ export default function LandingPageView() {
   const themeContext = useTheme();
 
   return (
-    <div className="min-h-screen theme-bg-app theme-text-primary overflow-x-hidden relative font-sans scroll-smooth">
-      {/* Sleek Landing Header */}
-      <header className="theme-bg-surface/85 border-b theme-border px-4 py-3 flex justify-between items-center z-30 shadow-md sticky top-0 backdrop-blur-md select-none">
+    <div className="min-h-screen theme-bg-app theme-text-primary overflow-x-hidden relative font-sans scroll-smooth selection:bg-[var(--accent-main)] selection:text-white">
+      {/* Sleek Animated Landing Header */}
+      <header className="theme-bg-surface/85 border-b theme-border px-4 py-3 flex justify-between items-center z-30 shadow-md sticky top-0 backdrop-blur-md select-none transition-colors duration-300">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
           {/* Logo Branding */}
           <div
             className="flex items-center gap-2.5 cursor-pointer group"
             onClick={() => navigate("/")}
           >
-            <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center font-black text-xs shadow-md group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center font-black text-xs shadow-md group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
               SPR
             </div>
-            <span className="font-extrabold theme-text-primary text-base sm:text-lg tracking-wide group-hover:theme-accent transition">
+            <span className="font-extrabold theme-text-primary text-base sm:text-lg tracking-wide group-hover:theme-accent transition-colors duration-200">
               SPR Note
             </span>
           </div>
 
           {/* Quick Nav Links (Desktop) */}
-          <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold theme-text-secondary">
-            <a href="#hifz-tracker" className="hover:theme-text-primary transition">
-              হিফজ ট্র্যাকার
+          <nav className="hidden lg:flex items-center gap-6 text-xs font-bold theme-text-secondary">
+            <a href="#hifz-tracker" className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200">
+              Hifz Tracker
             </a>
-            <a href="#audience" className="hover:theme-text-primary transition">
-              ইনস্টিটিউশন
+            <a href="#attendance" className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200">
+              Attendance Matrix
             </a>
-            <a href="#features" className="hover:theme-text-primary transition">
-              ফিচারসমূহ
+            <a href="#audience" className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200">
+              Institutions
             </a>
-            <a href="#verification" className="hover:theme-text-primary transition">
-              ভেরিফিকেশন
+            <a href="#features" className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200">
+              Features
             </a>
-            <a href="#creator" className="hover:theme-text-primary transition text-[var(--accent-main)]">
-              ক্রিয়েটর
+            <a href="#verification" className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200">
+              Verification
+            </a>
+            <a href="#creator" className="hover:theme-text-primary text-[var(--accent-main)] transition-colors duration-200 flex items-center gap-1 font-extrabold">
+              <span>Creator</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] animate-ping" />
             </a>
           </nav>
 
@@ -80,10 +84,10 @@ export default function LandingPageView() {
               <button
                 type="button"
                 onClick={() => navigate("/report-builder")}
-                className="px-4.5 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-98 transition cursor-pointer flex items-center gap-1.5"
+                className="px-4.5 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-95 hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center gap-1.5 group"
               >
-                <SparklesIcon className="w-3.5 h-3.5" />
-                <span>হিফজ রিপোর্ট জেনারেটর</span>
+                <SparklesIcon className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+                <span>Hifz Report Generator</span>
               </button>
             ) : (
               <>
@@ -97,7 +101,7 @@ export default function LandingPageView() {
                 <button
                   type="button"
                   onClick={() => navigate("/register")}
-                  className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-98 transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-95 hover:shadow-lg transition-all duration-200 cursor-pointer"
                 >
                   Get Started
                 </button>
@@ -107,17 +111,27 @@ export default function LandingPageView() {
         </div>
       </header>
 
-      {/* Full-Screen Sections Breakdown */}
+      {/* Full-Screen Animated Sections Breakdown */}
       <main className="space-y-0">
         <LandingHero />
         <div id="hifz-tracker">
           <LandingHifzTracker />
         </div>
-        <LandingAttendanceMatrix />
-        <LandingAudience />
-        <LandingFeatures />
-        <LandingVerifySearch />
-        <LandingCreatorSpotlight />
+        <div id="attendance">
+          <LandingAttendanceMatrix />
+        </div>
+        <div id="audience">
+          <LandingAudience />
+        </div>
+        <div id="features">
+          <LandingFeatures />
+        </div>
+        <div id="verification">
+          <LandingVerifySearch />
+        </div>
+        <div id="creator">
+          <LandingCreatorSpotlight />
+        </div>
       </main>
 
       <LandingFooter />
