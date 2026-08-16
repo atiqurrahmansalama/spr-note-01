@@ -1,0 +1,115 @@
+import React from "react";
+import { SparklesIcon, ShieldCheckIcon, AcademicCapIcon, BuildingOfficeIcon } from "../../components/ui/Icons";
+
+export default function LandingCreatorSpotlight() {
+  return (
+    <section id="creator" className="min-h-screen flex flex-col justify-center items-center py-24 px-4 theme-bg-app relative overflow-hidden select-none">
+      {/* Dynamic Ambient Background Glows */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] sm:w-[700px] h-[450px] sm:h-[700px] bg-[var(--accent-main)]/10 rounded-full blur-[140px] sm:blur-[180px] pointer-events-none -z-10" />
+
+      <div className="max-w-5xl w-full mx-auto space-y-12 relative z-10">
+        {/* Creator Badge Header */}
+        <div className="text-center space-y-4 max-w-2xl mx-auto animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full theme-bg-elevated border theme-border shadow-md backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+            <span className="text-[11px] sm:text-xs font-bold theme-text-primary uppercase tracking-widest">
+              Lead Architect &amp; Software Engineer
+            </span>
+          </div>
+
+          <h2 className="text-3xl sm:text-5xl font-black theme-text-primary tracking-tight">
+            জেনারেটেড বাই <span className="text-[var(--accent-main)]">Atiqur Rahman</span>
+          </h2>
+
+          <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed max-w-xl mx-auto">
+            Crafted with passion, architectural precision, and deep dedication to modernizing Quranic education and academic institutional recordkeeping worldwide.
+          </p>
+        </div>
+
+        {/* Creator Showcase Card */}
+        <div className="theme-bg-surface border theme-border rounded-3xl p-6 sm:p-10 shadow-2xl hover:border-[var(--accent-main)]/40 transition-all duration-300 relative group overflow-hidden">
+          {/* Subtle Ambient Top Accent Light */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent-main)] to-transparent opacity-80" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left: Avatar & Identity Summary */}
+            <div className="lg:col-span-5 flex flex-col items-center text-center space-y-4 sm:space-y-5 border-b lg:border-b-0 lg:border-r theme-border pb-8 lg:pb-0 lg:pr-8">
+              <div className="relative">
+                {/* Glowing Avatar Frame */}
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl theme-bg-elevated border-2 theme-border flex items-center justify-center text-3xl sm:text-4xl font-black text-[var(--accent-main)] shadow-2xl relative group-hover:scale-105 transition-transform duration-300">
+                  AR
+                </div>
+                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-2xl theme-bg-accent theme-accent-text flex items-center justify-center shadow-lg">
+                  <SparklesIcon className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black theme-text-primary tracking-tight">
+                  Atiqur Rahman
+                </h3>
+                <p className="text-xs font-bold text-[var(--accent-main)] mt-0.5 uppercase tracking-wider">
+                  Full-Stack Software Engineer &amp; EdTech Creator
+                </p>
+                <p className="text-[11px] theme-text-secondary mt-1">
+                  Creator &amp; System Architect of SPR Note Ecosystem
+                </p>
+              </div>
+
+              {/* Core Attributes Badges */}
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                {["Enterprise Architecture", "Modern React & Django", "Multi-Tenant Security", "Quranic EdTech"].map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-1 rounded-xl text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Vision, Biography & Mission Highlights */}
+            <div className="lg:col-span-7 space-y-5 text-left">
+              <div className="space-y-3">
+                <h4 className="text-sm sm:text-base font-bold theme-text-primary flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent-main)]"></span>
+                  <span>About the Creator &amp; System Vision</span>
+                </h4>
+                <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed">
+                  <strong>Atiqur Rahman</strong> is an accomplished full-stack software engineer and tech innovator focused on building resilient, high-speed, and human-centric software for Islamic academic institutions and educators.
+                </p>
+                <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed">
+                  With SPR Note, the goal was clear: eliminate paper-based disorganization and clumsy spreadsheets by providing madrasahs, colleges, and independent hifz teachers with an enterprise-grade, privacy-first management suite that works seamlessly on desktop and mobile alike.
+                </p>
+              </div>
+
+              {/* Engineering Highlights Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3">
+                <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-xs theme-text-primary">
+                    <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
+                    <span>Security-First Design</span>
+                  </div>
+                  <p className="text-[11px] theme-text-secondary leading-snug">
+                    Strict role-based isolation, encrypted tokenized invites, and audit matrices.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-xs theme-text-primary">
+                    <AcademicCapIcon className="w-4 h-4 text-sky-400" />
+                    <span>Holistic Hifz Tracking</span>
+                  </div>
+                  <p className="text-[11px] theme-text-secondary leading-snug">
+                    Real-time Sabaq, Sabqi, and Amokhta accuracy indicators for 30 Juz.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
