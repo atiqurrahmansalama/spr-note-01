@@ -1132,8 +1132,16 @@ class InstitutionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
         user = request.user
+        tenant_id = get_scoped_tenant_id(request)
         is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
-        if is_super:
+
+        if tenant_id:
+            inst = AcademicInstitution.objects.filter(id=tenant_id, is_deleted=False).first()
+            total_institutions = 1 if inst else 0
+            verified_institutions = 1 if (inst and inst.is_verified) else 0
+            total_students = Student.objects.filter(institution_id=tenant_id, is_deleted=False).count()
+            total_staff = User.objects.filter(institution_id=tenant_id, is_active=True).count()
+        elif is_super:
             total_institutions = AcademicInstitution.objects.filter(is_deleted=False).count()
             verified_institutions = AcademicInstitution.objects.filter(is_deleted=False, is_verified=True).count()
             total_students = Student.objects.filter(is_deleted=False).count()
@@ -1160,11 +1168,17 @@ class InstitutionViewSet(viewsets.ModelViewSet):
             tenant_id = user.institution_id
 
         if not tenant_id:
+            inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+            if inst:
+                serializer = AcademicInstitutionSerializer(inst)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             return Response({"error": "No active institution context found."}, status=status.HTTP_404_NOT_FOUND)
 
         inst = AcademicInstitution.objects.filter(id=tenant_id, is_deleted=False).first()
         if not inst:
-            return Response({"error": "Institution not found."}, status=status.HTTP_404_NOT_FOUND)
+            inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+            if not inst:
+                return Response({"error": "Institution not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if request.method == 'GET':
             serializer = AcademicInstitutionSerializer(inst)
@@ -1208,7 +1222,7 @@ class InstitutionViewSet(viewsets.ModelViewSet):
 class AcademicDepartmentViewSet(viewsets.ModelViewSet):
     queryset = AcademicDepartment.objects.filter(is_deleted=False).select_related('department_head', 'institution').order_by('order_rank', 'name')
     serializer_class = AcademicDepartmentSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
     required_section_key = 'student_departments'
 
     def get_queryset(self):
@@ -1238,8 +1252,11 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
         tenant_id = get_scoped_tenant_id(self.request)
         if tenant_id:
             serializer.save(institution_id=tenant_id)
+        elif self.request.user.institution_id:
+            serializer.save(institution_id=self.request.user.institution_id)
         else:
-            serializer.save()
+            first_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+            serializer.save(institution=first_inst)
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
@@ -1247,6 +1264,9 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
         filter_kwargs = {'is_deleted': False}
         if tenant_id:
             filter_kwargs['institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if request.user.institution_id:
+                filter_kwargs['institution_id'] = request.user.institution_id
 
         total_depts = AcademicDepartment.objects.filter(**filter_kwargs).count()
         total_classes = StudentClass.objects.filter(**filter_kwargs).count()

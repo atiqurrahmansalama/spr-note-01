@@ -96,7 +96,7 @@ export default function InstitutionListView() {
       if (metricsData) setMetrics(metricsData);
     } catch (err) {
       console.error('[Load Institutions Error]:', err);
-      showToast('Failed to load institutions.', 'error');
+      showToast(err.message || 'Failed to load institutions.', 'error');
     } finally {
       setIsLoading(false);
     }

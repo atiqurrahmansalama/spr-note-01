@@ -50,7 +50,8 @@ export default function DepartmentManagementView() {
       } else {
         const err = await res.json().catch(() => ({}));
         console.error("[DepartmentManagementView] HTTP Error:", res.status, err);
-        showToast(err.detail || err.error || `Failed to load departments (Status ${res.status}).`, "error");
+        const errMsg = err.message || err.detail || err.error || `Failed to load departments (Status ${res.status}).`;
+        showToast(errMsg, "error");
       }
     } catch (e) {
       console.error("[DepartmentManagementView] Exception:", e);
