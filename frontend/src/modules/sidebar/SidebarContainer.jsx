@@ -27,6 +27,11 @@ import {
   TeacherIcon,
   AttendanceIcon,
   LeaveIcon,
+  GateIcon,
+  FingerprintIcon,
+  MatrixIcon,
+  ChecklistIcon,
+  TimerIcon,
 } from "../../components/ui/Icons";
 
 export default function SidebarContainer({ 
@@ -45,7 +50,10 @@ export default function SidebarContainer({
   const [openSubMenus, setOpenSubMenus] = useState({
     "Academic Institution": true,
     "Student Management": true,
-    "Staff Management": true,
+    "Student Attendance": true,
+    "Teacher & Staff Attendance": true,
+    "Staff Management": false,
+    "Attendance Settings & Devices": false,
     "Report Generator": false,
     "App Management": false,
     Settings: false,
@@ -88,6 +96,31 @@ export default function SidebarContainer({
       ]
     },
     {
+      id: "Student Attendance",
+      name: "Student Attendance",
+      Icon: AttendanceIcon,
+      hasSub: true,
+      key: "nav_student_attendance",
+      subItems: [
+        { id: "Period & Class Roll Call", name: "Period & Class Roll Call", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
+        { id: "Gate Entry & Pass", name: "Gate Entry & Pass", path: "/attendance/students/gate-log", Icon: GateIcon, key: "student_gate_tracker" },
+        { id: "Surprise Headcount", name: "Surprise Headcount", path: "/attendance/students/adhoc", Icon: ChecklistIcon, key: "student_adhoc_headcount" },
+        { id: "31-Day Student Register", name: "31-Day Student Register", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
+      ]
+    },
+    {
+      id: "Teacher & Staff Attendance",
+      name: "Teacher & Staff Attendance",
+      Icon: TeacherIcon,
+      hasSub: true,
+      key: "nav_staff_attendance",
+      subItems: [
+        { id: "Teacher Period Matrix", name: "Teacher Period Matrix", path: "/attendance/staff/teacher-matrix", Icon: MatrixIcon, key: "teacher_period_matrix" },
+        { id: "Staff Daily Timesheet", name: "Staff Daily Timesheet", path: "/attendance/staff/daily-punch", Icon: TimerIcon, key: "staff_daily_attendance" },
+        { id: "Leave & Substitution Desk", name: "Leave & Substitution Desk", path: "/attendance/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
+      ]
+    },
+    {
       id: "Staff Management",
       name: "Staff Management",
       Icon: TeacherIcon,
@@ -95,21 +128,18 @@ export default function SidebarContainer({
       key: "nav_staff_management",
       subItems: [
         { id: "Staff Directory", name: "Staff Directory", path: "/staff", Icon: TeacherIcon, key: "staff_management" },
-        { id: "Staff Attendance", name: "Staff Attendance", path: "/staff/attendance", Icon: AttendanceIcon, key: "staff_attendance" },
-        { id: "Leave Desk", name: "Leave Desk", path: "/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
       ]
     },
     {
-      id: "Attendance & Calendar",
-      name: "Attendance & Calendar",
-      Icon: AttendanceIcon,
+      id: "Attendance Settings & Devices",
+      name: "Settings & Devices",
+      Icon: SettingsIcon,
       hasSub: true,
       key: "nav_attendance_management",
       subItems: [
-        { id: "Student Attendance", name: "Student Attendance", path: "/attendance/student", Icon: AttendanceIcon, key: "student_attendance" },
-        { id: "Monthly Register", name: "Monthly Register", path: "/attendance/monthly-register", Icon: AdmissionIcon, key: "monthly_attendance_matrix" },
+        { id: "Slots & Routine Manager", name: "Slots & Routine Manager", path: "/attendance/settings", Icon: SettingsIcon, key: "attendance_policies_slots" },
+        { id: "Biometric Devices", name: "Biometric Devices", path: "/attendance/devices", Icon: FingerprintIcon, key: "biometric_device_manager" },
         { id: "Institutional Calendar", name: "Institutional Calendar", path: "/calendar", Icon: CalendarIcon, key: "institutional_calendar" },
-        { id: "Slots & Policies", name: "Slots & Policies", path: "/attendance/settings", Icon: SettingsIcon, key: "attendance_policies_slots" },
       ]
     },
     {

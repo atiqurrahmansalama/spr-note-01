@@ -193,13 +193,13 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
       const payload = {
         staff_type: formData.staff_type,
         designation: formData.designation.trim(),
-        department: formData.department ? Number(formData.department) : null,
+        department: formData.department ? String(formData.department) : null,
         employment_status: formData.employment_status,
         joining_date: formData.joining_date || null,
         emergency_contact: formData.emergency_contact.trim(),
         nid_no: formData.nid_no.trim(),
         blood_group: formData.blood_group,
-        salary_type: formData.salary_type,
+        salary_type: formData.salary_type || 'MONTHLY',
         base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
         bank_name: formData.bank_name.trim(),
         bank_account_no: formData.bank_account_no.trim(),
@@ -207,6 +207,7 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
       };
 
       if (!isEditing) {
+        payload.user = Number(formData.user_id);
         payload.user_id = Number(formData.user_id);
       }
 

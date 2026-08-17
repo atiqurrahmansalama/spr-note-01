@@ -1466,9 +1466,12 @@ class StaffProfile(models.Model):
 
     SALARY_TYPE_CHOICES = (
         ('MONTHLY', 'Monthly Fixed'),
+        ('MONTHLY_FIXED', 'Monthly Fixed'),
         ('HOURLY', 'Hourly Rate'),
         ('FIXED', 'Fixed Project/Contract'),
         ('COMMISSION', 'Commission Based'),
+        ('PER_PERIOD', 'Per Class / Lecture Period'),
+        ('VOLUNTEER', 'Honorary / Volunteer'),
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -1982,6 +1985,20 @@ class StudentAttendance(models.Model):
         on_delete=models.CASCADE,
         related_name='attendances'
     )
+    student_class = models.ForeignKey(
+        StudentClass,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='student_class_attendances'
+    )
+    period_slot = models.ForeignKey(
+        'DynamicPeriodSlot',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='student_period_attendances'
+    )
     session_slot = models.ForeignKey(
         AttendanceSessionSlot,
         null=True,
@@ -1997,6 +2014,22 @@ class StudentAttendance(models.Model):
         db_index=True
     )
     in_time = models.TimeField(null=True, blank=True)
+    out_time = models.TimeField(null=True, blank=True)
+    taken_by_teacher = models.ForeignKey(
+        TeacherProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='conducted_student_attendances'
+    )
+    substitute_teacher = models.ForeignKey(
+        TeacherProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='substitute_student_attendances'
+    )
+    is_bunk_discrepancy = models.BooleanField(default=False)
     marked_by = models.ForeignKey(
         'User',
         null=True,
@@ -2013,16 +2046,369 @@ class StudentAttendance(models.Model):
         ordering = ['-date', 'student__roll_number', 'student__name']
         constraints = [
             models.UniqueConstraint(
-                fields=['student', 'session_slot', 'date'],
-                name='unique_student_slot_date_attendance'
+                fields=['student', 'period_slot', 'date'],
+                name='unique_student_period_date_attendance'
             )
         ]
         verbose_name = "Student Attendance"
         verbose_name_plural = "Student Attendance Records"
 
     def __str__(self):
-        slot_str = f" [{self.session_slot.name}]" if self.session_slot else ""
+        slot_name = self.period_slot.period_name if self.period_slot else (self.session_slot.name if self.session_slot else "")
+        slot_str = f" [{slot_name}]" if slot_name else ""
         return f"Student {self.student.roll_number or self.student.name} - {self.date}{slot_str} ({self.get_status_display()})"
+
+
+class DynamicPeriodSlot(models.Model):
+    SLOT_TYPE_CHOICES = (
+        ('PERIOD', 'Academic Class Period'),
+        ('SHIFT', 'Shift / General Attendance'),
+        ('SESSION', 'Sabq / Recitation Session'),
+        ('MUTALAA', 'Mutala\'a / Self Study'),
+        ('BREAK', 'Tiffin / Break'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='dynamic_period_slots'
+    )
+    department = models.ForeignKey(
+        AcademicDepartment,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dynamic_period_slots'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dynamic_period_slots'
+    )
+    slot_type = models.CharField(
+        max_length=20,
+        choices=SLOT_TYPE_CHOICES,
+        default='PERIOD'
+    )
+    period_name = models.CharField(max_length=100)
+    period_order = models.IntegerField(default=1)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    late_grace_minutes = models.IntegerField(default=10)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['period_order', 'start_time', 'period_name']
+        verbose_name = "Dynamic Period Slot"
+        verbose_name_plural = "Dynamic Period Slots"
+
+    def __str__(self):
+        return f"{self.period_name} ({self.start_time}-{self.end_time})"
+
+
+class TeacherRoutineSchedule(models.Model):
+    DAY_OF_WEEK_CHOICES = (
+        ('ALL', 'All Active Days'),
+        ('SATURDAY', 'Saturday'),
+        ('SUNDAY', 'Sunday'),
+        ('MONDAY', 'Monday'),
+        ('TUESDAY', 'Tuesday'),
+        ('WEDNESDAY', 'Wednesday'),
+        ('THURSDAY', 'Thursday'),
+        ('FRIDAY', 'Friday'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='teacher_routines'
+    )
+    teacher = models.ForeignKey(
+        TeacherProfile,
+        on_delete=models.CASCADE,
+        related_name='routine_schedules'
+    )
+    period_slot = models.ForeignKey(
+        DynamicPeriodSlot,
+        on_delete=models.CASCADE,
+        related_name='teacher_routines'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        on_delete=models.CASCADE,
+        related_name='teacher_routines'
+    )
+    student_group = models.ForeignKey(
+        StudentGroup,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='teacher_routines'
+    )
+    subject_or_kitab_name = models.CharField(max_length=150)
+    day_of_week = models.CharField(max_length=20, choices=DAY_OF_WEEK_CHOICES, default='ALL')
+    room_number = models.CharField(max_length=50, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['teacher__name_en', 'period_slot__period_order', 'student_class__name']
+        verbose_name = "Teacher Routine Schedule"
+        verbose_name_plural = "Teacher Routine Schedules"
+
+    def __str__(self):
+        t_name = self.teacher.name_en or str(self.teacher.id)
+        c_name = self.student_class.name if self.student_class else "Class"
+        return f"{t_name} - {c_name} - {self.subject_or_kitab_name} ({self.period_slot.period_name})"
+
+
+class TeacherPeriodAttendanceRecord(models.Model):
+    STATUS_CHOICES = (
+        ('PRESENT', 'Present / Conducted'),
+        ('ABSENT', 'Absent'),
+        ('SUBSTITUTED', 'Conducted by Substitute'),
+        ('LEAVE', 'Approved Leave'),
+        ('HOLIDAY', 'Holiday / Weekend'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='teacher_period_attendances'
+    )
+    schedule = models.ForeignKey(
+        TeacherRoutineSchedule,
+        on_delete=models.CASCADE,
+        related_name='attendance_records'
+    )
+    teacher = models.ForeignKey(
+        TeacherProfile,
+        on_delete=models.CASCADE,
+        related_name='period_attendances'
+    )
+    substitute_teacher = models.ForeignKey(
+        TeacherProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='substitute_period_attendances'
+    )
+    date = models.DateField(db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PRESENT')
+    is_conducted = models.BooleanField(default=True)
+    remarks = models.TextField(blank=True, default='')
+    marked_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='marked_teacher_period_attendances'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', 'teacher__name_en']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['schedule', 'date'],
+                name='unique_schedule_date_teacher_attendance'
+            )
+        ]
+        verbose_name = "Teacher Period Attendance Record"
+        verbose_name_plural = "Teacher Period Attendance Records"
+
+    def __str__(self):
+        t_name = self.teacher.name_en or str(self.teacher.id)
+        return f"{t_name} - {self.schedule.subject_or_kitab_name} on {self.date}: {self.status}"
+
+
+class GateEntryExitLog(models.Model):
+    DIRECTION_CHOICES = (
+        ('ENTRY', 'Campus Entry / In'),
+        ('EXIT', 'Campus Exit / Out'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='gate_logs'
+    )
+    student = models.ForeignKey(
+        Student,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='gate_logs'
+    )
+    staff = models.ForeignKey(
+        TeacherProfile,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='gate_logs'
+    )
+    person_name = models.CharField(max_length=150, blank=True)
+    barcode_or_rfid = models.CharField(max_length=100, blank=True, db_index=True)
+    punch_time = models.DateTimeField(default=timezone.now, db_index=True)
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default='ENTRY')
+    gate_pass_reason = models.CharField(max_length=255, blank=True, default='')
+    device_name = models.CharField(max_length=100, blank=True, default='Main Gate')
+    recorded_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='recorded_gate_logs'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-punch_time']
+        verbose_name = "Gate Entry/Exit Log"
+        verbose_name_plural = "Gate Entry/Exit Logs"
+
+    def __str__(self):
+        target = self.student.name if self.student else (self.staff.name if self.staff else self.person_name)
+        return f"{target} - {self.direction} at {self.punch_time}"
+
+
+class AdHocHeadcountSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='adhoc_headcounts'
+    )
+    title = models.CharField(max_length=200)
+    date_time = models.DateTimeField(default=timezone.now)
+    student_class = models.ForeignKey(
+        StudentClass,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='adhoc_headcounts'
+    )
+    student_group = models.ForeignKey(
+        StudentGroup,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='adhoc_headcounts'
+    )
+    conducted_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='conducted_adhoc_headcounts'
+    )
+    total_expected = models.IntegerField(default=0)
+    total_verified = models.IntegerField(default=0)
+    verified_student_ids = models.JSONField(default=list, blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_time']
+        verbose_name = "Ad-Hoc Headcount Session"
+        verbose_name_plural = "Ad-Hoc Headcount Sessions"
+
+    def __str__(self):
+        return f"{self.title} ({self.total_verified}/{self.total_expected}) at {self.date_time}"
+
+
+class BiometricDevice(models.Model):
+    DEVICE_TYPE_CHOICES = (
+        ('ZKTECO', 'ZKTeco Push / ADMS Protocol'),
+        ('HIKVISION', 'Hikvision ISAPI / Face Terminal'),
+        ('ANVIZ', 'Anviz Biometric / Cloud'),
+        ('RFID_GATE', 'RFID Gate Scanner'),
+        ('GENERIC_REST', 'Generic REST Webhook Device'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='biometric_devices'
+    )
+    device_name = models.CharField(max_length=150)
+    device_serial = models.CharField(max_length=100, unique=True, db_index=True)
+    device_ip = models.GenericIPAddressField(null=True, blank=True)
+    port = models.IntegerField(default=4370)
+    device_type = models.CharField(max_length=30, choices=DEVICE_TYPE_CHOICES, default='ZKTECO')
+    location = models.CharField(max_length=150, blank=True, default='Main Gate')
+    api_key_or_token = models.CharField(max_length=255, blank=True, default='')
+    last_heartbeat = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['device_name']
+        verbose_name = "Biometric Device"
+        verbose_name_plural = "Biometric Devices"
+
+    def __str__(self):
+        return f"{self.device_name} [{self.device_serial}] ({self.location})"
+
+
+class RawAttendancePunchLog(models.Model):
+    PUNCH_TYPE_CHOICES = (
+        ('CHECK_IN', 'Check In / Entry'),
+        ('CHECK_OUT', 'Check Out / Exit'),
+        ('BREAK_OUT', 'Break Out'),
+        ('BREAK_IN', 'Break In'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    device = models.ForeignKey(
+        BiometricDevice,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='raw_punches'
+    )
+    user_pin_or_card = models.CharField(max_length=100, db_index=True)
+    punch_timestamp = models.DateTimeField(db_index=True)
+    punch_type = models.CharField(max_length=20, choices=PUNCH_TYPE_CHOICES, default='CHECK_IN')
+    raw_payload = models.JSONField(default=dict, blank=True)
+    is_processed = models.BooleanField(default=False, db_index=True)
+    matched_student = models.ForeignKey(
+        Student,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='raw_biometric_punches'
+    )
+    matched_teacher = models.ForeignKey(
+        TeacherProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='raw_biometric_punches'
+    )
+    processing_notes = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-punch_timestamp']
+        verbose_name = "Raw Attendance Punch Log"
+        verbose_name_plural = "Raw Attendance Punch Logs"
+
+    def __str__(self):
+        return f"Punch: PIN {self.user_pin_or_card} at {self.punch_timestamp} (Processed: {self.is_processed})"
 
 
 class AttendancePolicySetting(models.Model):

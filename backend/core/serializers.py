@@ -53,6 +53,13 @@ from .models import (
     AttendanceSessionSlot,
     StudentAttendance,
     AttendancePolicySetting,
+    DynamicPeriodSlot,
+    TeacherRoutineSchedule,
+    TeacherPeriodAttendanceRecord,
+    GateEntryExitLog,
+    AdHocHeadcountSession,
+    BiometricDevice,
+    RawAttendancePunchLog,
 )
 
 
@@ -1987,6 +1994,7 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     user_avatar = serializers.CharField(source='user.avatar_url', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    employee_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     teacher_detail = TeacherDetailSerializer(required=False, allow_null=True)
     general_detail = GeneralStaffDetailSerializer(required=False, allow_null=True)
     active_assignments_count = serializers.SerializerMethodField()
@@ -2027,7 +2035,7 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'institution_name', 'department_name', 'created_at', 'updated_at', 'active_assignments_count', 'active_duties_count']
+        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'created_at', 'updated_at', 'active_assignments_count', 'active_duties_count']
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_active_assignments_count(self, obj):
@@ -2036,6 +2044,12 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.INT)
     def get_active_duties_count(self, obj):
         return obj.duties.filter(is_active=True).count()
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'user_id' in data and 'user' not in data:
+            data['user'] = data.pop('user_id')
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
         staff_type = attrs.get('staff_type') or (self.instance.staff_type if self.instance else 'TEACHING')
@@ -2054,6 +2068,13 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         teacher_data = validated_data.pop('teacher_detail', None)
         general_data = validated_data.pop('general_detail', None)
+
+        if not validated_data.get('employee_id'):
+            from .services import StaffOnboardingService
+            validated_data['employee_id'] = StaffOnboardingService.generate_employee_id(
+                validated_data.get('institution'),
+                validated_data.get('staff_type', 'TEACHING')
+            )
 
         with transaction.atomic():
             staff = StaffProfile.objects.create(**validated_data)
@@ -2489,3 +2510,288 @@ class AttendancePolicySettingSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'institution', 'institution_name', 'default_mode_display', 'created_at', 'updated_at']
+
+
+class DynamicPeriodSlotSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    slot_type_display = serializers.CharField(source='get_slot_type_display', read_only=True)
+
+    class Meta:
+        model = DynamicPeriodSlot
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'department',
+            'department_name',
+            'student_class',
+            'class_name',
+            'slot_type',
+            'slot_type_display',
+            'period_name',
+            'period_order',
+            'start_time',
+            'end_time',
+            'late_grace_minutes',
+            'is_active',
+            'is_deleted',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'class_name', 'slot_type_display', 'created_at', 'updated_at']
+
+
+class TeacherRoutineScheduleSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    teacher_name = serializers.SerializerMethodField()
+    period_slot_name = serializers.CharField(source='period_slot.period_name', read_only=True, default='')
+    period_order = serializers.IntegerField(source='period_slot.period_order', read_only=True, default=1)
+    period_start_time = serializers.TimeField(source='period_slot.start_time', read_only=True, default=None)
+    period_end_time = serializers.TimeField(source='period_slot.end_time', read_only=True, default=None)
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+
+    class Meta:
+        model = TeacherRoutineSchedule
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'teacher',
+            'teacher_name',
+            'period_slot',
+            'period_slot_name',
+            'period_order',
+            'period_start_time',
+            'period_end_time',
+            'student_class',
+            'student_class_name',
+            'student_group',
+            'student_group_name',
+            'subject_or_kitab_name',
+            'day_of_week',
+            'room_number',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'teacher_name', 'period_slot_name', 'period_order', 'period_start_time', 'period_end_time', 'student_class_name', 'student_group_name', 'created_at', 'updated_at']
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_teacher_name(self, obj):
+        if not obj.teacher:
+            return ""
+        return obj.teacher.name_en or getattr(obj.teacher, 'name_bn', '') or (obj.teacher.user.phone_number if obj.teacher.user else f"Teacher #{obj.teacher.id}")
+
+
+class TeacherPeriodAttendanceRecordSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    teacher_name = serializers.SerializerMethodField()
+    substitute_teacher_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    schedule_details = TeacherRoutineScheduleSerializer(source='schedule', read_only=True)
+    marked_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeacherPeriodAttendanceRecord
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'schedule',
+            'schedule_details',
+            'teacher',
+            'teacher_name',
+            'substitute_teacher',
+            'substitute_teacher_name',
+            'date',
+            'status',
+            'status_display',
+            'is_conducted',
+            'remarks',
+            'marked_by',
+            'marked_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'teacher_name', 'substitute_teacher_name', 'status_display', 'schedule_details', 'marked_by_name', 'created_at', 'updated_at']
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_teacher_name(self, obj):
+        if not obj.teacher:
+            return ""
+        return obj.teacher.name_en or (obj.teacher.user.phone_number if obj.teacher.user else f"Teacher #{obj.teacher.id}")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_substitute_teacher_name(self, obj):
+        if not obj.substitute_teacher:
+            return ""
+        return obj.substitute_teacher.name_en or (obj.substitute_teacher.user.phone_number if obj.substitute_teacher.user else f"Teacher #{obj.substitute_teacher.id}")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_marked_by_name(self, obj):
+        if not obj.marked_by:
+            return ""
+        return obj.marked_by.username or obj.marked_by.phone_number or f"User #{obj.marked_by.id}"
+
+
+class TeacherMatrixBulkUpdateItemSerializer(serializers.Serializer):
+    schedule_id = serializers.UUIDField()
+    date = serializers.DateField()
+    status = serializers.ChoiceField(choices=TeacherPeriodAttendanceRecord.STATUS_CHOICES, default='PRESENT')
+    substitute_teacher_id = serializers.IntegerField(required=False, allow_null=True)
+    remarks = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class TeacherMatrixBulkUpdateSerializer(serializers.Serializer):
+    records = TeacherMatrixBulkUpdateItemSerializer(many=True)
+
+
+class GateEntryExitLogSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    student_name = serializers.CharField(source='student.name', read_only=True, default='')
+    student_roll = serializers.IntegerField(source='student.roll_number', read_only=True, default=0)
+    student_class_name = serializers.CharField(source='student.student_class.name', read_only=True, default='')
+    staff_name = serializers.CharField(source='staff.name_en', read_only=True, default='')
+    direction_display = serializers.CharField(source='get_direction_display', read_only=True)
+    recorded_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GateEntryExitLog
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'student',
+            'student_name',
+            'student_roll',
+            'student_class_name',
+            'staff',
+            'staff_name',
+            'person_name',
+            'barcode_or_rfid',
+            'punch_time',
+            'direction',
+            'direction_display',
+            'gate_pass_reason',
+            'device_name',
+            'recorded_by',
+            'recorded_by_name',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'student_name', 'student_roll', 'student_class_name', 'staff_name', 'direction_display', 'recorded_by_name', 'created_at']
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_recorded_by_name(self, obj):
+        if not obj.recorded_by:
+            return ""
+        return obj.recorded_by.username or obj.recorded_by.phone_number or f"User #{obj.recorded_by.id}"
+
+
+class AdHocHeadcountSessionSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+    conducted_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AdHocHeadcountSession
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'title',
+            'date_time',
+            'student_class',
+            'student_class_name',
+            'student_group',
+            'student_group_name',
+            'conducted_by',
+            'conducted_by_name',
+            'total_expected',
+            'total_verified',
+            'verified_student_ids',
+            'notes',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'student_class_name', 'student_group_name', 'conducted_by_name', 'created_at']
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_conducted_by_name(self, obj):
+        if not obj.conducted_by:
+            return ""
+        return obj.conducted_by.username or obj.conducted_by.phone_number or f"User #{obj.conducted_by.id}"
+
+
+class BiometricDeviceSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    device_type_display = serializers.CharField(source='get_device_type_display', read_only=True)
+
+    class Meta:
+        model = BiometricDevice
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'device_name',
+            'device_serial',
+            'device_ip',
+            'port',
+            'device_type',
+            'device_type_display',
+            'location',
+            'api_key_or_token',
+            'last_heartbeat',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'device_type_display', 'created_at', 'updated_at']
+
+
+class RawAttendancePunchLogSerializer(serializers.ModelSerializer):
+    device_name = serializers.CharField(source='device.device_name', read_only=True, default='')
+    matched_student_name = serializers.CharField(source='matched_student.name', read_only=True, default='')
+    matched_teacher_name = serializers.CharField(source='matched_teacher.name_en', read_only=True, default='')
+    punch_type_display = serializers.CharField(source='get_punch_type_display', read_only=True)
+
+    class Meta:
+        model = RawAttendancePunchLog
+        fields = [
+            'id',
+            'device',
+            'device_name',
+            'user_pin_or_card',
+            'punch_timestamp',
+            'punch_type',
+            'punch_type_display',
+            'raw_payload',
+            'is_processed',
+            'matched_student',
+            'matched_student_name',
+            'matched_teacher',
+            'matched_teacher_name',
+            'processing_notes',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'device_name', 'matched_student_name', 'matched_teacher_name', 'punch_type_display', 'created_at']
+
+
+class StudentPeriodRollCallItemSerializer(serializers.Serializer):
+    student_id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=StudentAttendance.ATTENDANCE_STATUS_CHOICES, default='PRESENT')
+    in_time = serializers.TimeField(required=False, allow_null=True)
+    out_time = serializers.TimeField(required=False, allow_null=True)
+    remarks = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class StudentPeriodRollCallSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    period_slot_id = serializers.UUIDField()
+    class_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    group_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    taken_by_teacher_id = serializers.IntegerField(required=False, allow_null=True)
+    substitute_teacher_id = serializers.IntegerField(required=False, allow_null=True)
+    records = StudentPeriodRollCallItemSerializer(many=True)

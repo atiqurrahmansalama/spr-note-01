@@ -84,6 +84,13 @@ from .views import (
     AttendanceSlotViewSet,
     StudentAttendanceViewSet,
     AttendancePolicyViewSet,
+    TeacherMatrixViewSet,
+    DynamicPeriodSlotViewSet,
+    TeacherRoutineScheduleViewSet,
+    GateLogViewSet,
+    AdHocHeadcountViewSet,
+    BiometricDeviceViewSet,
+    BiometricGatewayViewSet,
 )
 
 router = DefaultRouter()
@@ -110,6 +117,13 @@ router.register(r'staff', StaffProfileViewSet, basename='staff-profile')
 router.register(r'calendar/events', CalendarEventViewSet, basename='calendar-events')
 router.register(r'calendar/tasks', InstitutionalTaskViewSet, basename='calendar-tasks')
 router.register(r'attendance/slots', AttendanceSlotViewSet, basename='attendance-slots')
+router.register(r'attendance/period-slots', DynamicPeriodSlotViewSet, basename='attendance-period-slots')
+router.register(r'attendance/routines', TeacherRoutineScheduleViewSet, basename='attendance-routines')
+router.register(r'attendance/teacher-matrix', TeacherMatrixViewSet, basename='attendance-teacher-matrix')
+router.register(r'attendance/gate-logs', GateLogViewSet, basename='attendance-gate-logs')
+router.register(r'attendance/adhoc-headcounts', AdHocHeadcountViewSet, basename='attendance-adhoc-headcounts')
+router.register(r'attendance/devices', BiometricDeviceViewSet, basename='attendance-devices')
+router.register(r'attendance/biometric', BiometricGatewayViewSet, basename='attendance-biometric')
 router.register(r'attendance/students', StudentAttendanceViewSet, basename='attendance-students')
 router.register(r'attendance/policy', AttendancePolicyViewSet, basename='attendance-policy')
 

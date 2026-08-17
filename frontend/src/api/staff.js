@@ -48,6 +48,32 @@ export const getStaffMetrics = async () => {
   };
 };
 
+export const extractErrorMessage = (err) => {
+  if (!err) return 'An unexpected error occurred.';
+  if (typeof err === 'string') return err;
+  if (err.message && typeof err.message === 'string') return err.message;
+  if (err.detail && typeof err.detail === 'string') return err.detail;
+  if (err.error && typeof err.error === 'string') return err.error;
+
+  const targetErrors = err.errors || err;
+  if (typeof targetErrors === 'object' && targetErrors !== null) {
+    const messages = [];
+    for (const [key, value] of Object.entries(targetErrors)) {
+      if (['success', 'status_code', 'error_type'].includes(key)) continue;
+      if (Array.isArray(value)) {
+        messages.push(`${key}: ${value.join(', ')}`);
+      } else if (typeof value === 'object' && value !== null) {
+        messages.push(`${key}: ${extractErrorMessage(value)}`);
+      } else if (value) {
+        messages.push(`${key}: ${String(value)}`);
+      }
+    }
+    if (messages.length > 0) return messages.join(' | ');
+  }
+
+  return 'Validation failed. Please check form inputs.';
+};
+
 export const getStaffDetail = async (id) => {
   const response = await fetchWithAuth(`/api/v1/staff/${id}/`);
   if (!response.ok) {
@@ -63,8 +89,7 @@ export const createStaff = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    const msg = err.detail || err.error || (typeof err === 'object' ? Object.values(err).flat().join(', ') : 'Failed to create staff profile');
-    throw new Error(msg);
+    throw new Error(extractErrorMessage(err));
   }
   return await response.json();
 };
@@ -76,8 +101,7 @@ export const updateStaff = async (id, data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    const msg = err.detail || err.error || (typeof err === 'object' ? Object.values(err).flat().join(', ') : 'Failed to update staff profile');
-    throw new Error(msg);
+    throw new Error(extractErrorMessage(err));
   }
   return await response.json();
 };
@@ -88,7 +112,7 @@ export const deleteStaff = async (id) => {
   });
   if (!response.ok && response.status !== 204) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || err.error || 'Failed to soft-delete staff profile');
+    throw new Error(extractErrorMessage(err));
   }
   return response.status === 204 ? { status: 'success' } : await response.json();
 };
@@ -100,8 +124,7 @@ export const inviteStaff = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    const msg = err.detail || err.error || (typeof err === 'object' ? Object.values(err).flat().join(', ') : 'Failed to invite staff member');
-    throw new Error(msg);
+    throw new Error(extractErrorMessage(err));
   }
   return await response.json();
 };

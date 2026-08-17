@@ -20,10 +20,20 @@ export const ROUTE_TITLE_MAP = {
   "/copy-report": { title: "Copy Report Settings", category: "Daily Reports" },
   "/sessions-comments": { title: "Sessions & Saved Comments", category: "Daily Reports" },
 
-  "/attendance/student": { title: "Student Attendance", category: "Attendance" },
-  "/attendance/monthly-register": { title: "Monthly Attendance Register", category: "Attendance" },
-  "/attendance/settings": { title: "Attendance Policies & Slots", category: "Attendance" },
-  "/calendar": { title: "Academic Calendar", category: "Attendance" },
+  "/attendance/students/roll-call": { title: "Period & Class Roll Call", category: "Student Attendance" },
+  "/attendance/students/gate-log": { title: "Campus Gate Entry & Pass Tracker", category: "Student Attendance" },
+  "/attendance/students/adhoc": { title: "Surprise Roll Call & Night Headcount", category: "Student Attendance" },
+  "/attendance/students/monthly-matrix": { title: "31-Day Student Register", category: "Student Attendance" },
+  "/attendance/student": { title: "Student Attendance", category: "Student Attendance" },
+  "/attendance/monthly-register": { title: "Monthly Attendance Register", category: "Student Attendance" },
+
+  "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix Register", category: "Teacher & Staff Attendance" },
+  "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Teacher & Staff Attendance" },
+  "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Teacher & Staff Attendance" },
+
+  "/attendance/settings": { title: "Slots & Routine Manager", category: "Attendance Settings & Devices" },
+  "/attendance/devices": { title: "Biometric Devices & IoT Gateway", category: "Attendance Settings & Devices" },
+  "/calendar": { title: "Academic Calendar", category: "Attendance Settings & Devices" },
 
   "/student-management/departments": { title: "Academic Departments", category: "Student Management" },
   "/student-management/classes": { title: "Classes & Grades", category: "Student Management" },

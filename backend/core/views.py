@@ -8,7 +8,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import uuid
-import datetime
+from datetime import datetime, date, time
+import calendar
 import io
 import base64
 import pyotp
@@ -57,6 +58,7 @@ from .models import (
     UserSectionOverride,
     FeatureFlagAuditLog,
     RoleInviteToken,
+    TeacherProfile,
     StaffProfile,
     TeacherDetail,
     GeneralStaffDetail,
@@ -69,6 +71,13 @@ from .models import (
     AttendanceSessionSlot,
     StudentAttendance,
     AttendancePolicySetting,
+    DynamicPeriodSlot,
+    TeacherRoutineSchedule,
+    TeacherPeriodAttendanceRecord,
+    GateEntryExitLog,
+    AdHocHeadcountSession,
+    BiometricDevice,
+    RawAttendancePunchLog,
 )
 from .permissions import (
     IsAdminUserRole,
@@ -96,6 +105,15 @@ from .serializers import (
     StudentAttendanceSerializer,
     BulkStudentAttendancePunchSerializer,
     AttendancePolicySettingSerializer,
+    DynamicPeriodSlotSerializer,
+    TeacherRoutineScheduleSerializer,
+    TeacherPeriodAttendanceRecordSerializer,
+    TeacherMatrixBulkUpdateSerializer,
+    GateEntryExitLogSerializer,
+    AdHocHeadcountSessionSerializer,
+    BiometricDeviceSerializer,
+    RawAttendancePunchLogSerializer,
+    StudentPeriodRollCallSerializer,
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
     ChangePasswordSerializer,
@@ -4103,7 +4121,7 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             target_date = timezone.localdate()
         else:
             try:
-                target_date = datetime.date.fromisoformat(date_str)
+                target_date = date.fromisoformat(date_str)
             except ValueError:
                 return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -4413,8 +4431,8 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         students = list(students_qs.order_by('roll_number', 'name'))
 
-        start_date = datetime.date(year, month, 1)
-        end_date = datetime.date(year, month, num_days)
+        start_date = date(year, month, 1)
+        end_date = date(year, month, num_days)
 
         att_qs = StudentAttendance.objects.filter(
             student__in=students,
@@ -4445,7 +4463,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         days_header = []
         for day in range(1, num_days + 1):
-            d = datetime.date(year, month, day)
+            d = date(year, month, day)
             weekday_str = d.strftime('%a').upper()
             is_weekend = d.strftime('%A').upper() in weekend_days
             matching_holiday = next((h for h in holidays if h.start_date <= d <= h.end_date), None)
@@ -4539,6 +4557,658 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             "holiday_excused": holiday,
             "total_recorded": total,
             "attendance_rate": rate
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='period-roll-call')
+    def period_roll_call(self, request):
+        serializer = StudentPeriodRollCallSerializer(data=request.data)
+        if not serializer.is_valid():
+            print("PERIOD_ROLL_CALL VALIDATION ERRORS:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        date_val = serializer.validated_data['date']
+        period_slot_id = serializer.validated_data['period_slot_id']
+        class_id = serializer.validated_data.get('class_id')
+        group_id = serializer.validated_data.get('group_id')
+        taken_by_teacher_id = serializer.validated_data.get('taken_by_teacher_id')
+        substitute_teacher_id = serializer.validated_data.get('substitute_teacher_id')
+        records = serializer.validated_data['records']
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        period_slot = DynamicPeriodSlot.objects.filter(id=period_slot_id, is_deleted=False).first()
+        if not period_slot:
+            return Response({"error": "Invalid or missing dynamic period slot."}, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher_obj = TeacherProfile.objects.filter(id=taken_by_teacher_id).first() if taken_by_teacher_id else None
+        substitute_obj = TeacherProfile.objects.filter(id=substitute_teacher_id).first() if substitute_teacher_id else None
+
+        created_or_updated = 0
+        with transaction.atomic():
+            for item in records:
+                student_id = item['student_id']
+                student = Student.objects.filter(id=student_id, is_deleted=False).first()
+                if not student:
+                    continue
+
+                if tenant_id and student.institution_id and str(student.institution_id) != str(tenant_id):
+                    continue
+
+                StudentAttendance.objects.update_or_create(
+                    student=student,
+                    period_slot=period_slot,
+                    date=date_val,
+                    defaults={
+                        'student_class': student.student_class,
+                        'status': item.get('status', 'PRESENT'),
+                        'in_time': item.get('in_time'),
+                        'out_time': item.get('out_time'),
+                        'taken_by_teacher': teacher_obj,
+                        'substitute_teacher': substitute_obj,
+                        'remarks': item.get('remarks', ''),
+                        'marked_by': request.user if request.user.is_authenticated else None,
+                        'source': 'PERIOD_ROLL_CALL'
+                    }
+                )
+                created_or_updated += 1
+
+            # Auto-sync Teacher Period Attendance Record if routine schedule exists
+            if teacher_obj or substitute_obj:
+                routine_query = TeacherRoutineSchedule.objects.filter(
+                    period_slot=period_slot,
+                    is_active=True
+                )
+                if class_id:
+                    routine_query = routine_query.filter(student_class_id=class_id)
+                if teacher_obj:
+                    routine_query = routine_query.filter(teacher=teacher_obj)
+
+                routine = routine_query.first()
+                if routine:
+                    att_status = 'SUBSTITUTED' if substitute_obj else 'PRESENT'
+                    TeacherPeriodAttendanceRecord.objects.update_or_create(
+                        schedule=routine,
+                        date=date_val,
+                        defaults={
+                            'institution_id': routine.institution_id,
+                            'teacher': routine.teacher,
+                            'substitute_teacher': substitute_obj,
+                            'status': att_status,
+                            'is_conducted': True,
+                            'marked_by': request.user if request.user.is_authenticated else None
+                        }
+                    )
+
+        return Response({
+            "status": "success",
+            "message": f"Recorded period roll call for {created_or_updated} students.",
+            "count": created_or_updated,
+            "period_slot": period_slot.period_name,
+            "date": str(date_val)
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='bunk-discrepancy')
+    def bunk_discrepancy(self, request):
+        date_str = request.query_params.get('date', str(timezone.localdate()))
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except Exception:
+            target_date = timezone.localdate()
+
+        gate_entries = GateEntryExitLog.objects.filter(
+            direction='ENTRY',
+            punch_time__date=target_date,
+            student__isnull=False
+        ).select_related('student', 'student__student_class')
+
+        if tenant_id:
+            gate_entries = gate_entries.filter(institution_id=tenant_id)
+
+        entered_student_ids = list(gate_entries.values_list('student_id', flat=True).distinct())
+
+        absent_records = StudentAttendance.objects.filter(
+            student_id__in=entered_student_ids,
+            date=target_date,
+            status='ABSENT'
+        ).select_related('student', 'student__student_class', 'period_slot')
+
+        discrepancy_list = []
+        for rec in absent_records:
+            gate_log = gate_entries.filter(student_id=rec.student_id).first()
+            discrepancy_list.append({
+                "student_id": rec.student_id,
+                "student_name": rec.student.name,
+                "roll_number": rec.student.roll_number,
+                "class_name": rec.student.student_class.name if rec.student.student_class else '',
+                "gate_entry_time": gate_log.punch_time.strftime('%I:%M %p') if gate_log else 'Gate Checked In',
+                "missed_period_name": rec.period_slot.period_name if rec.period_slot else 'Class Period',
+                "date": str(rec.date),
+                "remarks": rec.remarks or "Gate Entry Logged, but marked ABSENT in classroom."
+            })
+
+        return Response({
+            "date": str(target_date),
+            "total_discrepancies": len(discrepancy_list),
+            "discrepancies": discrepancy_list
+        }, status=status.HTTP_200_OK)
+
+
+def gregorian_to_hijri(date_obj):
+    try:
+        y, m, d = date_obj.year, date_obj.month, date_obj.day
+        if m < 3:
+            y -= 1
+            m += 12
+        a = int(y / 100)
+        b = 2 - a + int(a / 4)
+        jd = int(365.25 * (y + 4716)) + int(30.6001 * (m + 1)) + d + b - 1524.5
+        l = jd - 1948440 + 10632
+        n = int((l - 1) / 10631)
+        l = l - 10631 * n + 354
+        j = (int((10985 - l) / 5316)) * (int((50 * l) / 17719)) + (int(l / 5670)) * (int((43 * l) / 15238))
+        l = l - (int((30 - j) / 15)) * (int((17719 * j) / 50)) - (int(j / 16)) * (int((15238 * j) / 43)) + 29
+        m_h = int((24 * l) / 709)
+        d_h = int(l - int((709 * m_h) / 24))
+        y_h = int(30 * n + j - 30)
+
+        HIJRI_MONTHS = [
+            "Muharram", "Safar", "Rabi' al-Awwal", "Rabi' al-Thani",
+            "Jumada al-Awwal", "Jumada al-Thani", "Rajab", "Sha'ban",
+            "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"
+        ]
+        month_idx = max(0, min(11, m_h - 1))
+        return {
+            "day": d_h,
+            "month_number": m_h,
+            "month_name": HIJRI_MONTHS[month_idx],
+            "year": y_h,
+            "formatted": f"{d_h} {HIJRI_MONTHS[month_idx]}"
+        }
+    except Exception:
+        return {"day": date_obj.day, "month_number": 1, "month_name": "Hijri", "year": 1448, "formatted": f"{date_obj.day} Hijri"}
+
+
+class TeacherMatrixViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        try:
+            year = int(request.query_params.get('year', timezone.localdate().year))
+            month = int(request.query_params.get('month', timezone.localdate().month))
+        except ValueError:
+            year = timezone.localdate().year
+            month = timezone.localdate().month
+
+        import calendar
+        num_days = calendar.monthrange(year, month)[1]
+        start_date = date(year, month, 1)
+        end_date = date(year, month, num_days)
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        routines_qs = TeacherRoutineSchedule.objects.filter(is_active=True).select_related(
+            'teacher', 'period_slot', 'student_class', 'student_group'
+        ).order_by('teacher__name_en', 'period_slot__period_order', 'student_class__name')
+
+        if tenant_id:
+            routines_qs = routines_qs.filter(institution_id=tenant_id)
+
+        teacher_id_filter = request.query_params.get('teacher_id')
+        if teacher_id_filter and teacher_id_filter != 'ALL':
+            routines_qs = routines_qs.filter(teacher_id=teacher_id_filter)
+
+        class_id_filter = request.query_params.get('class_id')
+        if class_id_filter and class_id_filter != 'ALL':
+            routines_qs = routines_qs.filter(student_class_id=class_id_filter)
+
+        routines = list(routines_qs)
+
+        att_qs = TeacherPeriodAttendanceRecord.objects.filter(
+            schedule__in=routines,
+            date__gte=start_date,
+            date__lte=end_date
+        ).select_related('teacher', 'substitute_teacher')
+
+        att_map = {}
+        for att in att_qs:
+            if att.schedule_id not in att_map:
+                att_map[att.schedule_id] = {}
+            sub_name = att.substitute_teacher.name_en if att.substitute_teacher else ''
+            att_map[att.schedule_id][att.date.day] = {
+                "id": str(att.id),
+                "status": att.status,
+                "is_conducted": att.is_conducted,
+                "substitute_teacher_id": att.substitute_teacher_id,
+                "substitute_teacher_name": sub_name,
+                "remarks": att.remarks
+            }
+
+        holidays = []
+        if tenant_id:
+            holidays = list(AcademicCalendarEvent.objects.filter(
+                institution_id=tenant_id,
+                is_deleted=False,
+                start_date__lte=end_date,
+                end_date__gte=start_date,
+                event_type__in=['PUBLIC_HOLIDAY', 'INSTITUTIONAL_HOLIDAY', 'VACATION']
+            ))
+
+        policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first() if tenant_id else None
+        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+
+        days_header = []
+        for day in range(1, num_days + 1):
+            d = date(year, month, day)
+            weekday_str = d.strftime('%a').upper()
+            weekday_full = d.strftime('%A').upper()
+            is_friday = weekday_full == 'FRIDAY'
+            is_weekend = weekday_full in weekend_days
+            matching_holiday = next((h for h in holidays if h.start_date <= d <= h.end_date), None)
+            hijri_info = gregorian_to_hijri(d)
+
+            days_header.append({
+                "day": day,
+                "date_str": str(d),
+                "weekday": weekday_str,
+                "is_friday": is_friday,
+                "is_weekend": is_weekend,
+                "is_holiday": is_weekend or bool(matching_holiday),
+                "holiday_title": matching_holiday.title if matching_holiday else ("Friday / Weekend" if is_weekend else ""),
+                "hijri_day": hijri_info["day"],
+                "hijri_month": hijri_info["month_name"],
+                "hijri_year": hijri_info["year"],
+                "hijri_formatted": hijri_info["formatted"]
+            })
+
+        teacher_grouped = {}
+        for r in routines:
+            t_id = r.teacher_id
+            if t_id not in teacher_grouped:
+                teacher_grouped[t_id] = {
+                    "teacher_id": t_id,
+                    "teacher_name": r.teacher.name_en or (r.teacher.user.phone_number if r.teacher.user else f"Teacher #{t_id}"),
+                    "designation": r.teacher.designation or "Teacher",
+                    "rows": []
+                }
+
+            s_map = att_map.get(r.id, {})
+            present_cnt = 0
+            absent_cnt = 0
+            for d in range(1, num_days + 1):
+                cell = s_map.get(d)
+                if cell:
+                    if cell['status'] in ['PRESENT', 'SUBSTITUTED'] and cell['is_conducted']:
+                        present_cnt += 1
+                    elif cell['status'] in ['ABSENT', 'LEAVE']:
+                        absent_cnt += 1
+
+            start_t = r.period_slot.start_time.strftime('%I:%M %p') if r.period_slot.start_time else ''
+            end_t = r.period_slot.end_time.strftime('%I:%M %p') if r.period_slot.end_time else ''
+            time_display = f"{start_t} - {end_t}" if start_t and end_t else ""
+
+            teacher_grouped[t_id]["rows"].append({
+                "schedule_id": str(r.id),
+                "period_slot_id": str(r.period_slot_id),
+                "period_name": r.period_slot.period_name,
+                "period_order": r.period_slot.period_order,
+                "time_display": time_display,
+                "class_id": r.student_class_id,
+                "class_name": r.student_class.name,
+                "group_name": r.student_group.name if r.student_group else '',
+                "subject_or_kitab_name": r.subject_or_kitab_name,
+                "room_number": r.room_number,
+                "daily_statuses": s_map,
+                "present_count": present_cnt,
+                "absent_count": absent_cnt,
+                "total_scheduled": present_cnt + absent_cnt
+            })
+
+        matrix_teachers = list(teacher_grouped.values())
+
+        daily_class_counts = {}
+        monthly_grand_total = 0
+        for day in range(1, num_days + 1):
+            day_classes = 0
+            for r in routines:
+                cell = att_map.get(r.id, {}).get(day)
+                if cell and cell['status'] in ['PRESENT', 'SUBSTITUTED'] and cell['is_conducted']:
+                    day_classes += 1
+            daily_class_counts[day] = day_classes
+            monthly_grand_total += day_classes
+
+        first_hijri = days_header[0]["hijri_month"] if days_header else ""
+        last_hijri = days_header[-1]["hijri_month"] if days_header else ""
+        hijri_month_span = first_hijri if first_hijri == last_hijri else f"{first_hijri} - {last_hijri}"
+
+        return Response({
+            "year": year,
+            "month": month,
+            "total_days": num_days,
+            "hijri_month_span": hijri_month_span,
+            "hijri_year": days_header[0]["hijri_year"] if days_header else 1448,
+            "days_header": days_header,
+            "teachers": matrix_teachers,
+            "daily_class_counts": daily_class_counts,
+            "monthly_grand_total": monthly_grand_total,
+            "total_schedules": len(routines)
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='bulk-update')
+    def bulk_update(self, request):
+        serializer = TeacherMatrixBulkUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        records = serializer.validated_data['records']
+
+        updated_count = 0
+        with transaction.atomic():
+            for item in records:
+                sched_id = item['schedule_id']
+                date_val = item['date']
+                stat = item['status']
+                sub_id = item.get('substitute_teacher_id')
+                remarks = item.get('remarks', '')
+
+                schedule = TeacherRoutineSchedule.objects.filter(id=sched_id).first()
+                if not schedule:
+                    continue
+
+                sub_teacher = TeacherProfile.objects.filter(id=sub_id).first() if sub_id else None
+                is_conducted = stat in ['PRESENT', 'SUBSTITUTED']
+
+                TeacherPeriodAttendanceRecord.objects.update_or_create(
+                    schedule=schedule,
+                    date=date_val,
+                    defaults={
+                        'institution_id': schedule.institution_id,
+                        'teacher': schedule.teacher,
+                        'substitute_teacher': sub_teacher,
+                        'status': stat,
+                        'is_conducted': is_conducted,
+                        'remarks': remarks,
+                        'marked_by': request.user if request.user.is_authenticated else None
+                    }
+                )
+                updated_count += 1
+
+        return Response({
+            "status": "success",
+            "message": f"Updated {updated_count} teacher period attendance records.",
+            "count": updated_count
+        }, status=status.HTTP_200_OK)
+
+
+class DynamicPeriodSlotViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DynamicPeriodSlotSerializer
+    queryset = DynamicPeriodSlot.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = DynamicPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'department', 'student_class')
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        class_id = self.request.query_params.get('class_id')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student_class_id=class_id)
+        return qs.order_by('period_order', 'start_time')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        serializer.save(institution_id=tenant_id)
+
+    def perform_destroy(self, instance):
+        instance.is_deleted = True
+        instance.save(update_fields=['is_deleted'])
+
+
+class TeacherRoutineScheduleViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TeacherRoutineScheduleSerializer
+    queryset = TeacherRoutineSchedule.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = TeacherRoutineSchedule.objects.select_related(
+            'institution', 'teacher', 'period_slot', 'student_class', 'student_group'
+        )
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id and teacher_id != 'ALL':
+            qs = qs.filter(teacher_id=teacher_id)
+        class_id = self.request.query_params.get('class_id')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student_class_id=class_id)
+        return qs.order_by('teacher__name_en', 'period_slot__period_order', 'student_class__name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        serializer.save(institution_id=tenant_id)
+
+
+class GateLogViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = GateEntryExitLogSerializer
+    queryset = GateEntryExitLog.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = GateEntryExitLog.objects.select_related('institution', 'student', 'student__student_class', 'staff', 'recorded_by')
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        date_str = self.request.query_params.get('date')
+        if date_str:
+            qs = qs.filter(punch_time__date=date_str)
+        direction = self.request.query_params.get('direction')
+        if direction and direction != 'ALL':
+            qs = qs.filter(direction=direction.upper())
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(person_name__icontains=search) |
+                Q(barcode_or_rfid__icontains=search) |
+                Q(student__name__icontains=search) |
+                Q(student__roll_number__icontains=search) |
+                Q(staff__name_en__icontains=search)
+            )
+        return qs.order_by('-punch_time')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        serializer.save(institution_id=tenant_id, recorded_by=self.request.user)
+
+    @action(detail=False, methods=['post'], url_path='log-punch')
+    def log_punch(self, request):
+        barcode = request.data.get('barcode_or_rfid', '').strip()
+        direction = request.data.get('direction', 'ENTRY')
+        reason = request.data.get('gate_pass_reason', '')
+        student_id = request.data.get('student_id')
+        staff_id = request.data.get('staff_id')
+        person_name = request.data.get('person_name', '')
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        if not tenant_id:
+            return Response({"error": "No active institution scope."}, status=status.HTTP_400_BAD_REQUEST)
+
+        student = None
+        staff = None
+        if student_id:
+            student = Student.objects.filter(id=student_id, institution_id=tenant_id).first()
+        elif barcode:
+            student = Student.objects.filter(
+                Q(roll_number__iexact=barcode) | Q(student_id_card_number__iexact=barcode) | Q(uniq_id__iexact=barcode),
+                institution_id=tenant_id
+            ).first()
+
+        if staff_id:
+            staff = TeacherProfile.objects.filter(id=staff_id).first()
+        elif barcode and not student:
+            staff = TeacherProfile.objects.filter(
+                Q(user__phone_number__iexact=barcode) | Q(user__username__iexact=barcode)
+            ).first()
+
+        name = student.name if student else (staff.name_en if staff else person_name or barcode)
+
+        log = GateEntryExitLog.objects.create(
+            institution_id=tenant_id,
+            student=student,
+            staff=staff,
+            person_name=name,
+            barcode_or_rfid=barcode,
+            punch_time=timezone.now(),
+            direction=direction,
+            gate_pass_reason=reason,
+            recorded_by=request.user if request.user.is_authenticated else None
+        )
+        return Response(GateEntryExitLogSerializer(log).data, status=status.HTTP_201_CREATED)
+
+
+class AdHocHeadcountViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AdHocHeadcountSessionSerializer
+    queryset = AdHocHeadcountSession.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = AdHocHeadcountSession.objects.select_related('institution', 'student_class', 'student_group', 'conducted_by')
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        return qs.order_by('-date_time')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        serializer.save(institution_id=tenant_id, conducted_by=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='verify-students')
+    def verify_students(self, request, pk=None):
+        session = self.get_object()
+        student_ids = request.data.get('verified_student_ids', [])
+        notes = request.data.get('notes', session.notes)
+        session.verified_student_ids = student_ids
+        session.total_verified = len(student_ids)
+        session.notes = notes
+        session.save(update_fields=['verified_student_ids', 'total_verified', 'notes'])
+        return Response(AdHocHeadcountSessionSerializer(session).data, status=status.HTTP_200_OK)
+
+
+class BiometricDeviceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = BiometricDeviceSerializer
+    queryset = BiometricDevice.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = BiometricDevice.objects.all()
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        return qs.order_by('device_name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        serializer.save(institution_id=tenant_id)
+
+    @action(detail=True, methods=['post'], url_path='ping')
+    def ping(self, request, pk=None):
+        device = self.get_object()
+        device.last_heartbeat = timezone.now()
+        device.save(update_fields=['last_heartbeat'])
+        return Response({
+            "status": "online",
+            "device_name": device.device_name,
+            "device_serial": device.device_serial,
+            "last_heartbeat": device.last_heartbeat
+        }, status=status.HTTP_200_OK)
+
+
+class BiometricGatewayViewSet(viewsets.ViewSet):
+    permission_classes = [AllowAny]
+
+    @action(detail=False, methods=['post'], url_path='push')
+    def device_push(self, request):
+        serial = request.data.get('serial_number') or request.data.get('SN') or request.query_params.get('SN')
+        punches = request.data.get('punches', [])
+        if not punches and 'user_pin' in request.data:
+            punches = [request.data]
+
+        device = None
+        if serial:
+            device = BiometricDevice.objects.filter(device_serial=serial).first()
+            if device:
+                device.last_heartbeat = timezone.now()
+                device.save(update_fields=['last_heartbeat'])
+
+        processed_count = 0
+        for p in punches:
+            pin = str(p.get('user_pin') or p.get('PIN') or p.get('card_no', '')).strip()
+            punch_time_raw = p.get('timestamp') or p.get('time')
+            try:
+                punch_dt = datetime.fromisoformat(punch_time_raw) if punch_time_raw else timezone.now()
+            except Exception:
+                punch_dt = timezone.now()
+
+            p_type = p.get('punch_type', 'CHECK_IN')
+            raw_log = RawAttendancePunchLog.objects.create(
+                device=device,
+                user_pin_or_card=pin,
+                punch_timestamp=punch_dt,
+                punch_type=p_type,
+                raw_payload=p,
+                is_processed=False
+            )
+
+            # Auto-match with student or staff
+            student = Student.objects.filter(
+                Q(roll_number__iexact=pin) | Q(student_id_card_number__iexact=pin) | Q(uniq_id__iexact=pin)
+            ).first()
+            if student:
+                raw_log.matched_student = student
+                raw_log.is_processed = True
+                raw_log.processing_notes = f"Matched Student {student.name}"
+                raw_log.save()
+
+                if device and device.institution_id:
+                    GateEntryExitLog.objects.create(
+                        institution_id=device.institution_id,
+                        student=student,
+                        person_name=student.name,
+                        barcode_or_rfid=pin,
+                        punch_time=punch_dt,
+                        direction='ENTRY' if p_type in ['CHECK_IN', 'BREAK_IN'] else 'EXIT',
+                        device_name=device.device_name
+                    )
+                processed_count += 1
+            else:
+                teacher = TeacherProfile.objects.filter(Q(user__phone_number__iexact=pin) | Q(user__username__iexact=pin)).first()
+                if teacher:
+                    raw_log.matched_teacher = teacher
+                    raw_log.is_processed = True
+                    raw_log.processing_notes = f"Matched Teacher {teacher.name_en}"
+                    raw_log.save()
+                    processed_count += 1
+
+        return Response({
+            "status": "success",
+            "received_punches": len(punches),
+            "auto_processed": processed_count
         }, status=status.HTTP_200_OK)
 
 

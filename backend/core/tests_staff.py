@@ -346,3 +346,38 @@ class TeacherAndStaffManagementTestCase(TestCase):
         resp_leave = client.post('/api/v1/staff/leaves/apply/', leave_payload, format='json')
         self.assertEqual(resp_leave.status_code, 201)
         self.assertEqual(resp_leave.json()['status'], 'PENDING')
+
+    def test_08_staff_onboarding_creation(self):
+        """Test creating a new staff member with onboarding form modal payload."""
+        new_user = User.objects.create_user(phone_number='01799999999', name='Onboarding Teacher', institution=self.inst_a)
+        client = self.get_auth_client(self.inst_a_admin)
+
+        onboarding_payload = {
+            'user_id': new_user.id,
+            'staff_type': 'TEACHING',
+            'designation': 'Senior Qari & Ustadh',
+            'department': None,
+            'employment_status': 'PERMANENT',
+            'joining_date': '2026-08-16',
+            'emergency_contact': '01800000000',
+            'nid_no': '1234567890123',
+            'blood_group': 'B+',
+            'salary_type': 'MONTHLY_FIXED',
+            'base_salary': 25000,
+            'bank_name': 'Islami Bank',
+            'bank_account_no': '2050123456789',
+            'mobile_banking_no': '01799999999',
+            'teacher_detail': {
+                'highest_degree': 'Dawra-e-Hadith',
+                'specialization': 'Qira\'at & Hifz',
+                'max_daily_periods': 5,
+                'can_review_reports': True
+            }
+        }
+
+        resp = client.post('/api/v1/staff/', onboarding_payload, format='json')
+        self.assertEqual(resp.status_code, 201, resp.json() if hasattr(resp, 'json') else resp.content)
+        data = resp.json()
+        self.assertTrue(data['employee_id'].startswith('TEA-'))
+        self.assertEqual(data['designation'], 'Senior Qari & Ustadh')
+        self.assertEqual(data['teacher_detail']['specialization'], 'Qira\'at & Hifz')
