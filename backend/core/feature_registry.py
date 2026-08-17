@@ -11,6 +11,58 @@ FEATURE_REGISTRY = [
         "sort_order": 10,
     },
 
+    # --- REPORT GENERATOR (PARENT) ---
+    {
+        "key": "nav_report_generator",
+        "label": "Report Generator",
+        "category": "REPORTS",
+        "description": "Daily recitation report builder, sessions, comment templates, and history archive",
+        "is_parent": True,
+        "parent_key": None,
+        "default_enabled": True,
+        "sort_order": 12,
+    },
+    {
+        "key": "report_builder",
+        "label": "Daily Report Builder",
+        "category": "REPORTS",
+        "description": "Hifz recitation tracker, error logging, and live WhatsApp/PDF report generator",
+        "is_parent": False,
+        "parent_key": "nav_report_generator",
+        "default_enabled": True,
+        "sort_order": 13,
+    },
+    {
+        "key": "report_sessions_comments",
+        "label": "Sessions & Comment Templates",
+        "category": "REPORTS",
+        "description": "Custom recitation sessions and preset feedback comment templates",
+        "is_parent": False,
+        "parent_key": "nav_report_generator",
+        "default_enabled": True,
+        "sort_order": 14,
+    },
+    {
+        "key": "report_history",
+        "label": "Report History & Records",
+        "category": "REPORTS",
+        "description": "Student daily recitation history, analytics, and record logs",
+        "is_parent": False,
+        "parent_key": "nav_report_generator",
+        "default_enabled": True,
+        "sort_order": 15,
+    },
+    {
+        "key": "report_copy_settings",
+        "label": "Copy Report Settings",
+        "category": "REPORTS",
+        "description": "Formatting preferences for generated report text and preview options",
+        "is_parent": False,
+        "parent_key": "nav_report_generator",
+        "default_enabled": True,
+        "sort_order": 16,
+    },
+
     # --- ACADEMIC INSTITUTION (PARENT) ---
     {
         "key": "nav_institution",

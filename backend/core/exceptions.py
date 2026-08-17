@@ -28,8 +28,9 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
             {
                 "success": False,
                 "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "error_type": "InternalServerError",
-                "message": "An unexpected server error occurred. Please try again later."
+                "error_type": exc.__class__.__name__,
+                "message": f"Server Error: {str(exc)}" if str(exc) else "An unexpected server error occurred. Please try again later.",
+                "details": {"detail": str(exc) if str(exc) else "An unexpected server error occurred."}
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

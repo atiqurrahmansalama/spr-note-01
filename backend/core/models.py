@@ -975,13 +975,19 @@ class StudentDailyReport(models.Model):
     def save(self, *args, **kwargs):
         if not self.report_unique_id:
             self.report_unique_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
-        if self.student and not self.student_name:
-            self.student_name = self.student.name
+        if getattr(self, 'student_id', None) and not self.student_name:
+            try:
+                self.student_name = self.student.name_en or getattr(self.student, 'name', '') or 'Student'
+            except Exception:
+                pass
         super().save(*args, **kwargs)
 
     @property
     def student_group(self):
-        return self.student.group_name if self.student else ""
+        try:
+            return self.student.group_name if getattr(self, 'student_id', None) else ""
+        except Exception:
+            return ""
 
     # ── Convenience shortcuts via ReportStatus ───────────────
     @property
