@@ -1232,16 +1232,42 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     or mutable_data.get('group_name')
                     or 'General Group'
                 )
-                student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
-                if not student_obj:
-                    max_roll = Student.objects.aggregate(Max('roll_number'))['roll_number__max'] or 0
-                    student_obj = Student.objects.create(
-                        name_en=name_clean,
-                        group_name=group_val,
-                        roll_number=max_roll + 1,
+                try:
+                    student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
+                    if not student_obj:
+                        max_roll = Student.objects.aggregate(Max('roll_number'))['roll_number__max'] or 0
+                        student_obj = Student.objects.create(
+                            name_en=name_clean,
+                            group_name=group_val,
+                            roll_number=max_roll + 1,
+                        )
+                    mutable_data['student'] = student_obj.pk
+                    mutable_data['student_name'] = student_obj.name_en or name_clean
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"[ReportSerializer] Auto-student lookup/create failed for '{name_clean}': {e}. "
+                        f"Will attempt to find any existing match or proceed without FK."
                     )
-                mutable_data['student'] = student_obj.pk
-                mutable_data['student_name'] = student_obj.name_en
+                    # Last-chance fallback: try fetching any student by name substring
+                    try:
+                        fallback = Student.objects.filter(name_en__icontains=name_clean).first()
+                        if fallback:
+                            mutable_data['student'] = fallback.pk
+                            mutable_data['student_name'] = fallback.name_en or name_clean
+                        else:
+                            # Cannot link a Student FK — store name only.
+                            # The report model requires student FK, so raise a friendly validation error.
+                            from rest_framework.exceptions import ValidationError
+                            raise ValidationError(
+                                {'student': f"Could not find or create student '{name_clean}'. Please add the student first."}
+                            )
+                    except Exception:
+                        from rest_framework.exceptions import ValidationError
+                        raise ValidationError(
+                            {'student': f"Could not find or create student '{name_clean}'. Please add the student first."}
+                        )
 
         return super().to_internal_value(mutable_data)
 

@@ -27,29 +27,6 @@ export function useReportActions({ isOpen, onClose, reportData }) {
     return true;
   });
 
-  const [pdfFont, setPdfFont] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("spr_pdf_font");
-      return saved || "Outfit";
-    }
-    return "Outfit";
-  });
-
-  const [isPdfBold, setIsPdfBold] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("spr_pdf_bold");
-      return saved !== null ? saved === "true" : false;
-    }
-    return false;
-  });
-
-  const [isPdfItalic, setIsPdfItalic] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("spr_pdf_italic");
-      return saved !== null ? saved === "true" : false;
-    }
-    return false;
-  });
 
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -93,17 +70,6 @@ export function useReportActions({ isOpen, onClose, reportData }) {
     localStorage.setItem("spr_include_teacher", includeTeacher);
   }, [includeTeacher]);
 
-  useEffect(() => {
-    localStorage.setItem("spr_pdf_font", pdfFont);
-  }, [pdfFont]);
-
-  useEffect(() => {
-    localStorage.setItem("spr_pdf_bold", isPdfBold);
-  }, [isPdfBold]);
-
-  useEffect(() => {
-    localStorage.setItem("spr_pdf_italic", isPdfItalic);
-  }, [isPdfItalic]);
 
   // Synchronize generated text when settings/reportData/featureConfig change, if user is not manually editing
   const prevDataKey = `${isOpen}-${includeGroup}-${includeTeacher}-${JSON.stringify(reportData)}-${JSON.stringify(featureConfig)}`;
@@ -332,16 +298,8 @@ export function useReportActions({ isOpen, onClose, reportData }) {
 
       let currentY = padding;
 
-      const getFontStr = (size, isHeaderOrBold = false) => {
-        let weight = "";
-        if (isHeaderOrBold) {
-          weight = "bold";
-        } else if (isPdfBold) {
-          weight = "bold";
-        }
-        let style = isPdfItalic ? "italic" : "";
-        const parts = [style, weight, `${size}px`, `'${pdfFont}', sans-serif`].filter(Boolean);
-        return parts.join(" ");
+      const getFontStr = (size, isBold = false) => {
+        return `${isBold ? "bold " : ""}${size}px 'Outfit', sans-serif`;
       };
 
       items.forEach((item) => {
@@ -382,6 +340,27 @@ export function useReportActions({ isOpen, onClose, reportData }) {
         }
       });
 
+      // QR code note at the bottom
+      const qrNoteY = currentY + 10;
+      ctx.font = "11px 'Outfit', sans-serif";
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText("Scan QR code on PDF preview to verify authenticity.", padding, qrNoteY + 11);
+
+      canvas.height = (qrNoteY + 30) * scale;
+      // Re-draw background for the extra space
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(0, currentY * scale, width * scale, 40 * scale);
+      ctx.scale(1, 1); // reset before redrawing text
+      const canvas2 = document.createElement("canvas");
+      canvas2.width = canvas.width;
+      canvas2.height = canvas.height;
+      const ctx2 = canvas2.getContext("2d");
+      ctx2.drawImage(canvas, 0, 0);
+      ctx2.scale(scale, scale);
+      ctx2.font = "11px 'Outfit', sans-serif";
+      ctx2.fillStyle = "#94a3b8";
+      ctx2.fillText("Scan QR code on PDF preview to verify authenticity.", padding, qrNoteY + 11);
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "pt", [width, height]);
       pdf.addImage(imgData, "PNG", 0, 0, width, height);
@@ -407,16 +386,8 @@ export function useReportActions({ isOpen, onClose, reportData }) {
       const lineHeight = 22;
       const padding = 32;
 
-      const getFontStr = (size, isHeaderOrBold = false) => {
-        let weight = "";
-        if (isHeaderOrBold) {
-          weight = "bold";
-        } else if (isPdfBold) {
-          weight = "bold";
-        }
-        let style = isPdfItalic ? "italic" : "";
-        const parts = [style, weight, `${size}px`, `'${pdfFont}', sans-serif`].filter(Boolean);
-        return parts.join(" ");
+      const getFontStr = (size, isBold = false) => {
+        return `${isBold ? "bold " : ""}${size}px 'Outfit', sans-serif`;
       };
 
       ctx.font = getFontStr(fontSize, false);
@@ -482,12 +453,6 @@ export function useReportActions({ isOpen, onClose, reportData }) {
     setIncludeGroup,
     includeTeacher,
     setIncludeTeacher,
-    pdfFont,
-    setPdfFont,
-    isPdfBold,
-    setIsPdfBold,
-    isPdfItalic,
-    setIsPdfItalic,
     isEditing,
     setIsEditing,
     copied,

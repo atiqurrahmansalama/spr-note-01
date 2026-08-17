@@ -8,12 +8,37 @@ export default function CopyReportSettingsView() {
   const [includeGroup, setIncludeGroup] = useState(() => copyStore.getIncludeGroup());
   const [includeTeacher, setIncludeTeacher] = useState(() => copyStore.getIncludeTeacher());
   const [teacherName, setTeacherName] = useState(() => copyStore.getTeacherName());
-  const [autoCopy, setAutoCopy] = useState(() => copyStore.getAutoCopy());
   const [dateFormat, setDateFormat] = useState(() => copyStore.getDateFormat());
+
+  // Read the app-level date format (from Date & Time settings)
+  const appDateFormat = calendarSettings.getDateFormat ? calendarSettings.getDateFormat() : "DD/MM/YYYY";
+  const appDateFormatEntry = DATE_FORMAT_LIST.find((f) => f.id === appDateFormat);
+  const appDateLabel = appDateFormatEntry
+    ? `${appDateFormatEntry.name} (${appDateFormatEntry.sample})`
+    : appDateFormat;
+
+  // Build options: special "App" option first, then all standard formats
+  const dateFormatOptions = [
+    { label: `App's Date Format — ${appDateLabel}`, value: "APP_DEFAULT" },
+    ...DATE_FORMAT_LIST.map((fmt) => ({
+      label: `${fmt.name} (${fmt.sample})`,
+      value: fmt.id,
+    })),
+  ];
+
+  const resolvedDateFormat = dateFormat === "APP_DEFAULT" ? appDateFormat : dateFormat;
+  const resolvedEntry = DATE_FORMAT_LIST.find((f) => f.id === resolvedDateFormat);
 
   const handleDateFormatChange = (val) => {
     const selectedVal = typeof val === "object" ? val.value : val;
     if (selectedVal) {
+      // APP_DEFAULT = follow the app's Date & Time setting dynamically
+      if (selectedVal === "APP_DEFAULT") {
+        setDateFormat("APP_DEFAULT");
+        copyStore.saveDateFormat("APP_DEFAULT");
+        window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { dateFormat: "APP_DEFAULT" } }));
+        return;
+      }
       const matched = DATE_FORMAT_LIST.find((f) => f.id === selectedVal || `${f.name} (${f.sample})` === selectedVal);
       const targetId = matched ? matched.id : selectedVal;
       setDateFormat(targetId);
@@ -43,12 +68,6 @@ export default function CopyReportSettingsView() {
     window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { includeTeacher: val } }));
   };
 
-  const toggleAutoCopy = () => {
-    const val = !autoCopy;
-    setAutoCopy(val);
-    copyStore.saveAutoCopy(val);
-    window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { autoCopy: val } }));
-  };
 
   const cleanTeacherDisplay = teacherName.replace(/^@+/, "").trim() || "Mustafa";
 
@@ -76,8 +95,8 @@ export default function CopyReportSettingsView() {
           {/* Include Group Mention */}
           <div className="flex items-center justify-between p-4 theme-bg-sub rounded-xl hover:theme-bg-elevated transition border theme-border">
             <div className="space-y-0.5">
-              <div className="text-xs font-bold theme-text-primary">Include Student Group by Default</div>
-              <div className="text-[11px] theme-text-secondary">Append group name line at footer of progress reports</div>
+              <div className="text-xs font-bold theme-text-primary">Include Student Group</div>
+              <div className="text-[11px] theme-text-secondary">Shows 'Include Group' checkbox inside Report Preview</div>
             </div>
             <button
               type="button"
@@ -99,7 +118,7 @@ export default function CopyReportSettingsView() {
                 <div className="text-xs font-bold theme-text-primary">
                   Mention Teacher Tag
                 </div>
-                <div className="text-[11px] theme-text-secondary">Include teacher handle in report footer with @ tag</div>
+                <div className="text-[11px] theme-text-secondary">Shows 'Mention Teacher' checkbox inside Report Preview</div>
               </div>
               <button
                 type="button"
@@ -134,24 +153,6 @@ export default function CopyReportSettingsView() {
             )}
           </div>
 
-          {/* Auto Copy to Clipboard */}
-          <div className="flex items-center justify-between p-4 theme-bg-sub rounded-xl hover:theme-bg-elevated transition border theme-border">
-            <div className="space-y-0.5">
-              <div className="text-xs font-bold theme-text-primary">Auto Copy on Report Generation</div>
-              <div className="text-[11px] theme-text-secondary">Automatically copy text to clipboard when report modal opens</div>
-            </div>
-            <button
-              type="button"
-              onClick={toggleAutoCopy}
-              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                autoCopy ? "theme-bg-accent" : "theme-bg-elevated"
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-full theme-bg-surface transition-transform absolute top-1 ${
-                autoCopy ? "right-1" : "left-1"
-              }`} />
-            </button>
-          </div>
 
           {/* Report Date Format Dropdown (Custom AutocompleteDropdown) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 theme-bg-sub rounded-xl gap-3 hover:theme-bg-elevated transition border theme-border">
@@ -165,13 +166,12 @@ export default function CopyReportSettingsView() {
                 disableSaveButton={true}
                 showAllOptionsOnFocus={true}
                 onNextFocus={() => {}}
-                options={DATE_FORMAT_LIST.map((fmt) => ({
-                  label: `${fmt.name} (${fmt.sample})`,
-                  value: fmt.id,
-                }))}
+                options={dateFormatOptions}
                 value={
-                  DATE_FORMAT_LIST.find((f) => f.id === dateFormat)
-                    ? `${DATE_FORMAT_LIST.find((f) => f.id === dateFormat).name} (${DATE_FORMAT_LIST.find((f) => f.id === dateFormat).sample})`
+                  dateFormat === "APP_DEFAULT"
+                    ? `App's Date Format — ${appDateLabel}`
+                    : resolvedEntry
+                    ? `${resolvedEntry.name} (${resolvedEntry.sample})`
                     : dateFormat
                 }
                 onChange={handleDateFormatChange}

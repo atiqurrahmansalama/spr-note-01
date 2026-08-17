@@ -4,8 +4,17 @@ import { ReportBody } from "./ReportBody";
 import { ReportControls } from "./ReportControls";
 import { ReportFooter } from "./ReportFooter";
 import { DiscardAlertModal } from "./DiscardAlertModal";
+import { copyReportSettings as copyStore } from "../../../utils/localStore";
 
 export default function ReportModal({ isOpen, onClose, reportData = {} }) {
+  // Read which checkboxes are allowed from Copy Report Settings
+  const showGroupCheckbox = copyStore.getIncludeGroup !== undefined
+    ? copyStore.getIncludeGroup()
+    : true;
+  const showTeacherCheckbox = copyStore.getIncludeTeacher !== undefined
+    ? copyStore.getIncludeTeacher()
+    : true;
+
   const {
     viewMode,
     setViewMode,
@@ -13,12 +22,6 @@ export default function ReportModal({ isOpen, onClose, reportData = {} }) {
     setIncludeGroup,
     includeTeacher,
     setIncludeTeacher,
-    pdfFont,
-    setPdfFont,
-    isPdfBold,
-    setIsPdfBold,
-    isPdfItalic,
-    setIsPdfItalic,
     isEditing,
     setIsEditing,
     copied,
@@ -65,23 +68,17 @@ export default function ReportModal({ isOpen, onClose, reportData = {} }) {
             setCurrentText={setCurrentText}
             reportData={reportData}
             includeGroup={includeGroup}
-            pdfFont={pdfFont}
-            isPdfBold={isPdfBold}
-            isPdfItalic={isPdfItalic}
+            includeTeacher={includeTeacher}
           />
 
-          {/* Controls / Checkboxes & Styling Toolbar */}
+          {/* Conditional Checkboxes — only shown when enabled in Copy Report Settings */}
           <ReportControls
             includeGroup={includeGroup}
             setIncludeGroup={setIncludeGroup}
             includeTeacher={includeTeacher}
             setIncludeTeacher={setIncludeTeacher}
-            pdfFont={pdfFont}
-            setPdfFont={setPdfFont}
-            isPdfBold={isPdfBold}
-            setIsPdfBold={setIsPdfBold}
-            isPdfItalic={isPdfItalic}
-            setIsPdfItalic={setIsPdfItalic}
+            showGroupCheckbox={showGroupCheckbox}
+            showTeacherCheckbox={showTeacherCheckbox}
           />
 
           {/* Modal Footer */}

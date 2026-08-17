@@ -11,6 +11,12 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
 
   const maxPage = getMaxPage(juzValue);
 
+  const startVal = parseInt(range.start, 10);
+  const endVal = parseInt(range.end, 10);
+
+  const maxStartPage = !isNaN(endVal) && endVal > 0 ? Math.min(endVal, maxPage) : maxPage;
+  const minEndPage = !isNaN(startVal) && startVal > 0 ? Math.max(startVal, 1) : 1;
+
   return (
     <div className="flex items-center theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 shrink-0">
       <NumberScrollInput
@@ -29,7 +35,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
           if (onRemove) onRemove();
         }}
         min={1}
-        max={maxPage}
+        max={maxStartPage}
         placeholder="--"
         className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"
       />
@@ -51,7 +57,7 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
         onEmptyBackspace={(e) => {
           handleBackspaceFocusPrev(e, true);
         }}
-        min={range.start ? parseInt(range.start, 10) : 1}
+        min={minEndPage}
         max={maxPage}
         placeholder="--"
         className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"

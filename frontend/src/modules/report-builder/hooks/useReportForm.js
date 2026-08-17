@@ -743,7 +743,10 @@ export function useReportForm() {
       }
 
       resetForm();
-      await fetchData();
+      // NOTE: fetchData() intentionally NOT called here.
+      // Calling it caused a full state refresh (re-render of student/session lists)
+      // which appeared as an unwanted page "refresh" to the user.
+      // The spr_report_saved event dispatched above notifies any listeners (e.g. history view).
     } finally {
       setIsSaving(false);
     }

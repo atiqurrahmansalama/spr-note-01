@@ -142,6 +142,17 @@ export default function CommentSection({
     showToast("Comment cleared", "info");
   };
 
+  const isAlreadySaved = () => {
+    const trimmed = comment.trim();
+    if (!trimmed) return true;
+    const existingTexts = (savedComments || []).map((c) =>
+      typeof c === "object" && c !== null ? c.text : String(c)
+    );
+    return existingTexts.some((t) => (t || "").trim().toLowerCase() === trimmed.toLowerCase());
+  };
+
+  const showSaveButton = comment.trim().length > 0 && !isAlreadySaved();
+
   return (
     <div className="space-y-4">
       <div ref={containerRef} className="theme-bg-surface rounded-2xl p-5 shadow-lg relative z-0 space-y-3 border theme-border">
@@ -164,7 +175,7 @@ export default function CommentSection({
               </button>
             )}
 
-            {comment.trim().length > 0 && (
+            {showSaveButton && (
               <button
                 type="button"
                 onClick={handleSaveComment}
@@ -238,14 +249,14 @@ export default function CommentSection({
                       <div
                         key={msgId || index}
                         onClick={() => handlePickTemplate(text, msgId || text)}
-                        className="px-3.5 py-2.5 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2 group"
+                        className="px-3.5 py-2.5 text-xs theme-text-primary theme-bg-surface hover:theme-bg-elevated border theme-border rounded-lg cursor-pointer transition-colors flex items-start justify-between gap-2.5 group"
                         title={text}
                       >
-                        <span className="truncate flex-1 font-medium">{text}</span>
+                        <span className="flex-1 font-medium break-words leading-relaxed whitespace-pre-wrap">{text}</span>
                         <button
                           type="button"
                           onClick={(e) => handleDeleteComment(e, msg)}
-                          className="p-1 rounded text-xs theme-text-secondary hover:text-red-400 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className="p-1 rounded text-xs theme-text-secondary hover:text-red-400 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer shrink-0 mt-0.5"
                           title="Delete template message"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />

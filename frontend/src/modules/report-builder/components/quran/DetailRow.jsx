@@ -67,47 +67,19 @@ export default function DetailRow({
 
   const { min: minPage, max: maxPage } = getPageRangeForJuz(rowData.juz);
 
-  // Auto-clamp Juz & Page bounds based on top Juz/Page section data
-  useEffect(() => {
-    let updatedJuz = rowData.juz;
-    let needsUpdate = false;
-
-    if (availableJuzs && availableJuzs.length > 0) {
-      if (!availableJuzs.includes(rowData.juz)) {
-        updatedJuz = availableJuzs[0];
-        needsUpdate = true;
-      }
-    }
-
-    if (rowData.page !== "" && rowData.page !== null && rowData.page !== undefined) {
-      const { min, max } = getPageRangeForJuz(updatedJuz);
-      let currentPageNum = parseInt(rowData.page, 10);
-
-      if (!isNaN(currentPageNum) && (currentPageNum < min || currentPageNum > max)) {
-        const clamped = Math.min(Math.max(currentPageNum, min), max);
-        onChange((prev) => ({
-          ...prev,
-          juz: updatedJuz,
-          page: clamped.toString(),
-        }));
-        return;
-      }
-    }
-
-    if (needsUpdate) {
-      onChange((prev) => ({
-        ...prev,
-        juz: updatedJuz,
-      }));
-    }
-  }, [juzPageData, availableJuzs]);
+  // NOTE: Intentionally NO auto-clamp useEffect here.
+  // Auto-setting juz/page on every juzPageData change caused two bugs:
+  //   1. Sessions/rows kept re-appearing after the user deleted them.
+  //   2. Typing a multi-digit page number (e.g. "12") was impossible because
+  //      the effect fired after the first digit and clamped the value.
+  // Validation now only happens on blur (handled by NumberScrollInput.handleBlur).
 
   const handleJuzChange = (newJuz) => {
-    const range = getPageRangeForJuz(newJuz);
+    // Keep the existing page value when switching juz so typing is not disrupted.
+    // onBlur in NumberScrollInput will clamp the page to the new juz's range.
     onChange((prev) => ({
       ...prev,
       juz: newJuz,
-      page: range.min.toString(),
     }));
   };
 
@@ -166,9 +138,10 @@ export default function DetailRow({
 
   return (
     <div 
-      className={`flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-all duration-150 select-none ${
+      className={`flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-all duration-150 select-none focus-within:z-40 hover:z-20 ${
         isDragOverTarget ? "border-2 border-dashed border-[var(--accent-main)] bg-[var(--accent-main)]/10" : ""
       }`}
+      style={{ zIndex: 30 - index }}
       draggable={isDraggable}
       onDragStart={(e) => {
         if (onDragStart) onDragStart(e, listType, index);
@@ -212,13 +185,14 @@ export default function DetailRow({
             {hasJuz && (
               <div className="flex items-center gap-1 shrink-0 relative z-30">
                 <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
-                <CustomSelect
-                  options={availableJuzs.map((j) => ({ label: j, value: j }))}
-                  value={rowData.juz || (availableJuzs[0] || "")}
-                  onChange={(val) => handleJuzChange(val)}
-                  className="w-[50px] sm:w-16"
-                  buttonClassName="h-[38px] sm:h-10 w-[50px] sm:w-16 theme-bg-sub rounded-lg border theme-border flex items-center justify-between px-1 text-xs sm:text-sm theme-text-primary font-semibold cursor-pointer shadow-sm transition-colors select-none"
-                />
+                <div className="h-[38px] sm:h-10 w-[50px] sm:w-[58px] shrink-0">
+                  <CustomSelect
+                    options={availableJuzs.map((j) => ({ label: String(j), value: String(j) }))}
+                    value={String(rowData.juz || availableJuzs[0] || "")}
+                    onChange={(val) => handleJuzChange(val)}
+                    compactMode={true}
+                  />
+                </div>
               </div>
             )}
 
