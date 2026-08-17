@@ -225,7 +225,12 @@ export default function RecordReportsList({
                     )}
                   </div>
                   <p className="text-[11px] theme-text-secondary mt-0.5 truncate font-sans">
-                    {rep.formattedDate} {rep.formattedTime && `· ${rep.formattedTime}`} · <span className="theme-text-primary font-medium">{rep.student_group}</span>
+                    <span className="theme-text-primary font-medium">{rep.formattedReportDate || rep.formattedDate}</span>
+                    {rep.formattedGenerateTime && (
+                      <span className="opacity-80"> · {rep.formattedGenerateTime}</span>
+                    )}
+                    <span> · </span>
+                    <span className="theme-text-primary font-medium">{rep.student_group}</span>
                   </p>
                 </div>
               </div>

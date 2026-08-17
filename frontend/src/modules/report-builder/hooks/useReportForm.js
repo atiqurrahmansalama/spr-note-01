@@ -625,10 +625,10 @@ export function useReportForm() {
 
     try {
       const cleanMistakes = mistakeData.filter(
-        (m) => m.juz.trim() || m.page.trim() || m.ayahs.some((a) => a.value.trim())
+        (m) => (m.page && m.page.trim()) || (m.ayahs && m.ayahs.some((a) => a.value && a.value.trim()))
       );
       const cleanStucks = stuckData.filter(
-        (s) => s.juz.trim() || s.page.trim() || s.ayahs.some((a) => a.value.trim())
+        (s) => (s.page && s.page.trim()) || (s.ayahs && s.ayahs.some((a) => a.value && a.value.trim()))
       );
 
       const editedAt = new Date().toISOString();

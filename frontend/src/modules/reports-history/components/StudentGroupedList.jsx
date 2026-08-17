@@ -348,11 +348,11 @@ export default function StudentGroupedList({
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-xs font-bold theme-text-primary">
-                                  {rep.formattedDate}
+                                  {rep.formattedReportDate || rep.formattedDate}
                                 </span>
-                                {rep.formattedTime && (
+                                {rep.formattedGenerateTime && (
                                   <span className="text-[10px] theme-text-secondary font-mono">
-                                    {rep.formattedTime}
+                                    {rep.formattedGenerateTime}
                                   </span>
                                 )}
                                 <span className="text-[10px] theme-bg-sub px-2 py-0.5 rounded-md theme-text-primary border theme-border font-semibold">

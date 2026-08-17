@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
 import { isOnline } from "../../../utils/localStore";
+import { formatDate } from "../../../utils/reportGenerator";
 import { 
   CloudIcon, 
   UsersIcon, 
@@ -96,31 +97,45 @@ export default function StudentReportsView() {
 
   // Helper: Normalize a single report object
   const normalizeReport = (rep) => {
-    const rawDateStr = rep.date_time || rep.date || rep.created_at || "";
-    let formattedDate = "—";
-    let formattedTime = "";
+    // 1. Report Date (Recitation Date)
+    const rawReportDate = rep.report_date || rep.date || rep.selectedDate || "";
+    let formattedReportDate = "—";
     let isoDateOnly = "";
 
-    if (rawDateStr) {
+    if (rawReportDate) {
       try {
-        const d = new Date(rawDateStr);
+        const d = new Date(rawReportDate);
         if (!isNaN(d.getTime())) {
           isoDateOnly = d.toISOString().split("T")[0];
-          formattedDate = d.toLocaleDateString("en-US", {
-            month: "2-digit",
-            day: "2-digit",
-            year: "numeric",
-          });
-          formattedTime = d.toLocaleTimeString("en-US", {
+          formattedReportDate = formatDate(d);
+        } else {
+          formattedReportDate = formatDate(rawReportDate);
+        }
+      } catch {
+        formattedReportDate = String(rawReportDate);
+      }
+    }
+
+    // 2. Generated Date / Created At (Timestamp when report was recorded in DB)
+    const rawGenerateDate = rep.generate_date || rep.created_at || rep.client_created_at || rep.client_updated_at || rep.date_time || rawReportDate;
+    let formattedGenerateDate = "—";
+    let formattedGenerateTime = "";
+
+    if (rawGenerateDate) {
+      try {
+        const gd = new Date(rawGenerateDate);
+        if (!isNaN(gd.getTime())) {
+          formattedGenerateDate = formatDate(gd);
+          formattedGenerateTime = gd.toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
           });
         } else {
-          formattedDate = String(rawDateStr);
+          formattedGenerateDate = String(rawGenerateDate);
         }
       } catch {
-        formattedDate = String(rawDateStr);
+        formattedGenerateDate = String(rawGenerateDate);
       }
     }
 
@@ -158,6 +173,52 @@ export default function StudentReportsView() {
     );
     const editedAtTime = rep.edited_at || (hasEditedFlag ? rep.updated_at : null) || rep.client_updated_at || null;
 
+    // Mistakes count (strictly 0 if no real mistakes)
+    let mistakesCount = 0;
+    if (rep.total_mistake !== undefined && rep.total_mistake !== null) {
+      mistakesCount = Number(rep.total_mistake) || 0;
+    } else if (Array.isArray(rep.mistake_details) && rep.mistake_details.length > 0) {
+      mistakesCount = rep.mistake_details.filter((m) => (m.page && String(m.page).trim()) || (m.ayah && String(m.ayah).trim())).length;
+    } else if (Array.isArray(rep.error_details)) {
+      mistakesCount = rep.error_details.filter((e) => e.type === "Mistake").length;
+    } else if (Array.isArray(rep.mistakes)) {
+      let count = 0;
+      rep.mistakes.forEach((m) => {
+        if (m.ayahs && Array.isArray(m.ayahs)) {
+          m.ayahs.forEach((a) => {
+            const val = typeof a === "object" ? (a.value || a.ayah) : a;
+            if (val && String(val).trim()) count += 1;
+          });
+        } else if (m.page && String(m.page).trim()) {
+          count += 1;
+        }
+      });
+      mistakesCount = count;
+    }
+
+    // Stucks count (strictly 0 if no real stucks)
+    let stucksCount = 0;
+    if (rep.total_stuck !== undefined && rep.total_stuck !== null) {
+      stucksCount = Number(rep.total_stuck) || 0;
+    } else if (Array.isArray(rep.stuck_details) && rep.stuck_details.length > 0) {
+      stucksCount = rep.stuck_details.filter((s) => (s.page && String(s.page).trim()) || (s.ayah && String(s.ayah).trim())).length;
+    } else if (Array.isArray(rep.error_details)) {
+      stucksCount = rep.error_details.filter((e) => e.type === "Stuck").length;
+    } else if (Array.isArray(rep.stucks)) {
+      let count = 0;
+      rep.stucks.forEach((s) => {
+        if (s.ayahs && Array.isArray(s.ayahs)) {
+          s.ayahs.forEach((a) => {
+            const val = typeof a === "object" ? (a.value || a.ayah) : a;
+            if (val && String(val).trim()) count += 1;
+          });
+        } else if (s.page && String(s.page).trim()) {
+          count += 1;
+        }
+      });
+      stucksCount = count;
+    }
+
     return {
       ...rep,
       student_name:
@@ -174,14 +235,17 @@ export default function StudentReportsView() {
         "General Group",
       session_name: rep.session_name || rep.session || "General Session",
       comment: rep.comment || "",
-      formattedDate,
-      formattedTime,
+      formattedDate: formattedReportDate,
+      formattedTime: formattedGenerateTime,
+      formattedReportDate,
+      formattedGenerateDate,
+      formattedGenerateTime,
       isoDateOnly,
       is_edited: hasEditedFlag,
       edited_at: editedAtTime,
       totalPages: calculatedPages || rep.total_page || rep.total_pages || rep.pages || 0,
-      mistakesCount: rep.total_mistake ?? (rep.mistakes_count || rep.mistakes?.length || 0),
-      stucksCount: rep.total_stuck ?? (rep.stucks_count || rep.stucks?.length || 0),
+      mistakesCount,
+      stucksCount,
     };
   };
 

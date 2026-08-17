@@ -1,3 +1,4 @@
+from datetime import datetime, date
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -1101,21 +1102,19 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     error_details = ReportErrorDetailSerializer(many=True, required=False, default=list)
 
     # ── Backward-compat computed fields (read-only) ──────────
-    # Frontend still expects `mistake_details` and `stuck_details` arrays.
-    # These are filtered views over error_details — no separate DB tables.
     mistake_details = serializers.SerializerMethodField()
     stuck_details   = serializers.SerializerMethodField()
 
     # ── Report Status (Nested & Flattened) ────────────────────
     status_info = ReportStatusSerializer(read_only=True)
     report_status = ReportStatusSerializer(source='status_info', read_only=True)
-    is_edited = serializers.BooleanField(source='status_info.is_edited', read_only=True, default=False)
-    edit_time = serializers.DateTimeField(source='status_info.edit_time', read_only=True, allow_null=True)
-    edited_at = serializers.DateTimeField(source='status_info.edit_time', read_only=True, allow_null=True)
-    is_locked = serializers.BooleanField(source='status_info.is_locked', read_only=True, default=False)
-    lock_time = serializers.DateTimeField(source='status_info.lock_time', read_only=True, allow_null=True)
-    is_deleted = serializers.BooleanField(source='status_info.is_deleted', read_only=True, default=False)
-    delete_time = serializers.DateTimeField(source='status_info.delete_time', read_only=True, allow_null=True)
+    is_edited = serializers.SerializerMethodField()
+    edit_time = serializers.SerializerMethodField()
+    edited_at = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()
+    lock_time = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
+    delete_time = serializers.SerializerMethodField()
 
     # ── Related info ─────────────────────────────────────────
     student_details = StudentSerializer(source='student', read_only=True)
@@ -1130,13 +1129,15 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
     # ── Display helpers ───────────────────────────────────────
     date_time     = serializers.SerializerMethodField()
+    report_date   = serializers.SerializerMethodField()
+    generate_date = serializers.SerializerMethodField()
     formattedDate = serializers.SerializerMethodField()
     formattedTime = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentDailyReport
         fields = [
-            'id', 'report_unique_id', 'date', 'date_time',
+            'id', 'report_unique_id', 'date', 'date_time', 'report_date', 'generate_date',
             'formattedDate', 'formattedTime',
             'student', 'student_name', 'student_group', 'student_details',
             'session_name',
@@ -1152,18 +1153,53 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             'juz_and_pages',
             'portions',
             'error_details',
-            'mistake_details',   # computed from error_details where type='Mistake'
-            'stuck_details',     # computed from error_details where type='Stuck'
+            'mistake_details',
+            'stuck_details',
             'created_by',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_by', 'report_unique_id']
 
+    # ── Computed status fields ────────────────────────────────
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_edited(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.is_edited if st else False
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_edit_time(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.edit_time.strftime("%Y-%m-%d %H:%M:%S") if (st and st.edit_time) else None
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_edited_at(self, obj):
+        return self.get_edit_time(obj)
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_locked(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.is_locked if st else False
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_lock_time(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.lock_time.strftime("%Y-%m-%d %H:%M:%S") if (st and st.lock_time) else None
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_deleted(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.is_deleted if st else False
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_delete_time(self, obj):
+        st = getattr(obj, 'status_info', None)
+        return st.delete_time.strftime("%Y-%m-%d %H:%M:%S") if (st and st.delete_time) else None
+
     # ── Computed compat fields ───────────────────────────────
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_mistake_details(self, obj):
-        """Returns mistake entries from error_details (type='Mistake')."""
         items = [
             ed for ed in obj.error_details.all()
             if ed.type == 'Mistake'
@@ -1175,7 +1211,6 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_stuck_details(self, obj):
-        """Returns stuck entries from error_details (type='Stuck')."""
         items = [
             ed for ed in obj.error_details.all()
             if ed.type == 'Stuck'
@@ -1188,6 +1223,16 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.STR)
     def get_date_time(self, obj):
         dt = obj.date or obj.created_at
+        return dt.strftime("%Y-%m-%d %I:%M:%S %p") if dt else ""
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_report_date(self, obj):
+        dt = obj.date or obj.created_at
+        return dt.strftime("%Y-%m-%d") if dt else ""
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_generate_date(self, obj):
+        dt = obj.created_at or obj.date
         return dt.strftime("%Y-%m-%d %I:%M:%S %p") if dt else ""
 
     @extend_schema_field(OpenApiTypes.STR)
@@ -1207,12 +1252,30 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         date_val = mutable_data.get('report_date') or mutable_data.get('date')
         if date_val:
-            if isinstance(date_val, str):
-                if 'T' in date_val or ' ' in date_val:
-                    mutable_data['date'] = date_val
+            if isinstance(date_val, datetime):
+                mutable_data['date'] = date_val
+            elif isinstance(date_val, date):
+                mutable_data['date'] = datetime.combine(date_val, timezone.now().time())
+            elif isinstance(date_val, str) and date_val.strip():
+                clean_str = date_val.strip()
+                parsed_dt = None
+                try:
+                    from dateutil import parser
+                    parsed_dt = parser.parse(clean_str)
+                except Exception:
+                    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d %b %Y", "%d %B %Y", "%Y/%m/%d", "%d.%m.%Y"]:
+                        try:
+                            parsed_dt = datetime.strptime(clean_str, fmt)
+                            break
+                        except ValueError:
+                            pass
+                if parsed_dt:
+                    if parsed_dt.time() == datetime.min.time():
+                        now_time = timezone.now().time()
+                        parsed_dt = datetime.combine(parsed_dt.date(), now_time)
+                    mutable_data['date'] = timezone.make_aware(parsed_dt) if timezone.is_naive(parsed_dt) else parsed_dt
                 else:
-                    now_time = timezone.now().time()
-                    mutable_data['date'] = f"{date_val} {now_time.strftime('%H:%M:%S')}"
+                    mutable_data['date'] = timezone.now()
         else:
             mutable_data['date'] = timezone.now()
 
@@ -1236,10 +1299,14 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
                     if not student_obj:
                         max_roll = Student.objects.aggregate(Max('roll_number'))['roll_number__max'] or 0
+                        req = self.context.get('request')
+                        user = getattr(req, 'user', None) if req else None
                         student_obj = Student.objects.create(
                             name_en=name_clean,
+                            name=name_clean,
                             group_name=group_val,
                             roll_number=max_roll + 1,
+                            created_by=user if (user and user.is_authenticated) else None,
                         )
                     mutable_data['student'] = student_obj.pk
                     mutable_data['student_name'] = student_obj.name_en or name_clean
@@ -1247,18 +1314,14 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(
-                        f"[ReportSerializer] Auto-student lookup/create failed for '{name_clean}': {e}. "
-                        f"Will attempt to find any existing match or proceed without FK."
+                        f"[ReportSerializer] Auto-student lookup/create failed for '{name_clean}': {e}."
                     )
-                    # Last-chance fallback: try fetching any student by name substring
                     try:
                         fallback = Student.objects.filter(name_en__icontains=name_clean).first()
                         if fallback:
                             mutable_data['student'] = fallback.pk
                             mutable_data['student_name'] = fallback.name_en or name_clean
                         else:
-                            # Cannot link a Student FK — store name only.
-                            # The report model requires student FK, so raise a friendly validation error.
                             from rest_framework.exceptions import ValidationError
                             raise ValidationError(
                                 {'student': f"Could not find or create student '{name_clean}'. Please add the student first."}
@@ -1281,9 +1344,6 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
     def _parse_legacy_errors(self, report, mistakes_input, stucks_input):
         """Parse old frontend format (mistake_details/stuck_details arrays) into ReportErrorDetail."""
-        tot_mistakes = 0
-        tot_stucks = 0
-
         def _process(items, error_type):
             count = 0
             for item in items:
@@ -1293,30 +1353,32 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                 page = str(item.get('page', '')).strip()
                 ayahs = item.get('ayahs', [])
 
-                if isinstance(ayahs, list) and len(ayahs) > 0:
-                    for a in ayahs:
-                        val = (a.get('value') or a.get('ayah') or '') if isinstance(a, dict) else str(a)
-                        val = str(val).strip()
-                        if val or juz or page:
-                            ReportErrorDetail.objects.create(
-                                report=report,
-                                type=error_type,
-                                juz=self._safe_int(juz),
-                                page=self._safe_int(page),
-                                ayah=self._safe_int(val),
-                            )
-                            count += 1
-                else:
-                    line_val = str(item.get('line') or item.get('ayah') or '').strip()
-                    if juz or page or line_val:
+                valid_ayahs = [
+                    ((a.get('value') or a.get('ayah') or '') if isinstance(a, dict) else str(a)).strip()
+                    for a in (ayahs if isinstance(ayahs, list) else [])
+                ]
+                valid_ayahs = [a for a in valid_ayahs if a]
+
+                if valid_ayahs:
+                    for a_val in valid_ayahs:
                         ReportErrorDetail.objects.create(
                             report=report,
                             type=error_type,
                             juz=self._safe_int(juz),
                             page=self._safe_int(page),
-                            ayah=self._safe_int(line_val),
+                            ayah=self._safe_int(a_val),
                         )
                         count += 1
+                elif page:
+                    line_val = str(item.get('line') or item.get('ayah') or '').strip()
+                    ReportErrorDetail.objects.create(
+                        report=report,
+                        type=error_type,
+                        juz=self._safe_int(juz),
+                        page=self._safe_int(page),
+                        ayah=self._safe_int(line_val),
+                    )
+                    count += 1
             return count
 
         tot_mistakes = _process(mistakes_input, 'Mistake')
@@ -1358,7 +1420,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         student_obj = validated_data.get('student')
         if student_obj and not validated_data.get('student_name'):
-            validated_data['student_name'] = student_obj.name
+            validated_data['student_name'] = student_obj.name_en or student_obj.name or 'Student'
 
         report = StudentDailyReport.objects.create(**validated_data)
         ReportStatus.objects.get_or_create(report=report)
@@ -1378,6 +1440,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         report.total_stuck   = tot_stucks
         report.save(update_fields=['total_mistake', 'total_stuck'])
 
+        report.refresh_from_db()
         return report
 
     # ── UPDATE ───────────────────────────────────────────────

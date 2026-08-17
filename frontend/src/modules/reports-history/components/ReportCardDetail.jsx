@@ -103,7 +103,7 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
     <div className="p-4 sm:p-5 theme-bg-sub border-t theme-border space-y-4 text-xs font-sans animate-fade-in select-none rounded-b-2xl">
       
       {/* 1. Summary Header Grid Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 sm:p-4 theme-bg-surface border theme-border rounded-2xl shadow-sm">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 sm:p-4 theme-bg-surface border theme-border rounded-2xl shadow-sm">
         <div className="space-y-0.5">
           <span className="text-[10px] theme-text-secondary font-bold uppercase tracking-wider block">
             Student Name
@@ -133,10 +133,19 @@ export default function ReportCardDetail({ report, onEdit, onDelete }) {
 
         <div className="space-y-0.5">
           <span className="text-[10px] theme-text-secondary font-bold uppercase tracking-wider block">
-            Date & Time
+            Report Date
+          </span>
+          <span className="font-mono theme-text-primary font-semibold text-xs truncate block">
+            {report.formattedReportDate || report.formattedDate || "—"}
+          </span>
+        </div>
+
+        <div className="space-y-0.5 col-span-2 sm:col-span-1">
+          <span className="text-[10px] theme-text-secondary font-bold uppercase tracking-wider block">
+            Generated Date
           </span>
           <span className="font-mono theme-text-secondary text-xs truncate block">
-            {report.formattedDate} {report.formattedTime && `· ${report.formattedTime}`}
+            {report.formattedGenerateDate || "—"} {report.formattedGenerateTime && `· ${report.formattedGenerateTime}`}
           </span>
         </div>
       </div>
