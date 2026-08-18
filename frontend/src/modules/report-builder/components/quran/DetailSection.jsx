@@ -83,7 +83,7 @@ export default function DetailSection({
       const hasJuz = row.juz && String(row.juz).trim() !== "";
       const hasPage = row.page && String(row.page).trim() !== "";
       
-      if (hasJuz && hasPage) {
+      if (hasPage) {
         const filledAyahs = row.ayahs?.filter(a => a.value && String(a.value).trim() !== "") || [];
         if (filledAyahs.length > 0) {
           count += filledAyahs.length;

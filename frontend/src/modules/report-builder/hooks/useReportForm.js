@@ -634,8 +634,13 @@ export function useReportForm() {
       const editedAt = new Date().toISOString();
       const isEditing = Boolean(editingReport);
 
+      const selectedStudent = studentDatabase.find(
+        (s) => s.label?.trim().toLowerCase() === studentName.trim().toLowerCase()
+      );
+      const studentId = selectedStudent ? selectedStudent.id : null;
+
       const payload = {
-        student: studentName.trim(),
+        student: studentId || studentName.trim(),
         session: selectedSession.trim(),
         report_date: selectedDate || new Date().toISOString().split("T")[0],
         subject_course: groupName || "General Group",
@@ -692,6 +697,7 @@ export function useReportForm() {
         if (isOnline()) {
           try {
             const apiResult = await createReport({
+              studentId,
               studentName: studentName.trim(),
               groupName: groupName || "General Group",
               selectedSession: selectedSession.trim(),
@@ -713,21 +719,8 @@ export function useReportForm() {
               window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
             } else {
               const errData = apiResult.errors || {};
-              let errorMsg = "Failed to save report to server";
-              if (typeof errData === "string" && errData.trim()) {
-                errorMsg = errData;
-              } else if (errData && typeof errData === "object") {
-                if (errData.detail) {
-                  errorMsg = String(errData.detail);
-                } else {
-                  const formatted = Object.entries(errData)
-                    .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
-                    .filter(Boolean)
-                    .join(" | ");
-                  if (formatted) errorMsg = formatted;
-                }
-              }
-              showToast(errorMsg, "error");
+              const targetError = errData.details || errData;
+              showToast(targetError, "error");
               return;
             }
           } catch (error) {
