@@ -637,7 +637,7 @@ export function useReportForm() {
       const selectedStudent = studentDatabase.find(
         (s) => s.label?.trim().toLowerCase() === studentName.trim().toLowerCase()
       );
-      const studentId = selectedStudent ? selectedStudent.id : null;
+      const studentId = selectedStudent && !String(selectedStudent.id).startsWith("stu_") ? selectedStudent.id : null;
 
       const payload = {
         student: studentId || studentName.trim(),
