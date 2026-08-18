@@ -80,16 +80,10 @@ export default function DetailSection({
     if (!data || !Array.isArray(data)) return 0;
     let count = 0;
     data.forEach((row) => {
-      const hasJuz = row.juz && String(row.juz).trim() !== "";
       const hasPage = row.page && String(row.page).trim() !== "";
-      
       if (hasPage) {
         const filledAyahs = row.ayahs?.filter(a => a.value && String(a.value).trim() !== "") || [];
-        if (filledAyahs.length > 0) {
-          count += filledAyahs.length;
-        } else {
-          count += 1;
-        }
+        count += filledAyahs.length;
       }
     });
     return count;
@@ -130,6 +124,7 @@ export default function DetailSection({
           <DetailRow
             key={row.id}
             index={idx}
+            isLastRow={idx === data.length - 1}
             listType={listType}
             rowData={row}
             onChange={(newR) => handleRowChange(idx, newR)}

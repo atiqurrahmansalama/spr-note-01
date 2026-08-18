@@ -46,8 +46,7 @@ export const transformFormToApiPayload = (reportData) => {
   // 1. Transform Juz Page Data into `portions` array
   const portions = [];
   juzPageData.forEach((row) => {
-    if (!row.juz || String(row.juz).trim() === "") return;
-    const juzNum = parseInt(row.juz, 10) || 1;
+    const juzNum = parseInt(row.juz, 10) || 1; // default juz=1 if blank
 
     (row.ranges || []).forEach((r) => {
       const sPage = parseInt(r.start, 10);

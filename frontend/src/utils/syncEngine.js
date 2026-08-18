@@ -94,16 +94,19 @@ export const triggerCloudSync = async () => {
 
       if (apiResult.success && apiResult.data) {
         const serverReport = apiResult.data;
-        const itemIdx = reports.findIndex((r) => r.id === item.id);
+        const itemIdx = reports.findIndex(
+          (r) => r.id === item.id || (item.report_unique_id && r.report_unique_id === item.report_unique_id)
+        );
         if (itemIdx > -1) {
           reports[itemIdx] = {
             ...reports[itemIdx],
+            ...serverReport,
             id: serverReport.id,
-            report_unique_id: serverReport.report_unique_id,
+            report_unique_id: serverReport.report_unique_id || reports[itemIdx].report_unique_id,
             sync_status: "SYNCED",
           };
         }
-        updatedIds = updatedIds.filter((id) => id !== item.id);
+        updatedIds = updatedIds.filter((id) => id !== item.id && id !== serverReport.id);
       }
     } catch (error) {
       console.error("[SyncEngine] Failed to sync item:", item.id, error);

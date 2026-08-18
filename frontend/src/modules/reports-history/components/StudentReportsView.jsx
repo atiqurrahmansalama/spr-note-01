@@ -298,8 +298,23 @@ export default function StudentReportsView() {
           .filter((r) => {
             const hasDbId = r.id && !isNaN(Number(r.id)) && !String(r.id).includes("-");
             const existsOnServer = apiKeys.has(String(r.id || r.report_unique_id || ""));
-            // Keep locally only if it is a pure offline draft (has no database integer ID) and not present on server
-            return !existsOnServer && !hasDbId;
+
+            // If a server report already exists with matching student, recitation date, and session, it is already synced
+            const matchesApiReport = apiReports.some((apiR) => {
+              const sameStudent =
+                (apiR.student_name || "").toLowerCase().trim() ===
+                (r.student_name || "").toLowerCase().trim();
+              const apiDate = (apiR.isoDateOnly || apiR.report_date || "").split("T")[0];
+              const localDate = (r.isoDateOnly || r.report_date || r.selectedDate || "").split("T")[0];
+              const sameDate = apiDate && localDate && apiDate === localDate;
+              const sameSession =
+                (apiR.session_name || "").toLowerCase().trim() ===
+                (r.session_name || r.selectedSession || r.session || "").toLowerCase().trim();
+              return sameStudent && sameDate && sameSession;
+            });
+
+            // Keep locally only if it is a pure offline draft not present on server
+            return !existsOnServer && !hasDbId && !matchesApiReport;
           })
           .map(normalizeReport);
 

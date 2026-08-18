@@ -33,6 +33,18 @@ export default function StudentInputSection({
           type="text"
           value={groupName}
           onChange={(e) => onGroupNameChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const juzInput =
+                document.querySelector('input[id^="juz-input-"]') ||
+                document.querySelector('[data-section="juz-page"] input');
+              if (juzInput) {
+                juzInput.focus();
+                if (typeof juzInput.select === "function") juzInput.select();
+              }
+            }
+          }}
           className="w-[150px] ml-[13px] bg-transparent text-[12px] theme-text-secondary font-semibold mt-1 pl-1 focus:outline-none focus:theme-text-primary transition-colors placeholder:font-normal"
           placeholder="Group Name"
         />

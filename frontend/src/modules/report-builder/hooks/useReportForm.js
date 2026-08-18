@@ -620,6 +620,7 @@ export function useReportForm() {
   };
 
   const handleSaveRecord = async () => {
+    if (isSaving) return;
     if (!validateReportForm()) return;
     setIsSaving(true);
 
@@ -692,7 +693,18 @@ export function useReportForm() {
 
       } else {
         // New report — POST
-        saveReportLocally(payload);
+        // Store sync-friendly fields so triggerCloudSync can correctly re-transform later
+        const localSavedReport = saveReportLocally({
+          ...payload,
+          studentId,
+          studentName: studentName.trim(),
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData: cleanMistakes,
+          stuckData: cleanStucks,
+        });
 
         if (isOnline()) {
           try {
@@ -710,6 +722,35 @@ export function useReportForm() {
 
             if (apiResult.success) {
               const createdData = apiResult.data;
+
+              // Immediately sync the local storage copy with the backend response
+              try {
+                const allLocal = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+                const syncedLocal = allLocal.map((r) => {
+                  if (
+                    r.id === localSavedReport.id ||
+                    r.report_unique_id === localSavedReport.report_unique_id ||
+                    (createdData.report_unique_id && r.report_unique_id === createdData.report_unique_id)
+                  ) {
+                    return {
+                      ...r,
+                      ...createdData,
+                      id: createdData.id,
+                      report_unique_id: createdData.report_unique_id || r.report_unique_id,
+                      sync_status: "SYNCED",
+                    };
+                  }
+                  return r;
+                });
+                localStorage.setItem("spr_reports_local_v1", JSON.stringify(syncedLocal));
+
+                const pendingQ = JSON.parse(localStorage.getItem("spr_reports_pending_queue") || "[]");
+                const cleanedQ = pendingQ.filter((id) => id !== localSavedReport.id && id !== createdData.id);
+                localStorage.setItem("spr_reports_pending_queue", JSON.stringify(cleanedQ));
+              } catch (storageErr) {
+                console.warn("[useReportForm] Error updating local sync status:", storageErr);
+              }
+
               showToast(`Report #${createdData.report_unique_id || createdData.id || ''} for "${studentName}" recorded to Database!`, "success");
               saveStatusStore.set("database", "Database Synced");
               window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: createdData } }));

@@ -14,6 +14,7 @@ export default function DetailRow({
   juzPageData,
   listType,
   index,
+  isLastRow = false,
   onDragStart,
   onDragOver,
   onDrop,
@@ -240,10 +241,12 @@ export default function DetailRow({
                               value={ayah.value}
                               onChange={(val) => handleAyahChange(globalIdx, val)}
                               onEnter={(e) => {
-                                if (isLastTotal && onAddNewRow) {
+                                if (isLastRow && isLastTotal && onAddNewRow) {
+                                  if (e && e.preventDefault) e.preventDefault();
                                   onAddNewRow();
+                                } else {
+                                  handleEnterFocusNext(e);
                                 }
-                                handleEnterFocusNext(e);
                               }}
                               onShiftEnter={onNextSection}
                               onAdd={() => {
@@ -297,7 +300,15 @@ export default function DetailRow({
                             id={`ayah-${ayah.id}`}
                             value={ayah.value}
                             onChange={(val) => handleAyahChange(globalIdx, val)}
-                            onEnter={handleEnterFocusNext}
+                            onEnter={(e) => {
+                              if (isLastRow && isLastTotal && onAddNewRow) {
+                                if (e && e.preventDefault) e.preventDefault();
+                                onAddNewRow();
+                              } else {
+                                handleEnterFocusNext(e);
+                              }
+                            }}
+                            onShiftEnter={onNextSection}
                             onAdd={() => {
                               if (isLastTotal) addAyah();
                             }}
