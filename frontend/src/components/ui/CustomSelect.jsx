@@ -118,7 +118,7 @@ export default function CustomSelect({
           type="button"
           disabled={disabled}
           onClick={() => !disabled && setIsOpen((prev) => !prev)}
-          className={`w-full px-4 py-3 rounded-2xl border transition-all duration-200 flex items-center justify-between text-xs font-medium cursor-pointer ${
+          className={`w-full px-4 py-3 min-h-[46px] rounded-2xl border transition-all duration-200 flex items-center justify-between text-xs sm:text-sm font-medium cursor-pointer ${
             disabled
               ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
               : isOpen
@@ -133,11 +133,11 @@ export default function CustomSelect({
               <Icon className="w-4 h-4 shrink-0 text-sky-400" />
             )}
             {selectedLabel ? (
-              <span className="truncate theme-text-primary font-bold text-xs">
+              <span className="truncate theme-text-primary font-semibold text-xs sm:text-sm">
                 {selectedLabel}
               </span>
             ) : (
-              <span className="truncate theme-text-secondary opacity-60">
+              <span className="truncate theme-text-secondary opacity-60 text-xs sm:text-sm">
                 {placeholder}
               </span>
             )}
