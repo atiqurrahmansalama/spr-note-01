@@ -45,12 +45,13 @@ export default function InstitutionOnboardingModal({ isOpen, onClose, onSuccess 
   if (!isOpen) return null;
 
   const generateSlug = (name) => {
-    return name
+    const clean = name
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-');
+    return clean || `inst-${Date.now().toString().slice(-6)}`;
   };
 
   const handleNameChange = (e) => {
@@ -107,16 +108,28 @@ export default function InstitutionOnboardingModal({ isOpen, onClose, onSuccess 
       onClose();
     } catch (err) {
       console.error('[Onboarding Error]:', err);
-      const serverErrors = err.response?.data || {};
-      if (typeof serverErrors === 'object') {
+      const serverErrors = err.response?.data || (typeof err.data === 'object' ? err.data : {});
+      if (typeof serverErrors === 'object' && Object.keys(serverErrors).length > 0) {
         const mappedErrors = {};
         Object.entries(serverErrors).forEach(([key, val]) => {
           mappedErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
         });
         setErrors(mappedErrors);
-        showToast(mappedErrors.non_field_errors || mappedErrors.error || 'Failed to onboard institution. Check the errors below.', 'error');
+
+        // Auto-navigate to the step with error
+        if (mappedErrors.name || mappedErrors.phone || mappedErrors.institution_type || mappedErrors.eiin_or_reg_no) {
+          setStep(1);
+        } else if (mappedErrors.slug || mappedErrors.division || mappedErrors.district || mappedErrors.address || mappedErrors.logo_url) {
+          setStep(2);
+        } else if (mappedErrors.admin_name || mappedErrors.admin_phone || mappedErrors.admin_email || mappedErrors.admin_password || mappedErrors.preset_type) {
+          setStep(3);
+        }
+
+        const firstKey = Object.keys(mappedErrors)[0];
+        const readableMsg = mappedErrors.non_field_errors || mappedErrors.error || mappedErrors.detail || `${firstKey ? firstKey.replace(/_/g, ' ') + ': ' : ''}${mappedErrors[firstKey]}`;
+        showToast(readableMsg, 'error');
       } else {
-        showToast('Server error during onboarding. Please try again.', 'error');
+        showToast(err.message || 'Server error during onboarding. Please try again.', 'error');
       }
     } finally {
       setIsSubmitting(false);

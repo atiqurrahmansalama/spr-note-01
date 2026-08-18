@@ -72,8 +72,26 @@ export const registerInstitution = async (data) => {
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    const msg = errData.error || errData.detail || (typeof errData === 'object' ? Object.values(errData).flat().join(', ') : 'Failed to register institution');
-    throw new Error(msg);
+    let msg = 'Failed to register institution';
+    if (typeof errData === 'string') {
+      msg = errData;
+    } else if (errData && typeof errData === 'object') {
+      if (errData.error) msg = errData.error;
+      else if (errData.detail) msg = errData.detail;
+      else if (errData.non_field_errors) {
+        msg = Array.isArray(errData.non_field_errors)
+          ? errData.non_field_errors.join(', ')
+          : String(errData.non_field_errors);
+      } else {
+        const fieldMsgs = Object.entries(errData).map(
+          ([k, v]) => `${k.replace(/_/g, ' ')}: ${Array.isArray(v) ? v.join(', ') : v}`
+        );
+        if (fieldMsgs.length > 0) msg = fieldMsgs.join(' | ');
+      }
+    }
+    const err = new Error(msg);
+    err.response = { data: errData, status: response.status };
+    throw err;
   }
   return await response.json();
 };
