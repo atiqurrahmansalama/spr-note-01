@@ -15,6 +15,7 @@ import {
 import { getCurrentInstitution, updateCurrentInstitution } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import DocumentStudioEngine from '../../../components/documents/DocumentStudioEngine';
 
 export default function InstitutionProfileView() {
   const { showToast } = useToast();
@@ -22,7 +23,7 @@ export default function InstitutionProfileView() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [previewTab, setPreviewTab] = useState('slip'); // 'slip' | 'id_card' | 'report_banner'
+  const [previewTab, setPreviewTab] = useState('id_card'); // 'id_card' | 'slip' | 'certificate' | 'report_banner'
 
   const [formData, setFormData] = useState({
     name: '',
@@ -341,29 +342,41 @@ export default function InstitutionProfileView() {
         </div>
       </form>
 
-      {/* 3. Large, Full-Width Live Document Preview Hub (At the Bottom) */}
-      <div className="p-6 rounded-3xl theme-bg-elevated border theme-border shadow-md space-y-6">
+      {/* 3. Enterprise Universal Document & Smart ID Card Studio Engine */}
+      <div className="space-y-4">
         {/* Preview Hub Header & Tabs */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b theme-border">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl theme-bg-elevated border theme-border shadow-md">
           <div>
             <div className="flex items-center gap-2">
               <GlobeIcon className="w-5 h-5 text-sky-400" />
               <h2 className="text-base font-bold theme-text-primary uppercase tracking-wider">
-                Live Document & Identity Preview
+                Visual Document & Smart ID Card Studio
               </h2>
             </div>
             <p className="text-xs theme-text-secondary mt-0.5">
-              Real-time interactive rendering of how admission slips, student ID badges, and report headers appear with your branding
+              Live WYSIWYG visual designer, field visibility toggles, pre-printed PVC overlay mode, and custom presets
             </p>
           </div>
 
-          <div className="flex items-center p-1 rounded-2xl theme-bg-sub border theme-border">
+          <div className="flex items-center p-1 rounded-2xl theme-bg-sub border theme-border overflow-x-auto max-w-full">
+            <button
+              type="button"
+              onClick={() => setPreviewTab('id_card')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                previewTab === 'id_card'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
+                  : 'theme-text-secondary hover:theme-text-primary'
+              }`}
+            >
+              <UsersIcon className="w-3.5 h-3.5" />
+              <span>Smart ID Card</span>
+            </button>
             <button
               type="button"
               onClick={() => setPreviewTab('slip')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 previewTab === 'slip'
-                  ? 'theme-bg-elevated theme-text-primary shadow-xs'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
@@ -372,249 +385,45 @@ export default function InstitutionProfileView() {
             </button>
             <button
               type="button"
-              onClick={() => setPreviewTab('id_card')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                previewTab === 'id_card'
-                  ? 'theme-bg-elevated theme-text-primary shadow-xs'
+              onClick={() => setPreviewTab('certificate')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                previewTab === 'certificate'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
-              <UsersIcon className="w-3.5 h-3.5" />
-              <span>Student ID Card</span>
+              <CheckCircleIcon className="w-3.5 h-3.5" />
+              <span>Testimonial Certificate</span>
             </button>
             <button
               type="button"
               onClick={() => setPreviewTab('report_banner')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 previewTab === 'report_banner'
-                  ? 'theme-bg-elevated theme-text-primary shadow-xs'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
               <ClassIcon className="w-3.5 h-3.5" />
-              <span>Report Header Banner</span>
+              <span>Report Banner</span>
             </button>
           </div>
         </div>
 
-        {/* Preview Canvas Area */}
-        <div className="p-4 sm:p-8 rounded-2xl theme-bg-app border theme-border flex items-center justify-center min-h-[400px]">
-          {previewTab === 'slip' && (
-            /* Large Full-Width Dual-Voucher Admission Slip Preview */
-            <div className="w-full max-w-4xl bg-white text-zinc-900 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 shadow-xl p-6 sm:p-8 space-y-6 select-none font-sans">
-              {/* Slip Header */}
-              <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-zinc-800">
-                <div className="w-16 h-16 rounded-2xl bg-zinc-100 border border-zinc-300 flex items-center justify-center font-black text-xl text-zinc-700 overflow-hidden shrink-0 shadow-xs">
-                  {formData.logo_url ? (
-                    <img src={formData.logo_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    formData.name?.charAt(0) || 'W'
-                  )}
-                </div>
-
-                <div className="text-center flex-1 space-y-0.5">
-                  <div className="text-xs font-serif italic text-zinc-500">Bismillahir Rahmanir Rahim</div>
-                  <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">
-                    {formData.name || 'ACADEMIC INSTITUTION NAME'}
-                  </h3>
-                  {formData.bangla_name && (
-                    <p className="text-sm font-semibold text-zinc-700">{formData.bangla_name}</p>
-                  )}
-                  <p className="text-[11px] text-zinc-600">
-                    {formData.address || 'Campus Street Address'}, {formData.district || 'District, Bangladesh'} • Contact: {formData.phone || '01700000000'} {formData.email ? `• ${formData.email}` : ''}
-                  </p>
-                </div>
-
-                <div className="text-right shrink-0 text-[10px] font-mono text-zinc-500 border border-zinc-200 rounded-xl p-2 bg-zinc-50">
-                  <div>REG / EIIN: <strong>{formData.eiin_or_reg_no || '102938'}</strong></div>
-                  <div>TYPE: <strong>{formData.institution_type}</strong></div>
-                </div>
-              </div>
-
-              {/* Dual Copy Layout */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                {/* Office / Institutional Copy */}
-                <div className="p-4 rounded-xl border border-zinc-300 bg-zinc-50/70 space-y-3">
-                  <div className="flex justify-between items-center border-b border-zinc-200 pb-1.5">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-sky-700 bg-sky-100 px-2 py-0.5 rounded">
-                      Institutional Copy
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-500">VOUCHER #ADM-8841</span>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Student Full Name:</span>
-                      <strong className="text-zinc-900">Ahmad Abdullah</strong>
-                    </div>
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Assigned Department:</span>
-                      <strong className="text-zinc-900">Hifzul Quran Division</strong>
-                    </div>
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Class & Section:</span>
-                      <strong className="text-zinc-900">Standard Hifz — Halqa A</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Guardian Contact:</span>
-                      <strong className="font-mono text-zinc-900">01800000000</strong>
-                    </div>
-                  </div>
-
-                  <div className="pt-6 flex justify-between text-[10px] text-zinc-500 border-t border-zinc-200 font-bold">
-                    <span>Admission Officer</span>
-                    <span>{formData.principal_name || 'Principal / Muhtamim Signature'}</span>
-                  </div>
-                </div>
-
-                {/* Student / Guardian Copy */}
-                <div className="p-4 rounded-xl border border-zinc-300 bg-zinc-50/70 space-y-3">
-                  <div className="flex justify-between items-center border-b border-zinc-200 pb-1.5">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                      Student / Guardian Copy
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-500">STU-ID: 2026-0042</span>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Student Full Name:</span>
-                      <strong className="text-zinc-900">Ahmad Abdullah</strong>
-                    </div>
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Assigned Department:</span>
-                      <strong className="text-zinc-900">Hifzul Quran Division</strong>
-                    </div>
-                    <div className="flex justify-between border-b border-zinc-200 pb-1">
-                      <span className="text-zinc-500">Class & Section:</span>
-                      <strong className="text-zinc-900">Standard Hifz — Halqa A</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Admission Status:</span>
-                      <span className="text-emerald-700 font-bold">Verified & Enrolled</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-6 flex justify-between text-[10px] text-zinc-500 border-t border-zinc-200 font-bold">
-                    <span>Accounts Verified</span>
-                    <span>Student / Guardian Signature</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {previewTab === 'id_card' && (
-            /* Dual Front & Back Student ID Cards Preview */
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 w-full max-w-2xl py-4 select-none">
-              {/* Front Badge */}
-              <div className="w-64 h-96 rounded-3xl border border-sky-500/40 bg-gradient-to-b from-sky-950 via-zinc-900 to-zinc-950 text-white shadow-2xl p-5 flex flex-col justify-between text-center relative overflow-hidden">
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl"></div>
-
-                {/* Top Header */}
-                <div className="flex items-center justify-center gap-2 pb-2 border-b border-zinc-800">
-                  <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 font-bold text-xs overflow-hidden shrink-0">
-                    {formData.logo_url ? (
-                      <img src={formData.logo_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      formData.name?.charAt(0) || 'W'
-                    )}
-                  </div>
-                  <div className="text-left min-w-0">
-                    <div className="text-xs font-bold leading-tight truncate max-w-[170px] text-zinc-100">{formData.name || 'Institution Name'}</div>
-                    <div className="text-[9px] text-sky-400 font-mono">{formData.slug || 'workspace'}</div>
-                  </div>
-                </div>
-
-                {/* Photo & Name */}
-                <div className="space-y-2">
-                  <div className="w-20 h-20 rounded-2xl bg-zinc-800 border-2 border-sky-400/60 mx-auto flex items-center justify-center font-bold text-sm text-zinc-400 shadow-md">
-                    PHOTO
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-sm text-zinc-100">Ahmad Abdullah</h5>
-                    <p className="text-[10px] text-zinc-400 font-mono">STU-2026-0042</p>
-                  </div>
-                </div>
-
-                {/* Details Pill */}
-                <div className="p-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 text-[10px] grid grid-cols-2 gap-1.5 text-left">
-                  <div><span className="text-zinc-500">Dept:</span> Hifz</div>
-                  <div><span className="text-zinc-500">Class:</span> Standard 1</div>
-                  <div><span className="text-zinc-500">Blood:</span> B+</div>
-                  <div><span className="text-zinc-500">Contact:</span> {formData.phone ? formData.phone.slice(0, 7) + '...' : '017...'}</div>
-                </div>
-
-                {/* Bottom Strip */}
-                <div className="text-[9px] text-zinc-500 font-mono pt-1 border-t border-zinc-800/80">
-                  VALID TILL: DEC 2026
-                </div>
-              </div>
-
-              {/* Back Badge */}
-              <div className="w-64 h-96 rounded-3xl border border-zinc-700 bg-gradient-to-b from-zinc-900 to-zinc-950 text-white shadow-2xl p-5 flex flex-col justify-between text-center relative overflow-hidden">
-                <div className="text-xs font-bold text-zinc-300 pb-2 border-b border-zinc-800">
-                  INSTITUTIONAL TERMS
-                </div>
-
-                <div className="space-y-2 text-[10px] text-zinc-400 text-left">
-                  <p>• This identity card is property of {formData.name || 'this Institution'}.</p>
-                  <p>• If found, please return to: {formData.address || 'Campus Office'}, {formData.district || 'Dhaka'}.</p>
-                  <p>• Helpline: <span className="text-sky-400 font-mono">{formData.phone || '01700000000'}</span></p>
-                </div>
-
-                <div className="py-2 border-y border-zinc-800">
-                  <div className="w-32 h-6 bg-zinc-800 mx-auto rounded flex items-center justify-center font-mono text-[9px] tracking-widest text-zinc-400">
-                    ||||| ||| |||||||
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-[9px] text-zinc-400 font-serif italic mb-0.5">{formData.principal_name || 'Principal Signature'}</div>
-                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Authorized Signature</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {previewTab === 'report_banner' && (
-            /* Academic Report Header Banner Preview */
-            <div className="w-full max-w-3xl rounded-2xl theme-bg-elevated border theme-border shadow-xl p-6 space-y-4 select-none">
-              <div className="p-4 rounded-xl bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-transparent border border-sky-500/20 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold text-xl overflow-hidden shadow-xs">
-                    {formData.logo_url ? (
-                      <img src={formData.logo_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      formData.name?.charAt(0) || 'W'
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-base font-black theme-text-primary leading-tight">
-                      {formData.name || 'Academic Institution Title'}
-                    </h4>
-                    {formData.bangla_name && (
-                      <p className="text-xs theme-text-secondary mt-0.5">{formData.bangla_name}</p>
-                    )}
-                    <p className="text-[10px] theme-text-secondary font-mono mt-1">
-                      EIIN: {formData.eiin_or_reg_no || '102938'} • {formData.district || 'Dhaka'} • {formData.phone || '01700000000'}
-                    </p>
-                  </div>
-                </div>
-
-                <span className="px-3 py-1 rounded-xl bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-500/30 shrink-0">
-                  Daily Progress Card
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-xl theme-bg-sub border theme-border text-xs flex items-center justify-between text-zinc-400">
-                <span>Student: <strong className="theme-text-primary">Ahmad Abdullah</strong> (Class 1)</span>
-                <span>Session: <strong className="theme-text-primary">Morning / Subah</strong></span>
-                <span>Evaluation Score: <strong className="text-emerald-400">95 / 100</strong></span>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Embedded Interactive Document Studio */}
+        <DocumentStudioEngine
+          key={previewTab}
+          documentType={
+            previewTab === 'id_card'
+              ? 'ID_CARD'
+              : previewTab === 'slip'
+              ? 'ADMISSION_SLIP'
+              : previewTab === 'certificate'
+              ? 'TESTIMONIAL_CERTIFICATE'
+              : 'REPORT_BANNER'
+          }
+          embeddedMode={true}
+        />
       </div>
     </div>
   );

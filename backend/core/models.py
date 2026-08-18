@@ -2452,3 +2452,62 @@ class AttendancePolicySetting(models.Model):
 
     def __str__(self):
         return f"Attendance Policy for {self.institution.name}"
+
+
+class DocumentTemplateConfig(models.Model):
+    DOCUMENT_TYPE_CHOICES = (
+        ('ID_CARD', 'Student / Staff ID Card'),
+        ('ADMISSION_SLIP', 'Student Admission Voucher'),
+        ('FEE_VOUCHER', 'Monthly Fee Receipt'),
+        ('TESTIMONIAL_CERTIFICATE', 'Testimonial & Certificate'),
+        ('REPORT_BANNER', 'Report Header Banner'),
+    )
+
+    ORIENTATION_CHOICES = (
+        ('PORTRAIT', 'Portrait'),
+        ('LANDSCAPE', 'Landscape'),
+    )
+
+    PAGE_SIZE_CHOICES = (
+        ('CR80_PVC', 'CR80 PVC Card (54x85.6mm)'),
+        ('A4', 'A4 Standard'),
+        ('A5', 'A5 Half Page'),
+        ('CUSTOM', 'Custom Size'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='document_templates'
+    )
+    document_type = models.CharField(
+        max_length=40,
+        choices=DOCUMENT_TYPE_CHOICES,
+        default='ID_CARD',
+        db_index=True
+    )
+    template_name = models.CharField(max_length=150)
+    is_default = models.BooleanField(default=False)
+    orientation = models.CharField(
+        max_length=20,
+        choices=ORIENTATION_CHOICES,
+        default='PORTRAIT'
+    )
+    page_size = models.CharField(
+        max_length=30,
+        choices=PAGE_SIZE_CHOICES,
+        default='CR80_PVC'
+    )
+    layout_config = models.JSONField(default=dict, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_default', 'template_name']
+        verbose_name = "Document Template Config"
+        verbose_name_plural = "Document Template Configs"
+
+    def __str__(self):
+        return f"{self.template_name} ({self.get_document_type_display()}) - {self.institution.name}"

@@ -50,7 +50,7 @@ export default function StudentSavePanel({
       await onSave({
         mode,
         name,
-        group: selectedGroup || "General Group",
+        group: selectedGroup || "",
         oldStudent: selectedOldStudent,
       });
     }
@@ -88,9 +88,9 @@ export default function StudentSavePanel({
     }
   };
 
-  const groupOptions = (groups.length > 0 ? groups : ["General Group"]).map((g) => ({
-    label: typeof g === "string" ? g : (g.label || g),
-    value: typeof g === "string" ? g : (g.value || g),
+  const groupOptions = groups.map((g) => ({
+    label: typeof g === "string" ? g : (g.label || g.name || g),
+    value: typeof g === "string" ? g : (g.value || g.name || g),
   }));
 
   return (

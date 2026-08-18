@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   DepartmentIcon,
@@ -26,11 +27,12 @@ import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
 import InstitutionOnboardingForm from './InstitutionOnboardingForm';
 import InstitutionEditForm from './InstitutionEditForm';
+import DeleteImpactModal from '../../../components/common/DeleteImpactModal';
 
 export default function InstitutionListView() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions } = useTenant();
+  const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
@@ -177,6 +179,9 @@ export default function InstitutionListView() {
       setIsDeleting(false);
     }
   };
+
+  const selectedActiveInst =
+    institutions.find((i) => String(i.id) === String(activeTenantId)) || currentInstitution;
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-200 theme-text-primary select-none font-sans">
@@ -606,120 +611,43 @@ export default function InstitutionListView() {
         </div>
       )}
 
-      {/* Enterprise-Grade High-Security Decommission Safety Barrier Modal (Portaled to root with z-[9999]) */}
-      {deletingInst && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs select-none">
-          <div className="relative w-full max-w-lg rounded-3xl theme-bg-elevated border border-rose-500/40 shadow-2xl p-6 sm:p-7 space-y-5 animate-zoom-in">
-            {/* Header with Hazard Icon */}
-            <div className="flex items-start gap-3.5 pb-4 border-b theme-border">
-              <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 shadow-inner">
-                <AlertTriangleIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-rose-400 tracking-tight">
-                  High-Risk Action: Decommission Institution
-                </h3>
-                <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed">
-                  You are about to isolate and decommission institutional tenant <strong className="theme-text-primary">"{deletingInst.name}"</strong>.
-                </p>
-              </div>
-            </div>
-
-            {/* Danger Impact Summary */}
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 space-y-2">
-              <p className="font-bold flex items-center gap-1.5">
-                <span>⚠️ What will happen upon decommissioning:</span>
-              </p>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] text-rose-200/90 leading-relaxed">
-                <li>All active academic classes, sections, and department configurations will be frozen.</li>
-                <li>Enrolled student attendance matrices, exam reports, and grades will be isolated.</li>
-                <li>Teacher and staff access credentials under this tenant domain will be deactivated.</li>
-              </ul>
-            </div>
-
-            {/* Step 1: Acknowledgment Checkbox */}
-            <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="decommission_ack"
-                checked={deleteAcknowledged}
-                onChange={(e) => setDeleteAcknowledged(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded text-rose-600 focus:ring-rose-500 theme-bg-elevated theme-border cursor-pointer shrink-0"
-              />
-              <label htmlFor="decommission_ack" className="text-xs font-semibold theme-text-primary cursor-pointer leading-relaxed">
-                I acknowledge the consequences and confirm that I wish to permanently decommission this institution.
-              </label>
-            </div>
-
-            {/* Step 2: Verification Input Matching Exact Name */}
-            <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Type <span className="theme-text-primary font-mono font-bold select-all bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">{deletingInst.name}</span> to confirm:
-              </label>
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder="Enter exact institution name to unlock"
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
-              />
-            </div>
-
-            {/* Step 3: Admin Account Password Authorization */}
-            <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Your Admin Account Password <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Enter your account login password to authorize"
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
-              />
-            </div>
-
-            {/* Actions Bar */}
-            <div className="pt-4 border-t theme-border flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingInst(null)}
-                className="px-5 py-2.5 rounded-2xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
-              >
-                Cancel &amp; Keep Safe
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={
-                  isDeleting ||
-                  deleteConfirmText.trim() !== deletingInst.name.trim() ||
-                  !deleteAcknowledged ||
-                  !adminPassword.trim() ||
-                  deleteCountdown > 0
-                }
-                className="px-6 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isDeleting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Decommissioning...</span>
-                  </>
-                ) : deleteCountdown > 0 ? (
-                  <span>Hold Safety ({deleteCountdown}s)</span>
-                ) : (
-                  <>
-                    <TrashIcon className="w-4 h-4" />
-                    <span>Confirm Permanent Decommission</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Enterprise-Grade High-Security Decommission Safety Barrier Modal */}
+      <DeleteImpactModal
+        isOpen={Boolean(deletingInst)}
+        onClose={() => setDeletingInst(null)}
+        onConfirm={async ({ password }) => {
+          if (!deletingInst) return;
+          try {
+            setIsDeleting(true);
+            await deleteInstitution(deletingInst.id, { password: password.trim() });
+            showToast(`Institution '${deletingInst.name}' has been safely decommissioned.`, 'success');
+            setDeletingInst(null);
+            loadData();
+            refreshInstitutions();
+          } catch (err) {
+            console.error('[Delete Institution Error]:', err);
+            showToast(err.response?.data?.error || err.message || 'Failed to decommission institution.', 'error');
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="High-Risk Action: Decommission Institution"
+        subtitle={`You are about to isolate and decommission institutional tenant "${deletingInst?.name}".`}
+        entityName={deletingInst?.name || ''}
+        entityType="Institution"
+        requireAck={true}
+        requireNameMatch={true}
+        requirePassword={true}
+        isDeleting={isDeleting}
+        confirmButtonText="Confirm Permanent Decommission"
+        impactItems={[
+          { label: 'Departments', count: deletingInst?.department_count ?? 'All Active' },
+          { label: 'Classes & Sections', count: deletingInst?.class_count ?? 'All Active' },
+          { label: 'Enrolled Students', count: deletingInst?.student_count ?? 'All Roster' },
+          { label: 'Staff Accounts', count: deletingInst?.user_count ?? 'All Staff' },
+        ]}
+        warningMessage="All active academic classes, sections, department configurations, enrolled student attendance matrices, exam reports, and staff login credentials under this tenant domain will be decommissioned and frozen."
+      />
     </div>
   );
 }

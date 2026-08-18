@@ -16,6 +16,7 @@ import {
 } from "../../../components/ui/Icons";
 import ClassFormModal from "./ClassFormModal";
 import ClassMigrationModal from "./ClassMigrationModal";
+import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
 export default function ClassManagementView() {
   const { showToast } = useToast();
@@ -42,11 +43,22 @@ export default function ClassManagementView() {
   const [editingClass, setEditingClass] = useState(null);
 
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingClass, setDeletingClass] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadDepartments();
     loadMetrics();
+    loadClasses();
+
+    const handleTenantChanged = () => {
+      loadDepartments();
+      loadMetrics();
+      loadClasses();
+    };
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
   }, []);
 
   useEffect(() => {
@@ -72,21 +84,16 @@ export default function ClassManagementView() {
     setLoading(true);
     try {
       let url = "/api/v1/classes/";
-      const params = new URLSearchParams();
-      if (departmentFilter !== "ALL") {
-        params.append("department", departmentFilter);
+      if (departmentFilter && departmentFilter !== "ALL") {
+        url += `?department=${departmentFilter}`;
       }
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-
       const res = await fetchWithAuth(url);
       if (res.ok) {
         const data = await res.json();
         setClasses(Array.isArray(data) ? data : data.results || []);
       }
     } catch {
-      showToast("Failed to load classes.", "error");
+      showToast("Could not load classes.", "error");
     } finally {
       setLoading(false);
     }
@@ -115,35 +122,31 @@ export default function ClassManagementView() {
   };
 
   const handleDeletePrompt = (cls) => {
-    const studentCount = cls.student_count || 0;
-    const groupCount = cls.group_count || 0;
-
-    // If there are active students or groups, always open the migration modal
-    if (studentCount > 0 || groupCount > 0) {
-      setDeletingClass(cls);
-      setIsMigrationModalOpen(true);
-    } else {
-      if (window.confirm(`Are you sure you want to delete class "${cls.name}"?`)) {
-        performDirectDelete(cls.id);
-      }
-    }
+    setDeletingClass(cls);
+    setIsDeleteModalOpen(true);
   };
 
-  const performDirectDelete = async (classId) => {
+  const performDirectDelete = async () => {
+    if (!deletingClass) return;
     try {
-      const res = await fetchWithAuth(`/api/v1/classes/${classId}/`, {
+      setIsDeleting(true);
+      const res = await fetchWithAuth(`/api/v1/classes/${deletingClass.id}/`, {
         method: "DELETE",
       });
       if (res.ok) {
-        showToast("Class deleted successfully.", "success");
+        showToast(`Class "${deletingClass.name}" deleted successfully.`, "success");
+        setIsDeleteModalOpen(false);
+        setDeletingClass(null);
         loadClasses();
         loadMetrics();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(err.error || "Failed to delete class.", "error");
       }
     } catch {
       showToast("Network error.", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -516,6 +519,38 @@ export default function ClassManagementView() {
           }}
         />
       )}
+
+      {/* Reusable Delete Impact Modal */}
+      <DeleteImpactModal
+        isOpen={isDeleteModalOpen && Boolean(deletingClass)}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingClass(null);
+        }}
+        onConfirm={performDirectDelete}
+        title="Delete Academic Class"
+        subtitle={`You are about to delete class "${deletingClass?.name}".`}
+        entityName={deletingClass?.name || ''}
+        entityType="Class"
+        requireAck={true}
+        requireNameMatch={false}
+        isDeleting={isDeleting}
+        confirmButtonText="Confirm Delete"
+        impactItems={[
+          { label: 'Student Groups', count: deletingClass?.group_count ?? 0 },
+          { label: 'Enrolled Students', count: deletingClass?.student_count ?? 0 },
+        ]}
+        onMigrate={
+          (deletingClass?.group_count > 0 || deletingClass?.student_count > 0)
+            ? () => {
+                setIsDeleteModalOpen(false);
+                setIsMigrationModalOpen(true);
+              }
+            : undefined
+        }
+        migrateButtonText="Safely Migrate Students & Groups Instead"
+        warningMessage="Deleting this class will remove its section structure and dissociate enrolled students and period attendance rosters."
+      />
     </div>
   );
 }

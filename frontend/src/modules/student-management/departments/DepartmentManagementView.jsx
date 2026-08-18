@@ -16,6 +16,7 @@ import {
 import { useRightSidebar } from "../../../context/RightSidebarContext";
 import DepartmentForm from "./DepartmentForm";
 import DepartmentMigrationForm from "./DepartmentMigrationForm";
+import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
 export default function DepartmentManagementView() {
   const { showToast } = useToast();
@@ -24,6 +25,8 @@ export default function DepartmentManagementView() {
 
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingDept, setDeletingDept] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [metrics, setMetrics] = useState({
     total_departments: 0,
     total_classes: 0,
@@ -38,6 +41,13 @@ export default function DepartmentManagementView() {
   useEffect(() => {
     loadDepartments();
     loadMetrics();
+
+    const handleTenantChanged = () => {
+      loadDepartments();
+      loadMetrics();
+    };
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
   }, []);
 
   const loadDepartments = async () => {
@@ -105,43 +115,30 @@ export default function DepartmentManagementView() {
   };
 
   const handleDeleteDirect = (dept) => {
-    if (dept.classes_count > 0) {
-      openRightSidebar({
-        title: `Decommission: ${dept.name}`,
-        content: (
-          <DepartmentMigrationForm
-            department={dept}
-            onMigrated={() => {
-              loadDepartments();
-              loadMetrics();
-              closeRightSidebar();
-            }}
-            onCancel={closeRightSidebar}
-          />
-        ),
+    setDeletingDept(dept);
+  };
+
+  const handleConfirmDeleteDept = async () => {
+    if (!deletingDept) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetchWithAuth(`/api/v1/departments/${deletingDept.id}/`, {
+        method: "DELETE",
       });
-      return;
-    }
-
-    if (!window.confirm(`Are you sure you want to deactivate department "${dept.name}"?`)) return;
-
-    (async () => {
-      try {
-        const res = await fetchWithAuth(`/api/v1/departments/${dept.id}/`, {
-          method: "DELETE",
-        });
-        if (res.ok) {
-          showToast("Department deactivated successfully.", "success");
-          loadDepartments();
-          loadMetrics();
-        } else {
-          const err = await res.json();
-          showToast(err.error || "Failed to deactivate department.", "error");
-        }
-      } catch {
-        showToast("Network connection error.", "error");
+      if (res.ok) {
+        showToast(`Department "${deletingDept.name}" deleted successfully.`, "success");
+        setDeletingDept(null);
+        loadDepartments();
+        loadMetrics();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || "Failed to delete department.", "error");
       }
-    })();
+    } catch {
+      showToast("Network connection error.", "error");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const filteredDepartments = departments.filter((d) => {
@@ -383,6 +380,49 @@ export default function DepartmentManagementView() {
           </table>
         </div>
       )}
+
+      {/* Reusable Delete Impact Modal */}
+      <DeleteImpactModal
+        isOpen={Boolean(deletingDept)}
+        onClose={() => setDeletingDept(null)}
+        onConfirm={handleConfirmDeleteDept}
+        title="Delete Academic Department"
+        subtitle={`You are about to delete department "${deletingDept?.name}".`}
+        entityName={deletingDept?.name || ''}
+        entityType="Department"
+        requireAck={true}
+        requireNameMatch={false}
+        isDeleting={isDeleting}
+        confirmButtonText="Confirm Delete"
+        impactItems={[
+          { label: 'Assigned Classes', count: deletingDept?.classes_count ?? 0 },
+          { label: 'Enrolled Students', count: deletingDept?.student_count ?? 0 },
+        ]}
+        onMigrate={
+          deletingDept?.classes_count > 0
+            ? () => {
+                const dept = deletingDept;
+                setDeletingDept(null);
+                openRightSidebar({
+                  title: `Decommission: ${dept.name}`,
+                  content: (
+                    <DepartmentMigrationForm
+                      department={dept}
+                      onMigrated={() => {
+                        loadDepartments();
+                        loadMetrics();
+                        closeRightSidebar();
+                      }}
+                      onCancel={closeRightSidebar}
+                    />
+                  ),
+                });
+              }
+            : undefined
+        }
+        migrateButtonText="Safely Migrate Classes & Students Instead"
+        warningMessage="Deleting this department will remove its institutional configuration and decouple assigned classes and courses."
+      />
     </div>
   );
 }

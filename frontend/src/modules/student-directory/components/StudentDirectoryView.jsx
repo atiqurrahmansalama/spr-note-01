@@ -16,6 +16,7 @@ import {
   SectionControlIcon
 } from "../../../components/ui/Icons";
 import StudentAdmissionModal from "../admission/StudentAdmissionModal";
+import BulkIdCardPrintModal from "./BulkIdCardPrintModal";
 
 export default function StudentDirectoryView({ viewMode = "all" }) {
   const { showToast } = useToast();
@@ -47,6 +48,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   
   // Modal toggle
   const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
+  const [isBulkIdCardModalOpen, setIsBulkIdCardModalOpen] = useState(false);
   const [bulkActionType, setBulkActionType] = useState("");
   const [bulkGroupInput, setBulkGroupInput] = useState("");
   const [bulkStatusInput, setBulkStatusInput] = useState("Active");
@@ -333,6 +335,48 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
           </button>
         </div>
       </div>
+
+      {/* --- FLOATING / INLINE BULK SELECTION ACTION DOCK --- */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-sky-500/20 to-purple-500/20 border border-emerald-500/30 shadow-xl animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-emerald-500/30 text-emerald-300 font-black text-xs flex items-center justify-center border border-emerald-500/40">
+              {selectedIds.length}
+            </span>
+            <span className="text-xs font-bold theme-text-primary">
+              Students Selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsBulkIdCardModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition cursor-pointer flex items-center gap-1.5"
+            >
+              <span>🪪</span>
+              <span>Print Smart ID Cards ({selectedIds.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(true)}
+              className="px-3.5 py-2 rounded-xl theme-bg-elevated border theme-border hover:theme-bg-sub text-xs font-bold theme-text-primary transition cursor-pointer flex items-center gap-1.5"
+            >
+              <span>⚙️</span>
+              <span>Bulk Status / Group</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-semibold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* --- ACTIVE FILTER PILL BANNER --- */}
       {(groupFilter !== "ALL" || classFilter !== "ALL" || statusFilter !== "ALL" || searchQuery) && (
@@ -751,6 +795,16 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- BULK ID CARDS PRINT MANAGER MODAL --- */}
+      {isBulkIdCardModalOpen && (
+        <BulkIdCardPrintModal
+          isOpen={isBulkIdCardModalOpen}
+          onClose={() => setIsBulkIdCardModalOpen(false)}
+          selectedStudentIds={selectedIds}
+          allStudents={students}
+        />
       )}
     </div>
   );

@@ -23,7 +23,7 @@ export default function SidebarScreenBlockView({
     } else if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate("/");
+      navigate("/report-builder");
     }
   };
 

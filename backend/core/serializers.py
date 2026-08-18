@@ -60,6 +60,7 @@ from .models import (
     AdHocHeadcountSession,
     BiometricDevice,
     RawAttendancePunchLog,
+    DocumentTemplateConfig,
 )
 
 
@@ -676,6 +677,10 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                     order_rank=3,
                     is_active=True,
                 )
+
+            # 4. Seed Default Document Templates
+            from core.services import seed_default_document_templates
+            seed_default_document_templates(institution)
 
             return {
                 'institution': AcademicInstitutionSerializer(institution).data,
@@ -2795,3 +2800,36 @@ class StudentPeriodRollCallSerializer(serializers.Serializer):
     taken_by_teacher_id = serializers.IntegerField(required=False, allow_null=True)
     substitute_teacher_id = serializers.IntegerField(required=False, allow_null=True)
     records = StudentPeriodRollCallItemSerializer(many=True)
+
+
+class DocumentTemplateConfigSerializer(serializers.ModelSerializer):
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
+    orientation_display = serializers.CharField(source='get_orientation_display', read_only=True)
+    page_size_display = serializers.CharField(source='get_page_size_display', read_only=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+
+    class Meta:
+        model = DocumentTemplateConfig
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'document_type',
+            'document_type_display',
+            'template_name',
+            'is_default',
+            'orientation',
+            'orientation_display',
+            'page_size',
+            'page_size_display',
+            'layout_config',
+            'is_deleted',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'created_at', 'updated_at']
+
+    def validate_template_name(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Template name cannot be empty.")
+        return str(value).strip()

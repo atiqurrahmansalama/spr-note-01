@@ -236,7 +236,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
           <div className="space-y-6 animate-fade-in max-w-2xl mx-auto min-h-[480px]">
             {/* Institution English Name */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Institution Name (English) <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
@@ -245,19 +245,19 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                   value={formData.name}
                   onChange={handleNameChange}
                   placeholder="e.g. Darul Ulum Islamic Academy"
-                  className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                  className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                     errors.name ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
+                  } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
                 />
               </div>
               {errors.name && (
-                <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.name}</p>
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.name}</p>
               )}
             </div>
 
             {/* Native / Regional Title */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Native / Regional Name (Optional)
               </label>
               <input
@@ -265,7 +265,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                 value={formData.bangla_name}
                 onChange={(e) => setFormData({ ...formData, bangla_name: e.target.value })}
                 placeholder="e.g. দারুল উলুম একাডেমি"
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
               />
             </div>
 
@@ -283,7 +283,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   EIIN / Govt. Reg. No.
                 </label>
                 <input
@@ -291,7 +291,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                   value={formData.eiin_or_reg_no}
                   onChange={(e) => setFormData({ ...formData, eiin_or_reg_no: e.target.value })}
                   placeholder="e.g. 132456"
-                  className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
+                  className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
                 />
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             {/* Contact Phone & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Official Phone Number <span className="text-rose-400">*</span>
                 </label>
                 <div className="relative">
@@ -311,18 +311,18 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                       if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
                     }}
                     placeholder="e.g. 01712345678"
-                    className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                    className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                       errors.phone ? 'border-rose-500' : 'theme-border'
-                    } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
+                    } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
                   />
                 </div>
                 {errors.phone && (
-                  <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.phone}</p>
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.phone}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Official Email Address
                 </label>
                 <input
@@ -330,7 +330,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="e.g. info@institution.edu"
-                  className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
+                  className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
                 />
               </div>
             </div>
@@ -342,11 +342,11 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
           <div className="space-y-6 animate-fade-in max-w-2xl mx-auto min-h-[480px]">
             {/* Slug Identifier */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Unique Tenant Slug (Web Identifier) <span className="text-rose-400">*</span>
               </label>
               <div className="flex items-center">
-                <span className="px-4 py-3 rounded-l-2xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-xs font-mono font-bold">
+                <span className="px-4 py-3 sm:py-3.5 rounded-l-2xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-sm font-mono font-bold">
                   app/
                 </span>
                 <input
@@ -357,15 +357,15 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     if (errors.slug) setErrors((prev) => ({ ...prev, slug: null }));
                   }}
                   placeholder="e.g. darul-ulum"
-                  className={`flex-1 px-4 py-3 rounded-r-2xl theme-bg-sub border ${
+                  className={`flex-1 px-4 py-3 sm:py-3.5 rounded-r-2xl theme-bg-sub border ${
                     errors.slug ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
+                  } text-sm sm:text-base font-mono font-bold text-sky-400 focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all`}
                 />
               </div>
               {errors.slug && (
-                <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.slug}</p>
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.slug}</p>
               )}
-              <p className="mt-1.5 text-[11px] theme-text-secondary">
+              <p className="mt-1.5 text-xs theme-text-secondary">
                 Unique URL identifier used for isolated tenant routing and multi-branch isolation.
               </p>
             </div>
@@ -384,7 +384,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             <div className="pt-3 border-t theme-border space-y-5">
               <div className="flex items-center gap-2 mb-2">
                 <LocationIcon className="w-4 h-4 text-sky-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider theme-text-primary">
                   Campus Address & Geographic Location
                 </h4>
               </div>
@@ -401,7 +401,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     required
                   />
                   {errors.division && (
-                    <p className="mt-1 text-[11px] text-rose-400 font-medium">{errors.division}</p>
+                    <p className="mt-1 text-xs text-rose-400 font-medium">{errors.division}</p>
                   )}
                 </div>
 
@@ -416,7 +416,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     required
                   />
                   {errors.district && (
-                    <p className="mt-1 text-[11px] text-rose-400 font-medium">{errors.district}</p>
+                    <p className="mt-1 text-xs text-rose-400 font-medium">{errors.district}</p>
                   )}
                 </div>
               </div>
@@ -436,7 +436,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     />
                   ) : (
                     <div>
-                      <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                         Upazila / Thana / থানা
                       </label>
                       <input
@@ -444,14 +444,14 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                         value={formData.upazila_thana}
                         onChange={(e) => setFormData({ ...formData, upazila_thana: e.target.value })}
                         placeholder="e.g. Sadar"
-                        className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                        className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
                       />
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                  <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                     Post Code / Area Code
                   </label>
                   <input
@@ -459,14 +459,14 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     value={formData.post_code}
                     onChange={(e) => setFormData({ ...formData, post_code: e.target.value })}
                     placeholder="e.g. 1230"
-                    className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                    className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
                   />
                 </div>
               </div>
 
               {/* Detailed Street / Village Address */}
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Street / Village / Holding Details
                 </label>
                 <textarea
@@ -474,7 +474,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                   value={formData.street_address}
                   onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
                   placeholder="e.g. House #12, Road #4, Sector #7"
-                  className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] resize-none"
+                  className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] resize-none"
                 />
               </div>
             </div>
@@ -498,7 +498,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Admin Full Name <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -509,17 +509,17 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     if (errors.admin_name) setErrors((prev) => ({ ...prev, admin_name: null }));
                   }}
                   placeholder="e.g. Maulana Shamsul Haque"
-                  className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                  className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                     errors.admin_name ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
                 />
                 {errors.admin_name && (
-                  <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.admin_name}</p>
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.admin_name}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Admin Phone (Login User ID) <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -530,19 +530,19 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     if (errors.admin_phone) setErrors((prev) => ({ ...prev, admin_phone: null }));
                   }}
                   placeholder="e.g. 01812345678"
-                  className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                  className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                     errors.admin_phone ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
                 />
                 {errors.admin_phone && (
-                  <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.admin_phone}</p>
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.admin_phone}</p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Admin Email (Optional)
                 </label>
                 <input
@@ -553,17 +553,17 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     if (errors.admin_email) setErrors((prev) => ({ ...prev, admin_email: null }));
                   }}
                   placeholder="admin@institution.edu"
-                  className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                  className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                     errors.admin_email ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
                 />
                 {errors.admin_email && (
-                  <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.admin_email}</p>
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.admin_email}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Admin Login Password <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -574,12 +574,12 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
                     if (errors.admin_password) setErrors((prev) => ({ ...prev, admin_password: null }));
                   }}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-3 rounded-2xl theme-bg-sub border ${
+                  className={`w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border ${
                     errors.admin_password ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  } text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
                 />
                 {errors.admin_password && (
-                  <p className="mt-1.5 text-[11px] text-rose-400 font-medium">{errors.admin_password}</p>
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.admin_password}</p>
                 )}
               </div>
             </div>

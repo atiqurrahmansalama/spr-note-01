@@ -1219,3 +1219,219 @@ def delete_staff_profile_with_cascading(staff_profile, performed_by=None):
         'deactivated_duties': deactivated_duties
     }
 
+
+def seed_default_document_templates(institution):
+    """
+    Seeds initial default enterprise templates for an institution:
+    1. Classic Emerald Student ID Card (CR80 Portrait) - Default ID_CARD
+    2. Modern Navy Landscape ID Card (CR80 Landscape)
+    3. Pre-Printed PVC Wireframe Overlay (CR80 Portrait)
+    4. Standard Dual-Copy Admission Voucher (A4 Portrait) - Default ADMISSION_SLIP
+    5. Formal Academic Testimonial Certificate (A4 Landscape) - Default TESTIMONIAL_CERTIFICATE
+    6. Institutional Report Header Banner (Custom Size) - Default REPORT_BANNER
+    """
+    from .models import DocumentTemplateConfig
+    if not institution:
+        return []
+
+    templates_to_create = [
+        {
+            "document_type": "ID_CARD",
+            "template_name": "Classic Emerald Student ID (Portrait)",
+            "is_default": True,
+            "orientation": "PORTRAIT",
+            "page_size": "CR80_PVC",
+            "layout_config": {
+                "theme_color": "#064e3b",
+                "accent_color": "#10b981",
+                "text_color": "#ffffff",
+                "bg_style": "GRADIENT",
+                "overlay_only_mode": False,
+                "photo_frame_style": "ROUNDED",
+                "show_bismillah": True,
+                "show_logo": True,
+                "show_qr_code": True,
+                "show_barcode": True,
+                "show_blood_group": True,
+                "show_guardian_contact": True,
+                "show_dob": True,
+                "show_halqa": True,
+                "show_district": True,
+                "show_student_id": True,
+                "show_department": True,
+                "show_class": True,
+                "show_group": True,
+                "header_bn": institution.bangla_name or "",
+                "header_en": institution.name,
+                "back_terms": "This identity card is property of the institution. If found, please return to campus office.",
+                "signature_title": "Principal / Muhtamim",
+                "emergency_contact": institution.phone or "01700000000",
+                "field_order": ["student_name", "student_id", "department", "class", "group", "blood_group", "guardian_phone"]
+            }
+        },
+        {
+            "document_type": "ID_CARD",
+            "template_name": "Modern Navy Horizon ID (Landscape)",
+            "is_default": False,
+            "orientation": "LANDSCAPE",
+            "page_size": "CR80_PVC",
+            "layout_config": {
+                "theme_color": "#0f172a",
+                "accent_color": "#0284c7",
+                "text_color": "#ffffff",
+                "bg_style": "GRADIENT",
+                "overlay_only_mode": False,
+                "photo_frame_style": "SQUARE_SHADOW",
+                "show_bismillah": True,
+                "show_logo": True,
+                "show_qr_code": True,
+                "show_barcode": True,
+                "show_blood_group": True,
+                "show_guardian_contact": True,
+                "show_dob": True,
+                "show_halqa": True,
+                "show_district": True,
+                "show_student_id": True,
+                "show_department": True,
+                "show_class": True,
+                "show_group": True,
+                "header_bn": institution.bangla_name or "",
+                "header_en": institution.name,
+                "back_terms": "Cardholder must carry this ID badge on campus premises at all times.",
+                "signature_title": "Director of Administration",
+                "emergency_contact": institution.phone or "01700000000",
+                "field_order": ["student_name", "student_id", "department", "class", "group", "blood_group", "guardian_phone"]
+            }
+        },
+        {
+            "document_type": "ID_CARD",
+            "template_name": "Pre-Printed Plastic Card Wireframe Overlay",
+            "is_default": False,
+            "orientation": "PORTRAIT",
+            "page_size": "CR80_PVC",
+            "layout_config": {
+                "theme_color": "#000000",
+                "accent_color": "#000000",
+                "text_color": "#000000",
+                "bg_style": "TRANSPARENT",
+                "overlay_only_mode": True,
+                "photo_frame_style": "ROUNDED",
+                "show_bismillah": False,
+                "show_logo": False,
+                "show_qr_code": True,
+                "show_barcode": True,
+                "show_blood_group": True,
+                "show_guardian_contact": True,
+                "show_dob": True,
+                "show_halqa": True,
+                "show_district": True,
+                "show_student_id": True,
+                "show_department": True,
+                "show_class": True,
+                "show_group": True,
+                "header_bn": "",
+                "header_en": "",
+                "back_terms": "",
+                "signature_title": "",
+                "emergency_contact": "",
+                "field_order": ["student_name", "student_id", "department", "class", "group", "blood_group", "guardian_phone"]
+            }
+        },
+        {
+            "document_type": "ADMISSION_SLIP",
+            "template_name": "Standard Dual-Voucher Admission Slip",
+            "is_default": True,
+            "orientation": "PORTRAIT",
+            "page_size": "A4",
+            "layout_config": {
+                "theme_color": "#0369a1",
+                "accent_color": "#0ea5e9",
+                "text_color": "#0f172a",
+                "bg_style": "CLEAN_WHITE",
+                "overlay_only_mode": False,
+                "show_bismillah": True,
+                "show_logo": True,
+                "show_qr_code": True,
+                "show_barcode": False,
+                "header_bn": institution.bangla_name or "",
+                "header_en": institution.name,
+                "signature_title": "Principal / Muhtamim",
+                "accountant_title": "Accounts Officer",
+                "field_order": ["student_name", "student_id", "department", "class", "group", "guardian_name", "guardian_phone", "admission_date", "fees"]
+            }
+        },
+        {
+            "document_type": "TESTIMONIAL_CERTIFICATE",
+            "template_name": "Formal Academic Testimonial Certificate",
+            "is_default": True,
+            "orientation": "LANDSCAPE",
+            "page_size": "A4",
+            "layout_config": {
+                "theme_color": "#1e3a8a",
+                "accent_color": "#b45309",
+                "text_color": "#0f172a",
+                "bg_style": "ORNATE_BORDER",
+                "overlay_only_mode": False,
+                "show_bismillah": True,
+                "show_logo": True,
+                "show_qr_code": True,
+                "header_bn": institution.bangla_name or "",
+                "header_en": institution.name,
+                "certificate_title": "TESTIMONIAL & CERTIFICATE OF APPRECIATION",
+                "signature_title": "Principal / Muhtamim",
+                "exam_controller_title": "Controller of Examinations"
+            }
+        },
+        {
+            "document_type": "REPORT_BANNER",
+            "template_name": "Standard Academic Report Header Banner",
+            "is_default": True,
+            "orientation": "LANDSCAPE",
+            "page_size": "CUSTOM",
+            "layout_config": {
+                "theme_color": "#0f172a",
+                "accent_color": "#10b981",
+                "text_color": "#0f172a",
+                "bg_style": "CLEAN_WHITE",
+                "overlay_only_mode": False,
+                "show_bismillah": True,
+                "show_logo": True,
+                "show_qr_code": False,
+                "header_bn": institution.bangla_name or "",
+                "header_en": institution.name,
+                "subtitle": "Daily & Monthly Progress Monitoring Docket"
+            }
+        }
+    ]
+
+    created = []
+    for item in templates_to_create:
+        doc_type = item["document_type"]
+        exists = DocumentTemplateConfig.objects.filter(
+            institution=institution,
+            document_type=doc_type,
+            template_name=item["template_name"],
+            is_deleted=False
+        ).first()
+
+        if not exists:
+            if item.get("is_default"):
+                DocumentTemplateConfig.objects.filter(
+                    institution=institution,
+                    document_type=doc_type,
+                    is_deleted=False
+                ).update(is_default=False)
+
+            tpl = DocumentTemplateConfig.objects.create(
+                institution=institution,
+                document_type=doc_type,
+                template_name=item["template_name"],
+                is_default=item.get("is_default", False),
+                orientation=item.get("orientation", "PORTRAIT"),
+                page_size=item.get("page_size", "CR80_PVC"),
+                layout_config=item.get("layout_config", {})
+            )
+            created.append(tpl)
+    return created
+
+

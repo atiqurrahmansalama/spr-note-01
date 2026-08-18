@@ -91,6 +91,7 @@ from .views import (
     AdHocHeadcountViewSet,
     BiometricDeviceViewSet,
     BiometricGatewayViewSet,
+    DocumentTemplateViewSet,
 )
 
 router = DefaultRouter()
@@ -103,6 +104,7 @@ router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
+router.register(r'document-templates', DocumentTemplateViewSet, basename='document-templates')
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
 
 # Enterprise Teacher & Staff Management Routers

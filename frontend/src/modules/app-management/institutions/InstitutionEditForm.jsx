@@ -128,7 +128,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           {/* Identity Names */}
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Institution Name (English) <span className="text-rose-400">*</span>
               </label>
               <input
@@ -136,19 +136,19 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Native / Regional Name
               </label>
               <input
                 type="text"
                 value={formData.bangla_name}
                 onChange={(e) => setFormData({ ...formData, bangla_name: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
               />
             </div>
           </div>
@@ -167,14 +167,14 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 EIIN / Govt. Reg No.
               </label>
               <input
                 type="text"
                 value={formData.eiin_or_reg_no}
                 onChange={(e) => setFormData({ ...formData, eiin_or_reg_no: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20"
               />
             </div>
           </div>
@@ -182,26 +182,26 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           {/* Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Official Phone
               </label>
               <input
                 type="text"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Official Email
               </label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
               />
             </div>
           </div>
@@ -264,7 +264,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                   />
                 ) : (
                   <div>
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                    <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                       Upazila / Thana / থানা
                     </label>
                     <input
@@ -272,14 +272,14 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                       value={formData.upazila_thana}
                       onChange={(e) => setFormData({ ...formData, upazila_thana: e.target.value })}
                       placeholder="e.g. Sadar"
-                      className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                      className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Post Code / Area Code
                 </label>
                 <input
@@ -287,13 +287,13 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                   value={formData.post_code}
                   onChange={(e) => setFormData({ ...formData, post_code: e.target.value })}
                   placeholder="e.g. 1230"
-                  className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+                  className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+              <label className="block text-xs sm:text-sm font-bold theme-text-secondary uppercase tracking-wider mb-2">
                 Street / Holding / Campus Details
               </label>
               <textarea
@@ -301,7 +301,7 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
                 value={formData.street_address}
                 onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
                 placeholder="e.g. House #12, Road #4, Sector #7"
-                className="w-full px-4 py-3 rounded-2xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] resize-none"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-2xl theme-bg-sub border theme-border text-sm sm:text-base font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] resize-none"
               />
             </div>
           </div>

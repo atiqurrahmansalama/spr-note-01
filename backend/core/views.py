@@ -78,6 +78,7 @@ from .models import (
     AdHocHeadcountSession,
     BiometricDevice,
     RawAttendancePunchLog,
+    DocumentTemplateConfig,
 )
 from .permissions import (
     IsAdminUserRole,
@@ -143,6 +144,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     UserSessionSerializer,
     RoleInviteTokenSerializer,
+    DocumentTemplateConfigSerializer,
 )
 
 
@@ -2217,9 +2219,12 @@ class UserViewSet(viewsets.ModelViewSet):
             if user.institution_id:
                 qs = User.objects.filter(institution_id=user.institution_id).select_related('role', 'institution').order_by('-date_joined')
             else:
-                qs = User.objects.filter(id=user.id).select_related('role', 'institution')
+                qs = User.objects.filter(Q(id=user.id) | Q(created_by=user)).select_related('role', 'institution').order_by('-date_joined')
         else:
-            qs = User.objects.filter(id=user.id).select_related('role', 'institution')
+            if user.institution_id:
+                qs = User.objects.filter(institution_id=user.institution_id).select_related('role', 'institution').order_by('-date_joined')
+            else:
+                qs = User.objects.filter(id=user.id).select_related('role', 'institution')
 
         role_code = self.request.query_params.get('role_code') or self.request.query_params.get('user_type') or self.request.query_params.get('role')
         if role_code and role_code.upper() != 'ALL':
@@ -2246,9 +2251,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
         tenant_id = get_scoped_tenant_id(self.request)
         if tenant_id and not serializer.validated_data.get('institution'):
-            serializer.save(role=role_obj, institution_id=tenant_id)
+            serializer.save(role=role_obj, institution_id=tenant_id, created_by=self.request.user)
+        elif not serializer.validated_data.get('institution') and self.request.user.institution_id:
+            serializer.save(role=role_obj, institution_id=self.request.user.institution_id, created_by=self.request.user)
         else:
-            serializer.save(role=role_obj)
+            serializer.save(role=role_obj, created_by=self.request.user)
 
     def perform_update(self, serializer):
         user_type = self.request.data.get('user_type') or self.request.data.get('role') or self.request.data.get('role_code')
@@ -5257,3 +5264,152 @@ class AttendancePolicyViewSet(viewsets.ViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DocumentTemplateViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DocumentTemplateConfigSerializer
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            return DocumentTemplateConfig.objects.none()
+
+        # Check if templates need seeding for this tenant
+        if not DocumentTemplateConfig.objects.filter(institution_id=tenant_id, is_deleted=False).exists():
+            from .services import seed_default_document_templates
+            inst = AcademicInstitution.objects.filter(id=tenant_id).first()
+            if inst:
+                seed_default_document_templates(inst)
+
+        qs = DocumentTemplateConfig.objects.filter(
+            institution_id=tenant_id,
+            is_deleted=False
+        )
+
+        doc_type = self.request.query_params.get('document_type') or self.request.query_params.get('type')
+        if doc_type:
+            qs = qs.filter(document_type=doc_type.upper())
+
+        return qs.order_by('-is_default', 'template_name')
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise ValidationError({"error": "Active institutional scope is required."})
+
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first()
+        if not inst:
+            raise ValidationError({"error": "Institution not found."})
+
+        is_default = serializer.validated_data.get('is_default', False)
+        doc_type = serializer.validated_data.get('document_type', 'ID_CARD')
+
+        if is_default:
+            DocumentTemplateConfig.objects.filter(
+                institution=inst,
+                document_type=doc_type,
+                is_deleted=False
+            ).update(is_default=False)
+
+        serializer.save(institution=inst)
+
+    def perform_update(self, serializer):
+        is_default = serializer.validated_data.get('is_default', None)
+        instance = serializer.instance
+        if is_default:
+            DocumentTemplateConfig.objects.filter(
+                institution=instance.institution,
+                document_type=instance.document_type,
+                is_deleted=False
+            ).exclude(pk=instance.pk).update(is_default=False)
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        instance.is_deleted = True
+        instance.save(update_fields=['is_deleted'])
+
+    @action(detail=True, methods=['post'], url_path='set-default')
+    def set_default(self, request, pk=None):
+        instance = self.get_object()
+        DocumentTemplateConfig.objects.filter(
+            institution=instance.institution,
+            document_type=instance.document_type,
+            is_deleted=False
+        ).update(is_default=False)
+
+        instance.is_default = True
+        instance.save(update_fields=['is_default', 'updated_at'])
+
+        return Response({
+            "status": "success",
+            "message": f"Template '{instance.template_name}' set as default for {instance.get_document_type_display()}.",
+            "template": DocumentTemplateConfigSerializer(instance).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='by-type')
+    def by_type(self, request):
+        doc_type = request.query_params.get('type') or request.query_params.get('document_type')
+        if not doc_type:
+            return Response({"error": "Query param 'type' or 'document_type' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = self.get_queryset().filter(document_type=doc_type.upper())
+        serializer = self.get_serializer(qs, many=True)
+        default_tpl = qs.filter(is_default=True).first()
+        return Response({
+            "document_type": doc_type.upper(),
+            "default_template": DocumentTemplateConfigSerializer(default_tpl).data if default_tpl else None,
+            "templates": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='sample-data')
+    def sample_data(self, request):
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
+
+        sample_student = {
+            "id": 9999,
+            "uniq_id": "STU-2026-0042",
+            "student_id_card_number": "STU-2026-0042",
+            "roll_number": "104",
+            "name": "মুহাম্মাদ আব্দুল্লাহ (Ahmad Abdullah)",
+            "name_en": "Ahmad Abdullah",
+            "bangla_name": "মুহাম্মাদ আব্দুল্লাহ",
+            "father_name": "মাওলানা আবু বকর (Abu Bakr)",
+            "mother_name": "আমেনা বেগম (Amena Begum)",
+            "guardian_name": "মাওলানা আবু বকর (Guardian)",
+            "guardian_phone": "01812-345678",
+            "phone_number": "01812-345678",
+            "blood_group": "B+",
+            "date_of_birth": "2012-05-14",
+            "admission_date": "2026-01-10",
+            "department_name": "হিফজুল কুরআন বিভাগ (Hifz Division)",
+            "student_class_name": "স্ট্যান্ডার্ড হিফজ (Standard Hifz)",
+            "student_group_name": "হালকা ১ (Halqa A)",
+            "division": "Dhaka",
+            "district": "Dhaka",
+            "upazila_thana": "Mirpur",
+            "address": "House #12, Road #4, Sector #7, Uttara, Dhaka",
+            "profile_image": None,
+            "status": "Active"
+        }
+
+        sample_inst = {
+            "name": inst.name if inst else "Jamia Islamia Darul Quran",
+            "bangla_name": inst.bangla_name if inst else "جامعة دار القرآن الإسلامية",
+            "logo_url": (inst.logo_url or inst.logo_data) if inst else None,
+            "phone": inst.phone if inst else "01700-000000",
+            "email": inst.email if inst else "info@darulquran.edu.bd",
+            "eiin_or_reg_no": inst.eiin_or_reg_no if inst else "REG-884210",
+            "institution_type": inst.institution_type if inst else "MADRASA",
+            "address": inst.address if inst else "Uttara Sector 7, Dhaka, Bangladesh",
+            "district": inst.district if inst else "Dhaka",
+            "principal_name": getattr(inst, 'principal_name', 'Principal / Muhtamim')
+        }
+
+        return Response({
+            "sample_student": sample_student,
+            "institution": sample_inst
+        }, status=status.HTTP_200_OK)

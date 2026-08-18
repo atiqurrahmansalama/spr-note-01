@@ -14,6 +14,7 @@ import {
 } from "../../../components/ui/Icons";
 import GroupFormModal from "./GroupFormModal";
 import GroupMigrationModal from "./GroupMigrationModal";
+import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
 export default function GroupManagementView() {
   const { showToast } = useToast();
@@ -43,11 +44,22 @@ export default function GroupManagementView() {
   const [editingGroup, setEditingGroup] = useState(null);
 
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadClasses();
     loadMetrics();
+    loadGroups();
+
+    const handleTenantChanged = () => {
+      loadClasses();
+      loadMetrics();
+      loadGroups();
+    };
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
   }, []);
 
   useEffect(() => {
@@ -113,32 +125,31 @@ export default function GroupManagementView() {
   };
 
   const handleDeletePrompt = (grp) => {
-    const studentCount = grp.student_count || 0;
-    if (studentCount > 0) {
-      setDeletingGroup(grp);
-      setIsMigrationModalOpen(true);
-    } else {
-      if (window.confirm(`Are you sure you want to delete group "${grp.name}"?`)) {
-        performDirectDelete(grp.id);
-      }
-    }
+    setDeletingGroup(grp);
+    setIsDeleteModalOpen(true);
   };
 
-  const performDirectDelete = async (groupId) => {
+  const performDirectDelete = async () => {
+    if (!deletingGroup) return;
     try {
-      const res = await fetchWithAuth(`/api/v1/groups/${groupId}/`, {
+      setIsDeleting(true);
+      const res = await fetchWithAuth(`/api/v1/groups/${deletingGroup.id}/`, {
         method: "DELETE",
       });
       if (res.ok) {
-        showToast("Group deleted successfully.", "success");
+        showToast(`Group "${deletingGroup.name}" deleted successfully.`, "success");
+        setIsDeleteModalOpen(false);
+        setDeletingGroup(null);
         loadGroups();
         loadMetrics();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(err.error || "Failed to delete group.", "error");
       }
     } catch {
       showToast("Network error.", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -622,6 +633,38 @@ export default function GroupManagementView() {
           loadGroups();
           loadMetrics();
         }}
+      />
+
+      {/* Reusable Delete Impact Modal */}
+      <DeleteImpactModal
+        isOpen={isDeleteModalOpen && Boolean(deletingGroup)}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingGroup(null);
+        }}
+        onConfirm={performDirectDelete}
+        title="Delete Student Group"
+        subtitle={`You are about to delete student group "${deletingGroup?.name}".`}
+        entityName={deletingGroup?.name || ''}
+        entityType="Group"
+        requireAck={true}
+        requireNameMatch={false}
+        isDeleting={isDeleting}
+        confirmButtonText="Confirm Delete"
+        impactItems={[
+          { label: 'Assigned Class', count: deletingGroup?.student_class_name || 'Class Assigned' },
+          { label: 'Enrolled Students', count: deletingGroup?.student_count ?? 0 },
+        ]}
+        onMigrate={
+          deletingGroup?.student_count > 0
+            ? () => {
+                setIsDeleteModalOpen(false);
+                setIsMigrationModalOpen(true);
+              }
+            : undefined
+        }
+        migrateButtonText="Safely Migrate Students to Another Group"
+        warningMessage="Deleting this group will remove student roster groupings and daily attendance batches."
       />
     </div>
   );

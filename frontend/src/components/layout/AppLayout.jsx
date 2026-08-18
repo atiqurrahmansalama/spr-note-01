@@ -9,6 +9,7 @@ import InstitutionSwitcher from "./InstitutionSwitcher";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";
 import { useRightSidebar } from "../../context/RightSidebarContext";
+import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
 
 // Route details mapping for titles and path lookup
@@ -194,6 +195,7 @@ export default function AppLayout() {
     claimPendingInvite();
   }, [showToast]);
 
+  const { currentInstitution } = useTenant();
   const { isRightSidebarOpen, rightSidebarConfig, closeRightSidebar } = useRightSidebar();
   const isRightDock = panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
@@ -422,6 +424,15 @@ export default function AppLayout() {
           </button>
         </div>
 
+        {/* Selected Active Institution Name in Header Middle (Pure Text, No Background) */}
+        {currentInstitution?.name && (
+          <div className="flex-1 flex justify-center items-center px-2 sm:px-4 min-w-0 pointer-events-none select-none text-center">
+            <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
+              {currentInstitution.name}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <SaveStatusBadge />
 
@@ -551,7 +562,7 @@ export default function AppLayout() {
               <SidebarScreenBlockView
                 title={routeMeta.title}
                 category={routeMeta.category || "Navigation"}
-                onClose={() => navigate("/")}
+                onClose={() => navigate("/report-builder")}
                 dockPosition={isRightDock ? "right" : "left"}
                 onToggleDock={!isMobile ? togglePanelDock : undefined}
                 isDockDisabled={isRightSidebarOpen}
