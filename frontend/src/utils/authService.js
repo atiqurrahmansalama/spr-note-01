@@ -175,8 +175,9 @@ export const fetchWithAuth = async (url, options = {}) => {
   
   const makeRequest = async (authToken) => {
     const activeTenantId = typeof localStorage !== 'undefined' ? localStorage.getItem('active_tenant_id') : null;
+    const isFormData = options.body instanceof FormData;
     const headers = {
-      'Content-Type': 'application/json',
+      ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
       ...(activeTenantId && activeTenantId !== 'ALL' && activeTenantId !== 'null' && activeTenantId !== 'undefined' && { 'X-Tenant-ID': activeTenantId }),
       ...options.headers,

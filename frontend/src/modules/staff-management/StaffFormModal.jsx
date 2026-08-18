@@ -10,6 +10,7 @@ import {
 import { createStaff, updateStaff } from '../../api/staff';
 import { useToast } from '../../context/ToastContext';
 import { fetchWithAuth } from '../../utils/authService';
+import AddressLocationPicker from '../../components/common/AddressLocationPicker';
 
 export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) {
   const { showToast } = useToast();
@@ -31,6 +32,14 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
     emergency_contact: '',
     nid_no: '',
     blood_group: '',
+    address: '',
+    division: '',
+    district: '',
+    upazila_thana: '',
+    postal_code: '',
+    latitude: null,
+    longitude: null,
+    map_place_id: '',
 
     // Teaching profile fields
     teacher_detail: {
@@ -96,6 +105,14 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
         emergency_contact: staffData.emergency_contact || '',
         nid_no: staffData.nid_no || '',
         blood_group: staffData.blood_group || '',
+        address: staffData.address || '',
+        division: staffData.division || '',
+        district: staffData.district || '',
+        upazila_thana: staffData.upazila_thana || '',
+        postal_code: staffData.postal_code || '',
+        latitude: staffData.latitude || null,
+        longitude: staffData.longitude || null,
+        map_place_id: staffData.map_place_id || '',
         teacher_detail: {
           highest_degree: staffData.teacher_detail?.highest_degree || '',
           specialization: staffData.teacher_detail?.specialization || '',
@@ -124,6 +141,14 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
         emergency_contact: '',
         nid_no: '',
         blood_group: '',
+        address: '',
+        division: '',
+        district: '',
+        upazila_thana: '',
+        postal_code: '',
+        latitude: null,
+        longitude: null,
+        map_place_id: '',
         teacher_detail: {
           highest_degree: '',
           specialization: '',
@@ -488,6 +513,38 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
                     <option value="AB-">AB-</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Staff Residential Address & Location Picker */}
+              <div className="border-t theme-border pt-3">
+                <AddressLocationPicker
+                  label="Residential Location & Address"
+                  value={{
+                    address: formData.address,
+                    street_address: formData.address,
+                    district: formData.district,
+                    division: formData.division,
+                    upazila_thana: formData.upazila_thana,
+                    postal_code: formData.postal_code,
+                    latitude: formData.latitude,
+                    longitude: formData.longitude,
+                    map_place_id: formData.map_place_id,
+                  }}
+                  onChange={(loc) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      address: loc.address || loc.street_address || prev.address,
+                      district: loc.district || prev.district,
+                      division: loc.division || prev.division,
+                      upazila_thana: loc.upazila_thana || prev.upazila_thana,
+                      postal_code: loc.postal_code || prev.postal_code,
+                      latitude: loc.latitude !== undefined ? loc.latitude : prev.latitude,
+                      longitude: loc.longitude !== undefined ? loc.longitude : prev.longitude,
+                      map_place_id: loc.map_place_id || prev.map_place_id,
+                    }));
+                  }}
+                  placeholder="e.g. House 12, Road 4, Sector 7, Uttara, Dhaka (or click Pick on Map)"
+                />
               </div>
             </div>
           )}

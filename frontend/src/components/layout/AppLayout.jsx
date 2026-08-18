@@ -11,60 +11,62 @@ import { useToast } from "../../context/ToastContext";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
+import NotificationBellDropdown from "../../modules/header/components/NotificationBellDropdown";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
   "/": { title: "Dashboard", category: "Navigation", isDashboard: true },
   "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
-  "/report-builder": { title: "Report Generator", category: "Daily Reports" },
-  "/student-reports": { title: "Student Progress & Daily Reports", category: "Daily Reports" },
-  "/copy-report": { title: "Copy Report Settings", category: "Daily Reports" },
-  "/sessions-comments": { title: "Sessions & Saved Comments", category: "Daily Reports" },
+  "/report-builder": { title: "Generate Report", category: "Report Generator" },
+  "/student-reports": { title: "Student Reports", category: "Report Generator" },
+  "/copy-report": { title: "Report Settings", category: "Report Generator" },
+  "/sessions-comments": { title: "Sessions & Comments", category: "Report Generator" },
 
-  "/attendance/students/roll-call": { title: "Period & Class Roll Call", category: "Student Attendance" },
-  "/attendance/students/gate-log": { title: "Campus Gate Entry & Pass Tracker", category: "Student Attendance" },
-  "/attendance/students/adhoc": { title: "Surprise Roll Call & Night Headcount", category: "Student Attendance" },
-  "/attendance/students/monthly-matrix": { title: "31-Day Student Register", category: "Student Attendance" },
-  "/attendance/student": { title: "Student Attendance", category: "Student Attendance" },
-  "/attendance/monthly-register": { title: "Monthly Attendance Register", category: "Student Attendance" },
+  "/attendance/students/roll-call": { title: "Period & Class Roll Call", category: "Student Management" },
+  "/attendance/students/gate-log": { title: "Gate Entry & Pass", category: "Student Management" },
+  "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
+  "/attendance/students/monthly-matrix": { title: "31-Day Student Register", category: "Student Management" },
+  "/attendance/student": { title: "Student Attendance", category: "Student Management" },
+  "/attendance/monthly-register": { title: "31-Day Student Register", category: "Student Management" },
 
-  "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix Register", category: "Teacher & Staff Attendance" },
-  "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Teacher & Staff Attendance" },
-  "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Teacher & Staff Attendance" },
+  "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix", category: "Staff Management" },
+  "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Staff Management" },
+  "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Staff Management" },
 
-  "/attendance/settings": { title: "Slots & Routine Manager", category: "Attendance Settings & Devices" },
-  "/attendance/devices": { title: "Biometric Devices & IoT Gateway", category: "Attendance Settings & Devices" },
-  "/calendar": { title: "Academic Calendar", category: "Attendance Settings & Devices" },
+  "/attendance/settings": { title: "Slots & Routine Manager", category: "Settings & Devices" },
+  "/attendance/devices": { title: "Biometric Devices", category: "Settings & Devices" },
+  "/calendar": { title: "Institutional Calendar", category: "Settings & Devices" },
 
-  "/student-management/departments": { title: "Academic Departments", category: "Student Management" },
-  "/student-management/classes": { title: "Classes & Grades", category: "Student Management" },
-  "/student-management/groups": { title: "Student Groups", category: "Student Management" },
-  "/groups-students": { title: "Groups & Students Directory", category: "Student Management" },
+  "/student-management/departments": { title: "Department Management", category: "Academic Institution" },
+  "/student-management/classes": { title: "Class Management", category: "Academic Institution" },
+  "/student-management/groups": { title: "Group Management", category: "Academic Institution" },
+  "/groups-students": { title: "Student Roster", category: "Student Management" },
   "/student-roster": { title: "Student Roster", category: "Student Management" },
-  "/group-roster": { title: "Group Roster", category: "Student Management" },
-  "/admission": { title: "Student Admission & Profile Registration", category: "Student Management" },
+  "/group-roster": { title: "Group Management", category: "Academic Institution" },
+  "/admission": { title: "Student Admission", category: "Student Management" },
 
-  "/app-management/role-invites": { title: "Role QR & Invite", category: "App Management" },
-  "/app-management/institutions": { title: "Academic Institutions", category: "App Management" },
-  "/institutions": { title: "Academic Institutions", category: "App Management" },
+  "/app-management/role-invites": { title: "Role QR & Invites", category: "App Management" },
+  "/app-management/notifications": { title: "Notification Management", category: "App Management" },
+  "/app-management/institutions": { title: "Institution Directory", category: "Academic Institution" },
+  "/institutions": { title: "Institution Directory", category: "Academic Institution" },
   "/user-management": { title: "User Management", category: "App Management" },
-  "/role-management": { title: "Role Management & Hierarchy Permissions", category: "App Management" },
-  "/activity-analytics": { title: "Teacher Activity & Session Analytics", category: "App Management" },
-  "/section-control": { title: "Super Admin Section Control Panel", category: "App Management" },
+  "/role-management": { title: "Role Management", category: "App Management" },
+  "/activity-analytics": { title: "Activity Analytics", category: "App Management" },
+  "/section-control": { title: "Section Control", category: "App Management" },
 
-  "/profile-settings": { title: "User Profile Settings", category: "Settings" },
-  "/settings/institution": { title: "Institution Profile", category: "Settings" },
-  "/institution-profile": { title: "Institution Profile", category: "Settings" },
-  "/security-sessions": { title: "Security & Active Sessions", category: "Settings" },
-  "/appearance": { title: "Appearance & Typography", category: "Settings" },
-  "/date-time": { title: "Date & Time Settings", category: "Settings" },
-  "/language": { title: "Language Settings", category: "Settings" },
+  "/profile-settings": { title: "Profile Settings", category: "Settings" },
+  "/settings/institution": { title: "Profile & Branding", category: "Academic Institution" },
+  "/institution-profile": { title: "Profile & Branding", category: "Academic Institution" },
+  "/security-sessions": { title: "Security & Sessions", category: "Settings" },
+  "/appearance": { title: "Appearance", category: "Settings" },
+  "/date-time": { title: "Date & Time", category: "Settings" },
+  "/language": { title: "Language", category: "Settings" },
   "/data-backup": { title: "Data & Backup", category: "Settings" },
 
-  "/shortcuts": { title: "Keyboard Shortcuts", category: "Help & Guide" },
-  "/guide": { title: "User Guide & Documentation", category: "Help & Guide" },
-  "/about": { title: "About Application", category: "Help & Guide" },
-  "/trash-restoration": { title: "Trash & Soft-Deleted Reports", category: "Trash" },
+  "/shortcuts": { title: "Shortcuts", category: "Shortcuts" },
+  "/guide": { title: "App Guide", category: "App Guide" },
+  "/about": { title: "About", category: "About" },
+  "/trash-restoration": { title: "Trash", category: "Settings" },
 };
 
 
@@ -482,6 +484,9 @@ export default function AppLayout() {
               </svg>
             )}
           </button>
+
+          {/* Real-time In-App Notification Bell */}
+          <NotificationBellDropdown />
 
           <button 
             type="button"

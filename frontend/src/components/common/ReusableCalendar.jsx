@@ -151,10 +151,10 @@ export default function ReusableCalendar({
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="w-full h-[42px] flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-medium hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm"
+          className="w-full min-h-[46px] flex items-center justify-between px-4 py-3 rounded-2xl theme-bg-sub border theme-border theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated/60 focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all duration-200 cursor-pointer select-none shadow-xs"
         >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <CalendarIcon className="w-4 h-4 text-sky-400 shrink-0" />
             <span className="truncate font-semibold">{getLabel()}</span>
           </div>
           <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />

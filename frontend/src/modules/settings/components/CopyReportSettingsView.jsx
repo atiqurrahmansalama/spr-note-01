@@ -80,9 +80,9 @@ export default function CopyReportSettingsView() {
             <CopyIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold theme-text-primary">Copy Report Settings</h2>
+            <h2 className="text-xl font-bold theme-text-primary">Report Settings</h2>
             <p className="text-xs theme-text-secondary">
-              Configure default toggles, teacher tags, and copy preferences for generated progress reports.
+              Configure default toggles, teacher tags, and report preferences for generated progress reports.
             </p>
           </div>
         </div>

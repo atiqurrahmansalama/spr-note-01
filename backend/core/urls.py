@@ -92,6 +92,12 @@ from .views import (
     BiometricDeviceViewSet,
     BiometricGatewayViewSet,
     DocumentTemplateViewSet,
+    InAppNotificationViewSet,
+    NotificationGatewayViewSet,
+    NotificationTemplateViewSet,
+    NotificationTriggerRuleViewSet,
+    NotificationDispatchLogViewSet,
+    ManualBroadcastViewSet,
 )
 
 router = DefaultRouter()
@@ -128,6 +134,14 @@ router.register(r'attendance/devices', BiometricDeviceViewSet, basename='attenda
 router.register(r'attendance/biometric', BiometricGatewayViewSet, basename='attendance-biometric')
 router.register(r'attendance/students', StudentAttendanceViewSet, basename='attendance-students')
 router.register(r'attendance/policy', AttendancePolicyViewSet, basename='attendance-policy')
+
+# Enterprise Notification & Dispatch Control Hub Routers
+router.register(r'notifications/in-app', InAppNotificationViewSet, basename='notifications-in-app')
+router.register(r'notifications/gateways', NotificationGatewayViewSet, basename='notifications-gateways')
+router.register(r'notifications/templates', NotificationTemplateViewSet, basename='notifications-templates')
+router.register(r'notifications/triggers', NotificationTriggerRuleViewSet, basename='notifications-triggers')
+router.register(r'notifications/logs', NotificationDispatchLogViewSet, basename='notifications-logs')
+router.register(r'notifications/broadcast', ManualBroadcastViewSet, basename='notifications-broadcast')
 
 from django.http import JsonResponse
 

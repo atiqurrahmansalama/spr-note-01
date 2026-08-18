@@ -32,6 +32,7 @@ import {
   MatrixIcon,
   ChecklistIcon,
   TimerIcon,
+  BellIcon,
 } from "../../components/ui/Icons";
 
 export default function SidebarContainer({ 
@@ -50,10 +51,8 @@ export default function SidebarContainer({
   const [openSubMenus, setOpenSubMenus] = useState({
     "Academic Institution": true,
     "Student Management": true,
-    "Student Attendance": true,
-    "Teacher & Staff Attendance": true,
     "Staff Management": false,
-    "Attendance Settings & Devices": false,
+    "Settings & Devices": false,
     "Report Generator": false,
     "App Management": false,
     Settings: false,
@@ -78,10 +77,10 @@ export default function SidebarContainer({
       key: "nav_institution",
       subItems: [
         { id: "Institution Directory", name: "Institution Directory", path: "/institutions", Icon: BuildingOfficeIcon, key: "app_institutions" },
-        { id: "Profile & Branding", name: "Profile & Branding", path: "/settings/institution", Icon: DepartmentIcon, key: "settings_institution" },
-        { id: "Department Hierarchy", name: "Department Hierarchy", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
+        { id: "Department Management", name: "Department Management", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
         { id: "Class Management", name: "Class Management", path: "/student-management/classes", Icon: ClassIcon, key: "student_classes" },
         { id: "Group Management", name: "Group Management", path: "/student-management/groups", Icon: GroupIcon, key: "student_groups" },
+        { id: "Profile & Branding", name: "Profile & Branding", path: "/settings/institution", Icon: GlobeIcon, key: "settings_institution" },
       ]
     },
     {
@@ -92,32 +91,12 @@ export default function SidebarContainer({
       key: "nav_student_management",
       subItems: [
         { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
-        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
-      ]
-    },
-    {
-      id: "Student Attendance",
-      name: "Student Attendance",
-      Icon: AttendanceIcon,
-      hasSub: true,
-      key: "nav_student_attendance",
-      subItems: [
+        { id: "31-Day Student Register", name: "31-Day Student Register", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
+        { id: "Student Attendance", name: "Student Attendance", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
         { id: "Period & Class Roll Call", name: "Period & Class Roll Call", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
         { id: "Gate Entry & Pass", name: "Gate Entry & Pass", path: "/attendance/students/gate-log", Icon: GateIcon, key: "student_gate_tracker" },
         { id: "Surprise Headcount", name: "Surprise Headcount", path: "/attendance/students/adhoc", Icon: ChecklistIcon, key: "student_adhoc_headcount" },
-        { id: "31-Day Student Register", name: "31-Day Student Register", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
-      ]
-    },
-    {
-      id: "Teacher & Staff Attendance",
-      name: "Teacher & Staff Attendance",
-      Icon: TeacherIcon,
-      hasSub: true,
-      key: "nav_staff_attendance",
-      subItems: [
-        { id: "Teacher Period Matrix", name: "Teacher Period Matrix", path: "/attendance/staff/teacher-matrix", Icon: MatrixIcon, key: "teacher_period_matrix" },
-        { id: "Staff Daily Timesheet", name: "Staff Daily Timesheet", path: "/attendance/staff/daily-punch", Icon: TimerIcon, key: "staff_daily_attendance" },
-        { id: "Leave & Substitution Desk", name: "Leave & Substitution Desk", path: "/attendance/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
+        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
     {
@@ -128,10 +107,13 @@ export default function SidebarContainer({
       key: "nav_staff_management",
       subItems: [
         { id: "Staff Directory", name: "Staff Directory", path: "/staff", Icon: TeacherIcon, key: "staff_management" },
+        { id: "Teacher Period Matrix", name: "Teacher Period Matrix", path: "/attendance/staff/teacher-matrix", Icon: MatrixIcon, key: "teacher_period_matrix" },
+        { id: "Staff Daily Timesheet", name: "Staff Daily Timesheet", path: "/attendance/staff/daily-punch", Icon: TimerIcon, key: "staff_daily_attendance" },
+        { id: "Leave & Substitution Desk", name: "Leave & Substitution Desk", path: "/attendance/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
       ]
     },
     {
-      id: "Attendance Settings & Devices",
+      id: "Settings & Devices",
       name: "Settings & Devices",
       Icon: SettingsIcon,
       hasSub: true,
@@ -152,7 +134,7 @@ export default function SidebarContainer({
         { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon, key: "report_builder" },
         { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon, key: "report_sessions_comments" },
         { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
-        { id: "Copy Report Settings", name: "Copy Report Settings", path: "/copy-report", Icon: CopyIcon, key: "report_copy_settings" },
+        { id: "Report Settings", name: "Report Settings", path: "/copy-report", Icon: CopyIcon, key: "report_copy_settings" },
       ]
     },
     {
@@ -167,6 +149,7 @@ export default function SidebarContainer({
         { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
         { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
         { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", Icon: SectionControlIcon, key: "app_role_invites" },
+        { id: "Notification Management", name: "Notification Management", path: "/app-management/notifications", Icon: BellIcon, key: "notification_management" },
       ]
     },
     { 
@@ -182,9 +165,9 @@ export default function SidebarContainer({
         { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon, key: "settings_appearance" },
         { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon, key: "settings_language" },
         { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
+        { id: "Trash", name: "Trash", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
       ]
     },
-    { id: "Trash & Restoration", name: "Trash & Restoration", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
     { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon, key: "nav_shortcuts" },
     { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon, key: "nav_app_guide" },
     { id: "About", name: "About", path: "/about", Icon: AboutIcon, key: "nav_about" },

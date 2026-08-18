@@ -395,6 +395,16 @@ FEATURE_REGISTRY = [
         "default_enabled": True,
         "sort_order": 45,
     },
+    {
+        "key": "notification_management",
+        "label": "Notification Management",
+        "category": "ADMIN",
+        "description": "Notification Gateways, Triggers, Message Template Studio & Audit Logs",
+        "is_parent": False,
+        "parent_key": "nav_app_management",
+        "default_enabled": True,
+        "sort_order": 46,
+    },
 
     # --- REPORT GENERATOR (PARENT) ---
     {

@@ -15,6 +15,7 @@ import {
 import { getCurrentInstitution, updateCurrentInstitution } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import AddressLocationPicker from '../../../components/common/AddressLocationPicker';
 import DocumentStudioEngine from '../../../components/documents/DocumentStudioEngine';
 
 export default function InstitutionProfileView() {
@@ -36,6 +37,12 @@ export default function InstitutionProfileView() {
     email: '',
     address: '',
     district: '',
+    division: '',
+    upazila_thana: '',
+    postal_code: '',
+    latitude: null,
+    longitude: null,
+    map_place_id: '',
     principal_name: 'Maulana Principal / Muhtamim',
   });
 
@@ -56,6 +63,12 @@ export default function InstitutionProfileView() {
             email: data.email || '',
             address: data.address || '',
             district: data.district || '',
+            division: data.division || '',
+            upazila_thana: data.upazila_thana || '',
+            postal_code: data.postal_code || data.post_code || '',
+            latitude: data.latitude || null,
+            longitude: data.longitude || null,
+            map_place_id: data.map_place_id || '',
             principal_name: data.principal_name || 'Principal / Muhtamim',
           });
         }
@@ -74,6 +87,12 @@ export default function InstitutionProfileView() {
             email: currentInstitution.email || '',
             address: currentInstitution.address || '',
             district: currentInstitution.district || '',
+            division: currentInstitution.division || '',
+            upazila_thana: currentInstitution.upazila_thana || '',
+            postal_code: currentInstitution.postal_code || currentInstitution.post_code || '',
+            latitude: currentInstitution.latitude || null,
+            longitude: currentInstitution.longitude || null,
+            map_place_id: currentInstitution.map_place_id || '',
           }));
         }
       } finally {
@@ -298,10 +317,40 @@ export default function InstitutionProfileView() {
                 />
               </div>
 
+              {/* Campus Address & Location Picker */}
+              <AddressLocationPicker
+                label="Campus Location & Street Address"
+                value={{
+                  address: formData.address,
+                  street_address: formData.address,
+                  district: formData.district,
+                  division: formData.division,
+                  upazila_thana: formData.upazila_thana,
+                  postal_code: formData.postal_code,
+                  latitude: formData.latitude,
+                  longitude: formData.longitude,
+                  map_place_id: formData.map_place_id,
+                }}
+                onChange={(loc) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    address: loc.address || loc.street_address || prev.address,
+                    district: loc.district || prev.district,
+                    division: loc.division || prev.division,
+                    upazila_thana: loc.upazila_thana || prev.upazila_thana,
+                    postal_code: loc.postal_code || prev.postal_code,
+                    latitude: loc.latitude !== undefined ? loc.latitude : prev.latitude,
+                    longitude: loc.longitude !== undefined ? loc.longitude : prev.longitude,
+                    map_place_id: loc.map_place_id || prev.map_place_id,
+                  }));
+                }}
+                placeholder="e.g. Uttara Sector 4, Dhaka (or click Pick on Map)"
+              />
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold theme-text-secondary mb-1">
-                    District
+                    District / City
                   </label>
                   <input
                     type="text"
@@ -313,13 +362,13 @@ export default function InstitutionProfileView() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold theme-text-secondary mb-1">
-                    Campus Address
+                    Division / State
                   </label>
                   <input
                     type="text"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    placeholder="e.g. Uttara, Dhaka"
+                    value={formData.division}
+                    onChange={(e) => handleInputChange('division', e.target.value)}
+                    placeholder="e.g. Dhaka Division"
                     className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                   />
                 </div>

@@ -17,6 +17,14 @@ const HARD_DEFAULTS = {
   commentSection: true,
   actionButtons: true,
   pdfExport: true,
+  notification_management: true,
+  nav_app_management: true,
+  app_role_invites: true,
+  app_institutions: true,
+  app_user_management: true,
+  app_role_management: true,
+  app_activity_analytics: true,
+  app_section_control: true,
 };
 
 // Read the last cached server-evaluated config for this user id.

@@ -13,7 +13,8 @@ import {
   TrashIcon,
   WhatsAppIcon,
   CloseIcon,
-  SectionControlIcon
+  SectionControlIcon,
+  SparklesIcon
 } from "../../../components/ui/Icons";
 import StudentAdmissionModal from "../admission/StudentAdmissionModal";
 import BulkIdCardPrintModal from "./BulkIdCardPrintModal";
@@ -48,6 +49,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   
   // Modal toggle
   const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
+  const [admissionModalMode, setAdmissionModalMode] = useState("QUICK");
   const [isBulkIdCardModalOpen, setIsBulkIdCardModalOpen] = useState(false);
   const [bulkActionType, setBulkActionType] = useState("");
   const [bulkGroupInput, setBulkGroupInput] = useState("");
@@ -326,13 +328,31 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               <span>Bulk Actions ({selectedIds.length})</span>
             </button>
           )}
-          <button
-            onClick={() => setIsAdmissionModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>Add Student</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAdmissionModalMode("QUICK");
+                setIsAdmissionModalOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
+            >
+              <SparklesIcon className="w-3.5 h-3.5" />
+              <span>Quick Admission</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAdmissionModalMode("FULL");
+                setIsAdmissionModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>Full Admission</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -719,6 +739,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
       {isAdmissionModalOpen && (
         <StudentAdmissionModal
           isOpen={isAdmissionModalOpen}
+          initialMode={admissionModalMode}
           onClose={() => {
             setIsAdmissionModalOpen(false);
             loadStudents();

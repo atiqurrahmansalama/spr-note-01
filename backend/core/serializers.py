@@ -61,6 +61,11 @@ from .models import (
     BiometricDevice,
     RawAttendancePunchLog,
     DocumentTemplateConfig,
+    NotificationGatewayConfig,
+    NotificationTemplate,
+    NotificationTriggerRule,
+    InAppNotification,
+    NotificationDispatchLog,
 )
 
 
@@ -488,7 +493,8 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'bangla_name', 'slug', 'institution_type',
             'eiin_or_reg_no', 'logo_url', 'logo_data', 'phone', 'email', 'address',
-            'division', 'district', 'upazila_thana', 'post_code', 'street_address',
+            'division', 'district', 'upazila_thana', 'post_code', 'postal_code', 'street_address',
+            'latitude', 'longitude', 'map_place_id',
             'is_verified', 'is_active', 'is_deleted',
             'total_students_count', 'total_classes_count', 'total_staff_count',
             'created_at', 'updated_at',
@@ -532,7 +538,11 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
     district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     upazila_thana = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     post_code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
     street_address = serializers.CharField(required=False, allow_blank=True, default='')
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    map_place_id = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
 
     # Step 3: Admin & Presets
     admin_name = serializers.CharField(max_length=150, required=True)
@@ -579,9 +589,13 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
         division = validated_data.get('division', '')
         district = validated_data.get('district', '')
         upazila_thana = validated_data.get('upazila_thana', '')
-        post_code = validated_data.get('post_code', '')
+        post_code = validated_data.get('post_code') or validated_data.get('postal_code', '')
+        postal_code = validated_data.get('postal_code') or post_code
         street_address = validated_data.get('street_address', '')
         address = validated_data.get('address', '')
+        latitude = validated_data.get('latitude')
+        longitude = validated_data.get('longitude')
+        map_place_id = validated_data.get('map_place_id', '')
         if not address and (street_address or upazila_thana or district or division):
             parts = [p for p in [street_address, upazila_thana, district, division] if p]
             address = ", ".join(parts)
@@ -607,7 +621,11 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                 district=district,
                 upazila_thana=upazila_thana,
                 post_code=post_code,
+                postal_code=postal_code,
                 street_address=street_address,
+                latitude=latitude,
+                longitude=longitude,
+                map_place_id=map_place_id,
                 logo_url=logo_url,
                 logo_data=logo_data,
                 is_verified=True,
@@ -1692,7 +1710,8 @@ class AddressSerializer(serializers.ModelSerializer):
         model = Address
         fields = [
             'id', 'address_type', 'street_address', 'post_office', 
-            'post_code', 'thana_or_upazila', 'district', 'division', 'country'
+            'post_code', 'postal_code', 'thana_or_upazila', 'district', 'division', 'country',
+            'latitude', 'longitude', 'map_place_id'
         ]
 
 
@@ -1746,13 +1765,16 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             'id', 'name', 'bangla_name', 'student_id_card_number', 'gender', 'dob',
             'blood_group', 'birth_certificate_no', 'nid_no', 'photo', 'present_address_data',
             'permanent_address_data', 'academic_data', 'guardian_data',
-            'admission_mode', 'status', 'group_name', 'roll_number', 'education_status'
+            'latitude', 'longitude', 'map_place_id',
+            'admission_mode', 'status', 'group_name', 'roll_number', 'education_status',
+            'student_class', 'student_group'
         ]
 
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get('request')
         user = request.user if request and request.user.is_authenticated else None
+        scoped_inst_id = get_scoped_tenant_id(request) if request else None
 
         present_address_data = validated_data.pop('present_address_data', None)
         permanent_address_data = validated_data.pop('permanent_address_data', None)
@@ -1773,7 +1795,33 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         validated_data['permanent_address'] = permanent_address
         if user:
             validated_data['created_by'] = user
-        
+        if scoped_inst_id and not validated_data.get('institution_id'):
+            validated_data['institution_id'] = scoped_inst_id
+
+        # Auto sync class name / relation
+        student_class = validated_data.get('student_class')
+        if student_class and not validated_data.get('education_status'):
+            validated_data['education_status'] = student_class.name
+        elif not student_class and validated_data.get('education_status'):
+            inst = validated_data.get('institution') or getattr(user, 'institution', None)
+            if inst:
+                cls_obj = StudentClass.objects.filter(institution=inst, name__iexact=validated_data['education_status']).first()
+                if cls_obj:
+                    validated_data['student_class'] = cls_obj
+
+        # Auto generate class roll number if not provided
+        if not validated_data.get('roll_number') or validated_data.get('roll_number') <= 0:
+            filter_kwargs = {'is_deleted': False}
+            if scoped_inst_id:
+                filter_kwargs['institution_id'] = scoped_inst_id
+            if validated_data.get('student_class'):
+                filter_kwargs['student_class'] = validated_data.get('student_class')
+            elif validated_data.get('education_status'):
+                filter_kwargs['education_status'] = validated_data.get('education_status')
+            
+            max_roll = Student.objects.filter(**filter_kwargs).aggregate(Max('roll_number'))['roll_number__max'] or 0
+            validated_data['roll_number'] = max_roll + 1
+
         student = Student.objects.create(**validated_data)
 
         # Create StudentAcademicDetail (always exists, blank defaults if not in payload)
@@ -1820,6 +1868,7 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'id', 'uniq_id', 'roll_number', 'name', 'name_en', 'bangla_name', 
             'student_id_card_number', 'gender', 'dob', 'blood_group', 
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
+            'latitude', 'longitude', 'map_place_id',
             'academic_detail', 'guardian_detail', 'documents', 'academic_history', 'admission_mode', 
             'status', 'student_class', 'student_class_name', 'student_group', 'student_group_name',
             'group_name', 'created_at', 'updated_at', 'education_status',
@@ -2026,6 +2075,14 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             'nid_no',
             'emergency_contact',
             'blood_group',
+            'address',
+            'division',
+            'district',
+            'upazila_thana',
+            'postal_code',
+            'latitude',
+            'longitude',
+            'map_place_id',
             'salary_type',
             'base_salary',
             'bank_account_no',
@@ -2832,4 +2889,180 @@ class DocumentTemplateConfigSerializer(serializers.ModelSerializer):
     def validate_template_name(self, value):
         if not value or not str(value).strip():
             raise serializers.ValidationError("Template name cannot be empty.")
+        return str(value).strip()
+
+
+# ==============================================================================
+# NOTIFICATION ECOSYSTEM SERIALIZERS
+# ==============================================================================
+
+class NotificationGatewayConfigSerializer(serializers.ModelSerializer):
+    gateway_type_display = serializers.CharField(source='get_gateway_type_display', read_only=True)
+    provider_name_display = serializers.CharField(source='get_provider_name_display', read_only=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+    api_secret_or_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    is_secret_configured = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NotificationGatewayConfig
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'gateway_type',
+            'gateway_type_display',
+            'provider_name',
+            'provider_name_display',
+            'api_key',
+            'api_secret_or_token',
+            'is_secret_configured',
+            'sender_id_or_phone',
+            'api_url',
+            'port',
+            'use_tls_ssl',
+            'is_active',
+            'extra_headers_or_params',
+            'balance_cache',
+            'last_ping_status',
+            'last_ping_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'last_ping_status', 'last_ping_at', 'created_at', 'updated_at']
+
+    def get_is_secret_configured(self, obj):
+        return bool(obj.api_secret_or_token)
+
+    def update(self, instance, validated_data):
+        secret = validated_data.pop('api_secret_or_token', None)
+        if secret:
+            instance.api_secret_or_token = secret
+        return super().update(instance, validated_data)
+
+
+class NotificationTemplateSerializer(serializers.ModelSerializer):
+    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+
+    class Meta:
+        model = NotificationTemplate
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'name',
+            'event_type',
+            'event_type_display',
+            'subject',
+            'body',
+            'available_tags',
+            'is_system_default',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'institution_name', 'created_at', 'updated_at']
+
+    def validate_name(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Template title cannot be empty.")
+        return str(value).strip()
+
+    def validate_body(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Message template body cannot be empty.")
+        return str(value).strip()
+
+
+class NotificationTriggerRuleSerializer(serializers.ModelSerializer):
+    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    template_name = serializers.CharField(source='template.name', read_only=True)
+
+    class Meta:
+        model = NotificationTriggerRule
+        fields = [
+            'id',
+            'institution',
+            'event_type',
+            'event_type_display',
+            'channels',
+            'is_enabled',
+            'template',
+            'template_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'institution', 'event_type_display', 'template_name', 'created_at', 'updated_at']
+
+
+class InAppNotificationSerializer(serializers.ModelSerializer):
+    notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
+    recipient_name = serializers.CharField(source='recipient.username', read_only=True)
+
+    class Meta:
+        model = InAppNotification
+        fields = [
+            'id',
+            'institution',
+            'recipient',
+            'recipient_name',
+            'title',
+            'message',
+            'notification_type',
+            'notification_type_display',
+            'action_url',
+            'is_read',
+            'read_at',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'institution', 'recipient', 'recipient_name', 'read_at', 'created_at']
+
+
+class NotificationDispatchLogSerializer(serializers.ModelSerializer):
+    channel_display = serializers.CharField(source='get_channel_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    recipient_name = serializers.CharField(source='recipient_user.username', read_only=True, default='')
+
+    class Meta:
+        model = NotificationDispatchLog
+        fields = [
+            'id',
+            'institution',
+            'channel',
+            'channel_display',
+            'event_type',
+            'recipient_identifier',
+            'recipient_user',
+            'recipient_name',
+            'message_title',
+            'message_body',
+            'status',
+            'status_display',
+            'provider_response',
+            'error_reason',
+            'dispatched_at',
+        ]
+        read_only_fields = ['id', 'institution', 'dispatched_at']
+
+
+class ManualBroadcastSerializer(serializers.Serializer):
+    target_audience = serializers.ChoiceField(
+        choices=['ALL', 'STUDENTS', 'CLASS', 'TEACHERS', 'STAFF'],
+        default='ALL'
+    )
+    class_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    channels = serializers.ListField(
+        child=serializers.ChoiceField(choices=['IN_APP', 'SMS', 'WHATSAPP', 'EMAIL']),
+        default=['IN_APP']
+    )
+    title = serializers.CharField(max_length=200, default='Institutional Announcement')
+    message = serializers.CharField(required=True)
+    notification_type = serializers.ChoiceField(
+        choices=['INFO', 'WARNING', 'SUCCESS', 'ALERT'],
+        default='INFO'
+    )
+    action_url = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_message(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Broadcast message cannot be empty.")
         return str(value).strip()

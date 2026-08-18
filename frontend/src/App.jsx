@@ -28,6 +28,7 @@ import AppGuideView from "./modules/settings/components/AppGuideView";
 import AboutAppView from "./modules/settings/components/AboutAppView";
 import SectionToggleControlPanel from "./modules/settings/components/SectionToggleControlPanel";
 import RoleInviteManagerView from "./modules/app-management/invites/RoleInviteManagerView";
+import NotificationManagementView from "./modules/app-management/notifications/NotificationManagementView";
 import JoinWithInviteView from "./modules/auth/JoinWithInviteView";
 import StudentProfileHubView from "./modules/student-profile/StudentProfileHubView";
 import DepartmentManagementView from "./modules/student-management/departments/DepartmentManagementView";
@@ -148,7 +149,9 @@ export default function App() {
           <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionToggleControlPanel /></FeatureGuard>} />
           <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
           <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
-          <Route path="/app-management/role-invites" element={<FeatureGuard sectionKey="app_role_invites" fallback={<Navigate to="/dashboard" replace />}><RoleInviteManagerView /></FeatureGuard>} />
+          <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
+          <Route path="/app-management/notifications" element={<NotificationManagementView />} />
+          <Route path="/notifications" element={<NotificationManagementView />} />
           <Route path="/dashboard" element={null} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
