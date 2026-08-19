@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
-import { ClassIcon, CloseIcon, DepartmentIcon, BookOpenIcon } from "../../../components/ui/Icons";
+import { ClassIcon, DepartmentIcon } from "../../../components/ui/Icons";
+import Modal from "../../../components/ui/Modal";
+import CustomSelect from "../../../components/ui/CustomSelect";
+import CustomCheckbox from "../../../components/ui/CustomCheckbox";
 
 export default function ClassFormModal({ isOpen, onClose, editingClass, onSuccess }) {
   const { showToast } = useToast();
@@ -76,10 +79,8 @@ export default function ClassFormModal({ isOpen, onClose, editingClass, onSucces
     }
   };
 
-  if (!isOpen) return null;
-
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!formData.name.trim()) {
       showToast("Class Name is required.", "warning");
       return;
@@ -116,9 +117,9 @@ export default function ClassFormModal({ isOpen, onClose, editingClass, onSucces
           "success"
         );
         onSuccess?.();
-        onClose();
+        onClose?.();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         const msg = err.name?.[0] || err.detail || err.error || "Failed to save class.";
         showToast(msg, "error");
       }
@@ -130,159 +131,139 @@ export default function ClassFormModal({ isOpen, onClose, editingClass, onSucces
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in select-none">
-      <div className="w-full max-w-lg theme-bg-surface border theme-border rounded-3xl shadow-2xl overflow-hidden animate-scale-up">
-        {/* Modal Header */}
-        <div className="px-6 py-5 border-b theme-border flex items-center justify-between bg-zinc-900/40">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl theme-bg-accent/15 theme-accent flex items-center justify-center">
-              <ClassIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base theme-text-primary">
-                {editingClass ? "Edit Class / Grade" : "Create New Class / Grade"}
-              </h3>
-              <p className="text-xs theme-text-secondary">
-                Configure grade levels, assigned head teachers, and ordering
-              </p>
-            </div>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={editingClass ? "Edit Class / Grade" : "Create New Class / Grade"}
+      subtitle="Configure grade levels, assigned head teachers, and ordering"
+      icon={ClassIcon}
+      size="lg"
+      footer={
+        <div className="flex items-center justify-end gap-3 w-full">
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-elevated transition-colors cursor-pointer"
           >
-            <CloseIcon className="w-4 h-4" />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all cursor-pointer shadow-md disabled:opacity-50"
+          >
+            {submitting ? "Saving Class..." : editingClass ? "Update Class" : "Create Class"}
           </button>
         </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-left">
+        {/* Class Name */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
+            Class / Grade Name <span className="text-rose-400">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="e.g. Hifz Division, Class 5, Nazera Section"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
+          />
+        </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              Class / Grade Name <span className="text-rose-400">*</span>
+        {/* Class Code & Academic Department */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
+              Class Code (Optional)
             </label>
             <input
               type="text"
-              required
-              placeholder="e.g. Hifz Division, Class 5, Nazera Section"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub text-sm theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+              placeholder="e.g. HIFZ-01, CLS-5"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-mono font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                Class Code (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. HIFZ-01, CLS-5"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub text-sm theme-text-primary focus:outline-none focus:border-[var(--accent-main)] font-mono"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                Academic Department
-              </label>
-              <select
-                value={formData.department}
-                onChange={(e) => {
-                  const selectedId = e.target.value;
-                  const selectedObj = departments.find((d) => String(d.id) === String(selectedId));
-                  let autoType = formData.department_type;
-                  if (selectedObj) {
-                    if (selectedObj.has_quran_tracker) autoType = "HIFZ";
-                    else if (selectedObj.code?.includes("GEN")) autoType = "GENERAL";
-                  }
-                  setFormData({
-                    ...formData,
-                    department: selectedId,
-                    department_type: autoType,
-                  });
-                }}
-                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub text-sm theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-              >
-                <option value="">-- Select Department --</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} {d.code ? `(${d.code})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <CustomSelect
+              label="Academic Department"
+              value={formData.department}
+              onChange={(val) => {
+                const selectedObj = departments.find((d) => String(d.id) === String(val));
+                let autoType = formData.department_type;
+                if (selectedObj) {
+                  if (selectedObj.has_quran_tracker) autoType = "HIFZ";
+                  else if (selectedObj.code?.includes("GEN")) autoType = "GENERAL";
+                }
+                setFormData({
+                  ...formData,
+                  department: val,
+                  department_type: autoType,
+                });
+              }}
+              options={[
+                { value: "", label: "No Department (Independent)" },
+                ...departments.map((d) => ({
+                  value: d.id,
+                  label: `${d.name}${d.code ? ` (${d.code})` : ""}`,
+                })),
+              ]}
+              placeholder="Select Department..."
+              icon={DepartmentIcon}
+            />
           </div>
+        </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              Assigned Class Teacher / Head Ustadh
+        {/* Assigned Class Teacher */}
+        <div>
+          <CustomSelect
+            label="Assigned Class Teacher / Head Ustadh"
+            value={formData.class_teacher}
+            onChange={(val) => setFormData({ ...formData, class_teacher: val })}
+            options={[
+              { value: "", label: "Unassigned / No Teacher" },
+              ...teachers.map((t) => ({
+                value: t.id,
+                label: `${t.name || t.first_name || t.phone_number} (${t.user_type || "Staff"})`,
+              })),
+            ]}
+            placeholder="Select Class Teacher..."
+            searchable
+          />
+        </div>
+
+        {/* Order Rank & Status */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
+              Display Order Rank
             </label>
-            <select
-              value={formData.class_teacher}
-              onChange={(e) => setFormData({ ...formData, class_teacher: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub text-sm theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-            >
-              <option value="">-- No Class Teacher Assigned --</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name || t.first_name || t.phone_number} ({t.user_type || t.role_code || "Staff"})
-                </option>
-              ))}
-            </select>
+            <input
+              type="number"
+              min="1"
+              max="999"
+              value={formData.order_rank}
+              onChange={(e) => setFormData({ ...formData, order_rank: e.target.value })}
+              className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 items-center pt-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                Display Order Rank
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={formData.order_rank}
-                onChange={(e) => setFormData({ ...formData, order_rank: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub text-sm theme-text-primary focus:outline-none focus:border-[var(--accent-main)] font-mono"
-              />
-            </div>
-
-            <div className="flex items-center gap-3 pt-5">
-              <input
-                type="checkbox"
-                id="class_is_active"
-                checked={formData.is_active}
-                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 rounded text-[var(--accent-main)] border-zinc-700 bg-zinc-800 cursor-pointer"
-              />
-              <label htmlFor="class_is_active" className="text-xs font-bold theme-text-primary cursor-pointer">
-                Class is Active
-              </label>
-            </div>
+          <div className="p-3 rounded-2xl theme-bg-sub border theme-border mt-0 sm:mt-5">
+            <CustomCheckbox
+              id="class_is_active_check"
+              checked={formData.is_active}
+              onChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              label="Class is Active"
+              description="Active classes are accessible in course listings."
+            />
           </div>
-
-          {/* Modal Footer */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t theme-border mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-elevated transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-            >
-              {submitting ? "Saving Class..." : editingClass ? "Update Class" : "Create Class"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

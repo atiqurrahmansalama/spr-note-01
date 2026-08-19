@@ -91,7 +91,7 @@ const BD_DIVISIONS = [
 
 export function cleanDivisionName(rawDivision = '') {
   if (!rawDivision) return '';
-  let cleaned = rawDivision.replace(/Division|বিভাগ/gi, '').trim();
+  let cleaned = rawDivision.replace(/Division/gi, '').trim();
   const match = BD_DIVISIONS.find((d) => d.toLowerCase() === cleaned.toLowerCase());
   return match || cleaned;
 }
@@ -124,7 +124,7 @@ export function parseGooglePlaceComponents(place) {
       upazila = c.long_name;
     } else if (types.includes('administrative_area_level_2')) {
       // In Bangladesh, administrative_area_level_2 is the District (Zilla)
-      district = c.long_name.replace(/District|Zila|জেলা/gi, '').trim();
+      district = c.long_name.replace(/District|Zila/gi, '').trim();
     } else if (types.includes('administrative_area_level_1')) {
       // In Bangladesh, administrative_area_level_1 is the Division (Bibhag)
       division = cleanDivisionName(c.long_name);
@@ -191,7 +191,7 @@ export async function reverseGeocodeOSM(latitude, longitude) {
     const addr = data.address || {};
 
     const division = cleanDivisionName(addr.state || addr.province || addr.region || '');
-    const district = (addr.state_district || addr.county || addr.city || '').replace(/District|Zila|জেলা/gi, '').trim();
+    const district = (addr.state_district || addr.county || addr.city || '').replace(/District|Zila/gi, '').trim();
     const upazila = addr.suburb || addr.town || addr.municipality || addr.village || addr.neighbourhood || '';
     const postalCode = addr.postcode || '';
     const streetAddress = [addr.road, addr.house_number, upazila].filter(Boolean).join(', ') || data.display_name || '';

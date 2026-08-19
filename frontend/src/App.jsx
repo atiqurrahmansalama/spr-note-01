@@ -36,6 +36,8 @@ import ClassManagementView from "./modules/student-management/classes/ClassManag
 import GroupManagementView from "./modules/student-management/groups/GroupManagementView";
 import InstitutionListView from "./modules/app-management/institutions/InstitutionListView";
 import InstitutionProfileView from "./modules/settings/components/InstitutionProfileView";
+import AcademyProfileView from "./modules/settings/components/AcademyProfileView";
+import SPManagementView from "./modules/app-management/sp-management/SPManagementView";
 import StaffDirectoryView from "./modules/staff-management/StaffDirectoryView";
 import StaffProfileDetailView from "./modules/staff-management/StaffProfileDetailView";
 import StaffAttendanceView from "./modules/staff-management/StaffAttendanceView";
@@ -127,7 +129,9 @@ export default function App() {
           <Route path="/groups-students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView /></FeatureGuard>} />
           <Route path="/student-roster" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
           <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
-          <Route path="/admission" element={<FeatureGuard sectionKey="student_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView /></FeatureGuard>} />
+          <Route path="/short-admission" element={<FeatureGuard sectionKey="student_quick_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView defaultMode="QUICK" /></FeatureGuard>} />
+          <Route path="/admission/short" element={<FeatureGuard sectionKey="student_quick_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView defaultMode="QUICK" /></FeatureGuard>} />
+          <Route path="/admission" element={<FeatureGuard sectionKey="student_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView defaultMode="FULL" /></FeatureGuard>} />
           <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentProfileHubView /></FeatureGuard>} />
           <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments" fallback={<Navigate to="/dashboard" replace />}><SessionManager /></FeatureGuard>} />
           <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management" fallback={<Navigate to="/dashboard" replace />}><UserManagementModule /></FeatureGuard>} />
@@ -135,8 +139,9 @@ export default function App() {
           <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics" fallback={<Navigate to="/dashboard" replace />}><ActivityAnalyticsView /></FeatureGuard>} />
           <Route path="/trash-restoration" element={<FeatureGuard sectionKey="nav_trash" fallback={<Navigate to="/dashboard" replace />}><TrashRestorationView /></FeatureGuard>} />
           <Route path="/profile-settings" element={<FeatureGuard sectionKey="settings_profile" fallback={<Navigate to="/dashboard" replace />}><UserProfileSettingsView /></FeatureGuard>} />
-          <Route path="/settings/institution" element={<InstitutionProfileView />} />
-          <Route path="/institution-profile" element={<InstitutionProfileView />} />
+          <Route path="/academy-profile" element={<AcademyProfileView />} />
+          <Route path="/settings/institution" element={<AcademyProfileView />} />
+          <Route path="/institution-profile" element={<AcademyProfileView />} />
           <Route path="/security-sessions" element={<FeatureGuard sectionKey="settings_security" fallback={<Navigate to="/dashboard" replace />}><SecuritySessionsView /></FeatureGuard>} />
           <Route path="/appearance" element={<FeatureGuard sectionKey="settings_appearance" fallback={<Navigate to="/dashboard" replace />}><AppearanceSettings /></FeatureGuard>} />
           <Route path="/date-time" element={<FeatureGuard sectionKey="settings_datetime" fallback={<Navigate to="/dashboard" replace />}><CalendarSettings /></FeatureGuard>} />
@@ -149,6 +154,7 @@ export default function App() {
           <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionToggleControlPanel /></FeatureGuard>} />
           <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
           <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
+          <Route path="/sp-management" element={<SPManagementView />} />
           <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
           <Route path="/app-management/notifications" element={<NotificationManagementView />} />
           <Route path="/notifications" element={<NotificationManagementView />} />

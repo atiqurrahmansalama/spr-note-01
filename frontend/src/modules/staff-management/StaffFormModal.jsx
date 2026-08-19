@@ -675,7 +675,7 @@ export default function StaffFormModal({ isOpen, onClose, staffData, onSaved }) 
 
                 <div>
                   <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                    Base Salary Amount (৳ BDT)
+                    Base Salary Amount (BDT)
                   </label>
                   <input
                     type="number"

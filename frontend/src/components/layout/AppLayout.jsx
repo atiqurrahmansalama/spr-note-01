@@ -37,26 +37,30 @@ export const ROUTE_TITLE_MAP = {
   "/attendance/devices": { title: "Biometric Devices", category: "Settings & Devices" },
   "/calendar": { title: "Institutional Calendar", category: "Settings & Devices" },
 
-  "/student-management/departments": { title: "Department Management", category: "Academic Institution" },
-  "/student-management/classes": { title: "Class Management", category: "Academic Institution" },
-  "/student-management/groups": { title: "Group Management", category: "Academic Institution" },
-  "/groups-students": { title: "Student Roster", category: "Student Management" },
-  "/student-roster": { title: "Student Roster", category: "Student Management" },
-  "/group-roster": { title: "Group Management", category: "Academic Institution" },
-  "/admission": { title: "Student Admission", category: "Student Management" },
+  "/student-management/departments": { title: "Department", category: "Academy" },
+  "/student-management/classes": { title: "Class", category: "Academy" },
+  "/student-management/groups": { title: "Group", category: "Academy" },
+  "/groups-students": { title: "Student Roster", category: "Student" },
+  "/student-roster": { title: "Student Roster", category: "Student" },
+  "/group-roster": { title: "Group", category: "Academy" },
+  "/admission": { title: "Admission", category: "Student" },
+  "/short-admission": { title: "Short Admission", category: "Student" },
+  "/admission/short": { title: "Short Admission", category: "Student" },
 
   "/app-management/role-invites": { title: "Role QR & Invites", category: "App Management" },
   "/app-management/notifications": { title: "Notification Management", category: "App Management" },
-  "/app-management/institutions": { title: "Institution Directory", category: "Academic Institution" },
-  "/institutions": { title: "Institution Directory", category: "Academic Institution" },
+  "/app-management/institutions": { title: "Academies", category: "Academy" },
+  "/institutions": { title: "Academies", category: "Academy" },
+  "/academy-profile": { title: "Profile", category: "Academy" },
+  "/settings/institution": { title: "Profile", category: "Academy" },
+  "/institution-profile": { title: "Profile", category: "Academy" },
+  "/sp-management": { title: "SP Management", category: "Settings" },
   "/user-management": { title: "User Management", category: "App Management" },
   "/role-management": { title: "Role Management", category: "App Management" },
   "/activity-analytics": { title: "Activity Analytics", category: "App Management" },
   "/section-control": { title: "Section Control", category: "App Management" },
 
   "/profile-settings": { title: "Profile Settings", category: "Settings" },
-  "/settings/institution": { title: "Profile & Branding", category: "Academic Institution" },
-  "/institution-profile": { title: "Profile & Branding", category: "Academic Institution" },
   "/security-sessions": { title: "Security & Sessions", category: "Settings" },
   "/appearance": { title: "Appearance", category: "Settings" },
   "/date-time": { title: "Date & Time", category: "Settings" },
@@ -76,10 +80,25 @@ export default function AppLayout() {
   const { showToast } = useToast();
   const themeContext = useTheme();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    try {
+      const isMob = typeof window !== "undefined" && window.innerWidth < 768;
+      if (isMob) return false;
+      const saved = localStorage.getItem("spr_sidebar_is_open");
+      if (saved !== null) return saved === "true";
+      const mode = sidebarSettings.getMode();
+      return mode === "inline" || mode === "collapsed";
+    } catch {
+      return true;
+    }
+  });
+
   const [sidebarMode, setSidebarMode] = useState(() => {
-    const mode = sidebarSettings.getMode();
-    return mode === "inline" ? "overlay" : mode;
+    try {
+      return sidebarSettings.getMode() || "inline";
+    } catch {
+      return "inline";
+    }
   });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -389,16 +408,29 @@ export default function AppLayout() {
         setIsSidebarOpen(true);
         setSidebarMode("inline");
         sidebarSettings.saveMode("inline");
+        try { localStorage.setItem("spr_sidebar_is_open", "true"); } catch {}
       } else if (sidebarMode === "inline") {
         setSidebarMode("collapsed");
         sidebarSettings.saveMode("collapsed");
+        try { localStorage.setItem("spr_sidebar_is_open", "true"); } catch {}
       } else if (sidebarMode === "collapsed") {
+        setIsSidebarOpen(false);
         setSidebarMode("overlay");
         sidebarSettings.saveMode("overlay");
+        try { localStorage.setItem("spr_sidebar_is_open", "false"); } catch {}
       } else {
+        setIsSidebarOpen(true);
         setSidebarMode("inline");
         sidebarSettings.saveMode("inline");
+        try { localStorage.setItem("spr_sidebar_is_open", "true"); } catch {}
       }
+    }
+  };
+
+  const handleCloseSidebar = () => {
+    setIsSidebarOpen(false);
+    if (!isMobile) {
+      try { localStorage.setItem("spr_sidebar_is_open", "false"); } catch {}
     }
   };
 
@@ -513,7 +545,7 @@ export default function AppLayout() {
         {/* Left Sidebar Navigation */}
         <Sidebar 
           isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
+          onClose={handleCloseSidebar}
           activePath={currentPath}
           sidebarMode={sidebarMode}
           setSidebarMode={setSidebarMode}

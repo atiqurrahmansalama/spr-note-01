@@ -10,6 +10,7 @@ from drf_spectacular.views import (
 
 from .views import (
     InstitutionViewSet,
+    InstitutionCategoryViewSet,
     StudentViewSet, 
     AcademicDepartmentViewSet,
     StudentClassViewSet,
@@ -102,6 +103,8 @@ from .views import (
 
 router = DefaultRouter()
 router.register(r'institutions', InstitutionViewSet, basename='institution')
+router.register(r'institution-categories', InstitutionCategoryViewSet, basename='institution-category')
+router.register(r'academy-categories', InstitutionCategoryViewSet, basename='academy-category')
 router.register(r'departments', AcademicDepartmentViewSet, basename='department')
 router.register(r'classes', StudentClassViewSet, basename='class')
 router.register(r'students', StudentViewSet, basename='student')

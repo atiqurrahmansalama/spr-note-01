@@ -372,12 +372,29 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
         const errorData = await res.json().catch(() => ({}));
         console.error("Admission submission error:", errorData);
         let errorMsg = "Failed to enroll student. Please review inputs.";
-        if (typeof errorData === "object" && errorData !== null) {
-          const firstVal = Object.values(errorData)[0];
-          if (Array.isArray(firstVal) && firstVal.length > 0) {
-            errorMsg = firstVal[0];
-          } else if (typeof firstVal === "string") {
-            errorMsg = firstVal;
+        if (errorData && typeof errorData === "object") {
+          if (typeof errorData.detail === "string") {
+            errorMsg = errorData.detail;
+          } else if (typeof errorData.message === "string") {
+            errorMsg = errorData.message;
+          } else if (Array.isArray(errorData.non_field_errors) && errorData.non_field_errors.length > 0) {
+            errorMsg = errorData.non_field_errors[0];
+          } else {
+            for (const [k, v] of Object.entries(errorData)) {
+              if (typeof v === "string") {
+                errorMsg = `${k}: ${v}`;
+                break;
+              } else if (Array.isArray(v) && v.length > 0) {
+                errorMsg = typeof v[0] === "string" ? `${k}: ${v[0]}` : JSON.stringify(v[0]);
+                break;
+              } else if (typeof v === "object" && v !== null) {
+                const subVal = Object.values(v)[0];
+                if (Array.isArray(subVal) && subVal.length > 0) {
+                  errorMsg = `${k}: ${subVal[0]}`;
+                  break;
+                }
+              }
+            }
           }
         }
         showToast(errorMsg, "error");
@@ -496,13 +513,13 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
 
                   <div>
                     <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                      Bangla / Native Name
+                      Native / Regional Name (Optional)
                     </label>
                     <input
                       type="text"
                       value={sharedData.bangla_name || ""}
                       onChange={(e) => handleChange("bangla_name", e.target.value)}
-                      placeholder="e.g. Full Name in Bengali"
+                      placeholder="e.g. Full Name in Native Script"
                       className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
                     />
                   </div>
@@ -1183,7 +1200,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                       <span className="font-bold theme-text-primary">{sharedData.name || "--"}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Bangla Name</span>
+                      <span className="theme-text-secondary">Native Name</span>
                       <span className="font-bold theme-text-primary">{sharedData.bangla_name || "--"}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b theme-border">

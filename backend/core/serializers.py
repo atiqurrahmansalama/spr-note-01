@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db import transaction
 from .models import (
     AcademicInstitution,
+    InstitutionCategory,
     TeacherProfile,
     GuardianProfile,
     UserDevice,
@@ -70,6 +71,7 @@ from .models import (
 
 
 User = get_user_model()
+from .services import get_scoped_tenant_id
 
 
 # ─────────────────────────────────────────────────────────────
@@ -487,6 +489,10 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
     total_students_count = serializers.SerializerMethodField()
     total_classes_count = serializers.SerializerMethodField()
     total_staff_count = serializers.SerializerMethodField()
+    logo_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    slug = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = AcademicInstitution
@@ -500,6 +506,34 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_students_count', 'total_classes_count', 'total_staff_count']
+
+    def validate(self, attrs):
+        logo_url = attrs.get('logo_url')
+        if logo_url:
+            val_str = str(logo_url).strip()
+            if val_str.startswith('data:'):
+                attrs['logo_data'] = val_str
+                attrs['logo_url'] = None
+            elif not (val_str.startswith('http://') or val_str.startswith('https://')):
+                attrs['logo_data'] = val_str
+                attrs['logo_url'] = None
+
+        if 'postal_code' in attrs and not attrs.get('post_code'):
+            attrs['post_code'] = attrs['postal_code']
+        elif 'post_code' in attrs and not attrs.get('postal_code'):
+            attrs['postal_code'] = attrs['post_code']
+
+        if 'slug' in attrs and attrs.get('slug'):
+            slug_val = attrs['slug']
+            # Check unique against other institutions
+            inst_id = getattr(self.instance, 'id', None)
+            qs = AcademicInstitution.objects.filter(slug=slug_val)
+            if inst_id:
+                qs = qs.exclude(id=inst_id)
+            if qs.exists():
+                raise serializers.ValidationError({"slug": "This web slug identifier is already in use by another institution."})
+
+        return attrs
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_total_students_count(self, obj):
@@ -515,6 +549,18 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
     def get_total_staff_count(self, obj):
         from core.models import User
         return User.objects.filter(institution=obj, is_active=True).count()
+
+
+class InstitutionCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InstitutionCategory
+        fields = ['id', 'name', 'code', 'description', 'order', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_code(self, value):
+        if value:
+            return value.upper().strip()
+        return value
 
 
 class InstitutionOnboardingSerializer(serializers.Serializer):
@@ -833,6 +879,22 @@ class StudentAcademicHistorySerializer(serializers.ModelSerializer):
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
     transferred_by_name = serializers.CharField(source='transferred_by.name', read_only=True, default='')
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+
+    def get_start_date(self, obj):
+        if not obj.start_date:
+            return None
+        if hasattr(obj.start_date, 'strftime'):
+            return obj.start_date.strftime('%Y-%m-%d')
+        return str(obj.start_date)
+
+    def get_end_date(self, obj):
+        if not obj.end_date:
+            return None
+        if hasattr(obj.end_date, 'strftime'):
+            return obj.end_date.strftime('%Y-%m-%d')
+        return str(obj.end_date)
 
     class Meta:
         model = StudentAcademicHistory
@@ -1706,6 +1768,9 @@ class UserSecuritySerializer(serializers.ModelSerializer):
 
 # 🎯 Unified Address Serializer
 class AddressSerializer(serializers.ModelSerializer):
+    address_type = serializers.CharField(required=False, default='PRESENT', allow_blank=True)
+    postal_code = serializers.CharField(source='post_code', required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Address
         fields = [
@@ -1736,6 +1801,14 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     class_or_group_name = serializers.CharField(source='class_or_group.name', read_only=True)
+    admission_date = serializers.SerializerMethodField()
+
+    def get_admission_date(self, obj):
+        if not obj.admission_date:
+            return None
+        if hasattr(obj.admission_date, 'strftime'):
+            return obj.admission_date.strftime('%Y-%m-%d')
+        return str(obj.admission_date)
 
     class Meta:
         model = StudentAcademicDetail
@@ -1747,6 +1820,9 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
 
 # 🎯 Student Document Upload Serializer
 class StudentDocumentSerializer(serializers.ModelSerializer):
+    doc_type = serializers.CharField(required=False, default='OTHER')
+    title = serializers.CharField(required=False, allow_blank=True, default='')
+
     class Meta:
         model = StudentDocument
         fields = ['id', 'doc_type', 'file', 'title', 'uploaded_at']
@@ -1784,10 +1860,14 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         # Create Addresses if supplied
         present_address = None
         if present_address_data:
+            if not present_address_data.get('address_type'):
+                present_address_data['address_type'] = 'PRESENT'
             present_address = Address.objects.create(created_by=user, **present_address_data)
 
         permanent_address = None
         if permanent_address_data:
+            if not permanent_address_data.get('address_type'):
+                permanent_address_data['address_type'] = 'PERMANENT'
             permanent_address = Address.objects.create(created_by=user, **permanent_address_data)
 
         # Create Student
@@ -1835,6 +1915,23 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         guardian_kwargs['student'] = student
         guardian_kwargs['created_by'] = user
         StudentGuardian.objects.create(**guardian_kwargs)
+
+        # Auto-create legacy StudentDetail for backward compatibility
+        try:
+            StudentDetail.objects.get_or_create(
+                student=student,
+                defaults={
+                    'name_bn': validated_data.get('bangla_name', ''),
+                    'father_name': guardian_kwargs.get('father_name', ''),
+                    'mother_name': guardian_kwargs.get('mother_name', ''),
+                    'guardian_name': guardian_kwargs.get('primary_guardian_name', ''),
+                    'guardian_phone': guardian_kwargs.get('primary_guardian_phone', ''),
+                    'guardian_relation': guardian_kwargs.get('guardian_relation', ''),
+                    'created_by': user,
+                }
+            )
+        except Exception:
+            pass
 
         return student
 

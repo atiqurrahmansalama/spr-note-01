@@ -17,14 +17,65 @@ const HARD_DEFAULTS = {
   commentSection: true,
   actionButtons: true,
   pdfExport: true,
-  notification_management: true,
-  nav_app_management: true,
-  app_role_invites: true,
+
+  // Navigation / Sidebar Features
+  nav_dashboard: true,
+  nav_institution: true,
+  settings_institution: true,
   app_institutions: true,
+  student_departments: true,
+  student_classes: true,
+  student_groups: true,
+  sp_management: true,
+
+  nav_student_management: true,
+  student_roster: true,
+  monthly_attendance_matrix: true,
+  student_attendance: true,
+  student_gate_tracker: true,
+  student_adhoc_headcount: true,
+  student_quick_admission: true,
+  student_admission: true,
+  quran_hifz_tracker: true,
+
+  nav_staff_management: true,
+  staff_management: true,
+  teacher_period_matrix: true,
+  staff_daily_attendance: true,
+  staff_leaves: true,
+
+  nav_attendance_management: true,
+  attendance_policies_slots: true,
+  biometric_device_manager: true,
+  institutional_calendar: true,
+  institutional_tasks: true,
+
+  nav_report_generator: true,
+  report_builder: true,
+  report_sessions_comments: true,
+  report_history: true,
+  report_copy_settings: true,
+
+  nav_app_management: true,
+  app_section_control: true,
   app_user_management: true,
   app_role_management: true,
   app_activity_analytics: true,
-  app_section_control: true,
+  app_role_invites: true,
+  notification_management: true,
+
+  nav_settings: true,
+  settings_profile: true,
+  settings_security: true,
+  settings_datetime: true,
+  settings_appearance: true,
+  settings_language: true,
+  settings_backup: true,
+  nav_trash: true,
+
+  nav_shortcuts: true,
+  nav_app_guide: true,
+  nav_about: true,
 };
 
 // Read the last cached server-evaluated config for this user id.
@@ -181,15 +232,15 @@ export function FeatureControlProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
-  // ── isFeatureEnabled: safe default is FALSE (hide until server confirms ON) ─
+  // ── isFeatureEnabled: checks config, falls back to HARD_DEFAULTS or true ──
   const isFeatureEnabled = useCallback(
     (featureKey) => {
       if (!featureKey) return true;
-      // While loading the very first time (no cache), hide everything
-      if (loading && config[featureKey] === undefined) return false;
-      return config[featureKey] !== undefined ? !!config[featureKey] : true;
+      if (config && config[featureKey] !== undefined) return !!config[featureKey];
+      if (HARD_DEFAULTS[featureKey] !== undefined) return !!HARD_DEFAULTS[featureKey];
+      return true;
     },
-    [config, loading]
+    [config]
   );
 
   const getFeatureOrigin = useCallback(

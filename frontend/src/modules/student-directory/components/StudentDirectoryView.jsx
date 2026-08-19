@@ -14,10 +14,21 @@ import {
   WhatsAppIcon,
   CloseIcon,
   SectionControlIcon,
-  SparklesIcon
+  BookOpenIcon,
+  CheckCircleIcon,
+  BuildingOfficeIcon,
+  DepartmentIcon,
+  PhoneIcon,
+  TransferIcon,
 } from "../../../components/ui/Icons";
-import StudentAdmissionModal from "../admission/StudentAdmissionModal";
-import BulkIdCardPrintModal from "./BulkIdCardPrintModal";
+import DataTable from "../../../components/ui/DataTable";
+import DataCardGrid from "../../../components/ui/DataCardGrid";
+import ActionMenu from "../../../components/ui/ActionMenu";
+import CustomSelect from "../../../components/ui/CustomSelect";
+import CustomCheckbox from "../../../components/ui/CustomCheckbox";
+import MetricsGrid from "../../../components/ui/MetricsGrid";
+import Modal from "../../../components/ui/Modal";
+import StudentTransferModal from "../../student-profile/StudentTransferModal";
 
 export default function StudentDirectoryView({ viewMode = "all" }) {
   const { showToast } = useToast();
@@ -36,7 +47,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     total_students: 0,
     active_students: 0,
     new_admissions_this_month: 0,
-    avg_juz_completed: 0.0
+    avg_juz_completed: 0.0,
   });
 
   // UI state
@@ -44,22 +55,41 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   const [groupFilter, setGroupFilter] = useState(urlGroup);
   const [classFilter, setClassFilter] = useState(urlClass);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [displayMode, setDisplayMode] = useState("table"); // "table" vs "grid"
+  const [displayMode, setDisplayMode] = useState(() => {
+    try {
+      return localStorage.getItem("spr_students_display_mode") || "table";
+    } catch {
+      return "table";
+    }
+  });
   const [selectedIds, setSelectedIds] = useState([]);
-  
-  // Modal toggle
-  const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
-  const [admissionModalMode, setAdmissionModalMode] = useState("QUICK");
-  const [isBulkIdCardModalOpen, setIsBulkIdCardModalOpen] = useState(false);
-  const [bulkActionType, setBulkActionType] = useState("");
+
+  // Modals
+  const [bulkActionType, setBulkActionType] = useState("change_status");
   const [bulkGroupInput, setBulkGroupInput] = useState("");
   const [bulkStatusInput, setBulkStatusInput] = useState("Active");
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [isBulkTransferModalOpen, setIsBulkTransferModalOpen] = useState(false);
+
+  const handleToggleDisplayMode = (mode) => {
+    setDisplayMode(mode);
+    try {
+      localStorage.setItem("spr_students_display_mode", mode);
+    } catch {}
+  };
 
   useEffect(() => {
     loadStudents();
     loadClassesAndGroups();
     loadMetrics();
+
+    const handleTenantChanged = () => {
+      loadStudents();
+      loadClassesAndGroups();
+      loadMetrics();
+    };
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
   }, []);
 
   // Sync state when URL searchParams change
@@ -74,7 +104,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     try {
       const [cRes, gRes] = await Promise.all([
         fetchWithAuth("/api/v1/classes/"),
-        fetchWithAuth("/api/v1/groups/")
+        fetchWithAuth("/api/v1/groups/"),
       ]);
       if (cRes.ok) {
         const cData = await cRes.json();
@@ -95,7 +125,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         const data = await res.json();
         setStudents(data.results || data);
       }
-    } catch (err) {
+    } catch {
       showToast("Failed to load students.", "error");
     } finally {
       setLoading(false);
@@ -115,11 +145,11 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   const handleGroupFilterChange = (val) => {
     setGroupFilter(val);
     const newParams = new URLSearchParams(searchParams);
-    if (val === "ALL") {
+    if (val && val !== "ALL") {
+      newParams.set("student_group", val);
+    } else {
       newParams.delete("student_group");
       newParams.delete("group");
-    } else {
-      newParams.set("student_group", val);
     }
     setSearchParams(newParams);
   };
@@ -127,37 +157,27 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   const handleClassFilterChange = (val) => {
     setClassFilter(val);
     const newParams = new URLSearchParams(searchParams);
-    if (val === "ALL") {
+    if (val && val !== "ALL") {
+      newParams.set("student_class", val);
+    } else {
       newParams.delete("student_class");
       newParams.delete("class");
-    } else {
-      newParams.set("student_class", val);
     }
     setSearchParams(newParams);
   };
 
-  const handleClearAllFilters = () => {
-    setGroupFilter("ALL");
-    setClassFilter("ALL");
-    setStatusFilter("ALL");
-    setSearchQuery("");
-    setSearchParams({});
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(filteredStudents.map((s) => s.id));
-    } else {
+  const handleSelectAll = (checked) => {
+    if (!checked || selectedIds.length === filteredStudents.length) {
       setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredStudents.map((s) => s.id));
     }
   };
 
   const handleSelectRow = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((sid) => sid !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
   };
 
   const handleBulkActionSubmit = async () => {
@@ -170,7 +190,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     try {
       let payload = {
         action: bulkActionType,
-        student_ids: selectedIds
+        student_ids: selectedIds,
       };
 
       if (bulkActionType === "assign_group") {
@@ -186,7 +206,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
       const res = await fetchWithAuth("/api/v1/students/bulk-action/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -196,7 +216,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         loadStudents();
         loadMetrics();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(err.error || "Bulk action failed.", "error");
       }
     } catch {
@@ -204,19 +224,24 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     }
   };
 
-  const handleDeleteSingle = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this student record? This action cannot be undone.")) return;
+  const handleDeleteSingle = async (id, studentName) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete student record "${studentName || ""}"? This action cannot be undone.`
+      )
+    )
+      return;
 
     try {
       const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       if (res.ok) {
         showToast("Student record deleted.", "success");
         loadStudents();
         loadMetrics();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(err.error || "Failed to delete record.", "error");
       }
     } catch {
@@ -226,21 +251,17 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
 
   // Find active group or class object
   const activeGroupObj = groups.find(
-    (g) => String(g.id) === String(groupFilter) || g.name?.toLowerCase() === String(groupFilter).toLowerCase()
+    (g) =>
+      String(g.id) === String(groupFilter) ||
+      g.name?.toLowerCase() === String(groupFilter).toLowerCase()
   );
   const activeClassObj = classes.find(
-    (c) => String(c.id) === String(classFilter) || c.name?.toLowerCase() === String(classFilter).toLowerCase()
+    (c) =>
+      String(c.id) === String(classFilter) ||
+      c.name?.toLowerCase() === String(classFilter).toLowerCase()
   );
 
-  // Extract unique groups fallback from loaded students
-  const uniqueGroupNames = Array.from(
-    new Set([
-      ...groups.map((g) => g.name),
-      ...students.map((s) => s.group_name || s.group).filter(Boolean)
-    ])
-  ).sort();
-
-  // Filter students dynamically based on search, class, group and status selectors
+  // Filter students dynamically
   const filteredStudents = students.filter((s) => {
     const name = (s.name_en || s.name || "").toLowerCase();
     const bName = (s.bangla_name || "").toLowerCase();
@@ -248,9 +269,13 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     const gPhone = (s.details?.guardian_phone || "").toLowerCase();
     const query = searchQuery.toLowerCase();
 
-    const matchesSearch = !query || name.includes(query) || bName.includes(query) || roll.includes(query) || gPhone.includes(query);
-    
-    // Group filter matching ID or Name
+    const matchesSearch =
+      !query ||
+      name.includes(query) ||
+      bName.includes(query) ||
+      roll.includes(query) ||
+      gPhone.includes(query);
+
     let matchesGroup = true;
     if (groupFilter !== "ALL") {
       const targetGroupStr = String(groupFilter).toLowerCase();
@@ -262,7 +287,6 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         (activeGroupObj && sGroupName === activeGroupObj.name.toLowerCase());
     }
 
-    // Class filter matching ID or Name
     let matchesClass = true;
     if (classFilter !== "ALL") {
       const targetClassStr = String(classFilter).toLowerCase();
@@ -273,558 +297,554 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         sClassName === targetClassStr ||
         (activeClassObj && sClassName === activeClassObj.name.toLowerCase());
     }
-    
+
     const studentStatus = s.status || "Active";
-    const matchesStatus = 
-      statusFilter === "ALL" || 
+    const matchesStatus =
+      statusFilter === "ALL" ||
       (statusFilter === "ACTIVE" && studentStatus.toUpperCase() === "ACTIVE") ||
       (statusFilter === "INACTIVE" && studentStatus.toUpperCase() === "INACTIVE") ||
-      (statusFilter === "ALUMNI" && (studentStatus.toUpperCase() === "ALUMNI" || studentStatus.toUpperCase() === "TC"));
+      (statusFilter === "ALUMNI" &&
+        (studentStatus.toUpperCase() === "ALUMNI" || studentStatus.toUpperCase() === "TC"));
 
     return matchesSearch && matchesGroup && matchesClass && matchesStatus;
   });
 
-  return (
-    <div className="w-full max-w-6xl mx-auto py-8 px-4 font-sans theme-text-primary animate-fade-in select-none">
-      
-      {/* --- METRICS HEADER CARDS --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="theme-bg-surface border theme-border p-4 rounded-2xl shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">Total Students</span>
-          <p className="text-xl font-extrabold mt-1">{metrics.total_students}</p>
+  const getActionMenuItems = (s) => [
+    {
+      label: "View Profile",
+      icon: SearchIcon,
+      onClick: () => navigate(`/students/${s.id}/profile`),
+    },
+    ...(s.details?.guardian_phone
+      ? [
+          {
+            label: "Contact",
+            icon: WhatsAppIcon,
+            onClick: () =>
+              window.open(
+                `https://wa.me/${s.details.guardian_phone.replace(/[^\d]/g, "")}`,
+                "_blank"
+              ),
+          },
+        ]
+      : []),
+    { divider: true },
+    {
+      label: "Delete Record",
+      icon: TrashIcon,
+      danger: true,
+      onClick: () => handleDeleteSingle(s.id, s.name_en || s.name),
+    },
+  ];
+
+  // Reusable Centered Table Columns Specification
+  const tableColumns = [
+    {
+      key: "select",
+      header: (
+        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+          <CustomCheckbox
+            size="sm"
+            checked={
+              filteredStudents.length > 0 && selectedIds.length === filteredStudents.length
+            }
+            onChange={handleSelectAll}
+          />
         </div>
-        <div className="theme-bg-surface border theme-border p-4 rounded-2xl shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">Active Students</span>
-          <p className="text-xl font-extrabold mt-1 text-emerald-400">{metrics.active_students}</p>
+      ),
+      headerClassName: "w-12 text-center",
+      align: "center",
+      render: (s) => (
+        <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
+          <CustomCheckbox
+            size="sm"
+            checked={selectedIds.includes(s.id)}
+            onChange={() => handleSelectRow(s.id)}
+          />
         </div>
-        <div className="theme-bg-surface border theme-border p-4 rounded-2xl shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">New Admissions</span>
-          <p className="text-xl font-extrabold mt-1 text-sky-400">{metrics.new_admissions_this_month}</p>
-        </div>
-        {isSectionEnabled("quran_hifz_tracker") && (
-          <div className="theme-bg-surface border theme-border p-4 rounded-2xl shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">Avg Juz Completed</span>
-            <p className="text-xl font-extrabold mt-1 text-purple-400">{metrics.avg_juz_completed} Juz</p>
+      ),
+    },
+    {
+      key: "name",
+      header: "NAME",
+      headerClassName: "text-left",
+      align: "left",
+      render: (s) => (
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
+            {s.name_en ? s.name_en.charAt(0).toUpperCase() : "S"}
           </div>
-        )}
+          <div className="min-w-0">
+            <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
+              {s.name_en || s.name}
+            </span>
+            {s.details?.name_bn && (
+              <span className="text-[11px] theme-text-secondary block mt-0.5 truncate">
+                {s.details.name_bn}
+              </span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "class",
+      header: "CLASS",
+      headerClassName: "text-center",
+      align: "center",
+      render: (s) => (
+        <div className="text-center truncate text-xs">
+          <span className="theme-accent font-bold">
+            {s.student_class_name || "General"}
+          </span>
+          {(s.student_group_name || s.group_name) && (
+            <span className="theme-text-secondary">
+              {" • "}
+              {s.student_group_name || s.group_name}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "guardian",
+      header: "GUARDIAN",
+      headerClassName: "text-center",
+      align: "center",
+      render: (s) => (
+        <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2">
+          {s.details?.guardian_phone ? (
+            <>
+              <span className="font-mono text-xs font-semibold theme-text-primary">
+                {s.details.guardian_phone}
+              </span>
+              <a
+                href={`https://wa.me/${s.details.guardian_phone.replace(/[^\d]/g, "")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-400 hover:scale-110 transition-transform inline-flex items-center"
+                title="Contact on WhatsApp"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" />
+              </a>
+            </>
+          ) : (
+            <span className="text-zinc-500 text-xs italic">Unspecified</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "STATUS",
+      headerClassName: "text-center",
+      align: "center",
+      render: (s) => {
+        const status = (s.status || "Active").toUpperCase();
+        const isActive = status === "ACTIVE";
+        const isAlumni = status === "ALUMNI" || status === "TC";
+
+        return (
+          <div className="flex justify-center">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                isActive
+                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                  : isAlumni
+                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+              }`}
+            >
+              {s.status || "Active"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "ACTIONS",
+      align: "center",
+      headerClassName: "w-20 text-center",
+      render: (s) => (
+        <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
+          <ActionMenu items={getActionMenuItems(s)} />
+        </div>
+      ),
+    },
+  ];
+
+  // Reusable Card Renderer for Grid View
+  const renderStudentCard = (s) => (
+    <div
+      key={s.id}
+      onClick={() => navigate(`/students/${s.id}/profile`)}
+      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 cursor-pointer group"
+    >
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft text-sm font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
+              {s.name_en ? s.name_en.charAt(0).toUpperCase() : "S"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold theme-text-primary text-sm truncate">
+                {s.name_en || s.name}
+              </h3>
+              {s.details?.name_bn && (
+                <p className="text-[11px] theme-text-secondary truncate">
+                  {s.details.name_bn}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div onClick={(e) => e.stopPropagation()}>
+            <ActionMenu items={getActionMenuItems(s)} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="theme-accent font-bold">
+            {s.student_class_name || "General"}
+          </span>
+          {(s.student_group_name || s.group_name) && (
+            <span className="theme-text-secondary">
+              {" • "}
+              {s.student_group_name || s.group_name}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* --- TOOLBAR HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Student Information Hub</h1>
-          <p className="text-xs theme-text-secondary mt-1">Manage admissions, lifecycle stages, and bulk properties.</p>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="pt-3 border-t theme-border flex items-center justify-between text-xs"
+      >
+        {s.details?.guardian_phone ? (
+          <div className="flex items-center gap-1.5 font-mono text-[11px] theme-text-primary">
+            <span>{s.details.guardian_phone}</span>
+            <a
+              href={`https://wa.me/${s.details.guardian_phone.replace(/[^\d]/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-400 hover:scale-110 transition-transform"
+              title="Contact on WhatsApp"
+            >
+              <WhatsAppIcon className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        ) : (
+          <span className="text-[11px] text-zinc-500 italic">No phone</span>
+        )}
+
+        <span className="text-[10px] font-bold theme-accent">View Profile &rarr;</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="w-full max-w-7xl mx-auto py-5 sm:py-6 px-3.5 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-5 sm:space-y-6 text-left">
+      
+      {/* 1. Responsive Header with Icon */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
+            <StudentIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
+              Student Roster
+            </h1>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              Directory of enrolled students, academic classes, guardian contacts, and status
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2.5">
-          {selectedIds.length > 0 && (
+
+        {/* Compact Bulk Action Trigger with Theme Color & Selected Count */}
+        {selectedIds.length > 0 && (
+          <div className="flex items-center gap-2 animate-fade-in flex-wrap">
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold theme-bg-accent-soft theme-accent border theme-border">
+              {selectedIds.length} Selected
+            </span>
             <button
+              type="button"
+              onClick={() => setIsBulkTransferModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer transition-all flex items-center gap-1.5 shadow-md"
+            >
+              <TransferIcon className="w-3.5 h-3.5" />
+              <span>Bulk Transfer</span>
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setBulkActionType("change_status");
                 setShowBulkModal(true);
               }}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 cursor-pointer transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-primary cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
             >
               <SectionControlIcon className="w-3.5 h-3.5" />
-              <span>Bulk Actions ({selectedIds.length})</span>
+              <span>Bulk Status</span>
             </button>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setAdmissionModalMode("QUICK");
-                setIsAdmissionModalOpen(true);
-              }}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
-            >
-              <SparklesIcon className="w-3.5 h-3.5" />
-              <span>Quick Admission</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAdmissionModalMode("FULL");
-                setIsAdmissionModalOpen(true);
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>Full Admission</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* --- FLOATING / INLINE BULK SELECTION ACTION DOCK --- */}
-      {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-sky-500/20 to-purple-500/20 border border-emerald-500/30 shadow-xl animate-fade-in">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-emerald-500/30 text-emerald-300 font-black text-xs flex items-center justify-center border border-emerald-500/40">
-              {selectedIds.length}
-            </span>
-            <span className="text-xs font-bold theme-text-primary">
-              Students Selected
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setIsBulkIdCardModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition cursor-pointer flex items-center gap-1.5"
-            >
-              <span>🪪</span>
-              <span>Print Smart ID Cards ({selectedIds.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowBulkModal(true)}
-              className="px-3.5 py-2 rounded-xl theme-bg-elevated border theme-border hover:theme-bg-sub text-xs font-bold theme-text-primary transition cursor-pointer flex items-center gap-1.5"
-            >
-              <span>⚙️</span>
-              <span>Bulk Status / Group</span>
-            </button>
-
             <button
               type="button"
               onClick={() => setSelectedIds([])}
-              className="px-3 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-semibold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+              className="px-2.5 py-2 rounded-xl text-xs font-semibold theme-text-secondary hover:theme-text-primary border theme-border hover:theme-bg-sub transition cursor-pointer"
             >
               Clear
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* --- ACTIVE FILTER PILL BANNER --- */}
-      {(groupFilter !== "ALL" || classFilter !== "ALL" || statusFilter !== "ALL" || searchQuery) && (
-        <div className="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs animate-fade-in">
-          <span className="font-bold text-sky-400">Active Filters:</span>
-          {groupFilter !== "ALL" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30 shadow-sm">
-              <GroupIcon className="w-3.5 h-3.5 text-sky-300" />
-              <span>Group: {activeGroupObj?.name || groupFilter}</span>
-              <button
-                onClick={() => handleGroupFilterChange("ALL")}
-                className="hover:text-white ml-1 cursor-pointer"
-                title="Remove Group Filter"
-              >
-                <CloseIcon className="w-3.5 h-3.5" />
-              </button>
-            </span>
-          )}
-          {classFilter !== "ALL" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 shadow-sm">
-              <ClassIcon className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Class: {activeClassObj?.name || classFilter}</span>
-              <button
-                onClick={() => handleClassFilterChange("ALL")}
-                className="hover:text-white ml-1 cursor-pointer"
-                title="Remove Class Filter"
-              >
-                <CloseIcon className="w-3.5 h-3.5" />
-              </button>
-            </span>
-          )}
-          {statusFilter !== "ALL" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 shadow-sm">
-              <span>Status: {statusFilter}</span>
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className="hover:text-white ml-1 cursor-pointer"
-                title="Remove Status Filter"
-              >
-                <CloseIcon className="w-3.5 h-3.5" />
-              </button>
-            </span>
-          )}
-          <button
-            onClick={handleClearAllFilters}
-            className="text-zinc-400 hover:text-white underline ml-auto text-[11px] font-semibold cursor-pointer"
-          >
-            Reset All Filters
-          </button>
-        </div>
-      )}
+      {/* 2. Reusable Metric Cards (Positioned BELOW Header) */}
+      <MetricsGrid
+        items={[
+          {
+            label: "Total Students",
+            value: metrics.total_students || students.length,
+            icon: StudentIcon,
+            color: "sky",
+          },
+          {
+            label: "Active Students",
+            value: metrics.active_students,
+            icon: CheckCircleIcon,
+            color: "emerald",
+          },
+          {
+            label: "New Admissions",
+            value: metrics.new_admissions_this_month,
+            icon: PlusIcon,
+            color: "purple",
+          },
+          ...(isSectionEnabled("quran_hifz_tracker")
+            ? [
+                {
+                  label: "Avg Juz Completed",
+                  value: `${metrics.avg_juz_completed} Juz`,
+                  icon: BookOpenIcon,
+                  color: "accent",
+                },
+              ]
+            : []),
+        ]}
+      />
 
-      {/* --- ADVANCED FILTER TOOLBAR --- */}
-      <div className="theme-bg-surface border theme-border p-4 rounded-2xl flex flex-col md:flex-row gap-4 justify-between items-center mb-6 shadow-sm">
-        <div className="flex flex-wrap w-full md:w-auto gap-3 items-center">
-          {/* Search bar */}
-          <div className="relative w-full sm:w-56">
-            <input
-              type="text"
-              placeholder="Search student, roll..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-4 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none focus:border-sky-500"
+      {/* 3. Search & Reusable Dropdown Toolbar (Fully Responsive) */}
+      <div className="theme-bg-surface border theme-border p-3.5 rounded-2xl flex flex-col lg:flex-row gap-3 justify-between items-center shadow-xs">
+        <div className="relative w-full lg:w-72">
+          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search student, roll, guardian..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-9 pr-3.5 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current transition-all"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start sm:justify-end">
+          {/* Class Filter Dropdown */}
+          <div className="w-full sm:w-44 shrink-0">
+            <CustomSelect
+              size="sm"
+              value={classFilter}
+              onChange={handleClassFilterChange}
+              options={[
+                { value: "ALL", label: "All Classes" },
+                ...classes.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder="All Classes"
+              icon={ClassIcon}
             />
-            <span className="absolute left-2.5 top-2.5 text-zinc-400">
-              <SearchIcon className="w-3.5 h-3.5" />
-            </span>
           </div>
 
-          {/* Class Filter */}
-          <select
-            value={classFilter}
-            onChange={(e) => handleClassFilterChange(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Classes</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          {/* Group Filter Dropdown */}
+          <div className="w-full sm:w-48 shrink-0">
+            <CustomSelect
+              size="sm"
+              value={groupFilter}
+              onChange={handleGroupFilterChange}
+              options={[
+                { value: "ALL", label: "All Groups / Halqas" },
+                ...groups.map((g) => ({
+                  value: g.id,
+                  label: `${g.name}${g.student_class_name ? ` (${g.student_class_name})` : ""}`,
+                })),
+              ]}
+              placeholder="All Groups"
+              icon={GroupIcon}
+            />
+          </div>
 
-          {/* Group Filter */}
-          <select
-            value={groupFilter}
-            onChange={(e) => handleGroupFilterChange(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer font-semibold"
-          >
-            <option value="ALL">All Groups / Halqas</option>
-            {groups.length > 0
-              ? groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} {g.student_class_name ? `(${g.student_class_name})` : ""}
-                  </option>
-                ))
-              : uniqueGroupNames.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-          </select>
+          {/* Status Filter Dropdown */}
+          <div className="w-full sm:w-36 shrink-0">
+            <CustomSelect
+              size="sm"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={[
+                { value: "ALL", label: "All Status" },
+                { value: "ACTIVE", label: "Active Only" },
+                { value: "INACTIVE", label: "Inactive Only" },
+                { value: "ALUMNI", label: "Alumni / TC" },
+              ]}
+              placeholder="All Status"
+            />
+          </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Status</option>
-            <option value="ACTIVE">Active Only</option>
-            <option value="INACTIVE">Inactive Only</option>
-            <option value="ALUMNI">Alumni / TC</option>
-          </select>
-        </div>
-
-        {/* View Mode switcher */}
-        <div className="flex border theme-border rounded-xl overflow-hidden p-0.5 w-full sm:w-auto justify-center">
-          <button
-            onClick={() => setDisplayMode("table")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              displayMode === "table" ? "theme-bg-elevated text-sky-400 shadow-sm" : "theme-text-secondary hover:text-white"
-            }`}
-          >
-            Table View
-          </button>
-          <button
-            onClick={() => setDisplayMode("grid")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              displayMode === "grid" ? "theme-bg-elevated text-sky-400 shadow-sm" : "theme-text-secondary hover:text-white"
-            }`}
-          >
-            Grid Cards
-          </button>
+          {/* View Mode Toggle Buttons */}
+          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0 ml-auto sm:ml-0">
+            <button
+              type="button"
+              onClick={() => handleToggleDisplayMode("table")}
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                displayMode === "table"
+                  ? "theme-bg-accent theme-accent-text shadow-xs"
+                  : "theme-text-secondary hover:theme-text-primary"
+              }`}
+            >
+              <DepartmentIcon className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleDisplayMode("grid")}
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                displayMode === "grid"
+                  ? "theme-bg-accent theme-accent-text shadow-xs"
+                  : "theme-text-secondary hover:theme-text-primary"
+              }`}
+            >
+              <BuildingOfficeIcon className="w-3.5 h-3.5" />
+              <span>Cards</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* --- ROSTER DIRECTORY --- */}
-      {loading ? (
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-12 text-center animate-pulse">
-          <div className="h-6 w-32 bg-zinc-800 rounded mx-auto mb-4" />
-          <div className="h-4 w-48 bg-zinc-800 rounded mx-auto" />
-        </div>
-      ) : filteredStudents.length === 0 ? (
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-12 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center mx-auto mb-4 text-zinc-400">
-            <StudentIcon className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold">No students match the criteria</h3>
-          <p className="text-xs theme-text-secondary mt-1">Try adjusting your filters or search query.</p>
-        </div>
-      ) : displayMode === "table" ? (
-        /* --- HIGH DENSITY TABLE VIEW --- */
-        <div className="overflow-hidden border theme-border rounded-2xl theme-bg-surface shadow-lg">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b theme-border text-xs font-semibold theme-text-secondary uppercase tracking-wider bg-black/10">
-                <th className="px-6 py-4 w-12 text-center">
-                  <input
-                    type="checkbox"
-                    checked={filteredStudents.length > 0 && selectedIds.length === filteredStudents.length}
-                    onChange={handleSelectAll}
-                  />
-                </th>
-                <th className="px-6 py-4">Name (En/Bn)</th>
-                <th className="px-6 py-4">ID / Roll</th>
-                <th className="px-6 py-4">Group</th>
-                <th className="px-6 py-4">Guardian (WhatsApp)</th>
-                {isSectionEnabled("quran_hifz_tracker") && <th className="px-6 py-4">Hifz Progress</th>}
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y theme-border text-xs font-medium">
-              {filteredStudents.map((s) => (
-                <tr key={s.id} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => navigate(`/students/${s.id}/profile`)}>
-                  <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(s.id)}
-                      onChange={() => handleSelectRow(s.id)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg theme-bg-elevated font-bold text-sky-400 flex items-center justify-center border theme-border">
-                      {s.name_en ? s.name_en.charAt(0).toUpperCase() : "S"}
-                    </div>
-                    <div>
-                      <div className="font-bold theme-text-primary text-sm">{s.name_en || s.name}</div>
-                      {s.details?.name_bn && <div className="text-[10px] theme-text-secondary mt-0.5">{s.details.name_bn}</div>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-mono">{s.uniq_id || `STU-${s.id}`}</td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-0.5">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 inline-block">
-                        {s.student_group_name || s.group_name || s.group || "General Group"}
-                      </span>
-                      {s.student_class_name && (
-                        <span className="text-[10px] theme-text-secondary flex items-center gap-1 font-semibold">
-                          <ClassIcon className="w-3 h-3 text-sky-400" />
-                          <span>{s.student_class_name}</span>
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    {s.details?.guardian_phone ? (
-                      <div className="flex items-center gap-1.5">
-                        <span>{s.details.guardian_phone}</span>
-                        <a
-                          href={`https://wa.me/${s.details.guardian_phone.replace(/[^\d]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="hover:scale-110 transition-transform text-emerald-400 inline-flex items-center"
-                          title="WhatsApp direct chat"
-                        >
-                          <WhatsAppIcon className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    ) : (
-                      <span className="text-zinc-500">--</span>
-                    )}
-                  </td>
-                  {isSectionEnabled("quran_hifz_tracker") && (
-                    <td className="px-6 py-4 font-bold text-emerald-400">
-                      {s.details?.initial_completed_juz || 0} Juz
-                    </td>
-                  )}
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      s.status?.toUpperCase() === 'ACTIVE' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-                    }`}>
-                      {s.status || 'Active'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => navigate(`/students/${s.id}/profile`)}
-                        className="px-2 py-1 rounded border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <SearchIcon className="w-3 h-3" />
-                        <span>Profile</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSingle(s.id)}
-                        className="px-2 py-1 rounded border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <TrashIcon className="w-3 h-3" />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* 4. Display: Reusable Centered DataTable or DataCardGrid */}
+      {displayMode === "table" ? (
+        <DataTable
+          columns={tableColumns}
+          data={filteredStudents}
+          isLoading={loading}
+          loadingMessage="Loading student roster directory..."
+          emptyIcon={StudentIcon}
+          emptyTitle="No Students Found"
+          emptySubMessage={
+            searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+              ? "No student records match your active filter criteria."
+              : "No students registered in this academy roster."
+          }
+          onRowClick={(s) => navigate(`/students/${s.id}/profile`)}
+        />
       ) : (
-        /* --- GRID CARDS VIEW MODE --- */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {filteredStudents.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => navigate(`/students/${s.id}/profile`)}
-              className="theme-bg-surface border theme-border rounded-3xl p-5 shadow-md hover:shadow-lg transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between"
-            >
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl theme-bg-elevated font-bold text-lg text-sky-400 flex items-center justify-center border theme-border shrink-0">
-                  {s.name_en ? s.name_en.charAt(0).toUpperCase() : "S"}
-                </div>
-                <div className="space-y-1 overflow-hidden">
-                  <h3 className="font-bold text-sm truncate">{s.name_en || s.name}</h3>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono theme-text-secondary">{s.uniq_id || `STU-${s.id}`}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                      Roll #{s.roll_number || s.roll || "--"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                    <span className="text-[10px] text-zinc-300 font-semibold px-2 py-0.5 rounded bg-zinc-800 border theme-border inline-flex items-center gap-1">
-                      <GroupIcon className="w-3 h-3 text-sky-400" />
-                      <span>{s.student_group_name || s.group_name || s.group || "General Group"}</span>
-                    </span>
-                    {s.student_class_name && (
-                      <span className="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 inline-flex items-center gap-1">
-                        <ClassIcon className="w-3 h-3" />
-                        <span>{s.student_class_name}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {isSectionEnabled("quran_hifz_tracker") && (
-                <div className="space-y-1 mb-4 pt-3 border-t theme-border">
-                  <div className="flex justify-between items-center text-[10px] font-bold theme-text-secondary">
-                    <span>Hifz Progress</span>
-                    <span className="text-emerald-400">Juz {s.details?.initial_completed_juz || 0} / 30</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500"
-                      style={{ width: `${((s.details?.initial_completed_juz || 0) / 30) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-3 border-t theme-border">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                  s.status?.toUpperCase() === 'ACTIVE' 
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-                }`}>
-                  {s.status || 'Active'}
-                </span>
-                <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => navigate(`/students/${s.id}/profile`)}
-                    className="p-1.5 rounded-lg border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <SearchIcon className="w-3 h-3" />
-                    <span>Profile</span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSingle(s.id)}
-                    className="p-1.5 rounded-lg border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <TrashIcon className="w-3 h-3" />
-                    <span>Delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* --- ADMISSION WIZARD MODAL --- */}
-      {isAdmissionModalOpen && (
-        <StudentAdmissionModal
-          isOpen={isAdmissionModalOpen}
-          initialMode={admissionModalMode}
-          onClose={() => {
-            setIsAdmissionModalOpen(false);
-            loadStudents();
-            loadMetrics();
-          }}
+        <DataCardGrid
+          data={filteredStudents}
+          renderCard={renderStudentCard}
+          isLoading={loading}
+          loadingMessage="Loading student roster directory..."
+          emptyIcon={StudentIcon}
+          emptyTitle="No Students Found"
+          emptySubMessage={
+            searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+              ? "No student records match your active filter criteria."
+              : "No students registered in this academy roster."
+          }
+          gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
         />
       )}
 
-      {/* --- BULK ACTIONS MODAL --- */}
-      {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-2xl shadow-2xl overflow-hidden animate-zoom-in">
-            <div className="px-6 py-4 border-b theme-border flex justify-between items-center bg-black/20">
-              <h3 className="font-bold text-base">Bulk Operations ({selectedIds.length} Selected)</h3>
-              <button onClick={() => setShowBulkModal(false)} className="text-zinc-400 hover:text-white cursor-pointer font-bold">✕</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Select Action</label>
-                <select
-                  value={bulkActionType}
-                  onChange={(e) => setBulkActionType(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-elevated focus:outline-none focus:border-sky-500 text-xs"
-                >
-                  <option value="change_status">Change Status</option>
-                  <option value="assign_group">Assign Group/Halqa</option>
-                  <option value="bulk_delete">Bulk Delete Students</option>
-                </select>
-              </div>
-
-              {bulkActionType === "assign_group" && (
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Group / Halqa Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Nazera Group"
-                    value={bulkGroupInput}
-                    onChange={(e) => setBulkGroupInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-elevated focus:outline-none focus:border-sky-500 text-xs"
-                  />
-                </div>
-              )}
-
-              {bulkActionType === "change_status" && (
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Target Status</label>
-                  <select
-                    value={bulkStatusInput}
-                    onChange={(e) => setBulkStatusInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-elevated focus:outline-none focus:border-sky-500 text-xs"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Alumni">Alumni</option>
-                    <option value="Tc">Transfer Certificate (TC)</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="pt-4 border-t theme-border flex justify-end gap-3">
-                <button
-                  onClick={() => setShowBulkModal(false)}
-                  className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-elevated text-xs font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBulkActionSubmit}
-                  className="px-4 py-2 rounded-xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-90 shadow-md cursor-pointer"
-                >
-                  Execute Bulk Action
-                </button>
-              </div>
-            </div>
+      {/* --- BULK OPERATIONS MODAL --- */}
+      <Modal
+        isOpen={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        title={`Bulk Operations (${selectedIds.length} Selected)`}
+        subtitle="Apply batch updates to selected student profiles"
+        icon={SectionControlIcon}
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(false)}
+              className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-elevated text-xs font-bold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkActionSubmit}
+              className="px-5 py-2 rounded-xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-90 shadow-md cursor-pointer"
+            >
+              Execute Bulk Action
+            </button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <div className="p-5 sm:p-6 space-y-4 text-left">
+          <div>
+            <CustomSelect
+              label="Select Action"
+              value={bulkActionType}
+              onChange={(val) => setBulkActionType(val)}
+              options={[
+                { value: "change_status", label: "Change Status" },
+                { value: "assign_group", label: "Assign Group / Halqa" },
+                { value: "bulk_delete", label: "Bulk Delete Students" },
+              ]}
+              placeholder="Select Action..."
+            />
+          </div>
 
-      {/* --- BULK ID CARDS PRINT MANAGER MODAL --- */}
-      {isBulkIdCardModalOpen && (
-        <BulkIdCardPrintModal
-          isOpen={isBulkIdCardModalOpen}
-          onClose={() => setIsBulkIdCardModalOpen(false)}
-          selectedStudentIds={selectedIds}
-          allStudents={students}
+          {bulkActionType === "assign_group" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
+                Group / Halqa Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Nazera Group"
+                value={bulkGroupInput}
+                onChange={(e) => setBulkGroupInput(e.target.value)}
+                className="w-full h-10 px-3.5 py-2 rounded-xl border theme-border theme-bg-sub text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
+              />
+            </div>
+          )}
+
+          {bulkActionType === "change_status" && (
+            <div>
+              <CustomSelect
+                label="Target Status"
+                value={bulkStatusInput}
+                onChange={(val) => setBulkStatusInput(val)}
+                options={[
+                  { value: "Active", label: "Active" },
+                  { value: "Inactive", label: "Inactive" },
+                  { value: "Alumni", label: "Alumni" },
+                  { value: "Tc", label: "Transfer Certificate (TC)" },
+                ]}
+                placeholder="Select Status..."
+              />
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* --- BULK STUDENT TRANSFER MODAL --- */}
+      {isBulkTransferModalOpen && (
+        <StudentTransferModal
+          isOpen={isBulkTransferModalOpen}
+          studentIds={selectedIds}
+          onClose={() => setIsBulkTransferModalOpen(false)}
+          onSuccess={() => {
+            setSelectedIds([]);
+            loadStudents();
+            loadMetrics();
+          }}
         />
       )}
     </div>

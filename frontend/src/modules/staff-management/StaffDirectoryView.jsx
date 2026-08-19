@@ -370,8 +370,8 @@ export default function StaffDirectoryView() {
             <div className="flex items-center p-1 theme-bg-sub border theme-border rounded-xl">
               <button
                 onClick={() => handleToggleViewMode('grid')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  viewMode === 'grid' ? 'theme-bg-elevated theme-text-primary shadow' : 'theme-text-secondary hover:theme-text-primary'
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'grid' ? 'theme-bg-accent theme-accent-text shadow-xs' : 'theme-text-secondary hover:theme-text-primary'
                 }`}
                 title="Grid Cards"
               >
@@ -379,8 +379,8 @@ export default function StaffDirectoryView() {
               </button>
               <button
                 onClick={() => handleToggleViewMode('table')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  viewMode === 'table' ? 'theme-bg-elevated theme-text-primary shadow' : 'theme-text-secondary hover:theme-text-primary'
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'table' ? 'theme-bg-accent theme-accent-text shadow-xs' : 'theme-text-secondary hover:theme-text-primary'
                 }`}
                 title="Table List"
               >

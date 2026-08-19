@@ -8,20 +8,25 @@ import {
   GroupsIcon,
   PlusIcon,
   SearchIcon,
-  BookOpenIcon,
   EditIcon,
   TrashIcon,
-  CheckCircleIcon
+  BuildingOfficeIcon,
 } from "../../../components/ui/Icons";
+import DataTable from "../../../components/ui/DataTable";
+import DataCardGrid from "../../../components/ui/DataCardGrid";
+import ActionMenu from "../../../components/ui/ActionMenu";
+import MetricsGrid from "../../../components/ui/MetricsGrid";
 import { useRightSidebar } from "../../../context/RightSidebarContext";
 import DepartmentForm from "./DepartmentForm";
-import DepartmentMigrationForm from "./DepartmentMigrationForm";
-import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
 export default function DepartmentManagementView() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem("spr_dept_view_mode") || "table";
+  });
 
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,10 +38,14 @@ export default function DepartmentManagementView() {
     total_enrolled_students: 0,
   });
 
-  // UI state
   const [searchQuery, setSearchQuery] = useState("");
-  const [trackerFilter, setTrackerFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const handleToggleViewMode = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("spr_dept_view_mode", mode);
+    } catch {}
+  };
 
   useEffect(() => {
     loadDepartments();
@@ -147,79 +156,225 @@ export default function DepartmentManagementView() {
     const head = (d.department_head_name || "").toLowerCase();
     const query = searchQuery.toLowerCase();
 
-    const matchesSearch = !query || name.includes(query) || code.includes(query) || head.includes(query);
-
-    let matchesTracker = true;
-    if (trackerFilter === "QURAN") matchesTracker = d.has_quran_tracker === true;
-    if (trackerFilter === "GENERAL") matchesTracker = d.has_quran_tracker === false;
-
-    let matchesStatus = true;
-    if (statusFilter === "ACTIVE") matchesStatus = d.is_active === true;
-    if (statusFilter === "INACTIVE") matchesStatus = d.is_active === false;
-
-    return matchesSearch && matchesTracker && matchesStatus;
+    return !query || name.includes(query) || code.includes(query) || head.includes(query);
   });
 
-  return (
-    <div className="w-full max-w-6xl mx-auto py-8 px-4 font-sans theme-text-primary animate-fade-in select-none">
-      {/* --- METRICS HEADER CARDS --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="theme-bg-surface border theme-border p-5 rounded-3xl shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
-              Academic Departments
+  const getActionMenuItems = (d) => [
+    {
+      label: "Manage Classes",
+      icon: ClassIcon,
+      onClick: () => navigate(`/student-management/classes?department=${d.id}`),
+    },
+    {
+      label: "Edit Department",
+      icon: EditIcon,
+      onClick: () => handleOpenEdit(d),
+    },
+    {
+      divider: true,
+    },
+    {
+      label: "Decommission",
+      icon: TrashIcon,
+      danger: true,
+      onClick: () => handleDeleteDirect(d),
+    },
+  ];
+
+  // Define Reusable DataTable Columns
+  const columns = [
+    {
+      key: "name",
+      header: "Department & Code",
+      headerClassName: "min-w-[220px]",
+      render: (d) => (
+        <div>
+          <span className="font-bold theme-text-primary block text-xs sm:text-sm">{d.name}</span>
+          <span className="text-[10px] font-mono theme-text-secondary mt-0.5 block">
+            {d.code ? `Code: ${d.code} • ` : ""}Order: {d.order_rank ?? 1}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "department_head_name",
+      header: "Head / Dean",
+      headerClassName: "min-w-[240px] sm:w-1/3",
+      render: (d) => (
+        <div>
+          <span className="theme-text-primary font-semibold block text-xs">
+            {d.department_head_name || "Unassigned"}
+          </span>
+          {d.department_head_phone && (
+            <span className="text-[10px] font-mono theme-text-secondary block mt-0.5">
+              {d.department_head_phone}
             </span>
-            <p className="text-2xl font-extrabold mt-1 text-sky-400">{metrics.total_departments}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "classes_count",
+      header: "Classes",
+      align: "center",
+      headerClassName: "w-24 text-center",
+      render: (d) => (
+        <span className="font-bold text-sky-400">{d.classes_count ?? 0}</span>
+      ),
+    },
+    {
+      key: "students_count",
+      header: "Students",
+      align: "center",
+      headerClassName: "w-24 text-center",
+      render: (d) => (
+        <span className="font-bold text-emerald-400">{d.students_count ?? 0}</span>
+      ),
+    },
+    {
+      key: "is_active",
+      header: "Status",
+      align: "center",
+      headerClassName: "w-28 text-center",
+      render: (d) => (
+        <span
+          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+            d.is_active
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+          }`}
+        >
+          {d.is_active ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      headerClassName: "w-16 text-right",
+      render: (d) => (
+        <div className="flex items-center justify-end">
+          <ActionMenu items={getActionMenuItems(d)} />
+        </div>
+      ),
+    },
+  ];
+
+  // Reusable Card Renderer for DataCardGrid
+  const renderDepartmentCard = (d) => (
+    <div
+      key={d.id}
+      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between group hover:theme-bg-sub/30 transition-all"
+    >
+      <div className="space-y-4">
+        {/* Header with Title, Code, Status */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold theme-text-primary text-sm leading-tight break-words">
+              {d.name}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              {d.code && (
+                <span className="px-2 py-0.5 rounded-md theme-bg-sub border theme-border font-mono text-[10px] theme-accent font-bold">
+                  {d.code}
+                </span>
+              )}
+              <span className="text-[10px] font-mono theme-text-secondary">
+                Order: {d.order_rank ?? 1}
+              </span>
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
-            <DepartmentIcon className="w-6 h-6" />
-          </div>
+
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${
+              d.is_active
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-emerald-400" : "bg-zinc-400"}`}></span>
+            {d.is_active ? "Active" : "Inactive"}
+          </span>
         </div>
 
-        <div className="theme-bg-surface border theme-border p-5 rounded-3xl shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
-              Assigned Classes
-            </span>
-            <p className="text-2xl font-extrabold mt-1 text-emerald-400">{metrics.total_classes}</p>
+        {/* Head / Dean details */}
+        <div className="text-xs space-y-1 theme-text-secondary pt-2.5 border-t theme-border">
+          <div className="flex items-center justify-between text-[11px]">
+            <span>Head / Dean:</span>
+            <span className="theme-text-primary font-medium">{d.department_head_name || "Unassigned"}</span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-            <ClassIcon className="w-6 h-6" />
-          </div>
+          {d.department_head_phone && (
+            <div className="flex items-center justify-between text-[11px]">
+              <span>Phone Contact:</span>
+              <span className="theme-text-primary font-mono">{d.department_head_phone}</span>
+            </div>
+          )}
         </div>
 
-        <div className="theme-bg-surface border theme-border p-5 rounded-3xl shadow-sm flex items-center justify-between">
+        {/* Stats Strip */}
+        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">
-              Enrolled Students
-            </span>
-            <p className="text-2xl font-extrabold mt-1 text-purple-400">{metrics.total_enrolled_students}</p>
+            <span className="block text-sm font-bold text-sky-400">{d.classes_count ?? 0}</span>
+            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Classes</span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
-            <GroupsIcon className="w-6 h-6" />
+          <div className="border-l theme-border">
+            <span className="block text-sm font-bold text-emerald-400">{d.students_count ?? 0}</span>
+            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
           </div>
         </div>
       </div>
 
-      {/* --- TOOLBAR HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Academic Department Hub</h1>
-          <p className="text-xs theme-text-secondary mt-1">
-            Configure institutional divisions, curriculum tracker presets, and head deans.
-          </p>
+      {/* Card Footer Actions */}
+      <div className="pt-3.5 mt-2 border-t theme-border flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(`/student-management/classes?department=${d.id}`)}
+          className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border"
+        >
+          <ClassIcon className="w-3.5 h-3.5 text-sky-400" />
+          <span>Classes</span>
+        </button>
+
+        <ActionMenu items={getActionMenuItems(d)} />
+      </div>
+    </div>
+  );
+
+  const totalDeptsCount = metrics?.total_departments ?? departments.length;
+  const totalClassesCount = metrics?.total_classes ?? departments.reduce((acc, d) => acc + (d.classes_count || 0), 0);
+  const totalStudentsCount = metrics?.total_enrolled_students ?? departments.reduce((acc, d) => acc + (d.students_count || 0), 0);
+
+  return (
+    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left">
+      {/* 1. Standard Module Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b theme-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
+            <DepartmentIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
+              Department
+            </h1>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              Configure institutional academic divisions and head deans
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
             onClick={() => navigate("/student-management/classes")}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-elevated cursor-pointer transition-all flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub cursor-pointer transition-all flex items-center gap-2"
           >
             <ClassIcon className="w-4 h-4 text-sky-400" />
             <span>Manage Classes &rarr;</span>
           </button>
           <button
+            type="button"
             onClick={handleOpenCreate}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
           >
             <PlusIcon className="w-3.5 h-3.5" />
             <span>Add Department</span>
@@ -227,202 +382,150 @@ export default function DepartmentManagementView() {
         </div>
       </div>
 
-      {/* --- ADVANCED FILTER BAR --- */}
-      <div className="theme-bg-surface border theme-border p-4 rounded-2xl flex flex-col md:flex-row gap-4 justify-between items-center mb-6 shadow-sm">
-        <div className="flex flex-wrap w-full md:w-auto gap-3 items-center">
-          <div className="relative w-full sm:w-64">
-            <input
-              type="text"
-              placeholder="Search department, code, dean..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none focus:border-sky-500"
-            />
-            <span className="absolute left-3 top-2.5 text-zinc-400">
-              <SearchIcon className="w-3.5 h-3.5" />
-            </span>
-          </div>
+      {/* 2. Metrics Header Cards */}
+      <MetricsGrid
+        items={[
+          {
+            label: "Academic Departments",
+            value: totalDeptsCount,
+            icon: DepartmentIcon,
+            color: "sky",
+          },
+          {
+            label: "Assigned Classes",
+            value: totalClassesCount,
+            icon: ClassIcon,
+            color: "emerald",
+          },
+          {
+            label: "Enrolled Students",
+            value: totalStudentsCount,
+            icon: GroupsIcon,
+            color: "purple",
+          },
+        ]}
+      />
 
-          <select
-            value={trackerFilter}
-            onChange={(e) => setTrackerFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Curricula</option>
-            <option value="QURAN">Quran Tracker Enabled</option>
-            <option value="GENERAL">Standard General</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border theme-border theme-bg-elevated text-xs focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active Only</option>
-            <option value="INACTIVE">Inactive Only</option>
-          </select>
+      {/* 3. Search & View Mode Switcher Toolbar */}
+      <div className="theme-bg-surface border theme-border p-3.5 rounded-2xl flex flex-col sm:flex-row gap-3 justify-between items-center shadow-xs">
+        <div className="relative w-full sm:w-80">
+          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search department, code, dean..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-9 pr-4 py-2 rounded-xl border theme-border theme-bg-sub text-xs theme-text-primary focus:outline-none focus:border-current"
+          />
         </div>
 
-        <div className="text-xs font-semibold theme-text-secondary">
-          Showing <span className="theme-text-primary font-bold">{filteredDepartments.length}</span> of{" "}
-          <span className="theme-text-primary font-bold">{departments.length}</span> departments
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="text-xs font-semibold theme-text-secondary">
+            Showing <span className="theme-text-primary font-bold">{filteredDepartments.length}</span> of{" "}
+            <span className="theme-text-primary font-bold">{departments.length}</span> departments
+          </div>
+
+          {/* View Mode Toggle Buttons */}
+          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
+            <button
+              type="button"
+              onClick={() => handleToggleViewMode("grid")}
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "grid"
+                  ? "theme-bg-accent theme-accent-text shadow-xs"
+                  : "theme-text-secondary hover:theme-text-primary"
+              }`}
+            >
+              <BuildingOfficeIcon className="w-3.5 h-3.5" />
+              <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleViewMode("table")}
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "table"
+                  ? "theme-bg-accent theme-accent-text shadow-xs"
+                  : "theme-text-secondary hover:theme-text-primary"
+              }`}
+            >
+              <DepartmentIcon className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* --- TABLE VIEW --- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 space-y-3">
-          <div className="w-8 h-8 border-3 border-sky-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-bold theme-text-secondary">Loading academic entities...</span>
-        </div>
-      ) : filteredDepartments.length === 0 ? (
-        <div className="theme-bg-surface border theme-border p-12 rounded-3xl text-center space-y-3 shadow-sm">
-          <DepartmentIcon className="w-12 h-12 text-zinc-500 mx-auto" />
-          <h3 className="text-sm font-bold theme-text-primary">No Departments Found</h3>
-          <p className="text-xs theme-text-secondary max-w-sm mx-auto">
-            {searchQuery || trackerFilter !== "ALL" || statusFilter !== "ALL"
-              ? "No departments match the applied filters. Try resetting the search or category."
-              : "Get started by adding your first academic division (e.g., Hifz, Nazera, General School)."}
-          </p>
-        </div>
+      {/* --- DISPLAY: DATA CARD GRID OR DATA TABLE --- */}
+      {viewMode === "grid" ? (
+        <DataCardGrid
+          data={filteredDepartments}
+          renderCard={renderDepartmentCard}
+          isLoading={loading}
+          loadingMessage="Loading academic departments..."
+          emptyIcon={DepartmentIcon}
+          emptyTitle="No Departments Found"
+          emptySubMessage={
+            searchQuery
+              ? "No departments matched your search query. Try clearing the search box."
+              : "Get started by adding your first academic division."
+          }
+        />
       ) : (
-        <div className="theme-bg-surface border theme-border rounded-3xl overflow-hidden shadow-sm">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b theme-border bg-black/10 text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
-                <th className="px-6 py-4">Department &amp; Code</th>
-                <th className="px-6 py-4">Curriculum Preset</th>
-                <th className="px-6 py-4">Head / Dean</th>
-                <th className="px-6 py-4 text-center">Classes</th>
-                <th className="px-6 py-4 text-center">Students</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y theme-border text-xs">
-              {filteredDepartments.map((d) => (
-                <tr key={d.id} className="hover:bg-white/5 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-xs">
-                        {d.code || d.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <span className="font-bold theme-text-primary block">{d.name}</span>
-                        <span className="text-[10px] font-mono text-zinc-400">Order: {d.order_rank ?? 1}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {d.has_quran_tracker ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <BookOpenIcon className="w-3 h-3" />
-                        <span>30 Juz Tracker</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                        Standard
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="theme-text-primary font-medium block">{d.department_head_name || "Unassigned"}</span>
-                    {d.department_head_phone && (
-                      <span className="text-[10px] theme-text-secondary block">{d.department_head_phone}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-sky-400">{d.classes_count ?? 0}</span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-emerald-400">{d.students_count ?? 0}</span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        d.is_active
-                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
-                      }`}
-                    >
-                      {d.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => navigate(`/student-management/classes?department=${d.id}`)}
-                        className="px-2.5 py-1 rounded-lg border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <ClassIcon className="w-3 h-3 text-sky-400" />
-                        <span>Classes</span>
-                      </button>
-                      <button
-                        onClick={() => handleOpenEdit(d)}
-                        className="px-2.5 py-1 rounded-lg border theme-border hover:theme-bg-elevated transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <EditIcon className="w-3 h-3" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDirect(d)}
-                        className="px-2.5 py-1 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <TrashIcon className="w-3 h-3" />
-                        <span>Decommission</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredDepartments}
+          isLoading={loading}
+          loadingMessage="Loading academic departments..."
+          emptyIcon={DepartmentIcon}
+          emptyTitle="No Departments Found"
+          emptySubMessage={
+            searchQuery
+              ? "No departments matched your search query. Try clearing the search box."
+              : "Get started by adding your first academic division."
+          }
+        />
       )}
 
-      {/* Reusable Delete Impact Modal */}
-      <DeleteImpactModal
-        isOpen={Boolean(deletingDept)}
-        onClose={() => setDeletingDept(null)}
-        onConfirm={handleConfirmDeleteDept}
-        title="Delete Academic Department"
-        subtitle={`You are about to delete department "${deletingDept?.name}".`}
-        entityName={deletingDept?.name || ''}
-        entityType="Department"
-        requireAck={true}
-        requireNameMatch={false}
-        isDeleting={isDeleting}
-        confirmButtonText="Confirm Delete"
-        impactItems={[
-          { label: 'Assigned Classes', count: deletingDept?.classes_count ?? 0 },
-          { label: 'Enrolled Students', count: deletingDept?.student_count ?? 0 },
-        ]}
-        onMigrate={
-          deletingDept?.classes_count > 0
-            ? () => {
-                const dept = deletingDept;
-                setDeletingDept(null);
-                openRightSidebar({
-                  title: `Decommission: ${dept.name}`,
-                  content: (
-                    <DepartmentMigrationForm
-                      department={dept}
-                      onMigrated={() => {
-                        loadDepartments();
-                        loadMetrics();
-                        closeRightSidebar();
-                      }}
-                      onCancel={closeRightSidebar}
-                    />
-                  ),
-                });
-              }
-            : undefined
-        }
-        migrateButtonText="Safely Migrate Classes & Students Instead"
-        warningMessage="Deleting this department will remove its institutional configuration and decouple assigned classes and courses."
-      />
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {deletingDept && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-3xl p-6 shadow-2xl space-y-4 animate-scale-in text-left">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                <TrashIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold theme-text-primary">Delete Department</h3>
+                <p className="text-xs theme-text-secondary">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <p className="text-xs theme-text-secondary">
+              Are you sure you want to permanently delete department{" "}
+              <strong className="theme-text-primary">"{deletingDept.name}"</strong>?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t theme-border">
+              <button
+                type="button"
+                onClick={() => setDeletingDept(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteDept}
+                disabled={isDeleting}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete Department"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

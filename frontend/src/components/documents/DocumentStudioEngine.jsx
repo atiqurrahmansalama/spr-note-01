@@ -160,7 +160,7 @@ export default function DocumentStudioEngine({
       id: 101,
       uniq_id: 'STU-2026-0042',
       name: 'Ahmad Abdullah',
-      bangla_name: 'মুহাম্মাদ আব্দুল্লাহ',
+      bangla_name: 'Muhammad Abdullah',
       blood_group: 'B+',
       guardian_name: 'Maulana Abu Bakr',
       guardian_phone: '01812-345678',

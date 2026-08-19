@@ -43,7 +43,16 @@ export const updateCurrentInstitution = async (data) => {
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || errData.detail || 'Failed to update institution branding');
+    let msg = errData.error || errData.detail;
+    if (!msg && typeof errData === 'object') {
+      const errList = Object.entries(errData)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .filter(Boolean);
+      if (errList.length > 0) {
+        msg = errList.join(' | ');
+      }
+    }
+    throw new Error(msg || 'Failed to update institution profile');
   }
   return await response.json();
 };
@@ -135,4 +144,68 @@ export const deleteInstitution = async (id, payload = {}) => {
   }
   return true;
 };
+
+// ========================================================
+// Dynamic Academy / Institution Categories API (SP Management)
+// ========================================================
+
+export const getInstitutionCategories = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.all) query.append('all', 'true');
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await fetchWithAuth(`/api/v1/institution-categories/${qs}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load academy categories (Status: ${response.status})`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results || [];
+};
+
+export const createInstitutionCategory = async (data) => {
+  const response = await fetchWithAuth('/api/v1/institution-categories/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    let msg = errData.error || errData.detail;
+    if (!msg && typeof errData === 'object') {
+      msg = Object.entries(errData)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join(' | ');
+    }
+    throw new Error(msg || 'Failed to create category');
+  }
+  return await response.json();
+};
+
+export const updateInstitutionCategory = async (id, data) => {
+  const response = await fetchWithAuth(`/api/v1/institution-categories/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    let msg = errData.error || errData.detail;
+    if (!msg && typeof errData === 'object') {
+      msg = Object.entries(errData)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join(' | ');
+    }
+    throw new Error(msg || 'Failed to update category');
+  }
+  return await response.json();
+};
+
+export const deleteInstitutionCategory = async (id) => {
+  const response = await fetchWithAuth(`/api/v1/institution-categories/${id}/`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || errData.detail || 'Failed to delete category');
+  }
+  return true;
+};
+
 

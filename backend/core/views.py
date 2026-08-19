@@ -1,8 +1,9 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import ValidationError, PermissionDenied, NotFound
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
@@ -31,6 +32,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiRespon
 from drf_spectacular.types import OpenApiTypes
 from .models import (
     AcademicInstitution,
+    InstitutionCategory,
     Student,
     AcademicDepartment,
     StudentClass,
@@ -130,6 +132,7 @@ from .serializers import (
     RegisterSerializer,
     ChangePasswordSerializer,
     AcademicInstitutionSerializer,
+    InstitutionCategorySerializer,
     InstitutionOnboardingSerializer,
     StudentSerializer,
     AcademicDepartmentSerializer,
@@ -956,12 +959,37 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload-document')
     def upload_document(self, request, pk=None):
         from .serializers import StudentDocumentSerializer
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         student = self.get_object()
         serializer = StudentDocumentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save(student=student, created_by=request.user)
+            creator = request.user if request.user and request.user.is_authenticated else User.objects.filter(is_superuser=True).first()
+            if not creator:
+                creator = User.objects.first()
+            serializer.save(student=student, created_by=creator)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'documents/(?P<doc_id>[^/.]+)')
+    def manage_document(self, request, pk=None, doc_id=None):
+        student = self.get_object()
+        from .models import StudentDocument
+        try:
+            doc = StudentDocument.objects.get(id=doc_id, student=student)
+        except StudentDocument.DoesNotExist:
+            return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method.lower() == 'delete':
+            doc.delete()
+            return Response({"status": "success", "message": "Document deleted successfully"}, status=status.HTTP_200_OK)
+
+        elif request.method.lower() == 'patch':
+            new_title = request.data.get('title')
+            if new_title:
+                doc.title = new_title.strip()
+                doc.save(update_fields=['title'])
+            return Response({"status": "success", "title": doc.title, "id": doc.id}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
@@ -1006,13 +1034,43 @@ class StudentViewSet(viewsets.ModelViewSet):
         from django.db import transaction
         try:
             with transaction.atomic():
-                if action_type == 'assign_group':
+                if action_type == 'transfer':
+                    target_class_id = request.data.get('target_class_id')
+                    target_group_id = request.data.get('target_group_id')
+                    transition_date = request.data.get('transition_date')
+                    transition_reason = request.data.get('transition_reason', 'Bulk Academic Transfer')
+                    from .services import transfer_student_academic
+                    for s_id in student_ids:
+                        try:
+                            transfer_student_academic(
+                                student_id=s_id,
+                                target_class_id=target_class_id,
+                                target_group_id=target_group_id,
+                                transition_date=transition_date,
+                                transition_reason=transition_reason,
+                                performed_by=request.user
+                            )
+                        except Exception as ex:
+                            logger.warning(f"Error transferring student {s_id}: {ex}")
+                elif action_type == 'assign_class':
+                    target_class_id = request.data.get('target_class_id') or request.data.get('class_id')
+                    if not target_class_id:
+                        return Response({"error": "Class ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    from core.models import StudentClass
+                    target_cls = StudentClass.objects.get(id=target_class_id, is_deleted=False)
+                    queryset.update(student_class=target_cls)
+                elif action_type == 'assign_group':
+                    group_id = request.data.get('target_group_id') or request.data.get('group_id')
                     group_name = request.data.get('group_name')
-                    if not group_name:
-                        return Response({"error": "Group name is required"}, status=status.HTTP_400_BAD_REQUEST)
                     from core.models import StudentGroup
-                    grp, _ = StudentGroup.objects.get_or_create(name=group_name.strip())
-                    queryset.update(group_name=group_name.strip(), student_group=grp)
+                    if group_id:
+                        grp = StudentGroup.objects.get(id=group_id, is_deleted=False)
+                        queryset.update(group_name=grp.name, student_group=grp)
+                    elif group_name:
+                        grp, _ = StudentGroup.objects.get_or_create(name=group_name.strip())
+                        queryset.update(group_name=group_name.strip(), student_group=grp)
+                    else:
+                        return Response({"error": "Group is required"}, status=status.HTTP_400_BAD_REQUEST)
                 elif action_type == 'change_status':
                     status_val = request.data.get('status')
                     if not status_val:
@@ -1236,6 +1294,24 @@ class InstitutionViewSet(viewsets.ModelViewSet):
         instance.is_active = False
         instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
         return Response({"status": "success", "message": f"Institution '{instance.name}' has been safely decommissioned."}, status=status.HTTP_200_OK)
+
+
+class InstitutionCategoryViewSet(viewsets.ModelViewSet):
+    queryset = InstitutionCategory.objects.all().order_by('order', 'name')
+    serializer_class = InstitutionCategorySerializer
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsOwnerOrSuperAdmin()]
+
+    def get_queryset(self):
+        show_all = self.request.query_params.get('all') == 'true'
+        user = self.request.user
+        is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
+        if show_all and is_super:
+            return InstitutionCategory.objects.all().order_by('order', 'name')
+        return InstitutionCategory.objects.filter(is_active=True).order_by('order', 'name')
 
 
 class AcademicDepartmentViewSet(viewsets.ModelViewSet):
@@ -5391,20 +5467,20 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
             "uniq_id": "STU-2026-0042",
             "student_id_card_number": "STU-2026-0042",
             "roll_number": "104",
-            "name": "মুহাম্মাদ আব্দুল্লাহ (Ahmad Abdullah)",
+            "name": "Ahmad Abdullah",
             "name_en": "Ahmad Abdullah",
-            "bangla_name": "মুহাম্মাদ আব্দুল্লাহ",
-            "father_name": "মাওলানা আবু বকর (Abu Bakr)",
-            "mother_name": "আমেনা বেগম (Amena Begum)",
-            "guardian_name": "মাওলানা আবু বকর (Guardian)",
+            "bangla_name": "Ahmad Abdullah",
+            "father_name": "Abu Bakr",
+            "mother_name": "Amena Begum",
+            "guardian_name": "Abu Bakr",
             "guardian_phone": "01812-345678",
             "phone_number": "01812-345678",
             "blood_group": "B+",
             "date_of_birth": "2012-05-14",
             "admission_date": "2026-01-10",
-            "department_name": "হিফজুল কুরআন বিভাগ (Hifz Division)",
-            "student_class_name": "স্ট্যান্ডার্ড হিফজ (Standard Hifz)",
-            "student_group_name": "হালকা ১ (Halqa A)",
+            "department_name": "Hifz Division",
+            "student_class_name": "Standard Hifz",
+            "student_group_name": "Halqa A",
             "division": "Dhaka",
             "district": "Dhaka",
             "upazila_thana": "Mirpur",
@@ -5414,8 +5490,8 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
         }
 
         sample_inst = {
-            "name": inst.name if inst else "Jamia Islamia Darul Quran",
-            "bangla_name": inst.bangla_name if inst else "جامعة دار القرآن الإسلامية",
+            "name": inst.name if inst else "Darul Quran Academy",
+            "bangla_name": inst.bangla_name if (inst and inst.bangla_name) else "Darul Quran Academy",
             "logo_url": (inst.logo_url or inst.logo_data) if inst else None,
             "phone": inst.phone if inst else "01700-000000",
             "email": inst.email if inst else "info@darulquran.edu.bd",

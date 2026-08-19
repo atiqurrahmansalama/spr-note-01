@@ -67,6 +67,25 @@ class RoleActionPermission(models.Model):
         return f"Permissions for {self.role.code}"
 
 
+class InstitutionCategory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    description = models.TextField(blank=True, default='')
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = "Institution Category"
+        verbose_name_plural = "Institution Categories"
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
 class AcademicInstitution(models.Model):
     INSTITUTION_TYPE_CHOICES = (
         ('MADRASA', 'Madrasa / Maktab'),
@@ -901,7 +920,7 @@ class StudentAcademicHistory(models.Model):
         blank=True,
         related_name='historical_movements'
     )
-    start_date = models.DateField(default=timezone.now)
+    start_date = models.DateField(default=timezone.localdate)
     end_date = models.DateField(null=True, blank=True)
     is_current = models.BooleanField(default=True)
     transition_reason = models.CharField(max_length=255, blank=True)
@@ -1365,7 +1384,7 @@ class StudentAcademicDetail(models.Model):
     session_year = models.CharField(max_length=32, blank=True, null=True)
     class_or_group = models.ForeignKey(StudentGroup, on_delete=models.SET_NULL, null=True, blank=True)
     roll_number = models.CharField(max_length=32, blank=True, null=True)
-    admission_date = models.DateField(default=timezone.now)
+    admission_date = models.DateField(default=timezone.localdate)
     previous_school_name = models.CharField(max_length=255, blank=True, null=True)
     previous_school_address = models.CharField(max_length=255, blank=True, null=True)
     tc_number = models.CharField(max_length=64, blank=True, null=True)
@@ -1517,7 +1536,7 @@ class StaffProfile(models.Model):
         choices=EMPLOYMENT_STATUS_CHOICES,
         default='PERMANENT'
     )
-    joining_date = models.DateField(default=timezone.now)
+    joining_date = models.DateField(default=timezone.localdate)
     nid_no = models.CharField(max_length=64, blank=True, default='')
     emergency_contact = models.CharField(max_length=32, blank=True, default='')
     blood_group = models.CharField(max_length=10, blank=True, default='')
@@ -1684,7 +1703,7 @@ class GeneralStaffDuty(models.Model):
     )
     duty_title = models.CharField(max_length=150)
     duty_description = models.TextField(blank=True, default='')
-    effective_from = models.DateField(default=timezone.now)
+    effective_from = models.DateField(default=timezone.localdate)
     effective_to = models.DateField(null=True, blank=True)
     priority = models.CharField(
         max_length=20,

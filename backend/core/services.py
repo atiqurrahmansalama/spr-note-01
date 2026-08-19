@@ -24,6 +24,52 @@ logger = logging.getLogger('core')
 User = get_user_model()
 
 
+def get_scoped_tenant_id(request):
+    """
+    Extracts and resolves the active scoped tenant (institution) ID for the request.
+    Supports Super Admin header/param scoping as well as standard user institution affinity.
+    """
+    import uuid
+    from django.db.models import Q
+    from .models import AcademicInstitution
+
+    if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return None
+    is_super = request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
+    if is_super:
+        header_tenant = None
+        if hasattr(request, 'headers'):
+            header_tenant = request.headers.get('X-Tenant-ID')
+        if not header_tenant and hasattr(request, 'META'):
+            header_tenant = request.META.get('HTTP_X_TENANT_ID')
+        param_tenant = None
+        if hasattr(request, 'query_params'):
+            param_tenant = request.query_params.get('institution_id') or request.query_params.get('institution')
+        elif hasattr(request, 'GET'):
+            param_tenant = request.GET.get('institution_id') or request.GET.get('institution')
+        target_tenant = header_tenant or param_tenant
+        if target_tenant and str(target_tenant).strip().upper() not in ['ALL', 'NULL', 'UNDEFINED', 'NONE', '', 'FALSE']:
+            try:
+                valid_uuid = uuid.UUID(str(target_tenant).strip())
+                return str(valid_uuid)
+            except (ValueError, AttributeError, TypeError):
+                inst = AcademicInstitution.objects.filter(
+                    Q(slug__iexact=str(target_tenant).strip()) | Q(name__iexact=str(target_tenant).strip())
+                ).first()
+                if inst:
+                    return str(inst.id)
+                return None
+        return None
+
+    inst_id = getattr(request.user, 'institution_id', None)
+    if inst_id:
+        try:
+            return str(uuid.UUID(str(inst_id)))
+        except (ValueError, AttributeError, TypeError):
+            return None
+    return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. System Role & Section Seeding Services
 # ─────────────────────────────────────────────────────────────────────────────

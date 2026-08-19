@@ -38,7 +38,7 @@ export default function AdmissionSuccessModal({ student, onReset, onClose }) {
               <p>Suffah Hifz Management System</p>
             </div>
             <div class="field-row"><span class="field-label">Student Name:</span><span class="field-val">${student.name || ""}</span></div>
-            <div class="field-row"><span class="field-label">Bangla Name:</span><span class="field-val">${student.bangla_name || "-"}</span></div>
+            ${student.bangla_name ? `<div class="field-row"><span class="field-label">Native Name:</span><span class="field-val">${student.bangla_name}</span></div>` : ''}
             <div class="field-row"><span class="field-label">Student ID:</span><span class="field-val">${student.student_id_card_number || student.uniq_id || ""}</span></div>
             <div class="field-row"><span class="field-label">Class / Group:</span><span class="field-val">${student.group_name || "General Group"}</span></div>
             <div class="field-row"><span class="field-label">Admission Mode:</span><span class="field-val">${student.admission_mode || "QUICK"}</span></div>

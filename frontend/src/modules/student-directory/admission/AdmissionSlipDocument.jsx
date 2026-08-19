@@ -51,10 +51,12 @@ export default function AdmissionSlipDocument({ student, onClose }) {
               <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Student Name</span>
               <span className="font-bold text-zinc-800">{student.name_en || student.name}</span>
             </div>
-            <div>
-              <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Bangla Name</span>
-              <span className="font-semibold text-zinc-800">{student.bangla_name || "--"}</span>
-            </div>
+            {student.bangla_name && (
+              <div>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Native Name</span>
+                <span className="font-semibold text-zinc-800">{student.bangla_name}</span>
+              </div>
+            )}
             <div>
               <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Student ID / Roll</span>
               <span className="font-mono font-bold text-zinc-800">{student.uniq_id} {student.roll_number ? `(Roll: #${student.roll_number})` : ""}</span>

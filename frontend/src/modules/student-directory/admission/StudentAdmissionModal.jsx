@@ -156,7 +156,7 @@ export default function StudentAdmissionModal({ isOpen, onClose, onSuccess, init
                 }`}
               >
                 <SparklesIcon className="w-4 h-4" />
-                <span>Quick Admission</span>
+                <span>Short Admission</span>
               </button>
               <button
                 type="button"
@@ -168,7 +168,7 @@ export default function StudentAdmissionModal({ isOpen, onClose, onSuccess, init
                 }`}
               >
                 <AcademicCapIcon className="w-4 h-4" />
-                <span>Full Institutional Admission</span>
+                <span>Admission</span>
               </button>
             </div>
           </div>

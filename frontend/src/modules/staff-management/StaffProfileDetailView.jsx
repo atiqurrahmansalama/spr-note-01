@@ -566,7 +566,7 @@ export default function StaffProfileDetailView() {
             <div className="py-2.5 flex justify-between">
               <span className="theme-text-secondary">Base Salary:</span>
               <span className="text-emerald-400 font-mono font-bold text-sm">
-                ৳ {Number(staff.base_salary || 0).toLocaleString()} BDT
+                BDT {Number(staff.base_salary || 0).toLocaleString()}
               </span>
             </div>
             <div className="py-2.5 flex justify-between">

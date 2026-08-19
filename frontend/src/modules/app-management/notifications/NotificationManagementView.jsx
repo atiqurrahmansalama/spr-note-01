@@ -554,7 +554,7 @@ export default function NotificationManagementView() {
                         <div className="flex justify-between">
                           <span className="theme-text-secondary">Cached Balance:</span>
                           <span className="font-bold theme-accent">
-                            {gw.balance_cache != null ? `৳ ${gw.balance_cache}` : '--'}
+                            {gw.balance_cache != null ? `BDT ${gw.balance_cache}` : '--'}
                           </span>
                         </div>
                       )}

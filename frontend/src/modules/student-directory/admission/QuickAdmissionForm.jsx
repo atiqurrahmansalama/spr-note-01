@@ -82,12 +82,29 @@ export default function QuickAdmissionForm({ onCancel, onSuccess, sharedData, se
       } else {
         const errorData = await response.json().catch(() => ({}));
         let errorMsg = "Failed to enroll student. Please check inputs.";
-        if (typeof errorData === "object" && errorData !== null) {
-          const firstVal = Object.values(errorData)[0];
-          if (Array.isArray(firstVal) && firstVal.length > 0) {
-            errorMsg = firstVal[0];
-          } else if (typeof firstVal === "string") {
-            errorMsg = firstVal;
+        if (errorData && typeof errorData === "object") {
+          if (typeof errorData.detail === "string") {
+            errorMsg = errorData.detail;
+          } else if (typeof errorData.message === "string") {
+            errorMsg = errorData.message;
+          } else if (Array.isArray(errorData.non_field_errors) && errorData.non_field_errors.length > 0) {
+            errorMsg = errorData.non_field_errors[0];
+          } else {
+            for (const [k, v] of Object.entries(errorData)) {
+              if (typeof v === "string") {
+                errorMsg = `${k}: ${v}`;
+                break;
+              } else if (Array.isArray(v) && v.length > 0) {
+                errorMsg = typeof v[0] === "string" ? `${k}: ${v[0]}` : JSON.stringify(v[0]);
+                break;
+              } else if (typeof v === "object" && v !== null) {
+                const subVal = Object.values(v)[0];
+                if (Array.isArray(subVal) && subVal.length > 0) {
+                  errorMsg = `${k}: ${subVal[0]}`;
+                  break;
+                }
+              }
+            }
           }
         }
         showToast(errorMsg, "error");

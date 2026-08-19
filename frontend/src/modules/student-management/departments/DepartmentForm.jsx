@@ -181,18 +181,19 @@ export default function DepartmentForm({ department = null, onSaved, onCancel })
           </label>
         </div>
 
-        {/* Active Status */}
-        <div className="flex items-center gap-2 pt-2">
-          <input
-            type="checkbox"
-            id="dept_is_active"
-            checked={formData.is_active}
-            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-            className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 theme-bg-surface theme-border cursor-pointer"
-          />
-          <label htmlFor="dept_is_active" className="text-xs font-medium theme-text-primary cursor-pointer">
-            Department is Active & Available for Class Assignment
+        {/* Department Status Select */}
+        <div>
+          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+            Department Status
           </label>
+          <select
+            value={formData.is_active ? "ACTIVE" : "INACTIVE"}
+            onChange={(e) => setFormData({ ...formData, is_active: e.target.value === "ACTIVE" })}
+            className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-medium theme-text-primary cursor-pointer"
+          >
+            <option value="ACTIVE">🟢 Active (Operational & Available)</option>
+            <option value="INACTIVE">⚪ Inactive (Archived)</option>
+          </select>
         </div>
 
         {/* Action Buttons */}

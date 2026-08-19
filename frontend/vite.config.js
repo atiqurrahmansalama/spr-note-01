@@ -38,6 +38,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '^/media($|/)': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
       '^/(students|reports|sessions|groups|messages|users|roles|activity|auth|control-panel|institutions)($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

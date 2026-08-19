@@ -10,24 +10,28 @@ import {
   TrashIcon,
   EditIcon,
   UsersIcon,
-  BookOpenIcon,
   CloseIcon,
   BuildingOfficeIcon,
   PhoneIcon,
   ClassIcon,
+  MoreVerticalIcon,
 } from '../../../components/ui/Icons';
+import DataTable from '../../../components/ui/DataTable';
+import DataCardGrid from '../../../components/ui/DataCardGrid';
+import ActionMenu from '../../../components/ui/ActionMenu';
+import CustomSelect from '../../../components/ui/CustomSelect';
+import MetricsGrid from '../../../components/ui/MetricsGrid';
 import {
   getInstitutions,
   getInstitutionMetrics,
   deleteInstitution,
-  updateInstitution,
+  getInstitutionCategories,
 } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
 import InstitutionOnboardingForm from './InstitutionOnboardingForm';
 import InstitutionEditForm from './InstitutionEditForm';
-import DeleteImpactModal from '../../../components/common/DeleteImpactModal';
 
 export default function InstitutionListView() {
   const navigate = useNavigate();
@@ -46,6 +50,7 @@ export default function InstitutionListView() {
     total_active_students: 0,
     total_staff: 0,
   });
+  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -88,17 +93,26 @@ export default function InstitutionListView() {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [instData, metricsData] = await Promise.all([
+      const [instData, metricsData, catsData] = await Promise.allSettled([
         getInstitutions({ search: searchQuery }),
         getInstitutionMetrics(),
+        getInstitutionCategories(),
       ]);
 
-      const items = Array.isArray(instData) ? instData : (instData?.results || []);
-      setInstitutions(items);
-      if (metricsData) setMetrics(metricsData);
+      if (instData.status === 'fulfilled') {
+        const val = instData.value;
+        const items = Array.isArray(val) ? val : val?.results || [];
+        setInstitutions(items);
+      }
+      if (metricsData.status === 'fulfilled' && metricsData.value) {
+        setMetrics(metricsData.value);
+      }
+      if (catsData.status === 'fulfilled' && Array.isArray(catsData.value)) {
+        setCategories(catsData.value);
+      }
     } catch (err) {
-      console.error('[Load Institutions Error]:', err);
-      showToast(err.message || 'Failed to load institutions.', 'error');
+      console.error('[Load Academies Error]:', err);
+      showToast(err.message || 'Failed to load academies.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +134,7 @@ export default function InstitutionListView() {
 
   const handleOpenOnboarding = () => {
     openRightSidebar({
-      title: 'Onboard New Academic Institution',
+      title: 'Onboard New Academy',
       width: 640,
       content: (
         <InstitutionOnboardingForm
@@ -158,147 +172,387 @@ export default function InstitutionListView() {
     if (
       deleteConfirmText.trim() !== deletingInst.name.trim() ||
       !deleteAcknowledged ||
-      !adminPassword.trim() ||
       deleteCountdown > 0
     ) {
-      showToast('Please fulfill all security confirmation steps including your password.', 'warning');
+      showToast('Please type the full academy name and acknowledge data risk to confirm.', 'warning');
       return;
     }
 
     try {
       setIsDeleting(true);
-      await deleteInstitution(deletingInst.id, { password: adminPassword.trim() });
-      showToast(`Institution '${deletingInst.name}' has been safely decommissioned.`, 'success');
+      await deleteInstitution(deletingInst.id, {
+        password: adminPassword || undefined,
+      });
+
+      showToast(`Academy "${deletingInst.name}" has been decommissioned.`, 'success');
       setDeletingInst(null);
       loadData();
       refreshInstitutions();
     } catch (err) {
-      console.error('[Delete Institution Error]:', err);
-      showToast(err.response?.data?.error || err.message || 'Failed to decommission institution.', 'error');
+      console.error('[Decommission Error]:', err);
+      showToast(err.message || 'Decommission authorization failed. Please check administrator password.', 'error');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const selectedActiveInst =
-    institutions.find((i) => String(i.id) === String(activeTenantId)) || currentInstitution;
+  const getCategoryLabel = (typeCode) => {
+    const found = categories.find((c) => c.code === typeCode);
+    return found?.name || typeCode || 'Madrasa / Maktab';
+  };
+
+  // Reusable Action Items generator
+  const getActionMenuItems = (inst) => [
+    {
+      label: 'Switch Active Context',
+      icon: CheckCircleIcon,
+      onClick: () => handleSwitchContext(inst),
+      hidden: !isMultiTenantAdmin,
+    },
+    {
+      label: 'Edit Academy Profile',
+      icon: EditIcon,
+      onClick: () => handleOpenEdit(inst),
+    },
+    {
+      divider: true,
+    },
+    {
+      label: 'Decommission Academy',
+      icon: TrashIcon,
+      danger: true,
+      onClick: () => handleOpenDelete(inst),
+    },
+  ];
+
+  // Reusable DataTable Columns
+  const tableColumns = [
+    {
+      key: 'name',
+      header: 'Academy Profile',
+      headerClassName: 'min-w-[220px]',
+      render: (inst) => {
+        const isCurrent = String(activeTenantId) === String(inst.id);
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl theme-bg-sub border theme-border flex items-center justify-center font-bold text-xs theme-accent shrink-0 overflow-hidden shadow-xs">
+              {inst.logo_data || inst.logo_url ? (
+                <img src={inst.logo_data || inst.logo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                inst.name?.charAt(0).toUpperCase() || 'A'
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold theme-text-primary flex items-center gap-1.5 flex-wrap">
+                <span className="break-words leading-tight">{inst.name}</span>
+                {inst.is_verified && (
+                  <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="Verified Academy" />
+                )}
+                {isCurrent && (
+                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                    Active
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'institution_type',
+      header: 'Category & Reg.',
+      headerClassName: 'min-w-[150px]',
+      render: (inst) => (
+        <div>
+          <div className="font-semibold theme-text-primary text-xs">{getCategoryLabel(inst.institution_type)}</div>
+          {inst.eiin_or_reg_no && (
+            <div className="text-[10px] theme-text-secondary font-mono mt-0.5">
+              Reg: {inst.eiin_or_reg_no}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'phone',
+      header: 'Contact Details',
+      headerClassName: 'min-w-[160px]',
+      render: (inst) => (
+        <div>
+          <div className="theme-text-primary font-mono text-xs">{inst.phone || '--'}</div>
+          <div className="text-[10px] theme-text-secondary mt-0.5">
+            {inst.district || inst.division || 'Bangladesh'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'total_students_count',
+      header: 'Students',
+      align: 'center',
+      headerClassName: 'w-20 text-center',
+      render: (inst) => (
+        <span className="font-bold theme-accent">{inst.total_students_count ?? 0}</span>
+      ),
+    },
+    {
+      key: 'total_classes_count',
+      header: 'Classes',
+      align: 'center',
+      headerClassName: 'w-20 text-center',
+      render: (inst) => (
+        <span className="font-bold theme-text-primary">{inst.total_classes_count ?? 0}</span>
+      ),
+    },
+    {
+      key: 'total_staff_count',
+      header: 'Staff',
+      align: 'center',
+      headerClassName: 'w-20 text-center',
+      render: (inst) => (
+        <span className="font-bold theme-text-primary">{inst.total_staff_count ?? 0}</span>
+      ),
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      align: 'center',
+      headerClassName: 'w-24 text-center',
+      render: (inst) => (
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+            inst.is_active
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${inst.is_active ? 'bg-emerald-400' : 'bg-zinc-400'}`}></span>
+          {inst.is_active ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      headerClassName: 'w-16 text-right',
+      render: (inst) => (
+        <div className="flex items-center justify-end">
+          <ActionMenu items={getActionMenuItems(inst)} />
+        </div>
+      ),
+    },
+  ];
+
+  // Reusable Card Renderer for DataCardGrid
+  const renderAcademyCard = (inst) => {
+    const isCurrent = String(activeTenantId) === String(inst.id);
+    return (
+      <div
+        key={inst.id}
+        className={`rounded-2xl theme-bg-surface border transition-all duration-150 overflow-hidden flex flex-col justify-between group shadow-xs ${
+          isCurrent
+            ? 'border-[var(--accent-main)] ring-2 ring-[var(--accent-main)]/20'
+            : 'theme-border hover:theme-bg-sub/30'
+        }`}
+      >
+        <div className="p-5 space-y-4">
+          {/* Top Bar with Avatar, Name, Type, Status */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-11 h-11 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center theme-accent font-bold text-sm shrink-0 overflow-hidden shadow-xs">
+                {inst.logo_data || inst.logo_url ? (
+                  <img src={inst.logo_data || inst.logo_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  inst.name?.charAt(0).toUpperCase() || 'A'
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-1.5 flex-wrap">
+                  <h3 className="font-bold theme-text-primary text-sm leading-tight break-words">
+                    {inst.name}
+                  </h3>
+                  {inst.is_verified && (
+                    <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" title="Verified Academy" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="px-2 py-0.5 rounded-lg theme-bg-sub border theme-border text-[10px] font-medium theme-text-secondary">
+                {getCategoryLabel(inst.institution_type)}
+              </span>
+              {!inst.is_active && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border bg-zinc-500/10 text-zinc-400 border-zinc-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+                  Inactive
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Contact info */}
+          <div className="text-xs space-y-1.5 theme-text-secondary pt-2.5 border-t theme-border">
+            <div className="flex items-center justify-between text-[11px]">
+              <span>Contact Phone:</span>
+              <span className="theme-text-primary font-mono font-semibold">{inst.phone || '--'}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span>Campus Location:</span>
+              <span className="theme-text-primary font-medium">{inst.district || inst.division || 'Bangladesh'}</span>
+            </div>
+            {inst.eiin_or_reg_no && (
+              <div className="flex items-center justify-between text-[11px]">
+                <span>Govt. Reg / EIIN:</span>
+                <span className="theme-text-primary font-mono">{inst.eiin_or_reg_no}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Metrics Strip */}
+          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
+            <div>
+              <span className="block text-sm font-bold theme-accent">{inst.total_students_count ?? 0}</span>
+              <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
+            </div>
+            <div className="border-x theme-border">
+              <span className="block text-sm font-bold theme-text-primary">{inst.total_classes_count ?? 0}</span>
+              <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Classes</span>
+            </div>
+            <div>
+              <span className="block text-sm font-bold theme-text-primary">{inst.total_staff_count ?? 0}</span>
+              <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Staff</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Footer Actions */}
+        <div className="px-5 py-3 border-t theme-border theme-bg-sub/40 flex items-center justify-between gap-2">
+          {isMultiTenantAdmin ? (
+            <button
+              type="button"
+              onClick={() => handleSwitchContext(inst)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                isCurrent
+                  ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 shadow-xs'
+                  : 'theme-bg-surface hover:theme-bg-sub theme-text-primary border theme-border'
+              }`}
+            >
+              <CheckCircleIcon className="w-3.5 h-3.5" />
+              <span>{isCurrent ? 'Current Workspace' : 'Switch Context'}</span>
+            </button>
+          ) : (
+            <span className="text-[11px] theme-text-secondary font-medium">Academy Tenant</span>
+          )}
+
+          <ActionMenu items={getActionMenuItems(inst)} />
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-200 theme-text-primary select-none font-sans">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-xs">
-              <BuildingOfficeIcon className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black theme-text-primary tracking-tight">
-              Academic Institution Management
-            </h1>
+    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left">
+      {/* 1. Header Overview & Primary Action */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b theme-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
+            <BuildingOfficeIcon className="w-5 h-5" />
           </div>
-          <p className="text-xs theme-text-secondary mt-1">
-            Enterprise multi-tenant directory, row-level data boundaries, and institution presets
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
+                Academies
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold theme-bg-sub border theme-border theme-text-secondary tracking-wide">
+                Multi-Tenant
+              </span>
+            </div>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              Multi-tenant academic workspace directory & isolated database branches
+            </p>
+          </div>
         </div>
 
         {isMultiTenantAdmin && (
           <button
             type="button"
             onClick={handleOpenOnboarding}
-            className="px-5 py-2.5 rounded-2xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2"
+            className="px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2"
           >
             <PlusIcon className="w-4 h-4" />
-            <span>Onboard New Institution</span>
+            <span>Onboard Academy</span>
           </button>
         )}
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl theme-bg-elevated border theme-border shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
-            <DepartmentIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xl sm:text-2xl font-black theme-text-primary">
-              {metrics.total_institutions}
-            </span>
-            <p className="text-[11px] font-bold theme-text-secondary">Total Institutions</p>
-          </div>
-        </div>
+      {/* 2. Top Metric Cards */}
+      <MetricsGrid
+        items={[
+          {
+            label: 'Total Academies',
+            value: metrics.total_institutions,
+            icon: BuildingOfficeIcon,
+            color: 'default',
+          },
+          {
+            label: 'Verified Campuses',
+            value: metrics.verified_institutions,
+            icon: CheckCircleIcon,
+            color: 'accent',
+          },
+          {
+            label: 'Active Students',
+            value: metrics.total_active_students,
+            icon: UsersIcon,
+            color: 'default',
+          },
+          {
+            label: 'Faculty & Staff',
+            value: metrics.total_staff,
+            icon: DepartmentIcon,
+            color: 'default',
+          },
+        ]}
+      />
 
-        <div className="p-4 rounded-2xl theme-bg-elevated border theme-border shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-            <CheckCircleIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xl sm:text-2xl font-black theme-text-primary">
-              {metrics.verified_institutions}
-            </span>
-            <p className="text-[11px] font-bold theme-text-secondary">Verified Tenants</p>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl theme-bg-elevated border theme-border shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-            <UsersIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xl sm:text-2xl font-black theme-text-primary">
-              {metrics.total_active_students}
-            </span>
-            <p className="text-[11px] font-bold theme-text-secondary">Enrolled Students</p>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl theme-bg-elevated border theme-border shadow-xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-            <BookOpenIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xl sm:text-2xl font-black theme-text-primary">
-              {metrics.total_staff}
-            </span>
-            <p className="text-[11px] font-bold theme-text-secondary">Active Staff & Admins</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter, Search & View Toggle Bar */}
-      <div className="p-3.5 rounded-2xl theme-bg-elevated border theme-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* 3. Search & View Mode Switcher Toolbar */}
+      <div className="p-3.5 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 theme-text-secondary" />
+          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, slug, or district..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary placeholder-zinc-500 focus:outline-none focus:border-[var(--accent-main)]"
+            placeholder="Search academies by name, slug, phone..."
+            className="w-full h-10 pl-9 pr-3.5 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current transition-all"
           />
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-          >
-            <option value="ALL">All Institution Types</option>
-            <option value="MADRASA">Madrasa / Maktab</option>
-            <option value="SCHOOL">General School</option>
-            <option value="COLLEGE">College</option>
-            <option value="COACHING">Coaching</option>
-            <option value="OTHER">Other</option>
-          </select>
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="w-48 sm:w-56 shrink-0">
+            <CustomSelect
+              size="sm"
+              value={typeFilter}
+              onChange={(val) => setTypeFilter(val)}
+              options={[
+                { value: 'ALL', label: 'All Academy Types' },
+                ...categories.map((c) => ({ value: c.code, label: c.name })),
+              ]}
+              placeholder="All Academy Types"
+            />
+          </div>
 
-          {/* Dual Display Toggle */}
-          <div className="flex items-center p-0.5 rounded-xl theme-bg-sub border theme-border">
+          {/* View Mode Toggle Buttons */}
+          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
             <button
               type="button"
               onClick={() => handleToggleViewMode('grid')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 viewMode === 'grid'
-                  ? 'theme-bg-elevated theme-text-primary shadow-xs'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
@@ -308,9 +562,9 @@ export default function InstitutionListView() {
             <button
               type="button"
               onClick={() => handleToggleViewMode('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 viewMode === 'table'
-                  ? 'theme-bg-elevated theme-text-primary shadow-xs'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
@@ -321,333 +575,135 @@ export default function InstitutionListView() {
         </div>
       </div>
 
-      {/* Main Institution List Display */}
-      {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
-          <div className="w-9 h-9 border-3 border-[var(--accent-main)] border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-bold theme-text-secondary">Loading academic institutions...</p>
-        </div>
-      ) : filteredInstitutions.length === 0 ? (
-        <div className="py-16 px-4 rounded-3xl theme-bg-elevated border theme-border text-center space-y-3 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl theme-bg-sub flex items-center justify-center mx-auto text-sky-400">
-            <BuildingOfficeIcon className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold theme-text-primary">No Institutions Found</h3>
-          <p className="text-xs theme-text-secondary max-w-sm mx-auto">
-            {searchQuery
-              ? `No institutions matched '${searchQuery}'. Try adjusting your search query.`
-              : 'Onboard your first isolated multi-tenant academic institution to get started.'}
-          </p>
-        </div>
-      ) : viewMode === 'grid' ? (
-        /* 1. Modern Grid Cards View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredInstitutions.map((inst) => {
-            const isCurrent = String(activeTenantId) === String(inst.id);
-            return (
-              <div
-                key={inst.id}
-                className={`rounded-3xl theme-bg-elevated border transition-all duration-200 overflow-hidden flex flex-col justify-between group ${
-                  isCurrent
-                    ? 'border-[var(--accent-main)] shadow-md ring-2 ring-[var(--accent-main)]/20'
-                    : 'theme-border hover:theme-bg-sub/80 hover:shadow-lg'
-                }`}
-              >
-                <div className="p-5 space-y-4">
-                  {/* Top Bar with Avatar, Name, Type, Status */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-12 h-12 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center text-sky-400 font-bold text-base shrink-0 shadow-inner overflow-hidden">
-                        {inst.logo_data || inst.logo_url ? (
-                          <img src={inst.logo_data || inst.logo_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          inst.name?.charAt(0).toUpperCase() || 'W'
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-bold theme-text-primary text-sm truncate leading-tight">
-                            {inst.name}
-                          </h3>
-                          {inst.is_verified && (
-                            <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" title="Verified Academic Tenant" />
-                          )}
-                        </div>
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md theme-bg-sub border theme-border text-[10px] font-mono text-sky-400 font-bold">
-                          {inst.slug}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className="px-2.5 py-1 rounded-xl theme-bg-sub border theme-border text-[10px] font-medium theme-text-secondary">
-                        {inst.institution_type}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                          inst.is_active
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${inst.is_active ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                        {inst.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Contact info */}
-                  <div className="text-xs space-y-1.5 theme-text-secondary pt-2 border-t theme-border">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span>Contact Phone:</span>
-                      <span className="theme-text-primary font-mono font-bold">{inst.phone || '--'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span>Location / District:</span>
-                      <span className="theme-text-primary font-medium">{inst.district || inst.division || 'Bangladesh'}</span>
-                    </div>
-                    {inst.eiin_or_reg_no && (
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span>Govt. Reg / EIIN:</span>
-                        <span className="theme-text-primary font-mono">{inst.eiin_or_reg_no}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Metrics Strip */}
-                  <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl theme-bg-app border theme-border text-center">
-                    <div>
-                      <span className="block text-sm font-black text-sky-400">{inst.total_students_count ?? 0}</span>
-                      <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-bold">Students</span>
-                    </div>
-                    <div className="border-x theme-border">
-                      <span className="block text-sm font-black theme-text-primary">{inst.total_classes_count ?? 0}</span>
-                      <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-bold">Classes</span>
-                    </div>
-                    <div>
-                      <span className="block text-sm font-black theme-text-primary">{inst.total_staff_count ?? 0}</span>
-                      <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-bold">Staff</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Actions */}
-                <div className="px-5 py-3.5 border-t theme-border theme-bg-sub/60 flex items-center justify-between gap-2">
-                  {isMultiTenantAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchContext(inst)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isCurrent
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
-                          : 'theme-bg-elevated hover:theme-bg-app theme-text-primary border theme-border'
-                      }`}
-                    >
-                      <CheckCircleIcon className="w-3.5 h-3.5" />
-                      <span>{isCurrent ? 'Active Context' : 'Switch Context'}</span>
-                    </button>
-                  )}
-
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(inst)}
-                      className="p-2 rounded-xl theme-bg-elevated hover:theme-bg-app theme-text-secondary hover:theme-text-primary border theme-border transition cursor-pointer shadow-xs"
-                      title="Edit Institution Profile"
-                    >
-                      <EditIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDelete(inst)}
-                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition cursor-pointer shadow-xs"
-                      title="Decommission Institution"
-                    >
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* 4. Display: Reusable DataCardGrid or DataTable */}
+      {viewMode === 'grid' ? (
+        <DataCardGrid
+          data={filteredInstitutions}
+          renderCard={renderAcademyCard}
+          isLoading={isLoading}
+          loadingMessage="Loading academies..."
+          emptyIcon={BuildingOfficeIcon}
+          emptyTitle="No Academies Found"
+          emptySubMessage={
+            searchQuery
+              ? `No academies matched "${searchQuery}". Try adjusting your search query.`
+              : 'Onboard your first multi-tenant academy to get started.'
+          }
+        />
       ) : (
-        /* 2. High-Density Table View */
-        <div className="rounded-3xl theme-bg-elevated border theme-border shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b theme-border theme-bg-sub/80 text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
-                  <th className="px-5 py-3.5">Institution Profile</th>
-                  <th className="px-5 py-3.5">Type & Reg.</th>
-                  <th className="px-5 py-3.5">Contact Details</th>
-                  <th className="px-5 py-3.5 text-center">Students</th>
-                  <th className="px-5 py-3.5 text-center">Classes</th>
-                  <th className="px-5 py-3.5 text-center">Staff</th>
-                  <th className="px-5 py-3.5 text-center">Status</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y theme-border">
-                {filteredInstitutions.map((inst) => {
-                  const isCurrent = String(activeTenantId) === String(inst.id);
-                  return (
-                    <tr
-                      key={inst.id}
-                      className={`hover:theme-bg-sub/60 transition-colors ${
-                        isCurrent ? 'bg-sky-500/5' : ''
-                      }`}
-                    >
-                      {/* Name & Slug */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl theme-bg-sub border theme-border flex items-center justify-center font-bold text-sky-400 text-xs shrink-0 overflow-hidden">
-                            {inst.logo_data || inst.logo_url ? (
-                              <img src={inst.logo_data || inst.logo_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              inst.name?.charAt(0).toUpperCase()
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-bold theme-text-primary flex items-center gap-1.5">
-                              <span>{inst.name}</span>
-                              {inst.is_verified && (
-                                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400" />
-                              )}
-                            </div>
-                            <span className="text-[10px] font-mono text-sky-400">
-                              {inst.slug}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Type & EIIN */}
-                      <td className="px-5 py-3.5">
-                        <div className="font-medium theme-text-primary">{inst.institution_type}</div>
-                        {inst.eiin_or_reg_no && (
-                          <div className="text-[10px] theme-text-secondary font-mono">
-                            EIIN: {inst.eiin_or_reg_no}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Phone & District */}
-                      <td className="px-5 py-3.5">
-                        <div className="theme-text-primary font-mono">{inst.phone || '--'}</div>
-                        <div className="text-[10px] theme-text-secondary">
-                          {inst.district || inst.division || 'Bangladesh'}
-                        </div>
-                      </td>
-
-                      {/* Counts */}
-                      <td className="px-5 py-3.5 text-center font-bold text-sky-400">
-                        {inst.total_students_count ?? 0}
-                      </td>
-                      <td className="px-5 py-3.5 text-center font-bold theme-text-primary">
-                        {inst.total_classes_count ?? 0}
-                      </td>
-                      <td className="px-5 py-3.5 text-center font-bold theme-text-primary">
-                        {inst.total_staff_count ?? 0}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-5 py-3.5 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            inst.is_active
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${inst.is_active ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                          {inst.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isMultiTenantAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => handleSwitchContext(inst)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                                isCurrent
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                  : 'theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border'
-                              }`}
-                              title="Set this institution as active workspace context"
-                            >
-                              {isCurrent ? 'Active Context' : 'Switch Context'}
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(inst)}
-                            className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent cursor-pointer"
-                            title="Edit Institution Details"
-                          >
-                            <EditIcon className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDelete(inst)}
-                            className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition border-0 bg-transparent cursor-pointer"
-                            title="Decommission / Delete Institution"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={tableColumns}
+          data={filteredInstitutions}
+          isLoading={isLoading}
+          loadingMessage="Loading academies table..."
+          emptyIcon={BuildingOfficeIcon}
+          emptyTitle="No Academies Found"
+          emptySubMessage={
+            searchQuery
+              ? `No academies matched "${searchQuery}". Try adjusting your search query.`
+              : 'Onboard your first multi-tenant academy to get started.'
+          }
+        />
       )}
 
-      {/* Enterprise-Grade High-Security Decommission Safety Barrier Modal */}
-      <DeleteImpactModal
-        isOpen={Boolean(deletingInst)}
-        onClose={() => setDeletingInst(null)}
-        onConfirm={async ({ password }) => {
-          if (!deletingInst) return;
-          try {
-            setIsDeleting(true);
-            await deleteInstitution(deletingInst.id, { password: password.trim() });
-            showToast(`Institution '${deletingInst.name}' has been safely decommissioned.`, 'success');
-            setDeletingInst(null);
-            loadData();
-            refreshInstitutions();
-          } catch (err) {
-            console.error('[Delete Institution Error]:', err);
-            showToast(err.response?.data?.error || err.message || 'Failed to decommission institution.', 'error');
-          } finally {
-            setIsDeleting(false);
-          }
-        }}
-        title="High-Risk Action: Decommission Institution"
-        subtitle={`You are about to isolate and decommission institutional tenant "${deletingInst?.name}".`}
-        entityName={deletingInst?.name || ''}
-        entityType="Institution"
-        requireAck={true}
-        requireNameMatch={true}
-        requirePassword={true}
-        isDeleting={isDeleting}
-        confirmButtonText="Confirm Permanent Decommission"
-        impactItems={[
-          { label: 'Departments', count: deletingInst?.department_count ?? 'All Active' },
-          { label: 'Classes & Sections', count: deletingInst?.class_count ?? 'All Active' },
-          { label: 'Enrolled Students', count: deletingInst?.student_count ?? 'All Roster' },
-          { label: 'Staff Accounts', count: deletingInst?.user_count ?? 'All Staff' },
-        ]}
-        warningMessage="All active academic classes, sections, department configurations, enrolled student attendance matrices, exam reports, and staff login credentials under this tenant domain will be decommissioned and frozen."
-      />
+      {/* 5. High-Security Delete Confirmation Modal (Native Portal) */}
+      {deletingInst &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="w-full max-w-md theme-bg-surface border theme-border rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 animate-scale-in text-left">
+              {/* Header */}
+              <div className="flex items-center gap-3 text-rose-400 pb-3 border-b theme-border">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                  <AlertTriangleIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold theme-text-primary">Decommission Academy</h3>
+                  <p className="text-xs theme-text-secondary">Irreversible Multi-Tenant Action</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 space-y-1.5 leading-relaxed">
+                <p className="font-bold">⚠️ Warning: Complete Data Isolation Deletion</p>
+                <p className="text-[11px] opacity-90">
+                  You are about to decommission <strong className="text-white font-bold">{deletingInst.name}</strong> ({deletingInst.slug}). All associated students, classes, and records will be permanently archived.
+                </p>
+              </div>
+
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1">
+                    Type Academy Name to Confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={deletingInst.name}
+                    className="w-full px-3 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-rose-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold theme-text-secondary mb-1">
+                    Master Administrator Password:
+                  </label>
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter security password"
+                    className="w-full px-3 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-start gap-2.5 pt-1">
+                  <input
+                    type="checkbox"
+                    id="ack_decom"
+                    checked={deleteAcknowledged}
+                    onChange={(e) => setDeleteAcknowledged(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-rose-500 focus:ring-rose-400 theme-bg-sub theme-border cursor-pointer"
+                  />
+                  <label htmlFor="ack_decom" className="text-xs theme-text-secondary leading-snug cursor-pointer select-none">
+                    I acknowledge that decommissioning this academy will suspend all active student portals immediately.
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t theme-border">
+                <button
+                  type="button"
+                  onClick={() => setDeletingInst(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  disabled={
+                    isDeleting ||
+                    deleteCountdown > 0 ||
+                    deleteConfirmText.trim() !== deletingInst.name.trim() ||
+                    !deleteAcknowledged
+                  }
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  {isDeleting ? (
+                    <span>Decommissioning...</span>
+                  ) : deleteCountdown > 0 ? (
+                    <span>Wait ({deleteCountdown}s)</span>
+                  ) : (
+                    <span>Confirm Decommission</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

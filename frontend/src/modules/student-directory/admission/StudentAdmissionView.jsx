@@ -1,14 +1,27 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import QuickAdmissionForm from "./QuickAdmissionForm";
 import FullAdmissionWizard from "./FullAdmissionWizard";
 import AdmissionSuccessModal from "./AdmissionSuccessModal";
 import { SparklesIcon, AcademicCapIcon, GroupsIcon } from "../../../components/ui/Icons";
 
-export default function StudentAdmissionView() {
+export default function StudentAdmissionView({ defaultMode }) {
   const navigate = useNavigate();
-  const [activeMode, setActiveMode] = useState("FULL"); // QUICK or FULL
+  const location = useLocation();
+
+  const isShortRoute = defaultMode === "QUICK" || location.pathname.includes("short");
+  const [activeMode, setActiveMode] = useState(isShortRoute ? "QUICK" : "FULL");
   const [admittedStudent, setAdmittedStudent] = useState(null);
+
+  useEffect(() => {
+    if (defaultMode) {
+      setActiveMode(defaultMode);
+    } else if (location.pathname.includes("short")) {
+      setActiveMode("QUICK");
+    } else {
+      setActiveMode("FULL");
+    }
+  }, [location.pathname, defaultMode]);
 
   // Shared form inputs
   const [sharedData, setSharedData] = useState({
@@ -126,7 +139,7 @@ export default function StudentAdmissionView() {
               }`}
             >
               <SparklesIcon className="w-4 h-4" />
-              <span>Quick Admission</span>
+              <span>Short Admission</span>
             </button>
             <button
               type="button"
@@ -138,7 +151,7 @@ export default function StudentAdmissionView() {
               }`}
             >
               <AcademicCapIcon className="w-4 h-4" />
-              <span>Full Institutional Admission</span>
+              <span>Admission</span>
             </button>
           </div>
         )}

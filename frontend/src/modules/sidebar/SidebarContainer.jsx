@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import UserProfileCard from "./UserProfileCard";
 import { useFeatureControl } from "../../context/FeatureControlContext";
+import { useTenant } from "../../context/TenantContext";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -23,6 +24,7 @@ import {
   GroupIcon,
   StudentIcon,
   AdmissionIcon,
+  SparklesIcon,
   BuildingOfficeIcon,
   TeacherIcon,
   AttendanceIcon,
@@ -48,9 +50,11 @@ export default function SidebarContainer({
   const location = useLocation();
   const currentPath = propActivePath || location.pathname;
 
+  const { isMultiTenantAdmin } = useTenant();
   const [openSubMenus, setOpenSubMenus] = useState({
+    "Academy": true,
     "Academic Institution": true,
-    "Student Management": true,
+    "Student": true,
     "Staff Management": false,
     "Settings & Devices": false,
     "Report Generator": false,
@@ -70,22 +74,22 @@ export default function SidebarContainer({
   const menuItems = [
     { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
     {
-      id: "Academic Institution",
-      name: "Academic Institution",
+      id: "Academy",
+      name: "Academy",
       Icon: BuildingOfficeIcon,
       hasSub: true,
       key: "nav_institution",
       subItems: [
-        { id: "Institution Directory", name: "Institution Directory", path: "/institutions", Icon: BuildingOfficeIcon, key: "app_institutions" },
-        { id: "Department Management", name: "Department Management", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
-        { id: "Class Management", name: "Class Management", path: "/student-management/classes", Icon: ClassIcon, key: "student_classes" },
-        { id: "Group Management", name: "Group Management", path: "/student-management/groups", Icon: GroupIcon, key: "student_groups" },
-        { id: "Profile & Branding", name: "Profile & Branding", path: "/settings/institution", Icon: GlobeIcon, key: "settings_institution" },
+        { id: "Profile", name: "Profile", path: "/academy-profile", Icon: BuildingOfficeIcon, key: "settings_institution" },
+        { id: "Academies", name: "Academies", path: "/institutions", Icon: BuildingOfficeIcon, key: "app_institutions" },
+        { id: "Department", name: "Department", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
+        { id: "Class", name: "Class", path: "/student-management/classes", Icon: ClassIcon, key: "student_classes" },
+        { id: "Group", name: "Group", path: "/student-management/groups", Icon: GroupIcon, key: "student_groups" },
       ]
     },
     {
-      id: "Student Management",
-      name: "Student Management",
+      id: "Student",
+      name: "Student",
       Icon: GroupsIcon,
       hasSub: true,
       key: "nav_student_management",
@@ -96,7 +100,8 @@ export default function SidebarContainer({
         { id: "Period & Class Roll Call", name: "Period & Class Roll Call", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
         { id: "Gate Entry & Pass", name: "Gate Entry & Pass", path: "/attendance/students/gate-log", Icon: GateIcon, key: "student_gate_tracker" },
         { id: "Surprise Headcount", name: "Surprise Headcount", path: "/attendance/students/adhoc", Icon: ChecklistIcon, key: "student_adhoc_headcount" },
-        { id: "Student Admission", name: "Student Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
+        { id: "Short Admission", name: "Short Admission", path: "/short-admission", Icon: SparklesIcon, key: "student_quick_admission" },
+        { id: "Admission", name: "Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
     {
@@ -166,6 +171,7 @@ export default function SidebarContainer({
         { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon, key: "settings_language" },
         { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
         { id: "Trash", name: "Trash", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
+        { id: "SP Management", name: "SP Management", path: "/sp-management", Icon: SparklesIcon, key: "sp_management", superAdminOnly: true },
       ]
     },
     { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon, key: "nav_shortcuts" },
@@ -191,7 +197,10 @@ export default function SidebarContainer({
   const displayMenuItems = menuItems
     .map((item) => {
       if (item.hasSub) {
-        const visibleSubItems = item.subItems.filter((sub) => isSectionEnabled(sub.key));
+        const visibleSubItems = item.subItems.filter((sub) => {
+          if (sub.superAdminOnly && !isMultiTenantAdmin) return false;
+          return isSectionEnabled(sub.key);
+        });
         return { ...item, subItems: visibleSubItems };
       }
       return item;
