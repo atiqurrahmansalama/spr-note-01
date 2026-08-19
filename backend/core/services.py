@@ -210,9 +210,10 @@ def evaluate_section_config_for_user(user=None):
         GroupSectionPermission,
         RoleSectionPermission,
     )
-    from .services import sync_feature_registry_to_db
-
-    if not AppSection.objects.exists():
+    from .feature_registry import FEATURE_REGISTRY
+    registry_keys = {item["key"] for item in FEATURE_REGISTRY}
+    db_keys = set(AppSection.objects.values_list('section_key', flat=True))
+    if not registry_keys.issubset(db_keys):
         sync_feature_registry_to_db()
 
     sections = AppSection.objects.all().select_related('category')

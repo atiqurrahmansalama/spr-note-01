@@ -798,7 +798,7 @@ class Student(models.Model):
 
         # Auto-create initial Academic History record for newly registered student
         try:
-            if is_new or not self.academic_history.filter(is_current=True).exists():
+            if is_new:
                 if self.student_class or self.student_group:
                     adm_date = self.admission_date or timezone.now().date()
                     StudentAcademicHistory.objects.create(
