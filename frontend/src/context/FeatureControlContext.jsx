@@ -5,7 +5,7 @@ import { useAuth } from "./AuthContext";
 // ─── Cache key for per-user evaluated config ────────────────────────────────
 // We cache the last server-evaluated config in localStorage so that on page
 // refresh the correct (server-evaluated) state is shown immediately — no flash.
-const getCacheKey = (userId) => `spr_evaluated_config_${userId || "anon"}_v2`;
+const getCacheKey = (userId) => `spr_evaluated_config_${userId || "anon"}_v3`;
 
 const HARD_DEFAULTS = {
   headerDate: true,
