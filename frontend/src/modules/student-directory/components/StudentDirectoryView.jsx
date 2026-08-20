@@ -27,6 +27,7 @@ import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import CustomCheckbox from "../../../components/ui/CustomCheckbox";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
+import PageHeader from "../../../components/ui/PageHeader";
 import Modal from "../../../components/ui/Modal";
 import StudentTransferModal from "../../student-profile/StudentTransferModal";
 
@@ -546,57 +547,47 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   return (
     <div className="w-full max-w-7xl mx-auto py-5 sm:py-6 px-3.5 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-5 sm:space-y-6 text-left">
       
-      {/* 1. Responsive Header with Icon */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <StudentIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-              Student Roster
-            </h1>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Directory of enrolled students, academic classes, guardian contacts, and status
-            </p>
-          </div>
-        </div>
-
-        {/* Compact Bulk Action Trigger with Theme Color & Selected Count */}
-        {selectedIds.length > 0 && (
-          <div className="flex items-center gap-2 animate-fade-in flex-wrap">
-            <span className="px-2.5 py-1 rounded-xl text-xs font-bold theme-bg-accent-soft theme-accent border theme-border">
-              {selectedIds.length} Selected
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsBulkTransferModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer transition-all flex items-center gap-1.5 shadow-md"
-            >
-              <TransferIcon className="w-3.5 h-3.5" />
-              <span>Bulk Transfer</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setBulkActionType("change_status");
-                setShowBulkModal(true);
-              }}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-primary cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
-            >
-              <SectionControlIcon className="w-3.5 h-3.5" />
-              <span>Bulk Status</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="px-2.5 py-2 rounded-xl text-xs font-semibold theme-text-secondary hover:theme-text-primary border theme-border hover:theme-bg-sub transition cursor-pointer"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-      </div>
+      {/* 1. Responsive Header with Reusable PageHeader */}
+      <PageHeader
+        icon={StudentIcon}
+        title="Student Roster"
+        subtitle="Directory of enrolled students, academic classes, guardian contacts, and status"
+        actions={
+          selectedIds.length > 0 && (
+            <div className="flex items-center gap-2 animate-fade-in flex-wrap">
+              <span className="px-2.5 py-1 rounded-xl text-xs font-bold theme-bg-accent-soft theme-accent border theme-border">
+                {selectedIds.length} Selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsBulkTransferModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer transition-all flex items-center gap-1.5 shadow-md"
+              >
+                <TransferIcon className="w-3.5 h-3.5" />
+                <span>Bulk Transfer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkActionType("change_status");
+                  setShowBulkModal(true);
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-primary cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <SectionControlIcon className="w-3.5 h-3.5" />
+                <span>Bulk Status</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="px-2.5 py-2 rounded-xl text-xs font-semibold theme-text-secondary hover:theme-text-primary border theme-border hover:theme-bg-sub transition cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          )
+        }
+      />
 
       {/* 2. Reusable Metric Cards (Positioned BELOW Header) */}
       <MetricsGrid

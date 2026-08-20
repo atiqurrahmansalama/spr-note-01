@@ -25,9 +25,10 @@ export const ROUTE_TITLE_MAP = {
   "/attendance/students/roll-call": { title: "Period & Class Roll Call", category: "Student Management" },
   "/attendance/students/gate-log": { title: "Gate Entry & Pass", category: "Student Management" },
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
-  "/attendance/students/monthly-matrix": { title: "31-Day Student Register", category: "Student Management" },
-  "/attendance/student": { title: "Student Attendance", category: "Student Management" },
-  "/attendance/monthly-register": { title: "31-Day Student Register", category: "Student Management" },
+  "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Student" },
+  "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
+  "/attendance/student": { title: "Student Attendance", category: "Student" },
+  "/attendance/monthly-register": { title: "Class Attendance", category: "Student" },
 
   "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix", category: "Staff Management" },
   "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Staff Management" },
@@ -40,8 +41,10 @@ export const ROUTE_TITLE_MAP = {
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },
   "/student-management/groups": { title: "Group", category: "Academy" },
+  "/students": { title: "Student Roster", category: "Student" },
   "/groups-students": { title: "Student Roster", category: "Student" },
   "/student-roster": { title: "Student Roster", category: "Student" },
+  "/staff": { title: "Staff Directory", category: "Staff" },
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },
   "/short-admission": { title: "Short Admission", category: "Student" },
@@ -51,6 +54,10 @@ export const ROUTE_TITLE_MAP = {
   "/app-management/notifications": { title: "Notification Management", category: "App Management" },
   "/app-management/institutions": { title: "Academies", category: "Academy" },
   "/institutions": { title: "Academies", category: "Academy" },
+  "/academy/campus-profile": { title: "Academies & Departments", category: "Academy" },
+  "/academy/classes-groups": { title: "Classes & Groups", category: "Academy" },
+  "/classes-groups": { title: "Classes & Groups", category: "Academy" },
+  "/academy/branches": { title: "Branches", category: "Academy" },
   "/academy-profile": { title: "Profile", category: "Academy" },
   "/settings/institution": { title: "Profile", category: "Academy" },
   "/institution-profile": { title: "Profile", category: "Academy" },
@@ -79,6 +86,13 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const themeContext = useTheme();
+  const {
+    isRightSidebarOpen,
+    rightSidebarConfig,
+    closeRightSidebar,
+    drawerWidth,
+    setDrawerWidth,
+  } = useRightSidebar();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     try {
@@ -164,6 +178,35 @@ export default function AppLayout() {
     window.addEventListener("touchend", handleMouseUp);
   };
 
+  const [isDrawerResizing, setIsDrawerResizing] = useState(false);
+
+  const startDrawerResizing = (e) => {
+    e.preventDefault();
+    setIsDrawerResizing(true);
+
+    const handleMouseMove = (moveEvent) => {
+      const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const newWidth = window.innerWidth - clientX;
+      const minW = 380;
+      const maxW = Math.min(1300, Math.floor(window.innerWidth * 0.95));
+      const clampedWidth = Math.max(minW, Math.min(maxW, newWidth));
+      setDrawerWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDrawerResizing(false);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleMouseMove);
+      window.removeEventListener("touchend", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleMouseMove);
+    window.addEventListener("touchend", handleMouseUp);
+  };
+
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
 
   // Ensure mobile view always defaults to hidden overlay mode & disables right sidebar docking
@@ -217,7 +260,6 @@ export default function AppLayout() {
   }, [showToast]);
 
   const { currentInstitution } = useTenant();
-  const { isRightSidebarOpen, rightSidebarConfig, closeRightSidebar } = useRightSidebar();
   const isRightDock = panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
   // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)
@@ -397,7 +439,34 @@ export default function AppLayout() {
   const isReportBuilderRoute = currentPath === "/report-builder";
   const isMainFormView = isReportBuilderRoute || (isRightDock && !isDashboardRoute);
   const showRoutePanel = !isDashboardRoute && !isReportBuilderRoute;
-  const routeMeta = ROUTE_TITLE_MAP[currentPath] || { title: "Navigation View" };
+  let routeMeta = ROUTE_TITLE_MAP[currentPath];
+  if (currentPath === "/academy/campus-profile") {
+    const searchParams = new URLSearchParams(location.search);
+    const activeTab = searchParams.get("tab");
+    if (activeTab === "branches") {
+      routeMeta = { title: "Branches", subCategory: "Academies & Departments", category: "Academy" };
+    } else if (activeTab === "departments") {
+      routeMeta = { title: "Departments", subCategory: "Academies & Departments", category: "Academy" };
+    } else {
+      routeMeta = { title: "Academies", subCategory: "Academies & Departments", category: "Academy" };
+    }
+  } else if (currentPath === "/academy/classes-groups" || currentPath === "/classes-groups") {
+    const searchParams = new URLSearchParams(location.search);
+    const activeTab = searchParams.get("tab");
+    if (activeTab === "groups") {
+      routeMeta = { title: "Groups", subCategory: "Classes & Groups", category: "Academy" };
+    } else {
+      routeMeta = { title: "Classes & Sections", subCategory: "Classes & Groups", category: "Academy" };
+    }
+  } else if (!routeMeta) {
+    if (/^\/students\/[^/]+\/profile/.test(currentPath)) {
+      routeMeta = { title: "Student Profile", category: "Student" };
+    } else if (/^\/staff\/[^/]+/.test(currentPath)) {
+      routeMeta = { title: "Staff Profile", category: "Staff" };
+    } else {
+      routeMeta = { title: "Navigation View", category: "Navigation" };
+    }
+  }
 
   const handleToggleMenu = () => {
     if (isMobile) {
@@ -599,6 +668,7 @@ export default function AppLayout() {
               <SidebarScreenBlockView
                 title={routeMeta.title}
                 category={routeMeta.category || "Navigation"}
+                subCategory={routeMeta.subCategory}
                 onClose={() => navigate("/report-builder")}
                 dockPosition={isRightDock ? "right" : "left"}
                 onToggleDock={!isMobile ? togglePanelDock : undefined}
@@ -611,38 +681,68 @@ export default function AppLayout() {
           </div>
         )}
 
-        {/* Secondary Right Sidebar Panel (Opened by Sub-Views / Forms) */}
+        {/* Secondary Right Sidebar / Slide-Over Panel (Opened by Sub-Views / Forms) */}
         {isRightSidebarOpen && (
-          <div 
-            className="h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in"
-            style={{
-              width: `${Math.min(
-                typeof window !== 'undefined' ? window.innerWidth * 0.94 : 680,
-                isResizing ? rightPanelWidth : (rightSidebarConfig?.width || Math.max(680, rightPanelWidth))
-              )}px`,
-              transition: isResizing ? "none" : "width 0.15s ease-out"
-            }}
-          >
-            {/* Resizer Handle */}
-            <div
-              onMouseDown={startResizing}
-              onTouchStart={startResizing}
-              className="hidden md:flex absolute top-0 left-0 bottom-0 w-3 -ml-1.5 cursor-col-resize z-10 group items-center justify-center hover:bg-[var(--accent-main)]/20 active:bg-[var(--accent-main)]/40 transition-colors"
-              title="Drag left or right to resize sidebar width"
-            >
-              <div className="w-1 h-12 rounded-full theme-bg-accent opacity-60 group-hover:opacity-100 transition-opacity shadow-sm" />
-            </div>
+          isMobile ? (
+            /* Mobile Slide-Over Overlay (< 768px): Slide-over drawer with backdrop blur */
+            <div className="fixed inset-0 z-[999] overflow-hidden flex justify-end">
+              {/* Backdrop */}
+              <div 
+                className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs transition-opacity duration-300 animate-fade-in cursor-pointer"
+                onClick={closeRightSidebar}
+                aria-hidden="true"
+              />
 
-            <div className="w-full h-full flex-1 overflow-hidden">
-              <SidebarScreenBlockView
-                title={rightSidebarConfig?.title || "Action Panel"}
-                onClose={closeRightSidebar}
-                dockPosition="right"
+              {/* Slide-over Drawer Panel */}
+              <div 
+                className="w-full max-w-full sm:max-w-md h-full z-10 theme-bg-app shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out animate-slide-in-right relative"
+                role="dialog"
+                aria-modal="true"
               >
-                {rightSidebarConfig?.content}
-              </SidebarScreenBlockView>
+                <div className="w-full h-full flex-1 overflow-hidden">
+                  <SidebarScreenBlockView
+                    title={rightSidebarConfig?.title || "Action Panel"}
+                    onClose={closeRightSidebar}
+                    dockPosition="right"
+                  >
+                    {rightSidebarConfig?.content}
+                  </SidebarScreenBlockView>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Desktop Docked Sidebar (>= 768px) */
+            <div 
+              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in"
+              style={{
+                width: `${Math.min(
+                  typeof window !== 'undefined' ? window.innerWidth * 0.96 : 800,
+                  drawerWidth || 720
+                )}px`,
+                transition: isDrawerResizing ? "none" : "width 0.15s ease-out"
+              }}
+            >
+              {/* Resizer Handle for Secondary Drawer */}
+              <div
+                onMouseDown={startDrawerResizing}
+                onTouchStart={startDrawerResizing}
+                className="hidden md:flex absolute top-0 left-0 bottom-0 w-3 -ml-1.5 cursor-col-resize z-40 group items-center justify-center hover:bg-[var(--accent-main)]/20 active:bg-[var(--accent-main)]/40 transition-colors"
+                title="Drag left or right to resize drawer width"
+              >
+                <div className="w-1.5 h-14 rounded-full theme-bg-accent opacity-60 group-hover:opacity-100 transition-opacity shadow-sm" />
+              </div>
+
+              <div className="w-full h-full flex-1 overflow-hidden">
+                <SidebarScreenBlockView
+                  title={rightSidebarConfig?.title || "Action Panel"}
+                  onClose={closeRightSidebar}
+                  dockPosition="right"
+                >
+                  {rightSidebarConfig?.content}
+                </SidebarScreenBlockView>
+              </div>
+            </div>
+          )
         )}
       </div>
     </div>

@@ -12,6 +12,9 @@ from django.db import transaction
 from .models import (
     AcademicInstitution,
     InstitutionCategory,
+    AcademicBranch,
+    ClassSection,
+    ClassPeriodSlot,
     TeacherProfile,
     GuardianProfile,
     UserDevice,
@@ -756,6 +759,154 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                     'user_type': admin_user.user_type,
                 }
             }
+
+
+class AcademicBranchSerializer(serializers.ModelSerializer):
+    institution = serializers.PrimaryKeyRelatedField(queryset=AcademicInstitution.objects.all(), required=False, allow_null=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    in_charge_name = serializers.CharField(source='in_charge_staff.user.name', read_only=True, default='')
+    in_charge_phone = serializers.CharField(source='in_charge_staff.user.phone_number', read_only=True, default='')
+    in_charge_email = serializers.CharField(source='in_charge_staff.user.email', read_only=True, default='')
+    in_charge_avatar = serializers.CharField(source='in_charge_staff.user.avatar_url', read_only=True, default='')
+    in_charge_designation = serializers.CharField(source='in_charge_staff.designation', read_only=True, default='')
+    total_students = serializers.SerializerMethodField()
+    total_classes = serializers.SerializerMethodField()
+    total_sections = serializers.SerializerMethodField()
+    total_staff = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcademicBranch
+        fields = [
+            'id', 'institution', 'institution_name',
+            'branch_name', 'branch_code', 'branch_type',
+            'in_charge_staff', 'in_charge_name', 'in_charge_phone', 'in_charge_email', 'in_charge_avatar', 'in_charge_designation',
+            'contact_phone', 'contact_email', 'address', 'district', 'division',
+            'is_active', 'is_deleted',
+            'total_students', 'total_classes', 'total_sections', 'total_staff',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'institution_name',
+            'in_charge_name', 'in_charge_phone', 'in_charge_email', 'in_charge_avatar', 'in_charge_designation',
+            'total_students', 'total_classes', 'total_sections', 'total_staff'
+        ]
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_students(self, obj):
+        from core.models import Student
+        return Student.objects.filter(branch=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_classes(self, obj):
+        from core.models import StudentClass
+        return StudentClass.objects.filter(sections__branch=obj, sections__is_deleted=False, is_deleted=False).distinct().count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_sections(self, obj):
+        return obj.sections.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_staff(self, obj):
+        from core.models import StaffProfile
+        return StaffProfile.objects.filter(
+            Q(institution=obj.institution) & (
+                Q(managed_branches=obj) |
+                Q(managed_sections__branch=obj)
+            )
+        ).distinct().count()
+
+
+class ClassSectionSerializer(serializers.ModelSerializer):
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    student_class_code = serializers.CharField(source='student_class.code', read_only=True, default='')
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
+    branch_code = serializers.CharField(source='branch.branch_code', read_only=True, default='')
+    class_teacher_name = serializers.CharField(source='class_teacher.user.name', read_only=True, default='')
+    class_teacher_phone = serializers.CharField(source='class_teacher.user.phone_number', read_only=True, default='')
+    class_teacher_avatar = serializers.CharField(source='class_teacher.user.avatar_url', read_only=True, default='')
+    enrolled_students = serializers.SerializerMethodField()
+    capacity_percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClassSection
+        fields = [
+            'id', 'student_class', 'student_class_name', 'student_class_code',
+            'branch', 'branch_name', 'branch_code',
+            'section_name', 'section_type', 'room_number', 'max_capacity',
+            'class_teacher', 'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
+            'is_active', 'is_deleted',
+            'enrolled_students', 'capacity_percentage',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'student_class_name', 'student_class_code',
+            'branch_name', 'branch_code',
+            'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
+            'enrolled_students', 'capacity_percentage'
+        ]
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_enrolled_students(self, obj):
+        from core.models import Student
+        return Student.objects.filter(section=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.FLOAT)
+    def get_capacity_percentage(self, obj):
+        if not obj.max_capacity or obj.max_capacity <= 0:
+            return 0.0
+        enrolled = self.get_enrolled_students(obj)
+        return round(min(100.0, (enrolled / obj.max_capacity) * 100), 1)
+
+
+class ClassPeriodSlotSerializer(serializers.ModelSerializer):
+    institution = serializers.PrimaryKeyRelatedField(queryset=AcademicInstitution.objects.all(), required=False, allow_null=True)
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
+    department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    teacher = serializers.PrimaryKeyRelatedField(queryset=StaffProfile.objects.all(), required=False, allow_null=True)
+    teacher_name = serializers.SerializerMethodField()
+    teacher_designation = serializers.CharField(source='teacher.designation', read_only=True, default='')
+
+    class Meta:
+        model = ClassPeriodSlot
+        fields = [
+            'id', 'institution', 'institution_name',
+            'branch', 'branch_name',
+            'department', 'department_name',
+            'student_class', 'student_class_name',
+            'teacher', 'teacher_name', 'teacher_designation',
+            'period_name', 'slot_type', 'period_order',
+            'start_time', 'end_time', 'duration_minutes',
+            'is_active', 'is_deleted',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'institution_name', 'branch_name', 'department_name', 'student_class_name',
+            'teacher_name', 'teacher_designation'
+        ]
+
+    def get_teacher_name(self, obj):
+        if obj.teacher:
+            if obj.teacher.user:
+                return obj.teacher.user.name or obj.teacher.user.name_en or f"{obj.teacher.user.first_name} {obj.teacher.user.last_name}".strip()
+            return obj.teacher.employee_id or f"Teacher #{obj.teacher.id}"
+        return ""
+
+    def validate(self, attrs):
+        start_time = attrs.get('start_time') or (self.instance.start_time if self.instance else None)
+        end_time = attrs.get('end_time') or (self.instance.end_time if self.instance else None)
+        if start_time and end_time:
+            import datetime
+            t1 = datetime.datetime.combine(datetime.date.today(), start_time)
+            t2 = datetime.datetime.combine(datetime.date.today(), end_time)
+            if t2 < t1:
+                t2 += datetime.timedelta(days=1)
+            diff = (t2 - t1).total_seconds() / 60
+            attrs['duration_minutes'] = max(1, int(diff))
+        return attrs
 
 
 class AcademicDepartmentSerializer(serializers.ModelSerializer):

@@ -1,57 +1,94 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  AttendanceIcon,
+  MatrixIcon,
   RefreshIcon,
-  FilterIcon,
-  CalendarIcon,
   DownloadIcon,
   PrintIcon,
-  AdmissionIcon,
+  CalendarIcon,
+  AttendanceIcon,
+  FilledCheckCircleIcon,
+  FilledXCircleIcon,
 } from '../../components/ui/Icons';
-import { getMonthlyAttendanceMatrix, getAttendanceSlots } from '../../api/attendance';
+import PageHeader from '../../components/ui/PageHeader';
+import CustomSelect from '../../components/ui/CustomSelect';
+import DateRangePicker from '../../components/common/DateRangePicker';
+import ActionMenu from '../../components/ui/ActionMenu';
+import AttendanceMatrixTable from '../../components/common/AttendanceMatrixTable';
+import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
+import { calendarSettings } from '../../utils/localStore';
+import { getHijriDateString } from '../../utils/hijriUtils';
 
-export default function MonthlyAttendanceRegisterView() {
+export default function MonthlyAttendanceRegisterView({
+  classId: propClassId,
+  groupId: propGroupId,
+  hideHeader = false,
+  onStudentClick,
+} = {}) {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
 
+  // Class, Group & Teacher State
   const [classes, setClasses] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(propClassId || '');
   const [groups, setGroups] = useState([]);
-  const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [slots, setSlots] = useState([]);
-  const [selectedSlotId, setSelectedSlotId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState(propGroupId || '');
+  const [teachers, setTeachers] = useState([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
 
+  // Year & Month for standard month navigation
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
 
+  // Custom Date Range State (e.g. Past 1 Week, Past 2 Weeks, Custom)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Interactive Attendance Marking Mode (Toggled by "Take Attendance" button)
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Hijri Setting State
+  const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
+
+  // Matrix Data & Loading
   const [matrixData, setMatrixData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Fetch Classes & Slots
+  // Listen to live calendar setting changes for Hijri toggle
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setIsHijriEnabled(calendarSettings.getHijriEnabled());
+    };
+    window.addEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
+    return () => window.removeEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
+  }, []);
+
+  // 1. Fetch Classes and Teachers on Mount
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [clsRes, slotsRes] = await Promise.all([
+        const [classRes, staffRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
-          getAttendanceSlots({ is_active: true }),
+          fetchWithAuth('/api/v1/staff/'),
         ]);
 
-        if (clsRes.ok) {
-          const clsData = await clsRes.json();
-          const clsList = Array.isArray(clsData) ? clsData : clsData.results || [];
-          setClasses(clsList);
-          if (clsList.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(clsList[0].id));
+        if (classRes.status === 'fulfilled' && classRes.value.ok) {
+          const data = await classRes.value.json();
+          const classList = Array.isArray(data) ? data : data.results || [];
+          setClasses(classList);
+          if (classList.length > 0 && !selectedClassId) {
+            setSelectedClassId(String(classList[0].id));
           }
         }
 
-        const slotList = Array.isArray(slotsRes) ? slotsRes : slotsRes.results || [];
-        setSlots(slotList);
+        if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
+          const sData = await staffRes.value.json();
+          setTeachers(Array.isArray(sData) ? sData : sData.results || []);
+        }
       } catch (err) {
-        console.error('Error fetching classes:', err);
+        console.error('Error fetching classes or staff:', err);
       }
     };
 
@@ -82,7 +119,7 @@ export default function MonthlyAttendanceRegisterView() {
     fetchGroups();
   }, [selectedClassId]);
 
-  // 3. Fetch Monthly Matrix
+  // 3. Fetch Monthly / Range Attendance Matrix
   const loadMatrix = useCallback(async () => {
     if (!selectedClassId) {
       setMatrixData(null);
@@ -92,58 +129,246 @@ export default function MonthlyAttendanceRegisterView() {
 
     setIsLoading(true);
     try {
-      const res = await getMonthlyAttendanceMatrix({
+      const params = {
         class_id: selectedClassId,
         group_id: selectedGroupId || undefined,
-        session_slot_id: selectedSlotId || undefined,
-        year: selectedYear,
-        month: selectedMonth,
-      });
+        teacher_id: selectedTeacherId || undefined,
+      };
 
+      if (startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      } else {
+        params.year = selectedYear;
+        params.month = selectedMonth;
+      }
+
+      const res = await getMonthlyAttendanceMatrix(params);
       setMatrixData(res);
     } catch (err) {
-      console.error('Error loading monthly attendance matrix:', err);
-      showToast('Failed to load monthly attendance register', 'error');
+      console.error('Error loading attendance matrix:', err);
+      showToast('Failed to load class attendance matrix', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedClassId, selectedGroupId, selectedSlotId, selectedYear, selectedMonth, showToast]);
+  }, [selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, showToast]);
 
   useEffect(() => {
     loadMatrix();
   }, [loadMatrix]);
 
-  // Month navigation
-  const handlePrevMonth = () => {
-    if (selectedMonth === 1) {
-      setSelectedMonth(12);
-      setSelectedYear((y) => y - 1);
-    } else {
-      setSelectedMonth((m) => m - 1);
+  // Dynamic Stepper Labels and Shifting
+  const getStepLabels = () => {
+    if (!startDate || !endDate) {
+      return { prev: 'Prev Month', next: 'Next Month' };
+    }
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayCount === 7) return { prev: 'Prev Week', next: 'Next Week' };
+    if (dayCount === 14) return { prev: 'Prev 2 Weeks', next: 'Next 2 Weeks' };
+    if (dayCount === 1) return { prev: 'Prev Day', next: 'Next Day' };
+    return { prev: 'Prev Period', next: 'Next Period' };
+  };
+
+  const stepLabels = getStepLabels();
+
+  const handleStepBackward = () => {
+    if (!startDate || !endDate) {
+      if (selectedMonth === 1) {
+        setSelectedMonth(12);
+        setSelectedYear((y) => y - 1);
+      } else {
+        setSelectedMonth((m) => m - 1);
+      }
+      return;
+    }
+
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    s.setDate(s.getDate() - dayCount);
+    e.setDate(e.getDate() - dayCount);
+    setStartDate(s.toISOString().split('T')[0]);
+    setEndDate(e.toISOString().split('T')[0]);
+  };
+
+  const handleStepForward = () => {
+    if (!startDate || !endDate) {
+      if (selectedMonth === 12) {
+        setSelectedMonth(1);
+        setSelectedYear((y) => y + 1);
+      } else {
+        setSelectedMonth((m) => m + 1);
+      }
+      return;
+    }
+
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    s.setDate(s.getDate() + dayCount);
+    e.setDate(e.getDate() + dayCount);
+    setStartDate(s.toISOString().split('T')[0]);
+    setEndDate(e.toISOString().split('T')[0]);
+  };
+
+  const handleDateRangeSelect = (start, end) => {
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const handleResetDateRange = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
+  // Toggle "Take Attendance" mode
+  const handleToggleTakeAttendance = () => {
+    setIsEditing((prev) => {
+      const next = !prev;
+      if (next) {
+        showToast('Attendance marking mode enabled. Click any student date cell to mark attendance.', 'info');
+      } else {
+        showToast('Attendance marking mode saved.', 'success');
+      }
+      return next;
+    });
+  };
+
+  // Month Names
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  // Compute Header Date Details
+  const getHeaderDateDetails = () => {
+    if (startDate && endDate) {
+      const [sy, sm, sd] = startDate.split('-');
+      const [ey, em, ed] = endDate.split('-');
+      const gregorianTitle = `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`;
+      const hijriTitle = `${getHijriDateString(startDate)} – ${getHijriDateString(endDate)}`;
+      return { gregorianTitle, hijriTitle };
+    }
+
+    const firstDayStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const gregorianTitle = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
+    const hijriTitle = getHijriDateString(firstDayStr);
+    return { gregorianTitle, hijriTitle };
+  };
+
+  const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
+
+  // Interactive Click to Mark/Toggle Cell Attendance (Excludes Holidays/Weekends)
+  const handleToggleCellAttendance = async (studentId, dateStr, currentStatus, periodSlotId) => {
+    // Determine next status in cycle
+    let nextStatus = 'PRESENT';
+    if (currentStatus === 'PRESENT') {
+      nextStatus = 'ABSENT';
+    } else if (currentStatus === 'ABSENT') {
+      nextStatus = 'LATE';
+    } else if (currentStatus === 'LATE') {
+      nextStatus = 'PRESENT';
+    }
+
+    // Optimistic Update
+    setMatrixData((prev) => {
+      if (!prev || !prev.students_matrix) return prev;
+
+      const updatedMatrix = prev.students_matrix.map((row) => {
+        const isMatch =
+          row.student_id === studentId &&
+          (!periodSlotId || !row.period_slot_id || String(row.period_slot_id) === String(periodSlotId));
+        if (!isMatch) return row;
+
+        const updatedStatuses = { ...row.daily_statuses, [dateStr]: nextStatus };
+
+        // Recalculate totals (Excludes holidays and weekends)
+        let p_count = 0;
+        let l_count = 0;
+        let a_count = 0;
+        let hd_count = 0;
+        let lv_count = 0;
+        let hol_count = 0;
+
+        prev.days_header.forEach((d) => {
+          const isOff = d.is_holiday || d.is_weekend;
+          const st = updatedStatuses[d.date] || updatedStatuses[d.day];
+
+          if (isOff) {
+            hol_count += 1;
+          } else if (st === 'PRESENT') {
+            p_count += 1;
+          } else if (st === 'LATE') {
+            l_count += 1;
+          } else if (st === 'ABSENT') {
+            a_count += 1;
+          } else if (st === 'HALF_DAY') {
+            hd_count += 1;
+          } else if (st === 'ON_LEAVE') {
+            lv_count += 1;
+          }
+        });
+
+        const totalRecorded = p_count + l_count + a_count + hd_count + lv_count;
+        const effectivePresent = p_count + l_count + hd_count * 0.5;
+        const attendanceRate = totalRecorded > 0 ? Math.round((effectivePresent / totalRecorded) * 1000) / 10 : 0.0;
+
+        return {
+          ...row,
+          daily_statuses: updatedStatuses,
+          totals: {
+            present: p_count,
+            late: l_count,
+            absent: a_count,
+            half_day: hd_count,
+            on_leave: lv_count,
+            holiday_excused: hol_count,
+            total_recorded: totalRecorded,
+            attendance_rate: attendanceRate,
+          },
+        };
+      });
+
+      return {
+        ...prev,
+        students_matrix: updatedMatrix,
+      };
+    });
+
+    try {
+      await bulkMarkStudentAttendance({
+        date: dateStr,
+        class_id: selectedClassId ? Number(selectedClassId) : null,
+        group_id: selectedGroupId ? Number(selectedGroupId) : null,
+        override_holiday: true,
+        records: [
+          {
+            student_id: studentId,
+            period_slot_id: periodSlotId && periodSlotId !== 'DEFAULT' ? periodSlotId : null,
+            status: nextStatus,
+          },
+        ],
+      });
+    } catch (err) {
+      console.error('Failed to update student attendance cell:', err);
+      showToast('Could not save attendance change', 'error');
+      loadMatrix();
     }
   };
 
-  const handleNextMonth = () => {
-    if (selectedMonth === 12) {
-      setSelectedMonth(1);
-      setSelectedYear((y) => y + 1);
-    } else {
-      setSelectedMonth((m) => m + 1);
-    }
-  };
-
-  // Export CSV
+  // Export CSV Handler
   const handleExportCSV = () => {
     if (!matrixData || !matrixData.students_matrix || matrixData.students_matrix.length === 0) {
       showToast('No attendance matrix data available to export.', 'warning');
       return;
     }
 
-    const daysCount = matrixData.total_days;
     const headerRow = ['Roll', 'Student Name', 'Class', 'Group'];
-    for (let d = 1; d <= daysCount; d++) {
-      headerRow.push(`Day ${d}`);
-    }
+    matrixData.days_header.forEach((d) => {
+      headerRow.push(`${d.weekday} ${d.day}`);
+    });
     headerRow.push('Present', 'Late', 'Absent', 'Rate %');
 
     const csvRows = [headerRow.join(',')];
@@ -151,15 +376,15 @@ export default function MonthlyAttendanceRegisterView() {
     matrixData.students_matrix.forEach((s) => {
       const row = [
         s.roll_number || '',
-        `"${s.name.replace(/"/g, '""')}"`,
-        `"${s.class_name}"`,
-        `"${s.group_name}"`,
+        `"${(s.name || '').replace(/"/g, '""')}"`,
+        `"${s.class_name || ''}"`,
+        `"${s.group_name || ''}"`,
       ];
 
-      for (let d = 1; d <= daysCount; d++) {
-        const st = s.daily_statuses[d] || '—';
+      matrixData.days_header.forEach((d) => {
+        const st = s.daily_statuses[d.date] || s.daily_statuses[d.day] || '—';
         row.push(st);
-      }
+      });
 
       row.push(s.totals.present);
       row.push(s.totals.late);
@@ -172,314 +397,259 @@ export default function MonthlyAttendanceRegisterView() {
     const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvRows.join('\n'));
     const link = document.createElement('a');
     link.setAttribute('href', csvContent);
-    link.setAttribute('download', `Monthly_Attendance_Register_${selectedYear}_${selectedMonth}.csv`);
+    link.setAttribute('download', `Class_Attendance_Matrix_${selectedYear}_${selectedMonth}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Monthly register exported to CSV!', 'success');
+    showToast('Attendance register exported to CSV!', 'success');
   };
 
-  // Print Handler
   const handlePrint = () => {
     window.print();
   };
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+  // 3-Dot Action Menu Items
+  const headerActionMenuItems = [
+    {
+      label: 'Print Register',
+      icon: PrintIcon,
+      onClick: handlePrint,
+    },
+    {
+      label: 'Export CSV / Excel',
+      icon: DownloadIcon,
+      onClick: handleExportCSV,
+    },
+    {
+      label: 'Refresh Register',
+      icon: RefreshIcon,
+      onClick: loadMatrix,
+    },
+  ];
+
+  // Options for CustomSelect
+  const classOptions = classes.map((c) => ({
+    value: String(c.id),
+    label: `${c.name} (${c.code || 'Class'})`,
+  }));
+
+  const groupOptions = [
+    { value: '', label: 'All Groups' },
+    ...groups.map((g) => ({
+      value: String(g.id),
+      label: g.name,
+    })),
+  ];
+
+  const teacherOptions = [
+    { value: '', label: 'All Teachers' },
+    ...teachers.map((t) => ({
+      value: String(t.id),
+      label: `${t.user_name || t.employee_id || 'Teacher'} (${t.designation || 'Faculty'})`,
+    })),
   ];
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
-      {/* 1. Header Hub */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-inner">
-              <AdmissionIcon className="w-6 h-6" />
+    <div className="p-4 md:p-6 space-y-6 max-w-[1720px] w-full mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
+      
+      {/* 1. Header Hub with Reusable PageHeader */}
+      {!hideHeader && (
+        <div className="print:hidden">
+          <PageHeader
+            icon={MatrixIcon}
+            title="Class Attendance"
+            subtitle="Monthly attendance matrix and register for classes & groups with automated computations"
+            actions={
+              <div className="flex items-center gap-2">
+                {/* Take Attendance Toggle Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleTakeAttendance}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer ${
+                    isEditing
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25 ring-2 ring-emerald-500/30'
+                      : 'theme-bg-accent theme-accent-text hover:opacity-90'
+                  }`}
+                >
+                  {isEditing ? (
+                    <>
+                      <FilledCheckCircleIcon className="w-4 h-4 text-white" />
+                      <span>Done Marking</span>
+                    </>
+                  ) : (
+                    <>
+                      <AttendanceIcon className="w-4 h-4" />
+                      <span>Take Attendance</span>
+                    </>
+                  )}
+                </button>
+
+                {/* 3-Dot Action Menu for secondary actions */}
+                <ActionMenu items={headerActionMenuItems} />
+              </div>
+            }
+          />
+        </div>
+      )}
+
+      {/* 2. Unified Combined Header & Filter Card */}
+      <div className="p-5 rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4 print:hidden">
+        
+        {/* Top Row: Date Display & Smart Adaptive Stepper */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            {/* Line 1: Gregorian Date / Month Year / Range */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+              <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
+                {gregorianTitle}
+              </h2>
+              {startDate && endDate && (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent uppercase tracking-wider">
+                  Custom Range
+                </span>
+              )}
+              {isEditing && (
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider animate-pulse">
+                  Attendance Marking Active
+                </span>
+              )}
             </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
-                Monthly Attendance Register
-              </h1>
-              <p className="text-xs theme-text-secondary">
-                31-Day Excel-like attendance matrix with automated percentage computations & export
+
+            {/* Line 2: Islamic Hijri Summary (if setting enabled) */}
+            {isHijriEnabled && (
+              <p className="text-xs theme-accent font-medium pl-6">
+                Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
               </p>
-            </div>
+            )}
+          </div>
+
+          {/* Smart Stepper Controls */}
+          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+            <button
+              type="button"
+              onClick={handleStepBackward}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
+              title={stepLabels.prev}
+            >
+              <span>←</span>
+              <span>{stepLabels.prev}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleStepForward}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
+              title={stepLabels.next}
+            >
+              <span>{stepLabels.next}</span>
+              <span>→</span>
+            </button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={loadMatrix}
-            disabled={isLoading}
-            className="p-2 rounded-xl theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer"
-            title="Refresh Matrix"
-          >
-            <RefreshIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl theme-bg-surface border theme-border hover:theme-bg-elevated theme-text-primary text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <PrintIcon className="w-4 h-4" />
-            <span>Print Register</span>
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition-all cursor-pointer"
-          >
-            <DownloadIcon className="w-4 h-4" />
-            <span>Export Excel / CSV</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Month Selector & Filter Ribbon */}
-      <div className="p-4 rounded-3xl theme-bg-surface border theme-border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 print:hidden">
-        {/* Month Navigator */}
-        <div className="flex items-center gap-2 md:col-span-2">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-bold cursor-pointer"
-          >
-            ←
-          </button>
-          <div className="flex-1 text-center py-2 px-3 rounded-xl theme-bg-sub border theme-border font-bold text-xs theme-text-primary">
-            {monthNames[selectedMonth - 1]} {selectedYear}
+        {/* Bottom Row: 4-Column Clean Filters (Class, Group, Teacher, Date Range) */}
+        <div className="border-t theme-border pt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-end">
+          
+          {/* 1. Class Filter */}
+          <div>
+            <CustomSelect
+              label="Select Class"
+              value={selectedClassId}
+              onChange={setSelectedClassId}
+              options={classOptions}
+              placeholder="Select Class..."
+              searchable={false}
+            />
           </div>
-          <button
-            onClick={handleNextMonth}
-            className="p-2 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-bold cursor-pointer"
-          >
-            →
-          </button>
-        </div>
 
-        {/* Class Filter */}
-        <div>
-          <select
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            className="w-full px-3 py-2 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer font-medium"
-          >
-            <option value="">-- Select Class --</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.code || 'Class'})
-              </option>
-            ))}
-          </select>
-        </div>
+          {/* 2. Group Filter */}
+          <div>
+            <CustomSelect
+              label="Select Group"
+              value={selectedGroupId}
+              onChange={setSelectedGroupId}
+              options={groups.length > 0 ? groupOptions : [{ value: '', label: 'All Groups (General)' }]}
+              placeholder="All Groups"
+              searchable={false}
+            />
+          </div>
 
-        {/* Group Filter */}
-        <div>
-          <select
-            value={selectedGroupId}
-            onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="w-full px-3 py-2 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer font-medium"
-          >
-            <option value="">-- All Groups --</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          {/* 3. Teacher Filter */}
+          <div>
+            <CustomSelect
+              label="Assigned Teacher"
+              value={selectedTeacherId}
+              onChange={setSelectedTeacherId}
+              options={teacherOptions}
+              placeholder="All Teachers"
+              searchable={true}
+            />
+          </div>
 
-        {/* Slot Filter */}
-        <div>
-          <select
-            value={selectedSlotId}
-            onChange={(e) => setSelectedSlotId(e.target.value)}
-            className="w-full px-3 py-2 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer font-medium"
-          >
-            <option value="">-- Daily General Slot --</option>
-            {slots.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          {/* 4. Reusable Date Range Filter */}
+          <div>
+            <DateRangePicker
+              label="View Period / Date Range"
+              startDate={startDate}
+              endDate={endDate}
+              onRangeSelect={handleDateRangeSelect}
+              onReset={handleResetDateRange}
+              isHijriEnabled={isHijriEnabled}
+              placeholder="Full Month View"
+            />
+          </div>
         </div>
       </div>
 
-      {/* 3. 31-Day Excel-Style Matrix Table */}
-      <div className="rounded-3xl theme-bg-surface border theme-border shadow-xl overflow-hidden">
+      {/* 3. Reusable Attendance Matrix Table */}
+      <div className="rounded-3xl theme-bg-surface border theme-border shadow-xs overflow-hidden">
+        
         {/* Printable Header */}
         <div className="hidden print:block p-4 border-b theme-border text-center">
           <h2 className="text-lg font-bold">Monthly Student Attendance Register</h2>
           <p className="text-xs">
-            Month: {monthNames[selectedMonth - 1]} {selectedYear} | Class:{' '}
+            Period: {gregorianTitle} {isHijriEnabled && `(${hijriTitle})`} | Class:{' '}
             {classes.find((c) => String(c.id) === selectedClassId)?.name || 'All'}
           </p>
         </div>
 
-        {isLoading ? (
-          <div className="p-12 text-center text-xs theme-text-secondary flex flex-col items-center gap-3">
-            <RefreshIcon className="w-6 h-6 animate-spin text-indigo-400" />
-            <span>Generating 31-day attendance register matrix...</span>
-          </div>
-        ) : !matrixData || matrixData.students_matrix.length === 0 ? (
-          <div className="p-12 text-center text-xs theme-text-secondary">
-            No attendance records found for this class in {monthNames[selectedMonth - 1]} {selectedYear}.
-          </div>
-        ) : (
-          <div className="overflow-x-auto max-h-[70vh]">
-            <table className="w-full text-left border-collapse text-[11px]">
-              {/* Table Sticky Headers */}
-              <thead className="sticky top-0 z-20 theme-bg-sub border-b theme-border">
-                {/* 1st Row: Day Numbers */}
-                <tr className="border-b theme-border text-center font-bold">
-                  <th className="py-2.5 px-3 w-12 sticky left-0 z-30 theme-bg-sub border-r theme-border">
-                    Roll
-                  </th>
-                  <th className="py-2.5 px-3 min-w-[140px] sticky left-12 z-30 theme-bg-sub border-r theme-border text-left">
-                    Student Name
-                  </th>
-
-                  {/* Day Number Headers (1 to 31) */}
-                  {matrixData.days_header.map((d) => (
-                    <th
-                      key={d.day}
-                      className={`py-1.5 px-1 min-w-[28px] max-w-[32px] font-mono border-r theme-border ${
-                        d.is_holiday ? 'bg-amber-500/20 text-amber-300' : ''
-                      }`}
-                      title={d.holiday_title || `${d.weekday} - Day ${d.day}`}
-                    >
-                      <div>{d.day}</div>
-                      <div className="text-[9px] font-normal uppercase opacity-75">{d.weekday.slice(0, 2)}</div>
-                    </th>
-                  ))}
-
-                  {/* Summary Metric Headers */}
-                  <th className="py-2 px-2 w-10 text-emerald-400 border-l theme-border">P</th>
-                  <th className="py-2 px-2 w-10 text-amber-400">L</th>
-                  <th className="py-2 px-2 w-10 text-rose-400">A</th>
-                  <th className="py-2 px-2 w-14 text-right pr-3">Rate %</th>
-                </tr>
-              </thead>
-
-              {/* Student Matrix Rows */}
-              <tbody className="divide-y theme-border">
-                {matrixData.students_matrix.map((row) => {
-                  const rate = row.totals.attendance_rate;
-
-                  return (
-                    <tr key={row.student_id} className="hover:theme-bg-elevated/40 transition-colors">
-                      {/* Sticky Roll No */}
-                      <td className="py-2 px-3 text-center font-bold font-mono sticky left-0 z-10 theme-bg-surface border-r theme-border">
-                        {row.roll_number || '—'}
-                      </td>
-
-                      {/* Sticky Student Name */}
-                      <td className="py-2 px-3 sticky left-12 z-10 theme-bg-surface border-r theme-border">
-                        <div className="font-bold theme-text-primary truncate max-w-[130px]" title={row.name}>
-                          {row.name}
-                        </div>
-                        <div className="text-[10px] theme-text-secondary truncate max-w-[130px]">
-                          {row.group_name || row.class_name}
-                        </div>
-                      </td>
-
-                      {/* Day Status Cells (1 to 31) */}
-                      {matrixData.days_header.map((d) => {
-                        const status = row.daily_statuses[d.day];
-
-                        let cellText = '·';
-                        let cellClass = 'theme-text-secondary/40';
-
-                        if (status === 'PRESENT') {
-                          cellText = 'P';
-                          cellClass = 'bg-emerald-500/20 text-emerald-400 font-bold';
-                        } else if (status === 'LATE') {
-                          cellText = 'L';
-                          cellClass = 'bg-amber-500/20 text-amber-400 font-bold';
-                        } else if (status === 'ABSENT') {
-                          cellText = 'A';
-                          cellClass = 'bg-rose-500/25 text-rose-400 font-bold';
-                        } else if (status === 'HALF_DAY') {
-                          cellText = 'H';
-                          cellClass = 'bg-sky-500/20 text-sky-400 font-bold';
-                        } else if (status === 'ON_LEAVE') {
-                          cellText = 'LV';
-                          cellClass = 'bg-purple-500/20 text-purple-400 font-bold';
-                        } else if (status === 'HOLIDAY_EXCUSED' || d.is_holiday) {
-                          cellText = '—';
-                          cellClass = 'bg-amber-500/10 text-amber-400/50';
-                        }
-
-                        return (
-                          <td
-                            key={d.day}
-                            className={`py-1.5 px-0.5 text-center font-mono text-[10px] border-r theme-border ${cellClass}`}
-                            title={`Day ${d.day}: ${status || 'Unrecorded'}`}
-                          >
-                            {cellText}
-                          </td>
-                        );
-                      })}
-
-                      {/* Totals & Attendance Percentage */}
-                      <td className="py-2 px-1 text-center font-bold font-mono text-emerald-400 border-l theme-border">
-                        {row.totals.present}
-                      </td>
-                      <td className="py-2 px-1 text-center font-bold font-mono text-amber-400">
-                        {row.totals.late}
-                      </td>
-                      <td className="py-2 px-1 text-center font-bold font-mono text-rose-400">
-                        {row.totals.absent}
-                      </td>
-                      <td className="py-2 px-2 text-right pr-3 font-bold font-mono">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] ${
-                            rate >= 85
-                              ? 'text-emerald-400 bg-emerald-500/10'
-                              : rate >= 70
-                              ? 'text-amber-400 bg-amber-500/10'
-                              : 'text-rose-400 bg-rose-500/10'
-                          }`}
-                        >
-                          {rate}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Reusable AttendanceMatrixTable Component */}
+        <AttendanceMatrixTable
+          matrixData={matrixData}
+          isEditing={isEditing}
+          onToggleCell={handleToggleCellAttendance}
+          isHijriEnabled={isHijriEnabled}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          onStudentClick={onStudentClick}
+          isLoading={isLoading}
+        />
 
         {/* Legend Ribbon */}
         <div className="p-3.5 border-t theme-border theme-bg-sub flex flex-wrap items-center justify-between gap-3 text-[11px] theme-text-secondary">
-          <div className="flex items-center gap-3 flex-wrap font-mono">
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px]">P</span> Present
+          <div className="flex items-center gap-3.5 flex-wrap font-mono">
+            <span className="flex items-center gap-1.5">
+              <FilledCheckCircleIcon className="w-3.5 h-3.5 text-emerald-600/85 dark:text-emerald-400/90" /> Present
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-[10px]">L</span> Late
+            <span className="flex items-center gap-1.5">
+              <FilledXCircleIcon className="w-3.5 h-3.5 text-rose-500/80 dark:text-rose-400/85" /> Absent
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-rose-500/25 text-rose-400 font-bold flex items-center justify-center text-[10px]">A</span> Absent
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-500/10 text-amber-600/90 dark:text-amber-400/90 font-bold flex items-center justify-center text-[9px]">L</span> Late
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">H</span> Half Day
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-600/90 dark:text-sky-400/90 font-bold flex items-center justify-center text-[9px]">H</span> Half Day
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center text-[10px]">LV</span> Leave
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-full bg-purple-500/10 text-purple-600/90 dark:text-purple-400/90 font-bold flex items-center justify-center text-[9px]">LV</span> Leave
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-4 h-4 rounded bg-amber-500/10 text-amber-400 flex items-center justify-center text-[10px]">—</span> Holiday
+            <span className="flex items-center gap-1.5">
+              <span className="opacity-35 font-mono text-xs">—</span> Holiday / Weekend
             </span>
           </div>
 
-          <div className="font-mono">
-            Total Students: {matrixData?.total_students || 0}
+          <div className="font-mono font-medium">
+            Total Students: <strong className="theme-text-primary">{matrixData?.total_students || 0}</strong>
           </div>
         </div>
       </div>

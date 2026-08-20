@@ -9,7 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import uuid
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 import calendar
 import io
 import base64
@@ -33,6 +33,9 @@ from drf_spectacular.types import OpenApiTypes
 from .models import (
     AcademicInstitution,
     InstitutionCategory,
+    AcademicBranch,
+    ClassSection,
+    ClassPeriodSlot,
     Student,
     AcademicDepartment,
     StudentClass,
@@ -134,6 +137,9 @@ from .serializers import (
     AcademicInstitutionSerializer,
     InstitutionCategorySerializer,
     InstitutionOnboardingSerializer,
+    AcademicBranchSerializer,
+    ClassSectionSerializer,
+    ClassPeriodSlotSerializer,
     StudentSerializer,
     AcademicDepartmentSerializer,
     StudentClassSerializer,
@@ -1312,6 +1318,287 @@ class InstitutionCategoryViewSet(viewsets.ModelViewSet):
         if show_all and is_super:
             return InstitutionCategory.objects.all().order_by('order', 'name')
         return InstitutionCategory.objects.filter(is_active=True).order_by('order', 'name')
+
+
+class AcademicBranchViewSet(viewsets.ModelViewSet):
+    queryset = AcademicBranch.objects.filter(is_deleted=False).select_related('institution', 'in_charge_staff__user').order_by('branch_name')
+    serializer_class = AcademicBranchSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    required_section_key = 'academic_branches'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = AcademicBranch.objects.filter(is_deleted=True) if show_trash else AcademicBranch.objects.filter(is_deleted=False)
+
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        branch_type = self.request.query_params.get('branch_type') or self.request.query_params.get('type')
+        if branch_type and branch_type != 'ALL':
+            qs = qs.filter(branch_type=branch_type)
+
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None and is_active != 'ALL':
+            qs = qs.filter(is_active=(is_active.lower() == 'true'))
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(branch_name__icontains=search) |
+                Q(branch_code__icontains=search) |
+                Q(district__icontains=search) |
+                Q(division__icontains=search) |
+                Q(contact_phone__icontains=search)
+            )
+
+        return qs.select_related('institution', 'in_charge_staff__user').order_by('branch_name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(institution_id=tenant_id)
+        elif self.request.user.institution_id:
+            serializer.save(institution_id=self.request.user.institution_id)
+        else:
+            first_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+            serializer.save(institution=first_inst)
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        tenant_id = get_scoped_tenant_id(request)
+        filter_kwargs = {'is_deleted': False}
+        if tenant_id:
+            filter_kwargs['institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if request.user.institution_id:
+                filter_kwargs['institution_id'] = request.user.institution_id
+
+        total_branches = AcademicBranch.objects.filter(**filter_kwargs).count()
+        main_campuses = AcademicBranch.objects.filter(branch_type='MAIN_CAMPUS', **filter_kwargs).count()
+        sub_branches = AcademicBranch.objects.filter(branch_type='SUB_BRANCH', **filter_kwargs).count()
+        active_in_charges = AcademicBranch.objects.filter(in_charge_staff__isnull=False, **filter_kwargs).count()
+        
+        from django.db.models import Sum
+        capacity_sum = ClassSection.objects.filter(branch__in=AcademicBranch.objects.filter(**filter_kwargs), is_deleted=False).aggregate(total=Sum('max_capacity'))['total'] or 0
+
+        return Response({
+            "total_branches": total_branches,
+            "main_campuses": main_campuses,
+            "sub_branches": sub_branches,
+            "total_capacity": capacity_sum,
+            "active_in_charges": active_in_charges
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='stats')
+    def stats(self, request, pk=None):
+        branch = self.get_object()
+        total_students = Student.objects.filter(branch=branch, is_deleted=False).count()
+        total_sections = branch.sections.filter(is_deleted=False).count()
+        total_classes = StudentClass.objects.filter(sections__branch=branch, sections__is_deleted=False, is_deleted=False).distinct().count()
+        
+        from django.db.models import Sum
+        total_capacity = branch.sections.filter(is_deleted=False).aggregate(total=Sum('max_capacity'))['total'] or 0
+        
+        sections = ClassSectionSerializer(branch.sections.filter(is_deleted=False), many=True).data
+
+        return Response({
+            "id": branch.id,
+            "branch_name": branch.branch_name,
+            "branch_code": branch.branch_code,
+            "branch_type": branch.branch_type,
+            "total_students": total_students,
+            "total_sections": total_sections,
+            "total_classes": total_classes,
+            "total_capacity": total_capacity,
+            "sections": sections
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Branch '{instance.branch_name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+
+
+class ClassSectionViewSet(viewsets.ModelViewSet):
+    queryset = ClassSection.objects.filter(is_deleted=False).select_related('student_class', 'branch', 'class_teacher__user').order_by('student_class__order_rank', 'section_name')
+    serializer_class = ClassSectionSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    required_section_key = 'class_sections'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = ClassSection.objects.filter(is_deleted=True) if show_trash else ClassSection.objects.filter(is_deleted=False)
+
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(student_class__institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(student_class__institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        class_id = self.request.query_params.get('class') or self.request.query_params.get('student_class')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student_class_id=class_id)
+
+        branch_id = self.request.query_params.get('branch')
+        if branch_id and branch_id != 'ALL':
+            qs = qs.filter(branch_id=branch_id)
+
+        section_type = self.request.query_params.get('section_type')
+        if section_type and section_type != 'ALL':
+            qs = qs.filter(section_type=section_type)
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(section_name__icontains=search) |
+                Q(room_number__icontains=search) |
+                Q(student_class__name__icontains=search)
+            )
+
+        return qs.select_related('student_class', 'branch', 'class_teacher__user').order_by('student_class__order_rank', 'section_name')
+
+    @action(detail=False, methods=['get'], url_path='metrics')
+    def metrics(self, request):
+        tenant_id = get_scoped_tenant_id(request)
+        filter_kwargs = {'is_deleted': False}
+        if tenant_id:
+            filter_kwargs['student_class__institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if request.user.institution_id:
+                filter_kwargs['student_class__institution_id'] = request.user.institution_id
+
+        total_sections = ClassSection.objects.filter(**filter_kwargs).count()
+        from django.db.models import Sum
+        total_capacity = ClassSection.objects.filter(**filter_kwargs).aggregate(total=Sum('max_capacity'))['total'] or 0
+        total_enrolled = Student.objects.filter(section__in=ClassSection.objects.filter(**filter_kwargs), is_deleted=False).count()
+        occupancy_rate = round((total_enrolled / total_capacity * 100), 1) if total_capacity > 0 else 0.0
+
+        return Response({
+            "total_sections": total_sections,
+            "total_capacity": total_capacity,
+            "total_enrolled": total_enrolled,
+            "occupancy_rate": occupancy_rate
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Section '{instance.section_name}' has been soft-deleted."}, status=status.HTTP_200_OK)
+
+
+class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
+    queryset = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'branch', 'department', 'student_class').order_by('period_order', 'start_time')
+    serializer_class = ClassPeriodSlotSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
+    required_section_key = 'class_period_slots'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = ClassPeriodSlot.objects.filter(is_deleted=True) if show_trash else ClassPeriodSlot.objects.filter(is_deleted=False)
+
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.none()
+
+        dept_id = self.request.query_params.get('department')
+        if dept_id and dept_id != 'ALL':
+            qs = qs.filter(department_id=dept_id)
+
+        class_id = self.request.query_params.get('class') or self.request.query_params.get('student_class')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(student_class_id=class_id)
+
+        branch_id = self.request.query_params.get('branch')
+        if branch_id and branch_id != 'ALL':
+            qs = qs.filter(branch_id=branch_id)
+
+        teacher_id = self.request.query_params.get('teacher')
+        if teacher_id and teacher_id != 'ALL':
+            qs = qs.filter(teacher_id=teacher_id)
+
+        slot_type = self.request.query_params.get('slot_type')
+        if slot_type and slot_type != 'ALL':
+            qs = qs.filter(slot_type=slot_type)
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(period_name__icontains=search) |
+                Q(department__name__icontains=search) |
+                Q(student_class__name__icontains=search) |
+                Q(teacher__user__first_name__icontains=search) |
+                Q(teacher__user__last_name__icontains=search) |
+                Q(teacher__user__name__icontains=search) |
+                Q(teacher__user__name_en__icontains=search)
+            )
+
+        return qs.select_related('institution', 'branch', 'department', 'student_class', 'teacher', 'teacher__user').order_by('period_order', 'start_time')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            serializer.save(institution_id=tenant_id)
+        elif self.request.user.institution_id:
+            serializer.save(institution_id=self.request.user.institution_id)
+        else:
+            first_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+            serializer.save(institution=first_inst)
+
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """
+        Bulk update period slot ordering.
+        Payload: [{'id': uuid, 'period_order': int}, ...] or {'slots': [...]}
+        """
+        slots_data = request.data.get('slots', request.data) if isinstance(request.data, dict) else request.data
+        if not isinstance(slots_data, list):
+            return Response({"error": "Expected a list of slots with id and period_order"}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            for item in slots_data:
+                slot_id = item.get('id')
+                order = item.get('period_order')
+                if slot_id and order is not None:
+                    ClassPeriodSlot.objects.filter(id=slot_id).update(period_order=order, updated_at=timezone.now())
+
+        return Response({"status": "success", "message": "Period slots re-ordered successfully."}, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+        return Response({"status": "success", "message": f"Period Slot '{instance.period_name}' has been soft-deleted."}, status=status.HTTP_200_OK)
 
 
 class AcademicDepartmentViewSet(viewsets.ModelViewSet):
@@ -4527,7 +4814,10 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
     def monthly_matrix(self, request):
         class_id = request.query_params.get('class_id')
         group_id = request.query_params.get('group_id')
-        slot_id = request.query_params.get('session_slot_id')
+        slot_id = request.query_params.get('session_slot_id') or request.query_params.get('period_slot_id')
+        teacher_id = request.query_params.get('teacher_id') or request.query_params.get('teacher')
+        start_date_param = request.query_params.get('start_date')
+        end_date_param = request.query_params.get('end_date')
 
         try:
             year = int(request.query_params.get('year', timezone.localdate().year))
@@ -4536,8 +4826,20 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             year = timezone.localdate().year
             month = timezone.localdate().month
 
-        import calendar
-        num_days = calendar.monthrange(year, month)[1]
+        if start_date_param and end_date_param:
+            try:
+                start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+                year = start_date.year
+                month = start_date.month
+            except ValueError:
+                num_days = calendar.monthrange(year, month)[1]
+                start_date = date(year, month, 1)
+                end_date = date(year, month, num_days)
+        else:
+            num_days = calendar.monthrange(year, month)[1]
+            start_date = date(year, month, 1)
+            end_date = date(year, month, num_days)
 
         tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
 
@@ -4551,22 +4853,51 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         students = list(students_qs.order_by('roll_number', 'name'))
 
-        start_date = date(year, month, 1)
-        end_date = date(year, month, num_days)
+        # Fetch configured period slots for this class / institution
+        periods_qs = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('teacher', 'teacher__user')
+        if class_id and class_id != 'ALL':
+            class_periods = list(periods_qs.filter(student_class_id=class_id).order_by('period_order', 'start_time'))
+            if class_periods:
+                period_slots = class_periods
+            else:
+                if tenant_id:
+                    period_slots = list(periods_qs.filter(institution_id=tenant_id).order_by('period_order', 'start_time'))
+                else:
+                    period_slots = list(periods_qs.order_by('period_order', 'start_time'))
+        else:
+            if tenant_id:
+                period_slots = list(periods_qs.filter(institution_id=tenant_id).order_by('period_order', 'start_time'))
+            else:
+                period_slots = list(periods_qs.order_by('period_order', 'start_time'))
+
+        if slot_id and slot_id != 'ALL':
+            period_slots = [p for p in period_slots if str(p.id) == str(slot_id)]
+
+        if teacher_id and teacher_id != 'ALL':
+            period_slots = [p for p in period_slots if p.teacher_id and str(p.teacher_id) == str(teacher_id)]
 
         att_qs = StudentAttendance.objects.filter(
             student__in=students,
             date__gte=start_date,
             date__lte=end_date
         )
-        if slot_id and slot_id != 'ALL':
-            att_qs = att_qs.filter(session_slot_id=slot_id)
 
         att_map = {}
         for att in att_qs:
-            if att.student_id not in att_map:
-                att_map[att.student_id] = {}
-            att_map[att.student_id][att.date.day] = att.status
+            p_id = str(att.period_slot_id) if att.period_slot_id else (str(att.session_slot_id) if att.session_slot_id else 'DEFAULT')
+            key = f"{att.student_id}_{p_id}"
+            if key not in att_map:
+                att_map[key] = {}
+            date_str = att.date.isoformat()
+            att_map[key][date_str] = att.status
+            att_map[key][att.date.day] = att.status
+
+            # General student key fallback
+            s_key = f"{att.student_id}_DEFAULT"
+            if s_key not in att_map:
+                att_map[s_key] = {}
+            att_map[s_key][date_str] = att.status
+            att_map[s_key][att.date.day] = att.status
 
         holidays = []
         if tenant_id:
@@ -4582,60 +4913,120 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
 
         days_header = []
-        for day in range(1, num_days + 1):
-            d = date(year, month, day)
-            weekday_str = d.strftime('%a').upper()
-            is_weekend = d.strftime('%A').upper() in weekend_days
-            matching_holiday = next((h for h in holidays if h.start_date <= d <= h.end_date), None)
+        curr_d = start_date
+        while curr_d <= end_date:
+            weekday_str = curr_d.strftime('%a').upper()
+            is_weekend = curr_d.strftime('%A').upper() in weekend_days
+            matching_holiday = next((h for h in holidays if h.start_date <= curr_d <= h.end_date), None)
 
             days_header.append({
-                "day": day,
+                "date": curr_d.isoformat(),
+                "day": curr_d.day,
+                "month": curr_d.month,
+                "year": curr_d.year,
                 "weekday": weekday_str,
                 "is_weekend": is_weekend,
                 "is_holiday": is_weekend or bool(matching_holiday),
                 "holiday_title": matching_holiday.title if matching_holiday else ("Weekend" if is_weekend else "")
             })
+            curr_d += timedelta(days=1)
 
         matrix_rows = []
+        slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
+
         for s in students:
-            s_map = att_map.get(s.id, {})
-            p_count = sum(1 for st in s_map.values() if st == 'PRESENT')
-            l_count = sum(1 for st in s_map.values() if st == 'LATE')
-            a_count = sum(1 for st in s_map.values() if st == 'ABSENT')
-            hd_count = sum(1 for st in s_map.values() if st == 'HALF_DAY')
-            lv_count = sum(1 for st in s_map.values() if st == 'ON_LEAVE')
-            hol_count = sum(1 for st in s_map.values() if st == 'HOLIDAY_EXCUSED')
+            for p_idx, slot in enumerate(slots_to_iterate):
+                slot_id_str = str(slot.id) if slot else 'DEFAULT'
+                s_map = att_map.get(f"{s.id}_{slot_id_str}") or att_map.get(f"{s.id}_DEFAULT", {})
 
-            total_recorded = p_count + l_count + a_count + hd_count + lv_count
-            effective_present = p_count + l_count + (hd_count * 0.5)
-            attendance_rate = round((effective_present / total_recorded * 100), 1) if total_recorded > 0 else 0.0
+                # Compute totals across the requested date span
+                p_count = 0
+                l_count = 0
+                a_count = 0
+                hd_count = 0
+                lv_count = 0
+                hol_count = 0
 
-            matrix_rows.append({
-                "student_id": s.id,
-                "name": s.name or s.name_en or 'Student',
-                "roll_number": s.roll_number,
-                "class_name": s.student_class.name if s.student_class else '',
-                "group_name": s.student_group.name if s.student_group else '',
-                "daily_statuses": s_map,
-                "totals": {
-                    "present": p_count,
-                    "late": l_count,
-                    "absent": a_count,
-                    "half_day": hd_count,
-                    "on_leave": lv_count,
-                    "holiday_excused": hol_count,
-                    "total_recorded": total_recorded,
-                    "attendance_rate": attendance_rate
-                }
-            })
+                for d_info in days_header:
+                    d_key = d_info["date"]
+                    st = s_map.get(d_key) or s_map.get(d_info["day"])
+                    if st == 'PRESENT':
+                        p_count += 1
+                    elif st == 'LATE':
+                        l_count += 1
+                    elif st == 'ABSENT':
+                        a_count += 1
+                    elif st == 'HALF_DAY':
+                        hd_count += 1
+                    elif st == 'ON_LEAVE':
+                        lv_count += 1
+                    elif st == 'HOLIDAY_EXCUSED':
+                        hol_count += 1
+
+                total_recorded = p_count + l_count + a_count + hd_count + lv_count
+                effective_present = p_count + l_count + (hd_count * 0.5)
+                attendance_rate = round((effective_present / total_recorded * 100), 1) if total_recorded > 0 else 0.0
+
+                t_name = ''
+                t_desig = ''
+                if slot and slot.teacher:
+                    if slot.teacher.user:
+                        t_name = slot.teacher.user.name or slot.teacher.user.name_en or f"{slot.teacher.user.first_name} {slot.teacher.user.last_name}".strip()
+                    t_desig = slot.teacher.designation or ''
+
+                matrix_rows.append({
+                    "row_key": f"{s.id}_{slot_id_str}",
+                    "student_id": s.id,
+                    "name": s.name or s.name_en or 'Student',
+                    "roll_number": s.roll_number,
+                    "class_name": s.student_class.name if s.student_class else '',
+                    "group_name": s.student_group.name if s.student_group else '',
+                    "period_slot_id": slot_id_str if slot else None,
+                    "period_name": slot.period_name if slot else 'General Routine',
+                    "period_order": slot.period_order if slot else (p_idx + 1),
+                    "start_time": str(slot.start_time)[:5] if (slot and slot.start_time) else None,
+                    "end_time": str(slot.end_time)[:5] if (slot and slot.end_time) else None,
+                    "duration_minutes": slot.duration_minutes if slot else None,
+                    "teacher_id": str(slot.teacher_id) if (slot and slot.teacher_id) else None,
+                    "teacher_name": t_name,
+                    "teacher_designation": t_desig,
+                    "period_count": len(slots_to_iterate),
+                    "period_index": p_idx,
+                    "daily_statuses": s_map,
+                    "totals": {
+                        "present": p_count,
+                        "late": l_count,
+                        "absent": a_count,
+                        "half_day": hd_count,
+                        "on_leave": lv_count,
+                        "holiday_excused": hol_count,
+                        "total_recorded": total_recorded,
+                        "attendance_rate": attendance_rate
+                    }
+                })
 
         return Response({
             "year": year,
             "month": month,
-            "total_days": num_days,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "total_days": len(days_header),
             "days_header": days_header,
             "students_matrix": matrix_rows,
-            "total_students": len(students)
+            "total_students": len(students),
+            "period_count": len(slots_to_iterate),
+            "periods": [
+                {
+                    "id": str(p.id),
+                    "name": p.period_name,
+                    "order": p.period_order,
+                    "start_time": str(p.start_time)[:5] if p.start_time else "",
+                    "end_time": str(p.end_time)[:5] if p.end_time else "",
+                    "teacher_id": str(p.teacher_id) if p.teacher_id else None,
+                    "teacher_name": (p.teacher.user.name or p.teacher.user.name_en or f"{p.teacher.user.first_name} {p.teacher.user.last_name}".strip()) if (p.teacher and p.teacher.user) else "",
+                }
+                for p in period_slots
+            ]
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='daily-summary')

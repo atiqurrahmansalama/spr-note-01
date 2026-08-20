@@ -1,33 +1,37 @@
 import React from 'react';
 
 const COLOR_MAP = {
-  sky: {
-    icon: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-    value: 'text-sky-400',
-  },
-  emerald: {
-    icon: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    value: 'text-emerald-400',
-  },
-  purple: {
-    icon: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    value: 'text-purple-400',
-  },
-  amber: {
-    icon: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    value: 'text-amber-400',
-  },
-  rose: {
-    icon: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-    value: 'text-rose-400',
-  },
   accent: {
-    icon: 'theme-bg-accent-soft theme-accent border theme-border',
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
     value: 'theme-accent',
   },
   default: {
-    icon: 'theme-bg-sub theme-text-secondary border theme-border',
-    value: 'theme-text-primary',
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  sky: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  emerald: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  purple: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  amber: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  rose: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
+  },
+  indigo: {
+    icon: 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20',
+    value: 'theme-accent',
   },
 };
 

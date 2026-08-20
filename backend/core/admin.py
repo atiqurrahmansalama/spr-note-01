@@ -3,6 +3,9 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
 from .models import (
     User,
+    AcademicBranch,
+    ClassSection,
+    ClassPeriodSlot,
     TeacherProfile,
     GuardianProfile,
     UserDevice,
@@ -131,6 +134,14 @@ class UserDeviceAdmin(admin.ModelAdmin):
 # SUPPORT TABLE ADMINS
 # ─────────────────────────────────────────────────────────────
 
+@admin.register(AcademicBranch)
+class AcademicBranchAdmin(admin.ModelAdmin):
+    list_display = ('branch_name', 'branch_code', 'branch_type', 'in_charge_staff', 'district', 'division', 'is_active', 'is_deleted', 'created_at')
+    list_filter = ('branch_type', 'division', 'district', 'is_active', 'is_deleted')
+    search_fields = ('branch_name', 'branch_code', 'address', 'district', 'division', 'contact_phone')
+    ordering = ('branch_name',)
+
+
 @admin.register(AcademicDepartment)
 class AcademicDepartmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'code', 'department_head', 'has_quran_tracker', 'order_rank', 'is_active', 'is_deleted', 'created_at')
@@ -145,6 +156,22 @@ class StudentClassAdmin(admin.ModelAdmin):
     list_filter = ('department', 'department_type', 'is_active', 'is_deleted')
     search_fields = ('name', 'code')
     ordering = ('order_rank', 'name')
+
+
+@admin.register(ClassSection)
+class ClassSectionAdmin(admin.ModelAdmin):
+    list_display = ('section_name', 'student_class', 'branch', 'section_type', 'room_number', 'max_capacity', 'class_teacher', 'is_active', 'is_deleted', 'created_at')
+    list_filter = ('section_type', 'branch', 'student_class', 'is_active', 'is_deleted')
+    search_fields = ('section_name', 'room_number', 'student_class__name')
+    ordering = ('student_class', 'section_name')
+
+
+@admin.register(ClassPeriodSlot)
+class ClassPeriodSlotAdmin(admin.ModelAdmin):
+    list_display = ('period_name', 'slot_type', 'period_order', 'start_time', 'end_time', 'duration_minutes', 'department', 'student_class', 'branch', 'is_active', 'is_deleted')
+    list_filter = ('slot_type', 'department', 'student_class', 'branch', 'is_active', 'is_deleted')
+    search_fields = ('period_name', 'department__name', 'student_class__name')
+    ordering = ('period_order', 'start_time')
 
 
 @admin.register(StudentGroup)

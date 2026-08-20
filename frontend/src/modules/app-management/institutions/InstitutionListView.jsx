@@ -21,6 +21,9 @@ import DataCardGrid from '../../../components/ui/DataCardGrid';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
+import PageHeader from '../../../components/ui/PageHeader';
+import DataViewToolbar from '../../../components/ui/DataViewToolbar';
+import DataViewFooter from '../../../components/ui/DataViewFooter';
 import {
   getInstitutions,
   getInstitutionMetrics,
@@ -33,7 +36,11 @@ import { useRightSidebar } from '../../../context/RightSidebarContext';
 import InstitutionOnboardingForm from './InstitutionOnboardingForm';
 import InstitutionEditForm from './InstitutionEditForm';
 
-export default function InstitutionListView() {
+export default function InstitutionListView({
+  hideHeader = false,
+  hideMetrics = false,
+  isEmbedded = false,
+}) {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
@@ -246,10 +253,10 @@ export default function InstitutionListView() {
               <div className="font-bold theme-text-primary flex items-center gap-1.5 flex-wrap">
                 <span className="break-words leading-tight">{inst.name}</span>
                 {inst.is_verified && (
-                  <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="Verified Academy" />
+                  <CheckCircleIcon className="w-3.5 h-3.5 theme-accent shrink-0" title="Verified Academy" />
                 )}
                 {isCurrent && (
-                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                  <span className="px-1.5 py-0.2 rounded-md theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 text-[9px] font-bold">
                     Active
                   </span>
                 )}
@@ -323,11 +330,11 @@ export default function InstitutionListView() {
         <span
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
             inst.is_active
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20'
+              : 'theme-bg-sub theme-text-secondary border theme-border'
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${inst.is_active ? 'bg-emerald-400' : 'bg-zinc-400'}`}></span>
+          <span className={`w-1.5 h-1.5 rounded-full ${inst.is_active ? 'bg-[var(--accent-main)]' : 'theme-bg-elevated'}`}></span>
           {inst.is_active ? 'Active' : 'Inactive'}
         </span>
       ),
@@ -374,7 +381,7 @@ export default function InstitutionListView() {
                     {inst.name}
                   </h3>
                   {inst.is_verified && (
-                    <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" title="Verified Academy" />
+                    <CheckCircleIcon className="w-3.5 h-3.5 theme-accent shrink-0 mt-0.5" title="Verified Academy" />
                   )}
                 </div>
               </div>
@@ -385,8 +392,8 @@ export default function InstitutionListView() {
                 {getCategoryLabel(inst.institution_type)}
               </span>
               {!inst.is_active && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border bg-zinc-500/10 text-zinc-400 border-zinc-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border theme-bg-sub theme-text-secondary border theme-border">
+                  <span className="w-1.5 h-1.5 rounded-full theme-bg-elevated"></span>
                   Inactive
                 </span>
               )}
@@ -454,157 +461,128 @@ export default function InstitutionListView() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left">
-      {/* 1. Header Overview & Primary Action */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b theme-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <BuildingOfficeIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-                Academies
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold theme-bg-sub border theme-border theme-text-secondary tracking-wide">
-                Multi-Tenant
-              </span>
-            </div>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Multi-tenant academic workspace directory & isolated database branches
-            </p>
-          </div>
-        </div>
-
-        {isMultiTenantAdmin && (
-          <button
-            type="button"
-            onClick={handleOpenOnboarding}
-            className="px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>Onboard Academy</span>
-          </button>
-        )}
-      </div>
-
-      {/* 2. Top Metric Cards */}
-      <MetricsGrid
-        items={[
-          {
-            label: 'Total Academies',
-            value: metrics.total_institutions,
-            icon: BuildingOfficeIcon,
-            color: 'default',
-          },
-          {
-            label: 'Verified Campuses',
-            value: metrics.verified_institutions,
-            icon: CheckCircleIcon,
-            color: 'accent',
-          },
-          {
-            label: 'Active Students',
-            value: metrics.total_active_students,
-            icon: UsersIcon,
-            color: 'default',
-          },
-          {
-            label: 'Faculty & Staff',
-            value: metrics.total_staff,
-            icon: DepartmentIcon,
-            color: 'default',
-          },
-        ]}
-      />
-
-      {/* 3. Search & View Mode Switcher Toolbar */}
-      <div className="p-3.5 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search academies by name, slug, phone..."
-            className="w-full h-10 pl-9 pr-3.5 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current transition-all"
-          />
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          <div className="w-48 sm:w-56 shrink-0">
-            <CustomSelect
-              size="sm"
-              value={typeFilter}
-              onChange={(val) => setTypeFilter(val)}
-              options={[
-                { value: 'ALL', label: 'All Academy Types' },
-                ...categories.map((c) => ({ value: c.code, label: c.name })),
-              ]}
-              placeholder="All Academy Types"
-            />
-          </div>
-
-          {/* View Mode Toggle Buttons */}
-          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode('grid')}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === 'grid'
-                  ? 'theme-bg-accent theme-accent-text shadow-xs'
-                  : 'theme-text-secondary hover:theme-text-primary'
-              }`}
-            >
-              <BuildingOfficeIcon className="w-3.5 h-3.5" />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode('table')}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === 'table'
-                  ? 'theme-bg-accent theme-accent-text shadow-xs'
-                  : 'theme-text-secondary hover:theme-text-primary'
-              }`}
-            >
-              <DepartmentIcon className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Display: Reusable DataCardGrid or DataTable */}
-      {viewMode === 'grid' ? (
-        <DataCardGrid
-          data={filteredInstitutions}
-          renderCard={renderAcademyCard}
-          isLoading={isLoading}
-          loadingMessage="Loading academies..."
-          emptyIcon={BuildingOfficeIcon}
-          emptyTitle="No Academies Found"
-          emptySubMessage={
-            searchQuery
-              ? `No academies matched "${searchQuery}". Try adjusting your search query.`
-              : 'Onboard your first multi-tenant academy to get started.'
+    <div className={`${isEmbedded ? 'w-full space-y-6 font-sans theme-text-primary animate-fade-in text-left' : 'w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left'}`}>
+      {/* 1. Header Overview & Primary Action with Reusable PageHeader */}
+      {!hideHeader && (
+        <PageHeader
+          icon={BuildingOfficeIcon}
+          title="Academies"
+          badge={
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold theme-bg-sub border theme-border theme-text-secondary tracking-wide">
+              Multi-Tenant
+            </span>
           }
-        />
-      ) : (
-        <DataTable
-          columns={tableColumns}
-          data={filteredInstitutions}
-          isLoading={isLoading}
-          loadingMessage="Loading academies table..."
-          emptyIcon={BuildingOfficeIcon}
-          emptyTitle="No Academies Found"
-          emptySubMessage={
-            searchQuery
-              ? `No academies matched "${searchQuery}". Try adjusting your search query.`
-              : 'Onboard your first multi-tenant academy to get started.'
+          subtitle="Multi-tenant academic workspace directory & isolated database branches"
+          actions={
+            isMultiTenantAdmin && (
+              <button
+                type="button"
+                onClick={handleOpenOnboarding}
+                className="px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>Onboard Academy</span>
+              </button>
+            )
           }
         />
       )}
+
+      {/* 2. Top Metric Cards */}
+      {!hideMetrics && (
+        <MetricsGrid
+          items={[
+            {
+              label: 'Total Academies',
+              value: metrics.total_institutions,
+              icon: BuildingOfficeIcon,
+              color: 'default',
+            },
+            {
+              label: 'Verified Campuses',
+              value: metrics.verified_institutions,
+              icon: CheckCircleIcon,
+              color: 'accent',
+            },
+            {
+              label: 'Active Students',
+              value: metrics.total_active_students,
+              icon: UsersIcon,
+              color: 'default',
+            },
+            {
+              label: 'Faculty & Staff',
+              value: metrics.total_staff,
+              icon: DepartmentIcon,
+              color: 'default',
+            },
+          ]}
+        />
+      )}
+
+      {/* 3. Search & View Mode Switcher Toolbar */}
+      <DataViewToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search academies by name, slug, phone..."
+        filterElement={
+          <CustomSelect
+            size="sm"
+            searchable={false}
+            value={typeFilter}
+            onChange={(val) => setTypeFilter(val)}
+            options={[
+              { value: 'ALL', label: 'All Academy Types' },
+              ...categories.map((c) => ({ value: c.code, label: c.name })),
+            ]}
+            placeholder="All Academy Types"
+          />
+        }
+        viewMode={viewMode}
+        onToggleViewMode={handleToggleViewMode}
+      />
+
+      {/* 4. Display: Reusable DataCardGrid or DataTable */}
+      <div className="space-y-4">
+        {viewMode === 'grid' ? (
+          <DataCardGrid
+            data={filteredInstitutions}
+            renderCard={renderAcademyCard}
+            isLoading={isLoading}
+            loadingMessage="Loading academies..."
+            emptyIcon={BuildingOfficeIcon}
+            emptyTitle="No Academies Found"
+            emptySubMessage={
+              searchQuery
+                ? `No academies matched "${searchQuery}". Try adjusting your search query.`
+                : 'Onboard your first multi-tenant academy to get started.'
+            }
+          />
+        ) : (
+          <DataTable
+            columns={tableColumns}
+            data={filteredInstitutions}
+            isLoading={isLoading}
+            loadingMessage="Loading academies table..."
+            emptyIcon={BuildingOfficeIcon}
+            emptyTitle="No Academies Found"
+            emptySubMessage={
+              searchQuery
+                ? `No academies matched "${searchQuery}". Try adjusting your search query.`
+                : 'Onboard your first multi-tenant academy to get started.'
+            }
+          />
+        )}
+
+        {/* Reusable DataViewFooter */}
+        {!isLoading && institutions.length > 0 && (
+          <DataViewFooter
+            filteredCount={filteredInstitutions.length}
+            totalCount={institutions.length}
+            itemLabel="academies"
+          />
+        )}
+      </div>
 
       {/* 5. High-Security Delete Confirmation Modal (Native Portal) */}
       {deletingInst &&

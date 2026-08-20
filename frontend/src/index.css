@@ -39,10 +39,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar styling */
+/* Global ultra-lightweight soft scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -50,12 +50,17 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: color-mix(in srgb, var(--accent-main, #6366f1) 12%, rgba(148, 163, 184, 0.16));
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: color-mix(in srgb, var(--accent-main, #6366f1) 24%, rgba(148, 163, 184, 0.3));
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent-main, #6366f1) 12%, rgba(148, 163, 184, 0.16)) transparent;
 }
 
 body {
@@ -278,4 +283,17 @@ html[data-theme="amber"][data-mode="light"] {
   --accent-main: #d97706;
   --accent-soft: rgba(217, 119, 6, 0.10);
   --accent-text: #ffffff;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

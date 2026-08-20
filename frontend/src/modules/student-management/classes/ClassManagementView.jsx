@@ -20,11 +20,17 @@ import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
+import PageHeader from "../../../components/ui/PageHeader";
+import DataViewToolbar from "../../../components/ui/DataViewToolbar";
 import ClassFormModal from "./ClassFormModal";
 import ClassMigrationModal from "./ClassMigrationModal";
 import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
-export default function ClassManagementView() {
+export default function ClassManagementView({
+  hideHeader = false,
+  hideMetrics = false,
+  isEmbedded = false,
+}) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,6 +73,12 @@ export default function ClassManagementView() {
       localStorage.setItem("spr_classes_view_mode", mode);
     } catch {}
   };
+
+  useEffect(() => {
+    const handleOpen = () => handleOpenCreate();
+    window.addEventListener("spr_open_create_class", handleOpen);
+    return () => window.removeEventListener("spr_open_create_class", handleOpen);
+  }, []);
 
   useEffect(() => {
     loadDepartments();
@@ -213,7 +225,7 @@ export default function ClassManagementView() {
       key: "order_rank",
       header: "Rank",
       align: "center",
-      cellClassName: "w-14 text-center font-mono font-bold text-zinc-400",
+      cellClassName: "w-14 text-center font-mono font-bold theme-text-secondary",
       render: (cls) => `#${cls.order_rank ?? 1}`,
     },
     {
@@ -233,27 +245,19 @@ export default function ClassManagementView() {
     {
       key: "department",
       header: "Department",
-      render: (cls) => {
-        let deptBadge = "bg-sky-500/10 text-sky-400 border-sky-500/20";
-        if (cls.department_type === "GENERAL") {
-          deptBadge = "bg-purple-500/10 text-purple-400 border-purple-500/20";
-        } else if (cls.department_type === "OTHER") {
-          deptBadge = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-        }
-        return (
-          <div className="space-y-0.5">
-            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border tracking-wider inline-block ${deptBadge}`}>
-              {cls.department_name || cls.department_type || "HIFZ"}
+      render: (cls) => (
+        <div className="space-y-0.5">
+          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold border tracking-wider inline-block theme-bg-sub theme-text-secondary border-theme-border">
+            {cls.department_name || cls.department_type || "General"}
+          </span>
+          {cls.has_quran_tracker && (
+            <span className="text-[9px] theme-accent font-bold flex items-center gap-1">
+              <BookOpenIcon className="w-3 h-3 theme-accent" />
+              <span>30 Juz Tracker</span>
             </span>
-            {cls.has_quran_tracker && (
-              <span className="text-[9px] text-emerald-400 font-bold flex items-center gap-1">
-                <BookOpenIcon className="w-3 h-3 text-emerald-400" />
-                <span>30 Juz Tracker</span>
-              </span>
-            )}
-          </div>
-        );
-      },
+          )}
+        </div>
+      ),
     },
     {
       key: "class_teacher_name",
@@ -261,7 +265,7 @@ export default function ClassManagementView() {
       render: (cls) =>
         cls.class_teacher_name ? (
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center font-bold text-xs shrink-0">
+            <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-xs shrink-0 border border-[var(--accent-main)]/20">
               {cls.class_teacher_name.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -272,7 +276,7 @@ export default function ClassManagementView() {
             </div>
           </div>
         ) : (
-          <span className="text-zinc-500 italic text-[11px]">Unassigned</span>
+          <span className="theme-text-secondary italic text-[11px]">Unassigned</span>
         ),
     },
     {
@@ -282,7 +286,7 @@ export default function ClassManagementView() {
       render: (cls) => (
         <span
           onClick={() => navigate(`/students?student_class=${cls.id}`)}
-          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          className="px-2.5 py-1 rounded-lg text-xs font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 hover:opacity-80 transition-colors cursor-pointer inline-flex items-center gap-1.5"
           title="View Enrolled Students"
         >
           <StudentIcon className="w-3.5 h-3.5" />
@@ -297,10 +301,10 @@ export default function ClassManagementView() {
       render: (cls) => (
         <span
           onClick={() => navigate(`/student-management/groups?student_class=${cls.id}`)}
-          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          className="px-2.5 py-1 rounded-lg text-xs font-bold theme-bg-sub theme-text-primary border theme-border hover:theme-bg-elevated transition-colors cursor-pointer inline-flex items-center gap-1.5"
           title="View Groups in Class"
         >
-          <GroupIcon className="w-3.5 h-3.5" />
+          <GroupIcon className="w-3.5 h-3.5 theme-accent" />
           <span>{cls.group_count || 0}</span>
         </span>
       ),
@@ -311,12 +315,13 @@ export default function ClassManagementView() {
       align: "center",
       render: (cls) => (
         <span
-          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
             cls.is_active
-              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+              : "theme-bg-sub theme-text-secondary border theme-border"
           }`}
         >
+          <span className={`w-1.5 h-1.5 rounded-full ${cls.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
           {cls.is_active ? "Active" : "Inactive"}
         </span>
       ),
@@ -335,248 +340,199 @@ export default function ClassManagementView() {
   ];
 
   // Reusable Card Renderer
-  const renderClassCard = (cls) => {
-    let deptBadge = "bg-sky-500/10 text-sky-400 border-sky-500/20";
-    if (cls.department_type === "GENERAL") {
-      deptBadge = "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    } else if (cls.department_type === "OTHER") {
-      deptBadge = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-    }
-
-    return (
-      <div
-        key={cls.id}
-        className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group"
-      >
-        <div className="space-y-3.5">
-          {/* Top header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center font-mono font-bold text-xs theme-accent shrink-0 shadow-xs">
-                #{cls.order_rank ?? 1}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
-                    {cls.name}
-                  </h3>
-                  {cls.code && (
-                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub theme-text-secondary border theme-border">
-                      {cls.code}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border tracking-wider ${deptBadge}`}>
-                    {cls.department_name || cls.department_type || "HIFZ"}
+  const renderClassCard = (cls) => (
+    <div
+      key={cls.id}
+      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group"
+    >
+      <div className="space-y-3.5">
+        {/* Top header */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center font-mono font-bold text-xs theme-accent shrink-0 shadow-xs">
+              #{cls.order_rank ?? 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+                  {cls.name}
+                </h3>
+                {cls.code && (
+                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub theme-text-secondary border theme-border">
+                    {cls.code}
                   </span>
-                  {cls.has_quran_tracker && (
-                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
-                      <BookOpenIcon className="w-3 h-3 text-emerald-400" />
-                      <span>30 Juz</span>
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
-            </div>
-
-            <ActionMenu items={getActionMenuItems(cls)} />
-          </div>
-
-          {/* Teacher Block */}
-          <div className="p-2.5 rounded-xl theme-bg-sub border theme-border flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                {cls.class_teacher_name ? cls.class_teacher_name.charAt(0).toUpperCase() : "?"}
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] theme-text-secondary block font-medium">Class Teacher</span>
-                <span className="font-semibold theme-text-primary truncate block text-xs">
-                  {cls.class_teacher_name || "Unassigned"}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border tracking-wider theme-bg-sub theme-text-secondary border-theme-border">
+                  {cls.department_name || cls.department_type || "General"}
                 </span>
+                {cls.has_quran_tracker && (
+                  <span className="text-[10px] theme-accent font-bold flex items-center gap-1">
+                    <BookOpenIcon className="w-3 h-3 theme-accent" />
+                    <span>30 Juz</span>
+                  </span>
+                )}
               </div>
             </div>
-            {cls.class_teacher_phone && (
-              <span className="text-[10px] font-mono theme-text-secondary">{cls.class_teacher_phone}</span>
-            )}
           </div>
 
-          {/* Counts */}
-          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
-            <div
-              onClick={() => navigate(`/students?student_class=${cls.id}`)}
-              className="cursor-pointer hover:opacity-80 transition"
-            >
-              <span className="block text-sm font-bold text-emerald-400">{cls.student_count || 0}</span>
-              <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
-            </div>
-            <div
-              onClick={() => navigate(`/student-management/groups?student_class=${cls.id}`)}
-              className="border-l theme-border cursor-pointer hover:opacity-80 transition"
-            >
-              <span className="block text-sm font-bold text-sky-400">{cls.group_count || 0}</span>
-              <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Groups</span>
-            </div>
-          </div>
+          <ActionMenu items={getActionMenuItems(cls)} />
         </div>
 
-        {/* Footer */}
-        <div className="pt-2 border-t theme-border flex items-center justify-between">
-          <span
-            className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
-              cls.is_active
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-            }`}
-          >
-            {cls.is_active ? "Active" : "Inactive"}
-          </span>
+        {/* Teacher Block */}
+        <div className="p-2.5 rounded-xl theme-bg-sub border theme-border flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-[10px] shrink-0 border border-[var(--accent-main)]/20">
+              {cls.class_teacher_name ? cls.class_teacher_name.charAt(0).toUpperCase() : "?"}
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] theme-text-secondary block font-medium">Class Teacher</span>
+              <span className="font-semibold theme-text-primary truncate block text-xs">
+                {cls.class_teacher_name || "Unassigned"}
+              </span>
+            </div>
+          </div>
+          {cls.class_teacher_phone && (
+            <span className="text-[10px] font-mono theme-text-secondary">{cls.class_teacher_phone}</span>
+          )}
+        </div>
 
-          <button
-            onClick={() => navigate(`/student-management/groups?student_class=${cls.id}`)}
-            className="text-xs font-bold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
+        {/* Counts */}
+        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
+          <div
+            onClick={() => navigate(`/students?student_class=${cls.id}`)}
+            className="cursor-pointer hover:opacity-80 transition"
           >
-            <GroupIcon className="w-3.5 h-3.5" />
-            <span>Manage Groups &rarr;</span>
-          </button>
+            <span className="block text-sm font-bold theme-accent">{cls.student_count || 0}</span>
+            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
+          </div>
+          <div
+            onClick={() => navigate(`/student-management/groups?student_class=${cls.id}`)}
+            className="border-l theme-border cursor-pointer hover:opacity-80 transition"
+          >
+            <span className="block text-sm font-bold theme-text-primary">{cls.group_count || 0}</span>
+            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Groups</span>
+          </div>
         </div>
       </div>
-    );
-  };
+
+      {/* Footer */}
+      <div className="pt-2 border-t theme-border flex items-center justify-between">
+        <span
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${
+            cls.is_active
+              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+              : "theme-bg-sub theme-text-secondary border theme-border"
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${cls.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
+          {cls.is_active ? "Active" : "Inactive"}
+        </span>
+
+        <button
+          onClick={() => navigate(`/student-management/groups?student_class=${cls.id}`)}
+          className="text-xs font-bold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
+        >
+          <GroupIcon className="w-3.5 h-3.5 theme-accent" />
+          <span>Manage Groups &rarr;</span>
+        </button>
+      </div>
+    </div>
+  );
 
   const totalClassesCount = metrics?.total_classes || classes.length;
   const totalEnrolledCount = metrics?.total_enrolled_students ?? classes.reduce((acc, c) => acc + (c.student_count || 0), 0);
   const avgStudentsCount = metrics?.avg_students_per_class ?? (classes.length ? (totalEnrolledCount / classes.length).toFixed(1) : 0);
 
-  return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-6 text-left">
-      
-      {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <ClassIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-              Class
-            </h1>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Configure academic grades, head teacher assignments, and student promotion pipelines
-            </p>
-          </div>
-        </div>
+  const departmentOptions = [
+    { value: "ALL", label: "All Departments" },
+    ...departments.map((d) => ({ value: d.id, label: d.name })),
+  ];
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => navigate("/student-management/groups")}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <GroupIcon className="w-4 h-4 text-sky-400" />
-            <span>Manage Groups &rarr;</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>Add Class</span>
-          </button>
-        </div>
-      </div>
+  return (
+    <div className={`${isEmbedded ? "w-full space-y-6 font-sans theme-text-primary animate-fade-in text-left" : "w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-6 text-left"}`}>
+      
+      {/* 1. Header with Reusable PageHeader */}
+      {!hideHeader && (
+        <PageHeader
+          icon={ClassIcon}
+          title="Class"
+          subtitle="Configure academic grades, head teacher assignments, and student promotion pipelines"
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => navigate("/student-management/groups")}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <GroupIcon className="w-4 h-4 theme-accent" />
+                <span>Manage Groups &rarr;</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>Add Class</span>
+              </button>
+            </>
+          }
+        />
+      )}
 
       {/* 2. Reusable Metric Cards */}
-      <MetricsGrid
-        items={[
-          {
-            label: "Total Classes",
-            value: totalClassesCount,
-            icon: ClassIcon,
-            color: "sky",
-          },
-          {
-            label: "Enrolled Students",
-            value: totalEnrolledCount,
-            icon: StudentIcon,
-            color: "emerald",
-          },
-          {
-            label: "Avg Students / Class",
-            value: avgStudentsCount,
-            icon: DashboardIcon,
-            color: "amber",
-          },
-        ]}
-      />
+      {!hideMetrics && (
+        <MetricsGrid
+          items={[
+            {
+              label: "Total Classes",
+              value: totalClassesCount,
+              icon: ClassIcon,
+              color: "accent",
+            },
+            {
+              label: "Enrolled Students",
+              value: totalEnrolledCount,
+              icon: StudentIcon,
+              color: "default",
+            },
+            {
+              label: "Avg Students / Class",
+              value: avgStudentsCount,
+              icon: DashboardIcon,
+              color: "default",
+            },
+          ]}
+        />
+      )}
 
       {/* 3. Search & View Mode Switcher Toolbar */}
-      <div className="theme-bg-surface border theme-border p-3.5 rounded-2xl flex flex-col sm:flex-row gap-3 justify-between items-center shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search class name, code, or teacher..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-9 pr-3.5 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current transition-all"
+      <DataViewToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search class name, code, or teacher..."
+        filterElement={
+          <CustomSelect
+            value={departmentFilter}
+            onChange={(val) => {
+              setDepartmentFilter(val);
+              const newP = new URLSearchParams(searchParams);
+              if (val && val !== "ALL") {
+                newP.set("department", val);
+              } else {
+                newP.delete("department");
+              }
+              setSearchParams(newP);
+            }}
+            options={departmentOptions}
+            placeholder="Filter by Department"
           />
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          {/* Department Filter Dropdown using project's CustomSelect */}
-          <div className="w-48 sm:w-56 shrink-0">
-            <CustomSelect
-              size="sm"
-              value={departmentFilter}
-              onChange={(val) => {
-                setDepartmentFilter(val);
-                const newP = new URLSearchParams(searchParams);
-                if (val && val !== "ALL") {
-                  newP.set("department", val);
-                } else {
-                  newP.delete("department");
-                }
-                setSearchParams(newP);
-              }}
-              options={[
-                { value: "ALL", label: "All Departments" },
-                ...departments.map((d) => ({ value: d.id, label: d.name })),
-              ]}
-              placeholder="All Departments"
-            />
-          </div>
-
-          {/* View Mode Toggle Buttons */}
-          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("grid")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "grid"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <BuildingOfficeIcon className="w-3.5 h-3.5" />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("table")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "table"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <DepartmentIcon className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
-          </div>
-        </div>
-      </div>
+        }
+        viewMode={viewMode}
+        onToggleViewMode={handleToggleViewMode}
+      />
 
       {/* 4. Display: Reusable DataCardGrid or DataTable */}
       {viewMode === "grid" ? (

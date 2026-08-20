@@ -4,6 +4,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import { getSectionConfig, saveSectionConfig } from "../../../config/defaultSectionConfig";
 import CustomSelect from "../../../components/ui/CustomSelect";
+import TabSwitcher from "../../../components/ui/TabSwitcher";
 import {
   GlobeIcon,
   DepartmentIcon,
@@ -531,49 +532,34 @@ export default function SectionToggleControlPanel() {
       </div>
 
       {/* 2. 4-TIER SCOPE SELECTOR TABS */}
-      <div ref={tabsRef} className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none border-b theme-border">
-        <div className="flex items-center gap-2">
-          {[
+      <div ref={tabsRef} className="w-full">
+        <TabSwitcher
+          tabs={[
             { id: "global", label: "Global Defaults", Icon: GlobeIcon },
             { id: "role", label: "Role Overrides", Icon: DepartmentIcon },
             { id: "group", label: "Group Overrides", Icon: GroupsIcon },
             { id: "user", label: "User Overrides", Icon: StudentIcon },
             { id: "audit", label: "Audit Logs", Icon: SavedMessagesIcon },
-          ].map((tab) => {
-            const isActive = activeScope === tab.id;
-            const TabIcon = tab.Icon;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setActiveScope(tab.id);
-                  setModifiedFlags({});
-                }}
-                className={`px-4 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-t border-x flex items-center gap-2 ${
-                  isActive
-                    ? "theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-sm border-b-transparent"
-                    : "theme-bg-sub theme-text-secondary hover:theme-text-primary theme-border border-b-theme-border"
-                }`}
-              >
-                <TabIcon className="w-3.5 h-3.5 opacity-80" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {activeScope !== "audit" && (
-          <div className="relative w-64 hidden sm:block">
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search section keys..."
-              className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
-            />
-          </div>
-        )}
+          ]}
+          activeTab={activeScope}
+          onChange={(tabId) => {
+            setActiveScope(tabId);
+            setModifiedFlags({});
+          }}
+          rightContent={
+            activeScope !== "audit" && (
+              <div className="relative w-64 hidden sm:block">
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Search section keys..."
+                  className="w-full theme-bg-sub border theme-border theme-text-primary px-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/50"
+                />
+              </div>
+            )
+          }
+        />
       </div>
 
       {/* 3. DYNAMIC TARGET SELECTOR SUB-BAR */}

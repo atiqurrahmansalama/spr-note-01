@@ -7,9 +7,9 @@ import {
   ClockIcon,
   SparklesIcon,
   SleekCheckIcon,
+  TimerIcon,
 } from '../../components/ui/Icons';
 import {
-  getAttendanceSlots,
   getStudentAttendance,
   bulkMarkStudentAttendance,
   getStudentAttendanceSummary,
@@ -30,11 +30,12 @@ export default function StudentAttendanceView() {
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [slots, setSlots] = useState([]);
-  const [selectedSlotId, setSelectedSlotId] = useState('');
+  const [selectedSlotId, setSelectedSlotId] = useState('ALL'); // "ALL" = All Periods per student
 
   // Roster & Attendance States
   const [students, setStudents] = useState([]);
-  const [attendanceMap, setAttendanceMap] = useState({}); // { [studentId]: { status, in_time, remarks } }
+  // Key format: `${studentId}_${slotId}` -> { status, in_time, remarks, student_id, period_slot_id }
+  const [attendanceMap, setAttendanceMap] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -42,25 +43,13 @@ export default function StudentAttendanceView() {
   const [holidayInfo, setHolidayInfo] = useState({ is_holiday: false, reason: '', is_weekend: false });
   const [overrideHoliday, setOverrideHoliday] = useState(false);
 
-  // Summary Metrics
-  const [summaryMetrics, setSummaryMetrics] = useState({
-    present: 0,
-    late: 0,
-    absent: 0,
-    half_day: 0,
-    on_leave: 0,
-    holiday_excused: 0,
-    total_recorded: 0,
-    attendance_rate: 0,
-  });
-
-  // 1. Fetch Classes and Attendance Slots
+  // 1. Fetch Classes and Periods
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
         const [clsRes, slotsRes] = await Promise.all([
           fetchWithAuth('/api/v1/classes/'),
-          getAttendanceSlots({ is_active: true }),
+          fetchWithAuth('/api/v1/academy/periods/'),
         ]);
 
         if (clsRes.ok) {
@@ -72,8 +61,12 @@ export default function StudentAttendanceView() {
           }
         }
 
-        const slotList = Array.isArray(slotsRes) ? slotsRes : slotsRes.results || [];
-        setSlots(slotList);
+        if (slotsRes.ok) {
+          const pData = await slotsRes.json();
+          const pList = Array.isArray(pData) ? pData : pData.results || [];
+          pList.sort((a, b) => (a.period_order || 0) - (b.period_order || 0));
+          setSlots(pList);
+        }
       } catch (err) {
         console.error('Error fetching classes/slots:', err);
       }
@@ -82,7 +75,7 @@ export default function StudentAttendanceView() {
     fetchMetadata();
   }, [activeTenantId]);
 
-  // 2. Fetch Groups when Class changes
+  // 2. Fetch Groups and Class-specific Periods when Class changes
   useEffect(() => {
     if (!selectedClassId) {
       setGroups([]);
@@ -90,20 +83,39 @@ export default function StudentAttendanceView() {
       return;
     }
 
-    const fetchGroups = async () => {
+    const fetchGroupsAndPeriods = async () => {
       try {
-        const res = await fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`);
-        if (res.ok) {
-          const data = await res.json();
+        const [grpRes, perRes] = await Promise.all([
+          fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`),
+          fetchWithAuth(`/api/v1/academy/periods/?class=${selectedClassId}`),
+        ]);
+
+        if (grpRes.ok) {
+          const data = await grpRes.json();
           setGroups(Array.isArray(data) ? data : data.results || []);
-          setSelectedGroupId(''); // Reset to all groups in this class
+          setSelectedGroupId('');
+        }
+
+        if (perRes.ok) {
+          const pData = await perRes.json();
+          let list = Array.isArray(pData) ? pData : pData.results || [];
+          if (list.length === 0) {
+            // Fallback to all periods
+            const allRes = await fetchWithAuth('/api/v1/academy/periods/');
+            if (allRes.ok) {
+              const allData = await allRes.json();
+              list = Array.isArray(allData) ? allData : allData.results || [];
+            }
+          }
+          list.sort((a, b) => (a.period_order || 0) - (b.period_order || 0));
+          setSlots(list);
         }
       } catch (err) {
-        console.warn('Error fetching groups:', err);
+        console.warn('Error fetching groups/periods:', err);
       }
     };
 
-    fetchGroups();
+    fetchGroupsAndPeriods();
   }, [selectedClassId]);
 
   // 3. Holiday Check on Date Change
@@ -118,14 +130,24 @@ export default function StudentAttendanceView() {
           setOverrideHoliday(false);
         }
       } catch (err) {
-        console.warn('Error checking holiday status:', err);
+        console.warn('Holiday check error:', err);
       }
     };
 
     runHolidayCheck();
-  }, [selectedDate, activeTenantId]);
+  }, [selectedDate]);
 
-  // 4. Fetch Students Roster & Existing Attendance
+  // Active periods list for rendering
+  const activePeriods = useMemo(() => {
+    if (selectedSlotId && selectedSlotId !== 'ALL') {
+      return slots.filter((s) => String(s.id) === String(selectedSlotId));
+    }
+    return slots.length > 0
+      ? slots
+      : [{ id: 'DEFAULT', period_name: 'Regular Lecture Period', start_time: '08:00:00', end_time: '08:45:00', period_order: 1 }];
+  }, [slots, selectedSlotId]);
+
+  // 4. Load Student Roster and Attendance
   const loadRosterAndAttendance = useCallback(async () => {
     if (!selectedClassId) {
       setStudents([]);
@@ -146,7 +168,7 @@ export default function StudentAttendanceView() {
           date: selectedDate,
           class_id: selectedClassId,
           group_id: selectedGroupId || undefined,
-          session_slot: selectedSlotId || undefined,
+          session_slot: selectedSlotId !== 'ALL' ? selectedSlotId : undefined,
         }),
       ]);
 
@@ -155,69 +177,70 @@ export default function StudentAttendanceView() {
         const sData = await stuRes.json();
         stuList = Array.isArray(sData) ? sData : sData.results || [];
       }
+      stuList.sort((a, b) => (a.roll_number || 0) - (b.roll_number || 0));
       setStudents(stuList);
 
       const attList = Array.isArray(attRes) ? attRes : attRes.results || [];
       const newMap = {};
 
-      // Seed with existing attendance records
-      attList.forEach((a) => {
-        newMap[a.student] = {
-          status: a.status,
-          in_time: a.in_time ? a.in_time.slice(0, 5) : '',
-          remarks: a.remarks || '',
-        };
-      });
-
-      // Default unset students to PRESENT (or HOLIDAY_EXCUSED if holiday active)
       stuList.forEach((s) => {
-        if (!newMap[s.id]) {
-          newMap[s.id] = {
-            status: holidayInfo.is_holiday && !overrideHoliday ? 'HOLIDAY_EXCUSED' : 'PRESENT',
-            in_time: '08:00',
-            remarks: '',
+        activePeriods.forEach((p) => {
+          const recKey = `${s.id}_${p.id}`;
+          const found = attList.find(
+            (a) =>
+              String(a.student) === String(s.id) &&
+              (a.period_slot_id === p.id || a.period_slot === p.id || String(a.period_slot_id) === String(p.id))
+          );
+
+          newMap[recKey] = {
+            student_id: s.id,
+            period_slot_id: p.id,
+            status: found
+              ? found.status
+              : holidayInfo.is_holiday && !overrideHoliday
+              ? 'HOLIDAY_EXCUSED'
+              : 'PRESENT',
+            in_time: found?.in_time ? found.in_time.slice(0, 5) : p.start_time ? p.start_time.slice(0, 5) : '08:00',
+            remarks: found?.remarks || '',
           };
-        }
+        });
       });
 
       setAttendanceMap(newMap);
-
-      // Fetch summary KPIs
-      const sumRes = await getStudentAttendanceSummary({
-        date: selectedDate,
-        class_id: selectedClassId,
-        group_id: selectedGroupId || undefined,
-        session_slot_id: selectedSlotId || undefined,
-      });
-      setSummaryMetrics(sumRes);
     } catch (err) {
       console.error('Error loading attendance roster:', err);
       showToast('Failed to load attendance roster', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedClassId, selectedGroupId, selectedDate, selectedSlotId, holidayInfo.is_holiday, overrideHoliday, showToast]);
+  }, [selectedClassId, selectedGroupId, selectedDate, selectedSlotId, activePeriods, holidayInfo.is_holiday, overrideHoliday, showToast]);
 
   useEffect(() => {
     loadRosterAndAttendance();
   }, [loadRosterAndAttendance]);
 
   // Status Change Handlers
-  const handleStatusChange = (studentId, status) => {
+  const handleStatusChange = (studentId, slotId, status) => {
+    const key = `${studentId}_${slotId}`;
     setAttendanceMap((prev) => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
+      [key]: {
+        ...(prev[key] || {}),
+        student_id: studentId,
+        period_slot_id: slotId,
         status,
       },
     }));
   };
 
-  const handleFieldChange = (studentId, field, value) => {
+  const handleFieldChange = (studentId, slotId, field, value) => {
+    const key = `${studentId}_${slotId}`;
     setAttendanceMap((prev) => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
+      [key]: {
+        ...(prev[key] || {}),
+        student_id: studentId,
+        period_slot_id: slotId,
         [field]: value,
       },
     }));
@@ -226,46 +249,39 @@ export default function StudentAttendanceView() {
   // Batch Quick Actions
   const handleMarkAll = (status) => {
     const updated = { ...attendanceMap };
-    students.forEach((s) => {
-      updated[s.id] = {
-        ...updated[s.id],
+    Object.keys(updated).forEach((k) => {
+      updated[k] = {
+        ...updated[k],
         status,
       };
     });
     setAttendanceMap(updated);
-    showToast(`All students marked as ${status}`, 'info');
+    showToast(`All period slots marked as ${status}`, 'info');
   };
 
   // Submit Bulk Attendance
   const handleSaveAttendance = async () => {
-    if (students.length === 0) {
-      showToast('No students in selected class/group to mark.', 'warning');
-      return;
-    }
-
     setIsSaving(true);
     try {
-      const records = students.map((s) => {
-        const item = attendanceMap[s.id] || {};
-        return {
-          student_id: s.id,
-          status: item.status || 'PRESENT',
-          in_time: item.in_time ? `${item.in_time}:00` : null,
-          remarks: item.remarks || '',
-        };
-      });
+      const records = Object.values(attendanceMap).map((item) => ({
+        student_id: item.student_id,
+        period_slot_id: item.period_slot_id !== 'DEFAULT' ? item.period_slot_id : null,
+        status: item.status || 'PRESENT',
+        in_time: item.in_time ? (item.in_time.length === 5 ? `${item.in_time}:00` : item.in_time) : null,
+        remarks: item.remarks || '',
+      }));
 
       const payload = {
         date: selectedDate,
-        session_slot_id: selectedSlotId || null,
         class_id: selectedClassId ? Number(selectedClassId) : null,
         group_id: selectedGroupId ? Number(selectedGroupId) : null,
+        session_slot_id: selectedSlotId && selectedSlotId !== 'ALL' && selectedSlotId !== 'DEFAULT' ? selectedSlotId : null,
         override_holiday: overrideHoliday,
         records,
       };
 
       const res = await bulkMarkStudentAttendance(payload);
-      showToast(`Success! Attendance synced for ${res.count} students.`, 'success');
+      showToast(`Success! Attendance synced for ${res.count || records.length} records.`, 'success');
       loadRosterAndAttendance();
     } catch (err) {
       console.error('Error saving bulk attendance:', err);
@@ -278,8 +294,9 @@ export default function StudentAttendanceView() {
   // Live calculation of current view's numbers
   const liveStats = useMemo(() => {
     let p = 0, l = 0, a = 0, h = 0, lv = 0, hol = 0;
-    students.forEach((s) => {
-      const st = attendanceMap[s.id]?.status || 'PRESENT';
+    const values = Object.values(attendanceMap);
+    values.forEach((stObj) => {
+      const st = stObj?.status || 'PRESENT';
       if (st === 'PRESENT') p++;
       else if (st === 'LATE') l++;
       else if (st === 'ABSENT') a++;
@@ -289,7 +306,7 @@ export default function StudentAttendanceView() {
     });
     const total = p + l + a + h + lv;
     const rate = total > 0 ? Math.round(((p + l + h * 0.5) / total) * 100) : 0;
-    return { p, l, a, h, lv, hol, totalStudents: students.length, rate };
+    return { p, l, a, h, lv, hol, totalRecorded: values.length, totalStudents: students.length, rate };
   }, [students, attendanceMap]);
 
   return (
@@ -303,10 +320,10 @@ export default function StudentAttendanceView() {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
-                Student Attendance & Roll Call
+                Class Attendance & Period Roll Sheet
               </h1>
               <p className="text-xs theme-text-secondary">
-                Daily period-wise roll sheet, multi-session tracking, and holiday-aware register
+                Multi-period daily student attendance with synchronized routine timings from Period Section.
               </p>
             </div>
           </div>
@@ -329,7 +346,7 @@ export default function StudentAttendanceView() {
             className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
           >
             <SleekCheckIcon className="w-4 h-4" />
-            <span>{isSaving ? 'Syncing Attendance...' : 'Save & Sync Roll Call'}</span>
+            <span>{isSaving ? 'Syncing Attendance...' : 'Save & Sync Attendance'}</span>
           </button>
         </div>
       </div>
@@ -431,17 +448,17 @@ export default function StudentAttendanceView() {
         {/* Session / Period Slot Selector */}
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-            Session / Period Slot
+            Period Filter
           </label>
           <select
             value={selectedSlotId}
             onChange={(e) => setSelectedSlotId(e.target.value)}
             className="w-full px-3 py-2 theme-bg-sub border theme-border rounded-xl text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 cursor-pointer font-medium"
           >
-            <option value="">-- Daily General Roll Call --</option>
+            <option value="ALL">All Periods ({slots.length} Routine Slots)</option>
             {slots.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.start_time?.slice(0, 5)} - {s.end_time?.slice(0, 5)})
+                #{s.period_order || ''} {s.period_name} ({s.start_time?.slice(0, 5)} - {s.end_time?.slice(0, 5)})
               </option>
             ))}
           </select>
@@ -451,7 +468,7 @@ export default function StudentAttendanceView() {
       {/* 4. Live Real-Time Attendance KPI Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
         <div className="p-3 rounded-2xl theme-bg-surface border theme-border text-center">
-          <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">Enrolled</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">Students</div>
           <div className="text-lg font-black theme-text-primary mt-0.5">{liveStats.totalStudents}</div>
         </div>
 
@@ -514,16 +531,16 @@ export default function StudentAttendanceView() {
         </div>
 
         <div className="text-[11px] theme-text-secondary font-mono">
-          Roll Sheet: {students.length} Students
+          Roll Sheet: {students.length} Students × {activePeriods.length} Periods ({liveStats.totalRecorded} Total Slots)
         </div>
       </div>
 
-      {/* 6. Main Student Roll Call Table */}
+      {/* 6. Main Student Multi-Period Roll Call Table with Uniform Borders */}
       <div className="rounded-3xl theme-bg-surface border theme-border shadow-xl overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-xs theme-text-secondary flex flex-col items-center gap-3">
             <RefreshIcon className="w-6 h-6 animate-spin text-emerald-400" />
-            <span>Loading student roster and attendance sheet...</span>
+            <span>Loading student roster and period schedule...</span>
           </div>
         ) : students.length === 0 ? (
           <div className="p-12 text-center text-xs theme-text-secondary">
@@ -532,95 +549,147 @@ export default function StudentAttendanceView() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
+              {/* Header: All horizontal and vertical lines use the exact same theme-border */}
               <thead>
                 <tr className="border-b theme-border theme-bg-sub text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
-                  <th className="py-3 px-4 w-16 text-center">Roll</th>
-                  <th className="py-3 px-4 min-w-[180px]">Student Name</th>
-                  <th className="py-3 px-4 min-w-[280px]">Attendance Status</th>
-                  <th className="py-3 px-4 w-32">In Time</th>
+                  <th className="py-3 px-4 w-16 text-center border-r theme-border">Roll</th>
+                  <th className="py-3 px-4 min-w-[170px] border-r theme-border">Student Name</th>
+                  {/* 🎯 Dedicated Time Column right after Student Name */}
+                  <th className="py-3 px-4 min-w-[220px] border-r theme-border">
+                    <div className="flex items-center gap-1.5">
+                      <TimerIcon className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Scheduled Period & Timing</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 min-w-[280px] text-center border-r theme-border">Attendance Status</th>
+                  <th className="py-3 px-4 w-32 text-center border-r theme-border">Actual In Time</th>
                   <th className="py-3 px-4 min-w-[160px]">Remarks / Note</th>
                 </tr>
               </thead>
+
+              {/* Body: Multi-period rows per student with uniform borders */}
               <tbody className="divide-y theme-border">
                 {students.map((student) => {
-                  const currentRec = attendanceMap[student.id] || { status: 'PRESENT', in_time: '08:00', remarks: '' };
-                  const currentStatus = currentRec.status;
+                  return activePeriods.map((slot, pIdx) => {
+                    const recKey = `${student.id}_${slot.id}`;
+                    const currentRec = attendanceMap[recKey] || {
+                      status: 'PRESENT',
+                      in_time: slot.start_time ? slot.start_time.slice(0, 5) : '08:00',
+                      remarks: '',
+                    };
+                    const currentStatus = currentRec.status;
+                    const isFirstRow = pIdx === 0;
 
-                  return (
-                    <tr
-                      key={student.id}
-                      className="hover:theme-bg-elevated/40 transition-colors"
-                    >
-                      {/* Roll Number */}
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold font-mono theme-bg-sub border theme-border theme-text-primary shadow-sm">
-                          {student.roll_number || '—'}
-                        </span>
-                      </td>
+                    return (
+                      <tr
+                        key={recKey}
+                        className={`hover:theme-bg-elevated/40 transition-colors ${
+                          isFirstRow ? 'border-t-2 border-t-black/10 dark:border-t-white/10' : ''
+                        }`}
+                      >
+                        {/* Roll Number (Merged across all periods for this student) */}
+                        {isFirstRow && (
+                          <td
+                            rowSpan={activePeriods.length}
+                            className="py-3 px-4 text-center border-r border-b theme-border theme-text-primary align-middle"
+                          >
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold font-mono theme-bg-sub border theme-border shadow-xs">
+                              {student.roll_number || '—'}
+                            </span>
+                          </td>
+                        )}
 
-                      {/* Name & Halqa */}
-                      <td className="py-3 px-4">
-                        <div className="font-bold theme-text-primary text-sm">
-                          {student.name || student.name_en}
-                        </div>
-                        <div className="text-[11px] theme-text-secondary font-mono">
-                          {student.student_class_name || ''} {student.student_group_name ? `• ${student.student_group_name}` : ''}
-                        </div>
-                      </td>
+                        {/* Name & Halqa (Merged across all periods for this student) */}
+                        {isFirstRow && (
+                          <td
+                            rowSpan={activePeriods.length}
+                            className="py-3 px-4 border-r border-b theme-border align-middle"
+                          >
+                            <div className="font-bold theme-text-primary text-sm">
+                              {student.name || student.name_en}
+                            </div>
+                            <div className="text-[11px] theme-text-secondary font-mono mt-0.5">
+                              {student.student_class_name || ''}{' '}
+                              {student.student_group_name ? `• ${student.student_group_name}` : ''}
+                            </div>
+                          </td>
+                        )}
 
-                      {/* Status Toggle Buttons */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {[
-                            { id: 'PRESENT', label: 'P', name: 'Present', color: 'bg-emerald-600 text-white' },
-                            { id: 'LATE', label: 'L', name: 'Late', color: 'bg-amber-500 text-black' },
-                            { id: 'ABSENT', label: 'A', name: 'Absent', color: 'bg-rose-600 text-white' },
-                            { id: 'HALF_DAY', label: 'H', name: 'Half Day', color: 'bg-sky-600 text-white' },
-                            { id: 'ON_LEAVE', label: 'LV', name: 'Leave', color: 'bg-purple-600 text-white' },
-                            { id: 'HOLIDAY_EXCUSED', label: 'HOL', name: 'Holiday', color: 'bg-slate-600 text-white' },
-                          ].map((btn) => {
-                            const isActive = currentStatus === btn.id;
-                            return (
-                              <button
-                                key={btn.id}
-                                type="button"
-                                onClick={() => handleStatusChange(student.id, btn.id)}
-                                className={`px-3 py-1.5 rounded-xl font-bold font-mono text-xs transition-all cursor-pointer ${
-                                  isActive
-                                    ? `${btn.color} ring-2 ring-white/50 shadow-md scale-105`
-                                    : 'theme-bg-sub theme-text-secondary hover:theme-text-primary border theme-border'
-                                }`}
-                                title={btn.name}
-                              >
-                                {btn.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </td>
+                        {/* 🎯 Dedicated Time & Period Schedule Column */}
+                        <td className="py-3 px-4 border-r theme-border">
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold theme-text-primary text-xs">
+                              {slot.start_time ? slot.start_time.slice(0, 5) : '--'} -{' '}
+                              {slot.end_time ? slot.end_time.slice(0, 5) : '--'}
+                            </div>
+                            {slot.duration_minutes && (
+                              <span className="text-[10px] font-mono text-emerald-400 font-semibold">
+                                ({slot.duration_minutes}m)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-semibold theme-text-secondary mt-0.5 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              P-{slot.period_order || pIdx + 1}
+                            </span>
+                            <span className="truncate">{slot.period_name}</span>
+                          </div>
+                        </td>
 
-                      {/* In Time */}
-                      <td className="py-3 px-4">
-                        <input
-                          type="time"
-                          value={currentRec.in_time || ''}
-                          onChange={(e) => handleFieldChange(student.id, 'in_time', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary font-mono focus:outline-none focus:border-[var(--accent-main)]/50"
-                        />
-                      </td>
+                        {/* Status Toggle Buttons */}
+                        <td className="py-3 px-4 text-center border-r theme-border">
+                          <div className="inline-flex rounded-xl border theme-border p-1 theme-bg-sub shadow-inner gap-1">
+                            {[
+                              { id: 'PRESENT', label: 'P', name: 'Present', color: 'bg-emerald-600 text-white shadow-sm' },
+                              { id: 'LATE', label: 'L', name: 'Late', color: 'bg-amber-500 text-black shadow-sm' },
+                              { id: 'ABSENT', label: 'A', name: 'Absent', color: 'bg-rose-600 text-white shadow-sm' },
+                              { id: 'HALF_DAY', label: 'H', name: 'Half Day', color: 'bg-sky-600 text-white shadow-sm' },
+                              { id: 'ON_LEAVE', label: 'LV', name: 'Leave', color: 'bg-purple-600 text-white shadow-sm' },
+                              { id: 'HOLIDAY_EXCUSED', label: 'HOL', name: 'Holiday', color: 'bg-slate-600 text-white shadow-sm' },
+                            ].map((btn) => {
+                              const isActive = currentStatus === btn.id;
+                              return (
+                                <button
+                                  key={btn.id}
+                                  type="button"
+                                  onClick={() => handleStatusChange(student.id, slot.id, btn.id)}
+                                  className={`px-2.5 py-1 rounded-lg font-bold font-mono text-xs transition-all cursor-pointer ${
+                                    isActive
+                                      ? `${btn.color} ring-1 ring-white/40 scale-105`
+                                      : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
+                                  }`}
+                                  title={btn.name}
+                                >
+                                  {btn.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
 
-                      {/* Remarks */}
-                      <td className="py-3 px-4">
-                        <input
-                          type="text"
-                          placeholder="Optional note..."
-                          value={currentRec.remarks || ''}
-                          onChange={(e) => handleFieldChange(student.id, 'remarks', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 placeholder:theme-text-secondary"
-                        />
-                      </td>
-                    </tr>
-                  );
+                        {/* Actual In Time */}
+                        <td className="py-3 px-4 text-center border-r theme-border">
+                          <input
+                            type="time"
+                            value={currentRec.in_time || ''}
+                            onChange={(e) => handleFieldChange(student.id, slot.id, 'in_time', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary font-mono text-center focus:outline-none focus:border-[var(--accent-main)]/50"
+                          />
+                        </td>
+
+                        {/* Remarks */}
+                        <td className="py-3 px-4">
+                          <input
+                            type="text"
+                            placeholder="Optional lesson note..."
+                            value={currentRec.remarks || ''}
+                            onChange={(e) => handleFieldChange(student.id, slot.id, 'remarks', e.target.value)}
+                            className="w-full px-3 py-1.5 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 placeholder:theme-text-secondary/50"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  });
                 })}
               </tbody>
             </table>
@@ -638,7 +707,7 @@ export default function StudentAttendanceView() {
             disabled={isSaving || students.length === 0}
             className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow transition-all cursor-pointer"
           >
-            {isSaving ? 'Saving Roll Call...' : 'Save & Sync Roll Call'}
+            {isSaving ? 'Saving Roll Call...' : 'Save & Sync Attendance'}
           </button>
         </div>
       </div>

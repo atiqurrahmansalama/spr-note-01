@@ -34,6 +34,12 @@ import StudentProfileHubView from "./modules/student-profile/StudentProfileHubVi
 import DepartmentManagementView from "./modules/student-management/departments/DepartmentManagementView";
 import ClassManagementView from "./modules/student-management/classes/ClassManagementView";
 import GroupManagementView from "./modules/student-management/groups/GroupManagementView";
+import BranchManagementView from "./modules/academy/BranchManagementView";
+import ClassSectionManagerView from "./modules/academy/ClassSectionManagerView";
+import ClassPeriodScheduleView from "./modules/academy/ClassPeriodScheduleView";
+import BranchSectionHubView from "./modules/academy/BranchSectionHubView";
+import CampusProfileHubView from "./modules/academy/CampusProfileHubView";
+import ClassesGroupsHubView from "./modules/academy/ClassesGroupsHubView";
 import InstitutionListView from "./modules/app-management/institutions/InstitutionListView";
 import InstitutionProfileView from "./modules/settings/components/InstitutionProfileView";
 import AcademyProfileView from "./modules/settings/components/AcademyProfileView";
@@ -48,6 +54,7 @@ import MonthlyAttendanceRegisterView from "./modules/attendance/MonthlyAttendanc
 import AttendanceSettingsView from "./modules/attendance/AttendanceSettingsView";
 import TeacherPeriodMatrixView from "./modules/attendance/TeacherPeriodMatrixView";
 import StudentPeriodRollCallView from "./modules/attendance/StudentPeriodRollCallView";
+import ResidentialAttendanceView from "./modules/attendance/ResidentialAttendanceView";
 import GateEntryLogView from "./modules/attendance/GateEntryLogView";
 import AdHocHeadcountView from "./modules/attendance/AdHocHeadcountView";
 import BiometricDeviceManagerView from "./modules/attendance/BiometricDeviceManagerView";
@@ -111,6 +118,7 @@ export default function App() {
           <Route path="/attendance/students/gate-log" element={<FeatureGuard sectionKey="student_gate_tracker" fallback={<Navigate to="/dashboard" replace />}><GateEntryLogView /></FeatureGuard>} />
           <Route path="/attendance/students/adhoc" element={<FeatureGuard sectionKey="student_adhoc_headcount" fallback={<Navigate to="/dashboard" replace />}><AdHocHeadcountView /></FeatureGuard>} />
           <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
+          <Route path="/attendance/students/residential" element={<FeatureGuard sectionKey="residential_attendance" fallback={<Navigate to="/dashboard" replace />}><ResidentialAttendanceView /></FeatureGuard>} />
           <Route path="/attendance/student" element={<FeatureGuard sectionKey="student_attendance" fallback={<Navigate to="/dashboard" replace />}><StudentPeriodRollCallView /></FeatureGuard>} />
           <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
 
@@ -139,6 +147,19 @@ export default function App() {
           <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics" fallback={<Navigate to="/dashboard" replace />}><ActivityAnalyticsView /></FeatureGuard>} />
           <Route path="/trash-restoration" element={<FeatureGuard sectionKey="nav_trash" fallback={<Navigate to="/dashboard" replace />}><TrashRestorationView /></FeatureGuard>} />
           <Route path="/profile-settings" element={<FeatureGuard sectionKey="settings_profile" fallback={<Navigate to="/dashboard" replace />}><UserProfileSettingsView /></FeatureGuard>} />
+          {/* Academy Multi-Branch, Section & Period Routes */}
+          <Route path="/academy/campus-profile" element={<CampusProfileHubView />} />
+          <Route path="/campus-profile" element={<CampusProfileHubView />} />
+          <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
+          <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
+          <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches" fallback={<Navigate to="/dashboard" replace />}><BranchManagementView /></FeatureGuard>} />
+          <Route path="/academy/sections" element={<FeatureGuard sectionKey="class_sections" fallback={<Navigate to="/dashboard" replace />}><ClassSectionManagerView /></FeatureGuard>} />
+          <Route path="/academy/branches-sections" element={<BranchSectionHubView />} />
+          <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><ClassPeriodScheduleView /></FeatureGuard>} />
+          <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
+          <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
+          <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
+          <Route path="/academy/profile" element={<AcademyProfileView />} />
           <Route path="/academy-profile" element={<AcademyProfileView />} />
           <Route path="/settings/institution" element={<AcademyProfileView />} />
           <Route path="/institution-profile" element={<AcademyProfileView />} />

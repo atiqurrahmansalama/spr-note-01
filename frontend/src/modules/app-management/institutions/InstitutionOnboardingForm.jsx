@@ -11,6 +11,7 @@ import {
 import CustomSelect from '../../../components/ui/CustomSelect';
 import FileUploadZone from '../../../components/ui/FileUploadZone';
 import AddressMapModal from '../../../components/common/AddressMapModal';
+import AddressPickerInput from '../../../components/ui/AddressPickerInput';
 import { registerInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useToast } from '../../../context/ToastContext';
 import {
@@ -286,7 +287,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             {/* Native / Regional Title */}
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Native / Regional Name (Optional)
+                Regional Name
               </label>
               <input
                 type="text"
@@ -312,7 +313,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
               <div>
                 <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  EIIN / Govt. Reg. No.
+                  Govt. Reg. No.
                 </label>
                 <input
                   type="text"
@@ -328,7 +329,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Official Phone Number <span className="text-rose-400">*</span>
+                  Official Phone <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -347,7 +348,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
               <div>
                 <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Official Email Address
+                  Official Email
                 </label>
                 <input
                   type="email"
@@ -367,7 +368,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             {/* Slug Identifier */}
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Unique Tenant Slug (Web Identifier) <span className="text-rose-400">*</span>
+                Unique Tenant Slug <span className="text-rose-400">*</span>
               </label>
               <div className="flex items-center">
                 <span className="px-3.5 py-2 h-10 rounded-l-xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-xs font-mono font-bold flex items-center">
@@ -392,7 +393,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             {/* Logo File Upload */}
             <div>
               <FileUploadZone
-                label="Academy Logo / Emblem"
+                label="Academy Logo"
                 value={formData.logo_data}
                 onChange={(dataUrl) => setFormData({ ...formData, logo_data: dataUrl })}
                 onRemove={() => setFormData({ ...formData, logo_data: '' })}
@@ -400,110 +401,29 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             </div>
 
             {/* Campus Address & Google Maps Location Picker */}
-            <div className="pt-3 border-t theme-border space-y-4">
-              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-                    Campus Address & Geographic Location
-                  </h4>
-                </div>
-
-                {/* Google Maps / GPS Location Picker Trigger */}
-                <button
-                  type="button"
-                  onClick={() => setIsMapModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border text-xs font-bold theme-accent transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  title="Pick exact location from Google Maps or GPS"
-                >
-                  <CompassIcon className="w-3.5 h-3.5" />
-                  <span>Pick from Map / GPS</span>
-                </button>
-              </div>
-
-              {/* Division & District Cascading Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <CustomSelect
-                    label="Division"
-                    value={formData.division}
-                    onChange={handleDivisionChange}
-                    options={BANGLADESH_DIVISIONS}
-                    placeholder="Select Division"
-                    required
-                  />
-                  {errors.division && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.division}</p>}
-                </div>
-
-                <div>
-                  <CustomSelect
-                    label="District"
-                    value={formData.district}
-                    onChange={handleDistrictChange}
-                    options={availableDistricts}
-                    placeholder="Select District"
-                    searchable
-                    required
-                  />
-                  {errors.district && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.district}</p>}
-                </div>
-              </div>
-
-              {/* Thana/Upazila & Post Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  {availableThanas.length > 0 ? (
-                    <CustomSelect
-                      label="Upazila / Thana"
-                      value={formData.upazila_thana}
-                      onChange={(val) => setFormData({ ...formData, upazila_thana: val })}
-                      options={availableThanas}
-                      placeholder="Select Thana"
-                      searchable
-                      direction="auto"
-                    />
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                        Upazila / Thana
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.upazila_thana}
-                        onChange={(e) => setFormData({ ...formData, upazila_thana: e.target.value })}
-                        placeholder="e.g. Sadar"
-                        className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Post Code / Area Code
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.post_code}
-                    onChange={(e) => setFormData({ ...formData, post_code: e.target.value })}
-                    placeholder="e.g. 1230"
-                    className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-                  />
-                </div>
-              </div>
-
-              {/* Detailed Street / Village Address */}
-              <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Street / Village / Holding Details
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.street_address}
-                  onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
-                  placeholder="e.g. House #12, Road #4, Sector #7"
-                  className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border text-xs font-medium theme-text-primary focus:outline-none focus:border-[var(--accent-main)] resize-none transition-all"
-                />
-              </div>
+            <div className="pt-3 border-t theme-border">
+              <AddressPickerInput
+                value={{
+                  division: formData.division,
+                  district: formData.district,
+                  upazila: formData.upazila_thana,
+                  post_code: formData.post_code,
+                  street_address: formData.street_address,
+                  coordinates: formData.latitude && formData.longitude ? `${formData.latitude}, ${formData.longitude}` : '',
+                }}
+                onChange={(addr) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    division: addr.division,
+                    district: addr.district,
+                    upazila_thana: addr.upazila || addr.upazila_thana || '',
+                    post_code: addr.post_code || '',
+                    street_address: addr.street_address || '',
+                  }));
+                }}
+                title="Campus Location"
+                required
+              />
             </div>
           </div>
         )}
@@ -518,7 +438,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               <div>
                 <p className="font-bold text-xs theme-text-primary">Root Institutional Admin Credentials</p>
                 <p className="text-[11px] theme-text-secondary mt-0.5 leading-relaxed">
-                  This user account will have root permissions to manage academic departments, staff rosters, and permissions for this tenant.
+                  This user account will have root permissions to manage academic departments, staff rosters and permissions for this tenant.
                 </p>
               </div>
             </div>
@@ -545,7 +465,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
               <div>
                 <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Phone (Login ID) <span className="text-rose-400">*</span>
+                  Admin Phone <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -566,7 +486,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Email (Optional)
+                  Admin Email <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="email"

@@ -143,8 +143,8 @@ export default function CustomSelect({
               compactMode ? 'rounded-xl p-1' : 'rounded-2xl p-1.5'
             }`}
           >
-            {/* Search Box */}
-            {!compactMode && (searchable || options.length > 6) && (
+            {/* Search Box (Only when searchable is true) */}
+            {!compactMode && searchable && (
               <div className="p-2 border-b theme-border theme-bg-sub/60">
                 <div className="relative">
                   <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 theme-text-secondary" />
@@ -163,7 +163,7 @@ export default function CustomSelect({
             {/* Options List */}
             <div
               style={{
-                maxHeight: `${Math.max(80, coords.maxHeight - (!compactMode && (searchable || options.length > 6) ? 55 : 10))}px`,
+                maxHeight: `${Math.max(80, coords.maxHeight - (!compactMode && searchable ? 55 : 10))}px`,
                 scrollbarGutter: 'stable',
               }}
               className={`${compactMode ? 'p-0.5 space-y-1' : 'p-1 space-y-0.5'} overflow-y-auto`}

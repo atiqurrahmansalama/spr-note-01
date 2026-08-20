@@ -51,6 +51,15 @@ class IsOwnerOrSuperAdmin(BasePermission):
 
         # Check institution tenancy
         obj_inst_id = getattr(obj, 'institution_id', None)
+        if not obj_inst_id and hasattr(obj, 'student_class') and obj.student_class:
+            obj_inst_id = getattr(obj.student_class, 'institution_id', None)
+        if not obj_inst_id and hasattr(obj, 'branch') and obj.branch:
+            obj_inst_id = getattr(obj.branch, 'institution_id', None)
+        if not obj_inst_id and hasattr(obj, 'department') and obj.department:
+            obj_inst_id = getattr(obj.department, 'institution_id', None)
+        if not obj_inst_id and hasattr(obj, 'student') and obj.student:
+            obj_inst_id = getattr(obj.student, 'institution_id', None)
+
         user_inst_id = getattr(request.user, 'institution_id', None)
         if obj_inst_id and user_inst_id and str(obj_inst_id) == str(user_inst_id):
             return True

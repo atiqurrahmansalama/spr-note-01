@@ -5,6 +5,7 @@ import { useRightSidebar } from "../../context/RightSidebarContext";
 export default function SidebarScreenBlockView({ 
   title, 
   category = "Navigation",
+  subCategory,
   onClose, 
   onBack,
   children, 
@@ -51,6 +52,11 @@ export default function SidebarScreenBlockView({
             <span className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
               {category} /
             </span>
+            {subCategory && (
+              <span className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+                {subCategory} /
+              </span>
+            )}
             <span className="text-xs sm:text-sm font-bold theme-text-primary truncate">
               {title}
             </span>

@@ -30,8 +30,12 @@ import {
   CopyIcon,
   CameraIcon,
   LocationPinIcon,
+  AcademicCapIcon,
+  SparklesIcon,
+  CalendarIcon,
 } from "../../components/ui/Icons";
 import ActionMenu from "../../components/ui/ActionMenu";
+import StatusBadge from "../../components/ui/StatusBadge";
 import Modal from "../../components/ui/Modal";
 import StudentTransferModal from "./StudentTransferModal";
 
@@ -353,7 +357,7 @@ export default function StudentProfileHubView() {
   if (loading) {
     return (
       <div className="w-full max-w-6xl mx-auto py-16 px-4 text-center">
-        <div className="w-10 h-10 border-4 border-sky-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <div className="w-10 h-10 border-4 border-[var(--accent-main)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-xs theme-text-secondary animate-pulse">
           Loading student dossier...
         </p>
@@ -442,12 +446,12 @@ export default function StudentProfileHubView() {
       
       {/* --- HERO PROFILE HEADER CARD --- */}
       <div className="theme-bg-surface border theme-border rounded-3xl p-5 sm:p-7 shadow-xs relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-5 sm:gap-4">
           
-          {/* Left: Avatar with Camera Upload & Identity Details */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left flex-1 min-w-0">
-            {/* Unbordered Avatar Photo with Camera Upload Icon */}
-            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-visible shrink-0 theme-bg-sub shadow-xs">
+          {/* Avatar with Camera Upload & Identity Details (Centered on mobile, left-aligned on sm+) */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 flex-1 min-w-0 text-center sm:text-left">
+            {/* Avatar Photo with Camera Upload Icon */}
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-visible shrink-0 theme-bg-sub border theme-border shadow-xs">
               <div className="w-full h-full rounded-2xl overflow-hidden">
                 {student.photo ? (
                   <img
@@ -462,15 +466,15 @@ export default function StudentProfileHubView() {
                 )}
               </div>
 
-              {/* Camera Upload Button */}
+              {/* Camera Upload Button (No Border, Theme Color, Clean Shadow) */}
               <label
                 title="Change student photo"
-                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center cursor-pointer shadow-md hover:scale-110 transition-transform border-2 border-white dark:border-zinc-900"
+                className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center cursor-pointer shadow-md hover:scale-110 transition-transform z-10"
               >
                 {uploadingPhoto ? (
-                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <CameraIcon className="w-3.5 h-3.5" />
+                  <CameraIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 )}
                 <input
                   ref={photoInputRef}
@@ -483,23 +487,15 @@ export default function StudentProfileHubView() {
               </label>
             </div>
 
-            {/* Name & Structured Metadata (Line 1: 2 Capsules, Line 2: 2 Normal Texts) */}
-            <div className="space-y-2 min-w-0 flex-1">
+            {/* Name, Filled Status Badge, Bangla Name & Metadata */}
+            <div className="space-y-1.5 min-w-0 flex-1 flex flex-col items-center sm:items-start">
               <div className="flex items-center justify-center sm:justify-start gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary leading-tight">
                   {student.name_en || student.name}
                 </h1>
 
-                {/* Clean Green Status Pill beside name */}
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
-                    isActive
-                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                      : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-                  }`}
-                >
-                  {student.status || "Active"}
-                </span>
+                {/* Reusable Theme Filled Active Badge */}
+                <StatusBadge status={student.status || "ACTIVE"} variant="filled" />
               </div>
 
               {student.bangla_name && (
@@ -508,30 +504,42 @@ export default function StudentProfileHubView() {
                 </p>
               )}
 
-              {/* Line 1: 2 Capsules (ID & Roll) */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-0.5">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full theme-bg-sub border theme-border text-xs font-mono font-bold theme-text-primary">
-                  <span>ID:</span>
-                  <span>{student.uniq_id || `STU-${student.id}`}</span>
-                </span>
+              {/* Minimal Clean Metadata: Line 1: ID, Roll | Line 2: Class, Group */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs">
+                  {/* ID with Minimal Copy */}
+                  <div 
+                    onClick={() => {
+                      navigator.clipboard.writeText(student.uniq_id || `STU-${student.id}`);
+                      showToast("Student ID copied!", "success");
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border font-mono text-xs cursor-pointer hover:border-[var(--border-hover)] transition-all group select-text"
+                    title="Click to copy ID"
+                  >
+                    <span className="text-[10px] uppercase font-bold theme-text-secondary">ID:</span>
+                    <span className="font-bold theme-text-primary">{student.uniq_id || `STU-${student.id}`}</span>
+                    <CopyIcon className="w-3 h-3 text-zinc-400 group-hover:theme-accent transition-colors shrink-0" />
+                  </div>
 
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full theme-bg-sub border theme-border text-xs font-semibold theme-text-primary">
-                  <span>Roll:</span>
-                  <span className="font-mono font-bold">{student.roll_number ? `#${student.roll_number}` : "--"}</span>
-                </span>
-              </div>
+                  {/* Roll */}
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border text-xs">
+                    <span className="text-[10px] uppercase font-bold theme-text-secondary">Roll:</span>
+                    <span className="font-mono font-bold theme-text-primary">{student.roll_number ? `#${student.roll_number}` : "--"}</span>
+                  </span>
+                </div>
 
-              {/* Line 2: 2 Normal Texts (Class & Group) */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs theme-text-secondary font-medium">
-                <span>Class: <strong className="theme-text-primary font-semibold">{student.student_class_name || "General"}</strong></span>
-                <span>•</span>
-                <span>Group: <strong className="theme-text-primary font-semibold">{student.group_name || student.student_group_name || "General Group"}</strong></span>
+                {/* Class & Group - Minimal Text with subtle separators */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs theme-text-secondary font-medium">
+                  <span>Class: <strong className="theme-text-primary font-semibold">{student.student_class_name || "General"}</strong></span>
+                  <span>•</span>
+                  <span>Group: <strong className="theme-text-primary font-semibold">{student.group_name || student.student_group_name || "General Group"}</strong></span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right: 3-Dot Reusable Action Menu (QR code inside) */}
-          <div className="shrink-0">
+          {/* Right: 3-Dot Action Menu - Cleanly anchored top-right on mobile & desktop */}
+          <div className="absolute top-4 right-4 sm:static shrink-0 pt-0.5">
             <ActionMenu items={heroActionMenuItems} />
           </div>
         </div>
@@ -600,7 +608,7 @@ export default function StudentProfileHubView() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
                 <div>
                   <h3 className="font-bold text-base theme-text-primary flex items-center gap-2">
-                    <BookOpenIcon className="w-5 h-5 text-sky-400" />
+                    <BookOpenIcon className="w-5 h-5 theme-accent" />
                     <span>30-Juz Quran Memorization &amp; Revision Matrix</span>
                   </h3>
                   <p className="text-xs theme-text-secondary mt-0.5">
@@ -766,34 +774,131 @@ export default function StudentProfileHubView() {
               </div>
             </div>
 
-            {/* Card 3: Dedicated Comprehensive Address Card */}
-            <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-5">
-              <div className="flex items-center gap-2 border-b theme-border pb-3">
-                <LocationPinIcon className="w-4 h-4 theme-accent" />
-                <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
-                  Residential &amp; Address Information
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                <div className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-2">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-bold uppercase tracking-wider">
-                    Present / Residential Address
-                  </span>
-                  <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
-                    {student.details?.present_address || student.address || "No present address on record."}
-                  </p>
-                </div>
+            {/* Card 3: Dedicated Comprehensive Address Card (Minimal Flat Grid with full details) */}
+            {(() => {
+              const presAddr = student.present_address || (typeof student.details?.present_address === "object" ? student.details?.present_address : null);
+              const presStreet = (presAddr && presAddr.street_address) || (typeof student.details?.present_address === "string" ? student.details?.present_address : "") || (typeof student.address === "string" ? student.address : "") || "--";
+              const presThana = (presAddr && presAddr.thana_or_upazila) || student.thana || student.upazila || "--";
+              const presDistrict = (presAddr && presAddr.district) || student.district || "--";
+              const presDivision = (presAddr && presAddr.division) || student.division || "--";
+              const presPost = (presAddr && (presAddr.post_code || presAddr.post_office)) ? `${presAddr.post_office || ""} ${presAddr.post_code ? `(${presAddr.post_code})` : ""}`.trim() : "--";
 
-                <div className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-2">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider">
-                    Permanent / Village Address
-                  </span>
-                  <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
-                    {student.details?.permanent_address || student.details?.present_address || student.address || "No permanent address on record."}
-                  </p>
+              const permAddr = student.permanent_address || (typeof student.details?.permanent_address === "object" ? student.details?.permanent_address : null);
+              const permStreet = (permAddr && permAddr.street_address) || (typeof student.details?.permanent_address === "string" ? student.details?.permanent_address : "") || "--";
+              const permThana = (permAddr && permAddr.thana_or_upazila) || "--";
+              const permDistrict = (permAddr && permAddr.district) || "--";
+              const permDivision = (permAddr && permAddr.division) || "--";
+              const permPost = (permAddr && (permAddr.post_code || permAddr.post_office)) ? `${permAddr.post_office || ""} ${permAddr.post_code ? `(${permAddr.post_code})` : ""}`.trim() : "--";
+
+              return (
+                <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-6">
+                  <div className="flex items-center gap-2 border-b theme-border pb-3">
+                    <LocationPinIcon className="w-4 h-4 theme-accent" />
+                    <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
+                      Residential &amp; Address Information
+                    </h3>
+                  </div>
+
+                  {/* Present Address Details */}
+                  <div className="space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider theme-text-primary block">
+                      Present / Current Address
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Street / Village / Area
+                        </span>
+                        <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
+                          {presStreet}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Thana / Upazila
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {presThana}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          District
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {presDistrict}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Division
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {presDivision}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Post Office / Code
+                        </span>
+                        <p className="font-semibold theme-text-primary font-mono text-xs sm:text-sm">
+                          {presPost}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Permanent Address Details */}
+                  <div className="space-y-3 pt-4 border-t theme-border">
+                    <span className="text-xs font-bold uppercase tracking-wider theme-text-primary block">
+                      Permanent / Village Address
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Street / Village / Area
+                        </span>
+                        <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
+                          {permStreet}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Thana / Upazila
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {permThana}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          District
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {permDistrict}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Division
+                        </span>
+                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                          {permDivision}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                          Post Office / Code
+                        </span>
+                        <p className="font-semibold theme-text-primary font-mono text-xs sm:text-sm">
+                          {permPost}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -935,71 +1040,124 @@ export default function StudentProfileHubView() {
           </div>
         )}
 
-        {/* TAB 4: LIFECYCLE & TIMELINE */}
+        {/* TAB 4: LIFECYCLE & TIMELINE (Minimal Clean Design) */}
         {activeTab === "timeline" && (
           <div className="space-y-6 animate-fade-in">
-            <div className="theme-bg-surface border theme-border p-6 md:p-8 rounded-3xl shadow-xs space-y-6">
+            <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-6">
+              
+              {/* Header & Transfer Action */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
-                <div>
-                  <h3 className="font-bold text-base theme-text-primary flex items-center gap-2">
-                    <HistoryIcon className="w-5 h-5 text-sky-400" />
-                    <span>Academic Progression &amp; Historical Timeline</span>
+                <div className="flex items-center gap-2">
+                  <HistoryIcon className="w-4 h-4 theme-accent" />
+                  <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
+                    Academic Progression &amp; Lifecycle Timeline
                   </h3>
-                  <p className="text-xs theme-text-secondary mt-0.5">
-                    Immutable audit log of class promotions, halqa migrations, and grade transfers
-                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsTransferModalOpen(true)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
                 >
                   <TransferIcon className="w-3.5 h-3.5" />
                   <span>Transfer Class / Group</span>
                 </button>
               </div>
 
-              {/* Progression Events List */}
-              {student.academic_history && student.academic_history.length > 0 ? (
-                <div className="space-y-4">
-                  {student.academic_history.map((record) => (
-                    <div
-                      key={record.id}
-                      className="p-4 rounded-2xl theme-bg-sub border theme-border flex items-center justify-between gap-4 text-xs"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold theme-text-primary text-sm">
-                            {record.class_name || "General"}
+              {/* Vertical Timeline with Centered Tracks & Clean Nodes */}
+              <div className="space-y-0 pt-2">
+                
+                {/* 1. Current Active Stage */}
+                <div className="flex gap-4 items-start">
+                  <div className="flex flex-col items-center self-stretch shrink-0">
+                    <div className="w-8 h-8 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs z-10">
+                      <CheckCircleIcon className="w-4 h-4" />
+                    </div>
+                    <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1"></div>
+                  </div>
+
+                  <div className="flex-1 pb-6 space-y-1 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-sm theme-text-primary">
+                        {student.student_class_name || "General Class"}
+                      </span>
+                      {(student.group_name || student.student_group_name) && (
+                        <span className="text-xs theme-text-secondary font-medium">
+                          • {student.group_name || student.student_group_name}
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/25 uppercase tracking-wider">
+                        Current Enrolment
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs theme-text-secondary">
+                      <span>Status: <strong className="theme-text-primary font-medium">{student.status || "Active"}</strong></span>
+                      {student.academic_history?.[0]?.transition_reason && (
+                        <span>• Reason: <strong className="theme-text-primary font-medium">{student.academic_history[0].transition_reason}</strong></span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Historical Transitions (excluding current if duplicate) */}
+                {student.academic_history && student.academic_history.filter((r) => !r.is_current).map((record) => (
+                  <div key={record.id} className="flex gap-4 items-start">
+                    <div className="flex flex-col items-center self-stretch shrink-0">
+                      <div className="w-8 h-8 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-text-secondary shadow-xs z-10">
+                        <HistoryIcon className="w-4 h-4" />
+                      </div>
+                      <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1"></div>
+                    </div>
+
+                    <div className="flex-1 pb-6 space-y-1 pt-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-sm theme-text-primary">
+                          {record.student_class_name || record.class_name || "General Class"}
+                        </span>
+                        {(record.student_group_name || record.group_name) && (
+                          <span className="text-xs theme-text-secondary font-medium">
+                            • {record.student_group_name || record.group_name}
                           </span>
-                          {record.group_name && (
-                            <span className="px-2 py-0.5 rounded-md theme-bg-surface border theme-border text-[10px] font-semibold theme-text-secondary">
-                              {record.group_name}
-                            </span>
-                          )}
-                          {record.is_current && (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                              Current Enrolment
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] theme-text-secondary">
-                          Reason: {record.transition_reason || "Annual Progression"}
-                        </p>
+                        )}
+                        <span className="font-mono text-[11px] theme-text-secondary">
+                          ({record.start_date || "--"} &rarr; {record.end_date || "--"})
+                        </span>
                       </div>
 
-                      <div className="text-right font-mono text-[11px] theme-text-secondary shrink-0">
-                        <span>{record.start_date || "--"}</span>
-                        {record.end_date && <span> &rarr; {record.end_date}</span>}
-                      </div>
+                      <p className="text-xs theme-text-secondary">
+                        Reason: <span className="theme-text-primary">{record.transition_reason || "Annual Progression"}</span>
+                        {record.transferred_by_name && <span> • By {record.transferred_by_name}</span>}
+                      </p>
                     </div>
-                  ))}
+                  </div>
+                ))}
+
+                {/* 3. Admission Origin Node */}
+                <div className="flex gap-4 items-start">
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className="w-8 h-8 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-accent shadow-xs z-10">
+                      <SparklesIcon className="w-4 h-4" />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-1 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-sm theme-text-primary">
+                        Academy Admission
+                      </span>
+                      {student.admission_date && (
+                        <span className="font-mono text-[11px] theme-text-secondary">
+                          ({student.admission_date})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs theme-text-secondary">
+                      Officially registered and enrolled into academy records.
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-xs theme-text-secondary text-center py-6">
-                  No previous transfer history recorded for this student.
-                </p>
-              )}
+
+              </div>
             </div>
           </div>
         )}

@@ -81,10 +81,9 @@ export default function SidebarContainer({
       key: "nav_institution",
       subItems: [
         { id: "Profile", name: "Profile", path: "/academy-profile", Icon: BuildingOfficeIcon, key: "settings_institution" },
-        { id: "Academies", name: "Academies", path: "/institutions", Icon: BuildingOfficeIcon, key: "app_institutions" },
-        { id: "Department", name: "Department", path: "/student-management/departments", Icon: DepartmentIcon, key: "student_departments" },
-        { id: "Class", name: "Class", path: "/student-management/classes", Icon: ClassIcon, key: "student_classes" },
-        { id: "Group", name: "Group", path: "/student-management/groups", Icon: GroupIcon, key: "student_groups" },
+        { id: "Academies & Departments", name: "Academies & Departments", path: "/academy/campus-profile", Icon: BuildingOfficeIcon, key: "campus_profile" },
+        { id: "Classes & Groups", name: "Classes & Groups", path: "/academy/classes-groups", Icon: ClassIcon, key: "student_classes" },
+        { id: "Period Schedules", name: "Period Schedules", path: "/academy/periods", Icon: TimerIcon, key: "class_period_slots" },
       ]
     },
     {
@@ -95,11 +94,8 @@ export default function SidebarContainer({
       key: "nav_student_management",
       subItems: [
         { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
-        { id: "31-Day Student Register", name: "31-Day Student Register", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
-        { id: "Student Attendance", name: "Student Attendance", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
-        { id: "Period & Class Roll Call", name: "Period & Class Roll Call", path: "/attendance/students/roll-call", Icon: AttendanceIcon, key: "student_attendance" },
-        { id: "Gate Entry & Pass", name: "Gate Entry & Pass", path: "/attendance/students/gate-log", Icon: GateIcon, key: "student_gate_tracker" },
-        { id: "Surprise Headcount", name: "Surprise Headcount", path: "/attendance/students/adhoc", Icon: ChecklistIcon, key: "student_adhoc_headcount" },
+        { id: "Class Attendance", name: "Class Attendance", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
+        { id: "Residential Attendance", name: "Residential Attendance", path: "/attendance/students/residential", Icon: TimerIcon, key: "residential_attendance" },
         { id: "Short Admission", name: "Short Admission", path: "/short-admission", Icon: SparklesIcon, key: "student_quick_admission" },
         { id: "Admission", name: "Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
       ]
@@ -236,7 +232,7 @@ export default function SidebarContainer({
       <aside
         className={`
           ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full"}
-          ${isCollapsed ? "w-20 sm:w-20" : "w-72 sm:w-72"}
+          ${isCollapsed ? "w-20 sm:w-20" : "w-[280px] sm:w-[280px]"}
           theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
         `}
       >

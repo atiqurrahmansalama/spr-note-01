@@ -513,6 +513,54 @@ class Address(models.Model):
         return ", ".join([p for p in parts if p]) or f"Address #{self.id}"
 
 
+# 🎯 0. Branch / Multi-Campus Table
+class AcademicBranch(models.Model):
+    BRANCH_TYPE_CHOICES = (
+        ('MAIN_CAMPUS', 'Main Campus'),
+        ('SUB_BRANCH', 'Sub Branch'),
+        ('FEMALE_BRANCH', 'Female Branch / Mahila Branch'),
+        ('RESIDENTIAL_CAMPUS', 'Residential Campus'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='branches'
+    )
+    branch_name = models.CharField(max_length=200)
+    branch_code = models.CharField(max_length=50, blank=True, default='')
+    branch_type = models.CharField(
+        max_length=50,
+        choices=BRANCH_TYPE_CHOICES,
+        default='MAIN_CAMPUS'
+    )
+    in_charge_staff = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='managed_branches'
+    )
+    contact_phone = models.CharField(max_length=30, blank=True, default='')
+    contact_email = models.EmailField(blank=True, default='')
+    address = models.TextField(blank=True, default='')
+    district = models.CharField(max_length=100, blank=True, default='')
+    division = models.CharField(max_length=100, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['branch_name']
+        verbose_name = "Academic Branch"
+        verbose_name_plural = "Academic Branches"
+
+    def __str__(self):
+        return f"{self.branch_name} ({self.branch_code})" if self.branch_code else self.branch_name
+
+
 # 🎯 0a. Department Table
 class AcademicDepartment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -607,6 +655,134 @@ class StudentClass(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.code})" if self.code else self.name
+
+
+# 🎯 0c. Class Section & Halqa Table
+class ClassSection(models.Model):
+    SECTION_TYPE_CHOICES = (
+        ('GENERAL_SECTION', 'General Section'),
+        ('HIFZ_HALQA', 'Hifz Halqa'),
+        ('RESIDENTIAL_DORM', 'Residential Dorm / Boarding'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student_class = models.ForeignKey(
+        StudentClass,
+        on_delete=models.CASCADE,
+        related_name='sections'
+    )
+    branch = models.ForeignKey(
+        AcademicBranch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='sections'
+    )
+    section_name = models.CharField(max_length=100)
+    section_type = models.CharField(
+        max_length=50,
+        choices=SECTION_TYPE_CHOICES,
+        default='GENERAL_SECTION'
+    )
+    room_number = models.CharField(max_length=50, blank=True, default='')
+    max_capacity = models.PositiveIntegerField(default=40)
+    class_teacher = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='managed_sections'
+    )
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['student_class', 'section_name']
+        verbose_name = "Class Section"
+        verbose_name_plural = "Class Sections"
+
+    def __str__(self):
+        return f"{self.student_class.name} - Section {self.section_name}"
+
+
+# 🎯 0d. Dynamic Period Slot Table
+class ClassPeriodSlot(models.Model):
+    SLOT_TYPE_CHOICES = (
+        ('TEACHING_PERIOD', 'Teaching Period'),
+        ('BREAK_TIFFIN', 'Break / Tiffin'),
+        ('PRAYER_BREAK', 'Prayer Break'),
+        ('MUTALA_SESSION', 'Mutala / Study Session'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        AcademicInstitution,
+        on_delete=models.CASCADE,
+        related_name='class_period_slots'
+    )
+    branch = models.ForeignKey(
+        AcademicBranch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='period_slots'
+    )
+    department = models.ForeignKey(
+        AcademicDepartment,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='class_period_slots'
+    )
+    student_class = models.ForeignKey(
+        StudentClass,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='class_period_slots'
+    )
+    teacher = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_periods'
+    )
+    period_name = models.CharField(max_length=120)
+    slot_type = models.CharField(
+        max_length=50,
+        choices=SLOT_TYPE_CHOICES,
+        default='TEACHING_PERIOD'
+    )
+    period_order = models.PositiveIntegerField(default=1)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    duration_minutes = models.PositiveIntegerField(default=45, blank=True)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['period_order', 'start_time', 'period_name']
+        verbose_name = "Class Period Slot"
+        verbose_name_plural = "Class Period Slots"
+
+    def save(self, *args, **kwargs):
+        if self.start_time and self.end_time:
+            import datetime
+            t1 = datetime.datetime.combine(datetime.date.today(), self.start_time)
+            t2 = datetime.datetime.combine(datetime.date.today(), self.end_time)
+            if t2 < t1:
+                t2 += datetime.timedelta(days=1)
+            diff = (t2 - t1).total_seconds() / 60
+            self.duration_minutes = max(1, int(diff))
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.period_name} ({self.start_time}-{self.end_time})"
 
 
 # 🎯 1. Group Table
@@ -717,6 +893,20 @@ class Student(models.Model):
     )
     student_group = models.ForeignKey(
         StudentGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
+    branch = models.ForeignKey(
+        AcademicBranch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
+    section = models.ForeignKey(
+        ClassSection,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

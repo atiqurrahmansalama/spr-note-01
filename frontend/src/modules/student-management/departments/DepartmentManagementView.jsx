@@ -15,11 +15,26 @@ import {
 import DataTable from "../../../components/ui/DataTable";
 import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
+import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
+import PageHeader from "../../../components/ui/PageHeader";
+import DataViewToolbar from "../../../components/ui/DataViewToolbar";
+import DataViewFooter from "../../../components/ui/DataViewFooter";
 import { useRightSidebar } from "../../../context/RightSidebarContext";
 import DepartmentForm from "./DepartmentForm";
 
-export default function DepartmentManagementView() {
+const DEPARTMENT_STATUS_OPTIONS = [
+  { label: "All Departments", value: "ALL" },
+  { label: "Active Status", value: "ACTIVE" },
+  { label: "Inactive Status", value: "INACTIVE" },
+  { label: "Quran / Hifz Tracker", value: "QURAN_TRACKER" },
+];
+
+export default function DepartmentManagementView({
+  hideHeader = false,
+  hideMetrics = false,
+  isEmbedded = false,
+}) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
@@ -32,6 +47,7 @@ export default function DepartmentManagementView() {
   const [loading, setLoading] = useState(true);
   const [deletingDept, setDeletingDept] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [metrics, setMetrics] = useState({
     total_departments: 0,
     total_classes: 0,
@@ -151,12 +167,17 @@ export default function DepartmentManagementView() {
   };
 
   const filteredDepartments = departments.filter((d) => {
+    if (statusFilter === "ACTIVE" && !d.is_active) return false;
+    if (statusFilter === "INACTIVE" && d.is_active) return false;
+    if (statusFilter === "QURAN_TRACKER" && !d.has_quran_tracker) return false;
+
+    if (!searchQuery) return true;
     const name = (d.name || "").toLowerCase();
     const code = (d.code || "").toLowerCase();
     const head = (d.department_head_name || "").toLowerCase();
     const query = searchQuery.toLowerCase();
 
-    return !query || name.includes(query) || code.includes(query) || head.includes(query);
+    return name.includes(query) || code.includes(query) || head.includes(query);
   });
 
   const getActionMenuItems = (d) => [
@@ -219,7 +240,7 @@ export default function DepartmentManagementView() {
       align: "center",
       headerClassName: "w-24 text-center",
       render: (d) => (
-        <span className="font-bold text-sky-400">{d.classes_count ?? 0}</span>
+        <span className="font-bold theme-text-primary">{d.classes_count ?? 0}</span>
       ),
     },
     {
@@ -228,7 +249,7 @@ export default function DepartmentManagementView() {
       align: "center",
       headerClassName: "w-24 text-center",
       render: (d) => (
-        <span className="font-bold text-emerald-400">{d.students_count ?? 0}</span>
+        <span className="font-bold theme-accent">{d.students_count ?? 0}</span>
       ),
     },
     {
@@ -238,12 +259,13 @@ export default function DepartmentManagementView() {
       headerClassName: "w-28 text-center",
       render: (d) => (
         <span
-          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
             d.is_active
-              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+              : "theme-bg-sub theme-text-secondary border theme-border"
           }`}
         >
+          <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
           {d.is_active ? "Active" : "Inactive"}
         </span>
       ),
@@ -289,11 +311,11 @@ export default function DepartmentManagementView() {
           <span
             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${
               d.is_active
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+                : "theme-bg-sub theme-text-secondary border theme-border"
             }`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-emerald-400" : "bg-zinc-400"}`}></span>
+            <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
             {d.is_active ? "Active" : "Inactive"}
           </span>
         </div>
@@ -315,11 +337,11 @@ export default function DepartmentManagementView() {
         {/* Stats Strip */}
         <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
           <div>
-            <span className="block text-sm font-bold text-sky-400">{d.classes_count ?? 0}</span>
+            <span className="block text-sm font-bold theme-text-primary">{d.classes_count ?? 0}</span>
             <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Classes</span>
           </div>
           <div className="border-l theme-border">
-            <span className="block text-sm font-bold text-emerald-400">{d.students_count ?? 0}</span>
+            <span className="block text-sm font-bold theme-accent">{d.students_count ?? 0}</span>
             <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
           </div>
         </div>
@@ -332,7 +354,7 @@ export default function DepartmentManagementView() {
           onClick={() => navigate(`/student-management/classes?department=${d.id}`)}
           className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border"
         >
-          <ClassIcon className="w-3.5 h-3.5 text-sky-400" />
+          <ClassIcon className="w-3.5 h-3.5 theme-accent" />
           <span>Classes</span>
         </button>
 
@@ -346,145 +368,120 @@ export default function DepartmentManagementView() {
   const totalStudentsCount = metrics?.total_enrolled_students ?? departments.reduce((acc, d) => acc + (d.students_count || 0), 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left">
-      {/* 1. Standard Module Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b theme-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <DepartmentIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-              Department
-            </h1>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Configure institutional academic divisions and head deans
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => navigate("/student-management/classes")}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub cursor-pointer transition-all flex items-center gap-2"
-          >
-            <ClassIcon className="w-4 h-4 text-sky-400" />
-            <span>Manage Classes &rarr;</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>Add Department</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Metrics Header Cards */}
-      <MetricsGrid
-        items={[
-          {
-            label: "Academic Departments",
-            value: totalDeptsCount,
-            icon: DepartmentIcon,
-            color: "sky",
-          },
-          {
-            label: "Assigned Classes",
-            value: totalClassesCount,
-            icon: ClassIcon,
-            color: "emerald",
-          },
-          {
-            label: "Enrolled Students",
-            value: totalStudentsCount,
-            icon: GroupsIcon,
-            color: "purple",
-          },
-        ]}
-      />
-
-      {/* 3. Search & View Mode Switcher Toolbar */}
-      <div className="theme-bg-surface border theme-border p-3.5 rounded-2xl flex flex-col sm:flex-row gap-3 justify-between items-center shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search department, code, dean..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 py-2 rounded-xl border theme-border theme-bg-sub text-xs theme-text-primary focus:outline-none focus:border-current"
-          />
-        </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div className="text-xs font-semibold theme-text-secondary">
-            Showing <span className="theme-text-primary font-bold">{filteredDepartments.length}</span> of{" "}
-            <span className="theme-text-primary font-bold">{departments.length}</span> departments
-          </div>
-
-          {/* View Mode Toggle Buttons */}
-          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("grid")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "grid"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <BuildingOfficeIcon className="w-3.5 h-3.5" />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("table")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "table"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <DepartmentIcon className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* --- DISPLAY: DATA CARD GRID OR DATA TABLE --- */}
-      {viewMode === "grid" ? (
-        <DataCardGrid
-          data={filteredDepartments}
-          renderCard={renderDepartmentCard}
-          isLoading={loading}
-          loadingMessage="Loading academic departments..."
-          emptyIcon={DepartmentIcon}
-          emptyTitle="No Departments Found"
-          emptySubMessage={
-            searchQuery
-              ? "No departments matched your search query. Try clearing the search box."
-              : "Get started by adding your first academic division."
-          }
-        />
-      ) : (
-        <DataTable
-          columns={columns}
-          data={filteredDepartments}
-          isLoading={loading}
-          loadingMessage="Loading academic departments..."
-          emptyIcon={DepartmentIcon}
-          emptyTitle="No Departments Found"
-          emptySubMessage={
-            searchQuery
-              ? "No departments matched your search query. Try clearing the search box."
-              : "Get started by adding your first academic division."
+    <div className={`${isEmbedded ? "w-full space-y-6 font-sans theme-text-primary animate-fade-in text-left" : "w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans theme-text-primary animate-fade-in text-left"}`}>
+      {/* 1. Standard Module Header with Reusable PageHeader */}
+      {!hideHeader && (
+        <PageHeader
+          icon={DepartmentIcon}
+          title="Department"
+          subtitle="Configure institutional academic divisions and head deans"
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => navigate("/student-management/classes")}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub cursor-pointer transition-all flex items-center gap-2"
+              >
+                <ClassIcon className="w-4 h-4 theme-accent" />
+                <span>Manage Classes &rarr;</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>Add Department</span>
+              </button>
+            </>
           }
         />
       )}
+
+      {/* 2. Metrics Header Cards */}
+      {!hideMetrics && (
+        <MetricsGrid
+          items={[
+            {
+              label: "Academic Departments",
+              value: totalDeptsCount,
+              icon: DepartmentIcon,
+              color: "accent",
+            },
+            {
+              label: "Assigned Classes",
+              value: totalClassesCount,
+              icon: ClassIcon,
+              color: "default",
+            },
+            {
+              label: "Enrolled Students",
+              value: totalStudentsCount,
+              icon: GroupsIcon,
+              color: "default",
+            },
+          ]}
+        />
+      )}
+
+      {/* 3. Search & View Mode Switcher Toolbar */}
+      <DataViewToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search department, code, dean..."
+        filterElement={
+          <CustomSelect
+            options={DEPARTMENT_STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={(val) => setStatusFilter(val)}
+            placeholder="Filter by Status"
+          />
+        }
+        viewMode={viewMode}
+        onToggleViewMode={handleToggleViewMode}
+      />
+
+      {/* --- DISPLAY: DATA CARD GRID OR DATA TABLE --- */}
+      <div className="space-y-4">
+        {viewMode === "grid" ? (
+          <DataCardGrid
+            data={filteredDepartments}
+            renderCard={renderDepartmentCard}
+            isLoading={loading}
+            loadingMessage="Loading academic departments..."
+            emptyIcon={DepartmentIcon}
+            emptyTitle="No Departments Found"
+            emptySubMessage={
+              searchQuery
+                ? "No departments matched your search query. Try clearing the search box."
+                : "Get started by adding your first academic division."
+            }
+          />
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredDepartments}
+            isLoading={loading}
+            loadingMessage="Loading academic departments..."
+            emptyIcon={DepartmentIcon}
+            emptyTitle="No Departments Found"
+            emptySubMessage={
+              searchQuery
+                ? "No departments matched your search query. Try clearing the search box."
+                : "Get started by adding your first academic division."
+            }
+          />
+        )}
+
+        {/* Reusable DataViewFooter */}
+        {!loading && departments.length > 0 && (
+          <DataViewFooter
+            filteredCount={filteredDepartments.length}
+            totalCount={departments.length}
+            itemLabel="departments"
+          />
+        )}
+      </div>
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
       {deletingDept && (

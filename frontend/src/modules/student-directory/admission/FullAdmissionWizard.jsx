@@ -7,6 +7,7 @@ import { BD_GEO_DATA } from "../../../utils/bdGeoData";
 import { calculateAge, validateBDPhone, validateBRN, validateNID } from "../../../utils/admissionValidators";
 import { CameraIcon, UploadIcon, ChevronIcon } from "../../../components/ui/Icons";
 import AddressLocationPicker from "../../../components/common/AddressLocationPicker";
+import AddressPickerInput from "../../../components/ui/AddressPickerInput";
 
 const RELATION_OPTIONS = [
   "Father",
@@ -883,111 +884,29 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
 
               {/* DUAL ADDRESS SECTION: PRESENT & PERMANENT */}
               <div className="space-y-5 border-t theme-border pt-5">
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                  Present Address
-                </h4>
-
-                {/* Map Location Picker for Present Address */}
-                <AddressLocationPicker
-                  label="Search & Pick Present Address on Map"
+                <AddressPickerInput
                   value={{
-                    address: sharedData.street_address,
-                    street_address: sharedData.street_address,
-                    district: sharedData.district,
                     division: sharedData.division,
-                    upazila_thana: sharedData.thana_or_upazila,
-                    postal_code: sharedData.post_code,
-                    latitude: sharedData.latitude,
-                    longitude: sharedData.longitude,
-                    map_place_id: sharedData.map_place_id,
+                    district: sharedData.district,
+                    upazila: sharedData.thana_or_upazila,
+                    post_code: sharedData.post_code,
+                    street_address: sharedData.street_address,
+                    coordinates: sharedData.latitude && sharedData.longitude ? `${sharedData.latitude}, ${sharedData.longitude}` : '',
                   }}
-                  onChange={(loc) => {
+                  onChange={(addr) => {
                     setSharedData((prev) => ({
                       ...prev,
-                      street_address: loc.street_address || loc.address || prev.street_address,
-                      district: loc.district || prev.district,
-                      division: loc.division || prev.division,
-                      thana_or_upazila: loc.upazila_thana || prev.thana_or_upazila,
-                      post_code: loc.postal_code || prev.post_code,
-                      latitude: loc.latitude !== undefined ? loc.latitude : prev.latitude,
-                      longitude: loc.longitude !== undefined ? loc.longitude : prev.longitude,
-                      map_place_id: loc.map_place_id || prev.map_place_id,
+                      division: addr.division,
+                      district: addr.district,
+                      thana_or_upazila: addr.upazila || addr.thana_or_upazila || '',
+                      post_code: addr.post_code || '',
+                      street_address: addr.street_address || '',
                     }));
                   }}
-                  placeholder="Type address or click 'Pick on Map' to auto-detect location"
+                  title="Present Address & Geolocation"
+                  subTitle="Division, district, thana/upazila, postal code & physical address"
+                  required
                 />
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <div>
-                    <CustomSelect
-                      label="Division"
-                      options={Object.keys(BD_GEO_DATA).map((d) => ({ label: d, value: d }))}
-                      value={sharedData.division || ""}
-                      onChange={(val) => {
-                        setSharedData((prev) => ({
-                          ...prev,
-                          division: val,
-                          district: "",
-                          thana_or_upazila: "",
-                        }));
-                      }}
-                      placeholder="Select Division..."
-                    />
-                  </div>
-                  <div>
-                    <CustomSelect
-                      label="District"
-                      options={getDistrictsForDivision(sharedData.division).map((d) => ({ label: d, value: d }))}
-                      value={sharedData.district || ""}
-                      onChange={(val) => {
-                        setSharedData((prev) => ({
-                          ...prev,
-                          district: val,
-                          thana_or_upazila: "",
-                        }));
-                      }}
-                      placeholder="Select District..."
-                      searchable
-                    />
-                  </div>
-                  <div>
-                    <CustomSelect
-                      label="Thana / Upazila"
-                      options={getUpazilasForDistrict(sharedData.division, sharedData.district).map((u) => ({ label: u, value: u }))}
-                      value={sharedData.thana_or_upazila || ""}
-                      onChange={(val) => handleChange("thana_or_upazila", val)}
-                      placeholder="Select Upazila..."
-                      searchable
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                      Street Address / Village / House Details
-                    </label>
-                    <input
-                      type="text"
-                      value={sharedData.street_address || ""}
-                      onChange={(e) => handleChange("street_address", e.target.value)}
-                      placeholder="Street, Road, House, and Village detail"
-                      className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                      Postal Code
-                    </label>
-                    <input
-                      type="text"
-                      value={sharedData.post_code || ""}
-                      onChange={(e) => handleChange("post_code", e.target.value)}
-                      placeholder="Post Code"
-                      className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                    />
-                  </div>
-                </div>
 
                 {/* Same Address Checkbox Toggle */}
                 <div className="flex items-center gap-2 pt-2">
@@ -1006,111 +925,28 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
                 {/* Permanent Address Fields (Shown when unchecked) */}
                 {!sameAddress && (
                   <div className="space-y-4 pt-3 border-t theme-border animate-fade-in">
-                    <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                      Permanent Address
-                    </h4>
-
-                    {/* Map Location Picker for Permanent Address */}
-                    <AddressLocationPicker
-                      label="Search & Pick Permanent Address on Map"
+                    <AddressPickerInput
                       value={{
-                        address: sharedData.perm_street,
-                        street_address: sharedData.perm_street,
-                        district: sharedData.perm_district,
                         division: sharedData.perm_division,
-                        upazila_thana: sharedData.perm_thana,
-                        postal_code: sharedData.perm_post_code,
-                        latitude: sharedData.perm_latitude,
-                        longitude: sharedData.perm_longitude,
-                        map_place_id: sharedData.perm_map_place_id,
+                        district: sharedData.perm_district,
+                        upazila: sharedData.perm_thana,
+                        post_code: sharedData.perm_post_code,
+                        street_address: sharedData.perm_street,
+                        coordinates: sharedData.perm_latitude && sharedData.perm_longitude ? `${sharedData.perm_latitude}, ${sharedData.perm_longitude}` : '',
                       }}
-                      onChange={(loc) => {
+                      onChange={(addr) => {
                         setSharedData((prev) => ({
                           ...prev,
-                          perm_street: loc.street_address || loc.address || prev.perm_street,
-                          perm_district: loc.district || prev.perm_district,
-                          perm_division: loc.division || prev.perm_division,
-                          perm_thana: loc.upazila_thana || prev.perm_thana,
-                          perm_post_code: loc.postal_code || prev.perm_post_code,
-                          perm_latitude: loc.latitude !== undefined ? loc.latitude : prev.perm_latitude,
-                          perm_longitude: loc.longitude !== undefined ? loc.longitude : prev.perm_longitude,
-                          perm_map_place_id: loc.map_place_id || prev.perm_map_place_id,
+                          perm_division: addr.division,
+                          perm_district: addr.district,
+                          perm_thana: addr.upazila || addr.thana_or_upazila || '',
+                          perm_post_code: addr.post_code || '',
+                          perm_street: addr.street_address || '',
                         }));
                       }}
-                      placeholder="Type permanent address or click 'Pick on Map'"
+                      title="Permanent Address & Geolocation"
+                      subTitle="Permanent division, district, thana/upazila & postal details"
                     />
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                      <div>
-                        <CustomSelect
-                          label="Division"
-                          options={Object.keys(BD_GEO_DATA).map((d) => ({ label: d, value: d }))}
-                          value={sharedData.perm_division || ""}
-                          onChange={(val) => {
-                            setSharedData((prev) => ({
-                              ...prev,
-                              perm_division: val,
-                              perm_district: "",
-                              perm_thana: "",
-                            }));
-                          }}
-                          placeholder="Select Division..."
-                        />
-                      </div>
-                      <div>
-                        <CustomSelect
-                          label="District"
-                          options={getDistrictsForDivision(sharedData.perm_division).map((d) => ({ label: d, value: d }))}
-                          value={sharedData.perm_district || ""}
-                          onChange={(val) => {
-                            setSharedData((prev) => ({
-                              ...prev,
-                              perm_district: val,
-                              perm_thana: "",
-                            }));
-                          }}
-                          placeholder="Select District..."
-                          searchable
-                        />
-                      </div>
-                      <div>
-                        <CustomSelect
-                          label="Thana / Upazila"
-                          options={getUpazilasForDistrict(sharedData.perm_division, sharedData.perm_district).map((u) => ({ label: u, value: u }))}
-                          value={sharedData.perm_thana || ""}
-                          onChange={(val) => handleChange("perm_thana", val)}
-                          placeholder="Select Upazila..."
-                          searchable
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                          Permanent Street / Village / House Details
-                        </label>
-                        <input
-                          type="text"
-                          value={sharedData.perm_street || ""}
-                          onChange={(e) => handleChange("perm_street", e.target.value)}
-                          placeholder="Permanent Street, Road, House, and Village"
-                          className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                          Postal Code
-                        </label>
-                        <input
-                          type="text"
-                          value={sharedData.perm_post_code || ""}
-                          onChange={(e) => handleChange("perm_post_code", e.target.value)}
-                          placeholder="Post Code"
-                          className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>

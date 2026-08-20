@@ -18,11 +18,17 @@ import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
+import PageHeader from "../../../components/ui/PageHeader";
+import DataViewToolbar from "../../../components/ui/DataViewToolbar";
 import GroupFormModal from "./GroupFormModal";
 import GroupMigrationModal from "./GroupMigrationModal";
 import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
-export default function GroupManagementView() {
+export default function GroupManagementView({
+  hideHeader = false,
+  hideMetrics = false,
+  isEmbedded = false,
+}) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,6 +71,12 @@ export default function GroupManagementView() {
       localStorage.setItem("spr_groups_view_mode", mode);
     } catch {}
   };
+
+  useEffect(() => {
+    const handleOpen = () => handleOpenCreate();
+    window.addEventListener("spr_open_create_group", handleOpen);
+    return () => window.removeEventListener("spr_open_create_group", handleOpen);
+  }, []);
 
   useEffect(() => {
     loadClasses();
@@ -117,7 +129,7 @@ export default function GroupManagementView() {
         setGroups(Array.isArray(data) ? data : data.results || []);
       }
     } catch {
-      showToast("Failed to load groups.", "error");
+      showToast("Could not load student groups.", "error");
     } finally {
       setLoading(false);
     }
@@ -143,20 +155,29 @@ export default function GroupManagementView() {
     setIsFormModalOpen(true);
   };
 
+  const handleSaveSuccess = () => {
+    setIsFormModalOpen(false);
+    setEditingGroup(null);
+    loadGroups();
+    loadMetrics();
+  };
+
   const handleDeletePrompt = (grp) => {
     setDeletingGroup(grp);
     setIsDeleteModalOpen(true);
   };
 
-  const performDirectDelete = async () => {
+  const performDirectDelete = async (payload) => {
     if (!deletingGroup) return;
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
       const res = await fetchWithAuth(`/api/v1/groups/${deletingGroup.id}/`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {}),
       });
       if (res.ok) {
-        showToast(`Group "${deletingGroup.name}" deleted successfully.`, "success");
+        showToast("Group deleted successfully.", "success");
         setIsDeleteModalOpen(false);
         setDeletingGroup(null);
         loadGroups();
@@ -166,7 +187,7 @@ export default function GroupManagementView() {
         showToast(err.error || "Failed to delete group.", "error");
       }
     } catch {
-      showToast("Network error.", "error");
+      showToast("Network error deleting group.", "error");
     } finally {
       setIsDeleting(false);
     }
@@ -174,7 +195,7 @@ export default function GroupManagementView() {
 
   // Filtered in-memory search
   const filteredGroups = groups.filter((grp) => {
-    if (!searchQuery.trim()) return true;
+    if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
       grp.name?.toLowerCase().includes(q) ||
@@ -219,12 +240,12 @@ export default function GroupManagementView() {
       header: "Parent Class",
       render: (grp) =>
         grp.student_class_name ? (
-          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 inline-flex items-center gap-1">
-            <ClassIcon className="w-3 h-3" />
+          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border inline-flex items-center gap-1">
+            <ClassIcon className="w-3 h-3 theme-accent" />
             <span>{grp.student_class_name}</span>
           </span>
         ) : (
-          <span className="text-zinc-500 italic text-xs">None</span>
+          <span className="theme-text-secondary italic text-xs">None</span>
         ),
     },
     {
@@ -233,13 +254,13 @@ export default function GroupManagementView() {
       render: (grp) =>
         grp.mentor_teacher_name ? (
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+            <div className="w-6 h-6 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-[10px] shrink-0 border border-[var(--accent-main)]/20">
               {grp.mentor_teacher_name.charAt(0).toUpperCase()}
             </div>
             <span className="font-semibold text-xs theme-text-primary">{grp.mentor_teacher_name}</span>
           </div>
         ) : (
-          <span className="text-zinc-500 italic text-[11px]">Unassigned</span>
+          <span className="theme-text-secondary italic text-[11px]">Unassigned</span>
         ),
     },
     {
@@ -249,7 +270,7 @@ export default function GroupManagementView() {
       render: (grp) => (
         <span
           onClick={() => navigate(`/students?student_group=${grp.id}`)}
-          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          className="px-2.5 py-1 rounded-lg text-xs font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 hover:opacity-80 transition-colors cursor-pointer inline-flex items-center gap-1.5"
           title="View Enrolled Students"
         >
           <StudentIcon className="w-3.5 h-3.5" />
@@ -263,12 +284,13 @@ export default function GroupManagementView() {
       align: "center",
       render: (grp) => (
         <span
-          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
             grp.is_active
-              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+              : "theme-bg-sub theme-text-secondary border theme-border"
           }`}
         >
+          <span className={`w-1.5 h-1.5 rounded-full ${grp.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
           {grp.is_active ? "Active" : "Inactive"}
         </span>
       ),
@@ -308,12 +330,12 @@ export default function GroupManagementView() {
                 </h3>
                 <div className="mt-1">
                   {grp.student_class_name ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      <ClassIcon className="w-3 h-3" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border">
+                      <ClassIcon className="w-3 h-3 theme-accent" />
                       <span>{grp.student_class_name}</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] text-zinc-500 italic">No Parent Class</span>
+                    <span className="text-[10px] theme-text-secondary italic">No Parent Class</span>
                   )}
                 </div>
               </div>
@@ -324,7 +346,7 @@ export default function GroupManagementView() {
 
           {/* Mentor Teacher */}
           <div className="p-2.5 rounded-xl theme-bg-sub border theme-border flex items-center gap-2.5 text-xs">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold text-xs shrink-0">
+            <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-xs shrink-0 border border-[var(--accent-main)]/20">
               {grp.mentor_teacher_name ? grp.mentor_teacher_name.charAt(0).toUpperCase() : "?"}
             </div>
             <div className="min-w-0 flex-1">
@@ -341,12 +363,13 @@ export default function GroupManagementView() {
         {/* Footer */}
         <div className="pt-2 border-t theme-border flex items-center justify-between">
           <span
-            className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${
               grp.is_active
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+                : "theme-bg-sub theme-text-secondary border theme-border"
             }`}
           >
+            <span className={`w-1.5 h-1.5 rounded-full ${grp.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
             {grp.is_active ? "Active" : "Inactive"}
           </span>
 
@@ -366,138 +389,97 @@ export default function GroupManagementView() {
   const totalAssignedStudents = metrics?.total_assigned_students ?? groups.reduce((acc, g) => acc + (g.student_count || 0), 0);
   const totalClassesCount = classes.length;
 
-  return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-6 text-left">
-      
-      {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <GroupIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-              Group
-            </h1>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Configure academic sub-sections, halqa mentors, and student allocations
-            </p>
-          </div>
-        </div>
+  const classOptions = [
+    { value: "ALL", label: "All Parent Classes" },
+    ...classes.map((c) => ({
+      value: c.id,
+      label: `${c.name}${c.code ? ` (${c.code})` : ""}`,
+    })),
+  ];
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => navigate("/student-management/classes")}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <ClassIcon className="w-4 h-4 text-sky-400" />
-            <span>View Classes &rarr;</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>Add Group</span>
-          </button>
-        </div>
-      </div>
+  return (
+    <div className={`${isEmbedded ? "w-full space-y-6 font-sans theme-text-primary animate-fade-in text-left" : "w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 font-sans theme-text-primary animate-fade-in space-y-6 text-left"}`}>
+      
+      {/* 1. Header with Reusable PageHeader */}
+      {!hideHeader && (
+        <PageHeader
+          icon={GroupIcon}
+          title="Group"
+          subtitle="Configure academic sub-sections, halqa mentors, and student allocations"
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => navigate("/student-management/classes")}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <ClassIcon className="w-4 h-4 theme-accent" />
+                <span>View Classes &rarr;</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>Add Group</span>
+              </button>
+            </>
+          }
+        />
+      )}
 
       {/* 2. Reusable Metric Cards */}
-      <MetricsGrid
-        items={[
-          {
-            label: "Total Groups",
-            value: totalGroupsCount,
-            icon: GroupIcon,
-            color: "sky",
-          },
-          {
-            label: "Assigned Students",
-            value: totalAssignedStudents,
-            icon: StudentIcon,
-            color: "emerald",
-          },
-          {
-            label: "Parent Classes",
-            value: totalClassesCount,
-            icon: ClassIcon,
-            color: "purple",
-          },
-        ]}
-      />
+      {!hideMetrics && (
+        <MetricsGrid
+          items={[
+            {
+              label: "Total Groups",
+              value: totalGroupsCount,
+              icon: GroupIcon,
+              color: "accent",
+            },
+            {
+              label: "Assigned Students",
+              value: totalAssignedStudents,
+              icon: StudentIcon,
+              color: "default",
+            },
+            {
+              label: "Parent Classes",
+              value: totalClassesCount,
+              icon: ClassIcon,
+              color: "default",
+            },
+          ]}
+        />
+      )}
 
       {/* 3. Search & View Mode Switcher Toolbar */}
-      <div className="theme-bg-surface border theme-border p-3.5 rounded-2xl flex flex-col sm:flex-row gap-3 justify-between items-center shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search group name, class, mentor..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-9 pr-3.5 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current transition-all"
+      <DataViewToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search group name, class, mentor..."
+        filterElement={
+          <CustomSelect
+            value={classFilter}
+            onChange={(val) => {
+              setClassFilter(val);
+              const newP = new URLSearchParams(searchParams);
+              if (val && val !== "ALL") {
+                newP.set("student_class", val);
+              } else {
+                newP.delete("student_class");
+              }
+              setSearchParams(newP);
+            }}
+            options={classOptions}
+            placeholder="Filter by Class"
           />
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          {/* Parent Class Filter Dropdown using project's CustomSelect */}
-          <div className="w-48 sm:w-56 shrink-0">
-            <CustomSelect
-              size="sm"
-              value={classFilter}
-              onChange={(val) => {
-                setClassFilter(val);
-                const newP = new URLSearchParams(searchParams);
-                if (val && val !== "ALL") {
-                  newP.set("student_class", val);
-                } else {
-                  newP.delete("student_class");
-                }
-                setSearchParams(newP);
-              }}
-              options={[
-                { value: "ALL", label: "All Parent Classes" },
-                ...classes.map((c) => ({
-                  value: c.id,
-                  label: `${c.name}${c.code ? ` (${c.code})` : ""}`,
-                })),
-              ]}
-              placeholder="All Parent Classes"
-            />
-          </div>
-
-          {/* View Mode Toggle Buttons */}
-          <div className="flex items-center h-10 p-1 rounded-xl theme-bg-sub border theme-border shrink-0">
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("grid")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "grid"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <BuildingOfficeIcon className="w-3.5 h-3.5" />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleViewMode("table")}
-              className={`h-full px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "table"
-                  ? "theme-bg-accent theme-accent-text shadow-xs"
-                  : "theme-text-secondary hover:theme-text-primary"
-              }`}
-            >
-              <DepartmentIcon className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
-          </div>
-        </div>
-      </div>
+        }
+        viewMode={viewMode}
+        onToggleViewMode={handleToggleViewMode}
+      />
 
       {/* 4. Display: Reusable DataCardGrid or DataTable */}
       {viewMode === "grid" ? (

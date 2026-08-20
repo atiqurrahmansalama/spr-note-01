@@ -3,18 +3,22 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 const RightSidebarContext = createContext({
   isRightSidebarOpen: false,
   rightSidebarConfig: null,
+  drawerWidth: 680,
+  setDrawerWidth: () => {},
   openRightSidebar: () => {},
   closeRightSidebar: () => {},
 });
 
 export function RightSidebarProvider({ children }) {
   const [rightSidebarConfig, setRightSidebarConfig] = useState(null);
+  const [drawerWidth, setDrawerWidth] = useState(680);
 
-  const openRightSidebar = useCallback(({ title, content, width = 600, onClose }) => {
+  const openRightSidebar = useCallback(({ title, content, width = 680, onClose }) => {
+    setDrawerWidth(width || 680);
     setRightSidebarConfig({
       title: title || 'Action Panel',
       content: content || null,
-      width: width || 600,
+      width: width || 680,
       onClose: onClose || null,
     });
   }, []);
@@ -37,6 +41,8 @@ export function RightSidebarProvider({ children }) {
       value={{
         isRightSidebarOpen,
         rightSidebarConfig,
+        drawerWidth,
+        setDrawerWidth,
         openRightSidebar,
         closeRightSidebar,
       }}

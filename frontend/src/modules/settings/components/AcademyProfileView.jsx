@@ -21,6 +21,7 @@ import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
+import PageHeader from '../../../components/ui/PageHeader';
 import {
   BANGLADESH_DIVISIONS,
   BANGLADESH_DISTRICTS_BY_DIVISION,
@@ -36,7 +37,11 @@ const FALLBACK_CATEGORIES = [
   { label: 'Other Educational Center', value: 'OTHER' },
 ];
 
-export default function AcademyProfileView() {
+export default function AcademyProfileView({
+  hideHeader = false,
+  hideMetrics = false,
+  isEmbedded = false,
+}) {
   const { showToast } = useToast();
   const { currentInstitution, refreshInstitutions } = useTenant();
   const fileInputRef = useRef(null);
@@ -279,7 +284,7 @@ export default function AcademyProfileView() {
     'Madrasa / Maktab';
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fade-in text-left">
+    <div className={`${isEmbedded ? 'w-full space-y-6 animate-fade-in text-left' : 'w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fade-in text-left'}`}>
       {/* Hidden File Input for Logo upload */}
       <input
         type="file"
@@ -289,95 +294,87 @@ export default function AcademyProfileView() {
         className="hidden"
       />
 
-      {/* --- STANDARD MODULE HEADER --- */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b theme-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0">
-            <BuildingOfficeIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-              Academy Profile
-            </h1>
-            <p className="text-xs theme-text-secondary mt-0.5">
-              Active Campus Credentials, Identity & Contact Information
-            </p>
-          </div>
-        </div>
-
-        {/* Header Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          {isEditing ? (
-            <>
+      {/* --- STANDARD MODULE HEADER WITH REUSABLE PAGEHEADER --- */}
+      {!hideHeader && (
+        <PageHeader
+          icon={BuildingOfficeIcon}
+          title="Academy Profile"
+          subtitle="Active Campus Credentials, Identity & Contact Information"
+          actions={
+            isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <SaveIcon className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                onClick={() => setIsEditing(true)}
+                className="px-5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"
               >
-                Cancel
+                <EditIcon className="w-3.5 h-3.5" />
+                <span>Edit Profile</span>
               </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <SaveIcon className="w-3.5 h-3.5" />
-                    <span>Save Changes</span>
-                  </>
-                )}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="px-5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <EditIcon className="w-3.5 h-3.5" />
-              <span>Edit Profile</span>
-            </button>
-          )}
-        </div>
-      </div>
+            )
+          }
+        />
+      )}
 
       {/* --- STATS SUMMARY BAR --- */}
-      <MetricsGrid
-        items={[
-          {
-            label: 'Enrolled Students',
-            value: formData.total_students_count ?? 0,
-            icon: UsersIcon,
-            color: 'accent',
-          },
-          {
-            label: 'Academic Classes',
-            value: formData.total_classes_count ?? 0,
-            icon: ClassIcon,
-            color: 'default',
-          },
-          {
-            label: 'Faculty & Staff',
-            value: formData.total_staff_count ?? 0,
-            icon: DepartmentIcon,
-            color: 'default',
-          },
-          {
-            label: 'Operating Status',
-            value: 'Active & Verified',
-            icon: CheckCircleIcon,
-            color: 'accent',
-          },
-        ]}
-      />
+      {!hideMetrics && (
+        <MetricsGrid
+          items={[
+            {
+              label: 'Enrolled Students',
+              value: formData.total_students_count ?? 0,
+              icon: UsersIcon,
+              color: 'accent',
+            },
+            {
+              label: 'Academic Classes',
+              value: formData.total_classes_count ?? 0,
+              icon: ClassIcon,
+              color: 'default',
+            },
+            {
+              label: 'Faculty & Staff',
+              value: formData.total_staff_count ?? 0,
+              icon: DepartmentIcon,
+              color: 'default',
+            },
+            {
+              label: 'Operating Status',
+              value: 'Active & Verified',
+              icon: CheckCircleIcon,
+              color: 'accent',
+            },
+          ]}
+        />
+      )}
 
       {/* --- DIRECT 2-COLUMN MAIN CARDS (Compact, balanced spacing) --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4.5">
