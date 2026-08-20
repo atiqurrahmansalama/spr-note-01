@@ -146,9 +146,6 @@ export default function ResidentialAttendanceView({
           const data = await clsRes.value.json();
           const list = Array.isArray(data) ? data : data.results || [];
           setClasses(list);
-          if (list.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(list[0].id));
-          }
         }
 
         if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
@@ -165,15 +162,12 @@ export default function ResidentialAttendanceView({
 
   // Fetch Groups when Class changes
   useEffect(() => {
-    if (!selectedClassId) {
-      setGroups([]);
-      setSelectedGroupId('');
-      return;
-    }
-
     const fetchGroups = async () => {
       try {
-        const res = await fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`);
+        const url = selectedClassId
+          ? `/api/v1/groups/?student_class=${selectedClassId}`
+          : `/api/v1/groups/`;
+        const res = await fetchWithAuth(url);
         if (res.ok) {
           const data = await res.json();
           setGroups(Array.isArray(data) ? data : data.results || []);
@@ -189,16 +183,10 @@ export default function ResidentialAttendanceView({
 
   // Load Residential Attendance Matrix
   const loadMatrix = useCallback(async () => {
-    if (!selectedClassId) {
-      setMatrixData(null);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const params = {
-        class_id: selectedClassId,
+        class_id: selectedClassId || undefined,
         group_id: selectedGroupId || undefined,
       };
 
@@ -440,10 +428,13 @@ export default function ResidentialAttendanceView({
   const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
 
   // Options
-  const classOptions = classes.map((c) => ({
-    value: String(c.id),
-    label: `${c.name} (${c.code || 'Class'})`,
-  }));
+  const classOptions = [
+    { value: '', label: 'All Classes' },
+    ...classes.map((c) => ({
+      value: String(c.id),
+      label: `${c.name} (${c.code || 'Class'})`,
+    })),
+  ];
 
   const groupOptions = [
     { value: '', label: 'All Groups' },

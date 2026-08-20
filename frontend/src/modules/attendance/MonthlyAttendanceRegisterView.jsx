@@ -78,9 +78,6 @@ export default function MonthlyAttendanceRegisterView({
           const data = await classRes.value.json();
           const classList = Array.isArray(data) ? data : data.results || [];
           setClasses(classList);
-          if (classList.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(classList[0].id));
-          }
         }
 
         if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
@@ -97,15 +94,12 @@ export default function MonthlyAttendanceRegisterView({
 
   // 2. Fetch Groups when Class changes
   useEffect(() => {
-    if (!selectedClassId) {
-      setGroups([]);
-      setSelectedGroupId('');
-      return;
-    }
-
     const fetchGroups = async () => {
       try {
-        const res = await fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`);
+        const url = selectedClassId
+          ? `/api/v1/groups/?student_class=${selectedClassId}`
+          : `/api/v1/groups/`;
+        const res = await fetchWithAuth(url);
         if (res.ok) {
           const data = await res.json();
           setGroups(Array.isArray(data) ? data : data.results || []);
@@ -121,16 +115,10 @@ export default function MonthlyAttendanceRegisterView({
 
   // 3. Fetch Monthly / Range Attendance Matrix
   const loadMatrix = useCallback(async () => {
-    if (!selectedClassId) {
-      setMatrixData(null);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const params = {
-        class_id: selectedClassId,
+        class_id: selectedClassId || undefined,
         group_id: selectedGroupId || undefined,
         teacher_id: selectedTeacherId || undefined,
       };
@@ -428,10 +416,13 @@ export default function MonthlyAttendanceRegisterView({
   ];
 
   // Options for CustomSelect
-  const classOptions = classes.map((c) => ({
-    value: String(c.id),
-    label: `${c.name} (${c.code || 'Class'})`,
-  }));
+  const classOptions = [
+    { value: '', label: 'All Classes' },
+    ...classes.map((c) => ({
+      value: String(c.id),
+      label: `${c.name} (${c.code || 'Class'})`,
+    })),
+  ];
 
   const groupOptions = [
     { value: '', label: 'All Groups' },
