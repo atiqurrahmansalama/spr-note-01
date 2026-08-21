@@ -4,12 +4,7 @@ import { getHijriDateString } from "../../../utils/hijriUtils";
 import { TIMEZONE_LIST } from "../../../constants/calendarConstants";
 import { calendarSettings } from "../../../utils/localStore";
 import { formatDate } from "../../../utils/reportGenerator";
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-const WEEKDAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+import ReusableCalendar from "../../../components/common/ReusableCalendar";
 
 export default function HeaderDateSection({
   selectedDate,
@@ -31,21 +26,11 @@ export default function HeaderDateSection({
   useEffect(() => {
     if (selectedDate) {
       setSelectedCustomDate(selectedDate);
-      const cleanDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate.split(" ")[0];
-      const parts = cleanDate.split("-");
-      if (parts.length === 3) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10) - 1;
-        if (!isNaN(y) && !isNaN(m)) {
-          setViewYear(y);
-          setViewMonth(m);
-        }
-      }
     }
   }, [selectedDate]);
 
   useEffect(() => {
-    const handleSettingsUpdate = (e) => {
+    const handleSettingsUpdate = () => {
       setIsHijriEnabled(calendarSettings.getHijriEnabled());
       setActiveDateFormat(calendarSettings.getDateFormat());
     };
@@ -57,16 +42,7 @@ export default function HeaderDateSection({
     };
   }, []);
 
-  const initialDateObj = new Date(selectedCustomDate);
-  const [viewYear, setViewYear] = useState(
-    isNaN(initialDateObj.getFullYear()) ? new Date().getFullYear() : initialDateObj.getFullYear()
-  );
-  const [viewMonth, setViewMonth] = useState(
-    isNaN(initialDateObj.getMonth()) ? new Date().getMonth() : initialDateObj.getMonth()
-  );
-
   const activeRawDate = selectedCustomDate;
-
   const formattedDisplayDate = formatDate(activeRawDate, activeDateFormat || dateFormat);
   const hijriDateString = getHijriDateString(activeRawDate);
 
@@ -87,51 +63,9 @@ export default function HeaderDateSection({
     };
   }, [isCalendarOpen]);
 
-  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  const handlePrevMonth = (e) => {
-    e.stopPropagation();
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear((y) => y - 1);
-    } else {
-      setViewMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = (e) => {
-    e.stopPropagation();
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear((y) => y + 1);
-    } else {
-      setViewMonth((m) => m + 1);
-    }
-  };
-
-  const handleSelectDay = (dayNum) => {
-    const monthStr = String(viewMonth + 1).padStart(2, "0");
-    const dayStr = String(dayNum).padStart(2, "0");
-    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
-
+  const handleDateSelect = (dateStr) => {
     setSelectedCustomDate(dateStr);
     if (onDateChange) onDateChange(dateStr);
-    setIsCalendarOpen(false);
-  };
-
-  const handleSelectToday = (e) => {
-    e.stopPropagation();
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, "0");
-    const d = String(today.getDate()).padStart(2, "0");
-    const todayStr = `${y}-${m}-${d}`;
-
-    setViewYear(today.getFullYear());
-    setViewMonth(today.getMonth());
-    setSelectedCustomDate(todayStr);
-    if (onDateChange) onDateChange(todayStr);
     setIsCalendarOpen(false);
   };
 
@@ -171,84 +105,13 @@ export default function HeaderDateSection({
       {isCalendarOpen && (
         <div 
           style={{ fontFamily: activeFont.css }}
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 theme-bg-surface border theme-border rounded-2xl p-4 shadow-2xl w-72 text-left animate-fade-in theme-text-primary"
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 theme-bg-surface border theme-border rounded-2xl p-2 shadow-2xl w-72 text-left animate-fade-in theme-text-primary"
         >
-          <div className="flex items-center justify-between pb-3 mb-2 border-b theme-border">
-            <span className="text-xs font-bold theme-text-primary">
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-[18px] transition cursor-pointer"
-                title="Previous Month"
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-[18px] transition cursor-pointer"
-                title="Next Month"
-              >
-                ›
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center mb-1.5 ">
-            {WEEKDAY_NAMES.map((wd) => (
-              <span key={wd} className="text-[11px] font-bold theme-text-secondary">
-                {wd}
-              </span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <span key={`empty-${i}`} className="w-8 h-8" />
-            ))}
-
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const monthStr = String(viewMonth + 1).padStart(2, "0");
-              const dayStr = String(dayNum).padStart(2, "0");
-              const currentGridDateStr = `${viewYear}-${monthStr}-${dayStr}`;
-              const isSelected = currentGridDateStr === activeRawDate;
-              const isToday = currentGridDateStr === new Date().toISOString().split("T")[0];
-
-              return (
-                <button
-                  key={dayNum}
-                  type="button"
-                  onClick={() => handleSelectDay(dayNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
-                    isSelected
-                      ? "theme-bg-accent theme-accent-text font-bold shadow-md scale-105"
-                      : isToday
-                      ? "border border-[var(--accent-main)] theme-accent theme-bg-accent-soft font-bold"
-                      : "hover:theme-bg-elevated theme-text-primary"
-                  }`}
-                >
-                  {dayNum}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="pt-3 mt-2 border-t theme-border flex items-center justify-between">
-            <span className="text-[10px] theme-text-secondary font-medium">
-              Click any date to apply
-            </span>
-            <button
-              type="button"
-              onClick={handleSelectToday}
-              className="text-xs font-bold theme-accent hover:underline cursor-pointer"
-            >
-              Today
-            </button>
-          </div>
+          <ReusableCalendar
+            isInline
+            selectedDate={activeRawDate}
+            onSelectDate={handleDateSelect}
+          />
         </div>
       )}
     </div>

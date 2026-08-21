@@ -20,6 +20,7 @@ import UserProfileSettingsView from "./modules/settings/components/UserProfileSe
 import SecuritySessionsView from "./modules/settings/components/SecuritySessionsView";
 import AppearanceSettings from "./modules/settings/components/AppearanceSettings";
 import CalendarSettings from "./modules/settings/components/CalendarSettings";
+import PersonalizeSettingsHubView from "./modules/settings/PersonalizeSettingsHubView";
 import CopyReportSettingsView from "./modules/settings/components/CopyReportSettingsView";
 import LanguageSettingsView from "./modules/settings/components/LanguageSettingsView";
 import DataBackupView from "./modules/settings/components/DataBackupView";
@@ -40,20 +41,19 @@ import ClassPeriodScheduleView from "./modules/academy/ClassPeriodScheduleView";
 import BranchSectionHubView from "./modules/academy/BranchSectionHubView";
 import CampusProfileHubView from "./modules/academy/CampusProfileHubView";
 import ClassesGroupsHubView from "./modules/academy/ClassesGroupsHubView";
+import TimeCalendarManagerView from "./modules/academy/TimeCalendarManagerView";
 import InstitutionListView from "./modules/app-management/institutions/InstitutionListView";
 import InstitutionProfileView from "./modules/settings/components/InstitutionProfileView";
 import AcademyProfileView from "./modules/settings/components/AcademyProfileView";
-import SPManagementView from "./modules/app-management/sp-management/SPManagementView";
+import DeveloperToolsHubView from "./modules/app-management/developer-tools/DeveloperToolsHubView";
 import StaffDirectoryView from "./modules/staff-management/StaffDirectoryView";
 import StaffProfileDetailView from "./modules/staff-management/StaffProfileDetailView";
 import StaffAttendanceView from "./modules/staff-management/StaffAttendanceView";
 import StaffLeaveManagementView from "./modules/staff-management/StaffLeaveManagementView";
 import CalendarHubView from "./modules/calendar/CalendarHubView";
-import StudentAttendanceView from "./modules/attendance/StudentAttendanceView";
 import MonthlyAttendanceRegisterView from "./modules/attendance/MonthlyAttendanceRegisterView";
 import AttendanceSettingsView from "./modules/attendance/AttendanceSettingsView";
 import TeacherPeriodMatrixView from "./modules/attendance/TeacherPeriodMatrixView";
-import StudentPeriodRollCallView from "./modules/attendance/StudentPeriodRollCallView";
 import ResidentialAttendanceView from "./modules/attendance/ResidentialAttendanceView";
 import GateEntryLogView from "./modules/attendance/GateEntryLogView";
 import AdHocHeadcountView from "./modules/attendance/AdHocHeadcountView";
@@ -114,12 +114,12 @@ export default function App() {
           <Route path="/staff/leaves" element={<FeatureGuard sectionKey="staff_leaves" fallback={<Navigate to="/dashboard" replace />}><StaffLeaveManagementView /></FeatureGuard>} />
           
           {/* Student Attendance Multi-Dimensional Routes */}
-          <Route path="/attendance/students/roll-call" element={<FeatureGuard sectionKey="student_attendance" fallback={<Navigate to="/dashboard" replace />}><StudentPeriodRollCallView /></FeatureGuard>} />
+          <Route path="/attendance/students/roll-call" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
           <Route path="/attendance/students/gate-log" element={<FeatureGuard sectionKey="student_gate_tracker" fallback={<Navigate to="/dashboard" replace />}><GateEntryLogView /></FeatureGuard>} />
           <Route path="/attendance/students/adhoc" element={<FeatureGuard sectionKey="student_adhoc_headcount" fallback={<Navigate to="/dashboard" replace />}><AdHocHeadcountView /></FeatureGuard>} />
           <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
           <Route path="/attendance/students/residential" element={<FeatureGuard sectionKey="residential_attendance" fallback={<Navigate to="/dashboard" replace />}><ResidentialAttendanceView /></FeatureGuard>} />
-          <Route path="/attendance/student" element={<FeatureGuard sectionKey="student_attendance" fallback={<Navigate to="/dashboard" replace />}><StudentPeriodRollCallView /></FeatureGuard>} />
+          <Route path="/attendance/student" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
           <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
 
           {/* Teacher & Staff Attendance Routes */}
@@ -156,6 +156,9 @@ export default function App() {
           <Route path="/academy/sections" element={<FeatureGuard sectionKey="class_sections" fallback={<Navigate to="/dashboard" replace />}><ClassSectionManagerView /></FeatureGuard>} />
           <Route path="/academy/branches-sections" element={<BranchSectionHubView />} />
           <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><ClassPeriodScheduleView /></FeatureGuard>} />
+          <Route path="/academy/calendar-events" element={<TimeCalendarManagerView />} />
+          <Route path="/academy/calendar-schedule" element={<TimeCalendarManagerView />} />
+          <Route path="/academy/working-hours" element={<TimeCalendarManagerView />} />
           <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
           <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
           <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
@@ -164,10 +167,11 @@ export default function App() {
           <Route path="/settings/institution" element={<AcademyProfileView />} />
           <Route path="/institution-profile" element={<AcademyProfileView />} />
           <Route path="/security-sessions" element={<FeatureGuard sectionKey="settings_security" fallback={<Navigate to="/dashboard" replace />}><SecuritySessionsView /></FeatureGuard>} />
-          <Route path="/appearance" element={<FeatureGuard sectionKey="settings_appearance" fallback={<Navigate to="/dashboard" replace />}><AppearanceSettings /></FeatureGuard>} />
-          <Route path="/date-time" element={<FeatureGuard sectionKey="settings_datetime" fallback={<Navigate to="/dashboard" replace />}><CalendarSettings /></FeatureGuard>} />
+          <Route path="/personalize" element={<PersonalizeSettingsHubView />} />
+          <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
+          <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
+          <Route path="/language" element={<PersonalizeSettingsHubView />} />
           <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><CopyReportSettingsView /></FeatureGuard>} />
-          <Route path="/language" element={<FeatureGuard sectionKey="settings_language" fallback={<Navigate to="/dashboard" replace />}><LanguageSettingsView /></FeatureGuard>} />
           <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup" fallback={<Navigate to="/dashboard" replace />}><DataBackupView /></FeatureGuard>} />
           <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts" fallback={<Navigate to="/dashboard" replace />}><ShortcutsGuide /></FeatureGuard>} />
           <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide" fallback={<Navigate to="/dashboard" replace />}><AppGuideView /></FeatureGuard>} />
@@ -175,7 +179,8 @@ export default function App() {
           <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionToggleControlPanel /></FeatureGuard>} />
           <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
           <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
-          <Route path="/sp-management" element={<SPManagementView />} />
+          <Route path="/developer-tools" element={<DeveloperToolsHubView />} />
+          <Route path="/sp-management" element={<DeveloperToolsHubView />} />
           <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
           <Route path="/app-management/notifications" element={<NotificationManagementView />} />
           <Route path="/notifications" element={<NotificationManagementView />} />

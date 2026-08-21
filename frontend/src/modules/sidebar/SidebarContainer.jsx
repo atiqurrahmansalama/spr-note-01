@@ -84,6 +84,7 @@ export default function SidebarContainer({
         { id: "Academies & Departments", name: "Academies & Departments", path: "/academy/campus-profile", Icon: BuildingOfficeIcon, key: "campus_profile" },
         { id: "Classes & Groups", name: "Classes & Groups", path: "/academy/classes-groups", Icon: ClassIcon, key: "student_classes" },
         { id: "Period Schedules", name: "Period Schedules", path: "/academy/periods", Icon: TimerIcon, key: "class_period_slots" },
+        { id: "Calendar & Events", name: "Calendar & Events", path: "/academy/calendar-events", Icon: CalendarIcon, key: "academy_calendar_events" },
       ]
     },
     {
@@ -120,7 +121,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_attendance_management",
       subItems: [
-        { id: "Slots & Routine Manager", name: "Slots & Routine Manager", path: "/attendance/settings", Icon: SettingsIcon, key: "attendance_policies_slots" },
+        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", Icon: AttendanceIcon, key: "attendance_policies_slots" },
         { id: "Biometric Devices", name: "Biometric Devices", path: "/attendance/devices", Icon: FingerprintIcon, key: "biometric_device_manager" },
         { id: "Institutional Calendar", name: "Institutional Calendar", path: "/calendar", Icon: CalendarIcon, key: "institutional_calendar" },
       ]
@@ -161,13 +162,12 @@ export default function SidebarContainer({
       key: "nav_settings",
       subItems: [
         { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon, key: "settings_profile" },
+        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", Icon: AttendanceIcon, key: "attendance_policies_slots" },
         { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon, key: "settings_security" },
-        { id: "Date & Time", name: "Date & Time", path: "/date-time", Icon: CalendarIcon, key: "settings_datetime" },
-        { id: "Appearance", name: "Appearance", path: "/appearance", Icon: AppearanceIcon, key: "settings_appearance" },
-        { id: "Language", name: "Language", path: "/language", Icon: GlobeIcon, key: "settings_language" },
+        { id: "Personalize", name: "Personalize", path: "/personalize", Icon: AppearanceIcon, key: "settings_personalize" },
         { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
         { id: "Trash", name: "Trash", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
-        { id: "SP Management", name: "SP Management", path: "/sp-management", Icon: SparklesIcon, key: "sp_management", superAdminOnly: true },
+        { id: "Developer Tools", name: "Developer Tools", path: "/developer-tools", Icon: SparklesIcon, key: "developer_tools", superAdminOnly: true },
       ]
     },
     { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon, key: "nav_shortcuts" },
@@ -232,18 +232,18 @@ export default function SidebarContainer({
       <aside
         className={`
           ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full"}
-          ${isCollapsed ? "w-20 sm:w-20" : "w-[280px] sm:w-[280px]"}
+          ${isCollapsed ? "w-16 sm:w-20" : "w-[260px] sm:w-[275px] max-w-[85vw]"}
           theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
         `}
       >
         {/* App Name Header at the top of Sidebar when open in Overlay Mode */}
         {isOverlay && (
-          <div className="px-4 py-3.5 border-b theme-border flex justify-between items-center shrink-0">
+          <div className="px-3 py-2.5 sm:px-4 sm:py-3 border-b theme-border flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg theme-bg-accent theme-accent-text flex items-center justify-center font-bold text-xs shadow-sm">
                 SPR
               </div>
-              <span className="font-bold theme-text-primary text-base tracking-wide">SPR Note</span>
+              <span className="font-bold theme-text-primary text-sm sm:text-base tracking-wide">SPR Note</span>
             </div>
             <button
               type="button"
@@ -257,7 +257,7 @@ export default function SidebarContainer({
         )}
 
         <nav 
-          className={`flex-1 overflow-y-auto ${isCollapsed ? "px-3 py-6 space-y-4" : "px-4 py-6 space-y-2"} text-sm font-medium`}
+          className={`flex-1 overflow-y-auto ${isCollapsed ? "px-2 py-4 space-y-3" : "px-2.5 sm:px-3.5 py-3 sm:py-5 space-y-1 sm:space-y-1.5"} text-sm font-medium`}
           style={{ scrollbarGutter: "stable" }}
         >
           {displayMenuItems.map((item) => {
@@ -267,28 +267,27 @@ export default function SidebarContainer({
             const isSubOpen = openSubMenus[item.id] || isAnySubActive || false;
 
             if (item.hasSub) {
-
               return (
-                <div key={item.id} className="space-y-1.5">
+                <div key={item.id} className="space-y-1">
                   <button
                     type="button"
                     onClick={() => toggleSubMenu(item.id)}
                     title={item.name}
-                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-3" : "justify-between px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "justify-between px-2.5 sm:px-3 py-2 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                       isParentActive || isAnySubActive
                         ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                         : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                     }`}
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <ItemIcon className={`w-4.5 h-4.5 shrink-0 ${isParentActive || isAnySubActive ? "theme-accent" : "opacity-80"}`} />
-                      {!isCollapsed && <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <ItemIcon className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${isParentActive || isAnySubActive ? "theme-accent" : "opacity-80"}`} />
+                      {!isCollapsed && <span className="truncate text-xs sm:text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
                     </div>
 
                     {!isCollapsed && (
                       <ChevronIcon 
                         isOpen={isSubOpen} 
-                        className="w-3.5 h-3.5 theme-text-secondary shrink-0 opacity-60" 
+                        className="w-3.5 h-3.5 theme-text-secondary shrink-0 opacity-60 ml-1" 
                       />
                     )}
                   </button>
@@ -296,8 +295,8 @@ export default function SidebarContainer({
                   {(isSubOpen || isCollapsed) && (
                     <div className={
                       isCollapsed 
-                        ? "space-y-2 pt-1 flex flex-col items-center" 
-                        : "pl-5 space-y-1.5 pt-1"
+                        ? "space-y-1.5 pt-1 flex flex-col items-center" 
+                        : "border-l theme-border/40 ml-2.5 sm:ml-3 pl-2 sm:pl-2.5 space-y-1 pt-1"
                     }>
                       {item.subItems.map((sub) => {
                         const isSubActive = checkIsActive(sub.path);
@@ -308,15 +307,15 @@ export default function SidebarContainer({
                             type="button"
                             onClick={() => handleNavigate(sub.path)}
                             title={sub.name}
-                            className={`w-full flex items-center gap-3.5 relative ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                            className={`w-full flex items-center gap-2.5 sm:gap-3 relative ${isCollapsed ? "justify-center p-2" : "px-2.5 sm:px-3 py-1.5 sm:py-2"} rounded-xl transition-all cursor-pointer select-none ${
                               isSubActive
                                 ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                                 : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                             }`}
                           >
-                            <SubIcon className={`w-4.5 h-4.5 shrink-0 ${isSubActive ? "theme-accent" : "opacity-80"}`} />
+                            <SubIcon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isSubActive ? "theme-accent" : "opacity-80"}`} />
                             {!isCollapsed && (
-                              <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{sub.name}</span>
+                              <span className="truncate text-xs sm:text-[13px] font-medium tracking-wide leading-normal">{sub.name}</span>
                             )}
                           </button>
                         );
@@ -334,15 +333,15 @@ export default function SidebarContainer({
                 type="button"
                 onClick={() => handleNavigate(item.path)}
                 title={item.name}
-                className={`w-full flex items-center ${isCollapsed ? "justify-center p-3" : "px-3.5 py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "px-2.5 sm:px-3 py-2 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                   isActive
                     ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                     : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                 }`}
               >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <ItemIcon className={`w-4.5 h-4.5 shrink-0 ${isActive ? "theme-accent" : "opacity-80"}`} />
-                  {!isCollapsed && <span className="truncate text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <ItemIcon className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${isActive ? "theme-accent" : "opacity-80"}`} />
+                  {!isCollapsed && <span className="truncate text-xs sm:text-[13px] font-medium tracking-wide leading-normal">{item.name}</span>}
                 </div>
               </button>
             );
@@ -350,7 +349,7 @@ export default function SidebarContainer({
         </nav>
 
         {/* Sidebar Bottom Footer: Official Public Website */}
-        <div className="p-3 border-t theme-border shrink-0">
+        <div className="p-2.5 sm:p-3 border-t theme-border shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -359,7 +358,7 @@ export default function SidebarContainer({
             }}
             title="Official Website & Public Portal"
             className={`w-full flex items-center ${
-              isCollapsed ? "justify-center p-2.5" : "justify-start px-3.5 py-2.5 gap-3"
+              isCollapsed ? "justify-center p-2" : "justify-start px-2.5 sm:px-3 py-2 gap-2.5"
             } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-all cursor-pointer shadow-xs group`}
           >
             <div className="w-6 h-6 rounded-lg theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">

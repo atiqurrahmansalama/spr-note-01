@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
+import { useTenant } from "../../context/TenantContext";
+import { attendanceFilters } from "../../utils/localStore";
 import { GateIcon, RefreshIcon, SaveIcon } from "../../components/ui/Icons";
 
 export default function GateEntryLogView() {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
+
+  const savedFilters = useMemo(() => {
+    return attendanceFilters.getGateLogFilters(activeTenantId) || {};
+  }, [activeTenantId]);
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,23 +23,35 @@ export default function GateEntryLogView() {
   const [scanReason, setScanReason] = useState("");
 
   // Filter State
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDirection, setSelectedDirection] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState(() => savedFilters.searchQuery || "");
+  const [selectedDirection, setSelectedDirection] = useState(() => savedFilters.direction || "ALL");
+
+  // Persist filters
+  useEffect(() => {
+    attendanceFilters.saveGateLogFilters(activeTenantId, {
+      searchQuery,
+      direction: selectedDirection,
+    });
+  }, [searchQuery, selectedDirection, activeTenantId]);
+
 
   const barcodeInputRef = useRef(null);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      let url = "/attendance/gate-logs/";
+      let url = "/api/v1/attendance/gate-logs/";
       const params = [];
       if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
       if (selectedDirection !== "ALL") params.push(`direction=${selectedDirection}`);
       if (params.length > 0) url += `?${params.join("&")}`;
 
       const res = await fetchWithAuth(url);
-      const list = res?.results || (Array.isArray(res) ? res : []);
-      setLogs(list);
+      if (res && res.ok) {
+        const data = await res.json();
+        const list = data?.results || (Array.isArray(data) ? data : []);
+        setLogs(list);
+      }
     } catch (err) {
       showToast(err.message || "Failed to load gate logs", "error");
     } finally {
@@ -54,7 +73,7 @@ export default function GateEntryLogView() {
 
     setSubmitting(true);
     try {
-      const res = await fetchWithAuth("/attendance/gate-logs/log-punch/", {
+      const res = await fetchWithAuth("/api/v1/attendance/gate-logs/log-punch/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,7 +83,8 @@ export default function GateEntryLogView() {
         })
       });
 
-      showToast(`Gate ${scanDirection} logged for ${res.person_name || res.student_name || "person"}.`, "success");
+      const data = res && res.ok ? await res.json() : {};
+      showToast(`Gate ${scanDirection} logged for ${data.person_name || data.student_name || "person"}.`, "success");
       setScanBarcode("");
       setScanReason("");
       fetchLogs();

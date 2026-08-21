@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   AttendanceIcon,
   SaveIcon,
@@ -11,17 +11,22 @@ import { getStaffList, getStaffAttendance, bulkPunchAttendance, getMonthlyAttend
 import { useTenant } from '../../context/TenantContext';
 import { useToast } from '../../context/ToastContext';
 import { fetchWithAuth } from '../../utils/authService';
+import { attendanceFilters } from '../../utils/localStore';
 
 export default function StaffAttendanceView() {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
 
-  const [activeDate, setActiveDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [activeViewMode, setActiveViewMode] = useState('daily'); // 'daily' | 'monthly'
+  const savedFilters = useMemo(() => {
+    return attendanceFilters.getStaffFilters(activeTenantId) || {};
+  }, [activeTenantId]);
+
+  const [activeDate, setActiveDate] = useState(() => savedFilters.activeDate || new Date().toISOString().split('T')[0]);
+  const [activeViewMode, setActiveViewMode] = useState(() => savedFilters.viewMode || 'daily'); // 'daily' | 'monthly'
 
   const [staffList, setStaffList] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedDept, setSelectedDept] = useState(() => savedFilters.department || 'ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Attendance grid rows state: { [staff_id]: { status: 'PRESENT', in_time: '08:30', out_time: '16:30', remarks: '' } }
@@ -30,10 +35,22 @@ export default function StaffAttendanceView() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Monthly summary analytics state
-  const [monthlyYear, setMonthlyYear] = useState(() => new Date().getFullYear());
-  const [monthlyMonth, setMonthlyMonth] = useState(() => new Date().getMonth() + 1);
+  const [monthlyYear, setMonthlyYear] = useState(() => savedFilters.monthlyYear || new Date().getFullYear());
+  const [monthlyMonth, setMonthlyMonth] = useState(() => savedFilters.monthlyMonth || (new Date().getMonth() + 1));
   const [monthlyData, setMonthlyData] = useState(null);
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
+
+  // Persist filters
+  useEffect(() => {
+    attendanceFilters.saveStaffFilters(activeTenantId, {
+      activeDate,
+      viewMode: activeViewMode,
+      department: selectedDept,
+      monthlyYear,
+      monthlyMonth,
+    });
+  }, [activeDate, activeViewMode, selectedDept, monthlyYear, monthlyMonth, activeTenantId]);
+
 
   // Fetch departments lookup
   useEffect(() => {

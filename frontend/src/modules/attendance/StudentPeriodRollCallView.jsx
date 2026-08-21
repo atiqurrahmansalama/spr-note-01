@@ -12,6 +12,10 @@ import {
   SparklesIcon,
 } from "../../components/ui/Icons";
 
+const DEFAULT_PERIOD_SLOTS = [
+  { id: "DEFAULT", period_name: "Regular Lecture Period", start_time: "08:00:00", end_time: "08:45:00", period_order: 1 }
+];
+
 export default function StudentPeriodRollCallView() {
   const { showToast } = useToast();
 
@@ -38,17 +42,16 @@ export default function StudentPeriodRollCallView() {
   const [bunkList, setBunkList] = useState([]);
   const [showBunkDrawer, setShowBunkDrawer] = useState(false);
 
-  // Load initial lookups (Classes, Groups, Period Slots, Teachers)
+  // Load initial lookups (Classes, Groups, Teachers)
   useEffect(() => {
     loadInitialLookups();
   }, []);
 
   const loadInitialLookups = async () => {
     try {
-      const [clsRes, grpRes, periodsRes, tchRes] = await Promise.allSettled([
+      const [clsRes, grpRes, tchRes] = await Promise.allSettled([
         fetchWithAuth("/api/v1/classes/"),
         fetchWithAuth("/api/v1/groups/"),
-        fetchWithAuth("/api/v1/academy/periods/"),
         fetchWithAuth("/api/v1/staff/"),
       ]);
 
@@ -66,13 +69,6 @@ export default function StudentPeriodRollCallView() {
         setGroups(Array.isArray(grpData) ? grpData : grpData.results || []);
       }
 
-      if (periodsRes.status === "fulfilled" && periodsRes.value.ok) {
-        const pData = await periodsRes.value.json();
-        const pList = Array.isArray(pData) ? pData : pData.results || [];
-        pList.sort((a, b) => (a.period_order || 0) - (b.period_order || 0));
-        setPeriodSlots(pList);
-      }
-
       if (tchRes.status === "fulfilled" && tchRes.value.ok) {
         const tData = await tchRes.value.json();
         setTeachers(Array.isArray(tData) ? tData : tData.results || []);
@@ -82,7 +78,7 @@ export default function StudentPeriodRollCallView() {
     }
   };
 
-  // When selectedClass changes, reload period slots specific to this class or fallback to all slots
+  // When selectedClass changes, reload period slots specific to this class
   useEffect(() => {
     if (!selectedClass) return;
 
@@ -92,14 +88,6 @@ export default function StudentPeriodRollCallView() {
         if (res.ok) {
           const data = await res.json();
           let list = Array.isArray(data) ? data : data.results || [];
-          if (list.length === 0) {
-            // Fallback to all period slots
-            const allRes = await fetchWithAuth("/api/v1/academy/periods/");
-            if (allRes.ok) {
-              const allData = await allRes.json();
-              list = Array.isArray(allData) ? allData : allData.results || [];
-            }
-          }
           list.sort((a, b) => (a.period_order || 0) - (b.period_order || 0));
           setPeriodSlots(list);
         }
@@ -135,9 +123,7 @@ export default function StudentPeriodRollCallView() {
     if (selectedSlotId && selectedSlotId !== "ALL") {
       return periodSlots.filter((p) => String(p.id) === String(selectedSlotId));
     }
-    return periodSlots.length > 0
-      ? periodSlots
-      : [{ id: "DEFAULT", period_name: "Regular Lecture Period", start_time: "08:00:00", end_time: "08:45:00", period_order: 1 }];
+    return periodSlots.length > 0 ? periodSlots : DEFAULT_PERIOD_SLOTS;
   }, [periodSlots, selectedSlotId]);
 
   // Load Students and existing attendance records
@@ -522,8 +508,8 @@ export default function StudentPeriodRollCallView() {
         </div>
       </div>
 
-      {/* Main Multi-Period Attendance Table */}
-      <div className="flex-1 overflow-auto p-4">
+      {/* Main Multi-Period Attendance Table & Mobile View */}
+      <div className="flex-1 overflow-auto p-3 sm:p-4">
         {loading ? (
           <div className="h-64 flex flex-col items-center justify-center gap-3 theme-text-secondary">
             <RefreshIcon className="w-6 h-6 animate-spin theme-accent" />
@@ -536,111 +522,74 @@ export default function StudentPeriodRollCallView() {
             <p className="text-xs">Select an active class or group to begin roll call.</p>
           </div>
         ) : (
-          <div className="border theme-border rounded-2xl overflow-hidden shadow-lg theme-bg-surface">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
-                {/* Table Header: All horizontal and vertical lines use the exact same theme-border */}
-                <thead>
-                  <tr className="border-b theme-border theme-bg-sub/80 font-bold theme-text-secondary text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4 w-16 text-center border-r theme-border">Roll</th>
-                    <th className="py-3 px-4 min-w-[170px] border-r theme-border">Student Name</th>
-                    {/* Dedicated Time & Period Schedule Column */}
-                    <th className="py-3 px-4 min-w-[220px] border-r theme-border">
-                      <div className="flex items-center gap-1.5">
-                        <TimerIcon className="w-3.5 h-3.5 theme-accent" />
-                        <span>Scheduled Period & Timing</span>
+          <>
+            {/* 1. Mobile Cards View (sm:hidden) */}
+            <div className="block sm:hidden space-y-3 pb-6">
+              {students.map((student) => {
+                const isBunking = bunkList.some((b) => b.student_id === student.id);
+
+                return (
+                  <div
+                    key={student.id}
+                    className={`border theme-border rounded-2xl p-3.5 theme-bg-surface shadow-xs space-y-3 ${
+                      isBunking ? "border-rose-500/40 bg-rose-500/[0.02]" : ""
+                    }`}
+                  >
+                    {/* Student Header */}
+                    <div className="flex items-center justify-between gap-2 border-b theme-border pb-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold font-mono theme-bg-sub border theme-border text-xs shrink-0 shadow-xs">
+                          {student.roll_number || "—"}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold theme-text-primary text-sm truncate">
+                            {student.name || student.name_en}
+                          </div>
+                          <div className="text-[10px] theme-text-secondary font-mono truncate">
+                            {student.student_class_name || ""}
+                            {student.student_group_name ? ` • ${student.student_group_name}` : ""}
+                          </div>
+                        </div>
                       </div>
-                    </th>
-                    <th className="py-3 px-4 text-center min-w-[260px] border-r theme-border">Attendance Status</th>
-                    <th className="py-3 px-4 w-32 text-center border-r theme-border">Actual In Time</th>
-                    <th className="py-3 px-4 min-w-[160px]">Remarks / Lesson Note</th>
-                  </tr>
-                </thead>
 
-                {/* Table Body: Multi-period rows per student with uniform borders */}
-                <tbody className="divide-y theme-border">
-                  {students.map((student) => {
-                    const isBunking = bunkList.some((b) => b.student_id === student.id);
+                      {isBunking && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0">
+                          Gate In
+                        </span>
+                      )}
+                    </div>
 
-                    return activePeriods.map((slot, periodIdx) => {
-                      const recKey = `${student.id}_${slot.id}`;
-                      const record = attendanceRecords[recKey] || {
-                        status: "PRESENT",
-                        in_time: slot.start_time ? slot.start_time.slice(0, 5) : "08:00",
-                        remarks: "",
-                      };
-                      const isFirstPeriodRow = periodIdx === 0;
+                    {/* Periods for this student */}
+                    <div className="space-y-2.5">
+                      {activePeriods.map((slot, periodIdx) => {
+                        const recKey = `${student.id}_${slot.id}`;
+                        const record = attendanceRecords[recKey] || {
+                          status: "PRESENT",
+                          in_time: slot.start_time ? slot.start_time.slice(0, 5) : "08:00",
+                          remarks: "",
+                        };
 
-                      return (
-                        <tr
-                          key={recKey}
-                          className={`hover:theme-bg-elevated/40 transition-colors ${
-                            isFirstPeriodRow ? "border-t-2 border-t-black/10 dark:border-t-white/10" : ""
-                          } ${isBunking && record.status === "ABSENT" ? "bg-rose-500/10" : ""}`}
-                        >
-                          {/* Roll Number (Merged across all periods for this student) */}
-                          {isFirstPeriodRow && (
-                            <td
-                              rowSpan={activePeriods.length}
-                              className="py-3 px-4 text-center font-mono font-bold border-r border-b theme-border theme-text-primary align-middle"
-                            >
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold font-mono theme-bg-sub border theme-border shadow-xs">
-                                {student.roll_number || "—"}
-                              </span>
-                            </td>
-                          )}
-
-                          {/* Student Name (Merged across all periods for this student) */}
-                          {isFirstPeriodRow && (
-                            <td
-                              rowSpan={activePeriods.length}
-                              className="py-3 px-4 border-r border-b theme-border align-middle"
-                            >
-                              <div className="font-bold theme-text-primary text-sm">
-                                {student.name || student.name_en}
-                              </div>
-                              <div className="text-[10px] theme-text-secondary font-mono mt-0.5">
-                                {student.student_class_name || ""}
-                                {student.student_group_name ? ` • ${student.student_group_name}` : ""}
-                              </div>
-                              {isBunking && (
-                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                                  Punched In at Gate
+                        return (
+                          <div
+                            key={recKey}
+                            className="p-2.5 rounded-xl theme-bg-sub/50 border theme-border space-y-2"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="px-1.5 py-0.5 rounded font-mono text-[10px] theme-bg-accent-soft theme-accent font-bold border border-[var(--accent-main)]/20 shrink-0">
+                                  P-{slot.period_order || periodIdx + 1}
                                 </span>
-                              )}
-                            </td>
-                          )}
-
-                          {/* 🎯 Dedicated Time & Period Schedule Column (configured from Period Section) */}
-                          <td className="py-3 px-4 border-r theme-border">
-                            <div className="flex items-center gap-2">
-                              <div className="font-mono font-bold theme-text-primary text-xs">
-                                {slot.start_time ? slot.start_time.slice(0, 5) : "--"} -{" "}
-                                {slot.end_time ? slot.end_time.slice(0, 5) : "--"}
-                              </div>
-                              {slot.duration_minutes && (
-                                <span className="text-[10px] font-mono theme-accent font-semibold">
-                                  ({slot.duration_minutes}m)
+                                <span className="font-semibold theme-text-primary truncate text-xs">
+                                  {slot.period_name}
                                 </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] font-semibold theme-text-secondary mt-0.5 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.2 rounded font-mono text-[10px] theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
-                                P-{slot.period_order || periodIdx + 1}
-                              </span>
-                              <span className="truncate">{slot.period_name}</span>
-                            </div>
-                            {slot.teacher_name && (
-                              <div className="text-[10px] theme-accent font-semibold truncate mt-0.5 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] shrink-0"></span>
-                                <span>{slot.teacher_name}</span>
                               </div>
-                            )}
-                          </td>
+                              <span className="font-mono text-[11px] theme-text-secondary shrink-0 font-medium ml-1">
+                                {slot.start_time ? slot.start_time.slice(0, 5) : "--"} - {slot.end_time ? slot.end_time.slice(0, 5) : "--"}
+                              </span>
+                            </div>
 
-                          {/* Attendance Status Buttons */}
-                          <td className="py-3 px-4 text-center border-r theme-border">
-                            <div className="inline-flex rounded-xl border theme-border p-1 theme-bg-sub shadow-inner gap-1">
+                            {/* Status Buttons */}
+                            <div className="grid grid-cols-5 gap-1 pt-0.5">
                               {[
                                 { key: "PRESENT", label: "P", name: "Present", color: "bg-emerald-600 text-white shadow-sm" },
                                 { key: "LATE", label: "L", name: "Late", color: "bg-amber-500 text-black shadow-sm" },
@@ -654,10 +603,10 @@ export default function StudentPeriodRollCallView() {
                                     key={btn.key}
                                     type="button"
                                     onClick={() => setStudentPeriodStatus(student.id, slot.id, btn.key)}
-                                    className={`px-2.5 py-1 text-[11px] font-bold font-mono rounded-lg transition-all cursor-pointer ${
+                                    className={`py-1.5 text-xs font-bold font-mono rounded-lg transition-all text-center cursor-pointer ${
                                       isSelected
-                                        ? `${btn.color} ring-1 ring-white/40 scale-105`
-                                        : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
+                                        ? `${btn.color} ring-1 ring-white/40 font-extrabold`
+                                        : "theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary"
                                     }`}
                                     title={btn.name}
                                   >
@@ -666,36 +615,194 @@ export default function StudentPeriodRollCallView() {
                                 );
                               })}
                             </div>
-                          </td>
 
-                          {/* Actual In Time Input */}
-                          <td className="py-3 px-4 text-center border-r theme-border">
-                            <input
-                              type="time"
-                              value={record.in_time || ""}
-                              onChange={(e) => setStudentPeriodInTime(student.id, slot.id, e.target.value)}
-                              className="w-full px-2.5 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary font-mono text-xs text-center focus:outline-none focus:border-[var(--accent-main)]/60"
-                            />
-                          </td>
-
-                          {/* Remarks / Lesson Note */}
-                          <td className="py-3 px-4">
-                            <input
-                              type="text"
-                              value={record.remarks || ""}
-                              onChange={(e) => setStudentPeriodRemarks(student.id, slot.id, e.target.value)}
-                              placeholder="Lesson note / remarks..."
-                              className="w-full px-3 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary text-xs focus:outline-none focus:border-[var(--accent-main)]/60 placeholder:theme-text-secondary/50"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })}
-                </tbody>
-              </table>
+                            {/* In Time & Remarks Inputs */}
+                            <div className="grid grid-cols-3 gap-1.5 pt-1">
+                              <input
+                                type="time"
+                                value={record.in_time || ""}
+                                onChange={(e) => setStudentPeriodInTime(student.id, slot.id, e.target.value)}
+                                className="col-span-1 px-2 py-1.5 rounded-lg border theme-border theme-bg-sub theme-text-primary font-mono text-[11px] text-center focus:outline-none focus:border-[var(--accent-main)]/60"
+                              />
+                              <input
+                                type="text"
+                                value={record.remarks || ""}
+                                onChange={(e) => setStudentPeriodRemarks(student.id, slot.id, e.target.value)}
+                                placeholder="Remarks..."
+                                className="col-span-2 px-2.5 py-1.5 rounded-lg border theme-border theme-bg-sub theme-text-primary text-[11px] focus:outline-none focus:border-[var(--accent-main)]/60 placeholder:theme-text-secondary/50"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+
+            {/* 2. Desktop & Tablet Table View (hidden sm:block) */}
+            <div className="hidden sm:block border theme-border rounded-2xl overflow-hidden shadow-lg theme-bg-surface">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  {/* Table Header */}
+                  <thead>
+                    <tr className="border-b theme-border theme-bg-sub/80 font-bold theme-text-secondary text-[11px] uppercase tracking-wider">
+                      <th className="py-3 px-4 w-16 text-center border-r theme-border">Roll</th>
+                      <th className="py-3 px-4 min-w-[170px] border-r theme-border">Student Name</th>
+                      {/* Dedicated Time & Period Schedule Column */}
+                      <th className="py-3 px-4 min-w-[220px] border-r theme-border">
+                        <div className="flex items-center gap-1.5">
+                          <TimerIcon className="w-3.5 h-3.5 theme-accent" />
+                          <span>Scheduled Period & Timing</span>
+                        </div>
+                      </th>
+                      <th className="py-3 px-4 text-center min-w-[260px] border-r theme-border">Attendance Status</th>
+                      <th className="py-3 px-4 w-32 text-center border-r theme-border">Actual In Time</th>
+                      <th className="py-3 px-4 min-w-[160px]">Remarks / Lesson Note</th>
+                    </tr>
+                  </thead>
+
+                  {/* Table Body: Multi-period rows per student */}
+                  <tbody className="divide-y theme-border">
+                    {students.map((student) => {
+                      const isBunking = bunkList.some((b) => b.student_id === student.id);
+
+                      return activePeriods.map((slot, periodIdx) => {
+                        const recKey = `${student.id}_${slot.id}`;
+                        const record = attendanceRecords[recKey] || {
+                          status: "PRESENT",
+                          in_time: slot.start_time ? slot.start_time.slice(0, 5) : "08:00",
+                          remarks: "",
+                        };
+                        const isFirstPeriodRow = periodIdx === 0;
+
+                        return (
+                          <tr
+                            key={recKey}
+                            className={`hover:theme-bg-elevated/40 transition-colors ${
+                              isFirstPeriodRow ? "border-t-2 border-t-black/10 dark:border-t-white/10" : ""
+                            } ${isBunking && record.status === "ABSENT" ? "bg-rose-500/10" : ""}`}
+                          >
+                            {/* Roll Number */}
+                            {isFirstPeriodRow && (
+                              <td
+                                rowSpan={activePeriods.length}
+                                className="py-3 px-4 text-center font-mono font-bold border-r border-b theme-border theme-text-primary align-middle"
+                              >
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold font-mono theme-bg-sub border theme-border shadow-xs">
+                                  {student.roll_number || "—"}
+                                </span>
+                              </td>
+                            )}
+
+                            {/* Student Name */}
+                            {isFirstPeriodRow && (
+                              <td
+                                rowSpan={activePeriods.length}
+                                className="py-3 px-4 border-r border-b theme-border align-middle"
+                              >
+                                <div className="font-bold theme-text-primary text-sm">
+                                  {student.name || student.name_en}
+                                </div>
+                                <div className="text-[10px] theme-text-secondary font-mono mt-0.5">
+                                  {student.student_class_name || ""}
+                                  {student.student_group_name ? ` • ${student.student_group_name}` : ""}
+                                </div>
+                                {isBunking && (
+                                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                    Punched In at Gate
+                                  </span>
+                                )}
+                              </td>
+                            )}
+
+                            {/* Scheduled Period & Timing */}
+                            <td className="py-3 px-4 border-r theme-border">
+                              <div className="flex items-center gap-2">
+                                <div className="font-mono font-bold theme-text-primary text-xs">
+                                  {slot.start_time ? slot.start_time.slice(0, 5) : "--"} -{" "}
+                                  {slot.end_time ? slot.end_time.slice(0, 5) : "--"}
+                                </div>
+                                {slot.duration_minutes && (
+                                  <span className="text-[10px] font-mono theme-accent font-semibold">
+                                    ({slot.duration_minutes}m)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] font-semibold theme-text-secondary mt-0.5 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.2 rounded font-mono text-[10px] theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                                  P-{slot.period_order || periodIdx + 1}
+                                </span>
+                                <span className="truncate">{slot.period_name}</span>
+                              </div>
+                              {slot.teacher_name && (
+                                <div className="text-[10px] theme-accent font-semibold truncate mt-0.5 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] shrink-0"></span>
+                                  <span>{slot.teacher_name}</span>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Attendance Status Buttons */}
+                            <td className="py-3 px-4 text-center border-r theme-border">
+                              <div className="inline-flex rounded-xl border theme-border p-1 theme-bg-sub shadow-inner gap-1">
+                                {[
+                                  { key: "PRESENT", label: "P", name: "Present", color: "bg-emerald-600 text-white shadow-sm" },
+                                  { key: "LATE", label: "L", name: "Late", color: "bg-amber-500 text-black shadow-sm" },
+                                  { key: "ABSENT", label: "A", name: "Absent", color: "bg-rose-600 text-white shadow-sm" },
+                                  { key: "HALF_DAY", label: "H", name: "Half Day", color: "bg-sky-600 text-white shadow-sm" },
+                                  { key: "ON_LEAVE", label: "LV", name: "Leave", color: "bg-purple-600 text-white shadow-sm" },
+                                ].map((btn) => {
+                                  const isSelected = record.status === btn.key;
+                                  return (
+                                    <button
+                                      key={btn.key}
+                                      type="button"
+                                      onClick={() => setStudentPeriodStatus(student.id, slot.id, btn.key)}
+                                      className={`px-2.5 py-1 text-[11px] font-bold font-mono rounded-lg transition-all cursor-pointer ${
+                                        isSelected
+                                          ? `${btn.color} ring-1 ring-white/40 scale-105`
+                                          : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
+                                      }`}
+                                      title={btn.name}
+                                    >
+                                      {btn.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            {/* Actual In Time Input */}
+                            <td className="py-3 px-4 text-center border-r theme-border">
+                              <input
+                                type="time"
+                                value={record.in_time || ""}
+                                onChange={(e) => setStudentPeriodInTime(student.id, slot.id, e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary font-mono text-xs text-center focus:outline-none focus:border-[var(--accent-main)]/60"
+                              />
+                            </td>
+
+                            {/* Remarks / Lesson Note */}
+                            <td className="py-3 px-4">
+                              <input
+                                type="text"
+                                value={record.remarks || ""}
+                                onChange={(e) => setStudentPeriodRemarks(student.id, slot.id, e.target.value)}
+                                placeholder="Lesson note / remarks..."
+                                className="w-full px-3 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary text-xs focus:outline-none focus:border-[var(--accent-main)]/60 placeholder:theme-text-secondary/50"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

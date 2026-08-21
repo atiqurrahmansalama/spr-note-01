@@ -4855,20 +4855,17 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         # Fetch configured period slots for this class / institution
         periods_qs = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('teacher', 'teacher__user')
+        if tenant_id:
+            periods_qs = periods_qs.filter(institution_id=tenant_id)
+
         if class_id and class_id != 'ALL':
             class_periods = list(periods_qs.filter(student_class_id=class_id).order_by('period_order', 'start_time'))
             if class_periods:
                 period_slots = class_periods
             else:
-                if tenant_id:
-                    period_slots = list(periods_qs.filter(institution_id=tenant_id).order_by('period_order', 'start_time'))
-                else:
-                    period_slots = list(periods_qs.order_by('period_order', 'start_time'))
+                period_slots = list(periods_qs.filter(student_class__isnull=True).order_by('period_order', 'start_time'))
         else:
-            if tenant_id:
-                period_slots = list(periods_qs.filter(institution_id=tenant_id).order_by('period_order', 'start_time'))
-            else:
-                period_slots = list(periods_qs.order_by('period_order', 'start_time'))
+            period_slots = list(periods_qs.order_by('period_order', 'start_time'))
 
         if slot_id and slot_id != 'ALL':
             period_slots = [p for p in period_slots if str(p.id) == str(slot_id)]
@@ -4931,10 +4928,21 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             })
             curr_d += timedelta(days=1)
 
+        # Build periods map grouped by student_class_id for fast and accurate student-level resolution
+        class_slots_map = {}
+        for p in period_slots:
+            class_slots_map.setdefault(p.student_class_id, []).append(p)
+        global_slots = class_slots_map.get(None, [])
+
         matrix_rows = []
-        slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
 
         for s in students:
+            if class_id and class_id != 'ALL':
+                slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
+            else:
+                s_slots = class_slots_map.get(s.student_class_id, global_slots)
+                slots_to_iterate = s_slots if len(s_slots) > 0 else [None]
+
             for p_idx, slot in enumerate(slots_to_iterate):
                 slot_id_str = str(slot.id) if slot else 'DEFAULT'
                 s_map = att_map.get(f"{s.id}_{slot_id_str}") or att_map.get(f"{s.id}_DEFAULT", {})

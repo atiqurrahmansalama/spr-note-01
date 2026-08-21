@@ -22,19 +22,17 @@ export const ROUTE_TITLE_MAP = {
   "/copy-report": { title: "Report Settings", category: "Report Generator" },
   "/sessions-comments": { title: "Sessions & Comments", category: "Report Generator" },
 
-  "/attendance/students/roll-call": { title: "Period & Class Roll Call", category: "Student Management" },
   "/attendance/students/gate-log": { title: "Gate Entry & Pass", category: "Student Management" },
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
   "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Student" },
   "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
-  "/attendance/student": { title: "Student Attendance", category: "Student" },
   "/attendance/monthly-register": { title: "Class Attendance", category: "Student" },
 
   "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix", category: "Staff Management" },
   "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Staff Management" },
   "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Staff Management" },
 
-  "/attendance/settings": { title: "Slots & Routine Manager", category: "Settings & Devices" },
+  "/attendance/settings": { title: "Attendance Settings", category: "Settings" },
   "/attendance/devices": { title: "Biometric Devices", category: "Settings & Devices" },
   "/calendar": { title: "Institutional Calendar", category: "Settings & Devices" },
 

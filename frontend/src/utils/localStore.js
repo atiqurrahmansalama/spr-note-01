@@ -572,3 +572,194 @@ export const saveStatusStore = {
   },
 };
 
+// ─── Attendance Module Filters Persistence ──────────────────────────────────
+
+export const attendanceFilters = {
+  getMonthlyFilters: (tenantId) => readJSON(`spr_att_monthly_filters_${tenantId || 'default'}`, null),
+  saveMonthlyFilters: (tenantId, filters) => writeJSON(`spr_att_monthly_filters_${tenantId || 'default'}`, filters),
+
+  getResidentialFilters: (tenantId) => readJSON(`spr_att_residential_filters_${tenantId || 'default'}`, null),
+  saveResidentialFilters: (tenantId, filters) => writeJSON(`spr_att_residential_filters_${tenantId || 'default'}`, filters),
+
+  getTeacherMatrixFilters: (tenantId) => readJSON(`spr_att_teacher_filters_${tenantId || 'default'}`, null),
+  saveTeacherMatrixFilters: (tenantId, filters) => writeJSON(`spr_att_teacher_filters_${tenantId || 'default'}`, filters),
+
+  getStaffFilters: (tenantId) => readJSON(`spr_att_staff_filters_${tenantId || 'default'}`, null),
+  saveStaffFilters: (tenantId, filters) => writeJSON(`spr_att_staff_filters_${tenantId || 'default'}`, filters),
+
+  getGateLogFilters: (tenantId) => readJSON(`spr_att_gatelog_filters_${tenantId || 'default'}`, null),
+  saveGateLogFilters: (tenantId, filters) => writeJSON(`spr_att_gatelog_filters_${tenantId || 'default'}`, filters),
+
+  getSettingsTab: (tenantId) => readString(`spr_att_settings_tab_${tenantId || 'default'}`, 'policy'),
+  saveSettingsTab: (tenantId, tab) => writeString(`spr_att_settings_tab_${tenantId || 'default'}`, tab),
+};
+
+// ─── Master Institution Time & Calendar Store ────────────────────────────────
+
+const DEFAULT_CALENDAR_EVENTS = [
+  {
+    id: "wh-1",
+    title: "Morning Working Session",
+    category: "WORKING_HOURS",
+    audience: "STAFF",
+    startTime: "09:00",
+    endTime: "12:30",
+    timezone: "GMT+06:00",
+    repeats: true,
+    repeatDays: [0, 1, 2, 3, 4], // Sun, Mon, Tue, Wed, Thu
+    frequency: "WEEKLY",
+    until: "ONGOING",
+    startDate: "2026-01-01",
+    description: "Standard institution morning operational & academic hours",
+  },
+  {
+    id: "wh-2",
+    title: "Afternoon Working Session",
+    category: "WORKING_HOURS",
+    audience: "STAFF",
+    startTime: "13:30",
+    endTime: "17:00",
+    timezone: "GMT+06:00",
+    repeats: true,
+    repeatDays: [0, 1, 2, 3, 4],
+    frequency: "WEEKLY",
+    until: "ONGOING",
+    startDate: "2026-01-01",
+    description: "Staff & faculty afternoon working hours",
+  },
+  {
+    id: "wh-3",
+    title: "Evening Review / Study Hour",
+    category: "WORKING_HOURS",
+    audience: "STAFF",
+    startTime: "19:15",
+    endTime: "20:00",
+    timezone: "GMT+06:00",
+    repeats: true,
+    repeatDays: [1, 2, 3], // Mon, Tue, Wed
+    frequency: "WEEKLY",
+    until: "ONGOING",
+    startDate: "2026-01-01",
+    description: "Evening tutorial and faculty support shift",
+  },
+  {
+    id: "hol-1",
+    title: "Eid-ul-Adha Vacation",
+    category: "HOLIDAY",
+    audience: "ALL",
+    startDate: "2026-06-05",
+    endDate: "2026-06-09",
+    isFullDay: true,
+    repeats: false,
+    description: "Institutional closure for Holy Eid-ul-Adha",
+  },
+  {
+    id: "exam-1",
+    title: "Mid-Term Evaluation Exam",
+    category: "EXAM",
+    audience: "STUDENTS",
+    startDate: "2026-06-15",
+    endDate: "2026-06-18",
+    startTime: "09:30",
+    endTime: "12:30",
+    repeats: false,
+    description: "Comprehensive mid-term evaluation across all academic levels",
+  },
+];
+
+export const masterCalendarStore = {
+  getEvents: (tenantId) => {
+    const key = `spr_master_calendar_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_CALENDAR_EVENTS);
+  },
+  saveEvents: (tenantId, events) => {
+    const key = `spr_master_calendar_${tenantId || 'default'}`;
+    writeJSON(key, events);
+    window.dispatchEvent(new CustomEvent("spr_calendar_events_updated", { detail: events }));
+    return events;
+  },
+  addEvent: (tenantId, eventData) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    const newEvent = {
+      ...eventData,
+      id: eventData.id || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newEvent];
+    masterCalendarStore.saveEvents(tenantId, updated);
+    return newEvent;
+  },
+  updateEvent: (tenantId, eventId, updatedData) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    const updated = list.map((e) => (e.id === eventId ? { ...e, ...updatedData, updatedAt: new Date().toISOString() } : e));
+    masterCalendarStore.saveEvents(tenantId, updated);
+    return updated;
+  },
+  deleteEvent: (tenantId, eventId) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    const updated = list.filter((e) => e.id !== eventId);
+    masterCalendarStore.saveEvents(tenantId, updated);
+    return updated;
+  },
+  getHolidays: (tenantId) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    return list.filter((e) => e.category === 'HOLIDAY');
+  },
+  getWorkingHours: (tenantId) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    return list.filter((e) => e.category === 'WORKING_HOURS');
+  },
+};
+
+export const DEFAULT_CALENDAR_EVENT_TYPES = [
+  { id: "et-1", name: "Morning Working Session", code: "MORNING_WORKING_SESSION", description: "Standard morning operational shifts and faculty hours", order: 1, is_active: true },
+  { id: "et-2", name: "Evening Support Session", code: "EVENING_SUPPORT_SESSION", description: "Evening tutorial, revision, and support hours", order: 2, is_active: true },
+  { id: "et-3", name: "Weekly Holiday", code: "WEEKLY_HOLIDAY", description: "Standard weekend institutional recess", order: 3, is_active: true },
+  { id: "et-4", name: "Eid Vacation", code: "EID_VACATION", description: "Special holiday closure for holy Eid celebration", order: 4, is_active: true },
+  { id: "et-5", name: "Mid-Term Examination", code: "MID_TERM_EXAMINATION", description: "Formal mid-term evaluation & exam schedule", order: 5, is_active: true },
+  { id: "et-6", name: "Final Term Examination", code: "FINAL_TERM_EXAMINATION", description: "Annual and final institutional examinations", order: 6, is_active: true },
+  { id: "et-7", name: "Annual Sports & Cultural Day", code: "ANNUAL_SPORTS_DAY", description: "Annual athletic competitions and campus gathering", order: 7, is_active: true },
+  { id: "et-8", name: "Parent-Teacher Conference", code: "PARENT_TEACHER_CONFERENCE", description: "Quarterly progress review meetings with guardians", order: 8, is_active: true },
+];
+
+export const calendarEventTypesStore = {
+  getEventTypes: (tenantId) => {
+    const key = `spr_calendar_event_types_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_CALENDAR_EVENT_TYPES);
+  },
+  saveEventTypes: (tenantId, types) => {
+    const key = `spr_calendar_event_types_${tenantId || 'default'}`;
+    writeJSON(key, types);
+    window.dispatchEvent(new CustomEvent("spr_calendar_event_types_updated", { detail: types }));
+    return types;
+  },
+  addEventType: (tenantId, typeData) => {
+    const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const newType = {
+      ...typeData,
+      id: typeData.id || `et_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      order: typeData.order || list.length + 1,
+      is_active: typeData.is_active !== undefined ? typeData.is_active : true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newType];
+    calendarEventTypesStore.saveEventTypes(tenantId, updated);
+    return newType;
+  },
+  updateEventType: (tenantId, id, updatedData) => {
+    const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const updated = list.map((t) => (t.id === id ? { ...t, ...updatedData, updatedAt: new Date().toISOString() } : t));
+    calendarEventTypesStore.saveEventTypes(tenantId, updated);
+    return updated;
+  },
+  deleteEventType: (tenantId, id) => {
+    const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const updated = list.filter((t) => t.id !== id);
+    calendarEventTypesStore.saveEventTypes(tenantId, updated);
+    return updated;
+  },
+};
+
+
+
+

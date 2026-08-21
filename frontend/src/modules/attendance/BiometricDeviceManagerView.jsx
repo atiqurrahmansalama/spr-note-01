@@ -28,8 +28,11 @@ export default function BiometricDeviceManagerView() {
   const fetchDevices = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/attendance/devices/");
-      setDevices(res?.results || (Array.isArray(res) ? res : []));
+      const res = await fetchWithAuth("/api/v1/attendance/devices/");
+      if (res && res.ok) {
+        const data = await res.json();
+        setDevices(data?.results || (Array.isArray(data) ? data : []));
+      }
     } catch (err) {
       showToast(err.message || "Failed to load biometric devices", "error");
     } finally {
@@ -81,14 +84,14 @@ export default function BiometricDeviceManagerView() {
     setSaving(true);
     try {
       if (editingDevice) {
-        await fetchWithAuth(`/attendance/devices/${editingDevice.id}/`, {
+        await fetchWithAuth(`/api/v1/attendance/devices/${editingDevice.id}/`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
         });
         showToast("Biometric device updated successfully.", "success");
       } else {
-        await fetchWithAuth("/attendance/devices/", {
+        await fetchWithAuth("/api/v1/attendance/devices/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData)
@@ -107,7 +110,7 @@ export default function BiometricDeviceManagerView() {
   const handleDeleteDevice = async (id) => {
     if (!window.confirm("Are you sure you want to remove this biometric device?")) return;
     try {
-      await fetchWithAuth(`/attendance/devices/${id}/`, { method: "DELETE" });
+      await fetchWithAuth(`/api/v1/attendance/devices/${id}/`, { method: "DELETE" });
       showToast("Device removed.", "success");
       fetchDevices();
     } catch (err) {
@@ -119,8 +122,9 @@ export default function BiometricDeviceManagerView() {
   const handlePingDevice = async (id) => {
     setPingingId(id);
     try {
-      const res = await fetchWithAuth(`/attendance/devices/${id}/ping/`, { method: "POST" });
-      showToast(`Device ${res.device_name} responded Online. Heartbeat recorded.`, "success");
+      const res = await fetchWithAuth(`/api/v1/attendance/devices/${id}/ping/`, { method: "POST" });
+      const data = res && res.ok ? await res.json() : {};
+      showToast(`Device ${data.device_name || "Device"} responded Online. Heartbeat recorded.`, "success");
       fetchDevices();
     } catch (err) {
       showToast(err.message || "Device ping failed.", "error");

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronIcon, CalendarIcon, CheckIcon } from "../ui/Icons";
 import ReusableCalendar from "./ReusableCalendar";
 import { calendarSettings } from "../../utils/localStore";
@@ -7,6 +8,7 @@ import { getCurrentHijriMonthRange } from "../../utils/hijriUtils";
 /**
  * Universal Reusable Date Range Picker Component
  * Supports preset ranges (Past 1 Week, Past 2 Weeks, 1 Month, Full Hijri Month, etc.) and custom range picking.
+ * Uses portal-based rendering to prevent container clipping and mobile right-edge overflow.
  */
 export default function DateRangePicker({
   startDate,
@@ -25,6 +27,15 @@ export default function DateRangePicker({
   const [showCustomCalendar, setShowCustomCalendar] = useState(false);
   const [isCustomPicking, setIsCustomPicking] = useState(false);
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const [coords, setCoords] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    openUpward: false,
+    maxHeight: 360,
+  });
 
   const [isHijriActive, setIsHijriActive] = useState(() => {
     if (typeof isHijriEnabled === "boolean") return isHijriEnabled;
@@ -47,17 +58,80 @@ export default function DateRangePicker({
     return () => window.removeEventListener("spr_calendar_settings_updated", handleCalendarSetting);
   }, [isHijriEnabled]);
 
+  // Viewport position updater
+  const updatePosition = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const requiredHeight = showCustomCalendar ? 340 : 270;
+
+    const shouldOpenUpward = spaceBelow < requiredHeight && spaceAbove > spaceBelow;
+    const availableHeight = shouldOpenUpward
+      ? Math.max(120, spaceAbove - 16)
+      : Math.max(120, spaceBelow - 16);
+
+    const minPopupW = showCustomCalendar ? 290 : 230;
+    const maxScreenW = typeof window !== "undefined" ? window.innerWidth - 16 : 320;
+    const calculatedWidth = Math.min(maxScreenW, Math.max(rect.width, minPopupW));
+
+    let targetLeft = rect.left;
+    if (typeof window !== "undefined") {
+      if (targetLeft + calculatedWidth > window.innerWidth - 8) {
+        targetLeft = window.innerWidth - calculatedWidth - 8;
+      }
+      if (targetLeft < 8) {
+        targetLeft = 8;
+      }
+    }
+
+    setCoords({
+      left: targetLeft,
+      width: calculatedWidth,
+      top: shouldOpenUpward ? rect.top - 6 : rect.bottom + 6,
+      openUpward: shouldOpenUpward,
+      maxHeight: Math.min(420, availableHeight),
+    });
+  };
+
+  useEffect(() => {
+    if (isDropdownOpen || showCustomCalendar) {
+      updatePosition();
+      const handleScroll = (e) => {
+        if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
+        updatePosition();
+      };
+      window.addEventListener("scroll", handleScroll, true);
+      window.addEventListener("resize", updatePosition);
+      return () => {
+        window.removeEventListener("scroll", handleScroll, true);
+        window.removeEventListener("resize", updatePosition);
+      };
+    }
+  }, [isDropdownOpen, showCustomCalendar]);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
         setIsDropdownOpen(false);
         setShowCustomCalendar(false);
         setIsCustomPicking(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    if (isDropdownOpen || showCustomCalendar) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isDropdownOpen, showCustomCalendar]);
 
   const getPresetDates = (presetKey) => {
     const today = new Date();
@@ -187,16 +261,16 @@ export default function DateRangePicker({
     if (isCustomPicking) return "Pick custom range";
     if (activeKey === "today") return "Today";
     if (activeKey === "yesterday") return "Yesterday";
-    if (activeKey === "past_week") return "Past 1 Week (7 Days)";
-    if (activeKey === "past_2weeks") return "Past 2 Weeks (14 Days)";
+    if (activeKey === "past_week") return "Last 7 Days";
+    if (activeKey === "past_2weeks") return "Last 14 Days";
     if (activeKey === "this_month") return "This Month";
     if (activeKey === "full_hijri_month") {
       const hijriRange = getCurrentHijriMonthRange(new Date());
-      return `Full Hijri Month (${hijriRange.hijriMonthName})`;
+      return `Full Hijri Month`;
     }
-    if (activeKey === "past_month") return "Past 1 Month (30 Days)";
-    if (activeKey === "past_3months") return "Past 3 Months";
-    if (activeKey === "all_time") return "Full Month / All Time";
+    if (activeKey === "past_month") return "Last 30 Days";
+    if (activeKey === "past_3months") return "Last 90 Days";
+    if (activeKey === "all_time") return "Full Month";
 
     if (startDate && endDate) {
       return `${formatDateDisplay(startDate)} – ${formatDateDisplay(endDate)}`;
@@ -208,26 +282,113 @@ export default function DateRangePicker({
   const currentHijriRange = isHijriActive ? getCurrentHijriMonthRange() : null;
 
   const PRESET_OPTIONS = [
+    { key: "all_time", label: "Full Month (Reset)" },
     { key: "today", label: "Today" },
     { key: "yesterday", label: "Yesterday" },
-    { key: "past_week", label: "Past 1 Week (Last 7 Days)" },
-    { key: "past_2weeks", label: "Past 2 Weeks (Last 14 Days)" },
+    { key: "past_week", label: "Last 7 Days" },
+    { key: "past_2weeks", label: "Last 14 Days" },
     { key: "this_month", label: "This Month" },
+    { key: "past_month", label: "Last 30 Days" },
+    { key: "past_3months", label: "Last 90 Days" },
     ...(isHijriActive && currentHijriRange
       ? [
           {
             key: "full_hijri_month",
-            label: `Full Hijri Month (${currentHijriRange.hijriMonthName})`,
+            label: `Full Hijri Month`,
           },
         ]
       : []),
-    { key: "past_month", label: "Past 1 Month (Last 30 Days)" },
-    { key: "past_3months", label: "Past 3 Months" },
-    { key: "all_time", label: "Full Month View (Reset)" },
     { key: "custom", label: "Custom Date Range…" },
   ];
 
   const heightClass = size === "sm" ? "h-[38px] text-xs py-1.5" : "h-[42px] text-xs py-2";
+
+  // Dropdown Portal Menu Component
+  const dropdownPortal =
+    isDropdownOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              left: `${coords.left}px`,
+              top: coords.openUpward ? "auto" : `${coords.top}px`,
+              bottom: coords.openUpward ? `${window.innerHeight - coords.top}px` : "auto",
+              width: `${coords.width}px`,
+              maxHeight: `${coords.maxHeight}px`,
+              zIndex: 99999,
+            }}
+            className="theme-bg-surface border theme-border rounded-2xl shadow-2xl p-1.5 space-y-1 animate-fade-in text-xs font-medium select-none overflow-y-auto"
+          >
+            {PRESET_OPTIONS.map((opt) => {
+              const isSelected = activeKey === opt.key;
+              const isCustom = opt.key === "custom";
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => handleSelectPreset(opt.key)}
+                  className={`w-full px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-left ${
+                    isSelected
+                      ? "theme-bg-accent-soft theme-accent font-bold"
+                      : "hover:theme-bg-elevated theme-text-primary"
+                  }`}
+                >
+                  <span className="truncate">{opt.label}</span>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+                    {isSelected && !isCustom && <CheckIcon className="w-3.5 h-3.5 theme-accent" />}
+                    {isCustom && (
+                      <ChevronIcon
+                        isOpen={showCustomCalendar}
+                        className="w-3 h-3 theme-text-secondary"
+                      />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )
+      : null;
+
+  // Custom Calendar Portal Component
+  const calendarPortal =
+    showCustomCalendar && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              left: `${coords.left}px`,
+              top: coords.openUpward ? "auto" : `${coords.top}px`,
+              bottom: coords.openUpward ? `${window.innerHeight - coords.top}px` : "auto",
+              width: `${coords.width}px`,
+              maxHeight: `${coords.maxHeight}px`,
+              zIndex: 99999,
+            }}
+            className="theme-bg-surface border theme-border rounded-2xl shadow-2xl p-3 animate-fade-in overflow-y-auto"
+          >
+            <ReusableCalendar
+              isInline={true}
+              isRange={true}
+              startDate={startDate}
+              endDate={endDate}
+              onRangeSelect={(start, end) => {
+                if (onRangeSelect) onRangeSelect(start, end);
+                setIsDropdownOpen(false);
+                setShowCustomCalendar(false);
+                setIsCustomPicking(false);
+              }}
+              minDate={minDate}
+              maxDate={maxDate}
+              placeholder="Pick custom range"
+              className="w-full flex justify-center"
+            />
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div ref={containerRef} className={`w-full relative ${className}`}>
@@ -274,60 +435,9 @@ export default function DateRangePicker({
         <ChevronIcon isOpen={isDropdownOpen || showCustomCalendar} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
       </button>
 
-      {/* Dropdown Options Popup Menu */}
-      {isDropdownOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 w-full min-w-[220px] theme-bg-surface border theme-border rounded-2xl shadow-2xl p-1.5 space-y-1 animate-fade-in text-xs font-medium select-none">
-          {PRESET_OPTIONS.map((opt) => {
-            const isSelected = activeKey === opt.key;
-            const isCustom = opt.key === "custom";
-            return (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => handleSelectPreset(opt.key)}
-                className={`w-full px-3 py-2 rounded-xl flex items-center justify-between transition cursor-pointer text-left ${
-                  isSelected
-                    ? "theme-bg-accent-soft theme-accent font-bold"
-                    : "hover:theme-bg-elevated theme-text-primary"
-                }`}
-              >
-                <span>{opt.label}</span>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {isSelected && !isCustom && <CheckIcon className="w-3.5 h-3.5 theme-accent" />}
-                  {isCustom && (
-                    <ChevronIcon
-                      isOpen={showCustomCalendar}
-                      className="w-3 h-3 theme-text-secondary"
-                    />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Custom Calendar Popup below input */}
-      {showCustomCalendar && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 w-full min-w-[280px] theme-bg-surface border theme-border rounded-2xl shadow-2xl p-3 animate-fade-in">
-          <ReusableCalendar
-            isInline={true}
-            isRange={true}
-            startDate={startDate}
-            endDate={endDate}
-            onRangeSelect={(start, end) => {
-              if (onRangeSelect) onRangeSelect(start, end);
-              setIsDropdownOpen(false);
-              setShowCustomCalendar(false);
-              setIsCustomPicking(false);
-            }}
-            minDate={minDate}
-            maxDate={maxDate}
-            placeholder="Pick custom range"
-            className="w-full flex justify-center"
-          />
-        </div>
-      )}
+      {/* Render Dropdown & Calendar Portals */}
+      {dropdownPortal}
+      {calendarPortal}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   RefreshIcon,
   FilledCheckCircleIcon,
@@ -22,7 +22,26 @@ export default function AttendanceMatrixTable({
   onStudentClick,
   isLoading = false,
   emptyMessage = "No attendance records found for this class and period.",
+  tableContainerClass = "overflow-x-auto max-h-[75vh]",
 }) {
+  const containerRef = useRef(null);
+
+  // Enable Shift + Mouse Wheel Left-Right horizontal scroll
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if (e.shiftKey && e.deltaY !== 0) {
+        el.scrollLeft += e.deltaY * 1.2;
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="p-16 text-center text-xs theme-text-secondary flex flex-col items-center justify-center gap-3">
@@ -43,26 +62,26 @@ export default function AttendanceMatrixTable({
   const hasMultiplePeriods = matrixData.period_count > 1 || matrixData.students_matrix.some(r => r.period_count > 1);
 
   return (
-    <div className="overflow-x-auto max-h-[75vh]">
-      <table className="w-full text-left border-collapse text-[11px]">
+    <div ref={containerRef} className={`${tableContainerClass} scrollbar-none overflow-x-auto`}>
+      <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
         {/* Table Sticky Headers */}
-        <thead className="sticky top-0 z-20 theme-bg-sub border-b theme-border shadow-xs select-none">
-          <tr className="border-b theme-border text-center font-bold">
+        <thead className="sticky top-0 z-30 theme-bg-sub select-none">
+          <tr className="text-center font-bold">
             {/* Sticky Roll No Header */}
-            <th className="py-3 px-3 w-12 sticky left-0 z-30 theme-bg-sub border-r theme-border text-xs">
+            <th className="py-2.5 px-0.5 sm:px-1 w-[36px] min-w-[36px] max-w-[36px] sm:w-[42px] sm:min-w-[42px] sm:max-w-[42px] sticky left-0 z-40 theme-bg-sub border-r border-b theme-border text-xs text-center">
               Roll
             </th>
 
             {/* Sticky Student Name Header */}
-            <th className="py-3 px-3 min-w-[150px] sticky left-12 z-30 theme-bg-sub border-r theme-border text-left text-xs">
+            <th className="py-2.5 px-2 sm:px-2.5 w-[110px] min-w-[110px] max-w-[110px] sm:w-[140px] sm:min-w-[140px] sm:max-w-[140px] left-[36px] sm:left-[42px] sticky z-40 theme-bg-sub border-r border-b theme-border text-left text-xs shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-1px_rgba(0,0,0,0.25)]">
               Student Name
             </th>
 
             {/* Dedicated Time & Period Schedule Header */}
-            <th className="py-3 px-3 min-w-[170px] border-r theme-border text-left text-xs">
-              <div className="flex items-center gap-1.5">
-                <TimerIcon className="w-3.5 h-3.5 theme-accent" />
-                <span>Time & Period</span>
+            <th className="py-2.5 px-1.5 sm:px-2 w-[100px] min-w-[100px] max-w-[100px] sm:w-[125px] sm:min-w-[125px] sm:max-w-[125px] border-r border-b theme-border text-left text-xs">
+              <div className="flex items-center gap-1">
+                <TimerIcon className="w-3 h-3 theme-accent shrink-0" />
+                <span className="truncate">Time & Period</span>
               </div>
             </th>
 
@@ -81,7 +100,7 @@ export default function AttendanceMatrixTable({
               return (
                 <th
                   key={d.date || d.day}
-                  className={`py-3 px-1 min-w-[36px] sm:min-w-[42px] font-mono border-r theme-border transition-colors ${
+                  className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors ${
                     isWeekend
                       ? 'bg-rose-400/[0.045] dark:bg-rose-400/[0.08] text-rose-500/80'
                       : isHoliday
@@ -90,22 +109,22 @@ export default function AttendanceMatrixTable({
                   }`}
                   title={d.holiday_title || `${d.weekday} - ${fullDateStr}${hijriDayNumber ? ` (Hijri: ${hijriDayNumber})` : ''}`}
                 >
-                  <div className="flex flex-col items-center justify-between min-h-[58px] py-0.5">
+                  <div className="flex flex-col items-center justify-between min-h-[50px] sm:min-h-[56px] py-0.5">
                     {/* Top Group: Gregorian & Hijri Dates */}
                     <div className="space-y-0.5">
-                      <div className="font-bold text-sm sm:text-base tracking-tight leading-none theme-text-primary">
+                      <div className="font-bold text-xs sm:text-sm tracking-tight leading-none theme-text-primary">
                         {d.day}
                       </div>
 
                       {isHijriEnabled && hijriDayNumber && (
-                        <div className="text-[11px] sm:text-xs font-mono theme-accent font-semibold leading-none pt-0.5">
+                        <div className="text-[9px] sm:text-[10px] font-mono theme-accent font-semibold leading-none pt-0.5">
                           {hijriDayNumber}
                         </div>
                       )}
                     </div>
 
                     {/* Bottom: Weekday Name with clear spacing and subtle separator line */}
-                    <div className="text-[10px] font-semibold uppercase opacity-60 leading-none mt-2.5 pt-1.5 border-t theme-border w-full text-center">
+                    <div className="text-[8px] sm:text-[9px] font-semibold uppercase opacity-60 leading-none mt-1.5 sm:mt-2 pt-1 border-t theme-border w-full text-center">
                       {d.weekday.slice(0, 2)}
                     </div>
                   </div>
@@ -113,11 +132,11 @@ export default function AttendanceMatrixTable({
               );
             })}
 
-            {/* Summary Metric Headers */}
-            <th className="py-3 px-2 w-11 text-emerald-600/90 dark:text-emerald-400/90 border-l theme-border text-xs" title="Present">P</th>
-            <th className="py-3 px-2 w-11 text-amber-600/90 dark:text-amber-400/90 text-xs" title="Late">L</th>
-            <th className="py-3 px-2 w-11 text-rose-500/85 dark:text-rose-400/85 text-xs" title="Absent">A</th>
-            <th className="py-3 px-2 w-20 sm:w-24 min-w-[76px] text-right pr-4 text-xs" title="Attendance Rate % (Excludes holidays)">Rate %</th>
+            {/* Summary Metric Headers with EXACT same width as date columns */}
+            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-emerald-600 dark:text-emerald-400 border-l border-b theme-border text-xs" title="Present">P</th>
+            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs" title="Late">L</th>
+            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-rose-500 dark:text-rose-400 border-l border-b theme-border text-xs" title="Absent">A</th>
+            <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate % (Excludes holidays)">Rate %</th>
           </tr>
         </thead>
 
@@ -130,17 +149,15 @@ export default function AttendanceMatrixTable({
             return (
               <tr
                 key={row.row_key || `${row.student_id}_${row.period_slot_id || idx}`}
-                className={`border-b theme-border hover:theme-bg-elevated/40 transition-colors h-11 sm:h-12 ${
-                  isFirstPeriodRow && idx > 0 ? "border-t border-t-[var(--border-color)]" : ""
-                }`}
+                className="hover:theme-bg-elevated/40 transition-colors h-11 sm:h-12"
               >
                 {/* Sticky Roll No (Merged across all periods for this student) */}
                 {isFirstPeriodRow && (
                   <td
                     rowSpan={row.period_count || 1}
-                    className="py-2.5 px-3 text-center font-bold font-mono sticky left-0 z-10 theme-bg-surface border-r border-b theme-border theme-text-primary align-middle"
+                    className="py-2 px-0.5 sm:px-1 w-[36px] min-w-[36px] max-w-[36px] sm:w-[42px] sm:min-w-[42px] sm:max-w-[42px] text-center font-bold font-mono sticky left-0 z-20 theme-bg-surface border-r border-b theme-border theme-text-primary align-middle"
                   >
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg font-bold font-mono shadow-xs">
+                    <span className="inline-flex items-center justify-center font-bold font-mono text-xs">
                       {row.roll_number || '—'}
                     </span>
                   </td>
@@ -151,32 +168,31 @@ export default function AttendanceMatrixTable({
                   <td
                     rowSpan={row.period_count || 1}
                     onClick={() => onStudentClick && onStudentClick(row.student_id)}
-                    className={`py-2.5 px-3 sticky left-12 z-10 theme-bg-surface border-r border-b theme-border align-middle ${
+                    className={`py-2 px-2 sm:px-2.5 w-[110px] min-w-[110px] max-w-[110px] sm:w-[140px] sm:min-w-[140px] sm:max-w-[140px] left-[36px] sm:left-[42px] sticky z-20 theme-bg-surface border-r border-b theme-border align-middle shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-1px_rgba(0,0,0,0.25)] ${
                       onStudentClick ? 'cursor-pointer hover:underline' : ''
                     }`}
                   >
-                    <div className="font-bold theme-text-primary truncate max-w-[140px]" title={row.name}>
+                    <div className="font-bold text-xs theme-text-primary truncate max-w-[95px] sm:max-w-[125px]" title={row.name}>
                       {row.name}
                     </div>
-                    <div className="text-[10px] theme-text-secondary truncate max-w-[140px] mt-0.5">
+                    <div className="text-[10px] theme-text-secondary truncate max-w-[95px] sm:max-w-[125px] mt-0.5">
                       {row.group_name || row.class_name}
                     </div>
                   </td>
                 )}
 
                 {/* Dedicated Time & Period Schedule Column */}
-                <td className="py-2.5 px-3 border-r theme-border theme-bg-sub/30 min-w-[170px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-xs theme-text-primary">
+                <td className="py-2 px-1.5 sm:px-2 border-r border-b theme-border theme-bg-sub/30 w-[100px] min-w-[100px] max-w-[100px] sm:w-[125px] sm:min-w-[125px] sm:max-w-[125px]">
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono font-bold text-[11px] sm:text-xs theme-text-primary truncate">
                       {row.start_time || "--:--"} - {row.end_time || "--:--"}
                     </span>
                   </div>
-                  <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[155px] mt-0.5 flex items-center gap-1" title={row.period_name}>
+                  <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[90px] sm:max-w-[115px] mt-0.5" title={row.period_name}>
                     <span className="truncate">{row.period_name || 'General Routine'}</span>
                   </div>
                   {row.teacher_name && (
-                    <div className="text-[9px] theme-accent font-semibold truncate max-w-[155px] mt-0.5 flex items-center gap-1" title={`Teacher: ${row.teacher_name}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] shrink-0"></span>
+                    <div className="text-[9px] theme-accent font-semibold truncate max-w-[90px] sm:max-w-[115px] mt-0.5" title={`Teacher: ${row.teacher_name}`}>
                       <span className="truncate">{row.teacher_name}</span>
                     </div>
                   )}
@@ -202,71 +218,73 @@ export default function AttendanceMatrixTable({
                           onToggleCell(row.student_id, dateStr, status, row.period_slot_id);
                         }
                       }}
-                      className={`py-2 px-1 min-w-[36px] sm:min-w-[42px] text-center font-mono text-[10px] border-r theme-border transition-colors ${
-                        isWeekend
+                      className={`py-2 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-mono text-[10px] border-r border-b theme-border transition-colors ${
+                        isOffDay
+                          ? 'cursor-not-allowed select-none bg-zinc-500/[0.04] dark:bg-zinc-400/[0.04] opacity-60'
+                          : isWeekend
                           ? 'bg-rose-400/[0.025] dark:bg-rose-400/[0.045]'
                           : ''
                       } ${
                         canEditCell
                           ? 'cursor-pointer select-none hover:theme-bg-elevated/80'
                           : isOffDay
-                          ? 'cursor-default'
+                          ? 'cursor-not-allowed'
                           : 'cursor-default'
                       }`}
                       title={
                         isOffDay
-                          ? `${d.holiday_title || (isWeekend ? 'Weekly Weekend' : 'Holiday')}: No Attendance`
+                          ? `${d.holiday_title || (isWeekend ? 'Weekly Weekend' : 'Holiday')} (No Attendance Allowed)`
                           : isEditing
                           ? `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'} (Click to change)`
                           : `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'}`
                       }
                     >
                       {status === 'PRESENT' ? (
-                        <FilledCheckCircleIcon className="w-4.5 h-4.5 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                        <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                       ) : status === 'ABSENT' ? (
-                        <FilledXCircleIcon className="w-4.5 h-4.5 text-rose-500/75 dark:text-rose-400/80 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                        <FilledXCircleIcon className="w-4 h-4 text-rose-500/75 dark:text-rose-400/80 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                       ) : status === 'LATE' ? (
-                        <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
                           L
                         </span>
                       ) : status === 'HALF_DAY' ? (
-                        <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold text-[10px]">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold text-[10px]">
                           H
                         </span>
                       ) : status === 'ON_LEAVE' ? (
-                        <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
                           LV
                         </span>
                       ) : isOffDay ? (
                         <span className="opacity-35 font-mono text-xs select-none">—</span>
                       ) : canEditCell ? (
-                        <span className="inline-block w-3.5 h-3.5 rounded-full border theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all"></span>
+                        <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present"></span>
                       ) : (
-                        <span className="opacity-25 font-mono text-xs select-none">·</span>
+                        <span className="opacity-35 font-mono text-xs select-none theme-text-secondary">—</span>
                       )}
                     </td>
                   );
                 })}
 
-                {/* Totals & Attendance Percentage */}
-                <td className="py-2.5 px-1 text-center font-bold font-mono text-emerald-600/90 dark:text-emerald-400/90 border-l theme-border">
+                {/* Totals & Attendance Percentage with EXACT matching widths */}
+                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-emerald-600 dark:text-emerald-400 border-l border-b theme-border">
                   {row.totals.present}
                 </td>
-                <td className="py-2.5 px-1 text-center font-bold font-mono text-amber-600/90 dark:text-amber-400/90">
+                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-amber-600 dark:text-amber-400 border-l border-b theme-border">
                   {row.totals.late}
                 </td>
-                <td className="py-2.5 px-1 text-center font-bold font-mono text-rose-500/85 dark:text-rose-400/85">
+                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-rose-500 dark:text-rose-400 border-l border-b theme-border">
                   {row.totals.absent}
                 </td>
-                <td className="py-2.5 px-2 text-right pr-4 font-mono">
+                <td className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold font-mono text-xs border-l border-r border-b theme-border">
                   <span
-                    className={`px-2 py-0.5 rounded-lg text-[10px] ${
+                    className={
                       rate >= 85
-                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                        ? 'text-emerald-600 dark:text-emerald-400'
                         : rate >= 70
-                        ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10'
-                        : 'text-rose-600 dark:text-rose-400 bg-rose-500/10'
-                    }`}
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-rose-600 dark:text-rose-400'
+                    }
                   >
                     {rate}%
                   </span>

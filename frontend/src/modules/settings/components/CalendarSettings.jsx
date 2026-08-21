@@ -18,11 +18,13 @@ export default function CalendarSettings({
   timeZone: propTimeZone, 
   setTimeZone: propSetTimeZone, 
   dateFormat: propDateFormat, 
-  setDateFormat: propSetDateFormat 
+  setDateFormat: propSetDateFormat,
+  hideHeader = false,
+  isEmbedded = false,
 }) {
   const outletContext = useOutletContext() || {};
   const timeZone = propTimeZone || outletContext.timeZone || calStore.getTimezone();
-  const setTimeZone = propSetTimeZone || outletContext.setTimeZone || calStore.saveTimezone;
+  const setTimeZone = propTimeZone || outletContext.setTimeZone || calStore.saveTimezone;
   const dateFormat = propDateFormat || outletContext.dateFormat || calStore.getDateFormat();
   const setDateFormat = propSetDateFormat || outletContext.setDateFormat || calStore.saveDateFormat;
 
@@ -59,7 +61,7 @@ export default function CalendarSettings({
     calStore.saveDateFormat("DD/MM/YYYY");
     calStore.saveFirstDay("Saturday");
     calStore.saveHijriEnabled(false);
-    window.dispatchEvent(new CustomEvent("spr_calendar_settings_updated", { detail: { enableHijri: false } }));
+    window.dispatchEvent(new CustomEvent("spr_calendar_settings_updated", { detail: { enableHijri: false, dateFormat: "DD/MM/YYYY" } }));
   };
 
   const getFormattedSampleDate = (fmt) => {
@@ -80,31 +82,33 @@ export default function CalendarSettings({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-start py-4 px-3 sm:px-6 space-y-6 animate-fade-in theme-text-primary">
+    <div className={`w-full ${isEmbedded ? "max-w-none" : "max-w-2xl mx-auto"} flex flex-col items-center justify-start ${isEmbedded ? "py-0 px-0" : "py-4 px-3 sm:px-6"} space-y-6 animate-fade-in theme-text-primary`}>
       
       {/* 1. Header Card */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
-            <CalendarIcon className="w-5 h-5" />
+      {!hideHeader && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
+              <CalendarIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold theme-text-primary tracking-tight">Date, Time & Calendar Settings</h2>
+              <p className="text-[11px] theme-text-secondary mt-0.5">
+                Configure timezone offsets, date formats, calendar standards, and live clock previews.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold theme-text-primary tracking-tight">Date, Time & Calendar Settings</h2>
-            <p className="text-[11px] theme-text-secondary mt-0.5">
-              Configure timezone offsets, date formats, calendar standards, and live clock previews.
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleResetDefaults}
-          className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
-        >
-          <RefreshIcon className="w-3.5 h-3.5 theme-text-secondary" />
-          <span>Reset Defaults</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+          >
+            <RefreshIcon className="w-3.5 h-3.5 theme-text-secondary" />
+            <span>Reset Defaults</span>
+          </button>
+        </div>
+      )}
 
       {/* 2. Timezone Selection List */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-4">

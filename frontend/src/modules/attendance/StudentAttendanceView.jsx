@@ -19,6 +19,10 @@ import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 
+const DEFAULT_PERIOD_SLOTS = [
+  { id: 'DEFAULT', period_name: 'Regular Lecture Period', start_time: '08:00:00', end_time: '08:45:00', period_order: 1 }
+];
+
 export default function StudentAttendanceView() {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
@@ -99,14 +103,6 @@ export default function StudentAttendanceView() {
         if (perRes.ok) {
           const pData = await perRes.json();
           let list = Array.isArray(pData) ? pData : pData.results || [];
-          if (list.length === 0) {
-            // Fallback to all periods
-            const allRes = await fetchWithAuth('/api/v1/academy/periods/');
-            if (allRes.ok) {
-              const allData = await allRes.json();
-              list = Array.isArray(allData) ? allData : allData.results || [];
-            }
-          }
           list.sort((a, b) => (a.period_order || 0) - (b.period_order || 0));
           setSlots(list);
         }
@@ -142,9 +138,7 @@ export default function StudentAttendanceView() {
     if (selectedSlotId && selectedSlotId !== 'ALL') {
       return slots.filter((s) => String(s.id) === String(selectedSlotId));
     }
-    return slots.length > 0
-      ? slots
-      : [{ id: 'DEFAULT', period_name: 'Regular Lecture Period', start_time: '08:00:00', end_time: '08:45:00', period_order: 1 }];
+    return slots.length > 0 ? slots : DEFAULT_PERIOD_SLOTS;
   }, [slots, selectedSlotId]);
 
   // 4. Load Student Roster and Attendance

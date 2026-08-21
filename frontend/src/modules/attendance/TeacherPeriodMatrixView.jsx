@@ -1,21 +1,39 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
+import { useTenant } from "../../context/TenantContext";
+import { attendanceFilters } from "../../utils/localStore";
 import { RefreshIcon, SaveIcon, MatrixIcon, CloseIcon } from "../../components/ui/Icons";
 
 export default function TeacherPeriodMatrixView() {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
+
+  const savedFilters = useMemo(() => {
+    return attendanceFilters.getTeacherMatrixFilters(activeTenantId) || {};
+  }, [activeTenantId]);
 
   const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [selectedTeacherId, setSelectedTeacherId] = useState("ALL");
-  const [selectedClassId, setSelectedClassId] = useState("ALL");
+  const [selectedYear, setSelectedYear] = useState(() => savedFilters.year || currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(() => savedFilters.month || (currentDate.getMonth() + 1));
+  const [selectedTeacherId, setSelectedTeacherId] = useState(() => savedFilters.teacherId || "ALL");
+  const [selectedClassId, setSelectedClassId] = useState(() => savedFilters.classId || "ALL");
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [matrixData, setMatrixData] = useState(null);
   const [modifiedCells, setModifiedCells] = useState({}); // { `${scheduleId}_${day}`: { status, substitute_teacher_id, remarks } }
+
+  // Persist filters
+  useEffect(() => {
+    attendanceFilters.saveTeacherMatrixFilters(activeTenantId, {
+      year: selectedYear,
+      month: selectedMonth,
+      teacherId: selectedTeacherId,
+      classId: selectedClassId,
+    });
+  }, [selectedYear, selectedMonth, selectedTeacherId, selectedClassId, activeTenantId]);
+
 
   // Substitute modal state
   const [activeModalCell, setActiveModalCell] = useState(null); // { scheduleId, day, teacherName, subjectName, dateStr, currentStatus, substituteId, remarks }
@@ -23,12 +41,15 @@ export default function TeacherPeriodMatrixView() {
 
   // Load teacher list for substitute selector
   useEffect(() => {
-    fetchWithAuth("/staff/teachers/")
-      .then((res) => {
-        if (res && Array.isArray(res.results)) {
-          setAllTeachers(res.results);
-        } else if (Array.isArray(res)) {
-          setAllTeachers(res);
+    fetchWithAuth("/api/v1/staff/teachers/")
+      .then(async (res) => {
+        if (res && res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.results)) {
+            setAllTeachers(data.results);
+          } else if (Array.isArray(data)) {
+            setAllTeachers(data);
+          }
         }
       })
       .catch(() => {});
@@ -38,14 +59,17 @@ export default function TeacherPeriodMatrixView() {
   const fetchMatrix = async () => {
     setLoading(true);
     try {
-      let url = `/attendance/teacher-matrix/?year=${selectedYear}&month=${selectedMonth}`;
+      let url = `/api/v1/attendance/teacher-matrix/?year=${selectedYear}&month=${selectedMonth}`;
       if (selectedTeacherId !== "ALL") url += `&teacher_id=${selectedTeacherId}`;
       if (selectedClassId !== "ALL") url += `&class_id=${selectedClassId}`;
 
       const res = await fetchWithAuth(url);
-      if (res && res.teachers) {
-        setMatrixData(res);
-        setModifiedCells({});
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.teachers) {
+          setMatrixData(data);
+          setModifiedCells({});
+        }
       }
     } catch (err) {
       showToast(err.message || "Failed to load teacher matrix", "error");
@@ -161,12 +185,13 @@ export default function TeacherPeriodMatrixView() {
 
     setSaving(true);
     try {
-      const res = await fetchWithAuth("/attendance/teacher-matrix/bulk-update/", {
+      const res = await fetchWithAuth("/api/v1/attendance/teacher-matrix/bulk-update/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ records })
       });
-      showToast(res.message || "Teacher period matrix updated successfully.", "success");
+      const data = await res.json().catch(() => ({}));
+      showToast(data.message || "Teacher period matrix updated successfully.", "success");
       setModifiedCells({});
       fetchMatrix();
     } catch (err) {

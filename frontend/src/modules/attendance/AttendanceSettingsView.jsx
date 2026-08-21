@@ -17,12 +17,18 @@ import {
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
 import { useTenant } from "../../context/TenantContext";
+import { attendanceFilters } from "../../utils/localStore";
 
 export default function AttendanceSettingsView() {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
 
-  const [activeTab, setActiveTab] = useState("policy"); // 'policy' | 'slots' | 'routines'
+  const [activeTab, setActiveTab] = useState(() => attendanceFilters.getSettingsTab(activeTenantId) || "policy"); // 'policy' | 'slots' | 'routines'
+
+  useEffect(() => {
+    attendanceFilters.saveSettingsTab(activeTenantId, activeTab);
+  }, [activeTab, activeTenantId]);
+
 
   // Policy Settings States
   const [policy, setPolicy] = useState({
@@ -71,30 +77,45 @@ export default function AttendanceSettingsView() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [policyRes, slotsRes, routinesRes, tchRes, clsRes, grpRes] = await Promise.all([
+      const [policyRes, slotsRes, routinesRes, tchRes, clsRes, grpRes] = await Promise.allSettled([
         getAttendancePolicy(),
-        fetchWithAuth("/attendance/period-slots/"),
-        fetchWithAuth("/attendance/routines/"),
-        fetchWithAuth("/staff/teachers/"),
-        fetchWithAuth("/classes/"),
-        fetchWithAuth("/groups/")
+        fetchWithAuth("/api/v1/attendance/period-slots/"),
+        fetchWithAuth("/api/v1/attendance/routines/"),
+        fetchWithAuth("/api/v1/staff/teachers/"),
+        fetchWithAuth("/api/v1/classes/"),
+        fetchWithAuth("/api/v1/groups/")
       ]);
 
-      if (policyRes) {
+      if (policyRes.status === "fulfilled" && policyRes.value) {
         setPolicy({
-          weekend_days: policyRes.weekend_days || ["FRIDAY", "SATURDAY"],
-          default_mode: policyRes.default_mode || "DAILY_SINGLE",
-          default_late_cutoff_time: policyRes.default_late_cutoff_time || "08:30:00",
-          auto_excuse_holidays: policyRes.auto_excuse_holidays ?? true,
-          auto_notify_absent: policyRes.auto_notify_absent ?? false,
+          weekend_days: policyRes.value.weekend_days || ["FRIDAY", "SATURDAY"],
+          default_mode: policyRes.value.default_mode || "DAILY_SINGLE",
+          default_late_cutoff_time: policyRes.value.default_late_cutoff_time || "08:30:00",
+          auto_excuse_holidays: policyRes.value.auto_excuse_holidays ?? true,
+          auto_notify_absent: policyRes.value.auto_notify_absent ?? false,
         });
       }
 
-      setPeriodSlots(slotsRes?.results || (Array.isArray(slotsRes) ? slotsRes : []));
-      setRoutines(routinesRes?.results || (Array.isArray(routinesRes) ? routinesRes : []));
-      setTeachers(tchRes?.results || (Array.isArray(tchRes) ? tchRes : []));
-      setClasses(clsRes?.results || (Array.isArray(clsRes) ? clsRes : []));
-      setGroups(grpRes?.results || (Array.isArray(grpRes) ? grpRes : []));
+      if (slotsRes.status === "fulfilled" && slotsRes.value?.ok) {
+        const data = await slotsRes.value.json();
+        setPeriodSlots(data?.results || (Array.isArray(data) ? data : []));
+      }
+      if (routinesRes.status === "fulfilled" && routinesRes.value?.ok) {
+        const data = await routinesRes.value.json();
+        setRoutines(data?.results || (Array.isArray(data) ? data : []));
+      }
+      if (tchRes.status === "fulfilled" && tchRes.value?.ok) {
+        const data = await tchRes.value.json();
+        setTeachers(data?.results || (Array.isArray(data) ? data : []));
+      }
+      if (clsRes.status === "fulfilled" && clsRes.value?.ok) {
+        const data = await clsRes.value.json();
+        setClasses(data?.results || (Array.isArray(data) ? data : []));
+      }
+      if (grpRes.status === "fulfilled" && grpRes.value?.ok) {
+        const data = await grpRes.value.json();
+        setGroups(data?.results || (Array.isArray(data) ? data : []));
+      }
     } catch (err) {
       showToast("Failed to load attendance configuration", "error");
     } finally {
@@ -164,14 +185,14 @@ export default function AttendanceSettingsView() {
     setSavingSlot(true);
     try {
       if (editingSlot) {
-        await fetchWithAuth(`/attendance/period-slots/${editingSlot.id}/`, {
+        await fetchWithAuth(`/api/v1/attendance/period-slots/${editingSlot.id}/`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(slotForm)
         });
         showToast("Period slot updated.", "success");
       } else {
-        await fetchWithAuth("/attendance/period-slots/", {
+        await fetchWithAuth("/api/v1/attendance/period-slots/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(slotForm)
@@ -190,7 +211,7 @@ export default function AttendanceSettingsView() {
   const handleDeleteSlot = async (id) => {
     if (!window.confirm("Are you sure you want to delete this period slot?")) return;
     try {
-      await fetchWithAuth(`/attendance/period-slots/${id}/`, { method: "DELETE" });
+      await fetchWithAuth(`/api/v1/attendance/period-slots/${id}/`, { method: "DELETE" });
       showToast("Period slot deleted.", "success");
       loadData();
     } catch (err) {
@@ -241,14 +262,14 @@ export default function AttendanceSettingsView() {
       };
 
       if (editingRoutine) {
-        await fetchWithAuth(`/attendance/routines/${editingRoutine.id}/`, {
+        await fetchWithAuth(`/api/v1/attendance/routines/${editingRoutine.id}/`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
         showToast("Routine schedule updated.", "success");
       } else {
-        await fetchWithAuth("/attendance/routines/", {
+        await fetchWithAuth("/api/v1/attendance/routines/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -267,7 +288,7 @@ export default function AttendanceSettingsView() {
   const handleDeleteRoutine = async (id) => {
     if (!window.confirm("Are you sure you want to delete this routine schedule?")) return;
     try {
-      await fetchWithAuth(`/attendance/routines/${id}/`, { method: "DELETE" });
+      await fetchWithAuth(`/api/v1/attendance/routines/${id}/`, { method: "DELETE" });
       showToast("Routine schedule deleted.", "success");
       loadData();
     } catch (err) {

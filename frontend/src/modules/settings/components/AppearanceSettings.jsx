@@ -18,7 +18,11 @@ import {
 import { useTheme } from "../../../context/useTheme";
 import { useFont } from "../../../context/useFont";
 
-export default function AppearanceSettings(props) {
+export default function AppearanceSettings({
+  hideHeader = false,
+  isEmbedded = false,
+  ...props
+}) {
   const themeContext = useTheme();
   const fontContext = useFont();
 
@@ -47,31 +51,33 @@ export default function AppearanceSettings(props) {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-start py-4 px-3 sm:px-6 space-y-6 animate-fade-in theme-text-primary">
+    <div className={`w-full ${isEmbedded ? "max-w-none" : "max-w-2xl mx-auto"} flex flex-col items-center justify-start ${isEmbedded ? "py-0 px-0" : "py-4 px-3 sm:px-6"} space-y-6 animate-fade-in theme-text-primary`}>
       
-      {/* 1. Header Card */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
-            <AppearanceIcon className="w-5 h-5" />
+      {/* 1. Header Card (shown when not embedded) */}
+      {!hideHeader && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
+              <AppearanceIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold theme-text-primary tracking-tight">Appearance & Customization</h2>
+              <p className="text-[11px] theme-text-secondary mt-0.5">
+                Personalize application theme presets, light/dark modes, and typography style.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold theme-text-primary tracking-tight">Appearance & Customization</h2>
-            <p className="text-[11px] theme-text-secondary mt-0.5">
-              Personalize application theme presets, light/dark modes, and typography style.
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleResetDefaults}
-          className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
-        >
-          <RefreshIcon className="w-3.5 h-3.5 theme-text-secondary" />
-          <span>Reset Defaults</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition cursor-pointer self-end sm:self-center"
+          >
+            <RefreshIcon className="w-3.5 h-3.5" />
+            <span>Reset</span>
+          </button>
+        </div>
+      )}
 
       {/* 2. Theme Mode & Palette Presets Card */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-5">

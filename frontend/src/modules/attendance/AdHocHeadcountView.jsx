@@ -30,17 +30,27 @@ export default function AdHocHeadcountView() {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      const [sessRes, clsRes, grpRes] = await Promise.all([
-        fetchWithAuth("/attendance/adhoc-headcounts/"),
-        fetchWithAuth("/classes/"),
-        fetchWithAuth("/groups/")
+      const [sessRes, clsRes, grpRes] = await Promise.allSettled([
+        fetchWithAuth("/api/v1/attendance/adhoc-headcounts/"),
+        fetchWithAuth("/api/v1/classes/"),
+        fetchWithAuth("/api/v1/groups/")
       ]);
-      setSessions(sessRes?.results || (Array.isArray(sessRes) ? sessRes : []));
-      const clsList = clsRes?.results || (Array.isArray(clsRes) ? clsRes : []);
-      const grpList = grpRes?.results || (Array.isArray(grpRes) ? grpRes : []);
-      setClasses(clsList);
-      setGroups(grpList);
-      if (clsList.length > 0) setNewClassId(clsList[0].id);
+
+      if (sessRes.status === "fulfilled" && sessRes.value?.ok) {
+        const data = await sessRes.value.json();
+        setSessions(data?.results || (Array.isArray(data) ? data : []));
+      }
+      let clsList = [];
+      if (clsRes.status === "fulfilled" && clsRes.value?.ok) {
+        const data = await clsRes.value.json();
+        clsList = data?.results || (Array.isArray(data) ? data : []);
+        setClasses(clsList);
+        if (clsList.length > 0) setNewClassId(clsList[0].id);
+      }
+      if (grpRes.status === "fulfilled" && grpRes.value?.ok) {
+        const data = await grpRes.value.json();
+        setGroups(data?.results || (Array.isArray(data) ? data : []));
+      }
     } catch (err) {
       showToast(err.message || "Failed to load headcount sessions", "error");
     } finally {
@@ -63,10 +73,11 @@ export default function AdHocHeadcountView() {
     setCreating(true);
     try {
       // First fetch students of the selected class to calculate total_expected
-      let stUrl = `/students/?class_id=${newClassId}&is_active=true`;
+      let stUrl = `/api/v1/students/?class_id=${newClassId}&is_active=true`;
       if (newGroupId && newGroupId !== "ALL") stUrl += `&group_id=${newGroupId}`;
       const stRes = await fetchWithAuth(stUrl);
-      const stList = stRes?.results || (Array.isArray(stRes) ? stRes : []);
+      const stData = stRes && stRes.ok ? await stRes.json() : {};
+      const stList = stData?.results || (Array.isArray(stData) ? stData : []);
 
       const payload = {
         title: newTitle.trim(),
@@ -78,16 +89,18 @@ export default function AdHocHeadcountView() {
         notes: newNotes.trim()
       };
 
-      const res = await fetchWithAuth("/attendance/adhoc-headcounts/", {
+      const res = await fetchWithAuth("/api/v1/attendance/adhoc-headcounts/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
+      const resData = res && res.ok ? await res.json() : null;
+
       showToast("Headcount session started.", "success");
       setIsModalOpen(false);
       fetchSessions();
-      handleOpenSession(res);
+      if (resData) handleOpenSession(resData);
     } catch (err) {
       showToast(err.message || "Failed to create session.", "error");
     } finally {
@@ -102,11 +115,14 @@ export default function AdHocHeadcountView() {
 
     // Load students for this class/group
     try {
-      let stUrl = `/students/?is_active=true`;
+      let stUrl = `/api/v1/students/?is_active=true`;
       if (session.student_class) stUrl += `&class_id=${session.student_class}`;
       if (session.student_group) stUrl += `&group_id=${session.student_group}`;
       const res = await fetchWithAuth(stUrl);
-      setSessionStudents(res?.results || (Array.isArray(res) ? res : []));
+      if (res && res.ok) {
+        const data = await res.json();
+        setSessionStudents(data?.results || (Array.isArray(data) ? data : []));
+      }
     } catch {
       setSessionStudents([]);
     }
@@ -134,7 +150,7 @@ export default function AdHocHeadcountView() {
     setSavingSession(true);
     try {
       const list = Array.from(verifiedIds);
-      const res = await fetchWithAuth(`/attendance/adhoc-headcounts/${activeSession.id}/verify-students/`, {
+      const res = await fetchWithAuth(`/api/v1/attendance/adhoc-headcounts/${activeSession.id}/verify-students/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -142,8 +158,9 @@ export default function AdHocHeadcountView() {
           notes: activeSession.notes
         })
       });
+      const resData = res && res.ok ? await res.json() : null;
       showToast("Headcount verification saved.", "success");
-      setActiveSession(res);
+      if (resData) setActiveSession(resData);
       fetchSessions();
     } catch (err) {
       showToast(err.message || "Failed to save verification.", "error");
