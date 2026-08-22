@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "../../../context/ToastContext";
-import { useRightSidebar } from "../../../context/RightSidebarContext";
+import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import { fetchWithAuth } from "../../../utils/authService";
 import {
   KeyIcon,
@@ -21,7 +21,7 @@ import RoleInviteCreateForm from "./RoleInviteCreateForm";
 
 export default function RoleInviteManagerView() {
   const { showToast } = useToast();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [invites, setInvites] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -89,21 +89,31 @@ export default function RoleInviteManagerView() {
     };
   }, [activeMenuId]);
 
+  // Universal Drawer Registration for Role Invite (survives F5 refresh)
+  useDrawerRegistration(
+    "invite",
+    () => {
+      return {
+        title: "Generate Role Invite & QR",
+        category: "Role Management & Invites",
+        width: 620,
+        content: (
+          <RoleInviteCreateForm
+            roles={roles}
+            onSaved={() => {
+              loadData();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [roles, loadData, closeDrawer]
+  );
+
   const handleOpenCreateInSidebar = () => {
-    openRightSidebar({
-      title: "Generate Role Invite & QR",
-      width: 620,
-      content: (
-        <RoleInviteCreateForm
-          roles={roles}
-          onSaved={() => {
-            loadData();
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer("invite");
   };
 
   const handleRevoke = async (id) => {

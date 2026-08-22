@@ -85,6 +85,8 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     loadMetrics();
 
     const handleTenantChanged = () => {
+      setGroupFilter("ALL");
+      setClassFilter("ALL");
       loadStudents();
       loadClassesAndGroups();
       loadMetrics();

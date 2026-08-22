@@ -32,7 +32,7 @@ import {
 } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
-import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import InstitutionOnboardingForm from './InstitutionOnboardingForm';
 import InstitutionEditForm from './InstitutionEditForm';
 
@@ -44,7 +44,7 @@ export default function InstitutionListView({
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('spr_inst_view_mode') || 'grid';
@@ -139,39 +139,58 @@ export default function InstitutionListView({
     showToast(`Switched active workspace to ${inst.name}`, 'success');
   };
 
+  // Universal Drawer Registration for Institution Form (survives F5 refresh)
+  useDrawerRegistration(
+    'institution',
+    (params) => {
+      const mode = params.get('mode') || 'add';
+      const instId = params.get('id');
+      const foundInst = instId ? institutions.find((i) => String(i.id) === String(instId)) : null;
+
+      if (mode === 'edit') {
+        return {
+          title: `Edit: ${foundInst?.name || 'Academy'}`,
+          category: 'Institutions',
+          width: 620,
+          content: (
+            <InstitutionEditForm
+              institution={foundInst}
+              onSuccess={() => {
+                loadData();
+                refreshInstitutions();
+                closeDrawer();
+              }}
+              onCancel={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      return {
+        title: 'Onboard New Academy',
+        category: 'Institutions',
+        width: 640,
+        content: (
+          <InstitutionOnboardingForm
+            onSuccess={() => {
+              loadData();
+              refreshInstitutions();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [institutions, loadData, refreshInstitutions, closeDrawer]
+  );
+
   const handleOpenOnboarding = () => {
-    openRightSidebar({
-      title: 'Onboard New Academy',
-      width: 640,
-      content: (
-        <InstitutionOnboardingForm
-          onSuccess={() => {
-            loadData();
-            refreshInstitutions();
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('institution', { mode: 'add' });
   };
 
   const handleOpenEdit = (inst) => {
-    openRightSidebar({
-      title: `Edit: ${inst.name}`,
-      width: 620,
-      content: (
-        <InstitutionEditForm
-          institution={inst}
-          onSuccess={() => {
-            loadData();
-            refreshInstitutions();
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('institution', { mode: 'edit', id: inst.id });
   };
 
   const handleDeleteConfirm = async () => {

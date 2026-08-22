@@ -18,6 +18,8 @@ import { checkHoliday } from '../../api/calendar';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
+import { masterCalendarStore } from '../../utils/localStore';
+import { getEventColors } from '../../components/common/MasterTimeCalendar';
 
 const DEFAULT_PERIOD_SLOTS = [
   { id: 'DEFAULT', period_name: 'Regular Lecture Period', start_time: '08:00:00', end_time: '08:45:00', period_order: 1 }
@@ -132,6 +134,50 @@ export default function StudentAttendanceView() {
 
     runHolidayCheck();
   }, [selectedDate]);
+
+  // Version counter to trigger re-check when master calendar updates
+  const [calendarVersion, setCalendarVersion] = useState(0);
+
+  useEffect(() => {
+    const handleCalUpdate = () => setCalendarVersion((v) => v + 1);
+    window.addEventListener('spr_calendar_events_updated', handleCalUpdate);
+    return () => window.removeEventListener('spr_calendar_events_updated', handleCalUpdate);
+  }, []);
+
+  // Check if selectedDate has an active Calendar Event impacting Attendance
+  const activeCalendarEvent = useMemo(() => {
+    if (!selectedDate) return null;
+    const calendarEvents = masterCalendarStore.getEvents(activeTenantId) || [];
+    const dObj = new Date(selectedDate);
+    const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
+
+    const hasAttendanceImpact = (evt) => {
+      if (!evt) return false;
+      if (!evt.impacts) return true;
+      const impacts = Array.isArray(evt.impacts)
+        ? evt.impacts
+        : (typeof evt.impacts === 'string' ? evt.impacts.split(',').map((s) => s.trim()) : []);
+      if (impacts.length === 0) return true;
+      return impacts.some((imp) => {
+        const s = String(imp).toUpperCase();
+        return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
+      });
+    };
+
+    for (const evt of calendarEvents) {
+      if (!hasAttendanceImpact(evt)) continue;
+      if (Array.isArray(evt.exceptions) && evt.exceptions.includes(selectedDate)) continue;
+      if (evt.startDate === selectedDate && (!evt.endDate || evt.endDate === selectedDate)) return evt;
+      if (evt.startDate && evt.endDate && selectedDate >= evt.startDate && selectedDate <= evt.endDate) return evt;
+      if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
+        if (!evt.startDate || selectedDate >= evt.startDate) {
+          if (evt.until === 'DATE' && evt.untilDate && selectedDate > evt.untilDate) continue;
+          return evt;
+        }
+      }
+    }
+    return null;
+  }, [selectedDate, activeTenantId, calendarVersion]);
 
   // Active periods list for rendering
   const activePeriods = useMemo(() => {
@@ -345,8 +391,38 @@ export default function StudentAttendanceView() {
         </div>
       </div>
 
-      {/* 2. Holiday Softening Alert Banner */}
-      {holidayInfo.is_holiday && (
+      {/* 2. Active Calendar Schedule / Event Alert Banner */}
+      {activeCalendarEvent && (() => {
+        const evtColors = getEventColors(activeCalendarEvent);
+        return (
+          <div className={`p-4 rounded-3xl ${evtColors.bg} border ${evtColors.border} shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-2xl ${evtColors.bg} ${evtColors.text} border ${evtColors.border}`}>
+                <CalendarIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-sm font-bold theme-text-primary flex items-center gap-2">
+                  <span>Active Schedule Event:</span>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${evtColors.text}`}>
+                    {activeCalendarEvent.title}
+                  </span>
+                </div>
+                <p className="text-xs theme-text-secondary mt-0.5">
+                  {activeCalendarEvent.description || "This date has an active event scheduled in the Master Calendar with Attendance integration."}
+                </p>
+              </div>
+            </div>
+            <span className={`text-xs font-mono font-bold px-3 py-1 rounded-xl border ${evtColors.border} ${evtColors.text} shrink-0`}>
+              {activeCalendarEvent.startTime && activeCalendarEvent.endTime
+                ? `${activeCalendarEvent.startTime} - ${activeCalendarEvent.endTime}`
+                : "Full Day Schedule"}
+            </span>
+          </div>
+        );
+      })()}
+
+      {/* 3. Holiday Softening Alert Banner */}
+      {holidayInfo.is_holiday && !activeCalendarEvent && (
         <div className="p-4 rounded-3xl theme-bg-sub border border-amber-500/30 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
@@ -354,8 +430,8 @@ export default function StudentAttendanceView() {
             </div>
             <div>
               <div className="text-sm font-bold theme-text-primary flex items-center gap-2">
-                <span>🏖️ Scheduled Holiday / Off-Day:</span>
-                <span className="text-amber-400">{holidayInfo.reason}</span>
+                <span>Scheduled Holiday / Off-Day:</span>
+                <span className="text-amber-400 font-semibold">{holidayInfo.reason}</span>
               </div>
               <p className="text-xs theme-text-secondary mt-0.5">
                 Standard attendance is automatically excused. You can override below for special coaching or residential sessions.
@@ -379,7 +455,7 @@ export default function StudentAttendanceView() {
                 className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
               />
               <span className="text-xs font-bold theme-text-primary">
-                ⚡ Override & Mark Anyway
+                Override & Mark Anyway
               </span>
             </label>
           </div>

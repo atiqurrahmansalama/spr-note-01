@@ -297,3 +297,31 @@ html[data-theme="amber"][data-mode="light"] {
 .animate-slide-in-right {
   animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Universal Reusable Sidebar Content Density Optimizer (Left & Right Sidebars)
+   Automatically removes wasteful horizontal gaps, double-nested paddings, and max-width clipping */
+.sidebar-screen-container {
+  width: 100%;
+  min-width: 0;
+}
+
+@container (max-width: 900px) {
+  .sidebar-screen-container [class*="max-w-"] {
+    max-width: 100% !important;
+  }
+  .sidebar-screen-container [class*="mx-auto"] {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .sidebar-screen-container > div > [class*="px-4"],
+  .sidebar-screen-container > div > [class*="px-6"],
+  .sidebar-screen-container > div > [class*="px-3.5"],
+  .sidebar-screen-container > div > [class*="px-3"],
+  .sidebar-screen-container > div > [class*="py-6"],
+  .sidebar-screen-container > div > [class*="py-8"] {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}

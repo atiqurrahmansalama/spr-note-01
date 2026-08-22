@@ -9,7 +9,7 @@ export default function DataCardGrid({
   emptyTitle = 'No Records Found',
   emptySubMessage = 'No matching cards available to display.',
   emptyIcon: EmptyIcon,
-  gridClassName = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5',
+  gridClassName = 'grid grid-cols-1 @lg:grid-cols-2 @4xl:grid-cols-3 gap-3.5 @md:gap-5',
   wrapperClassName = '',
 }) {
   if (isLoading) {

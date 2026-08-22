@@ -5,6 +5,7 @@ import Sidebar from "../../modules/sidebar/SidebarContainer";
 import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "../../modules/sidebar/SidebarScreenBlockView";
+import RightSidebarPanel from "../ui/RightSidebarPanel";
 import InstitutionSwitcher from "./InstitutionSwitcher";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";
@@ -181,6 +182,10 @@ export default function AppLayout() {
   const startDrawerResizing = (e) => {
     e.preventDefault();
     setIsDrawerResizing(true);
+    if (typeof document !== "undefined") {
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+    }
 
     const handleMouseMove = (moveEvent) => {
       const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
@@ -193,30 +198,57 @@ export default function AppLayout() {
 
     const handleMouseUp = () => {
       setIsDrawerResizing(false);
+      if (typeof document !== "undefined") {
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+      }
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("touchmove", handleMouseMove);
       window.removeEventListener("touchend", handleMouseUp);
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: false });
     window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("touchmove", handleMouseMove);
+    window.addEventListener("touchmove", handleMouseMove, { passive: false });
     window.addEventListener("touchend", handleMouseUp);
   };
 
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
+  const handleDrawerResizerDoubleClick = () => {
+    setDrawerWidth((prev) => (prev > 700 ? 580 : 880));
+  };
 
-  // Ensure mobile view always defaults to hidden overlay mode & disables right sidebar docking
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
+  const wasMobileRef = useRef(typeof window !== "undefined" && window.innerWidth < 768);
+
+  // Ensure mobile view defaults to overlay mode & restores desktop open state when returning to desktop
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
+      const wasMobile = wasMobileRef.current;
+      wasMobileRef.current = mobile;
       setIsMobile(mobile);
+
       if (mobile) {
+        // When shrinking down to mobile: close sidebar into overlay mode without destroying desktop preference
         setIsSidebarOpen(false);
         setSidebarMode("overlay");
+      } else if (wasMobile && !mobile) {
+        // When enlarging back up to desktop: RESTORE previous desktop preference from localStorage!
+        try {
+          const savedOpen = localStorage.getItem("spr_sidebar_is_open");
+          const shouldBeOpen = savedOpen !== null ? savedOpen === "true" : true;
+          setIsSidebarOpen(shouldBeOpen);
+
+          const savedMode = sidebarSettings.getMode() || "inline";
+          setSidebarMode(savedMode === "overlay" ? "inline" : savedMode);
+        } catch {
+          setIsSidebarOpen(true);
+          setSidebarMode("inline");
+        }
       }
     };
+
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
@@ -337,6 +369,15 @@ export default function AppLayout() {
       window.removeEventListener("storage", handleSettingsUpdate);
     };
   }, []);
+
+  // Auto-close right sidebar drawer on route navigation
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      closeRightSidebar();
+    }
+  }, [location.pathname, closeRightSidebar]);
 
   const lastBackTimeRef = useRef(0);
 
@@ -608,7 +649,7 @@ export default function AppLayout() {
       </header>
 
       {/* Main Content Body */}
-      <div className="flex flex-1 h-full overflow-hidden relative">
+      <div className="flex flex-1 h-full overflow-hidden relative min-w-0">
         {/* Left Sidebar Navigation */}
         <Sidebar 
           isOpen={isSidebarOpen}
@@ -622,14 +663,14 @@ export default function AppLayout() {
 
         {/* Center / Dashboard Main Form Area or Coming Soon Dashboard */}
         {isDashboardRoute && (
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-center">
+          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-center min-w-0">
             <DashboardComingSoon />
           </main>
         )}
 
         {isMainFormView && (
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start">
-            <div className="w-full max-w-xl mx-auto">
+          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start min-w-0">
+            <div className="w-full max-w-xl mx-auto min-w-0">
               <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
             </div>
           </main>
@@ -640,9 +681,8 @@ export default function AppLayout() {
           <div 
             className={
               isRightDock
-                ? "h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app"
-                : "flex-1 h-full overflow-hidden relative"
-
+                ? "h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app min-w-0"
+                : "flex-1 h-full overflow-hidden relative min-w-0"
             }
             style={
               isRightDock
@@ -661,13 +701,15 @@ export default function AppLayout() {
               </div>
             )}
 
-
-            <div className="w-full h-full flex-1 overflow-hidden">
+            <div className="w-full h-full flex-1 overflow-hidden min-w-0">
               <SidebarScreenBlockView
                 title={routeMeta.title}
                 category={routeMeta.category || "Navigation"}
                 subCategory={routeMeta.subCategory}
-                onClose={() => navigate("/report-builder")}
+                onClose={() => {
+                  closeRightSidebar();
+                  navigate("/report-builder");
+                }}
                 dockPosition={isRightDock ? "right" : "left"}
                 onToggleDock={!isMobile ? togglePanelDock : undefined}
                 isDockDisabled={isRightSidebarOpen}
@@ -693,25 +735,38 @@ export default function AppLayout() {
 
               {/* Slide-over Drawer Panel */}
               <div 
-                className="w-full max-w-full sm:max-w-md h-full z-10 theme-bg-app shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out animate-slide-in-right relative"
+                className="w-full max-w-full sm:max-w-md h-full z-10 theme-bg-app shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out animate-slide-in-right relative min-w-0"
                 role="dialog"
                 aria-modal="true"
               >
-                <div className="w-full h-full flex-1 overflow-hidden">
-                  <SidebarScreenBlockView
+                <div className="w-full h-full flex-1 overflow-hidden min-w-0">
+                  <RightSidebarPanel
                     title={rightSidebarConfig?.title || "Action Panel"}
+                    subtitle={rightSidebarConfig?.subtitle}
+                    category={rightSidebarConfig?.category || "Action Panel"}
+                    size={rightSidebarConfig?.size || "md"}
+                    width={rightSidebarConfig?.width}
                     onClose={closeRightSidebar}
-                    dockPosition="right"
+                    onBack={rightSidebarConfig?.onBack}
+                    headerRight={rightSidebarConfig?.headerRight}
+                    footer={rightSidebarConfig?.footer}
+                    formId={rightSidebarConfig?.formId}
+                    onSave={rightSidebarConfig?.onSave}
+                    onCancel={rightSidebarConfig?.onCancel}
+                    saveLabel={rightSidebarConfig?.saveLabel || "SAVE"}
+                    cancelLabel={rightSidebarConfig?.cancelLabel || "Cancel"}
+                    isSubmitting={rightSidebarConfig?.isSubmitting}
+                    isSaveDisabled={rightSidebarConfig?.isSaveDisabled}
                   >
                     {rightSidebarConfig?.content}
-                  </SidebarScreenBlockView>
+                  </RightSidebarPanel>
                 </div>
               </div>
             </div>
           ) : (
             /* Desktop Docked Sidebar (>= 768px) */
             <div 
-              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in"
+              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in min-w-0"
               style={{
                 width: `${Math.min(
                   typeof window !== 'undefined' ? window.innerWidth * 0.96 : 800,
@@ -724,20 +779,34 @@ export default function AppLayout() {
               <div
                 onMouseDown={startDrawerResizing}
                 onTouchStart={startDrawerResizing}
+                onDoubleClick={handleDrawerResizerDoubleClick}
                 className="hidden md:flex absolute top-0 left-0 bottom-0 w-3 -ml-1.5 cursor-col-resize z-40 group items-center justify-center hover:bg-[var(--accent-main)]/20 active:bg-[var(--accent-main)]/40 transition-colors"
-                title="Drag left or right to resize drawer width"
+                title="Drag left/right to resize, or double-click to toggle width"
               >
                 <div className="w-1.5 h-14 rounded-full theme-bg-accent opacity-60 group-hover:opacity-100 transition-opacity shadow-sm" />
               </div>
 
               <div className="w-full h-full flex-1 overflow-hidden">
-                <SidebarScreenBlockView
+                <RightSidebarPanel
                   title={rightSidebarConfig?.title || "Action Panel"}
+                  subtitle={rightSidebarConfig?.subtitle}
+                  category={rightSidebarConfig?.category || "Action Panel"}
+                  size={rightSidebarConfig?.size || "md"}
+                  width={rightSidebarConfig?.width}
                   onClose={closeRightSidebar}
-                  dockPosition="right"
+                  onBack={rightSidebarConfig?.onBack}
+                  headerRight={rightSidebarConfig?.headerRight}
+                  footer={rightSidebarConfig?.footer}
+                  formId={rightSidebarConfig?.formId}
+                  onSave={rightSidebarConfig?.onSave}
+                  onCancel={rightSidebarConfig?.onCancel}
+                  saveLabel={rightSidebarConfig?.saveLabel || "SAVE"}
+                  cancelLabel={rightSidebarConfig?.cancelLabel || "Cancel"}
+                  isSubmitting={rightSidebarConfig?.isSubmitting}
+                  isSaveDisabled={rightSidebarConfig?.isSaveDisabled}
                 >
                   {rightSidebarConfig?.content}
-                </SidebarScreenBlockView>
+                </RightSidebarPanel>
               </div>
             </div>
           )

@@ -108,6 +108,9 @@ export function AuthProvider({ children }) {
       authStore.saveUserProfile(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
+      if (userData.institution_id && !localStorage.getItem('active_tenant_id')) {
+        localStorage.setItem('active_tenant_id', String(userData.institution_id));
+      }
     } else if (access) {
       setUser(user || true);
     }
@@ -297,6 +300,9 @@ export function AuthProvider({ children }) {
       }
     }
     authStore.clearTokens();
+    try {
+      localStorage.removeItem('active_tenant_id');
+    } catch {}
     setAccessToken(null);
     setUser(null);
     // Signal FeatureControlContext to clear flags and re-evaluate as anonymous

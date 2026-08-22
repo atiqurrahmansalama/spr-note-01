@@ -24,7 +24,7 @@ import { getBranchMetrics } from '../../api/academy';
 import { getInstitutionMetrics } from '../../api/institutions';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
-import { useRightSidebar } from '../../context/RightSidebarContext';
+import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import { useToast } from '../../context/ToastContext';
 
 const TABS = [
@@ -43,7 +43,7 @@ export default function CampusProfileHubView() {
     : 'academies';
 
   const { refreshInstitutions } = useTenant();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
   const { showToast } = useToast();
 
   // Metrics cache per tab
@@ -118,60 +118,72 @@ export default function CampusProfileHubView() {
     setSearchParams({ tab: tabId });
   };
 
-  // Primary Action Button handler based on active tab
-  const handlePrimaryAction = () => {
-    if (activeTab === 'branches') {
-      openRightSidebar({
-        title: 'Register Academic Branch',
-        width: 780,
-        content: (
-          <BranchForm
-            onSaved={() => {
-              loadAllMetrics();
-              closeRightSidebar();
-              showToast('Academic branch registered successfully.', 'success');
-            }}
-            onCancel={closeRightSidebar}
-          />
-        ),
-      });
-      return;
-    }
+  // Universal Drawer Registration for Campus Hub (survives F5 refresh)
+  useDrawerRegistration(
+    'campus-action',
+    (params) => {
+      const type = params.get('type') || activeTab;
 
-    if (activeTab === 'departments') {
-      openRightSidebar({
-        title: 'Create Academic Department',
+      if (type === 'branches') {
+        return {
+          title: 'Register Academic Branch',
+          category: 'Academy & Campus',
+          width: 780,
+          content: (
+            <BranchForm
+              onSaved={() => {
+                loadAllMetrics();
+                closeDrawer();
+                showToast('Academic branch registered successfully.', 'success');
+              }}
+              onCancel={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      if (type === 'departments') {
+        return {
+          title: 'Create Academic Department',
+          category: 'Academy & Campus',
+          width: 640,
+          content: (
+            <DepartmentForm
+              onSaved={() => {
+                loadAllMetrics();
+                closeDrawer();
+                showToast('Department created successfully.', 'success');
+              }}
+              onCancel={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      // type === 'academies'
+      return {
+        title: 'Onboard New Academy',
+        category: 'Academy & Campus',
         width: 640,
         content: (
-          <DepartmentForm
-            onSaved={() => {
+          <InstitutionOnboardingForm
+            onSuccess={() => {
               loadAllMetrics();
-              closeRightSidebar();
-              showToast('Department created successfully.', 'success');
+              refreshInstitutions();
+              closeDrawer();
+              showToast('New Academy onboarded successfully.', 'success');
             }}
-            onCancel={closeRightSidebar}
+            onCancel={closeDrawer}
           />
         ),
-      });
-      return;
-    }
+      };
+    },
+    [activeTab, loadAllMetrics, refreshInstitutions, closeDrawer, showToast]
+  );
 
-    // activeTab === 'academies'
-    openRightSidebar({
-      title: 'Onboard New Academy',
-      width: 640,
-      content: (
-        <InstitutionOnboardingForm
-          onSuccess={() => {
-            loadAllMetrics();
-            refreshInstitutions();
-            closeRightSidebar();
-            showToast('New Academy onboarded successfully.', 'success');
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+  // Primary Action Button handler based on active tab
+  const handlePrimaryAction = () => {
+    openDrawer('campus-action', { type: activeTab });
   };
 
   const getPrimaryActionConfig = () => {

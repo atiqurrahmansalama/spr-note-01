@@ -19,8 +19,12 @@ import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
+import { useRightSidebar } from '../../context/RightSidebarContext';
 import { calendarSettings, attendanceFilters, masterCalendarStore } from '../../utils/localStore';
 import { getHijriDateString } from '../../utils/hijriUtils';
+import { getEventColors } from '../../components/common/MasterTimeCalendar';
+import DayAgendaDrawer from '../../components/common/DayAgendaDrawer';
+import TimeScheduleDrawerForm from '../../components/common/TimeScheduleDrawerForm';
 
 export default function MonthlyAttendanceRegisterView({
   classId: propClassId,
@@ -30,6 +34,7 @@ export default function MonthlyAttendanceRegisterView({
 } = {}) {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
+  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -133,9 +138,14 @@ export default function MonthlyAttendanceRegisterView({
           const data = await classRes.value.json();
           const classList = Array.isArray(data) ? data : data.results || [];
           setClasses(classList);
-          if (classList.length > 0 && !selectedClassId) {
-            const matchingSaved = savedFilters.classId && classList.some(c => String(c.id) === String(savedFilters.classId));
-            setSelectedClassId(matchingSaved ? String(savedFilters.classId) : String(classList[0].id));
+          if (classList.length > 0) {
+            const isValid = selectedClassId && classList.some(c => String(c.id) === String(selectedClassId));
+            if (!isValid) {
+              const matchingSaved = savedFilters.classId && classList.some(c => String(c.id) === String(savedFilters.classId));
+              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : String(classList[0].id));
+            }
+          } else {
+            setSelectedClassId('');
           }
         }
 
@@ -320,32 +330,45 @@ export default function MonthlyAttendanceRegisterView({
 
   const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
 
-  // Merge Master Calendar Holidays with API matrixData
+  // Merge Master Calendar Events & Holidays impacting Attendance with API matrixData
   const enrichedMatrixData = useMemo(() => {
     if (!matrixData || !matrixData.days_header) return matrixData;
 
     const calendarEvents = masterCalendarStore.getEvents(activeTenantId) || [];
-    const holidayEvents = calendarEvents.filter(
-      (e) => e.category === 'HOLIDAY' || e.is_holiday || (e.title && /holiday|vacation|closure|eid|ছুটি|বন্ধ/i.test(e.title))
-    );
 
-    const isDateHolidayInCalendar = (dateStr, weekdayNum) => {
-      for (const evt of holidayEvents) {
-        // Single date match
+    const hasAttendanceImpact = (evt) => {
+      if (!evt) return false;
+      if (!evt.impacts) return true; // Default if not specified
+      const impacts = Array.isArray(evt.impacts)
+        ? evt.impacts
+        : (typeof evt.impacts === 'string' ? evt.impacts.split(',').map((s) => s.trim()) : []);
+      if (impacts.length === 0) return true;
+      return impacts.some((imp) => {
+        const s = String(imp).toUpperCase();
+        return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
+      });
+    };
+
+    const findMatchingAttendanceEvent = (dateStr, weekdayNum) => {
+      for (const evt of calendarEvents) {
+        if (!hasAttendanceImpact(evt)) continue;
+        if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) continue;
+
+        // 1. Single date match
         if (evt.startDate === dateStr && (!evt.endDate || evt.endDate === dateStr)) {
-          return evt.title || 'Institutional Holiday';
+          return evt;
         }
-        // Date range match
+        // 2. Date range match
         if (evt.startDate && evt.endDate && dateStr >= evt.startDate && dateStr <= evt.endDate) {
-          return evt.title || 'Institutional Holiday';
+          return evt;
         }
-        // Recurring match (e.g. weekly off-days)
+        // 3. Recurring match (e.g. weekly events / off-days)
         if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
           if (!evt.startDate || dateStr >= evt.startDate) {
             if (evt.until === 'DATE' && evt.untilDate && dateStr > evt.untilDate) {
               continue;
             }
-            return evt.title || 'Weekly Holiday';
+            return evt;
           }
         }
       }
@@ -357,15 +380,24 @@ export default function MonthlyAttendanceRegisterView({
       const dObj = new Date(dateStr);
       const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
 
-      const calHolidayTitle = isDateHolidayInCalendar(dateStr, weekdayNum);
-      const isHoliday = Boolean(d.is_holiday || calHolidayTitle);
-      const holidayTitle = calHolidayTitle || d.holiday_title || (isHoliday ? 'Institutional Holiday' : '');
+      const matchedEvt = findMatchingAttendanceEvent(dateStr, weekdayNum);
+      const eventColors = matchedEvt ? getEventColors(matchedEvt) : null;
+      const isCalHoliday = Boolean(
+        matchedEvt && (matchedEvt.category === 'HOLIDAY' || matchedEvt.is_holiday)
+      );
+      const isHoliday = Boolean(isCalHoliday);
+      const holidayTitle = isCalHoliday ? (matchedEvt.title || 'Institutional Holiday') : '';
 
       return {
         ...d,
         date: dateStr,
         is_holiday: isHoliday,
+        is_weekend: false,
         holiday_title: holidayTitle,
+        calendar_event: matchedEvt,
+        event_title: matchedEvt?.title,
+        event_color: matchedEvt?.color,
+        event_colors: eventColors,
       };
     });
 
@@ -378,7 +410,7 @@ export default function MonthlyAttendanceRegisterView({
       let hol_count = 0;
 
       enrichedDaysHeader.forEach((d) => {
-        const isOff = d.is_holiday || d.is_weekend;
+        const isOff = Boolean(d.is_holiday);
         const st = row.daily_statuses[d.date] || row.daily_statuses[d.day];
 
         if (isOff) {
@@ -422,14 +454,14 @@ export default function MonthlyAttendanceRegisterView({
     };
   }, [matrixData, activeTenantId, selectedYear, selectedMonth, calendarEventsVersion]);
 
-  // Interactive Click to Mark/Toggle Cell Attendance (Excludes Holidays/Weekends)
+  // Interactive Click to Mark/Toggle Cell Attendance (Excludes Holidays defined in Calendar)
   const handleToggleCellAttendance = async (studentId, dateStr, currentStatus, periodSlotId) => {
-    // Strictly disable on off-days (holiday/weekend)
+    // Strictly disable on holidays defined in event calendar
     const dayHeader = enrichedMatrixData?.days_header?.find(
       (d) => d.date === dateStr || String(d.day) === String(dateStr)
     );
-    if (dayHeader?.is_holiday || dayHeader?.is_weekend) {
-      showToast(`Attendance marking is disabled on ${dayHeader.holiday_title || 'holidays and weekends'}.`, 'warning');
+    if (dayHeader?.is_holiday) {
+      showToast(`Attendance marking is disabled on ${dayHeader.holiday_title || 'scheduled holidays'}.`, 'warning');
       return;
     }
 
@@ -455,7 +487,7 @@ export default function MonthlyAttendanceRegisterView({
 
         const updatedStatuses = { ...row.daily_statuses, [dateStr]: nextStatus };
 
-        // Recalculate totals (Excludes holidays and weekends)
+        // Recalculate totals (Excludes calendar holidays)
         let p_count = 0;
         let l_count = 0;
         let a_count = 0;
@@ -464,7 +496,7 @@ export default function MonthlyAttendanceRegisterView({
         let hol_count = 0;
 
         prev.days_header.forEach((d) => {
-          const isOff = d.is_holiday || d.is_weekend;
+          const isOff = Boolean(d.is_holiday);
           const st = updatedStatuses[d.date] || updatedStatuses[d.day];
 
           if (isOff) {
@@ -527,6 +559,93 @@ export default function MonthlyAttendanceRegisterView({
       showToast('Could not save attendance change', 'error');
       loadMatrix();
     }
+  };
+
+  // Click on date header -> Open Day Agenda & Task Worklist in Right Sidebar
+  const handleDateHeaderClick = (d) => {
+    const dateStr =
+      d.date ||
+      `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+    const dObj = new Date(dateStr);
+    const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
+
+    const allEvents = masterCalendarStore.getEvents(activeTenantId) || [];
+    const matchedEvents = allEvents.filter((evt) => {
+      if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) return false;
+      if (evt.startDate === dateStr && (!evt.endDate || evt.endDate === dateStr)) return true;
+      if (evt.startDate && evt.endDate && dateStr >= evt.startDate && dateStr <= evt.endDate) return true;
+      if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
+        if (!evt.startDate || dateStr >= evt.startDate) {
+          if (evt.until === 'DATE' && evt.untilDate && dateStr > evt.untilDate) return false;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    const handleEditEvent = (evt) => {
+      openRightSidebar({
+        title: "Edit Schedule / Task",
+        subtitle: dateStr,
+        size: "md",
+        content: (
+          <TimeScheduleDrawerForm
+            event={evt}
+            initialDate={dateStr}
+            onSave={(saved) => {
+              masterCalendarStore.updateEvent(activeTenantId, saved.id, saved);
+              showToast("Schedule updated successfully!", "success");
+              closeRightSidebar();
+            }}
+            onCancel={closeRightSidebar}
+          />
+        ),
+      });
+    };
+
+    const handleAddEvent = (targetDate) => {
+      openRightSidebar({
+        title: "Add Day Schedule / Task",
+        subtitle: targetDate || dateStr,
+        size: "md",
+        content: (
+          <TimeScheduleDrawerForm
+            initialDate={targetDate || dateStr}
+            defaultCategory="ACADEMIC_EVENT"
+            onSave={(saved) => {
+              masterCalendarStore.addEvent(activeTenantId, saved);
+              showToast("Event created successfully!", "success");
+              closeRightSidebar();
+            }}
+            onCancel={closeRightSidebar}
+          />
+        ),
+      });
+    };
+
+    const handleDeleteEvent = (evtOrId, options = {}) => {
+      const id = typeof evtOrId === "object" ? evtOrId.id : evtOrId;
+      const opts = typeof evtOrId === "object" ? evtOrId : options;
+      masterCalendarStore.deleteEvent(activeTenantId, id, opts);
+      showToast("Schedule deleted successfully!", "info");
+      closeRightSidebar();
+    };
+
+    openRightSidebar({
+      title: matchedEvents.length === 1 ? (matchedEvents[0].title || "Event Details") : "Day Agenda & Worklist",
+      subtitle: `Date: ${dateStr}`,
+      size: "md",
+      content: (
+        <DayAgendaDrawer
+          dateStr={dateStr}
+          events={matchedEvents}
+          onClose={closeRightSidebar}
+          onEditEvent={handleEditEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onAddEvent={handleAddEvent}
+        />
+      ),
+    });
   };
 
   // Export Matrix to CSV
@@ -594,11 +713,11 @@ export default function MonthlyAttendanceRegisterView({
     {
       label: isFullscreen ? 'Exit Full Screen' : 'Full Screen View',
       icon: isFullscreen ? (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
         </svg>
       ) : (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
         </svg>
       ),
@@ -606,17 +725,17 @@ export default function MonthlyAttendanceRegisterView({
     },
     {
       label: 'Export CSV',
-      icon: <DownloadIcon className="w-4 h-4" />,
+      icon: DownloadIcon,
       onClick: handleExportCSV,
     },
     {
       label: 'Print Register',
-      icon: <PrintIcon className="w-4 h-4" />,
+      icon: PrintIcon,
       onClick: handlePrint,
     },
     {
       label: 'Refresh Data',
-      icon: <RefreshIcon className="w-4 h-4" />,
+      icon: RefreshIcon,
       onClick: loadMatrix,
     },
   ];
@@ -883,6 +1002,7 @@ export default function MonthlyAttendanceRegisterView({
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
           onStudentClick={onStudentClick}
+          onDateClick={handleDateHeaderClick}
           isLoading={isLoading}
           tableContainerClass={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}
         />

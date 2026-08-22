@@ -1,33 +1,46 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader";
 import TabSwitcher from "../../components/ui/TabSwitcher";
 import MasterTimeCalendar from "../../components/common/MasterTimeCalendar";
 import TimeScheduleDrawerForm from "../../components/common/TimeScheduleDrawerForm";
+import TimeScheduleDetailDrawer from "../../components/common/TimeScheduleDetailDrawer";
 import { masterCalendarStore } from "../../utils/localStore";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../context/ToastContext";
-import { useRightSidebar } from "../../context/RightSidebarContext";
+import { useRightSidebar, useDrawerRegistration } from "../../context/RightSidebarContext";
 import {
   CalendarIcon,
   TimerIcon,
   PrintIcon,
   RefreshIcon,
   PlusIcon,
+  ChecklistIcon,
 } from "../../components/ui/Icons";
 
 const TABS = [
   { id: "WORKING_HOURS", label: "Working Hours", icon: TimerIcon },
   { id: "ACADEMIC_EVENT", label: "Academic Events", icon: CalendarIcon },
+  { id: "AGENDA", label: "Agenda", icon: ChecklistIcon },
 ];
 
 export default function TimeCalendarManagerView() {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);
-  const [activeTab, setActiveTab] = useState("WORKING_HOURS");
+  const activeTab = searchParams.get("tab") || "WORKING_HOURS";
   const [isLoading, setIsLoading] = useState(true);
+
+  const setActiveTab = (tabId) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tabId);
+      return next;
+    }, { replace: true });
+  };
 
   // Load events from tenant store
   const loadEvents = useCallback(() => {
@@ -51,7 +64,7 @@ export default function TimeCalendarManagerView() {
   }, [loadEvents]);
 
   // Handle Save Event
-  const handleSaveEvent = (eventData) => {
+  const handleSaveEvent = useCallback((eventData) => {
     try {
       if (eventData.id) {
         masterCalendarStore.updateEvent(activeTenantId, eventData.id, eventData);
@@ -64,34 +77,89 @@ export default function TimeCalendarManagerView() {
     } catch (err) {
       showToast("Failed to save event", "error");
     }
-  };
+  }, [activeTenantId, showToast, loadEvents]);
 
-  // Handle Delete Event
-  const handleDeleteEvent = (eventId) => {
+  // Handle Delete Event (Supports scoped recurring deletion)
+  const handleDeleteEvent = useCallback((eventOrId, options = {}) => {
     try {
-      masterCalendarStore.deleteEvent(activeTenantId, eventId);
+      const id = typeof eventOrId === "object" ? eventOrId.id : eventOrId;
+      const opts = typeof eventOrId === "object" ? eventOrId : options;
+      masterCalendarStore.deleteEvent(activeTenantId, id, opts);
       showToast("Schedule removed successfully.", "info");
       loadEvents();
     } catch (err) {
       showToast("Failed to delete event", "error");
     }
-  };
+  }, [activeTenantId, showToast, loadEvents]);
+
+  // Universal Drawer Registration for Schedule / Event (survives full browser reload / F5)
+  useDrawerRegistration(
+    "schedule",
+    (params) => {
+      const mode = params.get("mode") || "add";
+      const eventId = params.get("eventId");
+      const targetDate = params.get("date") || "";
+      const foundEvent = eventId ? events.find((e) => String(e.id) === String(eventId)) : null;
+      const defaultTabCategory = activeTab === "AGENDA" ? "WORKING_HOURS" : activeTab;
+      const targetCategory = foundEvent?.category || params.get("category") || defaultTabCategory;
+
+      const isWorkingHours = targetCategory === "WORKING_HOURS";
+
+      if (mode === "detail" && foundEvent) {
+        return {
+          title: isWorkingHours ? "Working Hours Details" : "Academic Event Details",
+          category: "Schedule & Calendar",
+          size: "md",
+          content: (
+            <TimeScheduleDetailDrawer
+              event={foundEvent}
+              currentDate={targetDate}
+              onEdit={() => {
+                openDrawer("schedule", {
+                  mode: "edit",
+                  eventId: foundEvent.id,
+                  category: foundEvent.category,
+                  date: targetDate,
+                });
+              }}
+              onDelete={(deleteInfo) => {
+                handleDeleteEvent(deleteInfo || foundEvent.id);
+                closeDrawer();
+              }}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      return {
+        title: mode === "add"
+          ? (isWorkingHours ? "Add Working Hours" : "Add Academic Event")
+          : "Edit Schedule / Event",
+        category: "Schedule & Calendar",
+        size: "md",
+        content: (
+          <TimeScheduleDrawerForm
+            event={foundEvent}
+            initialDate={targetDate}
+            defaultCategory={targetCategory}
+            onSave={(savedData) => {
+              handleSaveEvent(savedData);
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [events, activeTab, handleSaveEvent, handleDeleteEvent, openDrawer, closeDrawer]
+  );
 
   // Open Right Sidebar for adding new entry from top TabSwitcher
   const handleOpenAddDrawer = () => {
-    openRightSidebar({
-      title: activeTab === "WORKING_HOURS" ? "Add Working Hours" : "Add Academic Event",
-      width: 520,
-      content: (
-        <TimeScheduleDrawerForm
-          defaultCategory={activeTab}
-          onSave={(savedData) => {
-            handleSaveEvent(savedData);
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
+    openDrawer("schedule", {
+      mode: "add",
+      category: activeTab === "AGENDA" ? "WORKING_HOURS" : activeTab,
     });
   };
 
@@ -140,7 +208,7 @@ export default function TimeCalendarManagerView() {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none">
+    <div className="w-full max-w-7xl mx-auto py-2 @sm:py-4 px-1 @sm:px-3 @lg:px-6 space-y-3 @sm:space-y-6 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none min-w-0">
       
       {/* ─── 1. Header Overview with Reusable PageHeader ──────────── */}
       <div className="print:hidden">
@@ -161,22 +229,24 @@ export default function TimeCalendarManagerView() {
             <button
               type="button"
               onClick={handleOpenAddDrawer}
-              className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+              title="Add Schedule or Academic Event"
             >
               <PlusIcon className="w-3.5 h-3.5" />
-              <span>Add</span>
+              <span className="hidden sm:inline">Add</span>
             </button>
           }
         />
       </div>
 
       {/* ─── 3. Reusable Master Calendar Engine ────────────────────── */}
-      <div className="min-h-[640px]">
+      <div className="min-h-[640px] w-full min-w-0">
         <MasterTimeCalendar
           events={events}
           onSaveEvent={handleSaveEvent}
           onDeleteEvent={handleDeleteEvent}
-          selectedCategory={activeTab}
+          selectedCategory={activeTab === "AGENDA" ? "ALL" : activeTab}
+          viewMode={activeTab === "AGENDA" ? "list" : "month"}
           actionMenuItems={actionMenuItems}
         />
       </div>

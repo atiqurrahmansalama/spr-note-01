@@ -20,7 +20,7 @@ import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
 import DataViewFooter from "../../../components/ui/DataViewFooter";
-import { useRightSidebar } from "../../../context/RightSidebarContext";
+import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import DepartmentForm from "./DepartmentForm";
 
 const DEPARTMENT_STATUS_OPTIONS = [
@@ -106,37 +106,42 @@ export default function DepartmentManagementView({
     } catch {}
   };
 
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Universal Drawer Registration for Department Form (survives F5 refresh)
+  useDrawerRegistration(
+    "department",
+    (params) => {
+      const mode = params.get("mode") || "add";
+      const deptId = params.get("id");
+      const foundDept = deptId ? departments.find((d) => String(d.id) === String(deptId)) : null;
+
+      return {
+        title: mode === "add" ? "Create Academic Department" : `Edit: ${foundDept?.name || "Department"}`,
+        category: "Student Management",
+        size: "md",
+        content: (
+          <DepartmentForm
+            department={foundDept}
+            onSaved={() => {
+              loadDepartments();
+              loadMetrics();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [departments, closeDrawer]
+  );
+
   const handleOpenCreate = () => {
-    openRightSidebar({
-      title: "Create Academic Department",
-      content: (
-        <DepartmentForm
-          onSaved={() => {
-            loadDepartments();
-            loadMetrics();
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer("department", { mode: "add" });
   };
 
   const handleOpenEdit = (dept) => {
-    openRightSidebar({
-      title: `Edit: ${dept.name}`,
-      content: (
-        <DepartmentForm
-          department={dept}
-          onSaved={() => {
-            loadDepartments();
-            loadMetrics();
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer("department", { mode: "edit", id: dept.id });
   };
 
   const handleDeleteDirect = (dept) => {

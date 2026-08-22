@@ -20,6 +20,7 @@ export default function AttendanceMatrixTable({
   selectedYear,
   selectedMonth,
   onStudentClick,
+  onDateClick,
   isLoading = false,
   emptyMessage = "No attendance records found for this class and period.",
   tableContainerClass = "overflow-x-auto max-h-[75vh]",
@@ -94,20 +95,28 @@ export default function AttendanceMatrixTable({
                 ? getHijriDateString(fullDateStr).split(' ')[0]
                 : null;
 
-              const isWeekend = d.is_weekend;
-              const isHoliday = d.is_holiday;
+              const isHoliday = Boolean(d.is_holiday);
+              const hasEvent = Boolean(d.event_colors);
+              const eventTitle = d.event_title || d.calendar_event?.title || d.holiday_title;
 
               return (
                 <th
                   key={d.date || d.day}
-                  className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors ${
-                    isWeekend
-                      ? 'bg-rose-400/[0.045] dark:bg-rose-400/[0.08] text-rose-500/80'
+                  onClick={() => onDateClick && onDateClick(d)}
+                  className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors cursor-pointer hover:brightness-95 select-none ${
+                    hasEvent
+                      ? `${d.event_colors.bg} ${d.event_colors.text} font-bold shadow-2xs`
                       : isHoliday
                       ? 'theme-bg-accent-soft theme-accent'
                       : ''
                   }`}
-                  title={d.holiday_title || `${d.weekday} - ${fullDateStr}${hijriDayNumber ? ` (Hijri: ${hijriDayNumber})` : ''}`}
+                  title={
+                    eventTitle
+                      ? `${eventTitle} [${fullDateStr}] - Click to view schedule & tasks`
+                      : d.holiday_title
+                      ? `${d.holiday_title} [${fullDateStr}] - Click to view schedule`
+                      : `${d.weekday} - ${fullDateStr}${hijriDayNumber ? ` (Hijri: ${hijriDayNumber})` : ''} - Click to view day agenda`
+                  }
                 >
                   <div className="flex flex-col items-center justify-between min-h-[50px] sm:min-h-[56px] py-0.5">
                     {/* Top Group: Gregorian & Hijri Dates */}
@@ -135,7 +144,7 @@ export default function AttendanceMatrixTable({
             {/* Summary Metric Headers with EXACT same width as date columns */}
             <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-emerald-600 dark:text-emerald-400 border-l border-b theme-border text-xs" title="Present">P</th>
             <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs" title="Late">L</th>
-            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-rose-500 dark:text-rose-400 border-l border-b theme-border text-xs" title="Absent">A</th>
+            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold theme-danger border-l border-b theme-border text-xs" title="Absent">A</th>
             <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate % (Excludes holidays)">Rate %</th>
           </tr>
         </thead>
@@ -198,17 +207,17 @@ export default function AttendanceMatrixTable({
                   )}
                 </td>
 
-                {/* Day Status Cells */}
+                {/* Day Status Cells (Driven 100% dynamically from calendar event colors) */}
                 {matrixData.days_header.map((d) => {
                   const dateStr =
                     d.date ||
                     `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
                   const status = row.daily_statuses[d.date] || row.daily_statuses[d.day];
-                  const isWeekend = d.is_weekend;
-                  const isHoliday = d.is_holiday;
-                  const isOffDay = isWeekend || isHoliday;
+                  const isHoliday = Boolean(d.is_holiday);
+                  const hasEvent = Boolean(d.event_colors);
+                  const eventTitle = d.event_title || d.calendar_event?.title || d.holiday_title;
 
-                  const canEditCell = isEditing && !isOffDay;
+                  const canEditCell = isEditing && !isHoliday;
 
                   return (
                     <td
@@ -219,21 +228,23 @@ export default function AttendanceMatrixTable({
                         }
                       }}
                       className={`py-2 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-mono text-[10px] border-r border-b theme-border transition-colors ${
-                        isOffDay
+                        hasEvent
+                          ? `${d.event_colors.bg} ${d.event_colors.text}`
+                          : isHoliday
                           ? 'cursor-not-allowed select-none bg-zinc-500/[0.04] dark:bg-zinc-400/[0.04] opacity-60'
-                          : isWeekend
-                          ? 'bg-rose-400/[0.025] dark:bg-rose-400/[0.045]'
                           : ''
                       } ${
                         canEditCell
-                          ? 'cursor-pointer select-none hover:theme-bg-elevated/80'
-                          : isOffDay
+                          ? 'cursor-pointer select-none hover:brightness-95'
+                          : isHoliday
                           ? 'cursor-not-allowed'
                           : 'cursor-default'
                       }`}
                       title={
-                        isOffDay
-                          ? `${d.holiday_title || (isWeekend ? 'Weekly Weekend' : 'Holiday')} (No Attendance Allowed)`
+                        eventTitle
+                          ? `${eventTitle} [${dateStr}]`
+                          : isHoliday
+                          ? `${d.holiday_title || 'Scheduled Holiday'} (No Attendance Allowed)`
                           : isEditing
                           ? `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'} (Click to change)`
                           : `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'}`
@@ -242,7 +253,7 @@ export default function AttendanceMatrixTable({
                       {status === 'PRESENT' ? (
                         <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                       ) : status === 'ABSENT' ? (
-                        <FilledXCircleIcon className="w-4 h-4 text-rose-500/75 dark:text-rose-400/80 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                        <FilledXCircleIcon className="w-4 h-4 text-[var(--danger-main)] hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                       ) : status === 'LATE' ? (
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
                           L
@@ -255,7 +266,7 @@ export default function AttendanceMatrixTable({
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
                           LV
                         </span>
-                      ) : isOffDay ? (
+                      ) : isHoliday ? (
                         <span className="opacity-35 font-mono text-xs select-none">—</span>
                       ) : canEditCell ? (
                         <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present"></span>

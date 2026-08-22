@@ -51,17 +51,17 @@ export default function AppearanceSettings({
   };
 
   return (
-    <div className={`w-full ${isEmbedded ? "max-w-none" : "max-w-2xl mx-auto"} flex flex-col items-center justify-start ${isEmbedded ? "py-0 px-0" : "py-4 px-3 sm:px-6"} space-y-6 animate-fade-in theme-text-primary`}>
+    <div className={`w-full ${isEmbedded ? "max-w-none" : "max-w-2xl mx-auto"} flex flex-col items-center justify-start ${isEmbedded ? "py-0 px-0" : "py-4 px-3 sm:px-6"} space-y-6 animate-fade-in theme-text-primary @container min-w-0`}>
       
       {/* 1. Header Card (shown when not embedded) */}
       {!hideHeader && (
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 @sm:p-5 shadow-xl flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-3.5 @sm:gap-4">
+          <div className="flex items-center gap-3 @sm:gap-3.5">
             <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
               <AppearanceIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold theme-text-primary tracking-tight">Appearance & Customization</h2>
+              <h2 className="text-sm @sm:text-base font-bold theme-text-primary tracking-tight">Appearance & Customization</h2>
               <p className="text-[11px] theme-text-secondary mt-0.5">
                 Personalize application theme presets, light/dark modes, and typography style.
               </p>
@@ -71,7 +71,7 @@ export default function AppearanceSettings({
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition cursor-pointer self-end sm:self-center"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-semibold transition cursor-pointer self-end @sm:self-center"
           >
             <RefreshIcon className="w-3.5 h-3.5" />
             <span>Reset</span>
@@ -80,7 +80,7 @@ export default function AppearanceSettings({
       )}
 
       {/* 2. Theme Mode & Palette Presets Card */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-5">
+      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 @sm:p-5 shadow-xl space-y-5">
         
         {/* Light / Dark Mode Switcher */}
         <div className="space-y-3">
@@ -143,7 +143,7 @@ export default function AppearanceSettings({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3">
             {palettes.map((p) => {
               const isSelected = p.id === themeId;
               return (
@@ -185,7 +185,7 @@ export default function AppearanceSettings({
       </div>
 
       {/* 3. Font Family Selection Grid */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-xl space-y-4">
+      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 @sm:p-5 shadow-xl space-y-4">
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center gap-2">
             <FontIcon className="w-4 h-4 theme-accent" />
@@ -199,7 +199,7 @@ export default function AppearanceSettings({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3">
           {fontOptions.map((f) => {
             const isSelected = f.id === fontId;
             return (

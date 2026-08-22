@@ -26,7 +26,7 @@ import DataViewFooter from '../../components/ui/DataViewFooter';
 import BranchForm from './BranchForm';
 import { getBranches, getBranchMetrics, deleteBranch } from '../../api/academy';
 import { useToast } from '../../context/ToastContext';
-import { useRightSidebar } from '../../context/RightSidebarContext';
+import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 
 const BRANCH_TYPE_OPTIONS = [
   { label: 'All Campus Types', value: 'ALL' },
@@ -111,41 +111,43 @@ export default function BranchManagementView({
     }
   };
 
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Universal Drawer Registration for Branch Form (survives F5 refresh)
+  useDrawerRegistration(
+    'branch',
+    (params) => {
+      const mode = params.get('mode') || 'add';
+      const branchId = params.get('id');
+      const foundBranch = branchId ? branches.find((b) => String(b.id) === String(branchId)) : null;
+
+      return {
+        title: mode === 'add' ? 'Register Academic Branch' : `Edit: ${foundBranch?.branch_name || 'Branch'}`,
+        category: 'Academy & Branches',
+        size: 'lg',
+        width: 780,
+        content: (
+          <BranchForm
+            branch={foundBranch}
+            onSaved={() => {
+              loadData();
+              closeDrawer();
+              showToast(mode === 'add' ? 'Branch registered successfully.' : 'Branch updated successfully.', 'success');
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [branches, loadData, closeDrawer, showToast]
+  );
 
   const handleCreateNew = () => {
-    openRightSidebar({
-      title: 'Register Academic Branch',
-      width: 780,
-      content: (
-        <BranchForm
-          onSaved={() => {
-            loadData();
-            closeRightSidebar();
-            showToast('Branch registered successfully.', 'success');
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('branch', { mode: 'add' });
   };
 
   const handleEdit = (branch) => {
-    openRightSidebar({
-      title: `Edit: ${branch.branch_name}`,
-      width: 780,
-      content: (
-        <BranchForm
-          branch={branch}
-          onSaved={() => {
-            loadData();
-            closeRightSidebar();
-            showToast('Branch updated successfully.', 'success');
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('branch', { mode: 'edit', id: branch.id });
   };
 
   const handleDelete = async (branch) => {

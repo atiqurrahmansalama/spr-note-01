@@ -24,18 +24,18 @@ export default function PageHeader({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b theme-border select-none ${className}`}
+      className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-3 @md:pb-4 border-b theme-border select-none w-full min-w-0 ${className}`}
     >
       {/* Left: Icon & Title Metadata */}
-      <div className="flex items-center gap-3.5 min-w-0">
+      <div className="flex items-center gap-3 @sm:gap-3.5 min-w-0 flex-1">
         {Icon && (
-          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0 shadow-xs">
-            <Icon className="w-5 h-5" />
+          <div className="w-9 h-9 @sm:w-10 @sm:h-10 rounded-2xl theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0 shadow-xs">
+            <Icon className="w-4.5 h-4.5 @sm:w-5 @sm:h-5" />
           </div>
         )}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary truncate">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 @sm:gap-2.5 flex-wrap">
+            <h1 className="text-lg @sm:text-xl @xl:text-2xl font-bold tracking-tight theme-text-primary truncate">
               {title}
             </h1>
             {badge && (
@@ -43,7 +43,7 @@ export default function PageHeader({
             )}
           </div>
           {subtitle && (
-            <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed">
+            <p className="text-[11px] @sm:text-xs theme-text-secondary mt-0.5 leading-relaxed line-clamp-2 @sm:line-clamp-none">
               {subtitle}
             </p>
           )}
@@ -52,7 +52,7 @@ export default function PageHeader({
 
       {/* Right: Action Buttons / Controls */}
       {actionContent && (
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 @sm:gap-2.5 w-full @md:w-auto shrink-0 justify-start @md:justify-end">
           {actionContent}
         </div>
       )}

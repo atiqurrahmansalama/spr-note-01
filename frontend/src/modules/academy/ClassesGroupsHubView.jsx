@@ -13,11 +13,13 @@ import PageHeader from '../../components/ui/PageHeader';
 import TabSwitcher from '../../components/ui/TabSwitcher';
 import MetricsGrid from '../../components/ui/MetricsGrid';
 import { fetchWithAuth } from '../../utils/authService';
+import { useRightSidebar } from '../../context/RightSidebarContext';
 import ClassManagementView from '../student-management/classes/ClassManagementView';
 import GroupManagementView from '../student-management/groups/GroupManagementView';
 
 export default function ClassesGroupsHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { openDrawer } = useRightSidebar();
   const rawTab = searchParams.get('tab');
   const activeTab = rawTab === 'groups' ? 'groups' : 'classes';
 
@@ -96,24 +98,24 @@ export default function ClassesGroupsHubView() {
 
   const handlePrimaryAction = () => {
     if (activeTab === 'groups') {
-      window.dispatchEvent(new CustomEvent('spr_open_create_group'));
+      openDrawer('group', { mode: 'add' });
     } else {
-      window.dispatchEvent(new CustomEvent('spr_open_create_class'));
+      openDrawer('class', { mode: 'add' });
     }
   };
 
   const TABS = [
     {
       id: 'classes',
-      label: 'Classes & Sections',
+      label: 'Classes',
       icon: ClassIcon,
-      badge: classMetrics.total_classes,
+      // badge: classMetrics.total_classes,
     },
     {
       id: 'groups',
       label: 'Groups',
       icon: GroupIcon,
-      badge: groupMetrics.total_groups,
+      // badge: groupMetrics.total_groups,
     },
   ];
 

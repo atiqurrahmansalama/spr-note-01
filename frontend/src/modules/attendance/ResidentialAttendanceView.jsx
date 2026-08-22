@@ -29,7 +29,7 @@ import { calendarSettings, attendanceFilters } from '../../utils/localStore';
 import { getHijriDateString } from '../../utils/hijriUtils';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
-import { useRightSidebar } from '../../context/RightSidebarContext';
+import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 
 const DEFAULT_INITIAL_CHECKPOINTS = [
   {
@@ -74,7 +74,6 @@ export default function ResidentialAttendanceView({
 } = {}) {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -189,8 +188,14 @@ export default function ResidentialAttendanceView({
           const data = await clsRes.value.json();
           const list = Array.isArray(data) ? data : data.results || [];
           setClasses(list);
-          if (list.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(list[0].id));
+          if (list.length > 0) {
+            const isValid = selectedClassId && list.some(c => String(c.id) === String(selectedClassId));
+            if (!isValid) {
+              const matchingSaved = savedFilters.classId && list.some(c => String(c.id) === String(savedFilters.classId));
+              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : String(list[0].id));
+            }
+          } else {
+            setSelectedClassId('');
           }
         }
 
@@ -330,41 +335,50 @@ export default function ResidentialAttendanceView({
     setEndDate('');
   };
 
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Universal Drawer Registration for Residential Checkpoint (survives F5 refresh)
+  useDrawerRegistration(
+    'checkpoint',
+    (params) => {
+      const mode = params.get('mode') || 'add';
+      const chkId = params.get('id');
+      const foundChk = chkId ? checkpoints.find((c) => String(c.id) === String(chkId)) : null;
+
+      return {
+        title: mode === 'add' ? 'Add Residential Checkpoint' : `Edit Checkpoint: ${foundChk?.name || 'Checkpoint'}`,
+        category: 'Residential Attendance',
+        size: 'md',
+        width: 560,
+        content: (
+          <CheckpointForm
+            editingCheckpoint={foundChk}
+            onSaved={(savedChk) => {
+              if (mode === 'add') {
+                saveCheckpoints([...checkpoints, savedChk]);
+                showToast('New residential checkpoint added for all students.', 'success');
+              } else {
+                const updated = checkpoints.map((c) => (c.id === savedChk.id ? savedChk : c));
+                saveCheckpoints(updated);
+                showToast('Checkpoint updated successfully.', 'success');
+              }
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [checkpoints, closeDrawer, showToast]
+  );
+
   // Checkpoint Right Sidebar Handlers
   const handleOpenAddCheckpoint = () => {
-    openRightSidebar({
-      title: 'Add Residential Checkpoint',
-      width: 560,
-      content: (
-        <CheckpointForm
-          onSaved={(newChk) => {
-            saveCheckpoints([...checkpoints, newChk]);
-            showToast('New residential checkpoint added for all students.', 'success');
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('checkpoint', { mode: 'add' });
   };
 
   const handleOpenEditCheckpoint = (chk) => {
-    openRightSidebar({
-      title: `Edit Checkpoint: ${chk.name}`,
-      width: 560,
-      content: (
-        <CheckpointForm
-          editingCheckpoint={chk}
-          onSaved={(updatedChk) => {
-            const updated = checkpoints.map((c) => (c.id === chk.id ? updatedChk : c));
-            saveCheckpoints(updated);
-            showToast('Checkpoint updated successfully.', 'success');
-            closeRightSidebar();
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('checkpoint', { mode: 'edit', id: chk.id });
   };
 
   const handleDeleteCheckpoint = (chkId) => {

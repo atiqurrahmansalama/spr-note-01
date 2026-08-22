@@ -19,12 +19,19 @@ export default function ReusableCalendar({
   placeholder = "Select Date",
   className = "",
   isInline = false,
+  defaultOpen = false,
   label = "",
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [tempStart, setTempStart] = useState(startDate || selectedDate);
   const [tempEnd, setTempEnd] = useState(endDate);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (defaultOpen) {
+      setIsOpen(true);
+    }
+  }, [defaultOpen]);
 
   const activeDate = selectedDate || startDate || new Date().toISOString().split("T")[0];
   const initDate = new Date(activeDate);

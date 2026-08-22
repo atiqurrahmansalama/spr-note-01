@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SleekCheckIcon, SearchIcon } from './Icons';
 
@@ -17,6 +17,8 @@ export default function CustomSelect({
   size = 'md', // 'sm' | 'md' | 'lg'
   compactMode = false, // compact mode for small juz-style dropdowns
   showDescription = false, // defaults to false to keep dropdown items clean and concise
+  multiple = false,
+  isMulti = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -96,15 +98,28 @@ export default function CustomSelect({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isOpen]);
 
+  const isMultiple = Boolean(multiple || isMulti);
+
+  const currentValues = useMemo(() => {
+    if (!isMultiple) return [];
+    if (Array.isArray(value)) return value.map(String);
+    if (typeof value === 'string' && value.trim()) {
+      return value.split(',').map((s) => s.trim());
+    }
+    return [];
+  }, [value, isMultiple]);
+
   const filteredOptions = options.filter((opt) => {
     const labelText = typeof opt === 'string' ? opt : opt.label || opt.name || '';
     return labelText.toLowerCase().includes(search.toLowerCase());
   });
 
-  const selectedOption = options.find((opt) => {
-    if (typeof opt === 'string') return opt === value;
-    return opt.value === value || opt.id === value;
-  });
+  const selectedOption = !isMultiple
+    ? options.find((opt) => {
+        if (typeof opt === 'string') return opt === value;
+        return opt.value === value || opt.id === value;
+      })
+    : null;
 
   const selectedLabel = selectedOption
     ? typeof selectedOption === 'string'
@@ -114,17 +129,37 @@ export default function CustomSelect({
 
   const handleSelect = (opt) => {
     const val = typeof opt === 'string' ? opt : opt.value ?? opt.id;
-    onChange(val);
-    setIsOpen(false);
-    setSearch('');
+    if (isMultiple) {
+      let nextValues;
+      const strVal = String(val);
+      if (strVal === 'ALL') {
+        if (currentValues.includes('ALL')) {
+          nextValues = [];
+        } else {
+          nextValues = ['ALL'];
+        }
+      } else {
+        const withoutAll = currentValues.filter((v) => v !== 'ALL');
+        if (withoutAll.includes(strVal)) {
+          nextValues = withoutAll.filter((v) => v !== strVal);
+        } else {
+          nextValues = [...withoutAll, strVal];
+        }
+      }
+      onChange(nextValues);
+    } else {
+      onChange(val);
+      setIsOpen(false);
+      setSearch('');
+    }
   };
 
   const sizeClasses =
     size === 'sm'
-      ? 'px-3 py-1.5 min-h-[38px] h-[38px] rounded-xl text-xs'
+      ? 'px-3 py-1.5 min-h-[38px] rounded-xl text-xs'
       : size === 'lg'
       ? 'px-4 py-2.5 min-h-[44px] rounded-xl text-xs sm:text-sm'
-      : 'px-3.5 py-2 min-h-[40px] h-10 rounded-xl text-xs sm:text-sm';
+      : 'px-3.5 py-2 min-h-[40px] rounded-xl text-xs sm:text-sm';
 
   const dropdownMenu =
     isOpen && typeof document !== 'undefined'
@@ -178,7 +213,9 @@ export default function CustomSelect({
                   const optLabel = typeof opt === 'string' ? opt : opt.label || opt.name;
                   const optDesc =
                     typeof opt === 'object' && showDescription ? opt.description || opt.desc : null;
-                  const isSelected = String(optVal) === String(value);
+                  const isSelected = isMultiple
+                    ? currentValues.includes(String(optVal))
+                    : String(optVal) === String(value);
 
                   if (compactMode) {
                     return (
@@ -208,19 +245,51 @@ export default function CustomSelect({
                           : 'hover:theme-bg-sub/70 theme-text-primary'
                       }`}
                     >
-                      <div className="min-w-0 pr-2">
-                        <div className="truncate">{optLabel}</div>
-                        {optDesc && (
+                      <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
+                        {/* Checkbox Icon for Multi-Select */}
+                        {isMultiple && (
                           <div
-                            className={`text-[10px] truncate ${
-                              isSelected ? 'opacity-80' : 'theme-text-secondary'
+                            className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
+                              isSelected
+                                ? 'theme-bg-accent border-[var(--accent-main)] text-white shadow-xs'
+                                : 'theme-bg-sub theme-border'
                             }`}
                           >
-                            {optDesc}
+                            {isSelected && (
+                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
                           </div>
                         )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-medium">{optLabel}</span>
+                            {(opt.typeLabel || opt.badge) && (
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border ${
+                                  isSelected
+                                    ? 'theme-bg-surface/80 border-[var(--accent-main)]/30 theme-accent font-semibold'
+                                    : 'theme-bg-sub theme-text-secondary border-current/10'
+                                }`}
+                              >
+                                {opt.typeLabel || opt.badge}
+                              </span>
+                            )}
+                          </div>
+                          {(optDesc || opt.subLabel) && (
+                            <div
+                              className={`text-[10px] truncate mt-0.5 ${
+                                isSelected ? 'opacity-80' : 'theme-text-secondary'
+                              }`}
+                            >
+                              {optDesc || opt.subLabel}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0" />}
+                      {!isMultiple && isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1.5" />}
                     </button>
                   );
                 })
@@ -285,10 +354,59 @@ export default function CustomSelect({
               : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-current/20 theme-text-primary'
           }`}
         >
-          <div className="flex items-center gap-2 min-w-0 truncate">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {Icon && <Icon className="w-3.5 h-3.5 shrink-0 theme-accent" />}
-            {selectedLabel ? (
-              <span className="truncate theme-text-primary font-medium">{selectedLabel}</span>
+            
+            {/* Multi-Select Trigger View */}
+            {isMultiple ? (
+              currentValues.length === 0 ? (
+                <span className="truncate theme-text-secondary opacity-60">{placeholder}</span>
+              ) : currentValues.includes('ALL') ? (
+                (() => {
+                  const allOption = options.find((opt) => {
+                    const optVal = typeof opt === 'string' ? opt : opt.value ?? opt.id;
+                    return String(optVal) === 'ALL';
+                  });
+                  const allLabel = (typeof allOption === 'object' ? allOption?.label || allOption?.name : allOption) || 'All';
+                  return (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-accent theme-accent-text font-mono">
+                        ALL
+                      </span>
+                      <span className="text-xs theme-text-primary truncate">{allLabel}</span>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex items-center gap-1 flex-wrap min-w-0 pr-1 py-0.5">
+                  {options
+                    .filter((opt) => {
+                      const optVal = typeof opt === 'string' ? opt : opt.value ?? opt.id;
+                      return currentValues.includes(String(optVal));
+                    })
+                    .map((opt, i) => {
+                      const optLabel = typeof opt === 'string' ? opt : opt.label || opt.name;
+                      const optBadge = typeof opt === 'object' ? opt.badge || opt.typeLabel : null;
+                      return (
+                        <span
+                          key={i}
+                          className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold theme-bg-surface border theme-border theme-text-primary flex items-center gap-1 shrink-0 shadow-2xs"
+                        >
+                          <span className="truncate max-w-[120px]">{optBadge || optLabel}</span>
+                        </span>
+                      );
+                    })}
+                </div>
+              )
+            ) : selectedLabel ? (
+              <div className="flex items-center justify-between gap-2 w-full min-w-0 pr-1">
+                <span className="truncate theme-text-primary font-medium">{selectedLabel}</span>
+                {(selectedOption?.typeLabel || selectedOption?.badge) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono shrink-0 theme-bg-app theme-text-secondary border theme-border">
+                    {selectedOption.typeLabel || selectedOption.badge}
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="truncate theme-text-secondary opacity-60">{placeholder}</span>
             )}

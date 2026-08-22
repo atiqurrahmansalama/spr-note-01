@@ -691,13 +691,158 @@ export const masterCalendarStore = {
   },
   updateEvent: (tenantId, eventId, updatedData) => {
     const list = masterCalendarStore.getEvents(tenantId);
+    const editScope = updatedData.editScope || "ALL_EVENTS";
+    const targetDate = updatedData.targetDate || updatedData.startDate || new Date().toISOString().split("T")[0];
+    const cleanImpacts = Array.isArray(updatedData.impacts)
+      ? updatedData.impacts
+      : (updatedData.impacts ? [updatedData.impacts] : ["ALL"]);
+
+    // Case 1: Only for this single day occurrence
+    if (editScope === "THIS_EVENT" && eventId) {
+      const existing = list.find((e) => e.id === eventId);
+      if (existing) {
+        // If the event being edited is ALREADY a single override (isOverride: true), just update it directly!
+        if (existing.isOverride) {
+          const updated = list.map((e) => (e.id === eventId ? { ...e, ...updatedData, impacts: cleanImpacts, updatedAt: new Date().toISOString() } : e));
+          masterCalendarStore.saveEvents(tenantId, updated);
+          return updated.find((e) => e.id === eventId);
+        }
+
+        // Add targetDate to parent's exception list
+        const exceptions = Array.isArray(existing.exceptions) ? [...existing.exceptions] : [];
+        if (!exceptions.includes(targetDate)) {
+          exceptions.push(targetDate);
+        }
+
+        // Single override event for this specific date
+        const singleOverride = {
+          ...existing,
+          ...updatedData,
+          impacts: cleanImpacts,
+          id: `evt_ovr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          startDate: targetDate,
+          endDate: targetDate,
+          repeats: false,
+          repeatDays: [],
+          until: "DATE",
+          untilDate: targetDate,
+          parentEventId: eventId,
+          isOverride: true,
+          createdAt: new Date().toISOString(),
+        };
+
+        const updated = list.map((e) => (e.id === eventId ? { ...e, exceptions } : e));
+        updated.push(singleOverride);
+        masterCalendarStore.saveEvents(tenantId, updated);
+        return singleOverride;
+      }
+    }
+
+    // Case 2: From this date onwards (preserve past historical series)
+    if (editScope === "THIS_AND_FOLLOWING" && eventId) {
+      const existing = list.find((e) => e.id === eventId);
+      if (existing) {
+        // Calculate day before targetDate
+        const targetD = new Date(targetDate);
+        const prevD = new Date(targetD);
+        prevD.setDate(prevD.getDate() - 1);
+        const prevDateStr = prevD.toISOString().split("T")[0];
+
+        // End old series at prevDateStr
+        const cappedOld = {
+          ...existing,
+          until: "DATE",
+          untilDate: prevDateStr,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Create new series from targetDate onwards
+        const newFutureSeries = {
+          ...existing,
+          ...updatedData,
+          impacts: cleanImpacts,
+          id: `evt_fut_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          startDate: targetDate,
+          previousEventId: eventId,
+          createdAt: new Date().toISOString(),
+        };
+
+        const updated = list.map((e) => (e.id === eventId ? cappedOld : e));
+        updated.push(newFutureSeries);
+        masterCalendarStore.saveEvents(tenantId, updated);
+        return newFutureSeries;
+      }
+    }
+
+    // Case 3: All occurrences (Default)
     const updated = list.map((e) => (e.id === eventId ? { ...e, ...updatedData, updatedAt: new Date().toISOString() } : e));
     masterCalendarStore.saveEvents(tenantId, updated);
     return updated;
   },
-  deleteEvent: (tenantId, eventId) => {
+  deleteEvent: (tenantId, eventId, options = {}) => {
     const list = masterCalendarStore.getEvents(tenantId);
-    const updated = list.filter((e) => e.id !== eventId);
+    const deleteScope = typeof options === "string" ? options : (options.deleteScope || options.scope || "ALL_EVENTS");
+    const targetDate = typeof options === "object" && options.targetDate ? options.targetDate : new Date().toISOString().split("T")[0];
+
+    const existing = list.find((e) => e.id === eventId);
+    if (!existing) {
+      const updated = list.filter((e) => e.id !== eventId);
+      masterCalendarStore.saveEvents(tenantId, updated);
+      return updated;
+    }
+
+    // Case 1: Delete only this single day occurrence
+    if (deleteScope === "THIS_EVENT") {
+      // If it's a single override event or non-recurring, delete it directly
+      if (existing.isOverride || !existing.repeats) {
+        const updated = list.filter((e) => e.id !== eventId);
+        masterCalendarStore.saveEvents(tenantId, updated);
+        return updated;
+      }
+      // Add targetDate to parent's exceptions
+      const exceptions = Array.isArray(existing.exceptions) ? [...existing.exceptions] : [];
+      if (!exceptions.includes(targetDate)) {
+        exceptions.push(targetDate);
+      }
+      const updated = list.map((e) => (e.id === eventId ? { ...e, exceptions, updatedAt: new Date().toISOString() } : e));
+      masterCalendarStore.saveEvents(tenantId, updated);
+      return updated;
+    }
+
+    // Case 2: Delete this and following days (preserves past history)
+    if (deleteScope === "THIS_AND_FOLLOWING") {
+      const targetD = new Date(targetDate);
+      const prevD = new Date(targetD);
+      prevD.setDate(prevD.getDate() - 1);
+      const prevDateStr = prevD.toISOString().split("T")[0];
+
+      // If targetDate is <= startDate, delete whole event
+      if (existing.startDate && targetDate <= existing.startDate) {
+        const updated = list.filter((e) => e.id !== eventId);
+        masterCalendarStore.saveEvents(tenantId, updated);
+        return updated;
+      }
+
+      // Otherwise cap old series at prevDateStr
+      const cappedOld = {
+        ...existing,
+        until: "DATE",
+        untilDate: prevDateStr,
+        updatedAt: new Date().toISOString(),
+      };
+      const updated = list.map((e) => (e.id === eventId ? cappedOld : e));
+      masterCalendarStore.saveEvents(tenantId, updated);
+      return updated;
+    }
+
+    // Case 3: All occurrences (Default)
+    const updated = list.filter((e) => e.id !== eventId && e.parentEventId !== eventId);
+    masterCalendarStore.saveEvents(tenantId, updated);
+    return updated;
+  },
+  migrateEventCategory: (tenantId, fromCategory, toCategory) => {
+    const list = masterCalendarStore.getEvents(tenantId);
+    const updated = list.map((e) => (e.category === fromCategory ? { ...e, category: toCategory } : e));
     masterCalendarStore.saveEvents(tenantId, updated);
     return updated;
   },
@@ -712,15 +857,76 @@ export const masterCalendarStore = {
 };
 
 export const DEFAULT_CALENDAR_EVENT_TYPES = [
-  { id: "et-1", name: "Morning Working Session", code: "MORNING_WORKING_SESSION", description: "Standard morning operational shifts and faculty hours", order: 1, is_active: true },
-  { id: "et-2", name: "Evening Support Session", code: "EVENING_SUPPORT_SESSION", description: "Evening tutorial, revision, and support hours", order: 2, is_active: true },
-  { id: "et-3", name: "Weekly Holiday", code: "WEEKLY_HOLIDAY", description: "Standard weekend institutional recess", order: 3, is_active: true },
-  { id: "et-4", name: "Eid Vacation", code: "EID_VACATION", description: "Special holiday closure for holy Eid celebration", order: 4, is_active: true },
-  { id: "et-5", name: "Mid-Term Examination", code: "MID_TERM_EXAMINATION", description: "Formal mid-term evaluation & exam schedule", order: 5, is_active: true },
-  { id: "et-6", name: "Final Term Examination", code: "FINAL_TERM_EXAMINATION", description: "Annual and final institutional examinations", order: 6, is_active: true },
-  { id: "et-7", name: "Annual Sports & Cultural Day", code: "ANNUAL_SPORTS_DAY", description: "Annual athletic competitions and campus gathering", order: 7, is_active: true },
-  { id: "et-8", name: "Parent-Teacher Conference", code: "PARENT_TEACHER_CONFERENCE", description: "Quarterly progress review meetings with guardians", order: 8, is_active: true },
+  { id: "et-1", name: "Morning Working Session", code: "MORNING_WORKING_SESSION", type: "WORKING_HOURS", description: "Standard morning operational shifts and faculty hours", order: 1, is_active: true },
+  { id: "et-2", name: "Evening Support Session", code: "EVENING_SUPPORT_SESSION", type: "WORKING_HOURS", description: "Evening tutorial, revision, and support hours", order: 2, is_active: true },
+  { id: "et-3", name: "Weekly Holiday", code: "WEEKLY_HOLIDAY", type: "HOLIDAY", description: "Standard weekend institutional recess", order: 3, is_active: true },
+  { id: "et-4", name: "Eid Vacation", code: "EID_VACATION", type: "HOLIDAY", description: "Special holiday closure for holy Eid celebration", order: 4, is_active: true },
+  { id: "et-5", name: "Mid-Term Examination", code: "MID_TERM_EXAMINATION", type: "EXAM", description: "Formal mid-term evaluation & exam schedule", order: 5, is_active: true },
+  { id: "et-6", name: "Final Term Examination", code: "FINAL_TERM_EXAMINATION", type: "EXAM", description: "Annual and final institutional examinations", order: 6, is_active: true },
+  { id: "et-7", name: "Annual Sports & Cultural Day", code: "ANNUAL_SPORTS_DAY", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering", order: 7, is_active: true },
+  { id: "et-8", name: "Parent-Teacher Conference", code: "PARENT_TEACHER_CONFERENCE", type: "MEETING", description: "Quarterly progress review meetings with guardians", order: 8, is_active: true },
 ];
+
+export const DEFAULT_EVENT_KINDS = [
+  { id: "HOLIDAY", value: "HOLIDAY", label: "Holiday", color: "rose" },
+  { id: "EXAM", value: "EXAM", label: "Exam", color: "amber" },
+  { id: "WORKING_HOURS", value: "WORKING_HOURS", label: "Working Hours", color: "indigo" },
+  { id: "ACADEMIC", value: "ACADEMIC", label: "Academic / Class", color: "emerald" },
+  { id: "MEETING", value: "MEETING", label: "Meeting", color: "blue" },
+  { id: "ACTIVITY", value: "ACTIVITY", label: "Sports & Cultural", color: "purple" },
+  { id: "GENERAL", value: "GENERAL", label: "General", color: "slate" },
+];
+
+export const calendarEventKindsStore = {
+  getKinds: (tenantId) => {
+    const key = `spr_calendar_event_kinds_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_EVENT_KINDS);
+  },
+  saveKinds: (tenantId, kinds) => {
+    const key = `spr_calendar_event_kinds_${tenantId || 'default'}`;
+    writeJSON(key, kinds);
+    window.dispatchEvent(new CustomEvent("spr_calendar_event_kinds_updated", { detail: kinds }));
+    return kinds;
+  },
+  addKind: (tenantId, kindData) => {
+    const list = calendarEventKindsStore.getKinds(tenantId);
+    const code = (kindData.value || kindData.label || "").toUpperCase().replace(/[^A-Z0-9]/g, "_").slice(0, 30);
+    const newKind = {
+      id: code || `kind_${Date.now()}`,
+      value: code || `KIND_${Date.now()}`,
+      label: kindData.label || code,
+      color: kindData.color || "emerald",
+    };
+    const updated = [...list, newKind];
+    calendarEventKindsStore.saveKinds(tenantId, updated);
+    return newKind;
+  },
+  updateKind: (tenantId, oldVal, updatedData) => {
+    const list = calendarEventKindsStore.getKinds(tenantId);
+    const newVal = updatedData.value ? updatedData.value.toUpperCase().replace(/[^A-Z0-9]/g, "_") : oldVal;
+    const updated = list.map((k) => (k.value === oldVal ? { ...k, ...updatedData, value: newVal } : k));
+    calendarEventKindsStore.saveKinds(tenantId, updated);
+
+    // If value changed, migrate existing event types & events!
+    if (newVal !== oldVal) {
+      calendarEventTypesStore.migrateEventType(tenantId, oldVal, newVal);
+      masterCalendarStore.migrateEventCategory(tenantId, oldVal, newVal);
+    }
+    return updated;
+  },
+  deleteKind: (tenantId, valToDelete, replacementVal) => {
+    const list = calendarEventKindsStore.getKinds(tenantId);
+    const updated = list.filter((k) => k.value !== valToDelete);
+    calendarEventKindsStore.saveKinds(tenantId, updated);
+
+    // Migrate all existing event types and events to replacement type!
+    if (replacementVal) {
+      calendarEventTypesStore.migrateEventType(tenantId, valToDelete, replacementVal);
+      masterCalendarStore.migrateEventCategory(tenantId, valToDelete, replacementVal);
+    }
+    return updated;
+  },
+};
 
 export const calendarEventTypesStore = {
   getEventTypes: (tenantId) => {
@@ -758,7 +964,105 @@ export const calendarEventTypesStore = {
     calendarEventTypesStore.saveEventTypes(tenantId, updated);
     return updated;
   },
+  migrateEventType: (tenantId, fromType, toType) => {
+    const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const updated = list.map((t) => (t.type === fromType ? { ...t, type: toType } : t));
+    calendarEventTypesStore.saveEventTypes(tenantId, updated);
+    return updated;
+  },
 };
+
+export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
+  {
+    id: "attendance",
+    name: "Class & Staff Attendance",
+    code: "ATTENDANCE",
+    badge: "Attendance",
+    description: "Sync as scheduled activity or holiday in student and staff attendance registers",
+    is_active: true,
+    order: 1,
+  },
+  {
+    id: "notifications",
+    name: "Push & In-App Notifications",
+    code: "NOTIFICATIONS",
+    badge: "Notifications",
+    description: "Send instant alert and reminders to target audience members",
+    is_active: true,
+    order: 2,
+  },
+  {
+    id: "routine",
+    name: "Daily Timetable & Periods",
+    code: "ROUTINE",
+    badge: "Routine",
+    description: "Adjust period slots, bells, and classroom routine during this time",
+    is_active: true,
+    order: 3,
+  },
+  {
+    id: "reports",
+    name: "Exam & Report Evaluation",
+    code: "REPORTS",
+    badge: "Reports",
+    description: "Include event timetable in exam schedules and report builders",
+    is_active: true,
+    order: 4,
+  },
+  {
+    id: "gate_access",
+    name: "Gate & Biometric Movement",
+    code: "GATE_ACCESS",
+    badge: "Gate & RFID",
+    description: "Synchronize campus entry/exit timings and biometric RFID gates",
+    is_active: true,
+    order: 5,
+  },
+];
+
+export const calendarImpactScopesStore = {
+  getScopes: (tenantId) => {
+    const key = `spr_calendar_impact_scopes_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_SYSTEM_IMPACT_SCOPES);
+  },
+  saveScopes: (tenantId, scopes) => {
+    const key = `spr_calendar_impact_scopes_${tenantId || 'default'}`;
+    writeJSON(key, scopes);
+    window.dispatchEvent(new CustomEvent("spr_calendar_impact_scopes_updated", { detail: scopes }));
+    return scopes;
+  },
+  addScope: (tenantId, scopeData) => {
+    const list = calendarImpactScopesStore.getScopes(tenantId);
+    const code = (scopeData.code || scopeData.name || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_").slice(0, 30);
+    const newScope = {
+      ...scopeData,
+      id: scopeData.id || code.toLowerCase() || `scope_${Date.now()}`,
+      code: code || `SCOPE_${Date.now()}`,
+      name: scopeData.name || code,
+      badge: scopeData.badge || scopeData.name || code,
+      description: scopeData.description || "",
+      order: scopeData.order || list.length + 1,
+      is_active: scopeData.is_active !== undefined ? scopeData.is_active : true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newScope];
+    calendarImpactScopesStore.saveScopes(tenantId, updated);
+    return newScope;
+  },
+  updateScope: (tenantId, id, updatedData) => {
+    const list = calendarImpactScopesStore.getScopes(tenantId);
+    const updated = list.map((s) => (s.id === id ? { ...s, ...updatedData, updatedAt: new Date().toISOString() } : s));
+    calendarImpactScopesStore.saveScopes(tenantId, updated);
+    return updated;
+  },
+  deleteScope: (tenantId, id) => {
+    const list = calendarImpactScopesStore.getScopes(tenantId);
+    const updated = list.filter((s) => s.id !== id);
+    calendarImpactScopesStore.saveScopes(tenantId, updated);
+    return updated;
+  },
+};
+
 
 
 

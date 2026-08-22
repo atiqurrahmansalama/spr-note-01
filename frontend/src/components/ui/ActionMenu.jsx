@@ -82,7 +82,19 @@ export default function ActionMenu({
 
   const activeItems = items.filter((item) => item && !item.hidden);
 
-  if (activeItems.length === 0) return null;
+  const renderIcon = (iconInput, className) => {
+    if (!iconInput) return null;
+    if (React.isValidElement(iconInput)) {
+      return React.cloneElement(iconInput, {
+        className: `${iconInput.props.className || ''} ${className}`.trim(),
+      });
+    }
+    if (typeof iconInput === 'function' || typeof iconInput === 'object') {
+      const IconComponent = iconInput;
+      return <IconComponent className={className} />;
+    }
+    return null;
+  };
 
   return (
     <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
@@ -96,7 +108,7 @@ export default function ActionMenu({
           isOpen ? 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30' : ''
         } ${buttonClassName}`}
       >
-        <TriggerIcon className="w-4 h-4" />
+        {renderIcon(TriggerIcon, "w-4 h-4")}
       </button>
 
       {isOpen &&
@@ -119,7 +131,6 @@ export default function ActionMenu({
                 return <div key={`divider-${index}`} className="my-1 border-t theme-border" />;
               }
 
-              const Icon = item.icon;
               const isDanger = item.danger;
               const isDisabled = item.disabled;
 
@@ -138,16 +149,13 @@ export default function ActionMenu({
                     isDisabled
                       ? 'opacity-40 cursor-not-allowed theme-text-muted'
                       : isDanger
-                      ? 'text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/10'
+                      ? 'theme-danger hover:theme-bg-danger-soft focus:theme-bg-danger-soft'
                       : 'theme-text-primary hover:theme-bg-sub focus:theme-bg-sub'
                   }`}
                 >
-                  {Icon && (
-                    <Icon
-                      className={`w-3.5 h-3.5 shrink-0 ${
-                        isDanger ? 'text-rose-400' : 'theme-text-secondary'
-                      }`}
-                    />
+                  {renderIcon(
+                    item.icon,
+                    `w-3.5 h-3.5 shrink-0 ${isDanger ? 'theme-danger' : 'theme-text-secondary'}`
                   )}
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && (

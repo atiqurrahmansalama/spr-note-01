@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import SettingsSplitLayout from "../../../components/common/SettingsSplitLayout";
 import CompactTaxonomyManager from "../../../components/common/CompactTaxonomyManager";
@@ -6,6 +6,7 @@ import {
   BuildingOfficeIcon,
   SparklesIcon,
   CalendarIcon,
+  ChecklistIcon,
   RefreshIcon,
   CheckCircleIcon,
   TrashIcon,
@@ -16,7 +17,11 @@ import {
   updateInstitutionCategory,
   deleteInstitutionCategory,
 } from "../../../api/institutions";
-import { calendarEventTypesStore } from "../../../utils/localStore";
+import {
+  calendarEventTypesStore,
+  calendarEventKindsStore,
+  calendarImpactScopesStore,
+} from "../../../utils/localStore";
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../../constants/version";
 import { useToast } from "../../../context/ToastContext";
 import { useTenant } from "../../../context/TenantContext";
@@ -35,6 +40,12 @@ const SECTIONS = [
     icon: CalendarIcon,
   },
   {
+    id: "impact-scopes",
+    title: "System Impact Scopes",
+    description: "Configure system modules affected by calendar events (Attendance, Notifications, etc.)",
+    icon: ChecklistIcon,
+  },
+  {
     id: "system",
     title: "System & Environment",
     description: "Platform version, environment diagnostics, and local cache manager",
@@ -48,33 +59,53 @@ export default function DeveloperToolsHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
 
-  const rawSection = searchParams.get("section") || searchParams.get("tab");
-  const validIds = ["categories", "event-types", "system"];
-  const activeSection = validIds.includes(rawSection) ? rawSection : "categories";
+  const [eventKinds, setEventKinds] = useState(() => calendarEventKindsStore.getKinds(activeTenantId));
+
+  useEffect(() => {
+    const handleKindsUpdated = () => {
+      setEventKinds(calendarEventKindsStore.getKinds(activeTenantId));
+    };
+    window.addEventListener("spr_calendar_event_kinds_updated", handleKindsUpdated);
+    return () => window.removeEventListener("spr_calendar_event_kinds_updated", handleKindsUpdated);
+  }, [activeTenantId]);
+
+  const activeSection = searchParams.get("tab") || "categories";
 
   const handleSectionChange = (sectionId) => {
-    setSearchParams({ section: sectionId });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", sectionId);
+        return next;
+      },
+      { replace: true }
+    );
   };
 
   const handleClearCache = () => {
-    try {
-      // Clear non-auth temporary keys
-      const keysToPreserve = ["spr_user", "spr_token", "spr_theme_mode", "spr_theme_id", "spr_font_id"];
-      Object.keys(localStorage).forEach((key) => {
-        if (!keysToPreserve.includes(key)) {
-          localStorage.removeItem(key);
+    if (window.confirm("Are you sure you want to clear local cache and temporary session data?")) {
+      try {
+        const preserveKeys = ["spr_auth_token", "spr_user_profile", "spr_tenant_id", "spr_theme_mode"];
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && !preserveKeys.includes(k) && !k.startsWith("spr_tenant_")) {
+            toRemove.push(k);
+          }
         }
-      });
-      showToast("Local storage application cache purged successfully!", "success");
-    } catch (err) {
-      showToast("Failed to clear local cache", "error");
+        toRemove.forEach((k) => localStorage.removeItem(k));
+        sessionStorage.clear();
+        showToast("Local application cache cleared successfully!", "success");
+      } catch (err) {
+        showToast("Failed to clear cache", "error");
+      }
     }
   };
 
   return (
     <SettingsSplitLayout
-      title="Developer Tools"
-      subtitle="Super administrator console for managing system taxonomy, platform diagnostics, and developer utilities."
+      title="Developer & System Tools"
+      subtitle="Configure low-level system taxonomies, academy categories, calendar presets, and runtime diagnostics."
       headerIcon={SparklesIcon}
       sections={SECTIONS}
       activeSection={activeSection}
@@ -105,11 +136,28 @@ export default function DeveloperToolsHubView() {
             updateItem={async (id, payload) => calendarEventTypesStore.updateEventType(activeTenantId, id, payload)}
             deleteItem={async (id) => calendarEventTypesStore.deleteEventType(activeTenantId, id)}
             itemTypeName="Event Type"
+            typeOptions={eventKinds}
+            typeLabel="Event Type"
+            hideStatus={true}
             icon={CalendarIcon}
           />
         )}
 
-        {/* Section 3: System Diagnostics & Cache */}
+        {/* Section 3: System Impact Scopes */}
+        {activeSection === "impact-scopes" && (
+          <CompactTaxonomyManager
+            title="System Impact Scopes"
+            description="Manage integration modules and services affected by calendar schedules & events (e.g. Attendance, Push Notifications, Daily Routine, etc.)."
+            fetchItems={async () => calendarImpactScopesStore.getScopes(activeTenantId)}
+            createItem={async (payload) => calendarImpactScopesStore.addScope(activeTenantId, payload)}
+            updateItem={async (id, payload) => calendarImpactScopesStore.updateScope(activeTenantId, id, payload)}
+            deleteItem={async (id) => calendarImpactScopesStore.deleteScope(activeTenantId, id)}
+            itemTypeName="Impact Scope"
+            icon={ChecklistIcon}
+          />
+        )}
+
+        {/* Section 4: System Diagnostics & Cache */}
         {activeSection === "system" && (
           <div className="space-y-4 animate-fade-in text-left">
             {/* Environment Overview Card */}

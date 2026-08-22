@@ -23,6 +23,13 @@ export function TenantProvider({ children }) {
       if (user?.institution_details) {
         setCurrentInstitution(user.institution_details);
       }
+      if (user?.institution_id) {
+        const instId = String(user.institution_id);
+        setActiveTenantId(instId);
+        try {
+          localStorage.setItem('active_tenant_id', instId);
+        } catch {}
+      }
       return;
     }
 
@@ -39,18 +46,28 @@ export function TenantProvider({ children }) {
           setCurrentInstitution(found);
           setActiveTenantId(savedTenantId);
         } else if (items.length > 0) {
-          setCurrentInstitution(items[0]);
-          setActiveTenantId(items[0].id);
-          localStorage.setItem('active_tenant_id', items[0].id);
+          const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+          const target = userInst || items[0];
+          setCurrentInstitution(target);
+          setActiveTenantId(String(target.id));
+          try {
+            localStorage.setItem('active_tenant_id', String(target.id));
+          } catch {}
+          window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: target.id } }));
         }
       } else if (savedTenantId === 'ALL') {
         setCurrentInstitution(null);
         setActiveTenantId('ALL');
       } else if (items.length > 0) {
-        // Default to first institution
-        setCurrentInstitution(items[0]);
-        setActiveTenantId(items[0].id);
-        localStorage.setItem('active_tenant_id', items[0].id);
+        // Default to user's assigned institution if available, otherwise first
+        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+        const target = userInst || items[0];
+        setCurrentInstitution(target);
+        setActiveTenantId(String(target.id));
+        try {
+          localStorage.setItem('active_tenant_id', String(target.id));
+        } catch {}
+        window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: target.id } }));
       }
     } catch (err) {
       console.error('[TenantProvider] Error loading institutions:', err);

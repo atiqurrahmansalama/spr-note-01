@@ -29,12 +29,12 @@ export default function SidebarScreenBlockView({
   };
 
   return (
-    <div className={`w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20 @container ${
+    <div className={`w-full h-full theme-bg-app flex flex-col overflow-hidden animate-fade-in relative z-20 @container min-w-0 ${
       dockPosition === "right" ? "border-l theme-border shadow-2xl" : ""
     }`}>
       {/* Header Bar with Back Button & Breadcrumbs */}
-      <div className="theme-bg-surface border-b theme-border px-3.5 sm:px-6 py-2.5 flex justify-between items-center shrink-0 shadow-md select-none">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex justify-between items-center shrink-0 shadow-md select-none gap-2">
+        <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">
           {/* Universal Back Navigation Button */}
           <button
             type="button"
@@ -49,15 +49,15 @@ export default function SidebarScreenBlockView({
 
           {/* Module Category & View Title Breadcrumbs */}
           <div className="flex items-center gap-1.5 min-w-0 truncate">
-            <span className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+            <span className="text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
               {category} /
             </span>
             {subCategory && (
-              <span className="text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+              <span className="hidden @md:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
                 {subCategory} /
               </span>
             )}
-            <span className="text-xs sm:text-sm font-bold theme-text-primary truncate">
+            <span className="text-xs @sm:text-sm font-bold theme-text-primary truncate">
               {title}
             </span>
           </div>
@@ -107,8 +107,10 @@ export default function SidebarScreenBlockView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 sm:p-5 flex justify-center items-start">
-        {children}
+      <div className="sidebar-screen-container flex-1 overflow-y-auto overflow-x-hidden p-1 @sm:p-2 @md:p-3.5 @lg:p-5 w-full min-w-0">
+        <div className="w-full max-w-full min-w-0">
+          {children}
+        </div>
       </div>
     </div>
   );

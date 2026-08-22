@@ -94,7 +94,7 @@ export default function CalendarHubView() {
     try {
       const updated = await toggleTaskComplete(taskId);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-      showToast(updated.is_completed ? 'Task completed! 🎉' : 'Task marked pending.', 'info');
+      showToast(updated.is_completed ? 'Task marked completed.' : 'Task marked pending.', 'info');
     } catch (err) {
       showToast(err.message || 'Failed to update task', 'error');
     }
@@ -201,19 +201,19 @@ export default function CalendarHubView() {
   const pendingTaskCount = tasks.filter((t) => !t.is_completed).length;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
+    <div className="p-3 @sm:p-4 @md:p-6 space-y-5 @sm:space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none w-full min-w-0 @container">
       {/* 1. Header Hub */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 @sm:gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner">
-              <CalendarIcon className="w-6 h-6" />
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner shrink-0">
+              <CalendarIcon className="w-5 h-5 @sm:w-6 @sm:h-6" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
+              <h1 className="text-lg @sm:text-xl @md:text-2xl font-bold tracking-tight theme-text-primary flex items-center gap-2">
                 Institutional Calendar & Tasks
               </h1>
-              <p className="text-xs theme-text-secondary">
+              <p className="text-[11px] @sm:text-xs theme-text-secondary">
                 Academic schedule, holiday awareness engine, and institutional To-Do checklist
               </p>
             </div>
@@ -221,7 +221,7 @@ export default function CalendarHubView() {
         </div>
 
         {/* Top Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 @sm:gap-2.5">
           <button
             onClick={() => loadData(true)}
             disabled={isRefreshing}
@@ -256,9 +256,9 @@ export default function CalendarHubView() {
       </div>
 
       {/* 2. Main Calendar & To-Do Panel Split Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT & CENTER: Calendar Interactive Hub (2 Cols on lg) */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 @2xl:grid-cols-3 gap-4 @lg:gap-6 w-full min-w-0">
+        {/* LEFT & CENTER: Calendar Interactive Hub (2 Cols on @2xl) */}
+        <div className="@2xl:col-span-2 space-y-4 min-w-0">
           {/* Calendar Month Selector Bar */}
           <div className="p-4 rounded-2xl theme-bg-surface border theme-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-3">

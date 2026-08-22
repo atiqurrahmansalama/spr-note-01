@@ -20,7 +20,8 @@ import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
-import GroupFormModal from "./GroupFormModal";
+import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
+import GroupForm from "./GroupForm";
 import GroupMigrationModal from "./GroupMigrationModal";
 import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
@@ -31,6 +32,7 @@ export default function GroupManagementView({
 }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { openDrawer, closeDrawer } = useRightSidebar();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialClassFilter = searchParams.get("student_class") || "ALL";
@@ -57,9 +59,6 @@ export default function GroupManagementView({
   const [classFilter, setClassFilter] = useState(initialClassFilter);
 
   // Modals
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState(null);
@@ -145,21 +144,43 @@ export default function GroupManagementView({
     } catch {}
   };
 
+  // Universal Drawer Registration for Group Form (survives F5 refresh)
+  useDrawerRegistration(
+    "group",
+    (params) => {
+      const mode = params.get("mode") || "add";
+      const groupId = params.get("id");
+      const paramClassId = params.get("classId") || (classFilter !== "ALL" ? classFilter : "");
+      const foundGroup = groupId ? groups.find((g) => String(g.id) === String(groupId)) : null;
+
+      return {
+        title: mode === "add" ? "Create New Group / Halqa" : `Edit: ${foundGroup?.name || "Group"}`,
+        category: "Classes & Groups",
+        size: "md",
+        content: (
+          <GroupForm
+            editingGroup={foundGroup}
+            classes={classes}
+            defaultClassId={foundGroup?.student_class || paramClassId}
+            onSaved={() => {
+              loadGroups();
+              loadMetrics();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [groups, classes, classFilter, loadGroups, loadMetrics, closeDrawer]
+  );
+
   const handleOpenCreate = () => {
-    setEditingGroup(null);
-    setIsFormModalOpen(true);
+    openDrawer("group", { mode: "add", classId: classFilter !== "ALL" ? classFilter : "" });
   };
 
   const handleOpenEdit = (grp) => {
-    setEditingGroup(grp);
-    setIsFormModalOpen(true);
-  };
-
-  const handleSaveSuccess = () => {
-    setIsFormModalOpen(false);
-    setEditingGroup(null);
-    loadGroups();
-    loadMetrics();
+    openDrawer("group", { mode: "edit", id: grp.id });
   };
 
   const handleDeletePrompt = (grp) => {
@@ -514,17 +535,6 @@ export default function GroupManagementView({
       )}
 
       {/* --- MODALS --- */}
-      <GroupFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        editingGroup={editingGroup}
-        classes={classes}
-        defaultClassId={classFilter !== "ALL" ? classFilter : ""}
-        onSuccess={() => {
-          loadGroups();
-          loadMetrics();
-        }}
-      />
 
       <GroupMigrationModal
         isOpen={isMigrationModalOpen}

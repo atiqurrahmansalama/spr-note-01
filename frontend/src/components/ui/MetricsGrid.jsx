@@ -49,27 +49,27 @@ export function MetricCard({
   return (
     <div
       onClick={onClick}
-      className={`p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex items-center justify-between transition-all ${
+      className={`p-3 @sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex items-center justify-between transition-all min-w-0 ${
         onClick ? 'cursor-pointer hover:theme-bg-sub/30' : ''
       } ${className}`}
     >
-      <div className="min-w-0 flex-1 pr-3">
-        <span className="text-[11px] font-semibold theme-text-secondary block truncate">
+      <div className="min-w-0 flex-1 pr-2 @sm:pr-3">
+        <span className="text-[10px] @sm:text-[11px] font-semibold theme-text-secondary block truncate">
           {label}
         </span>
-        <p className={`text-xl font-bold tracking-tight mt-0.5 truncate ${colorConfig.value}`}>
+        <p className={`text-lg @sm:text-xl font-bold tracking-tight mt-0.5 truncate ${colorConfig.value}`}>
           {value ?? 0}
         </p>
         {subLabel && (
-          <span className="text-[10px] theme-text-secondary mt-0.5 block truncate">
+          <span className="text-[9px] @sm:text-[10px] theme-text-secondary mt-0.5 block truncate">
             {subLabel}
           </span>
         )}
       </div>
 
       {Icon && (
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${colorConfig.icon}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`w-8 h-8 @sm:w-10 @sm:h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${colorConfig.icon}`}>
+          <Icon className="w-4 h-4 @sm:w-5 @sm:h-5" />
         </div>
       )}
     </div>
@@ -83,16 +83,16 @@ export default function MetricsGrid({
 }) {
   if (!items || items.length === 0) return null;
 
-  let gridColsClass = 'grid-cols-2 lg:grid-cols-4';
+  let gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @2xl:grid-cols-4';
   if (cols === 1) gridColsClass = 'grid-cols-1';
-  else if (cols === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2';
-  else if (cols === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-3';
-  else if (cols === 4) gridColsClass = 'grid-cols-2 lg:grid-cols-4';
-  else if (items.length === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-3';
-  else if (items.length === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2';
+  else if (cols === 2) gridColsClass = 'grid-cols-1 @sm:grid-cols-2';
+  else if (cols === 3) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @xl:grid-cols-3';
+  else if (cols === 4) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @2xl:grid-cols-4';
+  else if (items.length === 3) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @xl:grid-cols-3';
+  else if (items.length === 2) gridColsClass = 'grid-cols-1 @sm:grid-cols-2';
 
   return (
-    <div className={`grid ${gridColsClass} gap-3.5 ${className}`}>
+    <div className={`grid ${gridColsClass} gap-2.5 @sm:gap-3.5 w-full min-w-0 ${className}`}>
       {items.map((item, idx) => (
         <MetricCard
           key={item.id || item.label || idx}

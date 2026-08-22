@@ -22,7 +22,8 @@ import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
-import ClassFormModal from "./ClassFormModal";
+import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
+import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
 import DeleteImpactModal from "../../../components/common/DeleteImpactModal";
 
@@ -33,6 +34,7 @@ export default function ClassManagementView({
 }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { openDrawer, closeDrawer } = useRightSidebar();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const queryDept = searchParams.get("department") || "ALL";
@@ -59,9 +61,6 @@ export default function ClassManagementView({
   const [departmentFilter, setDepartmentFilter] = useState(queryDept);
 
   // Modals
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState(null);
-
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingClass, setDeletingClass] = useState(null);
@@ -144,14 +143,40 @@ export default function ClassManagementView({
     }
   };
 
+  // Universal Drawer Registration for Class Form (survives F5 refresh)
+  useDrawerRegistration(
+    "class",
+    (params) => {
+      const mode = params.get("mode") || "add";
+      const classId = params.get("id");
+      const foundClass = classId ? classes.find((c) => String(c.id) === String(classId)) : null;
+
+      return {
+        title: mode === "add" ? "Create New Class / Grade" : `Edit: ${foundClass?.name || "Class"}`,
+        category: "Classes & Groups",
+        size: "md",
+        content: (
+          <ClassForm
+            editingClass={foundClass}
+            onSaved={() => {
+              loadClasses();
+              loadMetrics();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [classes, loadClasses, loadMetrics, closeDrawer]
+  );
+
   const handleOpenCreate = () => {
-    setEditingClass(null);
-    setIsFormModalOpen(true);
+    openDrawer("class", { mode: "add" });
   };
 
   const handleOpenEdit = (cls) => {
-    setEditingClass(cls);
-    setIsFormModalOpen(true);
+    openDrawer("class", { mode: "edit", id: cls.id });
   };
 
   const handleDeletePrompt = (cls) => {
@@ -567,20 +592,6 @@ export default function ClassManagementView({
       )}
 
       {/* --- MODALS --- */}
-      {isFormModalOpen && (
-        <ClassFormModal
-          isOpen={isFormModalOpen}
-          editingClass={editingClass}
-          onClose={() => {
-            setIsFormModalOpen(false);
-            setEditingClass(null);
-          }}
-          onSuccess={() => {
-            loadClasses();
-            loadMetrics();
-          }}
-        />
-      )}
 
       {isMigrationModalOpen && (
         <ClassMigrationModal

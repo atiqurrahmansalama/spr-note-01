@@ -4935,15 +4935,16 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         global_slots = class_slots_map.get(None, [])
 
         matrix_rows = []
+        default_slots = period_slots if len(period_slots) > 0 else [None]
 
         for s in students:
             if class_id and class_id != 'ALL':
-                slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
+                s_slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
             else:
                 s_slots = class_slots_map.get(s.student_class_id, global_slots)
-                slots_to_iterate = s_slots if len(s_slots) > 0 else [None]
+                s_slots_to_iterate = s_slots if len(s_slots) > 0 else [None]
 
-            for p_idx, slot in enumerate(slots_to_iterate):
+            for p_idx, slot in enumerate(s_slots_to_iterate):
                 slot_id_str = str(slot.id) if slot else 'DEFAULT'
                 s_map = att_map.get(f"{s.id}_{slot_id_str}") or att_map.get(f"{s.id}_DEFAULT", {})
 
@@ -4998,7 +4999,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     "teacher_id": str(slot.teacher_id) if (slot and slot.teacher_id) else None,
                     "teacher_name": t_name,
                     "teacher_designation": t_desig,
-                    "period_count": len(slots_to_iterate),
+                    "period_count": len(s_slots_to_iterate),
                     "period_index": p_idx,
                     "daily_statuses": s_map,
                     "totals": {
@@ -5022,7 +5023,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             "days_header": days_header,
             "students_matrix": matrix_rows,
             "total_students": len(students),
-            "period_count": len(slots_to_iterate),
+            "period_count": len(period_slots),
             "periods": [
                 {
                     "id": str(p.id),

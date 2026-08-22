@@ -25,7 +25,7 @@ import {
 } from '../../api/academy';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
-import { useRightSidebar } from '../../context/RightSidebarContext';
+import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 
 const SLOT_TYPE_CONFIG = {
   TEACHING_PERIOD: {
@@ -48,7 +48,6 @@ export default function ClassPeriodScheduleView({
   isEmbedded = false,
 }) {
   const { showToast } = useToast();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const [periodSlots, setPeriodSlots] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -131,47 +130,46 @@ export default function ClassPeriodScheduleView({
     }
   };
 
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Universal Drawer Registration for Period Slot (survives F5 refresh)
+  useDrawerRegistration(
+    'period-slot',
+    (params) => {
+      const mode = params.get('mode') || 'add';
+      const slotId = params.get('id');
+      const foundSlot = slotId ? periodSlots.find((s) => String(s.id) === String(slotId)) : null;
+
+      return {
+        title: mode === 'add' ? 'Add Period Slot' : `Edit: ${foundSlot?.period_name || 'Period'}`,
+        category: 'Class Routine & Periods',
+        size: 'lg',
+        width: 680,
+        content: (
+          <PeriodForm
+            editingSlot={foundSlot}
+            defaultDepartmentId={deptFilter !== 'ALL' ? deptFilter : null}
+            defaultClassId={classFilter !== 'ALL' ? classFilter : null}
+            nextOrder={foundSlot?.period_order || periodSlots.length + 1}
+            onSaved={() => {
+              loadSlots();
+              closeDrawer();
+              showToast(mode === 'add' ? 'Period slot saved successfully.' : 'Period slot updated successfully.', 'success');
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [periodSlots, deptFilter, classFilter, loadSlots, closeDrawer, showToast]
+  );
+
   const handleCreateNew = () => {
-    openRightSidebar({
-      title: 'Add Period Slot',
-      width: 680,
-      content: (
-        <PeriodForm
-          defaultDepartmentId={deptFilter !== 'ALL' ? deptFilter : null}
-          defaultClassId={classFilter !== 'ALL' ? classFilter : null}
-          defaultBranchId={branchFilter !== 'ALL' ? branchFilter : null}
-          nextOrder={periodSlots.length + 1}
-          onSaved={() => {
-            loadSlots();
-            closeRightSidebar();
-            showToast('Period slot saved successfully.', 'success');
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('period-slot', { mode: 'add' });
   };
 
   const handleEdit = (slot) => {
-    openRightSidebar({
-      title: `Edit: ${slot.period_name || 'Period'}`,
-      width: 680,
-      content: (
-        <PeriodForm
-          editingSlot={slot}
-          defaultDepartmentId={deptFilter !== 'ALL' ? deptFilter : null}
-          defaultClassId={classFilter !== 'ALL' ? classFilter : null}
-          defaultBranchId={branchFilter !== 'ALL' ? branchFilter : null}
-          nextOrder={slot.period_order}
-          onSaved={() => {
-            loadSlots();
-            closeRightSidebar();
-            showToast('Period slot updated successfully.', 'success');
-          }}
-          onCancel={closeRightSidebar}
-        />
-      ),
-    });
+    openDrawer('period-slot', { mode: 'edit', id: slot.id });
   };
 
   const handleDelete = async (slot) => {
