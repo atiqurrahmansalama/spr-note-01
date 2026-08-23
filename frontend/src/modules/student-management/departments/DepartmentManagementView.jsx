@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
@@ -48,6 +48,7 @@ export default function DepartmentManagementView({
   const [deletingDept, setDeletingDept] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selectedIds, setSelectedIds] = useState([]);
   const [metrics, setMetrics] = useState({
     total_departments: 0,
     total_classes: 0,
@@ -62,6 +63,21 @@ export default function DepartmentManagementView({
       localStorage.setItem("spr_dept_view_mode", mode);
     } catch {}
   };
+
+  const handleSelectRow = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     loadDepartments();
@@ -378,8 +394,8 @@ export default function DepartmentManagementView({
       {!hideHeader && (
         <PageHeader
           icon={DepartmentIcon}
-          title="Department"
-          subtitle="Configure institutional academic divisions and head deans"
+          title="Academic Departments"
+          subtitle="Configure institutional academic divisions, branches, and department leadership"
           actions={
             <>
               <button
@@ -448,6 +464,21 @@ export default function DepartmentManagementView({
 
       {/* --- DISPLAY: DATA CARD GRID OR DATA TABLE --- */}
       <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'department' : 'departments'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
         {viewMode === "grid" ? (
           <DataCardGrid
             data={filteredDepartments}
@@ -466,6 +497,11 @@ export default function DepartmentManagementView({
           <DataTable
             columns={columns}
             data={filteredDepartments}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
             isLoading={loading}
             loadingMessage="Loading academic departments..."
             emptyIcon={DepartmentIcon}

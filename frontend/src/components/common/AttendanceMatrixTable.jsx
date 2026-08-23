@@ -105,7 +105,7 @@ export default function AttendanceMatrixTable({
                   onClick={() => onDateClick && onDateClick(d)}
                   className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors cursor-pointer hover:brightness-95 select-none ${
                     hasEvent
-                      ? `${d.event_colors.bg} ${d.event_colors.text} font-bold shadow-2xs`
+                      ? `${d.event_colors.bg} ${d.event_colors.text} font-bold`
                       : isHoliday
                       ? 'theme-bg-accent-soft theme-accent'
                       : ''
@@ -120,8 +120,8 @@ export default function AttendanceMatrixTable({
                 >
                   <div className="flex flex-col items-center justify-between min-h-[50px] sm:min-h-[56px] py-0.5">
                     {/* Top Group: Gregorian & Hijri Dates */}
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-xs sm:text-sm tracking-tight leading-none theme-text-primary">
+                    <div className="space-y-0.5 flex flex-col items-center">
+                      <div className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${hasEvent ? d.event_colors.text : 'theme-text-primary'}`}>
                         {d.day}
                       </div>
 
@@ -129,6 +129,10 @@ export default function AttendanceMatrixTable({
                         <div className="text-[9px] sm:text-[10px] font-mono theme-accent font-semibold leading-none pt-0.5">
                           {hijriDayNumber}
                         </div>
+                      )}
+
+                      {hasEvent && (
+                        <span className={`w-1 h-1 rounded-full mt-0.5 shrink-0 ${d.event_colors.dot}`} />
                       )}
                     </div>
 
@@ -212,8 +216,8 @@ export default function AttendanceMatrixTable({
                   const dateStr =
                     d.date ||
                     `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-                  const status = row.daily_statuses[d.date] || row.daily_statuses[d.day];
-                  const isHoliday = Boolean(d.is_holiday);
+                  const isHoliday = Boolean(d.is_holiday || d.is_disabled);
+                  const status = isHoliday ? null : (row.daily_statuses[d.date] || row.daily_statuses[d.day]);
                   const hasEvent = Boolean(d.event_colors);
                   const eventTitle = d.event_title || d.calendar_event?.title || d.holiday_title;
 
@@ -231,26 +235,28 @@ export default function AttendanceMatrixTable({
                         hasEvent
                           ? `${d.event_colors.bg} ${d.event_colors.text}`
                           : isHoliday
-                          ? 'cursor-not-allowed select-none bg-zinc-500/[0.04] dark:bg-zinc-400/[0.04] opacity-60'
+                          ? 'select-none bg-zinc-500/[0.04] dark:bg-zinc-400/[0.04] opacity-60'
                           : ''
                       } ${
                         canEditCell
                           ? 'cursor-pointer select-none hover:brightness-95'
-                          : isHoliday
-                          ? 'cursor-not-allowed'
-                          : 'cursor-default'
+                          : isEditing && isHoliday
+                          ? 'cursor-not-allowed select-none'
+                          : 'cursor-default select-none'
                       }`}
                       title={
                         eventTitle
-                          ? `${eventTitle} [${dateStr}]`
+                          ? `${eventTitle} [${dateStr}] (Attendance Disabled)`
                           : isHoliday
-                          ? `${d.holiday_title || 'Scheduled Holiday'} (No Attendance Allowed)`
+                          ? `${d.holiday_title || 'Scheduled Holiday'} (Attendance Disabled)`
                           : isEditing
                           ? `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'} (Click to change)`
                           : `${dateStr} [${row.period_name}]: ${status || 'Unrecorded'}`
                       }
                     >
-                      {status === 'PRESENT' ? (
+                      {isHoliday ? (
+                        <span className={`text-[9px] opacity-30 font-bold select-none ${isEditing ? 'cursor-not-allowed' : 'cursor-default'}`}>--</span>
+                      ) : status === 'PRESENT' ? (
                         <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                       ) : status === 'ABSENT' ? (
                         <FilledXCircleIcon className="w-4 h-4 text-[var(--danger-main)] hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
@@ -263,11 +269,9 @@ export default function AttendanceMatrixTable({
                           H
                         </span>
                       ) : status === 'ON_LEAVE' ? (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:purple-400/85 font-bold text-[10px]">
                           LV
                         </span>
-                      ) : isHoliday ? (
-                        <span className="opacity-35 font-mono text-xs select-none">—</span>
                       ) : canEditCell ? (
                         <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present"></span>
                       ) : (

@@ -7,18 +7,22 @@ import {
   CloseIcon,
   ChevronIcon,
   CalendarIcon,
+  CheckIcon,
 } from "../ui/Icons";
 import {
   calendarEventTypesStore,
   calendarEventKindsStore,
   calendarImpactScopesStore,
+  calendarWorkingSchedulesStore,
+  masterCalendarStore,
+  getDynamicPriorityRankOptions,
 } from "../../utils/localStore";
 import { useTenant } from "../../context/TenantContext";
 import { fetchWithAuth } from "../../utils/authService";
 
 const CATEGORY_OPTIONS = [
-  { value: "WORKING_HOURS", label: "Working Hours (Shifts / Timings)" },
-  { value: "ACADEMIC_EVENT", label: "Academic Event (Programs, Holidays, Exams)" },
+  { value: "WORKING_HOURS", label: "Add a Working Schedule" },
+  { value: "ACADEMIC_EVENT", label: "Add an Academic Event" },
 ];
 
 const FREQUENCY_OPTIONS = [
@@ -38,23 +42,34 @@ const WEEKDAY_INITIALS = [
   { day: 6, label: "S", name: "Saturday" },
 ];
 
-// 15 Curated Vibrant & Popular Event Colors
+// Curated Vibrant & Soft Pastel Event Colors
 export const EVENT_COLORS = [
-  { id: "emerald", label: "Emerald", hex: "#10b981" },
-  { id: "indigo", label: "Indigo", hex: "#6366f1" },
-  { id: "blue", label: "Blue", hex: "#3b82f6" },
-  { id: "sky", label: "Sky", hex: "#0ea5e9" },
-  { id: "cyan", label: "Cyan", hex: "#06b6d4" },
-  { id: "teal", label: "Teal", hex: "#14b8a6" },
-  { id: "violet", label: "Violet", hex: "#8b5cf6" },
-  { id: "purple", label: "Purple", hex: "#a855f7" },
-  { id: "fuchsia", label: "Fuchsia", hex: "#d946ef" },
-  { id: "rose", label: "Rose", hex: "#f43f5e" },
-  { id: "red", label: "Red", hex: "#ef4444" },
-  { id: "orange", label: "Orange", hex: "#f97316" },
-  { id: "amber", label: "Amber", hex: "#f59e0b" },
-  { id: "lime", label: "Lime", hex: "#84cc16" },
-  { id: "slate", label: "Slate", hex: "#64748b" },
+  // Soft & Light Pastel Colors
+  { id: "mint", label: "Soft Mint", hex: "#6ee7b7", group: "Pastel" },
+  { id: "lavender", label: "Soft Lavender", hex: "#c4b5fd", group: "Pastel" },
+  { id: "peach", label: "Soft Peach", hex: "#fdba74", group: "Pastel" },
+  { id: "coral", label: "Soft Coral", hex: "#fca5a5", group: "Pastel" },
+  { id: "sage", label: "Soft Sage", hex: "#86efac", group: "Pastel" },
+  { id: "ice", label: "Ice Blue", hex: "#7dd3fc", group: "Pastel" },
+  { id: "sand", label: "Warm Sand", hex: "#cbd5e1", group: "Pastel" },
+  { id: "pink", label: "Soft Pink", hex: "#f472b6", group: "Pastel" },
+  { id: "cream", label: "Amber Cream", hex: "#fde68a", group: "Pastel" },
+
+  // Standard Vibrant Colors
+  { id: "indigo", label: "Indigo", hex: "#6366f1", group: "Vibrant" },
+  { id: "emerald", label: "Emerald", hex: "#10b981", group: "Vibrant" },
+  { id: "blue", label: "Sky Blue", hex: "#3b82f6", group: "Vibrant" },
+  { id: "teal", label: "Teal", hex: "#14b8a6", group: "Vibrant" },
+  { id: "cyan", label: "Cyan", hex: "#06b6d4", group: "Vibrant" },
+  { id: "purple", label: "Purple", hex: "#a855f7", group: "Vibrant" },
+  { id: "violet", label: "Violet", hex: "#8b5cf6", group: "Vibrant" },
+  { id: "fuchsia", label: "Fuchsia", hex: "#d946ef", group: "Vibrant" },
+  { id: "rose", label: "Rose", hex: "#f43f5e", group: "Vibrant" },
+  { id: "red", label: "Red", hex: "#ef4444", group: "Vibrant" },
+  { id: "orange", label: "Orange", hex: "#f97316", group: "Vibrant" },
+  { id: "amber", label: "Amber", hex: "#f59e0b", group: "Vibrant" },
+  { id: "lime", label: "Lime", hex: "#84cc16", group: "Vibrant" },
+  { id: "slate", label: "Slate Gray", hex: "#64748b", group: "Vibrant" },
 ];
 
 function formatTime12(timeStr) {
@@ -361,6 +376,143 @@ export function UntilWhenPicker({
   );
 }
 
+export function EventColorPickerDropdown({ value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedColor = useMemo(() => {
+    return EVENT_COLORS.find((c) => c.id === value) || EVENT_COLORS[0];
+  }, [value]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="block text-xs font-semibold theme-text-secondary">
+          Event Color
+        </label>
+        <span className="text-[10px] font-mono theme-text-secondary">
+          {selectedColor.label}
+        </span>
+      </div>
+
+      {/* Default Single Visible Color Card */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border transition cursor-pointer text-left focus:outline-none ${
+          isOpen
+            ? "theme-border border-[var(--accent-main)]/60 theme-bg-sub shadow-xs"
+            : "theme-border theme-bg-sub hover:border-[var(--accent-main)]/40"
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-4 h-4 rounded-full shrink-0 shadow-xs border border-white/20"
+            style={{ backgroundColor: selectedColor.hex }}
+          />
+          <span className="text-xs font-semibold theme-text-primary truncate">
+            {selectedColor.label}
+          </span>
+          <span className="text-[10px] font-mono theme-text-secondary">
+            ({selectedColor.hex})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border theme-border theme-text-secondary">
+            {isOpen ? "Close" : "Change"}
+          </span>
+          <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
+        </div>
+      </button>
+
+      {/* Expanded Color Palette with Color Names */}
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 p-3 rounded-2xl theme-bg-surface border theme-border shadow-2xl space-y-3 animate-fade-in max-h-72 overflow-y-auto">
+          {/* Soft & Light Pastel Colors */}
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
+              Soft & Light Pastel
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {EVENT_COLORS.filter((c) => c.group === "Pastel").map((col) => {
+                const isSelected = selectedColor.id === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(col.id);
+                      setIsOpen(false);
+                    }}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
+                      isSelected
+                        ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/60 font-bold shadow-xs"
+                        : "theme-bg-sub/40 hover:theme-bg-sub border-transparent hover:border theme-border theme-text-primary"
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border border-white/20"
+                      style={{ backgroundColor: col.hex }}
+                    />
+                    <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
+                    {isSelected && <CheckIcon className="w-3 h-3 theme-accent shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Standard Vibrant Colors */}
+          <div className="pt-2 border-t theme-border">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
+              Standard Vibrant
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {EVENT_COLORS.filter((c) => c.group === "Vibrant").map((col) => {
+                const isSelected = selectedColor.id === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(col.id);
+                      setIsOpen(false);
+                    }}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
+                      isSelected
+                        ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/60 font-bold shadow-xs"
+                        : "theme-bg-sub/40 hover:theme-bg-sub border-transparent hover:border theme-border theme-text-primary"
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border border-white/20"
+                      style={{ backgroundColor: col.hex }}
+                    />
+                    <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
+                    {isSelected && <CheckIcon className="w-3 h-3 theme-accent shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TimeScheduleDrawerForm({
   event,
   initialDate,
@@ -370,8 +522,9 @@ export default function TimeScheduleDrawerForm({
   onCancel,
 }) {
   const { activeTenantId } = useTenant();
-  const [eventTypes, setEventTypes] = useState([]);
-  const [eventKinds, setEventKinds] = useState([]);
+  const [eventTypes, setEventTypes] = useState(() => calendarEventTypesStore.getEventTypes(activeTenantId));
+  const [eventKinds, setEventKinds] = useState(() => calendarEventKindsStore.getKinds(activeTenantId));
+  const [workingSchedules, setWorkingSchedules] = useState(() => calendarWorkingSchedulesStore.getSchedules(activeTenantId));
   const [impactScopes, setImpactScopes] = useState(() => calendarImpactScopesStore.getScopes(activeTenantId));
   const [availableRoles, setAvailableRoles] = useState(() => {
     try {
@@ -391,33 +544,20 @@ export default function TimeScheduleDrawerForm({
       { code: "ADMIN", name: "Administration" },
     ];
   });
-  const colorScrollRef = useRef(null);
 
-  // Enable mouse wheel horizontal scrolling on the event colors container
-  useEffect(() => {
-    const el = colorScrollRef.current;
-    if (!el) return;
-    const handleWheel = (e) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, []);
-
-  // Fetch dynamic types, kinds, impact scopes, and user roles from backend API / active institution
+  // Fetch dynamic types, kinds, working schedules, impact scopes, and user roles from backend API / active institution
   useEffect(() => {
     let isMounted = true;
     const loadTypes = () => {
       const types = calendarEventTypesStore.getEventTypes(activeTenantId);
       const kinds = calendarEventKindsStore.getKinds(activeTenantId);
       const scopes = calendarImpactScopesStore.getScopes(activeTenantId);
+      const schedules = calendarWorkingSchedulesStore.getSchedules(activeTenantId);
       if (isMounted) {
         setEventTypes(types || []);
         setEventKinds(kinds || []);
         setImpactScopes(scopes || []);
+        setWorkingSchedules(schedules || []);
       }
     };
     loadTypes();
@@ -443,11 +583,13 @@ export default function TimeScheduleDrawerForm({
 
     window.addEventListener("spr_calendar_event_types_updated", loadTypes);
     window.addEventListener("spr_calendar_event_kinds_updated", loadTypes);
+    window.addEventListener("spr_calendar_working_schedules_updated", loadTypes);
     window.addEventListener("spr_calendar_impact_scopes_updated", loadTypes);
     return () => {
       isMounted = false;
       window.removeEventListener("spr_calendar_event_types_updated", loadTypes);
       window.removeEventListener("spr_calendar_event_kinds_updated", loadTypes);
+      window.removeEventListener("spr_calendar_working_schedules_updated", loadTypes);
       window.removeEventListener("spr_calendar_impact_scopes_updated", loadTypes);
     };
   }, [activeTenantId]);
@@ -508,6 +650,10 @@ export default function TimeScheduleDrawerForm({
     });
   };
 
+  const calendarEvents = useMemo(() => {
+    return masterCalendarStore.getEvents(activeTenantId) || [];
+  }, [activeTenantId]);
+
   const [formData, setFormData] = useState(() => {
     if (event) {
       let initialAudience = ["ALL"];
@@ -533,6 +679,9 @@ export default function TimeScheduleDrawerForm({
         category: event.category || defaultCategory,
         audience: initialAudience.length > 0 ? initialAudience : ["ALL"],
         impacts: initialImpacts.length > 0 ? initialImpacts : ["ALL"],
+        priorityRank: event.priorityRank !== undefined && event.priorityRank !== null
+          ? Number(event.priorityRank)
+          : (event.rank !== undefined ? Number(event.rank) : 1),
         startDate: event.startDate || new Date().toISOString().split("T")[0],
         endDate: event.endDate || "",
         startTime: event.startTime || "09:00",
@@ -548,11 +697,13 @@ export default function TimeScheduleDrawerForm({
         color: event.color || (defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald"),
       };
     }
+    const initialEventsList = masterCalendarStore.getEvents(activeTenantId) || [];
     return {
       title: defaultCategory === "WORKING_HOURS" ? "Morning Working Session" : "Mid-Term Examination",
       category: defaultCategory,
       audience: ["ALL"],
       impacts: ["ALL"],
+      priorityRank: initialEventsList.length + 1,
       startDate: initialDate || new Date().toISOString().split("T")[0],
       endDate: "",
       startTime: "09:00",
@@ -569,58 +720,112 @@ export default function TimeScheduleDrawerForm({
     };
   });
 
+  const priorityRankOptions = useMemo(() => {
+    return getDynamicPriorityRankOptions(calendarEvents, event?.id, formData.priorityRank);
+  }, [calendarEvents, event?.id, formData.priorityRank]);
+
   const prevEventIdRef = useRef(event?.id);
   const prevInitialDateRef = useRef(initialDate);
 
-  // Re-sync form state ONLY when event ID or target initial date actually changes
+  // Re-sync form state when event or target initial date changes
   useEffect(() => {
-    if (event && (prevEventIdRef.current !== event.id || prevInitialDateRef.current !== initialDate)) {
-      prevEventIdRef.current = event.id;
-      prevInitialDateRef.current = initialDate;
+    if (event) {
+      if (prevEventIdRef.current !== event.id || prevInitialDateRef.current !== initialDate) {
+        prevEventIdRef.current = event.id;
+        prevInitialDateRef.current = initialDate;
 
-      let initialAudience = ["ALL"];
-      if (Array.isArray(event.audience)) {
-        initialAudience = event.audience;
-      } else if (typeof event.audience === "string" && event.audience.trim()) {
-        initialAudience = event.audience.split(",").map((s) => s.trim()).filter(Boolean);
-      }
-
-      let rawImpacts = ["ALL"];
-      if (event.impacts) {
-        if (Array.isArray(event.impacts)) {
-          rawImpacts = event.impacts;
-        } else if (typeof event.impacts === "string" && event.impacts.trim()) {
-          rawImpacts = event.impacts.split(",").map((s) => s.trim()).filter(Boolean);
+        let initialAudience = ["ALL"];
+        if (Array.isArray(event.audience)) {
+          initialAudience = event.audience;
+        } else if (typeof event.audience === "string" && event.audience.trim()) {
+          initialAudience = event.audience.split(",").map((s) => s.trim()).filter(Boolean);
         }
+
+        let rawImpacts = ["ALL"];
+        if (event.impacts) {
+          if (Array.isArray(event.impacts)) {
+            rawImpacts = event.impacts;
+          } else if (typeof event.impacts === "string" && event.impacts.trim()) {
+            rawImpacts = event.impacts.split(",").map((s) => s.trim()).filter(Boolean);
+          }
+        }
+
+        const initialImpacts = normalizeImpacts(rawImpacts, impactScopes);
+
+        setFormData({
+          title: event.title || "",
+          category: event.category || defaultCategory,
+          audience: initialAudience.length > 0 ? initialAudience : ["ALL"],
+          impacts: initialImpacts.length > 0 ? initialImpacts : ["ALL"],
+          priorityRank: event.priorityRank !== undefined && event.priorityRank !== null
+            ? Number(event.priorityRank)
+            : (event.rank !== undefined ? Number(event.rank) : 1),
+          startDate: event.startDate || initialDate || new Date().toISOString().split("T")[0],
+          endDate: event.endDate || "",
+          startTime: event.startTime || "09:00",
+          endTime: event.endTime || "17:00",
+          timezone: event.timezone || "Asia/Dhaka",
+          repeats: Boolean(event.repeats),
+          repeatDays: event.repeatDays || [0, 1, 2, 3, 4],
+          frequency: event.frequency || "WEEKLY",
+          until: event.until || (event.endDate ? "DATE" : "ONGOING"),
+          untilDate: event.untilDate || event.endDate || "",
+          isFullDay: Boolean(event.isFullDay || (!event.startTime && !event.endTime)),
+          description: event.description || "",
+          color: event.color || (defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald"),
+        });
       }
-
-      const initialImpacts = normalizeImpacts(rawImpacts, impactScopes);
-
-      setFormData({
-        title: event.title || "",
-        category: event.category || defaultCategory,
-        audience: initialAudience.length > 0 ? initialAudience : ["ALL"],
-        impacts: initialImpacts.length > 0 ? initialImpacts : ["ALL"],
-        startDate: event.startDate || new Date().toISOString().split("T")[0],
-        endDate: event.endDate || "",
-        startTime: event.startTime || "09:00",
-        endTime: event.endTime || "17:00",
-        timezone: event.timezone || "Asia/Dhaka",
-        repeats: Boolean(event.repeats),
-        repeatDays: event.repeatDays || [0, 1, 2, 3, 4],
-        frequency: event.frequency || "WEEKLY",
-        until: event.until || (event.endDate ? "DATE" : "ONGOING"),
-        untilDate: event.untilDate || event.endDate || "",
-        isFullDay: Boolean(event.isFullDay || (!event.startTime && !event.endTime)),
-        description: event.description || "",
-        color: event.color || (defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald"),
-      });
+    } else {
+      // Add mode: sync initialDate if it changes
+      if (initialDate && prevInitialDateRef.current !== initialDate) {
+        prevInitialDateRef.current = initialDate;
+        setFormData((prev) => ({
+          ...prev,
+          startDate: initialDate,
+        }));
+      }
     }
   }, [event, initialDate, defaultCategory, impactScopes]);
 
   const eventTitleOptions = useMemo(() => {
+    const isWorkingHoursCategory = formData.category === "WORKING_HOURS";
+
+    if (isWorkingHoursCategory) {
+      const activeSchedules = (workingSchedules || []).filter((ws) => ws.is_active !== false);
+      const baseList = activeSchedules.length > 0 ? activeSchedules : [
+        { name: "Morning Working Session", description: "Standard morning operational shifts and faculty hours" },
+        { name: "Afternoon Working Session", description: "Staff & faculty afternoon working hours" },
+        { name: "Evening Support Session", description: "Evening tutorial, revision, and support hours" },
+      ];
+
+      const opts = baseList.map((ws) => ({
+        id: ws.id,
+        value: ws.name,
+        label: ws.name,
+        typeLabel: "Working Hours",
+        category: "WORKING_HOURS",
+        type: "WORKING_HOURS",
+        color: "indigo",
+        repeats: true,
+        description: ws.description || "",
+      }));
+
+      if (formData.title && !opts.some((o) => o.value === formData.title)) {
+        opts.unshift({
+          value: formData.title,
+          label: formData.title,
+          typeLabel: "Working Hours",
+          category: "WORKING_HOURS",
+          type: "WORKING_HOURS",
+          color: "indigo",
+          repeats: true,
+        });
+      }
+      return opts;
+    }
+
+    // Dynamic Academic Event Categories from Developer Tools
     const kindsMap = {
-      WORKING_HOURS: "Working Hours",
       ACADEMIC: "Academic",
       HOLIDAY: "Holiday",
       EXAM: "Exam",
@@ -628,43 +833,48 @@ export default function TimeScheduleDrawerForm({
       ACTIVITY: "Sports & Cultural",
       GENERAL: "General",
     };
+    const kindsColorMap = {
+      ACADEMIC: "emerald",
+      HOLIDAY: "rose",
+      EXAM: "amber",
+      MEETING: "blue",
+      ACTIVITY: "purple",
+      GENERAL: "slate",
+    };
+
     (eventKinds || []).forEach((k) => {
-      if (k.value || k.id) {
-        kindsMap[k.value || k.id] = k.label || k.name || k.value;
+      const key = k.value || k.id;
+      if (key) {
+        kindsMap[key] = k.label || k.name || key;
+        if (k.color) kindsColorMap[key] = k.color;
       }
     });
 
-    const active = (eventTypes || []).filter((et) => et.is_active !== false);
-    const isWorkingHoursCategory = formData.category === "WORKING_HOURS";
-
-    const filteredTypes = active.filter((et) => {
-      const isWH = et.type === "WORKING_HOURS" || et.category === "WORKING_HOURS" || et.code?.includes("WORKING_SESSION");
-      return isWorkingHoursCategory ? isWH : !isWH;
-    });
-
-    const baseList = filteredTypes.length > 0 ? filteredTypes : (
-      isWorkingHoursCategory
-        ? [
-            { name: "Morning Working Session", type: "WORKING_HOURS" },
-            { name: "Evening Support Session", type: "WORKING_HOURS" },
-          ]
-        : [
-            { name: "Mid-Term Examination", type: "EXAM" },
-            { name: "Final Term Examination", type: "EXAM" },
-            { name: "Weekly Holiday", type: "HOLIDAY" },
-            { name: "Eid Vacation", type: "HOLIDAY" },
-            { name: "Annual Sports & Cultural Day", type: "ACTIVITY" },
-            { name: "Parent-Teacher Conference", type: "MEETING" },
-          ]
-    );
+    const activeEvents = (eventTypes || []).filter((et) => et.is_active !== false);
+    const baseList = activeEvents.length > 0 ? activeEvents : [
+      { name: "Mid-Term Examination", type: "EXAM", description: "Formal mid-term evaluation & exam schedule" },
+      { name: "Final Term Examination", type: "EXAM", description: "Annual and final institutional examinations" },
+      { name: "Weekly Holiday", type: "HOLIDAY", description: "Standard weekend institutional recess" },
+      { name: "Eid Vacation", type: "HOLIDAY", description: "Special holiday closure for holy Eid celebration" },
+      { name: "Annual Sports & Cultural Day", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering" },
+      { name: "Parent-Teacher Conference", type: "MEETING", description: "Quarterly progress review meetings with guardians" },
+      { name: "Special Academic Event", type: "ACADEMIC", description: "Institutional conferences, orientation, and symposiums" },
+    ];
 
     const opts = baseList.map((et) => {
-      const typeLabel = kindsMap[et.type] || kindsMap[et.category] || (et.type ? et.type.replace(/_/g, " ") : (isWorkingHoursCategory ? "Working Hours" : "Academic Event"));
+      const rawType = et.type || et.category || "ACADEMIC";
+      const typeLabel = kindsMap[rawType] || (rawType ? rawType.replace(/_/g, " ") : "Academic Event");
+      const dynamicColor = kindsColorMap[rawType] || "emerald";
+
       return {
+        id: et.id,
         value: et.name,
         label: et.name,
-        typeLabel: typeLabel,
-        category: et.type || (isWorkingHoursCategory ? "WORKING_HOURS" : "ACADEMIC_EVENT"),
+        typeLabel,
+        category: "ACADEMIC_EVENT",
+        type: rawType,
+        color: dynamicColor,
+        description: et.description || "",
       };
     });
 
@@ -672,12 +882,14 @@ export default function TimeScheduleDrawerForm({
       opts.unshift({
         value: formData.title,
         label: formData.title,
-        typeLabel: isWorkingHoursCategory ? "Working Hours" : "Academic Event",
-        category: isWorkingHoursCategory ? "WORKING_HOURS" : "ACADEMIC_EVENT",
+        typeLabel: "Academic Event",
+        category: "ACADEMIC_EVENT",
+        type: "ACADEMIC",
+        color: "emerald",
       });
     }
     return opts;
-  }, [eventTypes, eventKinds, formData.title, formData.category]);
+  }, [workingSchedules, eventTypes, eventKinds, formData.title, formData.category]);
 
   const isRecurringOrMultiDay = Boolean(
     event && (event.repeats || (event.endDate && event.endDate !== event.startDate))
@@ -694,13 +906,13 @@ export default function TimeScheduleDrawerForm({
       },
       {
         value: "THIS_AND_FOLLOWING",
-        label: "This and following days",
-        description: `Applies from ${effectiveTargetDate} onwards. Preserves past attendance and history.`,
+        label: `This and all following days (from ${effectiveTargetDate})`,
+        description: "Preserves earlier historical records and applies modifications to future dates.",
       },
       {
         value: "ALL_EVENTS",
-        label: "All days in series",
-        description: "Updates all occurrences across past, present, and future dates.",
+        label: "Entire recurring schedule series",
+        description: "Applies changes to all past, present, and future recurring dates in this schedule.",
       },
     ];
   }, [effectiveTargetDate]);
@@ -718,6 +930,16 @@ export default function TimeScheduleDrawerForm({
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
+
+    if (!formData.title.trim()) {
+      alert("Please enter or select a schedule/event title");
+      return;
+    }
+    if (!formData.startDate) {
+      alert("Please specify a start date");
+      return;
+    }
+
     const audienceString = Array.isArray(formData.audience)
       ? (formData.audience.length === 0 ? "ALL" : formData.audience.join(", "))
       : (formData.audience || "ALL");
@@ -725,11 +947,12 @@ export default function TimeScheduleDrawerForm({
     if (onSave) {
       onSave({
         ...formData,
+        priorityRank: Number(formData.priorityRank) || 1,
         audience: audienceString,
         impacts: Array.isArray(formData.impacts) ? formData.impacts : (formData.impacts ? [formData.impacts] : ["ALL"]),
         id: event ? event.id : undefined,
-        editScope: isRecurringOrMultiDay ? editScope : "ALL_EVENTS",
         targetDate: effectiveTargetDate,
+        editScope: isRecurringOrMultiDay ? editScope : "ALL_EVENTS",
         endDate: formData.until === "DATE" ? (formData.untilDate || formData.endDate) : "",
         startTime: formData.isFullDay ? "" : formData.startTime,
         endTime: formData.isFullDay ? "" : formData.endTime,
@@ -748,10 +971,13 @@ export default function TimeScheduleDrawerForm({
                 value={formData.category}
                 onChange={(val) => {
                   const isWH = val === "WORKING_HOURS";
+                  const defaultTitle = isWH
+                    ? (workingSchedules?.[0]?.name || "Morning Working Session")
+                    : (eventTypes?.[0]?.name || "Mid-Term Examination");
                   setFormData((prev) => ({ 
                     ...prev, 
                     category: val,
-                    title: isWH ? "Morning Working Session" : "Mid-Term Examination",
+                    title: defaultTitle,
                     color: isWH ? "indigo" : "emerald",
                     repeats: isWH ? true : prev.repeats,
                   }));
@@ -786,23 +1012,50 @@ export default function TimeScheduleDrawerForm({
             />
           </div>
 
+          {/* Priority & Precedence Rank (Dynamic selection based on existing calendar items) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold theme-text-secondary">
+                Priority Rank
+              </label>
+              <span className="text-[10px] font-mono theme-accent font-semibold">
+                Rank {formData.priorityRank || 1}
+              </span>
+            </div>
+            <CustomSelect
+              value={formData.priorityRank || 1}
+              onChange={(val) => setFormData({ ...formData, priorityRank: Number(val) })}
+              options={priorityRankOptions}
+              placeholder="Select Priority Rank..."
+              showDescription={true}
+              direction="auto"
+            />
+          </div>
+
           {/* Schedule / Event Dropdown (Configured from Developer Tools) */}
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Schedule</label>
+            <label className="block text-xs font-semibold theme-text-secondary mb-1.5">Schedule / Event</label>
             <CustomSelect
               value={formData.title}
               onChange={(val) => {
                 const matched = eventTitleOptions.find((o) => o.value === val);
-                const isWH = matched?.category === "WORKING_HOURS" || formData.category === "WORKING_HOURS";
-                setFormData((prev) => ({
-                  ...prev,
-                  title: val,
-                  category: isWH ? "WORKING_HOURS" : "ACADEMIC_EVENT",
-                  color: isWH ? "indigo" : (matched?.category === "HOLIDAY" ? "rose" : prev.color),
-                }));
+                if (matched) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    title: matched.value,
+                    type: matched.type,
+                    category: matched.category,
+                    color: matched.color || prev.color,
+                    repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
+                  }));
+                } else {
+                  setFormData((prev) => ({ ...prev, title: val }));
+                }
               }}
               options={eventTitleOptions}
               placeholder="Select Schedule / Event..."
+              searchable={true}
+              showDescription={true}
             />
           </div>
 
@@ -877,43 +1130,11 @@ export default function TimeScheduleDrawerForm({
             </div>
           )}
 
-          {/* 15 Curated Event Color Swatches (Single line with mouse-wheel horizontal scroll & no card background) */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold theme-text-secondary">
-                Event Color
-              </label>
-              <span className="text-[10px] font-mono theme-text-secondary capitalize">
-                {formData.color || "Default"}
-              </span>
-            </div>
-            <div 
-              ref={colorScrollRef}
-              className="flex items-center gap-3 py-1.5 px-0.5 overflow-x-auto scrollbar-none select-none cursor-grab active:cursor-grabbing"
-            >
-              {EVENT_COLORS.map((col) => {
-                const isSelected = formData.color === col.id;
-                return (
-                  <button
-                    key={col.id}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, color: col.id })}
-                    style={{ backgroundColor: col.hex }}
-                    className={`w-7 h-7 shrink-0 rounded-full transition-all cursor-pointer flex items-center justify-center relative ${
-                      isSelected
-                        ? "ring-2 ring-offset-2 ring-offset-[var(--bg-surface)] ring-[var(--accent-main)] scale-110 shadow-sm"
-                        : "hover:scale-105 opacity-80 hover:opacity-100"
-                    }`}
-                    title={col.label}
-                  >
-                    {isSelected && (
-                      <span className="w-2 h-2 rounded-full bg-white shadow-xs" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Event Color Picker Dropdown with Single Visible Default & Expandable Palette */}
+          <EventColorPickerDropdown
+            value={formData.color}
+            onChange={(val) => setFormData({ ...formData, color: val })}
+          />
 
           {/* Repeats Toggle Switch (Matches All Day Toggle Design) */}
           <div className="flex items-center justify-between p-3 rounded-xl border theme-border theme-bg-sub/50">

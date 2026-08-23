@@ -61,6 +61,7 @@ export default function InstitutionListView({
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // High-Security Delete Confirmation State
   const [deletingInst, setDeletingInst] = useState(null);
@@ -77,6 +78,21 @@ export default function InstitutionListView({
     setAdminPassword('');
     setDeleteCountdown(3);
   };
+
+  const handleSelectRow = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -563,6 +579,21 @@ export default function InstitutionListView({
 
       {/* 4. Display: Reusable DataCardGrid or DataTable */}
       <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'academy' : 'academies'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
         {viewMode === 'grid' ? (
           <DataCardGrid
             data={filteredInstitutions}
@@ -581,6 +612,11 @@ export default function InstitutionListView({
           <DataTable
             columns={tableColumns}
             data={filteredInstitutions}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
             isLoading={isLoading}
             loadingMessage="Loading academies table..."
             emptyIcon={BuildingOfficeIcon}
@@ -598,7 +634,7 @@ export default function InstitutionListView({
           <DataViewFooter
             filteredCount={filteredInstitutions.length}
             totalCount={institutions.length}
-            itemLabel="academies"
+            itemLabel="academies & organizations"
           />
         )}
       </div>

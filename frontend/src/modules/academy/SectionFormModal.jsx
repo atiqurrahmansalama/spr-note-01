@@ -1,32 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
-import {
-  ClassIcon,
-  BuildingOfficeIcon,
-  TeacherIcon,
-  StudentIcon,
-} from '../../components/ui/Icons';
-import Modal from '../../components/ui/Modal';
+import { createSection, updateSection } from '../../api/academy';
+import { CloseIcon, ClassIcon } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
 import CustomCheckbox from '../../components/ui/CustomCheckbox';
-import { createSection, updateSection } from '../../api/academy';
 
 const SECTION_TYPES = [
   { label: 'General Academic Section', value: 'GENERAL_SECTION' },
-  { label: 'Hifz Halqa / Quran Circle', value: 'HIFZ_HALQA' },
-  { label: 'Residential Dorm / Boarding', value: 'RESIDENTIAL_DORM' },
+  { label: 'Hifz Halqa / Circle', value: 'HIFZ_HALQA' },
+  { label: 'Residential Dormitory', value: 'RESIDENTIAL_DORM' },
 ];
 
 export default function SectionFormModal({
   isOpen,
   onClose,
-  editingSection,
-  defaultClassId = null,
-  defaultBranchId = null,
-  onSuccess,
+  section = null,
+  classes = [],
+  branches = [],
+  teachers = [],
+  onSaved,
 }) {
   const { showToast } = useToast();
+  const isEdit = Boolean(section?.id);
 
   const [formData, setFormData] = useState({
     student_class: '',
@@ -39,73 +34,40 @@ export default function SectionFormModal({
     is_active: true,
   });
 
-  const [classes, setClasses] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [loadingLookups, setLoadingLookups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      loadLookups();
-      if (editingSection) {
-        setFormData({
-          student_class: editingSection.student_class || '',
-          branch: editingSection.branch || '',
-          section_name: editingSection.section_name || '',
-          section_type: editingSection.section_type || 'GENERAL_SECTION',
-          room_number: editingSection.room_number || '',
-          max_capacity: editingSection.max_capacity || 40,
-          class_teacher: editingSection.class_teacher || '',
-          is_active: editingSection.is_active ?? true,
-        });
-      } else {
-        setFormData({
-          student_class: defaultClassId || '',
-          branch: defaultBranchId || '',
-          section_name: '',
-          section_type: 'GENERAL_SECTION',
-          room_number: '',
-          max_capacity: 40,
-          class_teacher: '',
-          is_active: true,
-        });
-      }
+    if (section) {
+      setFormData({
+        student_class: section.student_class || '',
+        branch: section.branch || '',
+        section_name: section.section_name || '',
+        section_type: section.section_type || 'GENERAL_SECTION',
+        room_number: section.room_number || '',
+        max_capacity: section.max_capacity ?? 40,
+        class_teacher: section.class_teacher || '',
+        is_active: section.is_active ?? true,
+      });
+    } else {
+      setFormData({
+        student_class: classes[0]?.id || '',
+        branch: branches[0]?.id || '',
+        section_name: '',
+        section_type: 'GENERAL_SECTION',
+        room_number: '',
+        max_capacity: 40,
+        class_teacher: '',
+        is_active: true,
+      });
     }
-  }, [isOpen, editingSection, defaultClassId, defaultBranchId]);
+  }, [section, classes, branches]);
 
-  const loadLookups = async () => {
-    setLoadingLookups(true);
-    try {
-      const [classRes, branchRes, staffRes] = await Promise.allSettled([
-        fetchWithAuth('/api/v1/classes/'),
-        fetchWithAuth('/api/v1/academy/branches/'),
-        fetchWithAuth('/api/v1/staff/'),
-      ]);
-
-      if (classRes.status === 'fulfilled' && classRes.value.ok) {
-        const d = await classRes.value.json();
-        setClasses(Array.isArray(d) ? d : d.results || []);
-      }
-      if (branchRes.status === 'fulfilled' && branchRes.value.ok) {
-        const d = await branchRes.value.json();
-        setBranches(Array.isArray(d) ? d : d.results || []);
-      }
-      if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
-        const d = await staffRes.value.json();
-        setTeachers(Array.isArray(d) ? d : d.results || []);
-      }
-    } catch {
-      // Lookups fail gracefully
-    } finally {
-      setLoadingLookups(false);
-    }
-  };
+  if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!formData.student_class) {
-      showToast('Class assignment is required.', 'warning');
+      showToast('Please select a target Academic Class.', 'warning');
       return;
     }
     if (!formData.section_name.trim()) {
@@ -126,14 +88,14 @@ export default function SectionFormModal({
     };
 
     try {
-      if (editingSection) {
-        await updateSection(editingSection.id, payload);
+      if (isEdit) {
+        await updateSection(section.id, payload);
         showToast('Section updated successfully.', 'success');
       } else {
         await createSection(payload);
-        showToast('Section created successfully.', 'success');
+        showToast('New section created successfully.', 'success');
       }
-      onSuccess?.();
+      onSaved?.();
       onClose();
     } catch (err) {
       showToast(err.message || 'Failed to save section.', 'error');
@@ -142,183 +104,181 @@ export default function SectionFormModal({
     }
   };
 
-  const classOptions = [
-    { label: 'Select Academic Class', value: '' },
-    ...classes.map((c) => ({
-      label: `${c.name} ${c.code ? `(${c.code})` : ''}`,
-      value: c.id,
-    })),
-  ];
+  const classOptions = classes.map((c) => ({
+    label: `${c.name} ${c.code ? `(${c.code})` : ''}`,
+    value: String(c.id),
+  }));
 
   const branchOptions = [
-    { label: 'Main / Unassigned Campus', value: '' },
+    { label: 'All Branches / Main Campus', value: '' },
     ...branches.map((b) => ({
-      label: `${b.branch_name} ${b.branch_code ? `(${b.branch_code})` : ''}`,
-      value: b.id,
+      label: b.branch_name,
+      value: String(b.id),
     })),
   ];
 
   const teacherOptions = [
-    { label: 'None (Unassigned Ustadh / Teacher)', value: '' },
+    { label: '-- Unassigned Teacher --', value: '' },
     ...teachers.map((t) => ({
-      label: `${t.user_name || t.employee_id || 'Teacher'} - ${t.designation || 'Faculty'}`,
-      value: t.id,
+      label: `${t.name || t.first_name || 'Teacher'} (${t.phone_number || 'No Phone'})`,
+      value: String(t.id),
     })),
   ];
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={editingSection ? 'Edit Class Section / Halqa' : 'Add Class Section / Halqa'}
-      subtitle="Configure section capacity, room assignment, and class teacher."
-      icon={ClassIcon}
-      maxWidth="max-w-xl"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Academic Class <span className="text-rose-500">*</span>
-            </label>
-            <CustomSelect
-              options={classOptions}
-              value={formData.student_class}
-              onChange={(val) =>
-                setFormData({ ...formData, student_class: val })
-              }
-              placeholder="Assign to Class"
-            />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-left">
+      <div className="w-full max-w-lg theme-bg-surface border theme-border rounded-3xl p-6 shadow-2xl space-y-6 animate-scale-in">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b theme-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent">
+              <ClassIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold theme-text-primary">
+                {isEdit ? 'Edit Class Section' : 'Create Class Section / Halqa'}
+              </h3>
+              <p className="text-xs theme-text-secondary">
+                Configure classroom sections, halqa divisions, and teacher assignments.
+              </p>
+            </div>
           </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Campus / Branch
-            </label>
-            <CustomSelect
-              options={branchOptions}
-              value={formData.branch}
-              onChange={(val) =>
-                setFormData({ ...formData, branch: val })
-              }
-              placeholder="Select Branch"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Section Type
-            </label>
-            <CustomSelect
-              options={SECTION_TYPES}
-              value={formData.section_type}
-              onChange={(val) =>
-                setFormData({ ...formData, section_type: val })
-              }
-              placeholder="Section Format"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Section Name / Code <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Section A, Halqa-1, Boys Wing"
-              value={formData.section_name}
-              onChange={(e) =>
-                setFormData({ ...formData, section_name: e.target.value })
-              }
-              className="w-full bg-zinc-900/80 border border-zinc-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 transition-all outline-none"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Room / Location Number
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Room 204, 3rd Floor"
-              value={formData.room_number}
-              onChange={(e) =>
-                setFormData({ ...formData, room_number: e.target.value })
-              }
-              className="w-full bg-zinc-900/80 border border-zinc-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 transition-all outline-none"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Max Student Capacity
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="500"
-              value={formData.max_capacity}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  max_capacity: parseInt(e.target.value, 10) || 1,
-                })
-              }
-              className="w-full bg-zinc-900/80 border border-zinc-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 transition-all outline-none font-mono"
-            />
-          </div>
-
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Class Teacher / Section In-Charge
-            </label>
-            <CustomSelect
-              options={teacherOptions}
-              value={formData.class_teacher}
-              onChange={(val) =>
-                setFormData({ ...formData, class_teacher: val })
-              }
-              placeholder="Assign Ustadh / Faculty"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between">
-          <CustomCheckbox
-            id="section-is-active"
-            checked={formData.is_active}
-            onChange={(checked) =>
-              setFormData({ ...formData, is_active: checked })
-            }
-            label="Active Section"
-            description="Allows students to be enrolled into this section."
-          />
+        {/* Form Inputs */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Target Academic Class <span className="text-rose-400">*</span>
+              </label>
+              <CustomSelect
+                options={classOptions}
+                value={formData.student_class ? String(formData.student_class) : ''}
+                onChange={(val) => setFormData({ ...formData, student_class: val })}
+                placeholder="Select Academic Class"
+              />
+            </div>
 
-          <div className="flex items-center gap-3">
+            <div>
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Campus / Branch
+              </label>
+              <CustomSelect
+                options={branchOptions}
+                value={formData.branch ? String(formData.branch) : ''}
+                onChange={(val) => setFormData({ ...formData, branch: val })}
+                placeholder="Select Campus"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Section Format
+              </label>
+              <CustomSelect
+                options={SECTION_TYPES}
+                value={formData.section_type}
+                onChange={(val) => setFormData({ ...formData, section_type: val })}
+                placeholder="Section Format"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Section Name / Code <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Section A, Halqa-1, Boys Wing"
+                value={formData.section_name}
+                onChange={(e) => setFormData({ ...formData, section_name: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-medium theme-text-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Room Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Room 204"
+                value={formData.room_number}
+                onChange={(e) => setFormData({ ...formData, room_number: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-mono theme-text-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Max Capacity
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={formData.max_capacity}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_capacity: parseInt(e.target.value, 10) || 1,
+                  })
+                }
+                className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-xs font-mono theme-text-primary"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                Class Teacher / Section In-Charge
+              </label>
+              <CustomSelect
+                options={teacherOptions}
+                value={formData.class_teacher ? String(formData.class_teacher) : ''}
+                onChange={(val) => setFormData({ ...formData, class_teacher: val })}
+                placeholder="Assign Ustadh / Faculty"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl theme-bg-sub border theme-border">
+            <CustomCheckbox
+              id="section-is-active"
+              checked={formData.is_active}
+              onChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              label="Active Section"
+              description="Allows students to be enrolled into this section."
+            />
+          </div>
+
+          <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition-all"
+              disabled={submitting}
+              className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-xs font-semibold bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-xl shadow-lg shadow-sky-500/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition cursor-pointer disabled:opacity-50"
             >
-              {submitting && (
-                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-              )}
-              {editingSection ? 'Save Section' : 'Create Section'}
+              {submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Section'}
             </button>
           </div>
-        </div>
-      </form>
-    </Modal>
+        </form>
+      </div>
+    </div>
   );
 }

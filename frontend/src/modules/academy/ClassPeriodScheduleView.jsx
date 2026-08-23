@@ -10,7 +10,6 @@ import {
   CloseIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
-import MetricsGrid from '../../components/ui/MetricsGrid';
 import CustomSelect from '../../components/ui/CustomSelect';
 import DataTable from '../../components/ui/DataTable';
 import DataCardGrid from '../../components/ui/DataCardGrid';
@@ -44,7 +43,6 @@ const SLOT_TYPE_CONFIG = {
 
 export default function ClassPeriodScheduleView({
   hideHeader = false,
-  hideMetrics = false,
   isEmbedded = false,
 }) {
   const { showToast } = useToast();
@@ -54,6 +52,7 @@ export default function ClassPeriodScheduleView({
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // View Mode: 'grid' (Cards) or 'table' (Data Table)
   const [viewMode, setViewMode] = useState(() => {
@@ -71,6 +70,21 @@ export default function ClassPeriodScheduleView({
     } catch {}
   };
 
+  const handleSelectRow = React.useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = React.useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -86,7 +100,7 @@ export default function ClassPeriodScheduleView({
     loadSlots();
   }, [deptFilter, classFilter, teacherFilter, slotTypeFilter]);
 
-  const loadLookups = async () => {
+  const loadLookups = React.useCallback(async () => {
     try {
       const [deptRes, classRes, staffRes] = await Promise.allSettled([
         fetchWithAuth('/api/v1/departments/'),
@@ -107,9 +121,9 @@ export default function ClassPeriodScheduleView({
         setTeachers(Array.isArray(d) ? d : d.results || []);
       }
     } catch {}
-  };
+  }, []);
 
-  const loadSlots = async () => {
+  const loadSlots = React.useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -128,7 +142,7 @@ export default function ClassPeriodScheduleView({
     } finally {
       setLoading(false);
     }
-  };
+  }, [deptFilter, classFilter, teacherFilter, slotTypeFilter, showToast]);
 
   const { openDrawer, closeDrawer } = useRightSidebar();
 
@@ -160,8 +174,7 @@ export default function ClassPeriodScheduleView({
           />
         ),
       };
-    },
-    [periodSlots, deptFilter, classFilter, loadSlots, closeDrawer, showToast]
+    }
   );
 
   const handleCreateNew = () => {
@@ -244,52 +257,6 @@ export default function ClassPeriodScheduleView({
       (s.branch_name && s.branch_name.toLowerCase().includes(q))
     );
   });
-
-  const teachingPeriodsCount = periodSlots.filter(
-    (s) => s.slot_type === 'TEACHING_PERIOD'
-  ).length;
-  const breaksCount = periodSlots.filter(
-    (s) => s.slot_type === 'BREAK_TIFFIN' || s.slot_type === 'PRAYER_BREAK'
-  ).length;
-  const totalAcademicMinutes = periodSlots
-    .filter((s) => s.slot_type === 'TEACHING_PERIOD')
-    .reduce((acc, curr) => acc + (curr.duration_minutes || 0), 0);
-
-  const metricCards = [
-    {
-      label: 'Total Period Slots',
-      value: periodSlots.length,
-      icon: TimerIcon,
-      color: 'accent',
-      subLabel: 'Configured routine periods',
-    },
-    {
-      label: 'Teaching Periods',
-      value: teachingPeriodsCount,
-      icon: ClassIcon,
-      color: 'accent',
-      subLabel: `${totalAcademicMinutes} mins academic routine`,
-    },
-    {
-      label: 'Breaks & Salah',
-      value: breaksCount,
-      icon: SparklesIcon,
-      color: 'accent',
-      subLabel: 'Intervals & prayer breaks',
-    },
-    {
-      label: 'Daily Schedule Span',
-      value:
-        periodSlots.length >= 2
-          ? `${periodSlots[0]?.start_time?.slice(0, 5)} - ${periodSlots[periodSlots.length - 1]?.end_time?.slice(0, 5)}`
-          : periodSlots.length === 1
-          ? `${periodSlots[0]?.start_time?.slice(0, 5)}`
-          : '--',
-      icon: TimerIcon,
-      color: 'accent',
-      subLabel: 'Full day routine span',
-    },
-  ];
 
   const deptOptions = [
     { label: 'All Departments', value: 'ALL' },
@@ -450,21 +417,6 @@ export default function ClassPeriodScheduleView({
             </div>
           </div>
         </div>
-
-        {/* Footer Status */}
-        <div className="pt-3 border-t theme-border flex items-center justify-between text-xs">
-          <span className="theme-text-secondary text-[11px]">Slot Status:</span>
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-              slot.is_active
-                ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20'
-                : 'theme-bg-sub theme-text-secondary border theme-border'
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${slot.is_active ? 'bg-[var(--accent-main)]' : 'theme-bg-elevated'}`}></span>
-            {slot.is_active ? 'Active' : 'Inactive'}
-          </span>
-        </div>
       </div>
     );
   };
@@ -584,22 +536,6 @@ export default function ClassPeriodScheduleView({
       ),
     },
     {
-      header: 'Status',
-      align: 'center',
-      headerClassName: 'w-24',
-      render: (slot) => (
-        <span
-          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider border shadow-xs inline-block ${
-            slot.is_active
-              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20'
-              : 'theme-bg-sub theme-text-secondary theme-border opacity-70'
-          }`}
-        >
-          {slot.is_active ? 'Active' : 'Inactive'}
-        </span>
-      ),
-    },
-    {
       header: 'Actions',
       align: 'right',
       headerClassName: 'w-16 text-right',
@@ -616,7 +552,7 @@ export default function ClassPeriodScheduleView({
     : 'Add academic lecture periods, break times, and study sessions to build the routine schedule.';
 
   return (
-    <div className={`${isEmbedded ? 'w-full space-y-6 animate-fade-in' : 'p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fade-in'} theme-text-primary`}>
+    <div className={`${isEmbedded ? 'w-full space-y-4 sm:space-y-6 animate-fade-in' : 'p-3 sm:p-5 md:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-fade-in'} theme-text-primary`}>
       {/* Header */}
       {!hideHeader && (
         <PageHeader
@@ -639,14 +575,11 @@ export default function ClassPeriodScheduleView({
         />
       )}
 
-      {/* Metrics */}
-      {!hideMetrics && <MetricsGrid items={metricCards} />}
-
       {/* Responsive Filters & ViewMode Toolbar */}
       <div className="theme-bg-surface border theme-border p-3 sm:p-4 rounded-2xl shadow-xs space-y-3">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-2.5 items-center">
-          {/* Search (Full width on small screens, 1 col on desktop) */}
-          <div className="col-span-2 lg:col-span-1 relative w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-2.5 items-center">
+          {/* Search (Full width on small phones, 2 col on tablet, 1 col on desktop) */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-1 relative w-full">
             <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 theme-text-secondary opacity-60 pointer-events-none" />
             <input
               type="text"
@@ -667,7 +600,7 @@ export default function ClassPeriodScheduleView({
             )}
           </div>
 
-          {/* Department Filter (2 per line on mobile) */}
+          {/* Department Filter */}
           <div className="col-span-1 w-full">
             <CustomSelect
               options={deptOptions}
@@ -677,7 +610,7 @@ export default function ClassPeriodScheduleView({
             />
           </div>
 
-          {/* Class Filter (2 per line on mobile) */}
+          {/* Class Filter */}
           <div className="col-span-1 w-full">
             <CustomSelect
               options={classOptions}
@@ -687,7 +620,7 @@ export default function ClassPeriodScheduleView({
             />
           </div>
 
-          {/* Teacher Filter (replaces branch filter) */}
+          {/* Teacher Filter */}
           <div className="col-span-1 w-full">
             <CustomSelect
               options={teacherOptions}
@@ -697,7 +630,7 @@ export default function ClassPeriodScheduleView({
             />
           </div>
 
-          {/* Slot Type Filter (2 per line on mobile) */}
+          {/* Slot Type Filter */}
           <div className="col-span-1 w-full">
             <CustomSelect
               options={slotTypeOptions}
@@ -709,8 +642,8 @@ export default function ClassPeriodScheduleView({
         </div>
 
         {/* Active Filter Summary Bar & View Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t theme-border text-xs">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t theme-border text-xs">
+          <div className="flex flex-wrap items-center gap-2">
             {hasActiveFilters ? (
               <>
                 <span className="text-[11px] font-semibold theme-text-secondary">
@@ -736,11 +669,11 @@ export default function ClassPeriodScheduleView({
           </div>
 
           {/* View Mode Switcher (Cards Grid vs Data Table) */}
-          <div className="flex items-center gap-1 theme-bg-sub border theme-border p-1 rounded-xl shrink-0 select-none ml-auto">
+          <div className="flex items-center justify-center sm:justify-end gap-1 theme-bg-sub border theme-border p-1 rounded-xl shrink-0 select-none w-full sm:w-auto">
             <button
               type="button"
               onClick={() => handleToggleViewMode('grid')}
-              className={`px-3 py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 ${
+              className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
                 viewMode === 'grid'
                   ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
                   : 'theme-text-secondary hover:theme-text-primary font-medium'
@@ -751,7 +684,7 @@ export default function ClassPeriodScheduleView({
             <button
               type="button"
               onClick={() => handleToggleViewMode('table')}
-              className={`px-3 py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 ${
+              className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
                 viewMode === 'table'
                   ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
                   : 'theme-text-secondary hover:theme-text-primary font-medium'
@@ -765,6 +698,21 @@ export default function ClassPeriodScheduleView({
 
       {/* Main Content Area: Reusable DataCardGrid or DataTable */}
       <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'period slot' : 'period slots'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
         {viewMode === 'grid' ? (
           <DataCardGrid
             data={filteredSlots}
@@ -774,12 +722,17 @@ export default function ClassPeriodScheduleView({
             emptyTitle="No Period Slots Found"
             emptySubMessage={emptySubMessage}
             emptyIcon={TimerIcon}
-            gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4"
+            gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4"
           />
         ) : (
           <DataTable
             columns={tableColumns}
             data={filteredSlots}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
             isLoading={loading}
             loadingMessage="Loading period schedule slots..."
             emptyTitle="No Period Slots Found"

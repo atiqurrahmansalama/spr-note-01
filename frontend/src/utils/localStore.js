@@ -610,6 +610,8 @@ const DEFAULT_CALENDAR_EVENTS = [
     frequency: "WEEKLY",
     until: "ONGOING",
     startDate: "2026-01-01",
+    priorityRank: 1,
+    impacts: [],
     description: "Standard institution morning operational & academic hours",
   },
   {
@@ -625,6 +627,8 @@ const DEFAULT_CALENDAR_EVENTS = [
     frequency: "WEEKLY",
     until: "ONGOING",
     startDate: "2026-01-01",
+    priorityRank: 2,
+    impacts: [],
     description: "Staff & faculty afternoon working hours",
   },
   {
@@ -640,6 +644,8 @@ const DEFAULT_CALENDAR_EVENTS = [
     frequency: "WEEKLY",
     until: "ONGOING",
     startDate: "2026-01-01",
+    priorityRank: 3,
+    impacts: [],
     description: "Evening tutorial and faculty support shift",
   },
   {
@@ -651,6 +657,8 @@ const DEFAULT_CALENDAR_EVENTS = [
     endDate: "2026-06-09",
     isFullDay: true,
     repeats: false,
+    priorityRank: 1,
+    impacts: ["ATTENDANCE"],
     description: "Institutional closure for Holy Eid-ul-Adha",
   },
   {
@@ -663,14 +671,61 @@ const DEFAULT_CALENDAR_EVENTS = [
     startTime: "09:30",
     endTime: "12:30",
     repeats: false,
+    priorityRank: 2,
+    impacts: ["ATTENDANCE"],
     description: "Comprehensive mid-term evaluation across all academic levels",
   },
 ];
 
+/**
+ * Dynamically generates priority rank options based on the total number of events
+ * without hardcoding fixed limits.
+ */
+export const getDynamicPriorityRankOptions = (events = [], currentEventId = null, currentRank = null) => {
+  const list = Array.isArray(events) ? events : [];
+  // Calculate total positions dynamically: existing count + 1 (for new entries)
+  const totalRanks = Math.max(list.length + (currentEventId ? 0 : 1), currentRank ? Number(currentRank) : 1, 1);
+
+  const options = [];
+  for (let i = 1; i <= totalRanks; i++) {
+    const existingAtRank = list.find(
+      (e) => Number(e.priorityRank || e.rank) === i && String(e.id) !== String(currentEventId)
+    );
+    const isTop = i === 1;
+    const isBottom = i === totalRanks && totalRanks > 1;
+
+    let label = `Rank ${i}`;
+    if (isTop) label += " (Highest Priority / Top Precedence)";
+    else if (isBottom) label += " (Lowest Priority)";
+
+    let description = existingAtRank
+      ? `Currently assigned to: ${existingAtRank.title}`
+      : isTop
+      ? "Highest precedence — overrides all coinciding events on the same day"
+      : `Priority Level ${i}`;
+
+    options.push({
+      value: i,
+      label,
+      badge: `Rank ${i}`,
+      description,
+    });
+  }
+  return options;
+};
+
 export const masterCalendarStore = {
   getEvents: (tenantId) => {
     const key = `spr_master_calendar_${tenantId || 'default'}`;
-    return readJSON(key, DEFAULT_CALENDAR_EVENTS);
+    const data = readJSON(key, DEFAULT_CALENDAR_EVENTS);
+    if (!Array.isArray(data)) return [];
+    // Ensure all events have a valid priorityRank
+    return data.map((evt, idx) => ({
+      ...evt,
+      priorityRank: evt.priorityRank !== undefined && evt.priorityRank !== null
+        ? Number(evt.priorityRank)
+        : (evt.rank !== undefined ? Number(evt.rank) : idx + 1),
+    }));
   },
   saveEvents: (tenantId, events) => {
     const key = `spr_master_calendar_${tenantId || 'default'}`;
@@ -680,8 +735,13 @@ export const masterCalendarStore = {
   },
   addEvent: (tenantId, eventData) => {
     const list = masterCalendarStore.getEvents(tenantId);
+    const rankVal = eventData.priorityRank !== undefined && eventData.priorityRank !== null
+      ? Number(eventData.priorityRank)
+      : list.length + 1;
+
     const newEvent = {
       ...eventData,
+      priorityRank: rankVal,
       id: eventData.id || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),
     };
@@ -697,13 +757,27 @@ export const masterCalendarStore = {
       ? updatedData.impacts
       : (updatedData.impacts ? [updatedData.impacts] : ["ALL"]);
 
+    const cleanPriorityRank = updatedData.priorityRank !== undefined && updatedData.priorityRank !== null
+      ? Number(updatedData.priorityRank)
+      : undefined;
+
     // Case 1: Only for this single day occurrence
     if (editScope === "THIS_EVENT" && eventId) {
       const existing = list.find((e) => e.id === eventId);
       if (existing) {
         // If the event being edited is ALREADY a single override (isOverride: true), just update it directly!
         if (existing.isOverride) {
-          const updated = list.map((e) => (e.id === eventId ? { ...e, ...updatedData, impacts: cleanImpacts, updatedAt: new Date().toISOString() } : e));
+          const updated = list.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  ...updatedData,
+                  priorityRank: cleanPriorityRank !== undefined ? cleanPriorityRank : (e.priorityRank || 1),
+                  impacts: cleanImpacts,
+                  updatedAt: new Date().toISOString(),
+                }
+              : e
+          );
           masterCalendarStore.saveEvents(tenantId, updated);
           return updated.find((e) => e.id === eventId);
         }
@@ -718,6 +792,7 @@ export const masterCalendarStore = {
         const singleOverride = {
           ...existing,
           ...updatedData,
+          priorityRank: cleanPriorityRank !== undefined ? cleanPriorityRank : (existing.priorityRank || 1),
           impacts: cleanImpacts,
           id: `evt_ovr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           startDate: targetDate,
@@ -856,15 +931,98 @@ export const masterCalendarStore = {
   },
 };
 
+export const DEFAULT_WORKING_SCHEDULES = [
+  { id: "ws-1", name: "Morning Working Session", code: "MORNING_WORKING_SESSION", type: "WORKING_HOURS", description: "Standard morning operational shifts and faculty hours", order: 1, is_active: true },
+  { id: "ws-2", name: "Afternoon Working Session", code: "AFTERNOON_WORKING_SESSION", type: "WORKING_HOURS", description: "Staff & faculty afternoon working hours", order: 2, is_active: true },
+  { id: "ws-3", name: "Evening Support Session", code: "EVENING_SUPPORT_SESSION", type: "WORKING_HOURS", description: "Evening tutorial, revision, and support hours", order: 3, is_active: true },
+];
+
+export const calendarWorkingSchedulesStore = {
+  getSchedules: (tenantId) => {
+    const key = `spr_calendar_working_schedules_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_WORKING_SCHEDULES);
+  },
+  saveSchedules: (tenantId, schedules) => {
+    const key = `spr_calendar_working_schedules_${tenantId || 'default'}`;
+    writeJSON(key, schedules);
+    window.dispatchEvent(new CustomEvent("spr_calendar_working_schedules_updated", { detail: schedules }));
+    return schedules;
+  },
+  addSchedule: (tenantId, scheduleData) => {
+    const list = calendarWorkingSchedulesStore.getSchedules(tenantId);
+    const code = (scheduleData.code || scheduleData.name || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_").slice(0, 35);
+    const newSchedule = {
+      ...scheduleData,
+      id: scheduleData.id || `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      code: code || `SCHEDULE_${Date.now()}`,
+      name: scheduleData.name || code,
+      type: "WORKING_HOURS",
+      description: scheduleData.description || "",
+      order: scheduleData.order || list.length + 1,
+      is_active: scheduleData.is_active !== undefined ? scheduleData.is_active : true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newSchedule];
+    calendarWorkingSchedulesStore.saveSchedules(tenantId, updated);
+    return newSchedule;
+  },
+  updateSchedule: (tenantId, id, updatedData) => {
+    const list = calendarWorkingSchedulesStore.getSchedules(tenantId);
+    const existing = list.find((s) => s.id === id);
+    const oldName = existing?.name;
+    const newName = updatedData.name || oldName;
+
+    const updated = list.map((s) => (s.id === id ? { ...s, ...updatedData, updatedAt: new Date().toISOString() } : s));
+    calendarWorkingSchedulesStore.saveSchedules(tenantId, updated);
+
+    // Synchronize existing master calendar events if schedule name or description changed
+    if (oldName) {
+      const calEvents = masterCalendarStore.getEvents(tenantId);
+      let changed = false;
+      const syncedEvents = calEvents.map((evt) => {
+        if (evt.title === oldName || evt.workingScheduleId === id || String(evt.id) === String(id)) {
+          changed = true;
+          return {
+            ...evt,
+            title: newName,
+            description: updatedData.description !== undefined ? updatedData.description : evt.description,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return evt;
+      });
+      if (changed) {
+        masterCalendarStore.saveEvents(tenantId, syncedEvents);
+      }
+    }
+    return updated;
+  },
+  deleteSchedule: (tenantId, id) => {
+    const list = calendarWorkingSchedulesStore.getSchedules(tenantId);
+    const existing = list.find((s) => s.id === id);
+    const oldName = existing?.name;
+    const updated = list.filter((s) => s.id !== id);
+    calendarWorkingSchedulesStore.saveSchedules(tenantId, updated);
+
+    if (oldName) {
+      const calEvents = masterCalendarStore.getEvents(tenantId);
+      const syncedEvents = calEvents.filter((evt) => evt.title !== oldName && evt.workingScheduleId !== id);
+      if (syncedEvents.length !== calEvents.length) {
+        masterCalendarStore.saveEvents(tenantId, syncedEvents);
+      }
+    }
+    return updated;
+  },
+};
+
 export const DEFAULT_CALENDAR_EVENT_TYPES = [
-  { id: "et-1", name: "Morning Working Session", code: "MORNING_WORKING_SESSION", type: "WORKING_HOURS", description: "Standard morning operational shifts and faculty hours", order: 1, is_active: true },
-  { id: "et-2", name: "Evening Support Session", code: "EVENING_SUPPORT_SESSION", type: "WORKING_HOURS", description: "Evening tutorial, revision, and support hours", order: 2, is_active: true },
+  { id: "et-1", name: "Mid-Term Examination", code: "MID_TERM_EXAMINATION", type: "EXAM", description: "Formal mid-term evaluation & exam schedule", order: 1, is_active: true },
+  { id: "et-2", name: "Final Term Examination", code: "FINAL_TERM_EXAMINATION", type: "EXAM", description: "Annual and final institutional examinations", order: 2, is_active: true },
   { id: "et-3", name: "Weekly Holiday", code: "WEEKLY_HOLIDAY", type: "HOLIDAY", description: "Standard weekend institutional recess", order: 3, is_active: true },
   { id: "et-4", name: "Eid Vacation", code: "EID_VACATION", type: "HOLIDAY", description: "Special holiday closure for holy Eid celebration", order: 4, is_active: true },
-  { id: "et-5", name: "Mid-Term Examination", code: "MID_TERM_EXAMINATION", type: "EXAM", description: "Formal mid-term evaluation & exam schedule", order: 5, is_active: true },
-  { id: "et-6", name: "Final Term Examination", code: "FINAL_TERM_EXAMINATION", type: "EXAM", description: "Annual and final institutional examinations", order: 6, is_active: true },
-  { id: "et-7", name: "Annual Sports & Cultural Day", code: "ANNUAL_SPORTS_DAY", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering", order: 7, is_active: true },
-  { id: "et-8", name: "Parent-Teacher Conference", code: "PARENT_TEACHER_CONFERENCE", type: "MEETING", description: "Quarterly progress review meetings with guardians", order: 8, is_active: true },
+  { id: "et-5", name: "Annual Sports & Cultural Day", code: "ANNUAL_SPORTS_DAY", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering", order: 5, is_active: true },
+  { id: "et-6", name: "Parent-Teacher Conference", code: "PARENT_TEACHER_CONFERENCE", type: "MEETING", description: "Quarterly progress review meetings with guardians", order: 6, is_active: true },
+  { id: "et-7", name: "Special Academic Event", code: "SPECIAL_ACADEMIC_EVENT", type: "ACADEMIC", description: "Institutional conferences, orientation, and symposiums", order: 7, is_active: true },
 ];
 
 export const DEFAULT_EVENT_KINDS = [
@@ -954,14 +1112,52 @@ export const calendarEventTypesStore = {
   },
   updateEventType: (tenantId, id, updatedData) => {
     const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const existing = list.find((t) => t.id === id);
+    const oldName = existing?.name;
+    const newName = updatedData.name || oldName;
+    const oldType = existing?.type;
+    const newType = updatedData.type || oldType;
+
     const updated = list.map((t) => (t.id === id ? { ...t, ...updatedData, updatedAt: new Date().toISOString() } : t));
     calendarEventTypesStore.saveEventTypes(tenantId, updated);
+
+    // Synchronize master calendar events if event name, type, or description changed
+    if (oldName) {
+      const calEvents = masterCalendarStore.getEvents(tenantId);
+      let changed = false;
+      const syncedEvents = calEvents.map((evt) => {
+        if (evt.title === oldName || evt.eventTypeId === id || String(evt.id) === String(id)) {
+          changed = true;
+          return {
+            ...evt,
+            title: newName,
+            category: newType || evt.category,
+            description: updatedData.description !== undefined ? updatedData.description : evt.description,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return evt;
+      });
+      if (changed) {
+        masterCalendarStore.saveEvents(tenantId, syncedEvents);
+      }
+    }
     return updated;
   },
   deleteEventType: (tenantId, id) => {
     const list = calendarEventTypesStore.getEventTypes(tenantId);
+    const existing = list.find((t) => t.id === id);
+    const oldName = existing?.name;
     const updated = list.filter((t) => t.id !== id);
     calendarEventTypesStore.saveEventTypes(tenantId, updated);
+
+    if (oldName) {
+      const calEvents = masterCalendarStore.getEvents(tenantId);
+      const syncedEvents = calEvents.filter((evt) => evt.title !== oldName && evt.eventTypeId !== id);
+      if (syncedEvents.length !== calEvents.length) {
+        masterCalendarStore.saveEvents(tenantId, syncedEvents);
+      }
+    }
     return updated;
   },
   migrateEventType: (tenantId, fromType, toType) => {
@@ -1060,6 +1256,84 @@ export const calendarImpactScopesStore = {
     const updated = list.filter((s) => s.id !== id);
     calendarImpactScopesStore.saveScopes(tenantId, updated);
     return updated;
+  },
+};
+
+// ─── Attendance Event & Holiday Restrictions Store ───────────────────────────
+export const DEFAULT_ATTENDANCE_EVENT_RESTRICTIONS = {
+  // Keyed by event type code, ID, or kind slug
+  "WEEKLY_HOLIDAY": { disabled: true, auto_excuse: true },
+  "EID_VACATION": { disabled: true, auto_excuse: true },
+  "MID_TERM_EXAMINATION": { disabled: true, auto_excuse: false },
+  "FINAL_TERM_EXAMINATION": { disabled: true, auto_excuse: false },
+  "ANNUAL_SPORTS_DAY": { disabled: false, auto_excuse: false },
+  "PARENT_TEACHER_CONFERENCE": { disabled: false, auto_excuse: false },
+  "SPECIAL_ACADEMIC_EVENT": { disabled: false, auto_excuse: false },
+  // Category defaults fallback
+  "HOLIDAY": { disabled: true, auto_excuse: true },
+};
+
+export const attendanceEventRestrictionsStore = {
+  getRestrictions: (tenantId) => {
+    const key = `spr_attendance_event_restrictions_${tenantId || 'default'}`;
+    return readJSON(key, DEFAULT_ATTENDANCE_EVENT_RESTRICTIONS);
+  },
+  saveRestrictions: (tenantId, restrictions) => {
+    const key = `spr_attendance_event_restrictions_${tenantId || 'default'}`;
+    writeJSON(key, restrictions);
+    window.dispatchEvent(new CustomEvent("spr_attendance_event_restrictions_updated", { detail: restrictions }));
+    return restrictions;
+  },
+  setEventDisabled: (tenantId, eventCodeOrId, isDisabled, extra = {}) => {
+    const current = attendanceEventRestrictionsStore.getRestrictions(tenantId);
+    const updated = {
+      ...current,
+      [eventCodeOrId]: {
+        ...(current[eventCodeOrId] || {}),
+        ...extra,
+        disabled: Boolean(isDisabled),
+      },
+    };
+    attendanceEventRestrictionsStore.saveRestrictions(tenantId, updated);
+    return updated;
+  },
+  isAttendanceDisabledForEvent: (tenantId, evt) => {
+    if (!evt) return false;
+    const restrictions = attendanceEventRestrictionsStore.getRestrictions(tenantId);
+
+    // 1. Direct matching by code / id / eventTypeId
+    if (evt.code && restrictions[evt.code] !== undefined) {
+      return Boolean(restrictions[evt.code]?.disabled);
+    }
+    if (evt.eventTypeId && restrictions[evt.eventTypeId] !== undefined) {
+      return Boolean(restrictions[evt.eventTypeId]?.disabled);
+    }
+    if (evt.id && restrictions[evt.id] !== undefined) {
+      return Boolean(restrictions[evt.id]?.disabled);
+    }
+
+    // 2. Matching by title converted to slug
+    const titleSlug = (evt.title || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+    if (titleSlug && restrictions[titleSlug] !== undefined) {
+      return Boolean(restrictions[titleSlug]?.disabled);
+    }
+
+    // 3. Matching by event type or category
+    const eventType = (evt.type || evt.rawType || "").toUpperCase();
+    if (eventType && restrictions[eventType] !== undefined) {
+      return Boolean(restrictions[eventType]?.disabled);
+    }
+
+    const eventCategory = (evt.category || "").toUpperCase();
+    if (eventCategory && restrictions[eventCategory] !== undefined) {
+      return Boolean(restrictions[eventCategory]?.disabled);
+    }
+
+    // Default fallback: Holiday is disabled by default
+    if (eventCategory === "HOLIDAY" || eventType === "HOLIDAY") {
+      return true;
+    }
+    return false;
   },
 };
 

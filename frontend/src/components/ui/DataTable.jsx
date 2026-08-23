@@ -1,4 +1,5 @@
 import React from 'react';
+import CustomCheckbox from './CustomCheckbox';
 
 export default function DataTable({
   columns = [],
@@ -10,9 +11,20 @@ export default function DataTable({
   emptySubMessage = 'No matching data available to display.',
   emptyIcon: EmptyIcon,
   onRowClick,
+  hideHeader = false,
+  compact = false,
+  cellPaddingClass = '',
   wrapperClassName = '',
   tableClassName = '',
   rowClassName,
+  // --- Reusable Multi-Selection Props ---
+  selectable = false,
+  selectedIds = [],
+  onSelectRow,
+  onSelectAll,
+  idField = 'id',
+  selectionHeaderClassName = 'w-12 text-center',
+  selectionCellClassName = 'text-center',
 }) {
   if (isLoading) {
     return (
@@ -43,35 +55,87 @@ export default function DataTable({
     );
   }
 
+  const defaultHeaderPad = compact ? 'py-2 px-3' : 'py-3.5 px-4 sm:px-6';
+  const defaultCellPad = cellPaddingClass || (compact ? 'py-1.5 px-3' : 'py-3.5 px-4 sm:px-6');
+
+  const getItemId = (item, idx) => {
+    if (item && item[idField] !== undefined && item[idField] !== null) {
+      return item[idField];
+    }
+    return keyExtractor(item, idx);
+  };
+
+  const selectedSet = React.useMemo(() => {
+    if (!selectable) return new Set();
+    if (selectedIds instanceof Set) return selectedIds;
+    if (Array.isArray(selectedIds)) return new Set(selectedIds);
+    return new Set();
+  }, [selectable, selectedIds]);
+
+  const isSelected = (item, idx) => {
+    if (!selectable) return false;
+    const itemId = getItemId(item, idx);
+    return selectedSet.has(itemId);
+  };
+
+  const isAllSelected =
+    selectable &&
+    data.length > 0 &&
+    data.every((item, idx) => isSelected(item, idx));
+
   return (
     <div className={`theme-bg-surface border theme-border rounded-2xl shadow-xs overflow-hidden ${wrapperClassName}`}>
       <div className="overflow-x-auto">
         <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
-          <thead className="border-b theme-border theme-bg-sub/60 theme-text-secondary uppercase text-[10px] tracking-wider font-bold">
-            <tr>
-              {columns.map((col, idx) => {
-                const alignClass =
-                  col.align === 'center'
-                    ? 'text-center'
-                    : col.align === 'right'
-                    ? 'text-right'
-                    : 'text-left';
-
-                return (
+          {!hideHeader && (
+            <thead className="border-b theme-border theme-bg-sub/60 theme-text-secondary uppercase text-[10px] tracking-wider font-bold">
+              <tr>
+                {selectable && (
                   <th
-                    key={col.key || idx}
-                    className={`py-3.5 px-4 sm:px-6 ${alignClass} ${col.headerClassName || ''}`}
+                    className={`${defaultHeaderPad} ${selectionHeaderClassName}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {col.header}
+                    <div className="flex items-center justify-center">
+                      <CustomCheckbox
+                        size="sm"
+                        checked={isAllSelected}
+                        onChange={(checked) => {
+                          const allIds = data.map((item, idx) => getItemId(item, idx));
+                          onSelectAll?.(checked ? allIds : [], checked);
+                        }}
+                        disabled={data.length === 0}
+                      />
+                    </div>
                   </th>
-                );
-              })}
-            </tr>
-          </thead>
+                )}
+                {columns.map((col, idx) => {
+                  const alignClass =
+                    col.align === 'center'
+                      ? 'text-center'
+                      : col.align === 'right'
+                      ? 'text-right'
+                      : 'text-left';
+
+                  return (
+                    <th
+                      key={col.key || idx}
+                      className={`${defaultHeaderPad} ${alignClass} ${col.headerClassName || ''}`}
+                    >
+                      {col.header}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+          )}
           <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06] text-xs">
             {data.map((item, rowIdx) => {
               const rowKey = keyExtractor(item, rowIdx);
-              const customRowClass = typeof rowClassName === 'function' ? rowClassName(item, rowIdx) : rowClassName || '';
+              const itemSelected = isSelected(item, rowIdx);
+              const customRowClass =
+                typeof rowClassName === 'function'
+                  ? rowClassName(item, rowIdx, itemSelected)
+                  : rowClassName || '';
 
               return (
                 <tr
@@ -89,9 +153,26 @@ export default function DataTable({
                     onRowClick?.(item);
                   }}
                   className={`hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors ${
-                    onRowClick ? 'cursor-pointer' : ''
-                  } ${customRowClass}`}
+                    itemSelected ? 'theme-bg-accent-soft/20' : ''
+                  } ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
                 >
+                  {selectable && (
+                    <td
+                      className={`${defaultCellPad} ${selectionCellClassName}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center">
+                        <CustomCheckbox
+                          size="sm"
+                          checked={itemSelected}
+                          onChange={(checked) => {
+                            const itemId = getItemId(item, rowIdx);
+                            onSelectRow?.(itemId, item, checked);
+                          }}
+                        />
+                      </div>
+                    </td>
+                  )}
                   {columns.map((col, colIdx) => {
                     const alignClass =
                       col.align === 'center'
@@ -114,7 +195,7 @@ export default function DataTable({
                     return (
                       <td
                         key={col.key || colIdx}
-                        className={`py-3.5 px-4 sm:px-6 ${alignClass} ${customCellClass}`}
+                        className={`${defaultCellPad} ${alignClass} ${customCellClass}`}
                       >
                         {content}
                       </td>

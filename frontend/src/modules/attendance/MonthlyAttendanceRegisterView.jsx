@@ -20,8 +20,8 @@ import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
-import { calendarSettings, attendanceFilters, masterCalendarStore } from '../../utils/localStore';
-import { getHijriDateString } from '../../utils/hijriUtils';
+import { calendarSettings, attendanceFilters, masterCalendarStore, attendanceEventRestrictionsStore } from '../../utils/localStore';
+import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors } from '../../components/common/MasterTimeCalendar';
 import DayAgendaDrawer from '../../components/common/DayAgendaDrawer';
 import TimeScheduleDrawerForm from '../../components/common/TimeScheduleDrawerForm';
@@ -108,9 +108,11 @@ export default function MonthlyAttendanceRegisterView({
 
     window.addEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
     window.addEventListener('spr_calendar_events_updated', handleCalendarUpdate);
+    window.addEventListener('spr_attendance_event_restrictions_updated', handleCalendarUpdate);
     return () => {
       window.removeEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
       window.removeEventListener('spr_calendar_events_updated', handleCalendarUpdate);
+      window.removeEventListener('spr_attendance_event_restrictions_updated', handleCalendarUpdate);
     };
   }, []);
 
@@ -161,13 +163,11 @@ export default function MonthlyAttendanceRegisterView({
     fetchMetadata();
   }, [activeTenantId]);
 
-  // 2. Fetch Groups when Class changes
+  // 2. Fetch All Groups (with page_size=500 to ensure 100% of all groups appear)
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const url = selectedClassId
-          ? `/api/v1/groups/?student_class=${selectedClassId}`
-          : `/api/v1/groups/`;
+        const url = `/api/v1/groups/?page_size=500`;
         const res = await fetchWithAuth(url);
         if (res.ok) {
           const data = await res.json();
@@ -175,7 +175,7 @@ export default function MonthlyAttendanceRegisterView({
           setGroups(grpList);
           if (savedFilters.groupId && grpList.some(g => String(g.id) === String(savedFilters.groupId))) {
             setSelectedGroupId(String(savedFilters.groupId));
-          } else if (!grpList.some(g => String(g.id) === String(selectedGroupId))) {
+          } else if (selectedGroupId && !grpList.some(g => String(g.id) === String(selectedGroupId))) {
             setSelectedGroupId('');
           }
         }
@@ -185,7 +185,7 @@ export default function MonthlyAttendanceRegisterView({
     };
 
     fetchGroups();
-  }, [selectedClassId]);
+  }, [activeTenantId]);
 
   // 3. Fetch Monthly / Range Attendance Matrix
   const loadMatrix = useCallback(async () => {
@@ -292,7 +292,7 @@ export default function MonthlyAttendanceRegisterView({
     setEndDate('');
   };
 
-  // Toggle "Take Attendance" mode & automatically trigger Full Screen
+  // Toggle "Take Attendance" mode & automatically trigger Full Screen / Exit Full Screen
   const handleToggleTakeAttendance = () => {
     setIsEditing((prev) => {
       const next = !prev;
@@ -300,7 +300,8 @@ export default function MonthlyAttendanceRegisterView({
         setIsFullscreen(true);
         showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark attendance.', 'info');
       } else {
-        showToast('Attendance marking mode saved.', 'success');
+        setIsFullscreen(false);
+        showToast('Attendance marking finished. Exited full screen.', 'success');
       }
       return next;
     });
@@ -317,18 +318,38 @@ export default function MonthlyAttendanceRegisterView({
     if (startDate && endDate) {
       const [sy, sm, sd] = startDate.split('-');
       const [ey, em, ed] = endDate.split('-');
+
+      // Check if it is Full Hijri Month
+      const hijriRange = getCurrentHijriMonthRange(new Date(startDate));
+      const isFullHijriMonth = (startDate === hijriRange.start && endDate === hijriRange.end);
+
+      if (isFullHijriMonth) {
+        const gregorianTitle = `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`;
+        const hijriTitle = `${hijriRange.hijriMonthName} ${hijriRange.hijriYear} AH`;
+        return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: true };
+      }
+
+      // Single Day (e.g. Today or Yesterday or Custom single day)
+      if (startDate === endDate) {
+        const gregorianTitle = `${sd}/${sm}/${sy}`;
+        const hijriTitle = getHijriDateString(startDate);
+        return { gregorianTitle, hijriTitle, isSingleDay: true, isFullHijriMonth: false };
+      }
+
+      // Multi-Day Range (e.g. Last 7 Days, Last 14 Days, Custom Range)
       const gregorianTitle = `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`;
       const hijriTitle = `${getHijriDateString(startDate)} – ${getHijriDateString(endDate)}`;
-      return { gregorianTitle, hijriTitle };
+
+      return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: false };
     }
 
     const firstDayStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
     const gregorianTitle = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
     const hijriTitle = getHijriDateString(firstDayStr);
-    return { gregorianTitle, hijriTitle };
+    return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: false };
   };
 
-  const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
+  const { gregorianTitle, hijriTitle, isFullHijriMonth } = getHeaderDateDetails();
 
   // Merge Master Calendar Events & Holidays impacting Attendance with API matrixData
   const enrichedMatrixData = useMemo(() => {
@@ -338,29 +359,46 @@ export default function MonthlyAttendanceRegisterView({
 
     const hasAttendanceImpact = (evt) => {
       if (!evt) return false;
-      if (!evt.impacts) return true; // Default if not specified
+      // 1. Check if configured as disabled in Attendance Settings
+      if (attendanceEventRestrictionsStore.isAttendanceDisabledForEvent(activeTenantId, evt)) {
+        return true;
+      }
+
       const impacts = Array.isArray(evt.impacts)
         ? evt.impacts
         : (typeof evt.impacts === 'string' ? evt.impacts.split(',').map((s) => s.trim()) : []);
-      if (impacts.length === 0) return true;
-      return impacts.some((imp) => {
-        const s = String(imp).toUpperCase();
-        return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
-      });
+
+      // If impacts array is explicitly provided
+      if (impacts.length > 0) {
+        return impacts.some((imp) => {
+          const s = String(imp).toUpperCase();
+          return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
+        });
+      }
+
+      // If impacts are NOT specified, only genuine Holidays, Exams or Academic Events impact student attendance
+      if (evt.category === 'HOLIDAY' || evt.category === 'EXAM' || evt.category === 'ACADEMIC_EVENT' || evt.is_holiday || evt.affects_students) {
+        return true;
+      }
+
+      return false;
     };
 
     const findMatchingAttendanceEvent = (dateStr, weekdayNum) => {
+      const matched = [];
       for (const evt of calendarEvents) {
         if (!hasAttendanceImpact(evt)) continue;
         if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) continue;
 
         // 1. Single date match
         if (evt.startDate === dateStr && (!evt.endDate || evt.endDate === dateStr)) {
-          return evt;
+          matched.push(evt);
+          continue;
         }
         // 2. Date range match
         if (evt.startDate && evt.endDate && dateStr >= evt.startDate && dateStr <= evt.endDate) {
-          return evt;
+          matched.push(evt);
+          continue;
         }
         // 3. Recurring match (e.g. weekly events / off-days)
         if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
@@ -368,11 +406,19 @@ export default function MonthlyAttendanceRegisterView({
             if (evt.until === 'DATE' && evt.untilDate && dateStr > evt.untilDate) {
               continue;
             }
-            return evt;
+            matched.push(evt);
           }
         }
       }
-      return null;
+
+      if (matched.length === 0) return null;
+      matched.sort((a, b) => {
+        const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
+        const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
+        return rankA - rankB;
+      });
+
+      return matched[0];
     };
 
     const enrichedDaysHeader = matrixData.days_header.map((d) => {
@@ -382,16 +428,22 @@ export default function MonthlyAttendanceRegisterView({
 
       const matchedEvt = findMatchingAttendanceEvent(dateStr, weekdayNum);
       const eventColors = matchedEvt ? getEventColors(matchedEvt) : null;
+      const isAttendanceDisabled = Boolean(
+        matchedEvt && attendanceEventRestrictionsStore.isAttendanceDisabledForEvent(activeTenantId, matchedEvt)
+      );
       const isCalHoliday = Boolean(
-        matchedEvt && (matchedEvt.category === 'HOLIDAY' || matchedEvt.is_holiday)
+        matchedEvt && (matchedEvt.category === 'HOLIDAY' || matchedEvt.is_holiday || isAttendanceDisabled)
       );
       const isHoliday = Boolean(isCalHoliday);
-      const holidayTitle = isCalHoliday ? (matchedEvt.title || 'Institutional Holiday') : '';
+      const holidayTitle = isCalHoliday
+        ? (matchedEvt.title || (isAttendanceDisabled ? 'Class Attendance Off' : 'Institutional Holiday'))
+        : '';
 
       return {
         ...d,
         date: dateStr,
         is_holiday: isHoliday,
+        is_disabled: isAttendanceDisabled,
         is_weekend: false,
         holiday_title: holidayTitle,
         calendar_event: matchedEvt,
@@ -409,22 +461,28 @@ export default function MonthlyAttendanceRegisterView({
       let lv_count = 0;
       let hol_count = 0;
 
-      enrichedDaysHeader.forEach((d) => {
-        const isOff = Boolean(d.is_holiday);
-        const st = row.daily_statuses[d.date] || row.daily_statuses[d.day];
+      const cleanedDailyStatuses = { ...(row.daily_statuses || {}) };
 
+      enrichedDaysHeader.forEach((d) => {
+        const isOff = Boolean(d.is_holiday || d.is_disabled);
         if (isOff) {
           hol_count += 1;
-        } else if (st === 'PRESENT') {
-          p_count += 1;
-        } else if (st === 'LATE') {
-          l_count += 1;
-        } else if (st === 'ABSENT') {
-          a_count += 1;
-        } else if (st === 'HALF_DAY') {
-          hd_count += 1;
-        } else if (st === 'ON_LEAVE') {
-          lv_count += 1;
+          // Clear any previous status for this off day so it's not marked or shown
+          if (d.date) cleanedDailyStatuses[d.date] = null;
+          if (d.day) cleanedDailyStatuses[d.day] = null;
+        } else {
+          const st = cleanedDailyStatuses[d.date] || cleanedDailyStatuses[d.day];
+          if (st === 'PRESENT') {
+            p_count += 1;
+          } else if (st === 'LATE') {
+            l_count += 1;
+          } else if (st === 'ABSENT') {
+            a_count += 1;
+          } else if (st === 'HALF_DAY') {
+            hd_count += 1;
+          } else if (st === 'ON_LEAVE') {
+            lv_count += 1;
+          }
         }
       });
 
@@ -434,6 +492,7 @@ export default function MonthlyAttendanceRegisterView({
 
       return {
         ...row,
+        daily_statuses: cleanedDailyStatuses,
         totals: {
           present: p_count,
           late: l_count,
@@ -482,7 +541,7 @@ export default function MonthlyAttendanceRegisterView({
       const updatedMatrix = prev.students_matrix.map((row) => {
         const isMatch =
           row.student_id === studentId &&
-          (!periodSlotId || !row.period_slot_id || String(row.period_slot_id) === String(periodSlotId));
+          (periodSlotId ? String(row.period_slot_id) === String(periodSlotId) : true);
         if (!isMatch) return row;
 
         const updatedStatuses = { ...row.daily_statuses, [dateStr]: nextStatus };
@@ -561,7 +620,7 @@ export default function MonthlyAttendanceRegisterView({
     }
   };
 
-  // Click on date header -> Open Day Agenda & Task Worklist in Right Sidebar
+  // Click on date header -> Open Day Schedule & Event Details (Strictly Read-Only from Attendance)
   const handleDateHeaderClick = (d) => {
     const dateStr =
       d.date ||
@@ -583,66 +642,33 @@ export default function MonthlyAttendanceRegisterView({
       return false;
     });
 
-    const handleEditEvent = (evt) => {
+    if (matchedEvents.length === 1) {
       openRightSidebar({
-        title: "Edit Schedule / Task",
-        subtitle: dateStr,
+        title: matchedEvents[0].title || "Event Details",
+        subtitle: `Date: ${dateStr}`,
         size: "md",
         content: (
-          <TimeScheduleDrawerForm
-            event={evt}
-            initialDate={dateStr}
-            onSave={(saved) => {
-              masterCalendarStore.updateEvent(activeTenantId, saved.id, saved);
-              showToast("Schedule updated successfully!", "success");
-              closeRightSidebar();
-            }}
-            onCancel={closeRightSidebar}
+          <TimeScheduleDetailDrawer
+            event={matchedEvents[0]}
+            currentDate={dateStr}
+            readOnly={true}
+            onClose={closeRightSidebar}
           />
         ),
       });
-    };
-
-    const handleAddEvent = (targetDate) => {
-      openRightSidebar({
-        title: "Add Day Schedule / Task",
-        subtitle: targetDate || dateStr,
-        size: "md",
-        content: (
-          <TimeScheduleDrawerForm
-            initialDate={targetDate || dateStr}
-            defaultCategory="ACADEMIC_EVENT"
-            onSave={(saved) => {
-              masterCalendarStore.addEvent(activeTenantId, saved);
-              showToast("Event created successfully!", "success");
-              closeRightSidebar();
-            }}
-            onCancel={closeRightSidebar}
-          />
-        ),
-      });
-    };
-
-    const handleDeleteEvent = (evtOrId, options = {}) => {
-      const id = typeof evtOrId === "object" ? evtOrId.id : evtOrId;
-      const opts = typeof evtOrId === "object" ? evtOrId : options;
-      masterCalendarStore.deleteEvent(activeTenantId, id, opts);
-      showToast("Schedule deleted successfully!", "info");
-      closeRightSidebar();
-    };
+      return;
+    }
 
     openRightSidebar({
-      title: matchedEvents.length === 1 ? (matchedEvents[0].title || "Event Details") : "Day Agenda & Worklist",
+      title: matchedEvents.length > 1 ? "Day Schedule & Events" : "Day Agenda",
       subtitle: `Date: ${dateStr}`,
       size: "md",
       content: (
         <DayAgendaDrawer
           dateStr={dateStr}
           events={matchedEvents}
+          readOnly={true}
           onClose={closeRightSidebar}
-          onEditEvent={handleEditEvent}
-          onDeleteEvent={handleDeleteEvent}
-          onAddEvent={handleAddEvent}
         />
       ),
     });
@@ -749,21 +775,32 @@ export default function MonthlyAttendanceRegisterView({
     })),
   ];
 
-  const groupOptions = [
-    { value: '', label: 'All Groups' },
-    ...groups.map((g) => ({
-      value: String(g.id),
-      label: g.name,
-    })),
-  ];
+  const groupOptions = useMemo(() => {
+    let list = groups;
+    if (selectedClassId) {
+      const classSpecific = groups.filter((g) => String(g.student_class) === String(selectedClassId) || String(g.student_class_id) === String(selectedClassId) || String(g.student_class?.id) === String(selectedClassId));
+      const others = groups.filter((g) => !classSpecific.some((cg) => cg.id === g.id));
+      list = classSpecific.length > 0 ? [...classSpecific, ...others] : groups;
+    }
+    return [
+      { value: '', label: 'All Groups' },
+      ...list.map((g) => ({
+        value: String(g.id),
+        label: g.student_class_name ? `${g.name} (${g.student_class_name})` : g.name,
+      })),
+    ];
+  }, [groups, selectedClassId]);
 
-  const teacherOptions = [
+  const teacherOptions = useMemo(() => [
     { value: '', label: 'All Teachers' },
-    ...teachers.map((t) => ({
-      value: String(t.id),
-      label: `${t.user_name || t.employee_id || 'Teacher'} (${t.designation || 'Faculty'})`,
-    })),
-  ];
+    ...teachers.map((t) => {
+      const teacherName = t.user_name || t.name || t.full_name || t.employee_id || `Teacher #${t.id}`;
+      return {
+        value: String(t.id),
+        label: teacherName,
+      };
+    }),
+  ], [teachers]);
 
   const selectedClassName = classes.find((c) => String(c.id) === selectedClassId)?.name || 'All Classes';
   const selectedGroupName = groups.find((g) => String(g.id) === selectedGroupId)?.name || '';
@@ -853,7 +890,7 @@ export default function MonthlyAttendanceRegisterView({
               {isEditing ? (
                 <>
                   <FilledCheckCircleIcon className="w-4 h-4" />
-                  <span>Done Marking</span>
+                  <span>Done</span>
                 </>
               ) : (
                 <>
@@ -872,17 +909,12 @@ export default function MonthlyAttendanceRegisterView({
           {/* Top Row: Date Display & Smart Adaptive Stepper */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-0.5">
-              {/* Line 1: Gregorian Date / Month Year / Range */}
+              {/* Line 1: Main Title (Hijri Month Name if Full Hijri Month selected, otherwise Gregorian Date / Month Year / Range) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
                 <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
-                  {gregorianTitle}
+                  {isFullHijriMonth ? hijriTitle : gregorianTitle}
                 </h2>
-                {startDate && endDate && (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent uppercase tracking-wider">
-                    Custom Range
-                  </span>
-                )}
                 {isEditing && (
                   <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider animate-pulse">
                     Attendance Marking Active
@@ -890,12 +922,16 @@ export default function MonthlyAttendanceRegisterView({
                 )}
               </div>
 
-              {/* Line 2: Islamic Hijri Summary (if setting enabled) */}
-              {isHijriEnabled && (
+              {/* Line 2: Secondary Date Summary */}
+              {isFullHijriMonth ? (
+                <p className="text-xs theme-accent font-medium pl-6">
+                  Gregorian Range: <span className="font-semibold">{gregorianTitle}</span>
+                </p>
+              ) : isHijriEnabled ? (
                 <p className="text-xs theme-accent font-medium pl-6">
                   Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
                 </p>
-              )}
+              ) : null}
             </div>
 
             {/* Smart Stepper Controls */}
@@ -963,7 +999,7 @@ export default function MonthlyAttendanceRegisterView({
             {/* 4. Reusable Date Range Filter */}
             <div>
               <DateRangePicker
-                label="View Period / Date Range"
+                label="Date Range"
                 startDate={startDate}
                 endDate={endDate}
                 onRangeSelect={handleDateRangeSelect}

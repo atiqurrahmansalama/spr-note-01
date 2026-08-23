@@ -6,7 +6,6 @@ import {
   SleekCheckIcon,
 } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
-import CustomCheckbox from '../../components/ui/CustomCheckbox';
 import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { createPeriodSlot, updatePeriodSlot } from '../../api/academy';
 
@@ -21,7 +20,6 @@ export default function PeriodForm({
   editingSlot = null,
   defaultDepartmentId = null,
   defaultClassId = null,
-  defaultBranchId = null,
   nextOrder = 1,
   onSaved,
   onCancel,
@@ -37,15 +35,12 @@ export default function PeriodForm({
     end_time: '08:45',
     department: defaultDepartmentId || '',
     student_class: defaultClassId || '',
-    branch: defaultBranchId || '',
     teacher: '',
-    is_active: true,
   });
 
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [departments, setDepartments] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [branches, setBranches] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -80,9 +75,7 @@ export default function PeriodForm({
         end_time: editingSlot.end_time ? editingSlot.end_time.slice(0, 5) : '08:45',
         department: editingSlot.department || '',
         student_class: editingSlot.student_class || '',
-        branch: editingSlot.branch || '',
         teacher: editingSlot.teacher || '',
-        is_active: editingSlot.is_active ?? true,
       });
     } else {
       setFormData({
@@ -93,20 +86,17 @@ export default function PeriodForm({
         end_time: '08:45',
         department: defaultDepartmentId || '',
         student_class: defaultClassId || '',
-        branch: defaultBranchId || '',
         teacher: '',
-        is_active: true,
       });
     }
-  }, [editingSlot, defaultDepartmentId, defaultClassId, defaultBranchId, nextOrder]);
+  }, [editingSlot, defaultDepartmentId, defaultClassId, nextOrder]);
 
   const loadLookups = async () => {
     setLoadingLookups(true);
     try {
-      const [deptRes, classRes, branchRes, staffRes] = await Promise.allSettled([
+      const [deptRes, classRes, staffRes] = await Promise.allSettled([
         fetchWithAuth('/api/v1/departments/'),
         fetchWithAuth('/api/v1/classes/'),
-        fetchWithAuth('/api/v1/academy/branches/'),
         fetchWithAuth('/api/v1/staff/'),
       ]);
 
@@ -117,10 +107,6 @@ export default function PeriodForm({
       if (classRes.status === 'fulfilled' && classRes.value.ok) {
         const d = await classRes.value.json();
         setClasses(Array.isArray(d) ? d : d.results || []);
-      }
-      if (branchRes.status === 'fulfilled' && branchRes.value.ok) {
-        const d = await branchRes.value.json();
-        setBranches(Array.isArray(d) ? d : d.results || []);
       }
       if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
         const d = await staffRes.value.json();
@@ -149,22 +135,20 @@ export default function PeriodForm({
       period_name: formData.period_name.trim(),
       slot_type: formData.slot_type,
       period_order: parseInt(formData.period_order, 10) || 1,
-      start_time: formData.start_time.length === 5 ? `${formData.start_time}:00` : formData.start_time,
-      end_time: formData.end_time.length === 5 ? `${formData.end_time}:00` : formData.end_time,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
       department: formData.department || null,
       student_class: formData.student_class || null,
-      branch: formData.branch || null,
+      branch: null,
       teacher: formData.teacher || null,
-      is_active: formData.is_active,
+      is_active: true,
     };
 
     try {
       if (isEdit) {
         await updatePeriodSlot(editingSlot.id, payload);
-        showToast('Period schedule slot updated.', 'success');
       } else {
         await createPeriodSlot(payload);
-        showToast('Period schedule slot added.', 'success');
       }
       onSaved?.();
     } catch (err) {
@@ -175,26 +159,22 @@ export default function PeriodForm({
   };
 
   const deptOptions = [
-    { label: 'All Departments (Institution-Wide)', value: '' },
+    { label: 'All Departments', value: '' },
     ...departments.map((d) => ({
       label: d.name,
-      value: d.id,
+      value: String(d.id),
     })),
   ];
+
+  const filteredClasses = formData.department
+    ? classes.filter((c) => String(c.department) === String(formData.department))
+    : classes;
 
   const classOptions = [
-    { label: 'All Classes', value: '' },
-    ...classes.map((c) => ({
-      label: c.name,
-      value: c.id,
-    })),
-  ];
-
-  const branchOptions = [
-    { label: 'All Campuses', value: '' },
-    ...branches.map((b) => ({
-      label: b.branch_name,
-      value: b.id,
+    { label: 'All Classes in Department', value: '' },
+    ...filteredClasses.map((c) => ({
+      label: `${c.name}${c.code ? ` (${c.code})` : ''}`,
+      value: String(c.id),
     })),
   ];
 
@@ -202,17 +182,17 @@ export default function PeriodForm({
     { label: 'No Specific Teacher Assigned', value: '' },
     ...teachers.map((t) => ({
       label: `${t.user_name || t.employee_id || 'Teacher'} (${t.designation || 'Faculty'})`,
-      value: t.id,
+      value: String(t.id),
     })),
   ];
 
   return (
-    <div className="p-4 sm:p-5 space-y-4 h-full overflow-y-auto theme-text-primary">
+    <div className="p-4 sm:p-5 space-y-4 h-full overflow-y-auto theme-text-primary text-left">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Slot Name */}
         <div>
           <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Period Name <span className="text-rose-400 font-bold">*</span>
+            Period Name <span className="theme-accent font-bold">*</span>
           </label>
           <input
             type="text"
@@ -301,13 +281,13 @@ export default function PeriodForm({
         {/* Department Scope */}
         <div>
           <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Target Department <span className="text-rose-400 font-bold">*</span>
+            Target Department
           </label>
           <CustomSelect
             options={deptOptions}
             value={formData.department}
             onChange={(val) =>
-              setFormData({ ...formData, department: val })
+              setFormData({ ...formData, department: val, student_class: '' })
             }
             placeholder="All Departments"
             disabled={loadingLookups}
@@ -318,7 +298,7 @@ export default function PeriodForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Target Class <span className="text-rose-400 font-bold">*</span>
+              Target Class
             </label>
             <CustomSelect
               options={classOptions}
@@ -347,49 +327,20 @@ export default function PeriodForm({
           </div>
         </div>
 
-        {/* Campus Scope (Optional) */}
-        <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Campus / Branch (Optional)
-          </label>
-          <CustomSelect
-            options={branchOptions}
-            value={formData.branch}
-            onChange={(val) =>
-              setFormData({ ...formData, branch: val })
-            }
-            placeholder="All Campuses"
-            disabled={loadingLookups}
-          />
-        </div>
-
-        {/* Active Toggle */}
-        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
-          <CustomCheckbox
-            id="period-is-active"
-            checked={formData.is_active}
-            onChange={(checked) =>
-              setFormData({ ...formData, is_active: checked })
-            }
-            label="Active Period Slot"
-            description="Enabled for routine schedules, timetable displays, and roll-call attendance."
-          />
-        </div>
-
         {/* Action Buttons */}
-        <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">
+        <div className="pt-4 border-t theme-border flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={onCancel}
             disabled={submitting}
-            className="px-4 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer disabled:opacity-50 text-center"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 shadow-md cursor-pointer disabled:opacity-50 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto px-5 py-2.5 sm:py-2 text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 shadow-md cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
           >
             {submitting ? (
               <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">

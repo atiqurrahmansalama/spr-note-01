@@ -280,16 +280,11 @@ export function useScopedRightSidebar() {
   };
 }
 
-/**
- * useDrawerRegistration
- * Universal Hook: Registers a drawer renderer for a specific key.
- * On component mount and on page reload/refresh (F5), if URL contains ?drawer={drawerKey},
- * it automatically invokes the renderer and restores the drawer in full state!
- */
-export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) {
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+export function useDrawerRegistration(drawerKey, rendererFn, _dependencies = []) {
+  const { openRightSidebar } = useRightSidebar();
   const rendererRef = useRef(rendererFn);
   rendererRef.current = rendererFn;
+  const initialCheckedRef = useRef(false);
 
   useEffect(() => {
     if (!drawerKey) return;
@@ -302,20 +297,23 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
       return null;
     });
 
-    // Check if the current URL has this drawer requested
-    const currentParams = getUrlParams();
-    if (currentParams.get('drawer') === drawerKey) {
-      const config = rendererRef.current(currentParams);
-      if (config) {
-        openRightSidebar({
-          ...config,
-          drawerKey,
-        });
+    // Check if the current URL has this drawer requested on initial mount
+    if (!initialCheckedRef.current) {
+      initialCheckedRef.current = true;
+      const currentParams = getUrlParams();
+      if (currentParams.get('drawer') === drawerKey) {
+        const config = rendererRef.current(currentParams);
+        if (config) {
+          openRightSidebar({
+            ...config,
+            drawerKey,
+          });
+        }
       }
     }
 
     return () => {
       drawerRegistry.delete(drawerKey);
     };
-  }, [drawerKey, openRightSidebar, ...dependencies]);
+  }, [drawerKey, openRightSidebar]);
 }

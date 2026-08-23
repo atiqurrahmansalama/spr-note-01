@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
@@ -22,6 +22,7 @@ import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
+import DataViewFooter from "../../../components/ui/DataViewFooter";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
@@ -42,6 +43,7 @@ export default function ClassManagementView({
   const [classes, setClasses] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem("spr_classes_view_mode") || "grid";
@@ -72,6 +74,21 @@ export default function ClassManagementView({
       localStorage.setItem("spr_classes_view_mode", mode);
     } catch {}
   };
+
+  const handleSelectRow = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOpen = () => handleOpenCreate();
@@ -482,7 +499,7 @@ export default function ClassManagementView({
       {!hideHeader && (
         <PageHeader
           icon={ClassIcon}
-          title="Class"
+          title="Academic Classes"
           subtitle="Configure academic grades, head teacher assignments, and student promotion pipelines"
           actions={
             <>
@@ -560,36 +577,67 @@ export default function ClassManagementView({
       />
 
       {/* 4. Display: Reusable DataCardGrid or DataTable */}
-      {viewMode === "grid" ? (
-        <DataCardGrid
-          data={filteredClasses}
-          renderCard={renderClassCard}
-          isLoading={loading}
-          loadingMessage="Loading academic classes..."
-          emptyIcon={ClassIcon}
-          emptyTitle="No Classes Found"
-          emptySubMessage={
-            searchQuery || departmentFilter !== "ALL"
-              ? "No classes match your active filter criteria."
-              : "Get started by adding your first academic class or grade level."
-          }
-          gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
-        />
-      ) : (
-        <DataTable
-          columns={tableColumns}
-          data={filteredClasses}
-          isLoading={loading}
-          loadingMessage="Loading academic classes..."
-          emptyIcon={ClassIcon}
-          emptyTitle="No Classes Found"
-          emptySubMessage={
-            searchQuery || departmentFilter !== "ALL"
-              ? "No classes match your active filter criteria."
-              : "Get started by adding your first academic class or grade level."
-          }
-        />
-      )}
+      <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'class' : 'classes'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
+        {viewMode === "grid" ? (
+          <DataCardGrid
+            data={filteredClasses}
+            renderCard={renderClassCard}
+            isLoading={loading}
+            loadingMessage="Loading academic classes..."
+            emptyIcon={ClassIcon}
+            emptyTitle="No Classes Found"
+            emptySubMessage={
+              searchQuery || departmentFilter !== "ALL"
+                ? "No classes match your active filter criteria."
+                : "Get started by adding your first academic class or grade level."
+            }
+            gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+          />
+        ) : (
+          <DataTable
+            columns={tableColumns}
+            data={filteredClasses}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
+            isLoading={loading}
+            loadingMessage="Loading academic classes..."
+            emptyIcon={ClassIcon}
+            emptyTitle="No Classes Found"
+            emptySubMessage={
+              searchQuery || departmentFilter !== "ALL"
+                ? "No classes match your active filter criteria."
+                : "Get started by adding your first academic class or grade level."
+            }
+          />
+        )}
+
+        {/* Reusable DataViewFooter */}
+        {!loading && classes.length > 0 && (
+          <DataViewFooter
+            filteredCount={filteredClasses.length}
+            totalCount={classes.length}
+            itemLabel="academic classes"
+          />
+        )}
+      </div>
 
       {/* --- MODALS --- */}
 

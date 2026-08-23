@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
@@ -67,6 +67,7 @@ export default function BranchManagementView({
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -76,6 +77,21 @@ export default function BranchManagementView({
       localStorage.setItem('spr_branches_view_mode', mode);
     } catch {}
   };
+
+  const handleSelectRow = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -439,6 +455,21 @@ export default function BranchManagementView({
 
       {/* Main Content Area: Reusable DataCardGrid or DataTable */}
       <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'branch' : 'branches'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
         {viewMode === 'grid' ? (
           <DataCardGrid
             data={filteredBranches}
@@ -454,6 +485,11 @@ export default function BranchManagementView({
           <DataTable
             columns={tableColumns}
             data={filteredBranches}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
             isLoading={loading}
             loadingMessage="Loading academy branches..."
             emptyTitle="No Academic Branches Found"

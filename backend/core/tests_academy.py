@@ -187,3 +187,77 @@ class AcademyModelsAndAPITestCase(APITestCase):
 
         slot1_obj = ClassPeriodSlot.objects.get(id=slot1_id)
         self.assertEqual(slot1_obj.period_order, 2)
+
+    def test_department_requires_institution_and_accepts_branch(self):
+        # Create department with branch
+        branch = AcademicBranch.objects.create(
+            institution=self.institution,
+            branch_name="Uttara Branch",
+            branch_code="UTT-01"
+        )
+        res = self.client.post("/api/v1/departments/", {
+            "name": "General Education Department",
+            "code": "GEN-01",
+            "branch": str(branch.id),
+            "order_rank": 2,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["branch_name"], "Uttara Branch")
+
+        # Create department without branch (institution-wide / main campus)
+        res2 = self.client.post("/api/v1/departments/", {
+            "name": "Qirat Department",
+            "code": "QRT-01",
+            "branch": None,
+            "order_rank": 3,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res2.data["branch"], None)
+
+    def test_class_strictly_requires_department(self):
+        # Fails without department
+        res = self.client.post("/api/v1/classes/", {
+            "name": "Class 10 Without Department",
+            "code": "CLS-10",
+            "department": None,
+            "order_rank": 1,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        details = res.data.get("details", res.data)
+        self.assertIn("department", details)
+
+        # Succeeds with department
+        res_valid = self.client.post("/api/v1/classes/", {
+            "name": "Class 10 With Department",
+            "code": "CLS-10",
+            "department": str(self.department.id),
+            "order_rank": 1,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_valid.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_valid.data["department_name"], "Hifz Department")
+
+    def test_group_strictly_requires_class(self):
+        # Fails without student_class
+        res = self.client.post("/api/v1/groups/", {
+            "name": "Halqa Without Class",
+            "student_class": None,
+            "capacity": 20,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        details = res.data.get("details", res.data)
+        self.assertIn("student_class", details)
+
+        # Succeeds with student_class
+        res_valid = self.client.post("/api/v1/groups/", {
+            "name": "Halqa Abu Bakr",
+            "student_class": str(self.student_class.id),
+            "capacity": 25,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_valid.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_valid.data["student_class_name"], "Hifz Final Year")

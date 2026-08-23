@@ -28,11 +28,14 @@ const BRANCH_TYPES = [
 
 export default function BranchForm({ branch = null, onSaved, onCancel }) {
   const { showToast } = useToast();
+  const { activeTenantId, institutions, isMultiTenantAdmin, currentInstitution } = useTenant();
   const isEdit = Boolean(branch?.id);
 
   const initialValues = useMemo(() => {
+    const defaultInstId = branch?.institution || (activeTenantId !== 'ALL' ? activeTenantId : '') || (currentInstitution?.id || '');
     if (branch) {
       return {
+        institution: defaultInstId,
         branch_name: branch.branch_name || '',
         branch_code: branch.branch_code || '',
         branch_type: branch.branch_type || 'MAIN_CAMPUS',
@@ -47,6 +50,7 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
       };
     }
     return {
+      institution: defaultInstId,
       branch_name: '',
       branch_code: '',
       branch_type: 'MAIN_CAMPUS',
@@ -59,7 +63,7 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
       maps_location_query: '',
       is_active: true,
     };
-  }, [branch]);
+  }, [branch, activeTenantId, currentInstitution]);
 
   const [formData, setFormData] = useState(initialValues);
   const [staffList, setStaffList] = useState([]);
@@ -96,7 +100,7 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
     return Object.keys(initialValues).some((key) => formData[key] !== initialValues[key]);
   }, [formData, initialValues]);
 
-  const isFormValid = formData.branch_name.trim().length > 0;
+  const isFormValid = formData.branch_name.trim().length > 0 && Boolean(formData.institution || activeTenantId !== 'ALL');
   const canSave = isDirty && isFormValid && !submitting;
 
   const handleDivisionChange = (div) => {
@@ -117,9 +121,15 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
       showToast('Branch Name is required.', 'warning');
       return;
     }
+    const targetInstId = formData.institution || (activeTenantId !== 'ALL' ? activeTenantId : '');
+    if (!targetInstId && institutions.length > 0) {
+      showToast('Please select a parent Academy/Institution for this branch.', 'warning');
+      return;
+    }
 
     setSubmitting(true);
     const payload = {
+      institution: targetInstId || undefined,
       branch_name: formData.branch_name.trim(),
       branch_code: formData.branch_code.trim().toUpperCase(),
       branch_type: formData.branch_type,
@@ -165,6 +175,21 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+            {(institutions.length > 1 || activeTenantId === 'ALL' || isMultiTenantAdmin) && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
+                  Parent Academy / Institution <span className="text-rose-400">*</span>
+                </label>
+                <CustomSelect
+                  options={institutions.map((i) => ({ label: i.name, value: String(i.id) }))}
+                  value={formData.institution ? String(formData.institution) : ''}
+                  onChange={(val) => setFormData({ ...formData, institution: val })}
+                  placeholder="Select Parent Academy"
+                  disabled={isEdit}
+                />
+              </div>
+            )}
+
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
                 Branch / Campus Name <span className="text-rose-400">*</span>

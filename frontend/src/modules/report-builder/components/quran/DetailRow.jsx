@@ -124,8 +124,9 @@ export default function DetailRow({
 
   const ayahChunks = [];
   let i = 0;
-  while (i < rowData.ayahs.length) {
-    const chunkSize = (ayahChunks.length === 0) ? line1Max : (isMobile && hasJuz ? extraLineMax : line1Max);
+  while (i < (rowData.ayahs?.length || 0)) {
+    const rawChunkSize = (ayahChunks.length === 0) ? line1Max : (isMobile && hasJuz ? extraLineMax : line1Max);
+    const chunkSize = Math.max(1, parseInt(rawChunkSize, 10) || 1);
     ayahChunks.push({
       items: rowData.ayahs.slice(i, i + chunkSize),
       startIndex: i,

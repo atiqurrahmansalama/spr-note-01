@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import PageHeader from "../ui/PageHeader";
+import DataTable from "../ui/DataTable";
 import { ChevronIcon, SearchIcon } from "../ui/Icons";
 
 /**
  * Reusable Master-Detail Settings Layout Component
  * 
  * Behavior:
- * - Wide Containers (>= 740px): 2-Column Split View (Left list + Right settings pane).
+ * - Wide Containers (>= 740px): 2-Column Split View (Left list powered by compact DataTable + Right settings pane).
  * - Compact Containers (< 740px / Mobile / Wide Right Drawer): Full-page Master List -> Full-page Detail View with "Back" button.
  */
 export default function SettingsSplitLayout({
@@ -46,10 +47,7 @@ export default function SettingsSplitLayout({
   const filteredSections = sections.filter((sec) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      sec.title.toLowerCase().includes(q) ||
-      (sec.description && sec.description.toLowerCase().includes(q))
-    );
+    return sec.title.toLowerCase().includes(q);
   });
 
   const currentSectionObj = sections.find((s) => s.id === activeSection) || sections[0];
@@ -74,7 +72,7 @@ export default function SettingsSplitLayout({
       {isCompact ? (
         <div className="w-full space-y-4">
           {!showCompactDetail ? (
-            /* State A: Full Width Section List */
+            /* State A: Full Width Section List via DataTable */
             <div className="space-y-4 animate-fade-in">
               {title && (
                 <PageHeader
@@ -93,51 +91,75 @@ export default function SettingsSplitLayout({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search settings..."
-                    className="w-full text-sm pl-10 pr-3.5 py-2.5 rounded-2xl border theme-border theme-bg-surface theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
+                    className="w-full text-sm pl-10 pr-3.5 py-2 rounded-2xl border theme-border theme-bg-surface theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
                   />
                 </div>
               )}
 
-              <div className="rounded-2xl border theme-border theme-bg-surface divide-y theme-divide shadow-xs overflow-hidden">
-                {filteredSections.map((sec) => {
-                  const IconComp = sec.icon;
-                  const isActive = sec.id === activeSection;
+              <div className="rounded-2xl border theme-border theme-bg-surface shadow-xs overflow-hidden">
+                <DataTable
+                  hideHeader={true}
+                  compact={true}
+                  cellPaddingClass="py-2.5 px-3.5"
+                  data={filteredSections}
+                  keyExtractor={(sec) => sec.id}
+                  onRowClick={(sec) => handleSelectSection(sec.id)}
+                  wrapperClassName="border-0 rounded-none shadow-none theme-bg-surface"
+                  tableClassName="w-full"
+                  rowClassName={(sec) =>
+                    sec.id === activeSection
+                      ? "theme-bg-accent-soft font-semibold"
+                      : "hover:theme-bg-sub/60"
+                  }
+                  columns={[
+                    {
+                      key: "section",
+                      header: "Section",
+                      render: (sec) => {
+                        const IconComp = sec.icon;
+                        const isActive = sec.id === activeSection;
 
-                  return (
-                    <button
-                      key={sec.id}
-                      type="button"
-                      onClick={() => handleSelectSection(sec.id)}
-                      className={`w-full flex items-center justify-between p-3.5 transition-colors text-left cursor-pointer group active:opacity-80 ${
-                        isActive ? "theme-bg-sub/80" : "hover:theme-bg-sub/40"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 rounded-xl theme-bg-sub theme-text-secondary group-hover:theme-accent group-hover:theme-bg-accent-soft shrink-0 transition-colors">
-                          {IconComp && <IconComp className="w-4 h-4" />}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold theme-text-primary truncate">
-                              {sec.title}
-                            </span>
-                            {sec.badge !== undefined && sec.badge !== null && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold theme-bg-sub theme-text-secondary border theme-border">
-                                {sec.badge}
+                        return (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                                  isActive
+                                    ? "theme-bg-accent theme-accent-text"
+                                    : "theme-bg-sub theme-text-secondary"
+                                }`}
+                              >
+                                {IconComp && <IconComp className="w-3.5 h-3.5" />}
+                              </div>
+                              <span
+                                className={`text-xs truncate ${
+                                  isActive ? "theme-accent font-bold" : "theme-text-primary font-medium"
+                                }`}
+                              >
+                                {sec.title}
                               </span>
-                            )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {sec.badge !== undefined && sec.badge !== null && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                                    isActive
+                                      ? "theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
+                                      : "theme-bg-sub theme-text-secondary border theme-border"
+                                  }`}
+                                >
+                                  {sec.badge}
+                                </span>
+                              )}
+                              <ChevronIcon className="w-4 h-4 theme-text-secondary" />
+                            </div>
                           </div>
-                          {sec.description && (
-                            <p className="text-[11px] theme-text-secondary line-clamp-1 mt-0.5">
-                              {sec.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronIcon className="w-4 h-4 theme-text-secondary shrink-0 group-hover:theme-text-primary transition-colors" />
-                    </button>
-                  );
-                })}
+                        );
+                      },
+                    },
+                  ]}
+                />
               </div>
             </div>
           ) : (
@@ -181,72 +203,81 @@ export default function SettingsSplitLayout({
           )}
 
           <div className="flex flex-row items-start gap-5 lg:gap-6 w-full min-w-0">
-            {/* Left Master Navigation List Panel */}
-            <div className="flex flex-col w-60 lg:w-72 shrink-0 rounded-2xl border theme-border theme-bg-surface shadow-xs p-2.5 space-y-1.5 sticky top-4">
+            {/* Left Master Navigation List Panel powered by Compact DataTable */}
+            <div className="flex flex-col w-56 lg:w-64 shrink-0 rounded-2xl border theme-border theme-bg-surface shadow-xs p-1.5 sticky top-4 overflow-hidden">
               {searchable && (
-                <div className="relative mb-2 px-1">
-                  <SearchIcon className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 theme-text-secondary" />
+                <div className="relative mb-1.5 px-1">
+                  <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 theme-text-secondary" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search..."
-                    className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
+                    className="w-full text-xs pl-7.5 pr-2.5 py-1.5 rounded-xl border theme-border theme-bg-sub theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
                   />
                 </div>
               )}
 
-              {filteredSections.map((sec) => {
-                const isActive = sec.id === activeSection;
-                const IconComp = sec.icon;
+              <DataTable
+                hideHeader={true}
+                compact={true}
+                cellPaddingClass="py-2 px-2.5"
+                data={filteredSections}
+                keyExtractor={(sec) => sec.id}
+                onRowClick={(sec) => onSectionChange(sec.id)}
+                wrapperClassName="border-0 rounded-none shadow-none theme-bg-surface"
+                tableClassName="w-full"
+                rowClassName={(sec) =>
+                  sec.id === activeSection
+                    ? "theme-bg-accent-soft font-semibold rounded-xl"
+                    : "hover:theme-bg-sub/60 rounded-xl"
+                }
+                columns={[
+                  {
+                    key: "section",
+                    header: "Section",
+                    render: (sec) => {
+                      const isActive = sec.id === activeSection;
+                      const IconComp = sec.icon;
 
-                return (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    onClick={() => onSectionChange(sec.id)}
-                    className={`w-full flex items-start gap-3 p-2.5 rounded-xl transition-all text-left cursor-pointer group relative select-none ${
-                      isActive
-                        ? "theme-bg-accent theme-accent-text shadow-md font-semibold"
-                        : "theme-bg-surface hover:theme-bg-sub/60 theme-text-primary"
-                    }`}
-                  >
-                    <div
-                      className={`p-2 rounded-xl shrink-0 transition-colors ${
-                        isActive
-                          ? "bg-white/20 theme-accent-text"
-                          : "theme-bg-sub theme-text-secondary group-hover:theme-accent group-hover:theme-bg-accent-soft"
-                      }`}
-                    >
-                      {IconComp && <IconComp className="w-4 h-4" />}
-                    </div>
+                      return (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                                isActive
+                                  ? "theme-bg-accent theme-accent-text"
+                                  : "theme-bg-sub theme-text-secondary"
+                              }`}
+                            >
+                              {IconComp && <IconComp className="w-3.5 h-3.5" />}
+                            </div>
+                            <span
+                              className={`text-xs truncate ${
+                                isActive ? "theme-accent font-bold" : "theme-text-primary font-medium"
+                              }`}
+                            >
+                              {sec.title}
+                            </span>
+                          </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold truncate ${isActive ? "theme-accent-text" : "theme-text-primary"}`}>
-                          {sec.title}
-                        </span>
-                        {sec.badge !== undefined && sec.badge !== null && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                              isActive
-                                ? "bg-white/25 theme-accent-text"
-                                : "theme-bg-sub theme-text-secondary border theme-border"
-                            }`}
-                          >
-                            {sec.badge}
-                          </span>
-                        )}
-                      </div>
-                      {sec.description && (
-                        <p className={`text-[11px] line-clamp-1 mt-0.5 ${isActive ? "opacity-85" : "theme-text-secondary"}`}>
-                          {sec.description}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+                          {sec.badge !== undefined && sec.badge !== null && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold shrink-0 ${
+                                isActive
+                                  ? "theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
+                                  : "theme-bg-sub theme-text-secondary border theme-border"
+                              }`}
+                            >
+                              {sec.badge}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
+                ]}
+              />
             </div>
 
             {/* Right Detail Configuration Content Area */}

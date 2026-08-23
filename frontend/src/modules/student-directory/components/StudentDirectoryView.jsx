@@ -25,7 +25,6 @@ import DataTable from "../../../components/ui/DataTable";
 import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
-import CustomCheckbox from "../../../components/ui/CustomCheckbox";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import Modal from "../../../components/ui/Modal";
@@ -169,18 +168,21 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
     setSearchParams(newParams);
   };
 
-  const handleSelectAll = (checked) => {
-    if (!checked || selectedIds.length === filteredStudents.length) {
-      setSelectedIds([]);
+  const handleSelectAll = (val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else if (typeof val === 'boolean') {
+      setSelectedIds(val ? filteredStudents.map((s) => s.id) : []);
     } else {
-      setSelectedIds(filteredStudents.map((s) => s.id));
+      setSelectedIds([]);
     }
   };
 
   const handleSelectRow = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((sid) => sid !== id) : [...list, id];
+    });
   };
 
   const handleBulkActionSubmit = async () => {
@@ -264,53 +266,55 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
       c.name?.toLowerCase() === String(classFilter).toLowerCase()
   );
 
-  // Filter students dynamically
-  const filteredStudents = students.filter((s) => {
-    const name = (s.name_en || s.name || "").toLowerCase();
-    const bName = (s.bangla_name || "").toLowerCase();
-    const roll = String(s.roll_number || s.roll || "");
-    const gPhone = (s.details?.guardian_phone || "").toLowerCase();
-    const query = searchQuery.toLowerCase();
+  // Filter students dynamically with memoization
+  const filteredStudents = React.useMemo(() => {
+    return students.filter((s) => {
+      const name = (s.name_en || s.name || "").toLowerCase();
+      const bName = (s.bangla_name || "").toLowerCase();
+      const roll = String(s.roll_number || s.roll || "");
+      const gPhone = (s.details?.guardian_phone || "").toLowerCase();
+      const query = searchQuery.toLowerCase();
 
-    const matchesSearch =
-      !query ||
-      name.includes(query) ||
-      bName.includes(query) ||
-      roll.includes(query) ||
-      gPhone.includes(query);
+      const matchesSearch =
+        !query ||
+        name.includes(query) ||
+        bName.includes(query) ||
+        roll.includes(query) ||
+        gPhone.includes(query);
 
-    let matchesGroup = true;
-    if (groupFilter !== "ALL") {
-      const targetGroupStr = String(groupFilter).toLowerCase();
-      const sGroupId = s.student_group ? String(s.student_group).toLowerCase() : "";
-      const sGroupName = (s.student_group_name || s.group_name || s.group || "").toLowerCase();
-      matchesGroup =
-        sGroupId === targetGroupStr ||
-        sGroupName === targetGroupStr ||
-        (activeGroupObj && sGroupName === activeGroupObj.name.toLowerCase());
-    }
+      let matchesGroup = true;
+      if (groupFilter !== "ALL") {
+        const targetGroupStr = String(groupFilter).toLowerCase();
+        const sGroupId = s.student_group ? String(s.student_group).toLowerCase() : "";
+        const sGroupName = (s.student_group_name || s.group_name || s.group || "").toLowerCase();
+        matchesGroup =
+          sGroupId === targetGroupStr ||
+          sGroupName === targetGroupStr ||
+          (activeGroupObj && sGroupName === activeGroupObj.name.toLowerCase());
+      }
 
-    let matchesClass = true;
-    if (classFilter !== "ALL") {
-      const targetClassStr = String(classFilter).toLowerCase();
-      const sClassId = s.student_class ? String(s.student_class).toLowerCase() : "";
-      const sClassName = (s.student_class_name || "").toLowerCase();
-      matchesClass =
-        sClassId === targetClassStr ||
-        sClassName === targetClassStr ||
-        (activeClassObj && sClassName === activeClassObj.name.toLowerCase());
-    }
+      let matchesClass = true;
+      if (classFilter !== "ALL") {
+        const targetClassStr = String(classFilter).toLowerCase();
+        const sClassId = s.student_class ? String(s.student_class).toLowerCase() : "";
+        const sClassName = (s.student_class_name || "").toLowerCase();
+        matchesClass =
+          sClassId === targetClassStr ||
+          sClassName === targetClassStr ||
+          (activeClassObj && sClassName === activeClassObj.name.toLowerCase());
+      }
 
-    const studentStatus = s.status || "Active";
-    const matchesStatus =
-      statusFilter === "ALL" ||
-      (statusFilter === "ACTIVE" && studentStatus.toUpperCase() === "ACTIVE") ||
-      (statusFilter === "INACTIVE" && studentStatus.toUpperCase() === "INACTIVE") ||
-      (statusFilter === "ALUMNI" &&
-        (studentStatus.toUpperCase() === "ALUMNI" || studentStatus.toUpperCase() === "TC"));
+      const studentStatus = s.status || "Active";
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "ACTIVE" && studentStatus.toUpperCase() === "ACTIVE") ||
+        (statusFilter === "INACTIVE" && studentStatus.toUpperCase() === "INACTIVE") ||
+        (statusFilter === "ALUMNI" &&
+          (studentStatus.toUpperCase() === "ALUMNI" || studentStatus.toUpperCase() === "TC"));
 
-    return matchesSearch && matchesGroup && matchesClass && matchesStatus;
-  });
+      return matchesSearch && matchesGroup && matchesClass && matchesStatus;
+    });
+  }, [students, searchQuery, groupFilter, classFilter, statusFilter, activeGroupObj, activeClassObj]);
 
   const getActionMenuItems = (s) => [
     {
@@ -343,52 +347,35 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
   // Reusable Centered Table Columns Specification
   const tableColumns = [
     {
-      key: "select",
-      header: (
-        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-          <CustomCheckbox
-            size="sm"
-            checked={
-              filteredStudents.length > 0 && selectedIds.length === filteredStudents.length
-            }
-            onChange={handleSelectAll}
-          />
-        </div>
-      ),
-      headerClassName: "w-12 text-center",
-      align: "center",
-      render: (s) => (
-        <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
-          <CustomCheckbox
-            size="sm"
-            checked={selectedIds.includes(s.id)}
-            onChange={() => handleSelectRow(s.id)}
-          />
-        </div>
-      ),
-    },
-    {
       key: "name",
       header: "NAME",
       headerClassName: "text-left",
       align: "left",
-      render: (s) => (
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
-            {s.name_en ? s.name_en.charAt(0).toUpperCase() : "S"}
-          </div>
-          <div className="min-w-0">
-            <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
-              {s.name_en || s.name}
-            </span>
-            {s.details?.name_bn && (
-              <span className="text-[11px] theme-text-secondary block mt-0.5 truncate">
-                {s.details.name_bn}
+      render: (s) => {
+        const fatherName =
+          s.details?.father_name ||
+          s.father_name ||
+          s.details?.guardian_name ||
+          s.guardian_name;
+
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
+              {s.name_en ? s.name_en.charAt(0).toUpperCase() : (s.name ? s.name.charAt(0).toUpperCase() : "S")}
+            </div>
+            <div className="min-w-0">
+              <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
+                {s.name_en || s.name}
               </span>
-            )}
+              {fatherName && (
+                <span className="text-[11px] theme-text-secondary block mt-0.5 truncate">
+                  {fatherName}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "class",
@@ -398,14 +385,8 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
       render: (s) => (
         <div className="text-center truncate text-xs">
           <span className="theme-accent font-bold">
-            {s.student_class_name || "General"}
+            {s.student_class_name || (typeof s.student_class === "object" ? s.student_class?.name : null) || "General"}
           </span>
-          {(s.student_group_name || s.group_name) && (
-            <span className="theme-text-secondary">
-              {" • "}
-              {s.student_group_name || s.group_name}
-            </span>
-          )}
         </div>
       ),
     },
@@ -494,9 +475,9 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               <h3 className="font-bold theme-text-primary text-sm truncate">
                 {s.name_en || s.name}
               </h3>
-              {s.details?.name_bn && (
+              {(s.details?.father_name || s.father_name || s.details?.guardian_name || s.guardian_name) && (
                 <p className="text-[11px] theme-text-secondary truncate">
-                  {s.details.name_bn}
+                  {s.details?.father_name || s.father_name || s.details?.guardian_name || s.guardian_name}
                 </p>
               )}
             </div>
@@ -509,14 +490,8 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
 
         <div className="flex items-center gap-2 flex-wrap text-xs">
           <span className="theme-accent font-bold">
-            {s.student_class_name || "General"}
+            {s.student_class_name || (typeof s.student_class === "object" ? s.student_class?.name : null) || "General"}
           </span>
-          {(s.student_group_name || s.group_name) && (
-            <span className="theme-text-secondary">
-              {" • "}
-              {s.student_group_name || s.group_name}
-            </span>
-          )}
         </div>
       </div>
 
@@ -723,6 +698,11 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
         <DataTable
           columns={tableColumns}
           data={filteredStudents}
+          selectable={true}
+          selectedIds={selectedIds}
+          onSelectRow={handleSelectRow}
+          onSelectAll={handleSelectAll}
+          idField="id"
           isLoading={loading}
           loadingMessage="Loading student roster directory..."
           emptyIcon={StudentIcon}

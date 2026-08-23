@@ -46,6 +46,43 @@ export function TenantProvider({ children }) {
           setCurrentInstitution(found);
           setActiveTenantId(savedTenantId);
         } else if (items.length > 0) {
+          if (isMultiTenantAdmin) {
+            setCurrentInstitution(null);
+            setActiveTenantId('ALL');
+            try {
+              localStorage.setItem('active_tenant_id', 'ALL');
+            } catch {}
+          } else {
+            const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+            const target = userInst || items[0];
+            setCurrentInstitution(target);
+            setActiveTenantId(String(target.id));
+            try {
+              localStorage.setItem('active_tenant_id', String(target.id));
+            } catch {}
+          }
+        }
+      } else if (savedTenantId === 'ALL') {
+        setCurrentInstitution(null);
+        setActiveTenantId('ALL');
+      } else if (items.length > 0) {
+        // Multi-tenant Admin defaults to ALL (Global Scope) so all data across all institutions is visible immediately
+        if (isMultiTenantAdmin) {
+          const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+          if (userInst) {
+            setCurrentInstitution(userInst);
+            setActiveTenantId(String(userInst.id));
+            try {
+              localStorage.setItem('active_tenant_id', String(userInst.id));
+            } catch {}
+          } else {
+            setCurrentInstitution(null);
+            setActiveTenantId('ALL');
+            try {
+              localStorage.setItem('active_tenant_id', 'ALL');
+            } catch {}
+          }
+        } else {
           const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
           const target = userInst || items[0];
           setCurrentInstitution(target);
@@ -53,28 +90,14 @@ export function TenantProvider({ children }) {
           try {
             localStorage.setItem('active_tenant_id', String(target.id));
           } catch {}
-          window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: target.id } }));
         }
-      } else if (savedTenantId === 'ALL') {
-        setCurrentInstitution(null);
-        setActiveTenantId('ALL');
-      } else if (items.length > 0) {
-        // Default to user's assigned institution if available, otherwise first
-        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-        const target = userInst || items[0];
-        setCurrentInstitution(target);
-        setActiveTenantId(String(target.id));
-        try {
-          localStorage.setItem('active_tenant_id', String(target.id));
-        } catch {}
-        window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: target.id } }));
       }
     } catch (err) {
       console.error('[TenantProvider] Error loading institutions:', err);
     } finally {
       setIsLoadingInstitutions(false);
     }
-  }, [isMultiTenantAdmin, user]);
+  }, [isMultiTenantAdmin, user?.id, user?.institution_id]);
 
   useEffect(() => {
     fetchInstitutionsList();

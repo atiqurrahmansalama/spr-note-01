@@ -33,6 +33,14 @@ export default function TimeCalendarManagerView() {
   const [events, setEvents] = useState([]);
   const activeTab = searchParams.get("tab") || "WORKING_HOURS";
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTimelineDate, setSelectedTimelineDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [calendarDisplayMode, setCalendarDisplayMode] = useState(() => {
+    try {
+      return localStorage.getItem("spr_calendar_display_mode") || "grid";
+    } catch {
+      return "grid";
+    }
+  });
 
   const setActiveTab = (tabId) => {
     setSearchParams((prev) => {
@@ -140,6 +148,7 @@ export default function TimeCalendarManagerView() {
         size: "md",
         content: (
           <TimeScheduleDrawerForm
+            key={`schedule-form-${mode}-${eventId || 'new'}-${targetDate}-${targetCategory}`}
             event={foundEvent}
             initialDate={targetDate}
             defaultCategory={targetCategory}
@@ -157,8 +166,12 @@ export default function TimeCalendarManagerView() {
 
   // Open Right Sidebar for adding new entry from top TabSwitcher
   const handleOpenAddDrawer = () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const currentMode = localStorage.getItem("spr_calendar_display_mode") || calendarDisplayMode || "grid";
+    const targetDate = currentMode === "timeline" ? (selectedTimelineDate || todayStr) : todayStr;
     openDrawer("schedule", {
       mode: "add",
+      date: targetDate,
       category: activeTab === "AGENDA" ? "WORKING_HOURS" : activeTab,
     });
   };
@@ -248,6 +261,8 @@ export default function TimeCalendarManagerView() {
           selectedCategory={activeTab === "AGENDA" ? "ALL" : activeTab}
           viewMode={activeTab === "AGENDA" ? "list" : "month"}
           actionMenuItems={actionMenuItems}
+          onDateSelect={setSelectedTimelineDate}
+          onDisplayModeChange={setCalendarDisplayMode}
         />
       </div>
     </div>

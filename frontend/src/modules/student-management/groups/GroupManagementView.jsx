@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
@@ -20,6 +20,7 @@ import CustomSelect from "../../../components/ui/CustomSelect";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
+import DataViewFooter from "../../../components/ui/DataViewFooter";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import GroupForm from "./GroupForm";
 import GroupMigrationModal from "./GroupMigrationModal";
@@ -40,6 +41,7 @@ export default function GroupManagementView({
   const [groups, setGroups] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem("spr_groups_view_mode") || "grid";
@@ -70,6 +72,21 @@ export default function GroupManagementView({
       localStorage.setItem("spr_groups_view_mode", mode);
     } catch {}
   };
+
+  const handleSelectRow = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((val) => {
+    if (Array.isArray(val)) {
+      setSelectedIds(val);
+    } else {
+      setSelectedIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOpen = () => handleOpenCreate();
@@ -425,7 +442,7 @@ export default function GroupManagementView({
       {!hideHeader && (
         <PageHeader
           icon={GroupIcon}
-          title="Group"
+          title="Student Groups"
           subtitle="Configure academic sub-sections, halqa mentors, and student allocations"
           actions={
             <>
@@ -503,36 +520,67 @@ export default function GroupManagementView({
       />
 
       {/* 4. Display: Reusable DataCardGrid or DataTable */}
-      {viewMode === "grid" ? (
-        <DataCardGrid
-          data={filteredGroups}
-          renderCard={renderGroupCard}
-          isLoading={loading}
-          loadingMessage="Loading student groups & halqas..."
-          emptyIcon={GroupIcon}
-          emptyTitle="No Groups Found"
-          emptySubMessage={
-            searchQuery || classFilter !== "ALL"
-              ? "No groups match your active filter criteria."
-              : "Get started by adding your first group or halqa."
-          }
-          gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
-        />
-      ) : (
-        <DataTable
-          columns={tableColumns}
-          data={filteredGroups}
-          isLoading={loading}
-          loadingMessage="Loading student groups & halqas..."
-          emptyIcon={GroupIcon}
-          emptyTitle="No Groups Found"
-          emptySubMessage={
-            searchQuery || classFilter !== "ALL"
-              ? "No groups match your active filter criteria."
-              : "Get started by adding your first group or halqa."
-          }
-        />
-      )}
+      <div className="space-y-4">
+        {selectedIds.length > 0 && (
+          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
+            <span className="text-xs font-bold theme-text-primary">
+              {selectedIds.length} {selectedIds.length === 1 ? 'group' : 'groups'} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
+
+        {viewMode === "grid" ? (
+          <DataCardGrid
+            data={filteredGroups}
+            renderCard={renderGroupCard}
+            isLoading={loading}
+            loadingMessage="Loading student groups & halqas..."
+            emptyIcon={GroupIcon}
+            emptyTitle="No Groups Found"
+            emptySubMessage={
+              searchQuery || classFilter !== "ALL"
+                ? "No groups match your active filter criteria."
+                : "Get started by adding your first group or halqa."
+            }
+            gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+          />
+        ) : (
+          <DataTable
+            columns={tableColumns}
+            data={filteredGroups}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
+            isLoading={loading}
+            loadingMessage="Loading student groups & halqas..."
+            emptyIcon={GroupIcon}
+            emptyTitle="No Groups Found"
+            emptySubMessage={
+              searchQuery || classFilter !== "ALL"
+                ? "No groups match your active filter criteria."
+                : "Get started by adding your first group or halqa."
+            }
+          />
+        )}
+
+        {/* Reusable DataViewFooter */}
+        {!loading && groups.length > 0 && (
+          <DataViewFooter
+            filteredCount={filteredGroups.length}
+            totalCount={groups.length}
+            itemLabel="student groups & halqas"
+          />
+        )}
+      </div>
 
       {/* --- MODALS --- */}
 

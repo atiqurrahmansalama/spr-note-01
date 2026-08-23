@@ -352,7 +352,7 @@ export default function CustomTimePicker({
     <div className={`relative w-full text-left font-sans ${className}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-          {label} {required && <span className="text-rose-400 font-bold">*</span>}
+          {label} {required && <span className="theme-accent font-bold">*</span>}
         </label>
       )}
 
@@ -368,7 +368,7 @@ export default function CustomTimePicker({
             : isOpen
             ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
             : error
-            ? 'border-rose-500 theme-bg-sub theme-text-primary'
+            ? 'border-[var(--accent-main)] theme-bg-sub theme-text-primary'
             : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--accent-main)]/40 theme-text-primary'
         }`}
       >
@@ -402,7 +402,7 @@ export default function CustomTimePicker({
         </div>
       </button>
 
-      {error && <p className="mt-1 text-[11px] text-rose-400 font-medium">{error}</p>}
+      {error && <p className="mt-1 text-[11px] theme-accent font-medium">{error}</p>}
 
       {/* Render Portal Popover */}
       {popoverMenu}

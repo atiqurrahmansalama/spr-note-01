@@ -6,7 +6,7 @@ import {
   TrashIcon,
 } from "../ui/Icons";
 import CustomSelect from "../ui/CustomSelect";
-import { getEventColors } from "./MasterTimeCalendar";
+import { getEventColors, getEventDisplayType } from "./MasterTimeCalendar";
 import { calendarImpactScopesStore } from "../../utils/localStore";
 
 function formatTime12(timeStr) {
@@ -30,17 +30,9 @@ export default function TimeScheduleDetailDrawer({
   onEdit,
   onDelete,
   onClose,
+  readOnly = false,
 }) {
-  if (!event) return null;
-
-  const style = getEventColors(event);
-  const isWorkingHours = event.category === "WORKING_HOURS";
-  const isAllDay = event.isFullDay || !event.startTime || !event.endTime;
-  const isRecurringOrMultiDay = Boolean(
-    event.repeats || (event.endDate && event.endDate !== event.startDate)
-  );
-
-  const effectiveDate = currentDate || initialDate || event.startDate || new Date().toISOString().split("T")[0];
+  const effectiveDate = currentDate || initialDate || event?.startDate || new Date().toISOString().split("T")[0];
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [deleteScope, setDeleteScope] = useState("THIS_EVENT");
@@ -67,6 +59,15 @@ export default function TimeScheduleDetailDrawer({
     return calendarImpactScopesStore.getScopes();
   }, []);
 
+  if (!event) return null;
+
+  const style = getEventColors(event);
+  const isWorkingHours = event.category === "WORKING_HOURS";
+  const isAllDay = event.isFullDay || !event.startTime || !event.endTime;
+  const isRecurringOrMultiDay = Boolean(
+    event.repeats || (event.endDate && event.endDate !== event.startDate)
+  );
+
   return (
     <div className="space-y-5 text-left animate-fade-in">
       {/* Top Main Banner Card */}
@@ -86,7 +87,7 @@ export default function TimeScheduleDetailDrawer({
               </h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border ${style.border}`}>
-                  {isWorkingHours ? "Working Hours" : "Academic Event"}
+                  {getEventDisplayType(event)}
                 </span>
                 <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border theme-border theme-text-secondary">
                   Audience: {event.audience || "ALL"}
@@ -171,6 +172,14 @@ export default function TimeScheduleDetailDrawer({
           </div>
         )}
 
+        {/* Priority Rank */}
+        <div className="flex items-center justify-between py-2 border-b theme-border">
+          <span className="theme-text-secondary font-medium">Precedence Priority:</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+            Rank {event.priorityRank || event.rank || 1}
+          </span>
+        </div>
+
         {/* Timezone */}
         {event.timezone && (
           <div className="flex items-center justify-between py-2 border-b theme-border">
@@ -181,7 +190,7 @@ export default function TimeScheduleDetailDrawer({
       </div>
 
       {/* Inline Delete Confirmation Block with CustomSelect Scope */}
-      {isConfirmingDelete ? (
+      {!readOnly && isConfirmingDelete ? (
         <div className="p-4 rounded-2xl theme-bg-sub border border-[var(--danger-main)]/25 space-y-3 animate-fade-in">
           <div className="flex items-center gap-2">
             <TrashIcon className="w-4 h-4 theme-danger" />
@@ -239,16 +248,18 @@ export default function TimeScheduleDetailDrawer({
           </div>
         </div>
       ) : (
-        /* Standard Action Buttons */
-        <div className="pt-4 border-t theme-border flex items-center justify-between gap-2.5">
-          <button
-            type="button"
-            onClick={() => setIsConfirmingDelete(true)}
-            className="px-3.5 py-2.5 rounded-xl border border-[var(--danger-main)]/30 theme-danger hover:theme-bg-danger-soft font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <TrashIcon className="w-4 h-4" />
-            <span>Delete</span>
-          </button>
+        /* Action Buttons (Read-Only shows only Close button) */
+        <div className={`pt-4 border-t theme-border flex items-center ${readOnly || (!onEdit && !onDelete) ? "justify-end" : "justify-between"} gap-2.5`}>
+          {!readOnly && onDelete && (
+            <button
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              className="px-3.5 py-2.5 rounded-xl border border-[var(--danger-main)]/30 theme-danger hover:theme-bg-danger-soft font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <TrashIcon className="w-4 h-4" />
+              <span>Delete</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-2">
             {onClose && (
@@ -260,14 +271,16 @@ export default function TimeScheduleDetailDrawer({
                 Close
               </button>
             )}
-            <button
-              type="button"
-              onClick={onEdit}
-              className="px-4 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <EditIcon className="w-4 h-4" />
-              <span>Edit Schedule</span>
-            </button>
+            {!readOnly && onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="px-4 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <EditIcon className="w-4 h-4" />
+                <span>Edit Schedule</span>
+              </button>
+            )}
           </div>
         </div>
       )}

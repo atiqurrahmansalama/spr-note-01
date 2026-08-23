@@ -10,6 +10,7 @@ import {
 } from "../ui/Icons";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { EVENT_COLORS } from "./TimeScheduleDrawerForm";
+import { calendarEventTypesStore } from "../../utils/localStore";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -27,25 +28,86 @@ const WEEKDAY_NAMES_FULL = [
 ];
 
 export const EVENT_COLOR_MAP = {
-  emerald: { bg: "bg-emerald-500/15", border: "border-emerald-500/30", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
-  indigo: { bg: "bg-indigo-500/15", border: "border-indigo-500/30", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
-  blue: { bg: "bg-blue-500/15", border: "border-blue-500/30", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
-  sky: { bg: "bg-sky-500/15", border: "border-sky-500/30", text: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500", hex: "#0ea5e9" },
-  cyan: { bg: "bg-cyan-500/15", border: "border-cyan-500/30", text: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500", hex: "#06b6d4" },
-  teal: { bg: "bg-teal-500/15", border: "border-teal-500/30", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500", hex: "#14b8a6" },
-  violet: { bg: "bg-violet-500/15", border: "border-violet-500/30", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500", hex: "#8b5cf6" },
-  purple: { bg: "bg-purple-500/15", border: "border-purple-500/30", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500", hex: "#a855f7" },
-  fuchsia: { bg: "bg-fuchsia-500/15", border: "border-fuchsia-500/30", text: "text-fuchsia-600 dark:text-fuchsia-400", dot: "bg-fuchsia-500", hex: "#d946ef" },
-  rose: { bg: "bg-rose-500/15", border: "border-rose-500/30", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500", hex: "#f43f5e" },
-  red: { bg: "bg-red-500/15", border: "border-red-500/30", text: "text-red-600 dark:text-red-400", dot: "bg-red-500", hex: "#ef4444" },
-  orange: { bg: "bg-orange-500/15", border: "border-orange-500/30", text: "text-orange-600 dark:text-orange-400", dot: "bg-orange-500", hex: "#f97316" },
-  amber: { bg: "bg-amber-500/15", border: "border-amber-500/30", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", hex: "#f59e0b" },
-  lime: { bg: "bg-lime-500/15", border: "border-lime-500/30", text: "text-lime-600 dark:text-lime-400", dot: "bg-lime-500", hex: "#84cc16" },
-  slate: { bg: "bg-slate-500/15", border: "border-slate-500/30", text: "text-slate-600 dark:text-slate-400", dot: "bg-slate-500", hex: "#64748b" },
+  emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/25", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
+  indigo: { bg: "bg-indigo-500/10", border: "border-indigo-500/25", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
+  blue: { bg: "bg-blue-500/10", border: "border-blue-500/25", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
+  sky: { bg: "bg-sky-500/10", border: "border-sky-500/25", text: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500", hex: "#0ea5e9" },
+  cyan: { bg: "bg-cyan-500/10", border: "border-cyan-500/25", text: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500", hex: "#06b6d4" },
+  teal: { bg: "bg-teal-500/10", border: "border-teal-500/25", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500", hex: "#14b8a6" },
+  violet: { bg: "bg-violet-500/10", border: "border-violet-500/25", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500", hex: "#8b5cf6" },
+  purple: { bg: "bg-purple-500/10", border: "border-purple-500/25", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500", hex: "#a855f7" },
+  fuchsia: { bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/25", text: "text-fuchsia-600 dark:text-fuchsia-400", dot: "bg-fuchsia-500", hex: "#d946ef" },
+  rose: { bg: "bg-rose-500/10", border: "border-rose-500/25", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500", hex: "#f43f5e" },
+  red: { bg: "bg-red-500/10", border: "border-red-500/25", text: "text-red-600 dark:text-red-400", dot: "bg-red-500", hex: "#ef4444" },
+  orange: { bg: "bg-orange-500/10", border: "border-orange-500/25", text: "text-orange-600 dark:text-orange-400", dot: "bg-orange-500", hex: "#f97316" },
+  amber: { bg: "bg-amber-500/10", border: "border-amber-500/25", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", hex: "#f59e0b" },
+  lime: { bg: "bg-lime-500/10", border: "border-lime-500/25", text: "text-lime-600 dark:text-lime-400", dot: "bg-lime-500", hex: "#84cc16" },
+  slate: { bg: "bg-slate-500/10", border: "border-slate-500/25", text: "text-slate-600 dark:text-slate-400", dot: "bg-slate-500", hex: "#64748b" },
+  // Soft & Light Pastel Colors
+  mint: { bg: "bg-emerald-400/10", border: "border-emerald-400/25", text: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-300", hex: "#6ee7b7" },
+  lavender: { bg: "bg-violet-400/10", border: "border-violet-400/25", text: "text-violet-600 dark:text-violet-300", dot: "bg-violet-300", hex: "#c4b5fd" },
+  peach: { bg: "bg-orange-400/10", border: "border-orange-400/25", text: "text-orange-600 dark:text-orange-300", dot: "bg-orange-300", hex: "#fdba74" },
+  coral: { bg: "bg-rose-400/10", border: "border-rose-400/25", text: "text-rose-600 dark:text-rose-300", dot: "bg-rose-300", hex: "#fca5a5" },
+  sage: { bg: "bg-green-400/10", border: "border-green-400/25", text: "text-green-600 dark:text-green-300", dot: "bg-green-300", hex: "#86efac" },
+  ice: { bg: "bg-sky-400/10", border: "border-sky-400/25", text: "text-sky-600 dark:text-sky-300", dot: "bg-sky-300", hex: "#7dd3fc" },
+  sand: { bg: "bg-slate-400/10", border: "border-slate-400/25", text: "text-slate-600 dark:text-slate-300", dot: "bg-slate-300", hex: "#cbd5e1" },
+  pink: { bg: "bg-pink-400/10", border: "border-pink-400/25", text: "text-pink-600 dark:text-pink-300", dot: "bg-pink-300", hex: "#f472b6" },
+  cream: { bg: "bg-amber-300/10", border: "border-amber-300/25", text: "text-amber-600 dark:text-amber-300", dot: "bg-amber-300", hex: "#fde68a" },
 };
 
-export function getEventColors(evt) {
-  const isWorkingHours = evt?.category === "WORKING_HOURS";
+/**
+ * Resolves the precise display label for any calendar event or schedule.
+ * Looks up custom types configured in Developer Tools as well as built-in categories.
+ */
+export function getEventDisplayType(evt, tenantId) {
+  if (!evt) return "Event";
+  if (evt.category === "WORKING_HOURS" || evt.type === "WORKING_HOURS") {
+    return "Working Hours";
+  }
+
+  // 1. Direct explicit type / kind
+  const explicitType = evt.type || evt.event_type || evt.kind;
+
+  // 2. Lookup in configured Event Types from Developer Tools store
+  let matchedEventType = null;
+  if (typeof window !== "undefined") {
+    try {
+      const types = calendarEventTypesStore.getEventTypes(tenantId);
+      matchedEventType = types.find(
+        (t) => t.id === evt.eventTypeId || t.name === evt.title || t.code === evt.code
+      );
+    } catch {}
+  }
+
+  const rawType = explicitType || matchedEventType?.type || (evt.category !== "ACADEMIC_EVENT" ? evt.category : null);
+
+  const kindsMap = {
+    HOLIDAY: "Holiday",
+    EXAM: "Exam",
+    WORKING_HOURS: "Working Hours",
+    ACADEMIC: "Academic",
+    MEETING: "Meeting",
+    ACTIVITY: "Sports & Cultural",
+    GENERAL: "General",
+  };
+
+  if (rawType && kindsMap[String(rawType).toUpperCase()]) {
+    return kindsMap[String(rawType).toUpperCase()];
+  }
+
+  if (matchedEventType?.name && matchedEventType.type && kindsMap[String(matchedEventType.type).toUpperCase()]) {
+    return kindsMap[String(matchedEventType.type).toUpperCase()];
+  }
+
+  if (evt.category && evt.category !== "ACADEMIC_EVENT" && kindsMap[String(evt.category).toUpperCase()]) {
+    return kindsMap[String(evt.category).toUpperCase()];
+  }
+
+  return "Academic Event";
+}
+
+export function getEventColors(evt, tenantId) {
+  const isWorkingHours = evt?.category === "WORKING_HOURS" || evt?.type === "WORKING_HOURS";
 
   if (evt?.color && EVENT_COLOR_MAP[evt.color]) {
     const base = EVENT_COLOR_MAP[evt.color];
@@ -66,6 +128,15 @@ export function getEventColors(evt) {
       hex: "#6366f1",
     };
   }
+
+  // Auto-detect based on dynamic event type
+  const displayType = getEventDisplayType(evt, tenantId);
+  if (displayType === "Holiday") return EVENT_COLOR_MAP.rose;
+  if (displayType === "Exam") return EVENT_COLOR_MAP.amber;
+  if (displayType === "Meeting") return EVENT_COLOR_MAP.blue;
+  if (displayType === "Sports & Cultural") return EVENT_COLOR_MAP.purple;
+  if (displayType === "Academic") return EVENT_COLOR_MAP.emerald;
+
   return EVENT_COLOR_MAP.emerald;
 }
 
@@ -99,6 +170,8 @@ export default function MasterTimeCalendar({
   selectedCategory = "WORKING_HOURS",
   viewMode: propViewMode,
   actionMenuItems = [],
+  onDateSelect,
+  onDisplayModeChange,
   className = "",
 }) {
   const { openDrawer } = useRightSidebar();
@@ -120,7 +193,16 @@ export default function MasterTimeCalendar({
   const handleSetDisplayMode = (mode) => {
     setDisplayMode(mode);
     localStorage.setItem("spr_calendar_display_mode", mode);
+    if (onDisplayModeChange) {
+      onDisplayModeChange(mode);
+    }
   };
+
+  useEffect(() => {
+    if (onDisplayModeChange) {
+      onDisplayModeChange(displayMode);
+    }
+  }, [displayMode, onDisplayModeChange]);
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(viewYear, viewMonth - 1, 1));
@@ -130,8 +212,18 @@ export default function MasterTimeCalendar({
   };
   const handleJumpToday = () => {
     const now = new Date();
-    setCurrentDate(now);
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDay(now.getDate());
+    setTimeout(() => {
+      if (dayStripRef.current) {
+        const activeEl =
+          dayStripRef.current.querySelector('[data-active="true"]') ||
+          dayStripRef.current.querySelector('[data-today="true"]');
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+      }
+    }, 50);
   };
 
   // Open Right Sidebar for viewing event / working hours details
@@ -165,8 +257,15 @@ export default function MasterTimeCalendar({
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      if (selectedCategory && selectedCategory !== "ALL" && selectedCategory !== "AGENDA" && e.category !== selectedCategory) {
-        return false;
+      if (selectedCategory && selectedCategory !== "ALL" && selectedCategory !== "AGENDA") {
+        if (selectedCategory === "WORKING_HOURS") {
+          if (e.category !== "WORKING_HOURS") return false;
+        } else if (selectedCategory === "ACADEMIC_EVENT") {
+          // Under Academic Events tab, include all academic events, exams, holidays, etc.
+          if (e.category === "WORKING_HOURS") return false;
+        } else if (e.category !== selectedCategory) {
+          return false;
+        }
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -189,8 +288,11 @@ export default function MasterTimeCalendar({
     for (let i = firstDay - 1; i >= 0; i--) {
       const dayNum = daysInPrevMonth - i;
       const prevMonthDate = new Date(viewYear, viewMonth - 1, dayNum);
+      const y = prevMonthDate.getFullYear();
+      const m = String(prevMonthDate.getMonth() + 1).padStart(2, "0");
+      const d = String(dayNum).padStart(2, "0");
       cells.push({
-        dateStr: prevMonthDate.toISOString().split("T")[0],
+        dateStr: `${y}-${m}-${d}`,
         dayNum,
         isCurrentMonth: false,
         weekday: prevMonthDate.getDay(),
@@ -200,8 +302,11 @@ export default function MasterTimeCalendar({
     // Current month days
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(viewYear, viewMonth, d);
+      const y = viewYear;
+      const m = String(viewMonth + 1).padStart(2, "0");
+      const dStr = String(d).padStart(2, "0");
       cells.push({
-        dateStr: dateObj.toISOString().split("T")[0],
+        dateStr: `${y}-${m}-${dStr}`,
         dayNum: d,
         isCurrentMonth: true,
         weekday: dateObj.getDay(),
@@ -213,8 +318,11 @@ export default function MasterTimeCalendar({
     const remaining = totalCells - cells.length;
     for (let d = 1; d <= remaining; d++) {
       const nextMonthDate = new Date(viewYear, viewMonth + 1, d);
+      const y = nextMonthDate.getFullYear();
+      const m = String(nextMonthDate.getMonth() + 1).padStart(2, "0");
+      const dStr = String(d).padStart(2, "0");
       cells.push({
-        dateStr: nextMonthDate.toISOString().split("T")[0],
+        dateStr: `${y}-${m}-${dStr}`,
         dayNum: d,
         isCurrentMonth: false,
         weekday: nextMonthDate.getDay(),
@@ -225,28 +333,40 @@ export default function MasterTimeCalendar({
   }, [viewYear, viewMonth]);
 
   const getEventsForDate = (dateStr, weekday) => {
-    return filteredEvents.filter((e) => {
-      // If this occurrence has an exception/override, skip the recurring parent
-      if (Array.isArray(e.exceptions) && e.exceptions.includes(dateStr)) {
-        return false;
-      }
-      if (e.startDate === dateStr) return true;
-      if (e.startDate && e.endDate && dateStr >= e.startDate && dateStr <= e.endDate) {
-        return true;
-      }
-      if (e.repeats && Array.isArray(e.repeatDays) && e.repeatDays.includes(weekday)) {
-        if (!e.startDate || dateStr >= e.startDate) {
-          if (e.until === "DATE" && e.untilDate && dateStr > e.untilDate) {
-            return false;
-          }
+    return filteredEvents
+      .filter((e) => {
+        // If this occurrence has an exception/override, skip the recurring parent
+        if (Array.isArray(e.exceptions) && e.exceptions.includes(dateStr)) {
+          return false;
+        }
+        if (e.startDate === dateStr) return true;
+        if (e.startDate && e.endDate && dateStr >= e.startDate && dateStr <= e.endDate) {
           return true;
         }
-      }
-      return false;
-    });
+        if (e.repeats && Array.isArray(e.repeatDays) && e.repeatDays.includes(weekday)) {
+          if (!e.startDate || dateStr >= e.startDate) {
+            if (e.until === "DATE" && e.untilDate && dateStr > e.untilDate) {
+              return false;
+            }
+            return true;
+          }
+        }
+        return false;
+      })
+      .sort((a, b) => {
+        const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
+        const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
+        return rankA - rankB;
+      });
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
 
   // Timeline selected day safe resolution
   const daysInCurrentViewMonth = useMemo(() => {
@@ -264,6 +384,12 @@ export default function MasterTimeCalendar({
     const d = String(selectedDateObj.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }, [selectedDateObj]);
+
+  useEffect(() => {
+    if (onDateSelect) {
+      onDateSelect(selectedDateStr);
+    }
+  }, [selectedDateStr, onDateSelect]);
 
   const selectedWeekday = selectedDateObj.getDay();
   const selectedDayEvents = useMemo(() => {
@@ -651,11 +777,14 @@ export default function MasterTimeCalendar({
                 const isSelected = item.isCurrentMonth && item.dayNum === safeSelectedDay;
                 const dEvents = getEventsForDate(item.dateStr, item.weekday);
                 const isToday = item.dateStr === todayStr;
+                const topEvent = dEvents.length > 0 ? dEvents[0] : null;
+                const topColor = topEvent ? getEventColors(topEvent) : null;
 
                 return (
                   <button
                     key={`${item.yearNum}-${item.monthIdx}-${item.dayNum}`}
                     data-active={isSelected}
+                    data-today={isToday}
                     type="button"
                     onClick={() => {
                       if (item.isCurrentMonth) {
@@ -674,7 +803,7 @@ export default function MasterTimeCalendar({
                         ? "opacity-40 hover:opacity-90 hover:theme-bg-sub/50 theme-text-secondary"
                         : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
                     }`}
-                    title={`${MONTH_NAMES_SHORT[item.monthIdx]} ${item.dayNum}, ${item.yearNum}`}
+                    title={`${MONTH_NAMES_SHORT[item.monthIdx]} ${item.dayNum}, ${item.yearNum}${topEvent ? ` • ${topEvent.title}` : ""}`}
                   >
                     {/* Top Weekday Slot */}
                     <span className={`text-[8px] @sm:text-[9px] font-mono uppercase leading-none ${isSelected ? "text-white/80" : "theme-text-secondary"}`}>
@@ -686,10 +815,13 @@ export default function MasterTimeCalendar({
                       {item.dayNum}
                     </span>
 
-                    {/* Bottom Indicator Dot Slot (Constant height container prevents text from shifting) */}
+                    {/* Bottom Indicator Dot Slot: Displays priority event color */}
                     <div className="w-full h-1.5 flex items-center justify-center">
-                      {dEvents.length > 0 && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "theme-bg-accent"}`} />
+                      {topColor && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${isSelected ? "ring-1 ring-white/80" : "shadow-2xs"} ${topColor.dot}`}
+                          style={topColor.hex ? { backgroundColor: topColor.hex } : undefined}
+                        />
                       )}
                     </div>
                   </button>
@@ -697,42 +829,18 @@ export default function MasterTimeCalendar({
               })}
             </div>
 
-            {/* Selected Day Main View: Header + Vertical Timeline (Maximized width for sidebars) */}
+            {/* Selected Day Main View: Vertical Timeline (Maximized width for sidebars) */}
             <div className="p-1.5 @sm:p-3 @md:p-5 space-y-2 @sm:space-y-3.5 min-w-0">
               
-              {/* Day Header with Full Weekday & Date */}
-              <div className="flex items-center justify-between pb-1.5 @sm:pb-2.5 border-b border-[var(--border-color,rgba(0,0,0,0.07))] flex-wrap gap-1.5 min-w-0">
-                <div className="flex items-baseline gap-1.5 @sm:gap-2 flex-wrap min-w-0">
-                  <h2 className="text-sm @sm:text-lg @md:text-xl font-bold tracking-tight theme-text-primary">
-                    {WEEKDAY_NAMES_FULL[selectedWeekday]}
-                  </h2>
-                  <span className="text-[10px] @sm:text-xs @md:text-sm font-semibold theme-text-secondary font-mono">
-                    {selectedDateObj.getDate()}{getOrdinalSuffix(selectedDateObj.getDate())} {MONTH_NAMES[viewMonth]} {viewYear}
-                  </span>
-                </div>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenAddDrawer(selectedDateStr)}
-                    className="flex items-center gap-1 px-2 @sm:px-3 py-1 @sm:py-1.5 rounded-lg @sm:rounded-xl text-[11px] @sm:text-xs font-bold theme-bg-accent text-white hover:opacity-90 shadow-2xs transition-all cursor-pointer shrink-0"
-                    title="Add schedule for this date"
-                  >
-                    <PlusIcon className="w-3.5 h-3.5" />
-                    <span className="hidden @sm:inline">Add</span>
-                  </button>
-                )}
-              </div>
-
               {/* Timeline Cards Container */}
               {selectedDayEvents.length === 0 ? (
-                <div className="p-4 @sm:p-8 text-center border theme-border rounded-xl @sm:rounded-2xl theme-bg-sub/30 my-2 flex flex-col items-center justify-center gap-2">
-                  <div className="p-2 rounded-xl theme-bg-surface border theme-border theme-text-secondary opacity-60 shadow-inner">
-                    <CalendarIcon className="w-4 h-4 @sm:w-5 @sm:h-5" />
+                <div className="p-6 @sm:p-10 text-center border theme-border rounded-xl @sm:rounded-2xl theme-bg-sub/30 my-2 flex flex-col items-center justify-center gap-2">
+                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary opacity-60 shadow-inner">
+                    <CalendarIcon className="w-5 h-5" />
                   </div>
                   <div>
                     <h4 className="text-xs @sm:text-sm font-bold theme-text-primary">No schedules or events for this date</h4>
-                    <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">Click Add to create working hours or an academic event.</p>
+                    <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">Click below or use the top Add button to create working hours or an academic event.</p>
                   </div>
                   {!readOnly && (
                     <button
@@ -787,7 +895,7 @@ export default function MasterTimeCalendar({
                             <div className="flex items-center gap-1 flex-wrap">
                               <span className="text-[8px] @sm:text-[10px] uppercase font-mono tracking-wider theme-text-secondary">Type:</span>
                               <span className={`text-[9px] @sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
-                                {evt.category === 'WORKING_HOURS' ? 'Working Hours' : 'Academic Event'}
+                                {getEventDisplayType(evt)}
                               </span>
                             </div>
 
@@ -850,7 +958,7 @@ export default function MasterTimeCalendar({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-xs @sm:text-sm font-bold theme-text-primary truncate">{evt.title}</h4>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
-                            {evt.category === 'WORKING_HOURS' ? 'Working Hours' : 'Academic Event'}
+                            {getEventDisplayType(evt)}
                           </span>
                         </div>
                         <p className="text-[11px] @sm:text-xs theme-text-secondary mt-0.5 truncate">

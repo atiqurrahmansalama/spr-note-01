@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   CalendarIcon,
   TimerIcon,
@@ -6,7 +6,7 @@ import {
   EditIcon,
   ChevronIcon,
 } from "../ui/Icons";
-import { getEventColors } from "./MasterTimeCalendar";
+import { getEventColors, getEventDisplayType } from "./MasterTimeCalendar";
 import TimeScheduleDetailDrawer from "./TimeScheduleDetailDrawer";
 
 function formatTime12(timeStr) {
@@ -21,6 +21,25 @@ function formatTime12(timeStr) {
   return `${h}:${m}${ampm}`;
 }
 
+function formatFullDate(dateStr) {
+  if (!dateStr) return { weekday: "", formatted: "", short: "" };
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return { weekday: "", formatted: dateStr, short: dateStr };
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const dObj = new Date(y, m, d);
+
+  const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  return {
+    weekday: weekdays[dObj.getDay()],
+    formatted: `${d} ${months[m]} ${y}`,
+    short: `${d} ${months[m]}`,
+  };
+}
+
 export default function DayAgendaDrawer({
   dateStr,
   events = [],
@@ -28,19 +47,29 @@ export default function DayAgendaDrawer({
   onEditEvent,
   onDeleteEvent,
   onAddEvent,
+  readOnly = false,
 }) {
-  const [selectedEventId, setSelectedEventId] = useState(() => {
-    if (events.length === 1) return events[0].id;
-    return null;
-  });
+  const [selectedEventId, setSelectedEventId] = useState(null);
 
-  const selectedEvent = events.find((e) => e.id === selectedEventId);
+  const dateDetails = useMemo(() => formatFullDate(dateStr), [dateStr]);
+
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => {
+      const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
+      const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
+      return rankA - rankB;
+    });
+  }, [events]);
+
+  const selectedEvent = useMemo(() => {
+    return sortedEvents.find((e) => e.id === selectedEventId) || null;
+  }, [sortedEvents, selectedEventId]);
 
   // If a single event was clicked or chosen for details, show its full drawer
   if (selectedEvent) {
     return (
-      <div className="space-y-4">
-        {events.length > 1 && (
+      <div className="space-y-4 text-left animate-fade-in">
+        {!readOnly && (
           <button
             type="button"
             onClick={() => setSelectedEventId(null)}
@@ -52,9 +81,10 @@ export default function DayAgendaDrawer({
         <TimeScheduleDetailDrawer
           event={selectedEvent}
           currentDate={dateStr}
-          onEdit={() => onEditEvent && onEditEvent(selectedEvent)}
-          onDelete={(deleteInfo) => onDeleteEvent && onDeleteEvent(deleteInfo || selectedEvent.id)}
+          onEdit={readOnly ? undefined : () => onEditEvent && onEditEvent(selectedEvent)}
+          onDelete={readOnly ? undefined : (deleteInfo) => onDeleteEvent && onDeleteEvent(deleteInfo || selectedEvent.id)}
           onClose={onClose}
+          readOnly={readOnly}
         />
       </div>
     );
@@ -64,92 +94,93 @@ export default function DayAgendaDrawer({
   return (
     <div className="space-y-4 text-left animate-fade-in">
       {/* Top Date Header Banner */}
-      <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-2xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+      <div className="p-4 sm:p-4.5 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 flex items-center justify-center shrink-0 shadow-2xs">
             <CalendarIcon className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold theme-text-primary">
-              Day Agenda & Worklist
-            </h3>
-            <p className="text-xs font-mono font-medium theme-text-secondary mt-0.5">
-              {dateStr}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold theme-text-primary truncate">
+                {dateDetails.weekday || "Day Agenda"}
+              </h3>
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                {dateDetails.formatted || dateStr}
+              </span>
+            </div>
+            <p className="text-[11px] theme-text-secondary truncate mt-0.5">
+              {sortedEvents.length > 0
+                ? `${sortedEvents.length} scheduled item${sortedEvents.length > 1 ? "s" : ""} on this date`
+                : "No active shifts or events scheduled"}
             </p>
           </div>
         </div>
 
-        {onAddEvent && (
+        {!readOnly && onAddEvent && (
           <button
             type="button"
             onClick={() => onAddEvent(dateStr)}
-            className="px-3 py-1.5 rounded-xl theme-bg-accent text-white text-xs font-bold hover:opacity-90 active:scale-98 transition flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl theme-bg-accent text-white text-xs font-bold hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs w-full sm:w-auto"
           >
             <PlusIcon className="w-3.5 h-3.5" />
-            <span>Add Task</span>
+            <span>Add Event</span>
           </button>
         )}
       </div>
 
-      {/* Events Worklist */}
-      {events.length === 0 ? (
-        <div className="p-10 text-center rounded-2xl theme-bg-sub/40 border theme-border space-y-3">
-          <div className="w-10 h-10 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center mx-auto opacity-60">
-            <CalendarIcon className="w-5 h-5 theme-text-secondary" />
+      {/* Events Worklist & Perfectly Centered Empty State */}
+      {sortedEvents.length === 0 ? (
+        <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4 my-2 w-full">
+          <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 flex items-center justify-center shrink-0 shadow-xs">
+            <CalendarIcon className="w-7 h-7" />
           </div>
-          <div>
-            <h4 className="text-xs font-bold theme-text-primary">
-              No tasks or events scheduled
+          <div className="max-w-xs sm:max-w-sm mx-auto space-y-1.5 text-center flex flex-col items-center">
+            <h4 className="text-sm font-bold theme-text-primary">
+              No Schedules or Events
             </h4>
-            <p className="text-[11px] theme-text-secondary mt-1">
-              There are no calendar activities or special shifts planned for this date.
+            <p className="text-xs theme-text-secondary leading-relaxed">
+              No shifts or institutional events are registered for this date.
             </p>
           </div>
-          {onAddEvent && (
-            <button
-              type="button"
-              onClick={() => onAddEvent(dateStr)}
-              className="px-4 py-2 rounded-xl theme-bg-accent text-white text-xs font-bold hover:opacity-90 active:scale-98 transition inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>Create Event / Schedule</span>
-            </button>
-          )}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <span className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary block px-1">
-            Scheduled Items ({events.length})
+            Scheduled Items ({sortedEvents.length})
           </span>
 
-          <div className="space-y-2">
-            {events.map((evt) => {
+          <div className="space-y-2.5">
+            {sortedEvents.map((evt) => {
               const style = getEventColors(evt);
-              const isWorkingHours = evt.category === "WORKING_HOURS";
               const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
+              const rankVal = evt.priorityRank || evt.rank || 1;
 
               return (
                 <div
                   key={evt.id}
                   onClick={() => setSelectedEventId(evt.id)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-xs ${style.bg} ${style.border}`}
+                  className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-sm ${style.bg} ${style.border}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-                        <h4 className="text-xs font-bold theme-text-primary truncate">
+                        <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate">
                           {evt.title}
                         </h4>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                          Rank {rankVal}
+                        </span>
+
                         <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-surface border theme-border theme-text-primary">
                           {isAllDay ? "Full Day" : `${formatTime12(evt.startTime)} – ${formatTime12(evt.endTime)}`}
                         </span>
 
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
-                          {isWorkingHours ? "Working Hours" : "Academic Event"}
+                          {getEventDisplayType(evt)}
                         </span>
 
                         {evt.audience && (
@@ -160,7 +191,7 @@ export default function DayAgendaDrawer({
                       </div>
 
                       {evt.description && (
-                        <p className="text-[11px] theme-text-secondary line-clamp-2 pt-1">
+                        <p className="text-[11px] theme-text-secondary line-clamp-2 pt-0.5 leading-relaxed font-normal">
                           {evt.description}
                         </p>
                       )}
@@ -178,11 +209,11 @@ export default function DayAgendaDrawer({
       )}
 
       {/* Footer Close */}
-      <div className="pt-4 border-t theme-border flex items-center justify-end">
+      <div className="pt-3 border-t theme-border flex items-center justify-end">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-elevated theme-text-secondary font-semibold text-xs transition cursor-pointer"
+          className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary font-semibold text-xs transition cursor-pointer"
         >
           Close
         </button>

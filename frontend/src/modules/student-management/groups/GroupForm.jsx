@@ -111,17 +111,24 @@ export default function GroupForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-left animate-fade-in">
+      {classes.length === 0 && (
+        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border text-xs theme-text-secondary">
+          <p className="font-bold theme-text-primary">No Academic Class Found</p>
+          <p className="mt-0.5">Groups/Halqas must belong to a Class. Please create a Class first before creating a Group.</p>
+        </div>
+      )}
+
       {/* Parent Class Dropdown */}
       <div>
         <CustomSelect
-          label="Parent Academic Class"
+          label="Parent Academic Class *"
           value={formData.student_class}
           onChange={(val) => setFormData({ ...formData, student_class: val })}
           options={classes.map((c) => ({
-            value: c.id,
+            value: String(c.id),
             label: `${c.name}${c.code ? ` (${c.code})` : ""}`,
           }))}
-          placeholder="Select Parent Class..."
+          placeholder="Select Parent Class (Required)..."
           icon={ClassIcon}
           required
         />

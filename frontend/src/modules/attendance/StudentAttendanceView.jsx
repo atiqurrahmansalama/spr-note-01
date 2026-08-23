@@ -83,23 +83,21 @@ export default function StudentAttendanceView() {
 
   // 2. Fetch Groups and Class-specific Periods when Class changes
   useEffect(() => {
-    if (!selectedClassId) {
-      setGroups([]);
-      setSelectedGroupId('');
-      return;
-    }
-
     const fetchGroupsAndPeriods = async () => {
       try {
+        const perUrl = selectedClassId
+          ? `/api/v1/academy/periods/?class=${selectedClassId}`
+          : `/api/v1/academy/periods/`;
+
         const [grpRes, perRes] = await Promise.all([
-          fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`),
-          fetchWithAuth(`/api/v1/academy/periods/?class=${selectedClassId}`),
+          fetchWithAuth(`/api/v1/groups/?page_size=500`),
+          fetchWithAuth(perUrl),
         ]);
 
         if (grpRes.ok) {
           const data = await grpRes.json();
-          setGroups(Array.isArray(data) ? data : data.results || []);
-          setSelectedGroupId('');
+          const grpList = Array.isArray(data) ? data : data.results || [];
+          setGroups(grpList);
         }
 
         if (perRes.ok) {
@@ -114,7 +112,7 @@ export default function StudentAttendanceView() {
     };
 
     fetchGroupsAndPeriods();
-  }, [selectedClassId]);
+  }, [selectedClassId, activeTenantId]);
 
   // 3. Holiday Check on Date Change
   useEffect(() => {
@@ -135,49 +133,82 @@ export default function StudentAttendanceView() {
     runHolidayCheck();
   }, [selectedDate]);
 
-  // Version counter to trigger re-check when master calendar updates
+  // Version counter to trigger re-check when master calendar or attendance event restrictions update
   const [calendarVersion, setCalendarVersion] = useState(0);
 
   useEffect(() => {
     const handleCalUpdate = () => setCalendarVersion((v) => v + 1);
     window.addEventListener('spr_calendar_events_updated', handleCalUpdate);
-    return () => window.removeEventListener('spr_calendar_events_updated', handleCalUpdate);
+    window.addEventListener('spr_attendance_event_restrictions_updated', handleCalUpdate);
+    return () => {
+      window.removeEventListener('spr_calendar_events_updated', handleCalUpdate);
+      window.removeEventListener('spr_attendance_event_restrictions_updated', handleCalUpdate);
+    };
   }, []);
 
-  // Check if selectedDate has an active Calendar Event impacting Attendance
-  const activeCalendarEvent = useMemo(() => {
-    if (!selectedDate) return null;
+  // Check if selectedDate has active Calendar Events impacting Attendance (Sorted by Priority Rank)
+  const matchingCalendarEvents = useMemo(() => {
+    if (!selectedDate) return [];
     const calendarEvents = masterCalendarStore.getEvents(activeTenantId) || [];
     const dObj = new Date(selectedDate);
     const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
 
     const hasAttendanceImpact = (evt) => {
       if (!evt) return false;
-      if (!evt.impacts) return true;
+      // 1. Check if configured as disabled in Attendance Settings
+      if (attendanceEventRestrictionsStore.isAttendanceDisabledForEvent(activeTenantId, evt)) {
+        return true;
+      }
       const impacts = Array.isArray(evt.impacts)
         ? evt.impacts
         : (typeof evt.impacts === 'string' ? evt.impacts.split(',').map((s) => s.trim()) : []);
-      if (impacts.length === 0) return true;
-      return impacts.some((imp) => {
-        const s = String(imp).toUpperCase();
-        return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
-      });
+
+      // If impacts array is explicitly provided
+      if (impacts.length > 0) {
+        return impacts.some((imp) => {
+          const s = String(imp).toUpperCase();
+          return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
+        });
+      }
+
+      // If impacts are NOT specified, only genuine Holidays, Exams or Academic Events impact student attendance
+      if (evt.category === 'HOLIDAY' || evt.category === 'EXAM' || evt.category === 'ACADEMIC_EVENT' || evt.is_holiday || evt.affects_students) {
+        return true;
+      }
+
+      return false;
     };
 
+    const matched = [];
     for (const evt of calendarEvents) {
       if (!hasAttendanceImpact(evt)) continue;
       if (Array.isArray(evt.exceptions) && evt.exceptions.includes(selectedDate)) continue;
-      if (evt.startDate === selectedDate && (!evt.endDate || evt.endDate === selectedDate)) return evt;
-      if (evt.startDate && evt.endDate && selectedDate >= evt.startDate && selectedDate <= evt.endDate) return evt;
+      if (evt.startDate === selectedDate && (!evt.endDate || evt.endDate === selectedDate)) {
+        matched.push(evt);
+        continue;
+      }
+      if (evt.startDate && evt.endDate && selectedDate >= evt.startDate && selectedDate <= evt.endDate) {
+        matched.push(evt);
+        continue;
+      }
       if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
         if (!evt.startDate || selectedDate >= evt.startDate) {
           if (evt.until === 'DATE' && evt.untilDate && selectedDate > evt.untilDate) continue;
-          return evt;
+          matched.push(evt);
         }
       }
     }
-    return null;
+
+    matched.sort((a, b) => {
+      const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
+      const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
+      return rankA - rankB;
+    });
+
+    return matched;
   }, [selectedDate, activeTenantId, calendarVersion]);
+
+  const activeCalendarEvent = matchingCalendarEvents[0] || null;
 
   // Active periods list for rendering
   const activePeriods = useMemo(() => {
@@ -226,22 +257,19 @@ export default function StudentAttendanceView() {
       stuList.forEach((s) => {
         activePeriods.forEach((p) => {
           const recKey = `${s.id}_${p.id}`;
-          const found = attList.find(
-            (a) =>
-              String(a.student) === String(s.id) &&
-              (a.period_slot_id === p.id || a.period_slot === p.id || String(a.period_slot_id) === String(p.id))
+          const isDateDisabled = Boolean(
+            (holidayInfo?.is_holiday && !overrideHoliday) ||
+            (activeCalendarEvent && attendanceEventRestrictionsStore.isAttendanceDisabledForEvent(activeTenantId, activeCalendarEvent))
           );
 
           newMap[recKey] = {
             student_id: s.id,
             period_slot_id: p.id,
-            status: found
-              ? found.status
-              : holidayInfo.is_holiday && !overrideHoliday
+            status: isDateDisabled
               ? 'HOLIDAY_EXCUSED'
-              : 'PRESENT',
+              : (found ? found.status : 'PRESENT'),
             in_time: found?.in_time ? found.in_time.slice(0, 5) : p.start_time ? p.start_time.slice(0, 5) : '08:00',
-            remarks: found?.remarks || '',
+            remarks: isDateDisabled ? (activeCalendarEvent?.title || 'Attendance Disabled') : (found?.remarks || ''),
           };
         });
       });
@@ -394,6 +422,8 @@ export default function StudentAttendanceView() {
       {/* 2. Active Calendar Schedule / Event Alert Banner */}
       {activeCalendarEvent && (() => {
         const evtColors = getEventColors(activeCalendarEvent);
+        const rankVal = activeCalendarEvent.priorityRank || activeCalendarEvent.rank || 1;
+        const otherCount = matchingCalendarEvents.length - 1;
         return (
           <div className={`p-4 rounded-3xl ${evtColors.bg} border ${evtColors.border} shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in`}>
             <div className="flex items-center gap-3">
@@ -401,11 +431,19 @@ export default function StudentAttendanceView() {
                 <CalendarIcon className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-sm font-bold theme-text-primary flex items-center gap-2">
+                <div className="text-sm font-bold theme-text-primary flex items-center flex-wrap gap-2">
                   <span>Active Schedule Event:</span>
                   <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${evtColors.text}`}>
                     {activeCalendarEvent.title}
                   </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-surface border theme-border theme-text-primary">
+                    Rank {rankVal} (Top Precedence)
+                  </span>
+                  {otherCount > 0 && (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                      +{otherCount} lower-ranked event{otherCount > 1 ? 's' : ''} on this date
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs theme-text-secondary mt-0.5">
                   {activeCalendarEvent.description || "This date has an active event scheduled in the Master Calendar with Attendance integration."}
@@ -509,7 +547,7 @@ export default function StudentAttendanceView() {
             <option value="">-- All Groups / Halqas --</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                {g.student_class_name ? `${g.name} (${g.student_class_name})` : g.name}
               </option>
             ))}
           </select>

@@ -34,8 +34,6 @@ export const ROUTE_TITLE_MAP = {
   "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Staff Management" },
 
   "/attendance/settings": { title: "Attendance Settings", category: "Settings" },
-  "/attendance/devices": { title: "Biometric Devices", category: "Settings & Devices" },
-  "/calendar": { title: "Institutional Calendar", category: "Settings & Devices" },
 
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },
@@ -43,6 +41,7 @@ export const ROUTE_TITLE_MAP = {
   "/students": { title: "Student Roster", category: "Student" },
   "/groups-students": { title: "Student Roster", category: "Student" },
   "/student-roster": { title: "Student Roster", category: "Student" },
+  "/staff/roster": { title: "Teacher & Staff Roster", category: "Staff Management" },
   "/staff": { title: "Staff Directory", category: "Staff" },
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },

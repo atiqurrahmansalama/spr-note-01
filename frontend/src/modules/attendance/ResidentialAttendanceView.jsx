@@ -2,21 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import {
   RefreshIcon,
-  FilterIcon,
   CalendarIcon,
-  ClockIcon,
-  SparklesIcon,
   TimerIcon,
-  PlusIcon,
-  EditIcon,
-  TrashIcon,
   PrintIcon,
   DownloadIcon,
   FilledCheckCircleIcon,
   FilledXCircleIcon,
-  MatrixIcon,
-  StudentIcon,
-  TeacherIcon,
+  AttendanceIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import ActionMenu from '../../components/ui/ActionMenu';
@@ -24,9 +16,16 @@ import CustomSelect from '../../components/ui/CustomSelect';
 import DateRangePicker from '../../components/common/DateRangePicker';
 import CheckpointForm from './CheckpointForm';
 import { fetchWithAuth } from '../../utils/authService';
-import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
-import { calendarSettings, attendanceFilters } from '../../utils/localStore';
-import { getHijriDateString } from '../../utils/hijriUtils';
+import { getMonthlyAttendanceMatrix } from '../../api/attendance';
+import {
+  calendarSettings,
+  attendanceFilters,
+  masterCalendarStore,
+} from '../../utils/localStore';
+import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
+import { getEventColors } from '../../components/common/MasterTimeCalendar';
+import DayAgendaDrawer from '../../components/common/DayAgendaDrawer';
+import TimeScheduleDrawerForm from '../../components/common/TimeScheduleDrawerForm';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
@@ -55,17 +54,6 @@ const DEFAULT_INITIAL_CHECKPOINTS = [
   },
 ];
 
-const PRESET_TITLES = [
-  'Night Dormitory Bed Check',
-  'Morning Fajr Wakeup & Attendance',
-  'Evening Maghrib Study Roll Call',
-  'Afternoon Asr Checkpoint',
-  'Midday Zuhr Attendance',
-  'Dining Hall Meal Attendance',
-  'Tahajjud & Early Morning Check',
-  'Dormitory Cleaning & Inspection',
-];
-
 export default function ResidentialAttendanceView({
   classId: propClassId,
   groupId: propGroupId,
@@ -74,6 +62,7 @@ export default function ResidentialAttendanceView({
 } = {}) {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
+  const { openRightSidebar, closeRightSidebar, openDrawer } = useRightSidebar();
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -89,7 +78,7 @@ export default function ResidentialAttendanceView({
   const [selectedGroupId, setSelectedGroupId] = useState(() => propGroupId || savedFilters.groupId || '');
   const [selectedCheckpointId, setSelectedCheckpointId] = useState(() => savedFilters.checkpointId || 'ALL');
 
-  // Date Navigation State
+  // Date Navigation State (identical to Class Attendance)
   const [selectedYear, setSelectedYear] = useState(() => savedFilters.year || new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(() => savedFilters.month || (new Date().getMonth() + 1));
   const [startDate, setStartDate] = useState(() => {
@@ -103,16 +92,18 @@ export default function ResidentialAttendanceView({
     return savedFilters.endDate || '';
   });
 
-  // Attendance Marking State
+  // Attendance Marking & UI State
   const [isEditing, setIsEditing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
+  const [calendarEventsVersion, setCalendarEventsVersion] = useState(0);
 
   // Roster & Matrix Data
   const [matrixData, setMatrixData] = useState(null);
+  const tableScrollRef = useRef(null);
 
-  // Dynamic Residential Checkpoints / Rows
+  // Dynamic Residential Checkpoints
   const [checkpoints, setCheckpoints] = useState(() => {
     try {
       const saved = localStorage.getItem(`spr_res_checkpoints_${activeTenantId || 'default'}`);
@@ -122,7 +113,7 @@ export default function ResidentialAttendanceView({
     }
   });
 
-  // Checkpoint-specific Attendance Records: { [`${studentId}_${checkpointId}_${dateStr}`]: 'PRESENT' | 'ABSENT' | 'LATE' }
+  // Checkpoint-specific Attendance Records: { [`${studentId}_${checkpointId}_${dateStr}`]: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'ON_LEAVE' }
   const [residentialRecords, setResidentialRecords] = useState(() => {
     try {
       const saved = localStorage.getItem(`spr_res_records_${activeTenantId || 'default'}`);
@@ -146,7 +137,6 @@ export default function ResidentialAttendanceView({
     });
   }, [selectedClassId, selectedGroupId, selectedCheckpointId, selectedYear, selectedMonth, startDate, endDate, activeTenantId]);
 
-
   // Save checkpoints to localStorage
   const saveCheckpoints = useCallback((newCheckpoints) => {
     setCheckpoints(newCheckpoints);
@@ -155,13 +145,21 @@ export default function ResidentialAttendanceView({
     } catch {}
   }, [activeTenantId]);
 
-  // Listen to calendar settings
+  // Listen to live calendar setting changes
   useEffect(() => {
     const handleSettingsUpdate = () => {
       setIsHijriEnabled(calendarSettings.getHijriEnabled());
     };
+    const handleCalendarUpdate = () => {
+      setCalendarEventsVersion((v) => v + 1);
+    };
+
     window.addEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
-    return () => window.removeEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
+    window.addEventListener('spr_calendar_events_updated', handleCalendarUpdate);
+    return () => {
+      window.removeEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
+      window.removeEventListener('spr_calendar_events_updated', handleCalendarUpdate);
+    };
   }, []);
 
   // Listen to Escape key to exit full screen
@@ -179,9 +177,8 @@ export default function ResidentialAttendanceView({
   useEffect(() => {
     const fetchLookups = async () => {
       try {
-        const [clsRes, staffRes] = await Promise.allSettled([
+        const [clsRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
-          fetchWithAuth('/api/v1/staff/'),
         ]);
 
         if (clsRes.status === 'fulfilled' && clsRes.value.ok) {
@@ -198,13 +195,8 @@ export default function ResidentialAttendanceView({
             setSelectedClassId('');
           }
         }
-
-        if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
-          const sData = await staffRes.value.json();
-          setStaffList(Array.isArray(sData) ? sData : sData.results || []);
-        }
       } catch (err) {
-        console.error('Failed to load classes or staff for residential attendance:', err);
+        console.error('Failed to load classes for residential attendance:', err);
       }
     };
 
@@ -217,12 +209,11 @@ export default function ResidentialAttendanceView({
       try {
         const url = selectedClassId
           ? `/api/v1/groups/?student_class=${selectedClassId}`
-          : `/api/v1/groups/`;
+          : `/api/v1/groups/?page_size=500`;
         const res = await fetchWithAuth(url);
         if (res.ok) {
           const data = await res.json();
           setGroups(Array.isArray(data) ? data : data.results || []);
-          setSelectedGroupId('');
         }
       } catch (err) {
         console.warn('Failed to load groups:', err);
@@ -280,6 +271,7 @@ export default function ResidentialAttendanceView({
     const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
     if (dayCount === 7) return { prev: 'Prev Week', next: 'Next Week' };
     if (dayCount === 14) return { prev: 'Prev 2 Weeks', next: 'Next 2 Weeks' };
+    if (dayCount === 1) return { prev: 'Prev Day', next: 'Next Day' };
     return { prev: 'Prev Period', next: 'Next Period' };
   };
 
@@ -335,9 +327,7 @@ export default function ResidentialAttendanceView({
     setEndDate('');
   };
 
-  const { openDrawer, closeDrawer } = useRightSidebar();
-
-  // Universal Drawer Registration for Residential Checkpoint (survives F5 refresh)
+  // Universal Drawer Registration for Residential Checkpoint
   useDrawerRegistration(
     'checkpoint',
     (params) => {
@@ -349,164 +339,377 @@ export default function ResidentialAttendanceView({
         title: mode === 'add' ? 'Add Residential Checkpoint' : `Edit Checkpoint: ${foundChk?.name || 'Checkpoint'}`,
         category: 'Residential Attendance',
         size: 'md',
-        width: 560,
         content: (
           <CheckpointForm
-            editingCheckpoint={foundChk}
-            onSaved={(savedChk) => {
-              if (mode === 'add') {
-                saveCheckpoints([...checkpoints, savedChk]);
-                showToast('New residential checkpoint added for all students.', 'success');
-              } else {
-                const updated = checkpoints.map((c) => (c.id === savedChk.id ? savedChk : c));
+            checkpoint={foundChk}
+            onSave={(chkData) => {
+              if (foundChk) {
+                const updated = checkpoints.map((c) => (c.id === foundChk.id ? { ...c, ...chkData } : c));
                 saveCheckpoints(updated);
-                showToast('Checkpoint updated successfully.', 'success');
+                showToast(`Checkpoint "${chkData.name}" updated.`, 'success');
+              } else {
+                const newId = `chk_${Date.now()}`;
+                saveCheckpoints([...checkpoints, { ...chkData, id: newId }]);
+                showToast(`Checkpoint "${chkData.name}" created.`, 'success');
               }
-              closeDrawer();
+              closeRightSidebar();
             }}
-            onCancel={closeDrawer}
+            onCancel={closeRightSidebar}
           />
         ),
       };
-    },
-    [checkpoints, closeDrawer, showToast]
+    }
   );
 
-  // Checkpoint Right Sidebar Handlers
-  const handleOpenAddCheckpoint = () => {
+  const handleAddCheckpoint = () => {
     openDrawer('checkpoint', { mode: 'add' });
   };
 
-  const handleOpenEditCheckpoint = (chk) => {
-    openDrawer('checkpoint', { mode: 'edit', id: chk.id });
-  };
-
-  const handleDeleteCheckpoint = (chkId) => {
-    if (checkpoints.length <= 1) {
-      showToast('At least one checkpoint row is required in the register.', 'warning');
-      return;
-    }
-    const updated = checkpoints.filter((c) => c.id !== chkId);
-    saveCheckpoints(updated);
-    showToast('Checkpoint row removed.', 'info');
-  };
-
-  // Toggle Cell Attendance Handler for individual Checkpoint row
-  const handleToggleCell = async (studentId, dateStr, currentStatus, checkpointId) => {
-    // Strictly disable on off-days (holiday/weekend)
-    const dayHeader = matrixData?.days_header?.find(
-      (d) => d.date === dateStr || String(d.day) === String(dateStr)
-    );
-    if (dayHeader?.is_holiday || dayHeader?.is_weekend) {
-      showToast('Attendance marking is disabled on holidays and weekends.', 'warning');
-      return;
-    }
-
-    let nextStatus = 'PRESENT';
-    if (currentStatus === 'PRESENT') nextStatus = 'ABSENT';
-    else if (currentStatus === 'ABSENT') nextStatus = 'LATE';
-    else if (currentStatus === 'LATE') nextStatus = 'PRESENT';
-
-    const recordKey = `${studentId}_${checkpointId}_${dateStr}`;
-
-    setResidentialRecords((prev) => {
-      const next = { ...prev, [recordKey]: nextStatus };
-      try {
-        localStorage.setItem(`spr_res_records_${activeTenantId || 'default'}`, JSON.stringify(next));
-      } catch (e) {
-        console.error(e);
+  // Toggle "Take Attendance" mode & automatically trigger Full Screen
+  const handleToggleTakeAttendance = () => {
+    setIsEditing((prev) => {
+      const next = !prev;
+      if (next) {
+        setIsFullscreen(true);
+        showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark checkpoint attendance.', 'info');
+      } else {
+        setIsFullscreen(false);
+        showToast('Attendance marking finished. Exited full screen.', 'success');
       }
       return next;
     });
-
-    try {
-      await bulkMarkStudentAttendance({
-        date: dateStr,
-        class_id: selectedClassId ? Number(selectedClassId) : null,
-        group_id: selectedGroupId ? Number(selectedGroupId) : null,
-        override_holiday: true,
-        records: [
-          {
-            student_id: studentId,
-            status: nextStatus,
-          },
-        ],
-      });
-    } catch (err) {
-      console.warn('Residential attendance marked locally:', err);
-    }
   };
 
-  // Checkpoint Options for Dropdown Filter
-  const checkpointOptions = [
-    { value: 'ALL', label: `All Checkpoints (${checkpoints.length} Active Slots)` },
-    ...checkpoints.map((c) => ({
-      value: c.id,
-      label: `${c.time} — ${c.name}`,
-    })),
-    { value: '__ADD_NEW__', label: '+ Add More Checkpoint...' },
-  ];
-
-  const activeCheckpoints = useMemo(() => {
-    if (!selectedCheckpointId || selectedCheckpointId === 'ALL') return checkpoints;
-    return checkpoints.filter((c) => c.id === selectedCheckpointId);
-  }, [checkpoints, selectedCheckpointId]);
-
-  // Get Total Metrics per student across all checkpoints
-  const computeStudentTotals = useCallback((studentId) => {
-    let present = 0;
-    let late = 0;
-    let absent = 0;
-    if (!matrixData || !matrixData.days_header) {
-      return { present: 0, late: 0, absent: 0, attendance_rate: 0 };
-    }
-
-    matrixData.days_header.forEach((d) => {
-      const dateStr =
-        d.date ||
-        `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-      activeCheckpoints.forEach((chk) => {
-        const recordKey = `${studentId}_${chk.id}_${dateStr}`;
-        const status = residentialRecords[recordKey];
-
-        if (status === 'PRESENT') present++;
-        else if (status === 'LATE') late++;
-        else if (status === 'ABSENT') absent++;
-      });
-    });
-
-    const totalMarked = present + late + absent;
-    const rate = totalMarked > 0 ? Math.round(((present + late * 0.5) / totalMarked) * 100) : 0;
-    return { present, late, absent, attendance_rate: rate };
-  }, [matrixData, activeCheckpoints, residentialRecords, selectedYear, selectedMonth]);
-
-  const getStudentTotals = computeStudentTotals;
-
-
-  // Month Names & Titles
+  // Month Names
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
+  // Compute Header Date Details
   const getHeaderDateDetails = () => {
     if (startDate && endDate) {
       const [sy, sm, sd] = startDate.split('-');
       const [ey, em, ed] = endDate.split('-');
+
+      const hijriRange = getCurrentHijriMonthRange(new Date(startDate));
+      const isFullHijriMonth = (startDate === hijriRange.start && endDate === hijriRange.end);
+
+      if (isFullHijriMonth) {
+        const gregorianTitle = `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`;
+        const hijriTitle = `${hijriRange.hijriMonthName} ${hijriRange.hijriYear} AH`;
+        return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: true };
+      }
+
+      if (startDate === endDate) {
+        const gregorianTitle = `${sd}/${sm}/${sy}`;
+        const hijriTitle = getHijriDateString(startDate);
+        return { gregorianTitle, hijriTitle, isSingleDay: true, isFullHijriMonth: false };
+      }
+
       const gregorianTitle = `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`;
       const hijriTitle = `${getHijriDateString(startDate)} – ${getHijriDateString(endDate)}`;
-      return { gregorianTitle, hijriTitle };
+
+      return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: false };
     }
 
     const firstDayStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
     const gregorianTitle = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
     const hijriTitle = getHijriDateString(firstDayStr);
-    return { gregorianTitle, hijriTitle };
+    return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: false };
   };
 
-  const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
+  const { gregorianTitle, hijriTitle, isFullHijriMonth } = getHeaderDateDetails();
 
-  // Options
+  // Merge Master Calendar Events & Holidays — ONLY for Date Header styling, NEVER disabling attendance
+  const enrichedMatrixData = useMemo(() => {
+    if (!matrixData || !matrixData.days_header) return matrixData;
+
+    const calendarEvents = masterCalendarStore.getEvents(activeTenantId) || [];
+
+    const hasAttendanceImpact = (evt) => {
+      if (!evt) return false;
+      const impacts = Array.isArray(evt.impacts)
+        ? evt.impacts
+        : (typeof evt.impacts === 'string' ? evt.impacts.split(',').map((s) => s.trim()) : []);
+
+      if (impacts.length > 0) {
+        return impacts.some((imp) => {
+          const s = String(imp).toUpperCase();
+          return s === 'ALL' || s === 'ATTENDANCE' || s === 'RESIDENTIAL_ATTENDANCE';
+        });
+      }
+      return Boolean(evt.category === 'HOLIDAY' || evt.category === 'EXAM' || evt.category === 'ACADEMIC_EVENT' || evt.is_holiday || evt.affects_students);
+    };
+
+    const findMatchingAttendanceEvent = (dateStr, weekdayNum) => {
+      const matched = [];
+      for (const evt of calendarEvents) {
+        if (!hasAttendanceImpact(evt)) continue;
+        if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) continue;
+
+        if (evt.startDate === dateStr && (!evt.endDate || evt.endDate === dateStr)) {
+          matched.push(evt);
+          continue;
+        }
+        if (evt.startDate && evt.endDate && dateStr >= evt.startDate && dateStr <= evt.endDate) {
+          matched.push(evt);
+          continue;
+        }
+        if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
+          if (!evt.startDate || dateStr >= evt.startDate) {
+            if (evt.until === 'DATE' && evt.untilDate && dateStr > evt.untilDate) continue;
+            matched.push(evt);
+          }
+        }
+      }
+
+      if (matched.length === 0) return null;
+      matched.sort((a, b) => {
+        const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
+        const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
+        return rankA - rankB;
+      });
+      return matched[0];
+    };
+
+    const enrichedDaysHeader = matrixData.days_header.map((d) => {
+      const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+      const dObj = new Date(dateStr);
+      const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
+
+      const matchedEvt = findMatchingAttendanceEvent(dateStr, weekdayNum);
+      const eventColors = matchedEvt ? getEventColors(matchedEvt) : null;
+      const isCalHoliday = Boolean(
+        matchedEvt && (matchedEvt.category === 'HOLIDAY' || matchedEvt.is_holiday)
+      );
+
+      return {
+        ...d,
+        date: dateStr,
+        is_holiday: isCalHoliday,
+        is_disabled: false, // Attendance is NEVER disabled in residential
+        holiday_title: matchedEvt?.title || (isCalHoliday ? 'Holiday' : ''),
+        calendar_event: matchedEvt,
+        event_title: matchedEvt?.title,
+        event_color: matchedEvt?.color,
+        event_colors: eventColors,
+      };
+    });
+
+    return {
+      ...matrixData,
+      days_header: enrichedDaysHeader,
+    };
+  }, [matrixData, activeTenantId, selectedYear, selectedMonth, calendarEventsVersion]);
+
+  // Open Day Agenda Drawer on Header Date Click
+  const handleOpenDayAgenda = (dateStr) => {
+    const matchedDay = enrichedMatrixData?.days_header?.find((d) => d.date === dateStr);
+    const matchedEvt = matchedDay?.calendar_event;
+
+    openRightSidebar({
+      title: `Day Agenda: ${dateStr}`,
+      subtitle: `${getHijriDateString(dateStr)} • Master Calendar & Events`,
+      icon: CalendarIcon,
+      width: 580,
+      content: (
+        <DayAgendaDrawer
+          dateStr={dateStr}
+          activeTenantId={activeTenantId}
+          calendarEvent={matchedEvt}
+          isHoliday={matchedDay?.is_holiday}
+          holidayTitle={matchedDay?.holiday_title}
+          onClose={closeRightSidebar}
+          onOpenEventForm={(eventToEdit) => {
+            openRightSidebar({
+              title: eventToEdit ? `Edit: ${eventToEdit.title}` : 'Schedule Event / Holiday',
+              subtitle: `Date: ${dateStr}`,
+              icon: CalendarIcon,
+              width: 600,
+              content: (
+                <TimeScheduleDrawerForm
+                  event={eventToEdit}
+                  initialDate={dateStr}
+                  onSaveSuccess={() => {
+                    closeRightSidebar();
+                    setCalendarEventsVersion((v) => v + 1);
+                    showToast('Calendar event updated successfully.', 'success');
+                  }}
+                  onCancel={closeRightSidebar}
+                />
+              ),
+            });
+          }}
+        />
+      ),
+    });
+  };
+
+  // Toggle Cell Checkpoint Attendance (Always allowed, never blocked)
+  const handleToggleCell = (studentId, dateStr, currentStatus, checkpointId) => {
+    const nextStatus =
+      !currentStatus || currentStatus === 'PRESENT'
+        ? 'ABSENT'
+        : currentStatus === 'ABSENT'
+        ? 'LATE'
+        : currentStatus === 'LATE'
+        ? 'HALF_DAY'
+        : currentStatus === 'HALF_DAY'
+        ? 'ON_LEAVE'
+        : currentStatus === 'ON_LEAVE'
+        ? null
+        : 'PRESENT';
+
+    const recordKey = `${studentId}_${checkpointId}_${dateStr}`;
+    const newRecords = { ...residentialRecords, [recordKey]: nextStatus };
+    setResidentialRecords(newRecords);
+
+    try {
+      localStorage.setItem(`spr_res_records_${activeTenantId || 'default'}`, JSON.stringify(newRecords));
+    } catch {}
+  };
+
+  // Active checkpoints to show
+  const activeCheckpoints = useMemo(() => {
+    if (selectedCheckpointId === 'ALL') {
+      return checkpoints;
+    }
+    const found = checkpoints.filter((c) => String(c.id) === String(selectedCheckpointId));
+    return found.length > 0 ? found : checkpoints;
+  }, [checkpoints, selectedCheckpointId]);
+
+  // Unique Students from matrix
+  const uniqueStudents = useMemo(() => {
+    if (!enrichedMatrixData?.students_matrix) return [];
+    return enrichedMatrixData.students_matrix;
+  }, [enrichedMatrixData]);
+
+  // Compute student totals across active checkpoints
+  const computeStudentTotals = useCallback((studentId) => {
+    let p = 0, l = 0, a = 0, hd = 0, lv = 0;
+    if (!enrichedMatrixData?.days_header) {
+      return { present: 0, late: 0, absent: 0, half_day: 0, on_leave: 0, total_recorded: 0, attendance_rate: 100 };
+    }
+
+    enrichedMatrixData.days_header.forEach((d) => {
+      const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+      activeCheckpoints.forEach((chk) => {
+        const key = `${studentId}_${chk.id}_${dateStr}`;
+        const st = residentialRecords[key];
+        if (st === 'PRESENT') p += 1;
+        else if (st === 'LATE') l += 1;
+        else if (st === 'ABSENT') a += 1;
+        else if (st === 'HALF_DAY') hd += 1;
+        else if (st === 'ON_LEAVE') lv += 1;
+      });
+    });
+
+    const total = p + l + a + hd + lv;
+    const effective = p + l + hd * 0.5;
+    const rate = total > 0 ? Math.round((effective / total) * 1000) / 10 : 100.0;
+    return { present: p, late: l, absent: a, half_day: hd, on_leave: lv, total_recorded: total, attendance_rate: rate };
+  }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords]);
+
+  // Export CSV
+  const handleExportCSV = () => {
+    if (!matrixData || !matrixData.days_header || uniqueStudents.length === 0) {
+      showToast('No attendance records to export.', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Roll',
+      'Student Name',
+      'Class',
+      'Group',
+      'Time & Checkpoint',
+      ...matrixData.days_header.map((d) => `Day ${d.day} (${d.weekday})`),
+      'Present',
+      'Late',
+      'Absent',
+      'Half Day',
+      'Leave',
+      'Rate %',
+    ];
+
+    const rows = [];
+    uniqueStudents.forEach((student) => {
+      activeCheckpoints.forEach((chk) => {
+        const dayStatuses = matrixData.days_header.map((d) => {
+          const fullDateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+          const recordKey = `${student.student_id}_${chk.id}_${fullDateStr}`;
+          return residentialRecords[recordKey] || '—';
+        });
+
+        const totals = computeStudentTotals(student.student_id);
+
+        rows.push([
+          `"${student.roll_number || ''}"`,
+          `"${(student.name || '').replace(/"/g, '""')}"`,
+          `"${student.class_name || ''}"`,
+          `"${student.group_name || ''}"`,
+          `"${chk.name} (${chk.time || ''})"`,
+          ...dayStatuses.map((s) => `"${s}"`),
+          totals.present,
+          totals.late,
+          totals.absent,
+          totals.half_day,
+          totals.on_leave,
+          `"${totals.attendance_rate}%"`,
+        ].join(','));
+      });
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Residential_Attendance_${selectedYear}_${selectedMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Residential attendance CSV exported.', 'success');
+  };
+
+  // Secondary 3-Dot Action Menu Items
+  const headerActionMenuItems = [
+    {
+      label: isFullscreen ? 'Exit Full Screen' : 'Full Screen View',
+      icon: isFullscreen ? (
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+      ),
+      onClick: () => setIsFullscreen((prev) => !prev),
+    },
+    {
+      label: 'Add Checkpoint',
+      icon: TimerIcon,
+      onClick: handleAddCheckpoint,
+    },
+    {
+      label: 'Export CSV',
+      icon: DownloadIcon,
+      onClick: handleExportCSV,
+    },
+    {
+      label: 'Print Register',
+      icon: PrintIcon,
+      onClick: () => window.print(),
+    },
+    {
+      label: 'Refresh Data',
+      icon: RefreshIcon,
+      onClick: loadMatrix,
+    },
+  ];
+
+  // Options for CustomSelect
   const classOptions = [
     { value: '', label: 'All Classes' },
     ...classes.map((c) => ({
@@ -515,106 +718,29 @@ export default function ResidentialAttendanceView({
     })),
   ];
 
-  const groupOptions = [
-    { value: '', label: 'All Groups' },
-    ...groups.map((g) => ({
-      value: String(g.id),
-      label: g.name,
-    })),
-  ];
-
-  // Distinct Student Rows from matrixData
-  const uniqueStudents = useMemo(() => {
-    if (!matrixData || !matrixData.students_matrix) return [];
-    const seen = new Set();
-    const list = [];
-    for (const r of matrixData.students_matrix) {
-      if (!seen.has(r.student_id)) {
-        seen.add(r.student_id);
-        list.push(r);
-      }
+  const groupOptions = useMemo(() => {
+    let list = groups;
+    if (selectedClassId) {
+      const classSpecific = groups.filter((g) => String(g.student_class) === String(selectedClassId) || String(g.student_class_id) === String(selectedClassId) || String(g.student_class?.id) === String(selectedClassId));
+      const others = groups.filter((g) => !classSpecific.some((cg) => cg.id === g.id));
+      list = classSpecific.length > 0 ? [...classSpecific, ...others] : groups;
     }
-    return list;
-  }, [matrixData]);
+    return [
+      { value: '', label: 'All Groups' },
+      ...list.map((g) => ({
+        value: String(g.id),
+        label: g.student_class_name ? `${g.name} (${g.student_class_name})` : g.name,
+      })),
+    ];
+  }, [groups, selectedClassId]);
 
-  // Toggle "Take Attendance" mode
-  const handleToggleTakeAttendance = () => {
-    setIsEditing((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsFullscreen(true);
-        showToast('Residential attendance marking enabled in Full Screen view. Click any cell to record.', 'info');
-      } else {
-        showToast('Residential attendance saved.', 'success');
-      }
-      return next;
-    });
-  };
-
-  // Action Menu Items
-  const headerActionMenuItems = [
-    {
-      label: isFullscreen ? 'Exit Full Screen' : 'Full Screen View',
-      icon: isFullscreen ? (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
-        </svg>
-      ) : (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-        </svg>
-      ),
-      onClick: () => setIsFullscreen((prev) => !prev),
-    },
-    {
-      label: 'Add More Checkpoint',
-      icon: PlusIcon,
-      onClick: handleOpenAddCheckpoint,
-    },
-    {
-      label: 'Print Register',
-      icon: PrintIcon,
-      onClick: () => window.print(),
-    },
-    {
-      label: 'Refresh Register',
-      icon: RefreshIcon,
-      onClick: loadMatrix,
-    },
-  ];
-
-  const tableScrollRef = useRef(null);
-
-  // Enable Shift + Mouse Wheel Left-Right horizontal scroll
-  useEffect(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-
-    const handleWheel = (e) => {
-      if (e.shiftKey && e.deltaY !== 0) {
-        el.scrollLeft += e.deltaY * 1.2;
-        e.preventDefault();
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  const selectedClassName = classes.find((c) => String(c.id) === selectedClassId)?.name || 'All Classes';
-  const selectedGroupName = groups.find((g) => String(g.id) === selectedGroupId)?.name || '';
-
-  // Handle Escape key to exit fullscreen
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+  const checkpointOptions = useMemo(() => [
+    { value: 'ALL', label: 'All Checkpoints (Daily Roll Call)' },
+    ...checkpoints.map((c) => ({
+      value: String(c.id),
+      label: `${c.name} (${c.time || '--:--'})`,
+    })),
+  ], [checkpoints]);
 
   const content = (
     <div
@@ -624,16 +750,15 @@ export default function ResidentialAttendanceView({
           : "p-4 md:p-6 space-y-6 max-w-[1720px] w-full mx-auto min-h-screen theme-text-primary animate-fade-in select-none"
       }
     >
-      {/* 1. Header Hub with PageHeader (Hidden when in Full Screen) */}
+      {/* 1. Page Header (Hidden when in Full Screen) */}
       {!isFullscreen && !hideHeader && (
         <div className="print:hidden">
           <PageHeader
-            icon={MatrixIcon}
+            icon={TimerIcon}
             title="Residential Attendance"
-            subtitle="Residential dormitory roll call register with customizable checkpoint rows and scheduled timing"
+            subtitle="Time & Checkpoint roll-call attendance register for boarding/dormitory students"
             actions={
               <div className="flex items-center gap-2">
-                {/* Take Attendance Toggle */}
                 <button
                   type="button"
                   onClick={handleToggleTakeAttendance}
@@ -650,7 +775,7 @@ export default function ResidentialAttendanceView({
                     </>
                   ) : (
                     <>
-                      <TimerIcon className="w-4 h-4" />
+                      <AttendanceIcon className="w-4 h-4" />
                       <span>Take Attendance</span>
                     </>
                   )}
@@ -663,18 +788,16 @@ export default function ResidentialAttendanceView({
         </div>
       )}
 
-      {/* 2. Fullscreen Single-Line Top Header Bar (Only Header Title & Attendance Button) */}
+      {/* 2. Fullscreen Single-Line Top Header Bar */}
       {isFullscreen && (
         <div className="shrink-0 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl theme-bg-surface border theme-border flex items-center justify-between gap-3 shadow-xs print:hidden">
-          {/* Left: Only Header Title */}
           <div className="flex items-center gap-2.5">
-            <MatrixIcon className="w-5 h-5 theme-accent shrink-0" />
+            <TimerIcon className="w-5 h-5 theme-accent shrink-0" />
             <h1 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
               Residential Attendance
             </h1>
           </div>
 
-          {/* Right: Only Attendance Button */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -688,11 +811,11 @@ export default function ResidentialAttendanceView({
               {isEditing ? (
                 <>
                   <FilledCheckCircleIcon className="w-4 h-4" />
-                  <span>Done Marking</span>
+                  <span>Done</span>
                 </>
               ) : (
                 <>
-                  <TimerIcon className="w-4 h-4" />
+                  <AttendanceIcon className="w-4 h-4" />
                   <span>Take Attendance</span>
                 </>
               )}
@@ -701,42 +824,42 @@ export default function ResidentialAttendanceView({
         </div>
       )}
 
-      {/* 3. Unified Header & Filter Card (Shown only when NOT in fullscreen) */}
+      {/* 3. Unified Combined Header & Filter Card */}
       {!isFullscreen && (
         <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4 print:hidden">
-          {/* Top Row: Date Display & Stepper */}
+          {/* Top Row: Date Display & Smart Adaptive Stepper (Matching Class Attendance) */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
                 <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
-                  {gregorianTitle}
+                  {isFullHijriMonth ? hijriTitle : gregorianTitle}
                 </h2>
-                {startDate && endDate && (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent uppercase tracking-wider">
-                    Custom Range
-                  </span>
-                )}
                 {isEditing && (
-                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider animate-pulse">
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 uppercase tracking-wider animate-pulse">
                     Attendance Marking Active
                   </span>
                 )}
               </div>
 
-              {isHijriEnabled && (
+              {isFullHijriMonth ? (
+                <p className="text-xs theme-accent font-medium pl-6">
+                  Gregorian Range: <span className="font-semibold">{gregorianTitle}</span>
+                </p>
+              ) : isHijriEnabled ? (
                 <p className="text-xs theme-accent font-medium pl-6">
                   Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
                 </p>
-              )}
+              ) : null}
             </div>
 
-            {/* Stepper Buttons */}
+            {/* Smart Stepper Controls */}
             <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
               <button
                 type="button"
                 onClick={handleStepBackward}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
+                title={stepLabels.prev}
               >
                 <span>←</span>
                 <span>{stepLabels.prev}</span>
@@ -745,6 +868,7 @@ export default function ResidentialAttendanceView({
                 type="button"
                 onClick={handleStepForward}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
+                title={stepLabels.next}
               >
                 <span>{stepLabels.next}</span>
                 <span>→</span>
@@ -752,14 +876,17 @@ export default function ResidentialAttendanceView({
             </div>
           </div>
 
-          {/* Filters Row: Class, Group, Checkpoint Dropdown, Date Range */}
+          {/* Bottom Row: 4 Filters with Standard Project Labels (Matching Class Attendance) */}
           <div className="border-t theme-border pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-end">
             <div>
               <CustomSelect
                 label="Select Class"
-                value={selectedClassId}
-                onChange={setSelectedClassId}
                 options={classOptions}
+                value={selectedClassId}
+                onChange={(val) => {
+                  setSelectedClassId(val);
+                  setSelectedGroupId('');
+                }}
                 placeholder="Select Class..."
                 searchable={false}
               />
@@ -768,27 +895,20 @@ export default function ResidentialAttendanceView({
             <div>
               <CustomSelect
                 label="Select Group"
-                value={selectedGroupId}
-                onChange={setSelectedGroupId}
                 options={groups.length > 0 ? groupOptions : [{ value: '', label: 'All Groups (General)' }]}
+                value={selectedGroupId}
+                onChange={(val) => setSelectedGroupId(val)}
                 placeholder="All Groups"
                 searchable={false}
               />
             </div>
 
-            {/* 3. Checkpoint Filter Dropdown */}
             <div>
               <CustomSelect
-                label="Residential Checkpoint"
-                value={selectedCheckpointId}
-                onChange={(val) => {
-                  if (val === '__ADD_NEW__') {
-                    handleOpenAddCheckpoint();
-                  } else {
-                    setSelectedCheckpointId(val);
-                  }
-                }}
+                label="Select Checkpoint"
                 options={checkpointOptions}
+                value={selectedCheckpointId}
+                onChange={(val) => setSelectedCheckpointId(val)}
                 placeholder="All Checkpoints"
                 searchable={false}
               />
@@ -796,7 +916,19 @@ export default function ResidentialAttendanceView({
 
             <div>
               <DateRangePicker
-                label="Select Date Range"
+                label="Date Range"
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                onMonthChange={(m) => {
+                  setSelectedMonth(m);
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                onYearChange={(y) => {
+                  setSelectedYear(y);
+                  setStartDate('');
+                  setEndDate('');
+                }}
                 startDate={startDate}
                 endDate={endDate}
                 onRangeSelect={handleDateRangeSelect}
@@ -822,69 +954,102 @@ export default function ResidentialAttendanceView({
             <RefreshIcon className="w-6 h-6 animate-spin theme-accent" />
             <span>Generating residential attendance register...</span>
           </div>
-        ) : !matrixData || uniqueStudents.length === 0 ? (
+        ) : !enrichedMatrixData || uniqueStudents.length === 0 ? (
           <div className="p-16 text-center text-xs theme-text-secondary">
-            No students found for this class and residential group selection.
+            No students found for this class and residential selection.
           </div>
         ) : (
           <div ref={tableScrollRef} className={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}>
             <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
-              {/* Sticky Headers */}
+              {/* Sticky Headers (Exact Match with Class Attendance) */}
               <thead className="sticky top-0 z-30 theme-bg-sub select-none">
                 <tr className="text-center font-bold">
+                  {/* Sticky Roll No */}
                   <th className="py-2.5 px-0.5 sm:px-1 w-[36px] min-w-[36px] max-w-[36px] sm:w-[42px] sm:min-w-[42px] sm:max-w-[42px] sticky left-0 z-40 theme-bg-sub border-r border-b theme-border text-xs text-center">
                     Roll
                   </th>
+
+                  {/* Sticky Student Name */}
                   <th className="py-2.5 px-2 sm:px-2.5 w-[110px] min-w-[110px] max-w-[110px] sm:w-[140px] sm:min-w-[140px] sm:max-w-[140px] left-[36px] sm:left-[42px] sticky z-40 theme-bg-sub border-r border-b theme-border text-left text-xs shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-1px_rgba(0,0,0,0.25)]">
                     Student Name
                   </th>
-                  <th className="py-2.5 px-1.5 sm:px-2 w-[100px] min-w-[100px] max-w-[100px] sm:w-[125px] sm:min-w-[125px] sm:max-w-[125px] border-r border-b theme-border text-left text-xs">
+
+                  {/* Dedicated Time & Checkpoint Header */}
+                  <th className="py-2.5 px-1.5 sm:px-2 w-[100px] min-w-[100px] max-w-[100px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[130px] border-r border-b theme-border text-left text-xs">
                     <div className="flex items-center gap-1">
-                      <TimerIcon className="w-3 h-3 theme-accent shrink-0" />
-                      <span className="truncate">Time & Checkpoint</span>
+                      <TimerIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                      <span className="truncate">Time &amp; Checkpoint</span>
                     </div>
                   </th>
 
-                  {/* Day Columns */}
-                  {matrixData.days_header.map((d) => {
+                  {/* Dynamic Date Headers with 3 Lines (Day -> Hijri -> Weekday) & Event Color Priority */}
+                  {enrichedMatrixData.days_header.map((d) => {
                     const fullDateStr =
                       d.date ||
                       `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-                    const isToday =
-                      new Date().toISOString().split('T')[0] === fullDateStr;
+                    const hijriDayNumber = isHijriEnabled
+                      ? getHijriDateString(fullDateStr).split(' ')[0]
+                      : null;
+
+                    const isHoliday = Boolean(d.is_holiday);
+                    const hasEvent = Boolean(d.event_colors);
+                    const eventTitle = d.event_title || d.calendar_event?.title || d.holiday_title;
 
                     return (
                       <th
                         key={d.date || d.day}
-                        className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] border-r border-b theme-border text-center transition-colors ${
-                          d.is_weekend
-                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                            : isToday
-                            ? 'bg-[var(--accent-main)]/15 theme-accent'
+                        onClick={() => handleOpenDayAgenda(fullDateStr)}
+                        className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors cursor-pointer hover:brightness-95 select-none ${
+                          hasEvent
+                            ? `${d.event_colors.bg} ${d.event_colors.text} font-bold`
+                            : isHoliday
+                            ? 'theme-bg-accent-soft theme-accent font-bold'
                             : ''
                         }`}
+                        title={
+                          eventTitle
+                            ? `${eventTitle} [${fullDateStr}] - Click to view schedule & events`
+                            : `${d.weekday} - ${fullDateStr}${hijriDayNumber ? ` (Hijri: ${hijriDayNumber})` : ''} - Click to view day agenda`
+                        }
                       >
-                        <div className="text-[10px] font-medium opacity-75">{d.weekday}</div>
-                        <div className="text-xs font-bold">{d.day}</div>
-                        {isHijriEnabled && (
-                          <div className="text-[8px] font-normal opacity-50">
-                            {getHijriDateString(fullDateStr).split(' ')[0]}
+                        <div className="flex flex-col items-center justify-between min-h-[50px] sm:min-h-[56px] py-0.5">
+                          {/* Top Group: Gregorian & Hijri Dates */}
+                          <div className="space-y-0.5 flex flex-col items-center">
+                            <div className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${hasEvent ? d.event_colors.text : 'theme-text-primary'}`}>
+                              {d.day}
+                            </div>
+
+                            {isHijriEnabled && hijriDayNumber && (
+                              <div className="text-[9px] sm:text-[10px] font-mono theme-accent font-semibold leading-none pt-0.5">
+                                {hijriDayNumber}
+                              </div>
+                            )}
+
+                            {hasEvent && (
+                              <span className={`w-1 h-1 rounded-full mt-0.5 shrink-0 ${d.event_colors.dot}`} />
+                            )}
                           </div>
-                        )}
+
+                          {/* Bottom: Weekday Name with clear spacing and subtle separator line */}
+                          <div className="text-[8px] sm:text-[9px] font-semibold uppercase opacity-60 leading-none mt-1.5 sm:mt-2 pt-1 border-t theme-border w-full text-center">
+                            {d.weekday.slice(0, 2)}
+                          </div>
+                        </div>
                       </th>
                     );
                   })}
 
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold border-l border-b theme-border text-emerald-600 dark:text-emerald-400 text-xs">P</th>
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs">L</th>
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-rose-500 dark:text-rose-400 border-l border-b theme-border text-xs">A</th>
-                  <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border">Rate %</th>
+                  {/* Summary Metric Headers (Matching Class Attendance) */}
+                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-emerald-600 dark:text-emerald-400 border-l border-b theme-border text-xs" title="Present">P</th>
+                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs" title="Late">L</th>
+                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-rose-500 dark:text-rose-400 border-l border-b theme-border text-xs" title="Absent">A</th>
+                  <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate %">Rate %</th>
                 </tr>
               </thead>
 
               {/* Student Rows Iterated Across Checkpoints */}
               <tbody className="divide-y theme-border font-sans">
-                {uniqueStudents.map((student, sIdx) => {
+                {uniqueStudents.map((student) => {
                   const studentTotals = computeStudentTotals(student.student_id);
 
                   return activeCheckpoints.map((chk, chkIdx) => {
@@ -918,7 +1083,7 @@ export default function ResidentialAttendanceView({
                               onStudentClick ? 'cursor-pointer hover:underline' : ''
                             }`}
                           >
-                            <div className="font-semibold text-xs theme-text-primary truncate max-w-[95px] sm:max-w-[125px]" title={student.name}>
+                            <div className="font-bold text-xs theme-text-primary truncate max-w-[95px] sm:max-w-[125px]" title={student.name}>
                               {student.name}
                             </div>
                             <div className="text-[10px] theme-text-secondary truncate max-w-[95px] sm:max-w-[125px] mt-0.5">
@@ -928,26 +1093,25 @@ export default function ResidentialAttendanceView({
                         )}
 
                         {/* Dedicated Time & Checkpoint Column */}
-                        <td className="py-2 px-1.5 sm:px-2 border-r border-b theme-border w-[100px] min-w-[100px] max-w-[100px] sm:w-[125px] sm:min-w-[125px] sm:max-w-[125px]">
+                        <td className="py-2 px-1.5 sm:px-2 border-r border-b theme-border w-[100px] min-w-[100px] max-w-[100px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[130px]">
                           <div className="flex items-center gap-1">
-                            <span className="font-mono text-xs font-semibold theme-text-primary truncate">
+                            <span className="font-mono font-bold text-xs theme-accent truncate">
                               {chk.time || '--:--'}
                             </span>
                           </div>
-                          <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[90px] sm:max-w-[115px] mt-0.5" title={chk.name}>
+                          <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[90px] sm:max-w-[120px] mt-0.5" title={chk.name}>
                             {chk.name}
                           </div>
                         </td>
 
-                        {/* Day Status Cells */}
-                        {matrixData.days_header.map((d) => {
+                        {/* Day Status Cells with Exact Class Attendance Colors & Micro-animations */}
+                        {enrichedMatrixData.days_header.map((d) => {
                           const dateStr =
                             d.date ||
                             `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
                           const recordKey = `${student.student_id}_${chk.id}_${dateStr}`;
                           const status = residentialRecords[recordKey];
-                          const isOffDay = d.is_weekend || d.is_holiday;
-                          const canEditCell = isEditing && !isOffDay;
+                          const canEditCell = isEditing;
 
                           return (
                             <td
@@ -958,38 +1122,38 @@ export default function ResidentialAttendanceView({
                                 }
                               }}
                               className={`py-2 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-mono text-[10px] border-r border-b theme-border transition-colors ${
-                                isOffDay
-                                  ? 'cursor-not-allowed select-none bg-zinc-500/[0.04] dark:bg-zinc-400/[0.04] opacity-60'
-                                  : d.is_weekend
-                                  ? 'bg-rose-400/[0.025] dark:bg-rose-400/[0.045]'
+                                d.event_colors
+                                  ? `${d.event_colors.bg} ${d.event_colors.text}`
+                                  : d.is_holiday
+                                  ? 'theme-bg-accent-soft/30'
                                   : ''
                               } ${
                                 canEditCell
-                                  ? 'cursor-pointer select-none hover:theme-bg-elevated/80'
-                                  : isOffDay
-                                  ? 'cursor-not-allowed'
+                                  ? 'cursor-pointer select-none hover:brightness-95'
                                   : 'cursor-default'
                               }`}
                               title={
-                                isOffDay
-                                  ? `${d.holiday_title || (d.is_weekend ? 'Weekly Weekend' : 'Holiday')} (No Attendance Allowed)`
-                                  : isEditing
-                                  ? `${dateStr} [${chk.name}]: ${status || 'Unrecorded'} (Click to change)`
+                                isEditing
+                                  ? `${dateStr} [${chk.name}]: ${status || 'Unrecorded'} (Click to toggle status)`
                                   : `${dateStr} [${chk.name}]: ${status || 'Unrecorded'}`
                               }
                             >
                               {status === 'PRESENT' ? (
-                                <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 inline-block" />
+                                <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                               ) : status === 'ABSENT' ? (
-                                <FilledXCircleIcon className="w-4 h-4 text-rose-500/75 inline-block" />
+                                <FilledXCircleIcon className="w-4 h-4 text-[var(--danger-main)] hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
                               ) : status === 'LATE' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600 font-bold">L</span>
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
+                                  L
+                                </span>
                               ) : status === 'HALF_DAY' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 text-sky-600 font-bold">H</span>
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold text-[10px]">
+                                  H
+                                </span>
                               ) : status === 'ON_LEAVE' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600 font-bold">LV</span>
-                              ) : isOffDay ? (
-                                <span className="opacity-35 font-mono text-xs select-none">—</span>
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
+                                  LV
+                                </span>
                               ) : canEditCell ? (
                                 <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present"></span>
                               ) : (
@@ -999,7 +1163,7 @@ export default function ResidentialAttendanceView({
                           );
                         })}
 
-                        {/* Summary Metrics */}
+                        {/* Summary Metrics (Matching Class Attendance) */}
                         {isFirstRow && (
                           <>
                             <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-emerald-600 dark:text-emerald-400 border-l border-b theme-border align-middle">
@@ -1035,26 +1199,26 @@ export default function ResidentialAttendanceView({
           </div>
         )}
 
-        {/* Legend Ribbon & Bottom Controls */}
+        {/* Legend Ribbon & Bottom Controls (Matching Class Attendance) */}
         <div className="p-3 sm:p-3.5 border-t theme-border theme-bg-sub flex flex-wrap items-center justify-between gap-3 text-[11px] theme-text-secondary shrink-0">
           <div className="flex items-center gap-3.5 flex-wrap font-mono">
             <span className="flex items-center gap-1.5">
               <FilledCheckCircleIcon className="w-3.5 h-3.5 text-emerald-600/85" /> Present
             </span>
             <span className="flex items-center gap-1.5">
-              <FilledXCircleIcon className="w-3.5 h-3.5 text-rose-500/80" /> Absent
+              <FilledXCircleIcon className="w-3.5 h-3.5 text-[var(--danger-main)]" /> Absent
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-amber-500/10 text-amber-600 font-bold flex items-center justify-center text-[9px]">L</span> Late
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold flex items-center justify-center text-[9px]">L</span> Late
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-600 font-bold flex items-center justify-center text-[9px]">H</span> Half Day
+              <span className="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold flex items-center justify-center text-[9px]">H</span> Half Day
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-purple-500/10 text-purple-600 font-bold flex items-center justify-center text-[9px]">LV</span> Leave
+              <span className="w-3.5 h-3.5 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold flex items-center justify-center text-[9px]">LV</span> Leave
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="opacity-35 font-mono text-xs">—</span> Holiday / Weekend
+              <span className="opacity-35 font-mono text-xs">—</span> Unmarked
             </span>
           </div>
 

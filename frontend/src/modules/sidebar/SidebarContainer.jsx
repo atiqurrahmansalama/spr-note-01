@@ -97,7 +97,6 @@ export default function SidebarContainer({
         { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
         { id: "Class Attendance", name: "Class Attendance", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
         { id: "Residential Attendance", name: "Residential Attendance", path: "/attendance/students/residential", Icon: TimerIcon, key: "residential_attendance" },
-        { id: "Short Admission", name: "Short Admission", path: "/short-admission", Icon: SparklesIcon, key: "student_quick_admission" },
         { id: "Admission", name: "Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
@@ -108,22 +107,11 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_staff_management",
       subItems: [
+        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", path: "/staff/roster", Icon: TeacherIcon, key: "staff_roster" },
         { id: "Staff Directory", name: "Staff Directory", path: "/staff", Icon: TeacherIcon, key: "staff_management" },
         { id: "Teacher Period Matrix", name: "Teacher Period Matrix", path: "/attendance/staff/teacher-matrix", Icon: MatrixIcon, key: "teacher_period_matrix" },
         { id: "Staff Daily Timesheet", name: "Staff Daily Timesheet", path: "/attendance/staff/daily-punch", Icon: TimerIcon, key: "staff_daily_attendance" },
         { id: "Leave & Substitution Desk", name: "Leave & Substitution Desk", path: "/attendance/staff/leaves", Icon: LeaveIcon, key: "staff_leaves" },
-      ]
-    },
-    {
-      id: "Settings & Devices",
-      name: "Settings & Devices",
-      Icon: SettingsIcon,
-      hasSub: true,
-      key: "nav_attendance_management",
-      subItems: [
-        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", Icon: AttendanceIcon, key: "attendance_policies_slots" },
-        { id: "Biometric Devices", name: "Biometric Devices", path: "/attendance/devices", Icon: FingerprintIcon, key: "biometric_device_manager" },
-        { id: "Institutional Calendar", name: "Institutional Calendar", path: "/calendar", Icon: CalendarIcon, key: "institutional_calendar" },
       ]
     },
     {

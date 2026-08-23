@@ -29,7 +29,7 @@ class HasSectionAccess(BasePermission):
             if pk == 'me' or str(pk) == str(request.user.id):
                 return True
                 
-        from .services import get_resolved_feature_flags_for_user
+        from core.services import get_resolved_feature_flags_for_user
         flags, _ = get_resolved_feature_flags_for_user(request.user)
         return flags.get(section_key, False)
 

@@ -71,7 +71,7 @@ def seed_default_templates(institution):
     """
     Seeds default system templates for an institution if not already present.
     """
-    from .models import NotificationTemplate
+    from core.models import NotificationTemplate
     created_count = 0
     for tpl_data in DEFAULT_SYSTEM_TEMPLATES:
         obj, created = NotificationTemplate.objects.get_or_create(
@@ -435,7 +435,7 @@ def dispatch_notification(
     3. Dispatches across enabled channels (IN_APP, SMS, WHATSAPP, EMAIL).
     4. Writes immutable audit logs into NotificationDispatchLog.
     """
-    from .models import (
+    from core.models import (
         NotificationTriggerRule,
         NotificationTemplate,
         NotificationGatewayConfig,

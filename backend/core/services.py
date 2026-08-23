@@ -31,7 +31,7 @@ def get_scoped_tenant_id(request):
     """
     import uuid
     from django.db.models import Q
-    from .models import AcademicInstitution
+    from core.models import AcademicInstitution
 
     if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
         return None
@@ -78,7 +78,7 @@ def seed_system_roles():
     """
     Ensures all baseline system roles and default action permissions exist.
     """
-    from .models import UserRole, RoleActionPermission
+    from core.models import UserRole, RoleActionPermission
 
     system_roles = [
         {
@@ -182,7 +182,7 @@ def sync_feature_registry_to_db():
     """
     Syncs the FEATURE_REGISTRY definition manifest to the AppSection database table.
     """
-    from .models import AppSectionCategory, AppSection
+    from core.models import AppSectionCategory, AppSection
     from .feature_registry import FEATURE_REGISTRY
 
     # Automatically map categories keys to titles
@@ -250,7 +250,7 @@ def evaluate_section_config_for_user(user=None):
     And applies One-Way Top-Down Cascading rule:
     If a parent section is OFF, all its children are forced OFF.
     """
-    from .models import (
+    from core.models import (
         AppSection,
         UserSectionOverride,
         GroupSectionPermission,
@@ -479,7 +479,7 @@ def get_or_create_google_user(profile_data):
     Finds existing user by Google sub_id or email, or auto-registers with dynamic default role.
     Handles deactivated accounts and profile sync.
     """
-    from .models import UserRole, SystemSetting
+    from core.models import UserRole, SystemSetting
 
     sub = profile_data.get('sub')
     email = profile_data.get('email')
@@ -571,7 +571,7 @@ def delete_class_with_migration(source_class_id, target_class_id, performed_by=N
     """
     from django.db import transaction
     from rest_framework.exceptions import ValidationError, NotFound
-    from .models import StudentClass, StudentGroup, Student, StudentAcademicHistory
+    from core.models import StudentClass, StudentGroup, Student, StudentAcademicHistory
 
     if not target_class_id:
         raise ValidationError({"target_class_id": "Target destination class ID is required."})
@@ -646,7 +646,7 @@ def delete_group_with_migration(source_group_id, target_group_id, performed_by=N
     """
     from django.db import transaction
     from rest_framework.exceptions import ValidationError, NotFound
-    from .models import StudentGroup, Student, StudentAcademicHistory
+    from core.models import StudentGroup, Student, StudentAcademicHistory
 
     if not target_group_id:
         raise ValidationError({"target_group_id": "Target destination group ID is required."})
@@ -723,7 +723,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
     """
     from django.db import transaction
     from rest_framework.exceptions import ValidationError, NotFound
-    from .models import Student, StudentClass, StudentGroup, StudentAcademicHistory
+    from core.models import Student, StudentClass, StudentGroup, StudentAcademicHistory
 
     try:
         student = Student.objects.get(id=student_id, is_deleted=False)
@@ -800,7 +800,7 @@ def delete_department_with_migration(source_dept_id, target_dept_id, performed_b
     Reassigns all active classes from source department to target department.
     Soft-deletes the source department (is_deleted=True, is_active=False).
     """
-    from .models import AcademicDepartment, StudentClass
+    from core.models import AcademicDepartment, StudentClass
     from rest_framework.exceptions import ValidationError
 
     if not target_dept_id:
@@ -847,7 +847,7 @@ def seed_default_departments():
     """
     Seed standard default academic departments and link existing unassigned classes.
     """
-    from .models import AcademicDepartment, StudentClass
+    from core.models import AcademicDepartment, StudentClass
 
     defaults = [
         {"name": "Hifz Division", "code": "HIFZ", "has_quran_tracker": True, "order_rank": 1},
@@ -888,7 +888,7 @@ def seed_default_departments():
 class StaffOnboardingService:
     @staticmethod
     def generate_employee_id(institution, staff_type='TEACHING'):
-        from .models import StaffProfile
+        from core.models import StaffProfile
         import random
         from datetime import datetime
         prefix = 'TEA' if staff_type == 'TEACHING' else 'STF'
@@ -903,7 +903,7 @@ class StaffOnboardingService:
 
     @classmethod
     def invite_staff(cls, institution, creator_user, data):
-        from .models import User, UserRole, RoleInviteToken, StaffProfile, TeacherDetail, GeneralStaffDetail, ActivityLog
+        from core.models import User, UserRole, RoleInviteToken, StaffProfile, TeacherDetail, GeneralStaffDetail, ActivityLog
         from django.db import transaction
         from datetime import timedelta
 
@@ -1030,7 +1030,7 @@ class StaffOnboardingService:
 class StaffAttendanceService:
     @staticmethod
     def bulk_punch_attendance(institution, date_val, records, recorded_by=None, source='WEB_PORTAL'):
-        from .models import StaffProfile, StaffAttendance, ActivityLog
+        from core.models import StaffProfile, StaffAttendance, ActivityLog
         from django.db import transaction
         from datetime import datetime, time
 
@@ -1111,7 +1111,7 @@ class StaffAttendanceService:
 
     @staticmethod
     def get_monthly_analytics_summary(institution, year, month, staff_id=None, department_id=None):
-        from .models import StaffProfile, StaffAttendance
+        from core.models import StaffProfile, StaffAttendance
         from django.db.models import Count, Q
         import calendar
 
@@ -1172,7 +1172,7 @@ class StaffAttendanceService:
 class StaffLeaveService:
     @staticmethod
     def apply_leave(staff, leave_data):
-        from .models import StaffLeaveRequest, ActivityLog
+        from core.models import StaffLeaveRequest, ActivityLog
 
         leave_req = StaffLeaveRequest.objects.create(
             staff=staff,
@@ -1195,7 +1195,7 @@ class StaffLeaveService:
 
     @staticmethod
     def action_leave(leave_request, action_status, admin_user, admin_remarks=''):
-        from .models import StaffAttendance, ActivityLog
+        from core.models import StaffAttendance, ActivityLog
         from django.db import transaction
         from datetime import timedelta
 
@@ -1237,7 +1237,7 @@ def delete_staff_profile_with_cascading(staff_profile, performed_by=None):
     Soft-deletes a StaffProfile and automatically deactivates all active
     TeacherAssignments and GeneralStaffDuties to prevent orphaned assignments.
     """
-    from .models import ActivityLog
+    from core.models import ActivityLog
     from django.db import transaction
 
     with transaction.atomic():
@@ -1277,7 +1277,7 @@ def seed_default_document_templates(institution):
     5. Formal Academic Testimonial Certificate (A4 Landscape) - Default TESTIMONIAL_CERTIFICATE
     6. Institutional Report Header Banner (Custom Size) - Default REPORT_BANNER
     """
-    from .models import DocumentTemplateConfig
+    from core.models import DocumentTemplateConfig
     if not institution:
         return []
 

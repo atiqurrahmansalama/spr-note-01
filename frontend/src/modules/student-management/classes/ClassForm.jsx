@@ -82,12 +82,16 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
       showToast("Class Name is required.", "warning");
       return;
     }
+    if (!formData.department) {
+      showToast("Parent Academic Department is strictly required for every class.", "warning");
+      return;
+    }
 
     setSubmitting(true);
     const payload = {
       name: formData.name.trim(),
       code: formData.code.trim(),
-      department: formData.department || null,
+      department: formData.department,
       department_type: formData.department_type,
       class_teacher: formData.class_teacher ? formData.class_teacher : null,
       order_rank: parseInt(formData.order_rank, 10) || 1,
@@ -116,7 +120,7 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
         onSaved?.();
       } else {
         const err = await res.json().catch(() => ({}));
-        const msg = err.name?.[0] || err.detail || err.error || "Failed to save class.";
+        const msg = err.department?.[0] || err.name?.[0] || err.detail || err.error || "Failed to save class.";
         showToast(msg, "error");
       }
     } catch {
@@ -128,6 +132,13 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-left animate-fade-in">
+      {departments.length === 0 && (
+        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border text-xs theme-text-secondary">
+          <p className="font-bold theme-text-primary">No Academic Department Found</p>
+          <p className="mt-0.5">Classes must belong to a Department. Please create a Department under Academies & Departments first.</p>
+        </div>
+      )}
+
       {/* Class Name */}
       <div>
         <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
@@ -160,7 +171,7 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
 
         <div>
           <CustomSelect
-            label="Academic Department"
+            label="Academic Department *"
             value={formData.department}
             onChange={(val) => {
               const selectedObj = departments.find((d) => String(d.id) === String(val));
@@ -175,14 +186,11 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
                 department_type: autoType,
               });
             }}
-            options={[
-              { value: "", label: "No Department (Independent)" },
-              ...departments.map((d) => ({
-                value: d.id,
-                label: `${d.name}${d.code ? ` (${d.code})` : ""}`,
-              })),
-            ]}
-            placeholder="Select Department..."
+            options={departments.map((d) => ({
+              value: String(d.id),
+              label: `${d.name}${d.code ? ` (${d.code})` : ""}`,
+            }))}
+            placeholder="Select Department (Required)..."
             icon={DepartmentIcon}
           />
         </div>

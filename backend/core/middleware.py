@@ -1,7 +1,7 @@
 import threading
 from django.utils import timezone
 from django.db import close_old_connections
-from .authentication import FlexibleJWTAuthentication
+from core.authentication import FlexibleJWTAuthentication
 
 
 def get_client_ip(request):
@@ -85,7 +85,7 @@ def _log_activity_async(user_id, action_name, endpoint, http_method, ip_address)
     """
     try:
         close_old_connections()
-        from .models import ActivityLog, User
+        from core.models import ActivityLog, User
         user_obj = User.objects.filter(id=user_id).first() if user_id else None
         ActivityLog.objects.create(
             user=user_obj,
@@ -162,7 +162,7 @@ class UserActivityMiddleware:
 
     def _update_user_session(self, request):
         try:
-            from .models import UserSession
+            from core.models import UserSession
             device_type = detect_device_type(request)
             device_info = detect_device_info(request)
             ip_address = get_client_ip(request)

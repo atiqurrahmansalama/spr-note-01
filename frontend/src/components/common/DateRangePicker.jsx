@@ -244,10 +244,8 @@ export default function DateRangePicker({
     if (startDate === twoWeeksStr && endDate === todayStr) return "past_2weeks";
     if (startDate === startOfMonth && endDate === todayStr) return "this_month";
 
-    if (isHijriActive) {
-      const hijriRange = getCurrentHijriMonthRange(today);
-      if (startDate === hijriRange.start && endDate === hijriRange.end) return "full_hijri_month";
-    }
+    const hijriRange = getCurrentHijriMonthRange(today);
+    if (startDate === hijriRange.start && endDate === hijriRange.end) return "full_hijri_month";
 
     if (startDate === monthStr && endDate === todayStr) return "past_month";
     if (startDate === threeMonthStr && endDate === todayStr) return "past_3months";
@@ -256,6 +254,7 @@ export default function DateRangePicker({
   };
 
   const activeKey = getActivePresetKey();
+  const currentHijriRange = getCurrentHijriMonthRange();
 
   const getLabel = () => {
     if (isCustomPicking) return "Pick custom range";
@@ -265,7 +264,6 @@ export default function DateRangePicker({
     if (activeKey === "past_2weeks") return "Last 14 Days";
     if (activeKey === "this_month") return "This Month";
     if (activeKey === "full_hijri_month") {
-      const hijriRange = getCurrentHijriMonthRange(new Date());
       return `Full Hijri Month`;
     }
     if (activeKey === "past_month") return "Last 30 Days";
@@ -279,8 +277,6 @@ export default function DateRangePicker({
     return placeholder;
   };
 
-  const currentHijriRange = isHijriActive ? getCurrentHijriMonthRange() : null;
-
   const PRESET_OPTIONS = [
     { key: "all_time", label: "Full Month (Reset)" },
     { key: "today", label: "Today" },
@@ -288,16 +284,9 @@ export default function DateRangePicker({
     { key: "past_week", label: "Last 7 Days" },
     { key: "past_2weeks", label: "Last 14 Days" },
     { key: "this_month", label: "This Month" },
+    { key: "full_hijri_month", label: `Full Hijri Month` },
     { key: "past_month", label: "Last 30 Days" },
     { key: "past_3months", label: "Last 90 Days" },
-    ...(isHijriActive && currentHijriRange
-      ? [
-          {
-            key: "full_hijri_month",
-            label: `Full Hijri Month`,
-          },
-        ]
-      : []),
     { key: "custom", label: "Custom Date Range…" },
   ];
 
@@ -393,8 +382,8 @@ export default function DateRangePicker({
   return (
     <div ref={containerRef} className={`w-full relative ${className}`}>
       {label && (
-        <div className="flex items-center justify-between mb-1.5 min-h-[16px]">
-          <label className="block text-xs font-semibold theme-text-secondary">
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
             {label}
           </label>
           {(startDate || endDate) && onReset && (
@@ -406,10 +395,10 @@ export default function DateRangePicker({
                 setShowCustomCalendar(false);
                 setIsCustomPicking(false);
               }}
-              className="text-[11px] font-normal theme-accent hover:underline cursor-pointer transition"
+              className="text-[10px] font-bold theme-accent hover:underline cursor-pointer transition uppercase tracking-wider"
               title="Reset date filter"
             >
-              Clear date
+              Clear
             </button>
           )}
         </div>

@@ -7,6 +7,7 @@ import {
   SparklesIcon,
   CalendarIcon,
   ChecklistIcon,
+  ClockIcon,
   RefreshIcon,
   CheckCircleIcon,
   TrashIcon,
@@ -21,6 +22,7 @@ import {
   calendarEventTypesStore,
   calendarEventKindsStore,
   calendarImpactScopesStore,
+  calendarWorkingSchedulesStore,
 } from "../../../utils/localStore";
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../../constants/version";
 import { useToast } from "../../../context/ToastContext";
@@ -32,6 +34,12 @@ const SECTIONS = [
     title: "Academy Categories",
     description: "Manage institution types, curriculum categories, and taxonomies",
     icon: BuildingOfficeIcon,
+  },
+  {
+    id: "working-schedules",
+    title: "Working Hours & Shifts",
+    description: "Manage pre-configured operational shifts, duty hours, and faculty sessions",
+    icon: ClockIcon,
   },
   {
     id: "event-types",
@@ -126,7 +134,22 @@ export default function DeveloperToolsHubView() {
           />
         )}
 
-        {/* Section 2: Schedule & Event Types */}
+        {/* Section 2: Working Hours & Shifts */}
+        {activeSection === "working-schedules" && (
+          <CompactTaxonomyManager
+            title="Working Hours & Operational Shifts"
+            description="Manage pre-configured operational shifts, lecture sessions, and faculty duty hours available in the Working Hours entry picker."
+            fetchItems={async () => calendarWorkingSchedulesStore.getSchedules(activeTenantId)}
+            createItem={async (payload) => calendarWorkingSchedulesStore.addSchedule(activeTenantId, payload)}
+            updateItem={async (id, payload) => calendarWorkingSchedulesStore.updateSchedule(activeTenantId, id, payload)}
+            deleteItem={async (id) => calendarWorkingSchedulesStore.deleteSchedule(activeTenantId, id)}
+            itemTypeName="Working Schedule"
+            hideStatus={true}
+            icon={ClockIcon}
+          />
+        )}
+
+        {/* Section 3: Schedule & Event Types */}
         {activeSection === "event-types" && (
           <CompactTaxonomyManager
             title="Schedule & Event Types"

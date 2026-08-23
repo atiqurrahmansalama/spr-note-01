@@ -119,7 +119,7 @@ export default function ReusableCalendar({
   const handleSelectToday = (e) => {
     if (e) e.stopPropagation();
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
     if (!isRange) {
@@ -254,7 +254,7 @@ export default function ReusableCalendar({
                 : currDateStr === selectedDate;
 
               const isInRange = isRange && tempStart && tempEnd && currDateStr >= tempStart && currDateStr <= tempEnd;
-              const isToday = currDateStr === new Date().toISOString().split("T")[0];
+              const isToday = currDateStr === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
               const isDisabled = (minDate && currDateStr < minDate) || (maxDate && currDateStr > maxDate);
 
               return (
