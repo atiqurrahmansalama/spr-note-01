@@ -235,3 +235,72 @@ export const syncSessionsAndComments = async () => {
     console.error("[SyncEngine] Comment template sync failed:", err);
   }
 };
+
+// 5. Tenant Taxonomies & Developer Tools Two-Way Cloud Sync Engine
+let taxonomySyncTimeout = null;
+const pendingTaxonomyQueue = {};
+
+export const queueTaxonomyPush = (tenantId, taxonomyKey, data) => {
+  if (!taxonomyKey || !data) return;
+  const tid = tenantId || "default";
+  if (!pendingTaxonomyQueue[tid]) pendingTaxonomyQueue[tid] = {};
+  pendingTaxonomyQueue[tid][taxonomyKey] = data;
+
+  if (taxonomySyncTimeout) clearTimeout(taxonomySyncTimeout);
+  taxonomySyncTimeout = setTimeout(async () => {
+    try {
+      const { taxonomiesApi } = await import("../api/taxonomies");
+      for (const [tenant, payload] of Object.entries(pendingTaxonomyQueue)) {
+        if (Object.keys(payload).length > 0) {
+          await taxonomiesApi.bulkSyncTaxonomies(tenant, payload);
+          delete pendingTaxonomyQueue[tenant];
+        }
+      }
+    } catch (err) {
+      console.warn("[SyncEngine] Background taxonomy sync error:", err);
+    }
+  }, 600);
+};
+
+export const syncTenantTaxonomies = async (tenantId) => {
+  if (!navigator.onLine) return;
+  try {
+    const { taxonomiesApi } = await import("../api/taxonomies");
+    const res = await taxonomiesApi.fetchTaxonomies(tenantId);
+    if (!res.success || !res.taxonomies) return;
+
+    const cloudData = res.taxonomies;
+    const tid = tenantId || "default";
+
+    // Map cloud keys to local storage keys
+    const taxonomyKeyMap = {
+      staff_ranks: `spr_staff_ranks_${tid}`,
+      staff_categories: `spr_staff_categories_${tid}`,
+      calendar_event_kinds: `spr_calendar_event_kinds_${tid}`,
+      calendar_event_types: `spr_calendar_event_types_${tid}`,
+      document_types: `spr_document_types_${tid}`,
+      working_schedules: `spr_working_schedules_${tid}`,
+      impact_scopes: `spr_impact_scopes_${tid}`,
+      admission_doc_requirements: `spr_admission_doc_requirements_${tid}`,
+      staff_recruitment_requirements: `spr_staff_recruitment_requirements_${tid}`,
+    };
+
+    let needsLocalSave = false;
+    for (const [apiKey, storageKey] of Object.entries(taxonomyKeyMap)) {
+      if (cloudData[apiKey] && Array.isArray(cloudData[apiKey]) && cloudData[apiKey].length > 0) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(cloudData[apiKey]));
+          needsLocalSave = true;
+        } catch {}
+      }
+    }
+
+    if (needsLocalSave) {
+      window.dispatchEvent(new CustomEvent("spr_taxonomies_synced", { detail: cloudData }));
+      window.dispatchEvent(new CustomEvent("spr_calendar_event_kinds_updated"));
+      window.dispatchEvent(new CustomEvent("spr_document_types_updated"));
+    }
+  } catch (err) {
+    console.warn("[SyncEngine] Failed to sync tenant taxonomies:", err);
+  }
+};

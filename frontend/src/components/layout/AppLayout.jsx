@@ -331,21 +331,23 @@ export default function AppLayout() {
     return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, [navigate]);
 
-  // Automatic Offline-to-Online Sync triggers
+  // Automatic Offline-to-Online Sync & Cloud Taxonomy Sync triggers
   useEffect(() => {
-    import("../../utils/syncEngine").then(({ triggerCloudSync }) => {
+    import("../../utils/syncEngine").then(({ triggerCloudSync, syncTenantTaxonomies }) => {
       triggerCloudSync();
+      syncTenantTaxonomies(activeTenantId);
     });
 
     const handleOnline = () => {
-      import("../../utils/syncEngine").then(({ triggerCloudSync }) => {
+      import("../../utils/syncEngine").then(({ triggerCloudSync, syncTenantTaxonomies }) => {
         triggerCloudSync();
+        syncTenantTaxonomies(activeTenantId);
       });
     };
 
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  }, []);
+  }, [activeTenantId]);
 
   // Calendar settings synchronization
   const [timeZone, setTimeZone] = useState(() => calendarSettings.getTimezone());

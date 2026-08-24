@@ -20,6 +20,7 @@ from drf_spectacular.types import OpenApiTypes
 
 from core.models import (
     User, UserRole, RoleActionPermission, AcademicInstitution, InstitutionCategory,
+    TenantTaxonomySetting,
     AcademicBranch, AcademicDepartment, Address, StudentClass, ClassSection,
     ClassPeriodSlot, StudentGroup, Session, SavedMessage, Student, StudentDetail,
     StudentAcademicHistory, StudentDailyReport, ReportPortion, ReportErrorDetail,
@@ -423,4 +424,12 @@ class AddressSerializer(serializers.ModelSerializer):
             'post_code', 'postal_code', 'thana_or_upazila', 'district', 'division', 'country',
             'latitude', 'longitude', 'map_place_id'
         ]
+
+
+class TenantTaxonomySettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TenantTaxonomySetting
+        fields = ['id', 'institution', 'taxonomy_key', 'data', 'version', 'updated_at', 'created_at']
+        read_only_fields = ['id', 'version', 'updated_at', 'created_at']
+
 

@@ -11,6 +11,7 @@ from drf_spectacular.views import (
 from .views import (
     InstitutionViewSet,
     InstitutionCategoryViewSet,
+    TenantTaxonomySettingViewSet,
     AcademicBranchViewSet,
     ClassSectionViewSet,
     ClassPeriodSlotViewSet,
@@ -129,6 +130,7 @@ router.register(r'messages', SavedMessageViewSet, basename='message')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'document-templates', DocumentTemplateViewSet, basename='document-templates')
+router.register(r'tenant-taxonomies', TenantTaxonomySettingViewSet, basename='tenant-taxonomies')
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
 router.register(r'admissions/tokens', AdmissionInviteTokenViewSet, basename='admission-tokens')
 

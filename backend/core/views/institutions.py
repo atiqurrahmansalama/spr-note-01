@@ -412,3 +412,77 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
         return Response({"status": "success", "message": f"Department '{instance.name}' has been soft-deleted."}, status=status.HTTP_200_OK)
 
+
+class TenantTaxonomySettingViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for multi-device cloud synchronization of tenant taxonomies,
+    custom staff ranks, operational shifts, calendar event kinds, document titles,
+    admission rules, and recruitment requirements.
+    """
+    queryset = TenantTaxonomySetting.objects.all()
+    serializer_class = TenantTaxonomySettingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id and tenant_id != 'default':
+            return TenantTaxonomySetting.objects.filter(institution_id=tenant_id)
+        elif self.request.user.is_authenticated and self.request.user.institution_id:
+            return TenantTaxonomySetting.objects.filter(institution_id=self.request.user.institution_id)
+        return TenantTaxonomySetting.objects.filter(institution__isnull=True)
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        result = {}
+        for item in qs:
+            result[item.taxonomy_key] = item.data
+        return Response({
+            "status": "success",
+            "taxonomies": result,
+            "count": len(result),
+            "synced_at": timezone.now().isoformat()
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='bulk-sync')
+    def bulk_sync(self, request):
+        """
+        Accepts a dictionary of { taxonomy_key: list_of_records } or single key update
+        and atomically upserts them for the active tenant institution.
+        """
+        tenant_id = get_scoped_tenant_id(request)
+        institution = None
+        if tenant_id and tenant_id != 'default':
+            try:
+                institution = AcademicInstitution.objects.get(id=tenant_id)
+            except (AcademicInstitution.DoesNotExist, ValueError):
+                pass
+        elif request.user.is_authenticated and request.user.institution:
+            institution = request.user.institution
+
+        payload = request.data.get('taxonomies') or request.data
+        if not isinstance(payload, dict):
+            return Response({"error": "Payload must be a dictionary of taxonomy keys"}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_keys = []
+        with transaction.atomic():
+            for key, val in payload.items():
+                if not isinstance(key, str) or not isinstance(val, (list, dict)):
+                    continue
+                setting, created = TenantTaxonomySetting.objects.get_or_create(
+                    institution=institution,
+                    taxonomy_key=key,
+                    defaults={'data': val, 'version': 1}
+                )
+                if not created:
+                    setting.data = val
+                    setting.version = F('version') + 1
+                    setting.save()
+                updated_keys.append(key)
+
+        return Response({
+            "status": "success",
+            "synced_keys": updated_keys,
+            "synced_at": timezone.now().isoformat()
+        }, status=status.HTTP_200_OK)
+
+

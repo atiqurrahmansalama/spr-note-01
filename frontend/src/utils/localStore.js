@@ -61,10 +61,46 @@ function readJSON(key, defaultValue) {
   }
 }
 
-/** JSON-safe write. Silently ignores quota errors. */
+/** JSON-safe write. Silently ignores quota errors and triggers reactive cloud sync. */
 function writeJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+
+    // Reactive background cloud synchronization for taxonomy stores
+    if (
+      key.startsWith("spr_") &&
+      !key.includes("_synced") &&
+      !key.includes("_queue") &&
+      !key.includes("_status") &&
+      !key.includes("_draft")
+    ) {
+      const withoutPrefix = key.slice(4); // remove 'spr_'
+      const lastUnderscoreIndex = withoutPrefix.lastIndexOf("_");
+      if (lastUnderscoreIndex > 0) {
+        const taxonomyKey = withoutPrefix.slice(0, lastUnderscoreIndex);
+        const tenantId = withoutPrefix.slice(lastUnderscoreIndex + 1);
+
+        const monitoredKeys = [
+          "staff_ranks",
+          "staff_categories",
+          "calendar_event_kinds",
+          "calendar_event_types",
+          "document_types",
+          "working_schedules",
+          "impact_scopes",
+          "admission_doc_requirements",
+          "staff_recruitment_requirements",
+        ];
+
+        if (monitoredKeys.includes(taxonomyKey)) {
+          import("./syncEngine")
+            .then(({ queueTaxonomyPush }) => {
+              queueTaxonomyPush(tenantId, taxonomyKey, value);
+            })
+            .catch(() => {});
+        }
+      }
+    }
   } catch (err) {
     console.warn(`[localStore] Failed to write key "${key}":`, err);
   }

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { TrashIcon, EyeIcon } from './Icons';
+import { compressImageFile } from '../../utils/imageCompressor';
 
 /**
  * Format raw bytes into human readable size
@@ -67,19 +68,32 @@ export default function DocumentFilePicker({
       }
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      onChange?.({
-        file,
-        url: reader.result,
-        name: file.name,
-        size: formatFileSize(file.size),
-      });
+    const processFile = async (rawFile) => {
+      let finalFile = rawFile;
+      if (rawFile.type && rawFile.type.startsWith("image/")) {
+        try {
+          finalFile = await compressImageFile(rawFile, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
+        } catch {
+          finalFile = rawFile;
+        }
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        onChange?.({
+          file: finalFile,
+          url: reader.result,
+          name: finalFile.name,
+          size: formatFileSize(finalFile.size),
+        });
+      };
+      reader.onerror = () => {
+        setError("Failed to read file. Please try again.");
+      };
+      reader.readAsDataURL(finalFile);
     };
-    reader.onerror = () => {
-      setError("Failed to read file. Please try again.");
-    };
-    reader.readAsDataURL(file);
+
+    processFile(file);
   };
 
   const handleInputChange = (e) => {

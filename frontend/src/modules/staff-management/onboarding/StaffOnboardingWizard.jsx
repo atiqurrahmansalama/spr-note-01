@@ -22,6 +22,7 @@ import {
 import { staffRanksStore, STAFF_CATEGORY_OPTIONS, staffRecruitmentRequirementsStore } from '../../../utils/localStore';
 import { fetchWithAuth } from '../../../utils/authService';
 import { submitStaffOnboarding } from '../../../api/staffOnboarding';
+import { compressImageFile } from '../../../utils/imageCompressor';
 
 const calculateAge = (dobString) => {
   if (!dobString) return '';
@@ -216,21 +217,26 @@ export default function StaffOnboardingWizard({
   };
 
   // Photo Upload Handler
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      showToast('Photo size must be under 3MB', 'error');
-      return;
+    try {
+      const compressed = await compressImageFile(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.85 });
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData((prev) => ({ ...prev, photo_url: reader.result }));
+        showToast('Photo uploaded successfully', 'success');
+      };
+      reader.readAsDataURL(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData((prev) => ({ ...prev, photo_url: reader.result }));
+        showToast('Photo uploaded successfully', 'success');
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFormData((prev) => ({ ...prev, photo_url: reader.result }));
-      showToast('Photo uploaded successfully', 'success');
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {

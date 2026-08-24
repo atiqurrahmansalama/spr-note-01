@@ -4,6 +4,7 @@ import { fetchWithAuth } from "../../../utils/authService";
 import { auth as authStore } from "../../../utils/localStore";
 import { CloseIcon, CameraIcon, LockIcon } from "../../../components/ui/Icons";
 import CustomInput from "../../../components/ui/CustomInput";
+import { compressImageFile } from "../../../utils/imageCompressor";
 
 export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdated }) {
   const { showToast } = useToast();
@@ -86,24 +87,32 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
     });
   };
 
-  const handleAvatarFile = (e) => {
+  const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast("Avatar image size must be under 2MB", "warning");
-      return;
+    try {
+      const compressed = await compressImageFile(file, { maxWidth: 600, maxHeight: 600, quality: 0.85 });
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64Url = ev.target?.result;
+        if (base64Url) {
+          setFormData((prev) => ({ ...prev, avatar_url: base64Url }));
+          showToast("Uploaded avatar preview!", "info");
+        }
+      };
+      reader.readAsDataURL(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64Url = ev.target?.result;
+        if (base64Url) {
+          setFormData((prev) => ({ ...prev, avatar_url: base64Url }));
+          showToast("Uploaded avatar preview!", "info");
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64Url = ev.target?.result;
-      if (base64Url) {
-        setFormData((prev) => ({ ...prev, avatar_url: base64Url }));
-        showToast("Uploaded avatar preview!", "info");
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {

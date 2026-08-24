@@ -188,3 +188,35 @@ class AcademicDepartment(models.Model):
     def __str__(self):
         return f"{self.name} ({self.code})" if self.code else self.name
 
+
+class TenantTaxonomySetting(models.Model):
+    """
+    Central cloud storage for multi-device synchronization of institution taxonomies,
+    custom staff ranks, operational shifts, calendar event kinds, document titles,
+    admission rules, and recruitment requirements.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='taxonomy_settings',
+        null=True,
+        blank=True,
+        db_index=True
+    )
+    taxonomy_key = models.CharField(max_length=64, db_index=True, help_text="e.g. staff_ranks, working_schedules, event_types, etc.")
+    data = models.JSONField(default=list, help_text="List of JSON taxonomy records")
+    version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('institution', 'taxonomy_key')
+        verbose_name = "Tenant Taxonomy Setting"
+        verbose_name_plural = "Tenant Taxonomy Settings"
+
+    def __str__(self):
+        inst_name = self.institution.name if self.institution else "Global"
+        return f"{inst_name} — {self.taxonomy_key} (v{self.version})"
+
+
