@@ -351,9 +351,11 @@ export default function CustomTimePicker({
   return (
     <div className={`relative w-full text-left font-sans ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-          {label} {required && <span className="theme-accent font-bold">*</span>}
-        </label>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
+            {label} {required && <span className="theme-danger">*</span>}
+          </label>
+        </div>
       )}
 
       {/* Trigger Button */}

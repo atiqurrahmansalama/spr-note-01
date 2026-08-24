@@ -12,10 +12,11 @@ import {
 import PageHeader from '../../components/ui/PageHeader';
 import TabSwitcher from '../../components/ui/TabSwitcher';
 import MetricsGrid from '../../components/ui/MetricsGrid';
+import { PageContainer } from '../../components/layout';
 import { fetchWithAuth } from '../../utils/authService';
 import { useRightSidebar } from '../../context/RightSidebarContext';
-import ClassManagementView from '../student-management/classes/ClassManagementView';
-import GroupManagementView from '../student-management/groups/GroupManagementView';
+import ClassManagementView from './classes/ClassManagementView';
+import GroupManagementView from './groups/GroupManagementView';
 
 export default function ClassesGroupsHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -190,7 +191,7 @@ export default function ClassesGroupsHubView() {
   const isGroups = activeTab === 'groups';
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans text-left">
+    <PageContainer>
       {/* 1. Header Overview with Reusable PageHeader */}
       <PageHeader
         title="Classes & Groups"
@@ -229,6 +230,6 @@ export default function ClassesGroupsHubView() {
           <GroupManagementView hideHeader hideMetrics isEmbedded />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -11,8 +11,9 @@ import {
   FilledXCircleIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
+import { PageContainer } from '../../components/layout';
 import CustomSelect from '../../components/ui/CustomSelect';
-import DateRangePicker from '../../components/common/DateRangePicker';
+import { ClassSelect, GroupSelect, TeacherSelect, DateRangePicker } from '../../components/selectors';
 import ActionMenu from '../../components/ui/ActionMenu';
 import AttendanceMatrixTable from '../../components/common/AttendanceMatrixTable';
 import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
@@ -22,9 +23,7 @@ import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { calendarSettings, attendanceFilters, masterCalendarStore, attendanceEventRestrictionsStore } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
-import { getEventColors } from '../../components/common/MasterTimeCalendar';
-import DayAgendaDrawer from '../../components/common/DayAgendaDrawer';
-import TimeScheduleDrawerForm from '../../components/common/TimeScheduleDrawerForm';
+import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
 
 export default function MonthlyAttendanceRegisterView({
   classId: propClassId,
@@ -817,14 +816,8 @@ export default function MonthlyAttendanceRegisterView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
 
-  const content = (
-    <div
-      className={
-        isFullscreen
-          ? "fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen"
-          : "p-4 md:p-6 space-y-6 max-w-[1720px] w-full mx-auto min-h-screen theme-text-primary animate-fade-in select-none"
-      }
-    >
+  const innerContent = (
+    <>
       {/* 1. Normal View Page Header (Hidden when in Full Screen) */}
       {!isFullscreen && !hideHeader && (
         <div className="print:hidden">
@@ -834,7 +827,6 @@ export default function MonthlyAttendanceRegisterView({
             subtitle="Monthly attendance matrix and register for classes & groups with automated computations"
             actions={
               <div className="flex items-center gap-2">
-                {/* Take Attendance Toggle Button */}
                 <button
                   type="button"
                   onClick={handleToggleTakeAttendance}
@@ -856,8 +848,6 @@ export default function MonthlyAttendanceRegisterView({
                     </>
                   )}
                 </button>
-
-                {/* 3-Dot Action Menu for secondary actions */}
                 <ActionMenu items={headerActionMenuItems} />
               </div>
             }
@@ -868,15 +858,12 @@ export default function MonthlyAttendanceRegisterView({
       {/* 2. Fullscreen Single-Line Top Header Bar (Only Header Title & Attendance Button) */}
       {isFullscreen && (
         <div className="shrink-0 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl theme-bg-surface border theme-border flex items-center justify-between gap-3 shadow-xs print:hidden">
-          {/* Left: Only Header Title */}
           <div className="flex items-center gap-2.5">
             <MatrixIcon className="w-5 h-5 theme-accent shrink-0" />
             <h1 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
               Class Attendance
             </h1>
           </div>
-
-          {/* Right: Only Attendance Button */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -903,26 +890,23 @@ export default function MonthlyAttendanceRegisterView({
         </div>
       )}
 
-      {/* 3. Unified Combined Header & Filter Card (Shown only when NOT in fullscreen) */}
+      {/* 3. Combined Header & Filter Card */}
       {!isFullscreen && (
         <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4 print:hidden">
-          {/* Top Row: Date Display & Smart Adaptive Stepper */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-0.5">
-              {/* Line 1: Main Title (Hijri Month Name if Full Hijri Month selected, otherwise Gregorian Date / Month Year / Range) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
                 <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
                   {isFullHijriMonth ? hijriTitle : gregorianTitle}
                 </h2>
                 {isEditing && (
-                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider animate-pulse">
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 uppercase tracking-wider animate-pulse">
                     Attendance Marking Active
                   </span>
                 )}
               </div>
 
-              {/* Line 2: Secondary Date Summary */}
               {isFullHijriMonth ? (
                 <p className="text-xs theme-accent font-medium pl-6">
                   Gregorian Range: <span className="font-semibold">{gregorianTitle}</span>
@@ -934,27 +918,6 @@ export default function MonthlyAttendanceRegisterView({
               ) : null}
             </div>
 
-            {/* Smart Stepper Controls */}
-            <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-              <button
-                type="button"
-                onClick={handleStepBackward}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
-                title={stepLabels.prev}
-              >
-                <span>←</span>
-                <span>{stepLabels.prev}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleStepForward}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
-                title={stepLabels.next}
-              >
-                <span>{stepLabels.next}</span>
-                <span>→</span>
-              </button>
-            </div>
           </div>
 
           {/* Bottom Row: 4-Column Clean Filters (Class, Group, Teacher, Date Range) */}
@@ -962,37 +925,35 @@ export default function MonthlyAttendanceRegisterView({
             
             {/* 1. Class Filter */}
             <div>
-              <CustomSelect
+              <ClassSelect
                 label="Select Class"
                 value={selectedClassId}
                 onChange={setSelectedClassId}
-                options={classOptions}
-                placeholder="Select Class..."
-                searchable={false}
+                classes={classes}
+                allowAll={false}
               />
             </div>
 
             {/* 2. Group Filter */}
             <div>
-              <CustomSelect
+              <GroupSelect
                 label="Select Group"
                 value={selectedGroupId}
                 onChange={setSelectedGroupId}
-                options={groups.length > 0 ? groupOptions : [{ value: '', label: 'All Groups (General)' }]}
-                placeholder="All Groups"
-                searchable={false}
+                classId={selectedClassId}
+                groups={groups}
+                allLabel="All Groups (General)"
               />
             </div>
 
             {/* 3. Teacher Filter */}
             <div>
-              <CustomSelect
+              <TeacherSelect
                 label="Assigned Teacher"
                 value={selectedTeacherId}
                 onChange={setSelectedTeacherId}
-                options={teacherOptions}
-                placeholder="All Teachers"
-                searchable={true}
+                teachers={teachers}
+                allLabel="All Teachers"
               />
             </div>
 
@@ -1097,8 +1058,21 @@ export default function MonthlyAttendanceRegisterView({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 
-  return isFullscreen ? createPortal(content, document.body) : content;
+  if (isFullscreen) {
+    return createPortal(
+      <div className="fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen">
+        {innerContent}
+      </div>,
+      document.body
+    );
+  }
+
+  return (
+    <PageContainer maxWidth="full" className="min-h-screen">
+      {innerContent}
+    </PageContainer>
+  );
 }

@@ -34,7 +34,7 @@ from core.models import (
     AttendancePolicySetting, DocumentTemplateConfig, NotificationGatewayConfig,
     NotificationTemplate, NotificationTriggerRule, InAppNotification,
     NotificationDispatchLog, UserSession, UserDevice, UserLoginLog, UserActivityLog,
-    ActivityLog, TeacherProfile, GuardianProfile
+    ActivityLog, TeacherProfile, GuardianProfile, StaffOnboardingToken
 )
 from core.services import get_scoped_tenant_id
 
@@ -94,6 +94,7 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             'employee_id',
             'staff_type',
             'designation',
+            'rank_order',
             'department',
             'department_name',
             'employment_status',
@@ -401,4 +402,87 @@ class StaffInviteSerializer(serializers.Serializer):
     employee_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     highest_degree = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     specialization = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+
+
+class StaffOnboardingTokenSerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = StaffOnboardingToken
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'token',
+            'title',
+            'staff_type',
+            'designation',
+            'rank_order',
+            'department',
+            'department_name',
+            'max_applications',
+            'applied_count',
+            'expires_at',
+            'is_active',
+            'auto_approve',
+            'include_payroll',
+            'created_by',
+            'created_by_name',
+            'is_valid',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'institution', 'token', 'applied_count', 'created_by', 'created_at', 'updated_at']
+
+
+class StaffOnboardingApplicationSerializer(serializers.Serializer):
+    token = serializers.CharField(required=False, allow_blank=True, default='')
+
+    # Core User Identity
+    name = serializers.CharField(max_length=150)
+    bangla_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
+    phone_number = serializers.CharField(max_length=20)
+    user_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    gender = serializers.CharField(max_length=20, required=False, default='MALE')
+    dob = serializers.DateField(required=False, allow_null=True)
+    nid_no = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    blood_group = serializers.CharField(max_length=10, required=False, allow_blank=True, default='')
+    emergency_contact = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+    photo_url = serializers.CharField(required=False, allow_blank=True, default='')
+
+    # Staff Role & Hierarchy
+    staff_type = serializers.ChoiceField(choices=StaffProfile.STAFF_TYPE_CHOICES, default='TEACHING')
+    designation = serializers.CharField(max_length=100)
+    rank_order = serializers.IntegerField(default=99)
+    department = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    employment_status = serializers.ChoiceField(choices=StaffProfile.EMPLOYMENT_STATUS_CHOICES, default='PERMANENT')
+    joining_date = serializers.DateField(required=False, default=timezone.localdate)
+
+    # Academic & Duty
+    highest_degree = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+    specialization = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+    max_daily_periods = serializers.IntegerField(default=4, required=False)
+
+    # Address
+    address = serializers.CharField(required=False, allow_blank=True, default='')
+    division = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    upazila_thana = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    perm_address = serializers.CharField(required=False, allow_blank=True, default='')
+    perm_division = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    perm_district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    perm_upazila = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    perm_postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+
+    # Payroll & Banking
+    salary_type = serializers.ChoiceField(choices=StaffProfile.SALARY_TYPE_CHOICES, default='MONTHLY_FIXED')
+    base_salary = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=Decimal('0.00'))
+    bank_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    bank_account_no = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    mobile_banking_no = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
 

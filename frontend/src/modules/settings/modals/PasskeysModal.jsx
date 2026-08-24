@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
-import { CloseIcon, LockIcon } from "../components/Icons";
+import { CloseIcon, LockIcon } from "../../../components/ui/Icons";
 
 export default function PasskeysModal({ isOpen, onClose, onPasskeysUpdated }) {
   const { showToast } = useToast();

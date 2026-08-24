@@ -1,13 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
+import CustomInput from "../../../components/ui/CustomInput";
 import CustomSelect from "../../../components/ui/CustomSelect";
+import CustomCheckbox from "../../../components/ui/CustomCheckbox";
+import { ClassSelect } from "../../../components/selectors";
+import Stepper from "../../../components/ui/Stepper";
 import ReusableCalendar from "../../../components/common/ReusableCalendar";
-import { BD_GEO_DATA } from "../../../utils/bdGeoData";
-import { calculateAge, validateBDPhone, validateBRN, validateNID } from "../../../utils/admissionValidators";
-import { CameraIcon, UploadIcon, ChevronIcon } from "../../../components/ui/Icons";
-import AddressLocationPicker from "../../../components/common/AddressLocationPicker";
+import { BD_GEO_DATA } from "../../../utils/bangladeshGeoData";
+import { calculateAge, validateBDPhone, validateBRN, validateNID } from "../../../utils/inputValidators";
+import { CameraIcon, UploadIcon, ChevronIcon, CheckCircleIcon, IdentificationIcon } from "../../../components/ui/Icons";
 import AddressPickerInput from "../../../components/ui/AddressPickerInput";
+import MultiDocumentManager from "../../../components/ui/MultiDocumentManager";
+import DocumentFilePicker from "../../../components/ui/DocumentFilePicker";
+import { classAdmissionRequirementsStore } from "../../../utils/localStore";
+import { useTenant } from "../../../context/TenantContext";
+
+const ADMISSION_STEPS = [
+  { id: 1, label: "Profile & Photo" },
+  { id: 2, label: "Academic" },
+  { id: 3, label: "Guardian & Address" },
+  { id: 4, label: "Vault & Review" },
+];
 
 const RELATION_OPTIONS = [
   "Father",
@@ -18,8 +32,20 @@ const RELATION_OPTIONS = [
   "Aunt",
   "Grandfather",
   "Grandmother",
-  "Legal Guardian",
   "Other",
+];
+
+const SESSION_YEAR_OPTIONS = [
+  { label: "2026-2027 (Current Session)", value: "2026-2027" },
+  { label: "2025-2026 (Previous Session)", value: "2025-2026" },
+  { label: "2027-2028 (Upcoming Session)", value: "2027-2028" },
+  { label: "2028-2029", value: "2028-2029" },
+  { label: "2024-2025", value: "2024-2025" },
+];
+
+const IDENTITY_DOC_OPTIONS = [
+  { label: "Birth Certificate", value: "BRN" },
+  { label: "National ID", value: "NID" },
 ];
 
 function RelationCombobox({ value, onChange, placeholder = "Select or type relation..." }) {
@@ -84,11 +110,78 @@ function RelationCombobox({ value, onChange, placeholder = "Select or type relat
   );
 }
 
-export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, setSharedData }) {
+export default function FullAdmissionWizard({
+  onCancel,
+  onSuccess,
+  sharedData: propSharedData,
+  setSharedData: propSetSharedData,
+  isPublicOnlineMode = false,
+  tokenMeta = null,
+  token = null,
+}) {
   const { showToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
+
+  // Internal state fallback if not managed by parent container
+  const [internalSharedData, setInternalSharedData] = useState({
+    name: "",
+    bangla_name: "",
+    gender: "MALE",
+    dob: "",
+    blood_group: "",
+    birth_certificate_no: "",
+    nid_no: "",
+    student_class: tokenMeta?.target_class_id || "",
+    education_status: tokenMeta?.target_class_name || "",
+    session_year: tokenMeta?.session_year || "2026-2027",
+    admission_date: new Date().toISOString().split("T")[0],
+    previous_school_name: "",
+    previous_school_address: "",
+    previous_class: "",
+    previous_roll_number: "",
+    previous_result: "",
+    previous_passing_year: "",
+    previous_study_details: "",
+    tc_number: "",
+    father_name: "",
+    father_phone: "",
+    father_occupation: "",
+    mother_name: "",
+    mother_phone: "",
+    mother_occupation: "",
+    primary_guardian_name: "",
+    guardian_phone: "",
+    guardian_relation: "Father",
+    guardian_nid: "",
+    emergency_contact_phone: "",
+    street_address: "",
+    post_code: "",
+    thana_or_upazila: "",
+    district: "",
+    division: "",
+    latitude: null,
+    longitude: null,
+    map_place_id: "",
+    perm_street: "",
+    perm_post_code: "",
+    perm_thana: "",
+    perm_district: "",
+    perm_division: "",
+    perm_latitude: null,
+    perm_longitude: null,
+    perm_map_place_id: "",
+  });
+
+  const sharedData = propSharedData || internalSharedData;
+  const setSharedData = propSetSharedData || setInternalSharedData;
+
+  // Unified Identity Document Selection State (BRN or NID)
+  const [identityDocType, setIdentityDocType] = useState(() => {
+    if (sharedData.nid_no) return "NID";
+    return "BRN";
+  });
 
   // Photo Input Ref
   const photoInputRef = useRef(null);
@@ -97,7 +190,27 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   
-  const [birthCertFile, setBirthCertFile] = useState(null);
+  // Reusable multi-document repository state
+  const [studentDocuments, setStudentDocuments] = useState(() => [
+    {
+      id: "doc_req_0_brn",
+      title: "Birth Registration Certificate (BRN)",
+      is_required: true,
+      file_url: "",
+      file_name: "",
+      file_size: "",
+    },
+    {
+      id: "doc_req_1_gnid",
+      title: "Guardian National ID (NID)",
+      is_required: true,
+      file_url: "",
+      file_name: "",
+      file_size: "",
+    },
+  ]);
+
+  const [identityDocFile, setIdentityDocFile] = useState(null);
   const [guardianNidFile, setGuardianNidFile] = useState(null);
 
   // Drag and drop states
@@ -110,8 +223,57 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
   const [lookupResults, setLookupResults] = useState(null);
   const [lookupLoading, setLookupLoading] = useState(false);
 
-  // Fetch institution dynamic classes
+  // Dynamic class admission document requirements synchronization
+  const tenantContext = useTenant ? useTenant() : {};
+  const activeTenantId = tenantContext?.activeTenantId || "default";
+
   useEffect(() => {
+    const requiredTitles = classAdmissionRequirementsStore.getRequiredDocsForClass(
+      activeTenantId,
+      sharedData.student_class,
+      sharedData.education_status
+    );
+
+    setStudentDocuments((prevDocs) => {
+      const existing = Array.isArray(prevDocs) ? prevDocs : [];
+
+      // Build required docs preserving existing uploaded files
+      const requiredDocs = requiredTitles.map((title, idx) => {
+        const found = existing.find((d) => d.title === title);
+        if (found) {
+          return { ...found, is_required: true };
+        }
+        return {
+          id: `doc_req_${idx}_${title.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 15)}`,
+          title,
+          is_required: true,
+          file_url: "",
+          file_name: "",
+          file_size: "",
+        };
+      });
+
+      // Keep user-added custom optional documents that are not in the mandatory list
+      const customDocs = existing.filter((d) => !requiredTitles.includes(d.title) && !d.is_required);
+
+      return [...requiredDocs, ...customDocs];
+    });
+  }, [activeTenantId, sharedData.student_class, sharedData.education_status]);
+
+  // Fetch institution dynamic classes (or use tokenMeta available classes)
+  useEffect(() => {
+    if (tokenMeta && Array.isArray(tokenMeta.available_classes) && tokenMeta.available_classes.length > 0) {
+      setClasses(tokenMeta.available_classes.map((c) => ({ label: c.name, value: c.id, name: c.name })));
+      if (tokenMeta.target_class_id && !sharedData.student_class) {
+        setSharedData((prev) => ({
+          ...prev,
+          student_class: tokenMeta.target_class_id,
+          education_status: tokenMeta.target_class_name || prev.education_status,
+        }));
+      }
+      return;
+    }
+
     fetchWithAuth("/api/v1/classes/")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
@@ -121,11 +283,11 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       .catch((err) => {
         console.error("Failed to load classes", err);
       });
-  }, []);
+  }, [tokenMeta]);
 
   // Guardian Debounce Sibling Lookup
   useEffect(() => {
-    const phone = sharedData.guardian_phone || "";
+    const phone = sharedData?.guardian_phone || "";
     const digitsOnly = phone.replace(/[^\d]/g, "");
     
     if (digitsOnly.length === 11) {
@@ -175,6 +337,29 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
     });
   };
 
+  // Handler for unified identity number (either BRN or NID)
+  const handleIdentityNumberChange = (val) => {
+    if (identityDocType === "BRN") {
+      handleChange("birth_certificate_no", val);
+      handleChange("nid_no", "");
+    } else {
+      handleChange("nid_no", val);
+      handleChange("birth_certificate_no", "");
+    }
+  };
+
+  const handleIdentityTypeSwitch = (type) => {
+    setIdentityDocType(type);
+    const existingVal = sharedData.birth_certificate_no || sharedData.nid_no || "";
+    if (type === "BRN") {
+      handleChange("birth_certificate_no", existingVal);
+      handleChange("nid_no", "");
+    } else {
+      handleChange("nid_no", existingVal);
+      handleChange("birth_certificate_no", "");
+    }
+  };
+
   const handlePhotoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -216,16 +401,20 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
   const nextStep = () => {
     if (currentStep === 1) {
       if (!sharedData.name?.trim()) {
-        showToast("Student Name is required", "warning");
+        showToast("Student Name (English) is required", "warning");
         return;
       }
-      if (sharedData.birth_certificate_no && !validateBRN(sharedData.birth_certificate_no)) {
-        showToast("Birth Certificate must be exactly 17 digits", "warning");
-        return;
+      if (identityDocType === "BRN" && sharedData.birth_certificate_no) {
+        if (!validateBRN(sharedData.birth_certificate_no)) {
+          showToast("Birth Certificate Number must be exactly 17 digits", "warning");
+          return;
+        }
       }
-      if (sharedData.nid_no && !validateNID(sharedData.nid_no)) {
-        showToast("National ID (NID) must be 10, 13 or 17 digits", "warning");
-        return;
+      if (identityDocType === "NID" && sharedData.nid_no) {
+        if (!validateNID(sharedData.nid_no)) {
+          showToast("National ID (NID) must be 10, 13, or 17 digits", "warning");
+          return;
+        }
       }
     }
     if (currentStep === 2) {
@@ -275,7 +464,7 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
         setPhotoFile(file);
         setPhotoPreview(URL.createObjectURL(file));
       }
-      if (field === "birth_certificate") setBirthCertFile(file);
+      if (field === "identity_doc") setIdentityDocFile(file);
       if (field === "guardian_nid") setGuardianNidFile(file);
     }
   };
@@ -311,16 +500,17 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
           map_place_id: sharedData.perm_map_place_id || "",
         };
 
-    const parsedRoll = sharedData.roll_number && parseInt(sharedData.roll_number, 10) > 0 
-      ? parseInt(sharedData.roll_number, 10) 
-      : null;
-
     const academicData = {
       session_year: sharedData.session_year || "2026-2027",
-      roll_number: parsedRoll,
       admission_date: sharedData.admission_date || new Date().toISOString().split("T")[0],
       previous_school_name: sharedData.previous_school_name || "",
-      previous_school_address: "",
+      previous_school_address: sharedData.previous_school_address || "",
+      previous_class: sharedData.previous_class || "",
+      previous_roll_number: sharedData.previous_roll_number || "",
+      previous_result: sharedData.previous_result || "",
+      previous_passing_year: sharedData.previous_passing_year || "",
+      previous_study_details: sharedData.previous_study_details || "",
+      tc_number: sharedData.tc_number || "",
     };
 
     const guardianData = {
@@ -353,7 +543,6 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       map_place_id: sharedData.map_place_id || "",
       admission_mode: "FULL",
       status: "ACTIVE",
-      roll_number: parsedRoll,
       student_class: sharedData.student_class || null,
       education_status: selectedClassObj ? selectedClassObj.name : (sharedData.education_status || ""),
       present_address_data: presentAddressData,
@@ -361,6 +550,24 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
       academic_data: academicData,
       guardian_data: guardianData,
     };
+
+    if (token) {
+      payload.admission_token = token;
+      payload.token = token;
+    }
+
+    // Validate that all mandatory documents have files uploaded
+    const missingDocs = (studentDocuments || []).filter(
+      (doc) => doc.is_required && !doc.file_url
+    );
+    if (missingDocs.length > 0) {
+      showToast(
+        `Please attach all mandatory required documents: ${missingDocs.map((d) => d.title).join(", ")}`,
+        "error"
+      );
+      setCurrentStep(4);
+      return;
+    }
 
     try {
       // 1. Submit admission base record
@@ -416,28 +623,32 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
         }).catch((e) => console.warn("Photo upload warning:", e));
       }
 
-      // 3. Upload Birth Certificate if attached
-      if (birthCertFile && studentId) {
-        const bcFormData = new FormData();
-        bcFormData.append("doc_type", "BIRTH_CERTIFICATE");
-        bcFormData.append("file", birthCertFile);
-        bcFormData.append("title", `Birth Certificate of ${sharedData.name}`);
-        await fetchWithAuth(`/api/v1/students/${studentId}/upload-document/`, {
-          method: "POST",
-          body: bcFormData,
-        }).catch((e) => console.warn("Birth cert upload warning:", e));
-      }
+      // 3. Upload all attached student documents from MultiDocumentManager
+      if (Array.isArray(studentDocuments)) {
+        for (const doc of studentDocuments) {
+          if (doc.file_url) {
+            try {
+              const docType = (doc.title || "STUDENT_DOCUMENT").toUpperCase().replace(/\s+/g, '_').slice(0, 30);
+              const docFormData = new FormData();
+              docFormData.append("doc_type", docType);
+              docFormData.append("title", doc.title || `Document of ${sharedData.name}`);
+              
+              if (doc.file) {
+                docFormData.append("file", doc.file);
+              } else if (doc.file_url.startsWith("data:")) {
+                const blob = await fetch(doc.file_url).then(r => r.blob());
+                docFormData.append("file", blob, doc.file_name || "document.pdf");
+              }
 
-      // 4. Upload Guardian NID Copy if attached
-      if (guardianNidFile && studentId) {
-        const gnidFormData = new FormData();
-        gnidFormData.append("doc_type", "GUARDIAN_NID");
-        gnidFormData.append("file", guardianNidFile);
-        gnidFormData.append("title", `Guardian NID copy of ${sharedData.name}`);
-        await fetchWithAuth(`/api/v1/students/${studentId}/upload-document/`, {
-          method: "POST",
-          body: gnidFormData,
-        }).catch((e) => console.warn("Guardian NID upload warning:", e));
+              await fetchWithAuth(`/api/v1/students/${studentId}/upload-document/`, {
+                method: "POST",
+                body: docFormData,
+              }).catch((e) => console.warn("Document upload warning:", e));
+            } catch (docErr) {
+              console.warn("Document upload error:", docErr);
+            }
+          }
+        }
       }
 
       showToast("Student successfully enrolled & registered!", "success");
@@ -455,671 +666,604 @@ export default function FullAdmissionWizard({ onCancel, onSuccess, sharedData, s
     }
   };
 
-  // BD Geo Cascading Lists Helper
-  const getDistrictsForDivision = (div) => {
-    if (!div || !BD_GEO_DATA[div]) return [];
-    return Object.keys(BD_GEO_DATA[div]);
-  };
-
-  const getUpazilasForDistrict = (div, dist) => {
-    if (!div || !dist || !BD_GEO_DATA[div] || !BD_GEO_DATA[div][dist]) return [];
-    return BD_GEO_DATA[div][dist];
-  };
+  const currentIdentityValue = identityDocType === "BRN" 
+    ? (sharedData.birth_certificate_no || "")
+    : (sharedData.nid_no || "");
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-between select-none py-1 text-left min-h-0 h-full">
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Streamlined Stepper Header */}
-        <div className="grid grid-cols-4 gap-2 text-xs font-bold theme-text-secondary border-b theme-border pb-3 mb-5 shrink-0">
-          <div className={`flex items-center gap-2 ${currentStep === 1 ? "theme-accent" : ""}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${currentStep === 1 ? "theme-bg-accent theme-accent-text" : "theme-bg-elevated theme-text-secondary"}`}>1</span>
-            <span className="truncate">Profile &amp; Photo</span>
-          </div>
-          <div className={`flex items-center gap-2 ${currentStep === 2 ? "theme-accent" : ""}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${currentStep === 2 ? "theme-bg-accent theme-accent-text" : "theme-bg-elevated theme-text-secondary"}`}>2</span>
-            <span className="truncate">Academic</span>
-          </div>
-          <div className={`flex items-center gap-2 ${currentStep === 3 ? "theme-accent" : ""}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${currentStep === 3 ? "theme-bg-accent theme-accent-text" : "theme-bg-elevated theme-text-secondary"}`}>3</span>
-            <span className="truncate">Guardian &amp; Address</span>
-          </div>
-          <div className={`flex items-center gap-2 ${currentStep === 4 ? "theme-accent" : ""}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${currentStep === 4 ? "theme-bg-accent theme-accent-text" : "theme-bg-elevated theme-text-secondary"}`}>4</span>
-            <span className="truncate">Vault &amp; Review</span>
-          </div>
-        </div>
-
-        {/* Scrollable Step Body */}
-        <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar min-h-0">
-          {/* STEP 1: PERSONAL INFORMATION & PHOTO */}
-          {currentStep === 1 && (
-            <div className="space-y-5 animate-fade-in">
-              {/* Top Row: Name Inputs (Left) + Tall Square Photo Bar (Right) */}
-              <div className="flex flex-col-reverse sm:flex-row items-start gap-5">
-                {/* Left Side: English & Bangla Full Names */}
-                <div className="flex-1 space-y-4 w-full">
-                  <div>
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                      Student Full Name (English) <span className="theme-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={sharedData.name || ""}
-                      onChange={(e) => handleChange("name", e.target.value)}
-                      required
-                      placeholder="e.g. Abdullah bin Arif"
-                      className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                      Native / Regional Name (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={sharedData.bangla_name || ""}
-                      onChange={(e) => handleChange("bangla_name", e.target.value)}
-                      placeholder="e.g. Full Name in Native Script"
-                      className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Right Side: Tall Square Student Photo Upload Card with responsive ref */}
-                <div className="w-full sm:w-40 shrink-0 flex flex-col items-center">
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2 self-start">
-                    Student Photo
-                  </label>
-                  <div
-                    onClick={() => photoInputRef.current && photoInputRef.current.click()}
-                    onDragEnter={(e) => handleDrag(e, "photo")}
-                    onDragOver={(e) => handleDrag(e, "photo")}
-                    onDragLeave={(e) => handleDrag(e, "photo")}
-                    onDrop={(e) => handleDrop(e, "photo")}
-                    className="relative w-36 sm:w-40 h-44 sm:h-48 rounded-2xl border-2 border-dashed theme-border overflow-hidden theme-bg-sub hover:border-[var(--accent-main)] transition-all duration-200 flex flex-col items-center justify-center cursor-pointer shadow-xs group"
-                    title="Click to choose student photo"
-                  >
-                    {photoPreview ? (
-                      <>
-                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-1.5 text-white text-[11px] font-bold">
-                          <CameraIcon className="w-5 h-5 theme-accent" />
-                          <span>Change Photo</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemovePhoto();
-                          }}
-                          className="absolute top-2 right-2 w-6 h-6 rounded-full theme-bg-danger-soft theme-danger border theme-border text-xs font-bold flex items-center justify-center shadow-md hover:opacity-80 cursor-pointer z-10"
-                          title="Remove Photo"
-                        >
-                          ✕
-                        </button>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center p-3 text-center space-y-2">
-                        <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shadow-inner">
-                          <CameraIcon className="w-5 h-5" />
-                        </div>
-                        <span className="text-xs font-bold theme-text-primary">Click to Upload</span>
-                        <span className="text-[10px] theme-text-secondary">Passport / 3:4 (Max 3MB)</span>
-                      </div>
-                    )}
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      onChange={handlePhotoChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Gender, DOB, Blood Group */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div>
-                  <CustomSelect
-                    label="Gender"
-                    options={[
-                      { label: "Male", value: "MALE" },
-                      { label: "Female", value: "FEMALE" },
-                      { label: "Other", value: "OTHER" },
-                    ]}
-                    value={sharedData.gender || "MALE"}
-                    onChange={(val) => handleChange("gender", val)}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
-                      Date of Birth
-                    </label>
-                    {sharedData.dob && (
-                      <span className="text-[10px] font-bold theme-bg-accent-soft theme-accent px-2 py-0.5 rounded-lg border theme-border">
-                        Age: {calculateAge(sharedData.dob)}
-                      </span>
-                    )}
-                  </div>
-                  <ReusableCalendar
-                    selectedDate={sharedData.dob || ""}
-                    onSelectDate={(val) => handleChange("dob", val)}
-                    placeholder="Select Date of Birth"
-                  />
-                </div>
-
-                <div>
-                  <CustomSelect
-                    label="Blood Group"
-                    options={[
-                      { label: "Unknown / Not Tested", value: "" },
-                      { label: "A+ (Positive)", value: "A+" },
-                      { label: "A- (Negative)", value: "A-" },
-                      { label: "B+ (Positive)", value: "B+" },
-                      { label: "B- (Negative)", value: "B-" },
-                      { label: "O+ (Positive)", value: "O+" },
-                      { label: "O- (Negative)", value: "O-" },
-                      { label: "AB+", value: "AB+" },
-                      { label: "AB-", value: "AB-" },
-                    ]}
-                    value={sharedData.blood_group || ""}
-                    onChange={(val) => handleChange("blood_group", val)}
-                  />
-                </div>
-              </div>
-
-              {/* BRN & NID (Optional) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Birth Registration No (BRN)
-                  </label>
-                  <input
-                    type="text"
-                    value={sharedData.birth_certificate_no || ""}
-                    onChange={(e) => handleChange("birth_certificate_no", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="17 Digit Certificate Number"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                  {sharedData.birth_certificate_no && !validateBRN(sharedData.birth_certificate_no) && (
-                    <span className="text-[10px] theme-danger block mt-1.5 font-bold">Must be exactly 17 digits.</span>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    National ID (NID)
-                  </label>
-                  <input
-                    type="text"
-                    value={sharedData.nid_no || ""}
-                    onChange={(e) => handleChange("nid_no", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="10, 13, or 17 Digit NID Number"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                  {sharedData.nid_no && !validateNID(sharedData.nid_no) && (
-                    <span className="text-[10px] theme-danger block mt-1.5 font-bold">Must be 10, 13, or 17 digits.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: ACADEMIC ENROLLMENT */}
-          {currentStep === 2 && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Academic Session Year
-                  </label>
-                  <input
-                    type="text"
-                    value={sharedData.session_year || "2026-2027"}
-                    onChange={(e) => handleChange("session_year", e.target.value)}
-                    placeholder="e.g. 2026-2027"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <CustomSelect
-                    label="Enrolling Class / Track *"
-                    options={classes}
-                    value={sharedData.student_class || ""}
-                    onChange={(clsId) => {
-                      const clsObj = classes.find((c) => c.value === clsId);
-                      setSharedData((prev) => ({
-                        ...prev,
-                        student_class: clsId,
-                        education_status: clsObj ? clsObj.name : "",
-                      }));
-                    }}
-                    placeholder={classes.length > 0 ? "Select Institutional Class..." : "No classes found"}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Numeric Roll Number Input */}
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Class Roll Number (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={sharedData.roll_number || ""}
-                    onChange={(e) => handleChange("roll_number", e.target.value)}
-                    placeholder="e.g. 101 (Leave blank for auto sequential roll)"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                  <span className="text-[10px] theme-text-secondary block mt-1.5 font-medium">
-                    {sharedData.roll_number 
-                      ? `Assigned Roll: #${sharedData.roll_number}` 
-                      : "Automatic sequential roll number will be assigned if left blank."}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Admission Date
-                  </label>
-                  <ReusableCalendar
-                    selectedDate={sharedData.admission_date || new Date().toISOString().split("T")[0]}
-                    onSelectDate={(val) => handleChange("admission_date", val)}
-                    placeholder="Select Admission Date"
-                  />
-                </div>
-              </div>
-
-              <div className="border-t theme-border pt-4">
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Previous School / Madrasa (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={sharedData.previous_school_name || ""}
-                  onChange={(e) => handleChange("previous_school_name", e.target.value)}
-                  placeholder="e.g. Jamia Rahmania Madrasa"
-                  className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: GUARDIAN & DUAL RESIDENTIAL ADDRESS */}
-          {currentStep === 3 && (
-            <div className="space-y-5 animate-fade-in">
-              {/* Guardian Sibling Lookup Notification Banner */}
-              {lookupLoading && (
-                <div className="p-3.5 theme-bg-elevated border theme-border rounded-2xl text-xs theme-accent animate-pulse font-semibold">
-                  Searching parent profile database...
-                </div>
-              )}
-              {lookupResults && lookupResults.guardian && (
-                <div className="p-4 theme-bg-accent-soft border theme-border rounded-2xl text-xs theme-accent flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div>
-                    <span className="font-bold">Database Match Found:</span>{" "}
-                    Registered siblings:{" "}
-                    <span className="underline font-semibold">
-                      {lookupResults.siblings.map((sib) => sib.name).join(", ")}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAutoFillGuardian}
-                    className="px-3.5 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-sm transition-all hover:opacity-90 cursor-pointer"
-                  >
-                    Auto-fill Parent Info
-                  </button>
-                </div>
-              )}
-
-              {/* Primary Guardian Phone & Hybrid Searchable Combobox */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Primary Guardian Phone <span className="theme-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={sharedData.guardian_phone || ""}
-                    onChange={(e) => handleChange("guardian_phone", e.target.value.replace(/[^\d]/g, ""))}
-                    required
-                    placeholder="Official SMS mobile (e.g. 01712345678)"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                  {sharedData.guardian_phone && !validateBDPhone(sharedData.guardian_phone) && (
-                    <span className="text-[10px] theme-danger block mt-1.5 font-bold">Must be 11 digit mobile starting with 01.</span>
-                  )}
-                </div>
-
-                {/* Single Smart Relation Combobox: Direct Typing + Dropdown List */}
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                    Guardian Relation <span className="theme-danger">*</span>
-                  </label>
-                  <RelationCombobox
-                    value={sharedData.guardian_relation || ""}
-                    onChange={(val) => handleChange("guardian_relation", val)}
-                    placeholder="Type or pick relation (Father, Mother...)"
-                  />
-                </div>
-              </div>
-
-              {/* Parents Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t theme-border pt-4">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Father Name</label>
-                  <input
-                    type="text"
-                    value={sharedData.father_name || ""}
-                    onChange={(e) => handleChange("father_name", e.target.value)}
-                    placeholder="Father's Full Name"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Father Phone</label>
-                  <input
-                    type="text"
-                    value={sharedData.father_phone || ""}
-                    onChange={(e) => handleChange("father_phone", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="Father's Phone"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Father Occupation</label>
-                  <input
-                    type="text"
-                    value={sharedData.father_occupation || ""}
-                    onChange={(e) => handleChange("father_occupation", e.target.value)}
-                    placeholder="Occupation"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Mother Name</label>
-                  <input
-                    type="text"
-                    value={sharedData.mother_name || ""}
-                    onChange={(e) => handleChange("mother_name", e.target.value)}
-                    placeholder="Mother's Full Name"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Mother Phone</label>
-                  <input
-                    type="text"
-                    value={sharedData.mother_phone || ""}
-                    onChange={(e) => handleChange("mother_phone", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="Mother's Phone"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">Emergency Phone</label>
-                  <input
-                    type="text"
-                    value={sharedData.emergency_contact_phone || ""}
-                    onChange={(e) => handleChange("emergency_contact_phone", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="Emergency Alternate"
-                    className="w-full px-4 py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* DUAL ADDRESS SECTION: PRESENT & PERMANENT */}
-              <div className="space-y-5 border-t theme-border pt-5">
-                <AddressPickerInput
-                  value={{
-                    division: sharedData.division,
-                    district: sharedData.district,
-                    upazila: sharedData.thana_or_upazila,
-                    post_code: sharedData.post_code,
-                    street_address: sharedData.street_address,
-                    coordinates: sharedData.latitude && sharedData.longitude ? `${sharedData.latitude}, ${sharedData.longitude}` : '',
-                  }}
-                  onChange={(addr) => {
-                    setSharedData((prev) => ({
-                      ...prev,
-                      division: addr.division,
-                      district: addr.district,
-                      thana_or_upazila: addr.upazila || addr.thana_or_upazila || '',
-                      post_code: addr.post_code || '',
-                      street_address: addr.street_address || '',
-                    }));
-                  }}
-                  title="Present Address & Geolocation"
-                  subTitle="Division, district, thana/upazila, postal code & physical address"
-                  required
-                />
-
-                {/* Same Address Checkbox Toggle */}
-                <div className="flex items-center gap-2 pt-2">
-                  <input
-                    type="checkbox"
-                    id="sameAddressCheckbox"
-                    checked={sameAddress}
-                    onChange={(e) => handleAddressClone(e.target.checked)}
-                    className="w-4 h-4 rounded theme-border text-[var(--accent-main)] focus:ring-[var(--accent-main)] cursor-pointer"
-                  />
-                  <label htmlFor="sameAddressCheckbox" className="text-xs font-bold theme-text-primary select-none cursor-pointer">
-                    Permanent address is the same as present address
-                  </label>
-                </div>
-
-                {/* Permanent Address Fields (Shown when unchecked) */}
-                {!sameAddress && (
-                  <div className="space-y-4 pt-3 border-t theme-border animate-fade-in">
-                    <AddressPickerInput
-                      value={{
-                        division: sharedData.perm_division,
-                        district: sharedData.perm_district,
-                        upazila: sharedData.perm_thana,
-                        post_code: sharedData.perm_post_code,
-                        street_address: sharedData.perm_street,
-                        coordinates: sharedData.perm_latitude && sharedData.perm_longitude ? `${sharedData.perm_latitude}, ${sharedData.perm_longitude}` : '',
-                      }}
-                      onChange={(addr) => {
-                        setSharedData((prev) => ({
-                          ...prev,
-                          perm_division: addr.division,
-                          perm_district: addr.district,
-                          perm_thana: addr.upazila || addr.thana_or_upazila || '',
-                          perm_post_code: addr.post_code || '',
-                          perm_street: addr.street_address || '',
-                        }));
-                      }}
-                      title="Permanent Address & Geolocation"
-                      subTitle="Permanent division, district, thana/upazila & postal details"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: DOCUMENT VAULT & REVIEW SUMMARY */}
-          {currentStep === 4 && (
-            <div className="space-y-6 animate-fade-in">
-              {/* Drag & Drop Document Vault */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary border-b theme-border pb-2">
-                  Document Repository
-                </h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {/* File 1: Birth Cert */}
-                  <div
-                    onDragEnter={(e) => handleDrag(e, "birth_certificate")}
-                    onDragOver={(e) => handleDrag(e, "birth_certificate")}
-                    onDragLeave={(e) => handleDrag(e, "birth_certificate")}
-                    onDrop={(e) => handleDrop(e, "birth_certificate")}
-                    className={`p-5 rounded-3xl border-2 border-dashed text-center flex flex-col justify-center items-center transition-all ${
-                      activeDragField === "birth_certificate" ? "border-[var(--accent-main)] theme-bg-accent-soft" : "theme-border hover:border-[var(--accent-main)]/60 theme-bg-sub/60"
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center mb-2 shadow-inner">
-                      <UploadIcon className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold theme-text-primary">Birth Certificate</span>
-                    <span className="text-[10px] theme-text-secondary mt-1">
-                      {birthCertFile ? birthCertFile.name : "Drag & Drop or Browse"}
-                    </span>
-                    <input
-                      type="file"
-                      id="bc-input"
-                      className="hidden"
-                      onChange={(e) => setBirthCertFile(e.target.files && e.target.files[0])}
-                    />
-                    <label htmlFor="bc-input" className="mt-3 px-4 py-2 theme-bg-elevated theme-text-primary text-xs font-bold rounded-xl border theme-border hover:theme-bg-sub cursor-pointer shadow-xs">
-                      Browse File
-                    </label>
-                  </div>
-
-                  {/* File 2: Guardian NID */}
-                  <div
-                    onDragEnter={(e) => handleDrag(e, "guardian_nid")}
-                    onDragOver={(e) => handleDrag(e, "guardian_nid")}
-                    onDragLeave={(e) => handleDrag(e, "guardian_nid")}
-                    onDrop={(e) => handleDrop(e, "guardian_nid")}
-                    className={`p-5 rounded-3xl border-2 border-dashed text-center flex flex-col justify-center items-center transition-all ${
-                      activeDragField === "guardian_nid" ? "border-[var(--accent-main)] theme-bg-accent-soft" : "theme-border hover:border-[var(--accent-main)]/60 theme-bg-sub/60"
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center mb-2 shadow-inner">
-                      <UploadIcon className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-bold theme-text-primary">Guardian NID</span>
-                    <span className="text-[10px] theme-text-secondary mt-1">
-                      {guardianNidFile ? guardianNidFile.name : "Drag & Drop or Browse"}
-                    </span>
-                    <input
-                      type="file"
-                      id="gnid-input"
-                      className="hidden"
-                      onChange={(e) => setGuardianNidFile(e.target.files && e.target.files[0])}
-                    />
-                    <label htmlFor="gnid-input" className="mt-3 px-4 py-2 theme-bg-elevated theme-text-primary text-xs font-bold rounded-xl border theme-border hover:theme-bg-sub cursor-pointer shadow-xs">
-                      Browse File
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Information Summary Review */}
-              <div className="space-y-4 border-t theme-border pt-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                  Review &amp; Confirmation
-                </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-medium">
-                  {/* Column 1: Personal & Academic */}
-                  <div className="theme-bg-surface border theme-border p-5 rounded-3xl space-y-2.5 shadow-xs">
-                    <h5 className="font-bold theme-accent uppercase tracking-wider text-[11px] mb-2">Student &amp; Class</h5>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Student Name</span>
-                      <span className="font-bold theme-text-primary">{sharedData.name || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Native Name</span>
-                      <span className="font-bold theme-text-primary">{sharedData.bangla_name || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Class / Track</span>
-                      <span className="font-bold theme-accent">{sharedData.education_status || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="theme-text-secondary">Class Roll</span>
-                      <span className="font-bold theme-text-primary">
-                        {sharedData.roll_number ? `#${sharedData.roll_number}` : "Auto Assigned"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Column 2: Guardian & Address */}
-                  <div className="theme-bg-surface border theme-border p-5 rounded-3xl space-y-2.5 shadow-xs">
-                    <h5 className="font-bold theme-accent uppercase tracking-wider text-[11px] mb-2">Guardian &amp; Contact</h5>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Guardian Phone</span>
-                      <span className="font-bold theme-text-primary">{sharedData.guardian_phone || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Relation</span>
-                      <span className="theme-text-primary">{sharedData.guardian_relation || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b theme-border">
-                      <span className="theme-text-secondary">Father / Mother</span>
-                      <span className="theme-text-primary">{sharedData.father_name || sharedData.mother_name || "--"}</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="theme-text-secondary">Present Address</span>
-                      <span className="theme-text-primary truncate max-w-[200px]" title={sharedData.street_address}>
-                        {sharedData.street_address || sharedData.district || "--"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="w-full select-none text-left space-y-6">
+      {/* Modern Minimal Stepper Progress Bar */}
+      <div className="pb-1 sm:pb-2">
+        <Stepper
+          steps={ADMISSION_STEPS}
+          currentStep={currentStep}
+          onStepClick={(stepNum) => {
+            if (stepNum < currentStep) {
+              setCurrentStep(stepNum);
+            }
+          }}
+          clickable={true}
+          size="md"
+        />
       </div>
 
-      {/* Fixed Stationary Footer Buttons Dock */}
-      <div className="flex justify-between items-center pt-4 border-t theme-border select-none mt-5 shrink-0">
-        {currentStep > 1 ? (
-          <button
-            type="button"
-            onClick={prevStep}
-            disabled={loading}
-            className="px-6 py-2.5 h-11 text-xs font-bold theme-bg-sub theme-text-primary rounded-2xl border theme-border hover:theme-bg-elevated transition cursor-pointer"
-          >
-            ← Back
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-6 py-2.5 h-11 text-xs font-bold theme-bg-sub theme-text-secondary hover:theme-text-primary rounded-2xl transition cursor-pointer"
-          >
-            Cancel
-          </button>
+      {/* Step Body */}
+      <div className="w-full">
+        {/* STEP 1: PERSONAL INFORMATION & PHOTO */}
+        {currentStep === 1 && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Top Row: Names in 2 Lines (Left, Bottom-Aligned) + Large Photo Card (Far Right) */}
+            <div className="flex flex-col-reverse md:flex-row items-center md:items-end justify-between gap-6 md:gap-10 lg:gap-12">
+              {/* Left Side: English & Bangla Full Names in 2 Clean Stacked Lines (Reduced Width on Large Screens) */}
+              <div className="w-full space-y-4 sm:space-y-4.5 max-w-md">
+                <div>
+                  <CustomInput
+                    label="Full Name (English)"
+                    required
+                    value={sharedData.name || ""}
+                    onChange={(val) => handleChange("name", val)}
+                    placeholder="e.g. Abdullah Bin Arif"
+                  />
+                </div>
+
+                <div>
+                  <CustomInput
+                    label="Full Name (Native)"
+                    value={sharedData.bangla_name || ""}
+                    onChange={(val) => handleChange("bangla_name", val)}
+                    placeholder="উদা: আব্দুল্লাহ বিন আরিফ"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side: Larger Photo Upload Card on the Far Right */}
+              <div className="shrink-0 flex flex-col items-center md:items-end">
+                <div
+                  onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                  onDragEnter={(e) => handleDrag(e, "photo")}
+                  onDragOver={(e) => handleDrag(e, "photo")}
+                  onDragLeave={(e) => handleDrag(e, "photo")}
+                  onDrop={(e) => handleDrop(e, "photo")}
+                  className="relative w-40 sm:w-44 md:w-48 h-48 sm:h-52 md:h-56 rounded-2xl border-2 border-dashed theme-border overflow-hidden theme-bg-sub hover:border-[var(--accent-main)] transition-all duration-200 flex flex-col items-center justify-center cursor-pointer shadow-xs group"
+                  title="Click to select student photo"
+                >
+                  {photoPreview ? (
+                    <>
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-1.5 text-white text-[11px] font-bold">
+                        <CameraIcon className="w-5 h-5 theme-accent" />
+                        <span>Change Photo</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePhoto();
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full theme-bg-danger-soft theme-danger border theme-border text-xs font-bold flex items-center justify-center shadow-md hover:opacity-80 cursor-pointer z-10"
+                        title="Remove Photo"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
+                      <div className="w-11 h-11 rounded-2xl theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shadow-inner">
+                        <CameraIcon className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold theme-text-primary">Upload Photo</span>
+                      <span className="text-[10px] theme-text-secondary">Passport / 3:4 (Max 3MB)</span>
+                    </div>
+                  )}
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Gender, Date of Birth, Blood Group */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 border-t theme-border pt-5">
+              <div>
+                <CustomSelect
+                  label="Gender"
+                  options={[
+                    { label: "Male", value: "MALE" },
+                    { label: "Female", value: "FEMALE" },
+                    { label: "Other", value: "OTHER" },
+                  ]}
+                  value={sharedData.gender || "MALE"}
+                  onChange={(val) => handleChange("gender", val)}
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                    Date of Birth
+                  </label>
+                  {sharedData.dob && (
+                    <span className="text-[10px] font-bold theme-bg-accent-soft theme-accent px-2 py-0.5 rounded-lg border theme-border">
+                      Age: {calculateAge(sharedData.dob)}
+                    </span>
+                  )}
+                </div>
+                <ReusableCalendar
+                  selectedDate={sharedData.dob || ""}
+                  onSelectDate={(val) => handleChange("dob", val)}
+                  placeholder="Select Date of Birth"
+                />
+              </div>
+
+              <div>
+                <CustomSelect
+                  label="Blood Group"
+                  options={[
+                    { label: "Unknown", value: "" },
+                    { label: "A+ (Positive)", value: "A+" },
+                    { label: "A- (Negative)", value: "A-" },
+                    { label: "B+ (Positive)", value: "B+" },
+                    { label: "B- (Negative)", value: "B-" },
+                    { label: "O+ (Positive)", value: "O+" },
+                    { label: "O- (Negative)", value: "O-" },
+                    { label: "AB+", value: "AB+" },
+                    { label: "AB-", value: "AB-" },
+                  ]}
+                  value={sharedData.blood_group || ""}
+                  onChange={(val) => handleChange("blood_group", val)}
+                />
+              </div>
+            </div>
+
+            {/* Unified Identity Document Section: BRN or NID */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t theme-border pt-5">
+              <div>
+                <CustomSelect
+                  label="Identity Document Type"
+                  options={IDENTITY_DOC_OPTIONS}
+                  value={identityDocType}
+                  onChange={(val) => handleIdentityTypeSwitch(val)}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <CustomInput
+                  type={identityDocType === "BRN" ? "brn" : "nid"}
+                  label={identityDocType === "BRN" ? "Birth Registration Number (BRN)" : "National ID Number (NID)"}
+                  value={currentIdentityValue}
+                  onChange={(val) => handleIdentityNumberChange(val)}
+                  placeholder={identityDocType === "BRN" ? "17-digit birth certificate number" : "10, 13, or 17-digit NID number"}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
-        {currentStep < 4 ? (
-          <button
-            type="button"
-            onClick={nextStep}
-            className="px-8 py-2.5 h-11 min-w-[160px] text-xs font-black theme-bg-accent theme-accent-text hover:opacity-90 rounded-2xl transition cursor-pointer shadow-md flex items-center justify-center gap-1.5"
-          >
-            <span>Next Step</span>
-            <span>→</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="px-8 py-2.5 h-11 min-w-[160px] text-xs font-black theme-bg-accent theme-accent-text hover:opacity-90 rounded-2xl transition cursor-pointer disabled:opacity-50 shadow-xl flex items-center justify-center gap-2"
-          >
-            {loading ? "Registering Student..." : "Complete Student Enrollment"}
-          </button>
+        {/* STEP 2: ACADEMIC ENROLLMENT */}
+        {currentStep === 2 && (
+          <div className="space-y-5 animate-fade-in">
+            {/* Session Year Dropdown, Class Select & Admission Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+              <div>
+                <CustomSelect
+                  label="Academic Session Year"
+                  options={SESSION_YEAR_OPTIONS}
+                  value={sharedData.session_year || "2026-2027"}
+                  onChange={(val) => handleChange("session_year", val)}
+                  required
+                />
+              </div>
+
+              <div>
+                <ClassSelect
+                  label="Enrolling Class"
+                  value={sharedData.student_class || ""}
+                  onChange={(clsId, clsObj) => {
+                    setSharedData((prev) => ({
+                      ...prev,
+                      student_class: clsId,
+                      education_status: clsObj ? clsObj.name : "",
+                    }));
+                  }}
+                  allowAll={false}
+                  placeholder="Select Institutional Class..."
+                  required={true}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                  Admission Date
+                </label>
+                <ReusableCalendar
+                  selectedDate={sharedData.admission_date || new Date().toISOString().split("T")[0]}
+                  onSelectDate={(val) => handleChange("admission_date", val)}
+                  placeholder="Select Admission Date"
+                />
+              </div>
+            </div>
+
+            {/* Previous Academic Background */}
+            <div className="border-t theme-border pt-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <CustomInput
+                    label="Previous Academy Name"
+                    value={sharedData.previous_school_name || ""}
+                    onChange={(val) => handleChange("previous_school_name", val)}
+                    placeholder="e.g. Jamia Rahmania Madrasa"
+                  />
+                </div>
+                <div>
+                  <CustomInput
+                    label="Previous Academy Address"
+                    value={sharedData.previous_school_address || ""}
+                    onChange={(val) => handleChange("previous_school_address", val)}
+                    placeholder="e.g. Mirpur, Dhaka"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                <div>
+                  <CustomInput
+                    label="Previous Class"
+                    value={sharedData.previous_class || ""}
+                    onChange={(val) => handleChange("previous_class", val)}
+                    placeholder="e.g. Class 4 / Hifz 15 Para / Nazera"
+                  />
+                </div>
+                <div>
+                  <CustomInput
+                    label="Previous Exam Roll Number"
+                    value={sharedData.previous_roll_number || ""}
+                    onChange={(val) => handleChange("previous_roll_number", val)}
+                    placeholder="e.g. 15"
+                  />
+                </div>
+                <div>
+                  <CustomInput
+                    label="Previous Exam Result & Average"
+                    value={sharedData.previous_result || ""}
+                    onChange={(val) => handleChange("previous_result", val)}
+                    placeholder="e.g. Mumtaz / 88% "
+                  />
+                </div>
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Academic & Study Details"
+                  value={sharedData.previous_study_details || ""}
+                  onChange={(val) => handleChange("previous_study_details", val)}
+                  placeholder="e.g. Completed 10 Paras Hifz with Tajweed."
+                />
+              </div>
+            </div>
+          </div>
         )}
+
+        {/* STEP 3: GUARDIAN & DUAL RESIDENTIAL ADDRESS */}
+        {currentStep === 3 && (
+          <div className="space-y-5 animate-fade-in">
+            {/* Guardian Sibling Lookup Notification Banner */}
+            {lookupLoading && (
+              <div className="p-3.5 theme-bg-elevated border theme-border rounded-2xl text-xs theme-accent animate-pulse font-semibold">
+                Searching parent profile database...
+              </div>
+            )}
+            {lookupResults && lookupResults.guardian && (
+              <div className="p-4 theme-bg-accent-soft border theme-border rounded-2xl text-xs theme-accent flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <span className="font-bold">Database Match Found:</span>{" "}
+                  Registered siblings:{" "}
+                  <span className="underline font-semibold">
+                    {lookupResults.siblings.map((sib) => sib.name).join(", ")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoFillGuardian}
+                  className="px-3.5 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-sm transition-all hover:opacity-90 cursor-pointer"
+                >
+                  Auto-fill Parent Info
+                </button>
+              </div>
+            )}
+
+            {/* Primary Guardian Phone & Hybrid Searchable Combobox */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <CustomInput
+                  type="phone"
+                  label="Primary Guardian Phone"
+                  required
+                  value={sharedData.guardian_phone || ""}
+                  onChange={(val) => handleChange("guardian_phone", val)}
+                  placeholder="Official SMS mobile (e.g. 01712345678)"
+                />
+              </div>
+
+              {/* Single Smart Relation Combobox: Direct Typing + Dropdown List */}
+              <div>
+                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                  Guardian Relation <span className="theme-danger">*</span>
+                </label>
+                <RelationCombobox
+                  value={sharedData.guardian_relation || ""}
+                  onChange={(val) => handleChange("guardian_relation", val)}
+                  placeholder="Type or pick relation (Father, Mother...)"
+                />
+              </div>
+            </div>
+
+            {/* Parents Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t theme-border pt-4">
+              <div>
+                <CustomInput
+                  label="Father Name"
+                  value={sharedData.father_name || ""}
+                  onChange={(val) => handleChange("father_name", val)}
+                  placeholder="Father's Full Name"
+                />
+              </div>
+              <div>
+                <CustomInput
+                  type="phone"
+                  label="Father Phone"
+                  value={sharedData.father_phone || ""}
+                  onChange={(val) => handleChange("father_phone", val)}
+                  placeholder="Father's Phone"
+                />
+              </div>
+              <div>
+                <CustomInput
+                  label="Father Occupation"
+                  value={sharedData.father_occupation || ""}
+                  onChange={(val) => handleChange("father_occupation", val)}
+                  placeholder="e.g. Business, Teacher"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div>
+                <CustomInput
+                  label="Mother Name"
+                  value={sharedData.mother_name || ""}
+                  onChange={(val) => handleChange("mother_name", val)}
+                  placeholder="Mother's Full Name"
+                />
+              </div>
+              <div>
+                <CustomInput
+                  type="phone"
+                  label="Mother Phone"
+                  value={sharedData.mother_phone || ""}
+                  onChange={(val) => handleChange("mother_phone", val)}
+                  placeholder="Mother's Phone"
+                />
+              </div>
+              <div>
+                <CustomInput
+                  type="phone"
+                  label="Emergency Phone"
+                  value={sharedData.emergency_contact_phone || ""}
+                  onChange={(val) => handleChange("emergency_contact_phone", val)}
+                  placeholder="Emergency Alternate"
+                />
+              </div>
+            </div>
+
+            {/* DUAL ADDRESS SECTION: PRESENT & PERMANENT */}
+            <div className="space-y-5 border-t theme-border pt-5">
+              <AddressPickerInput
+                value={{
+                  division: sharedData.division,
+                  district: sharedData.district,
+                  upazila: sharedData.thana_or_upazila,
+                  post_code: sharedData.post_code,
+                  street_address: sharedData.street_address,
+                  coordinates: sharedData.latitude && sharedData.longitude ? `${sharedData.latitude}, ${sharedData.longitude}` : '',
+                }}
+                onChange={(addr) => {
+                  setSharedData((prev) => ({
+                    ...prev,
+                    division: addr.division,
+                    district: addr.district,
+                    thana_or_upazila: addr.upazila || addr.thana_or_upazila || '',
+                    post_code: addr.post_code || '',
+                    street_address: addr.street_address || '',
+                  }));
+                }}
+                title="Present Address & Geolocation"
+                required
+              />
+
+              {/* Standard Theme-Aware Same Address CustomCheckbox */}
+              <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
+                <CustomCheckbox
+                  checked={sameAddress}
+                  onChange={(checked) => handleAddressClone(checked)}
+                  label="Permanent address is the same as present address"
+                  size="md"
+                />
+              </div>
+
+              {/* Permanent Address Fields (Shown when unchecked) */}
+              {!sameAddress && (
+                <div className="space-y-4 pt-3 border-t theme-border animate-fade-in">
+                  <AddressPickerInput
+                    value={{
+                      division: sharedData.perm_division,
+                      district: sharedData.perm_district,
+                      upazila: sharedData.perm_thana,
+                      post_code: sharedData.perm_post_code,
+                      street_address: sharedData.perm_street,
+                      coordinates: sharedData.perm_latitude && sharedData.perm_longitude ? `${sharedData.perm_latitude}, ${sharedData.perm_longitude}` : '',
+                    }}
+                    onChange={(addr) => {
+                      setSharedData((prev) => ({
+                        ...prev,
+                        perm_division: addr.division,
+                        perm_district: addr.district,
+                        perm_thana: addr.upazila || addr.thana_or_upazila || '',
+                        perm_post_code: addr.post_code || '',
+                        perm_street: addr.street_address || '',
+                      }));
+                    }}
+                    title="Permanent Address"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: DOCUMENT VAULT & REVIEW SUMMARY */}
+        {currentStep === 4 && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Reusable Multi-Document List Manager */}
+            <MultiDocumentManager
+              title="STUDENT DOCUMENTS & CREDENTIALS"
+              subTitle="Attach official documents, birth certificate, transfer certificate, or marksheets"
+              addButtonLabel="+ Add Document"
+              itemLabelPrefix="DOCUMENT"
+              documents={studentDocuments}
+              onChange={(docs) => setStudentDocuments(docs)}
+            />
+
+            {/* Information Summary Review */}
+            <div className="space-y-4 border-t theme-border pt-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                Review &amp; Confirmation
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-medium">
+                {/* Column 1: Personal & Academic */}
+                <div className="theme-bg-surface border theme-border p-5 rounded-3xl space-y-2.5 shadow-xs">
+                  <h5 className="font-bold theme-accent uppercase tracking-wider text-[11px] mb-2">Student &amp; Class</h5>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Student Name</span>
+                    <span className="font-bold theme-text-primary">{sharedData.name || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Native Name</span>
+                    <span className="font-bold theme-text-primary">{sharedData.bangla_name || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Academic Session</span>
+                    <span className="font-bold theme-text-primary">{sharedData.session_year || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Class / Track</span>
+                    <span className="font-bold theme-accent">{sharedData.education_status || "--"}</span>
+                  </div>
+                  {sharedData.previous_school_name && (
+                    <div className="flex justify-between py-1 border-b theme-border">
+                      <span className="theme-text-secondary">Previous Academy</span>
+                      <span className="font-bold theme-text-primary">
+                        {sharedData.previous_school_name} {sharedData.previous_class ? `(${sharedData.previous_class})` : ''}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1">
+                    <span className="theme-text-secondary">Identity ({identityDocType})</span>
+                    <span className="font-bold font-mono theme-text-primary">
+                      {currentIdentityValue || "Not Provided"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Column 2: Guardian & Address */}
+                <div className="theme-bg-surface border theme-border p-5 rounded-3xl space-y-2.5 shadow-xs">
+                  <h5 className="font-bold theme-accent uppercase tracking-wider text-[11px] mb-2">Guardian &amp; Address</h5>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Guardian Phone</span>
+                    <span className="font-bold font-mono theme-text-primary">{sharedData.guardian_phone || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Relation</span>
+                    <span className="font-bold theme-text-primary">{sharedData.guardian_relation || "--"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Father / Mother</span>
+                    <span className="font-bold theme-text-primary">
+                      {sharedData.father_name || sharedData.mother_name || "--"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="theme-text-secondary">Present Location</span>
+                    <span className="font-bold theme-text-primary truncate max-w-[200px]">
+                      {[sharedData.thana_or_upazila, sharedData.district, sharedData.division].filter(Boolean).join(", ") || "--"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation Wizard Actions Footer */}
+      <div className="flex items-center justify-between pt-6 border-t theme-border">
+        <div>
+          {currentStep > 1 ? (
+            <button
+              type="button"
+              onClick={prevStep}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub text-xs font-bold theme-text-primary transition cursor-pointer disabled:opacity-50"
+            >
+              Back
+            </button>
+          ) : onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+            >
+              Cancel
+            </button>
+          ) : <div />}
+        </div>
+
+        <div>
+          {currentStep < 4 ? (
+            <button
+              type="button"
+              onClick={nextStep}
+              className="px-6 py-2.5 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-sm flex items-center gap-1.5"
+            >
+              <span>Next</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="px-7 py-3 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-md flex items-center gap-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent border-white animate-spin" />
+                  <span>Enrolling Student...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-4 h-4" />
+                  <span>Confirm &amp; Complete Admission</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

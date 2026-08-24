@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   TeacherIcon,
   PlusIcon,
@@ -7,17 +7,24 @@ import {
 } from '../../components/ui/Icons';
 import { createStaff, updateStaff } from '../../api/staff';
 import { useToast } from '../../context/ToastContext';
+import { useTenant } from '../../context/TenantContext';
 import { fetchWithAuth } from '../../utils/authService';
+import { staffRanksStore, STAFF_CATEGORY_OPTIONS } from '../../utils/localStore';
 import CustomSelect from '../../components/ui/CustomSelect';
+import CustomInput from '../../components/ui/CustomInput';
 import AddressLocationPicker from '../../components/common/AddressLocationPicker';
+import { DrawerContainer, DrawerFooter } from '../../components/layout';
 
 export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
   const isEditing = Boolean(staffData);
 
   const [activeTab, setActiveTab] = useState('core'); // 'core' | 'academic_operational' | 'payroll'
   const [departments, setDepartments] = useState([]);
   const [usersList, setUsersList] = useState([]);
+  const [ranksList, setRanksList] = useState(() => staffRanksStore.getRanks(activeTenantId));
+  const [isCustomDesignation, setIsCustomDesignation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State
@@ -25,6 +32,7 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
     user_id: '',
     staff_type: 'TEACHING',
     designation: '',
+    rank_order: 99,
     department: '',
     employment_status: 'PERMANENT',
     joining_date: new Date().toISOString().split('T')[0],
@@ -63,6 +71,15 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
     mobile_banking_no: '',
   });
 
+  // Listen for live rank updates from Developer Tools
+  useEffect(() => {
+    const handleRanksUpdated = () => {
+      setRanksList(staffRanksStore.getRanks(activeTenantId));
+    };
+    window.addEventListener('spr_staff_ranks_updated', handleRanksUpdated);
+    return () => window.removeEventListener('spr_staff_ranks_updated', handleRanksUpdated);
+  }, [activeTenantId]);
+
   // Fetch departments and candidate users
   useEffect(() => {
     const fetchLookups = async () => {
@@ -92,10 +109,13 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
   // Populate form if editing
   useEffect(() => {
     if (staffData) {
+      const isCustom = Boolean(staffData.designation && !ranksList.some(r => r.name === staffData.designation));
+      setIsCustomDesignation(isCustom);
       setFormData({
         user_id: staffData.user || '',
         staff_type: staffData.staff_type || 'TEACHING',
         designation: staffData.designation || '',
+        rank_order: staffData.rank_order !== undefined ? staffData.rank_order : 99,
         department: staffData.department || '',
         employment_status: staffData.employment_status || 'PERMANENT',
         joining_date: staffData.joining_date || new Date().toISOString().split('T')[0],
@@ -131,7 +151,7 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
         mobile_banking_no: staffData.mobile_banking_no || '',
       });
     }
-  }, [staffData]);
+  }, [staffData, ranksList]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,6 +190,19 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
     }
   };
 
+  const rankOptions = useMemo(() => {
+    const list = ranksList.map((r) => ({
+      value: r.name,
+      label: `${r.name_bn ? `${r.name_bn} (${r.name})` : r.name} — [Rank ${r.order}]`,
+      rank_order: r.order,
+      type: r.type,
+    }));
+    return [
+      ...list,
+      { value: '__CUSTOM__', label: '+ Enter Custom Designation / Title...' },
+    ];
+  }, [ranksList]);
+
   const userOptions = [
     { value: '', label: 'Select Existing User...' },
     ...usersList.map((u) => ({
@@ -186,30 +219,25 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
     })),
   ];
 
-  const staffTypeOptions = [
-    { value: 'TEACHING', label: 'Teaching Faculty (Teacher / Ustad)' },
-    { value: 'SUPPORT', label: 'Support & Residential Staff' },
-    { value: 'ADMIN', label: 'Administrative Officer' },
-    { value: 'MANAGEMENT', label: 'Management Executive' },
-  ];
+  const staffTypeOptions = STAFF_CATEGORY_OPTIONS;
 
   const statusOptions = [
     { value: 'PERMANENT', label: 'Permanent Full-Time' },
     { value: 'PROBATION', label: 'Probationary Period' },
-    { value: 'CONTRACT', label: 'Contractual Basis' },
-    { value: 'PART_TIME', label: 'Part-Time Faculty' },
+    { value: 'CONTRACT', label: 'Contractual Appointment' },
+    { value: 'TERMINATED', label: 'Terminated / Released' },
   ];
 
   return (
-    <div className="p-4 sm:p-5 space-y-5 h-full overflow-y-auto theme-text-primary text-left">
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1.5 p-1 rounded-2xl theme-bg-sub border theme-border shrink-0">
+    <DrawerContainer padding="normal" spacing="normal">
+      {/* Tab Navigation Header */}
+      <div className="flex items-center gap-1.5 p-1 rounded-2xl theme-bg-sub border theme-border mb-4">
         <button
           type="button"
           onClick={() => setActiveTab('core')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
             activeTab === 'core'
-              ? 'theme-bg-surface theme-accent shadow-xs'
+              ? 'theme-bg-accent theme-accent-text shadow-sm'
               : 'theme-text-secondary hover:theme-text-primary'
           }`}
         >
@@ -218,20 +246,20 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
         <button
           type="button"
           onClick={() => setActiveTab('academic_operational')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
             activeTab === 'academic_operational'
-              ? 'theme-bg-surface theme-accent shadow-xs'
+              ? 'theme-bg-accent theme-accent-text shadow-sm'
               : 'theme-text-secondary hover:theme-text-primary'
           }`}
         >
-          2. Academic / Duty
+          2. {formData.staff_type === 'TEACHING' ? 'Academic' : 'Operations'}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('payroll')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
             activeTab === 'payroll'
-              ? 'theme-bg-surface theme-accent shadow-xs'
+              ? 'theme-bg-accent theme-accent-text shadow-sm'
               : 'theme-text-secondary hover:theme-text-primary'
           }`}
         >
@@ -283,20 +311,66 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
               </div>
             </div>
 
-            {/* Designation & Employment Status */}
+            {/* Designation / Institutional Rank & Employment Status */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Designation / Title <span className="theme-accent font-bold">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Senior Hifz Teacher, Admin Officer"
-                  value={formData.designation}
-                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary"
-                />
+                {!isCustomDesignation ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                        Rank &amp; Designation <span className="theme-danger">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomDesignation(true)}
+                        className="text-[11px] theme-accent font-semibold hover:underline cursor-pointer"
+                      >
+                        Custom Title
+                      </button>
+                    </div>
+                    <CustomSelect
+                      options={rankOptions}
+                      value={formData.designation}
+                      onChange={(val) => {
+                        if (val === '__CUSTOM__') {
+                          setIsCustomDesignation(true);
+                          return;
+                        }
+                        const matched = ranksList.find((r) => r.name === val);
+                        setFormData((prev) => ({
+                          ...prev,
+                          designation: val,
+                          rank_order: matched ? matched.order : 99,
+                          staff_type: matched && matched.type ? matched.type : prev.staff_type,
+                        }));
+                      }}
+                      placeholder="Select Institutional Rank..."
+                      required
+                      searchable={true}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                        Custom Designation <span className="theme-danger">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomDesignation(false)}
+                        className="text-[11px] theme-accent font-semibold hover:underline cursor-pointer"
+                      >
+                        Select from Ranks
+                      </button>
+                    </div>
+                    <CustomInput
+                      required
+                      placeholder="e.g. Special Advisor, Guest Scholar"
+                      value={formData.designation}
+                      onChange={(val) => setFormData({ ...formData, designation: val })}
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -313,27 +387,22 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
             {/* Joining Date & Emergency Contact */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Joining Date
-                </label>
-                <input
+                <CustomInput
                   type="date"
+                  label="Joining Date"
                   value={formData.joining_date}
-                  onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary"
+                  onChange={(val) => setFormData({ ...formData, joining_date: val })}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Emergency Contact Phone
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  type="phone"
+                  label="Emergency Contact Phone"
+                  optional
                   placeholder="e.g. 017XXXXXXXX"
                   value={formData.emergency_contact}
-                  onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary font-mono"
+                  onChange={(val) => setFormData({ ...formData, emergency_contact: val })}
                 />
               </div>
             </div>
@@ -341,28 +410,23 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
             {/* NID & Blood Group */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  National ID (NID)
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  type="nid"
+                  label="National ID (NID)"
+                  optional
                   placeholder="NID number"
                   value={formData.nid_no}
-                  onChange={(e) => setFormData({ ...formData, nid_no: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary font-mono"
+                  onChange={(val) => setFormData({ ...formData, nid_no: val })}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Blood Group
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Blood Group"
+                  optional
                   placeholder="e.g. A+, B+, O+, AB+"
                   value={formData.blood_group}
-                  onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary"
+                  onChange={(val) => setFormData({ ...formData, blood_group: val })}
                 />
               </div>
             </div>
@@ -402,66 +466,57 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                    Highest Educational Degree
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Highest Educational Degree"
+                    optional
                     placeholder="e.g. Dawra-e-Hadith, Kamil, B.A. in Islamic Studies"
                     value={formData.teacher_detail.highest_degree}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
                         teacher_detail: {
                           ...formData.teacher_detail,
-                          highest_degree: e.target.value,
+                          highest_degree: val,
                         },
                       })
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                    Academic Specialization / Subject
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Academic Specialization / Subject"
+                    optional
                     placeholder="e.g. Tajweed, Fiqh, Arabic Grammar, Mathematics"
                     value={formData.teacher_detail.specialization}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
                         teacher_detail: {
                           ...formData.teacher_detail,
-                          specialization: e.target.value,
+                          specialization: val,
                         },
                       })
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                    Max Recommended Daily Teaching Periods
-                  </label>
-                  <input
+                  <CustomInput
                     type="number"
+                    label="Max Recommended Daily Teaching Periods"
                     min={1}
                     max={12}
                     value={formData.teacher_detail.max_daily_periods}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
                         teacher_detail: {
                           ...formData.teacher_detail,
-                          max_daily_periods: Number(e.target.value),
+                          max_daily_periods: Number(val),
                         },
                       })
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary font-mono"
                   />
                 </div>
               </div>
@@ -475,48 +530,43 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                    Assigned Campus Zone / Building
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Assigned Campus Zone / Building"
+                    optional
                     placeholder="e.g. Dormitory Block A, Main Dining Hall, Campus Gate 1"
                     value={formData.general_detail.assigned_zone}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
                         general_detail: {
                           ...formData.general_detail,
-                          assigned_zone: e.target.value,
+                          assigned_zone: val,
                         },
                       })
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                    Operational Shift
-                  </label>
-                  <select
+                  <CustomSelect
+                    label="Operational Shift"
                     value={formData.general_detail.shift_type}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
                         general_detail: {
                           ...formData.general_detail,
-                          shift_type: e.target.value,
+                          shift_type: val,
                         },
                       })
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
-                  >
-                    <option value="MORNING">Morning Shift (06:00 - 14:00)</option>
-                    <option value="EVENING">Evening Shift (14:00 - 22:00)</option>
-                    <option value="NIGHT">Night Dormitory Shift (22:00 - 06:00)</option>
-                    <option value="ROTATING">Rotating 24/7 Shift</option>
-                  </select>
+                    options={[
+                      { value: 'MORNING', label: 'Morning Shift (06:00 - 14:00)' },
+                      { value: 'EVENING', label: 'Evening Shift (14:00 - 22:00)' },
+                      { value: 'NIGHT', label: 'Night Dormitory Shift (22:00 - 06:00)' },
+                      { value: 'ROTATING', label: 'Rotating 24/7 Shift' },
+                    ]}
+                  />
                 </div>
               </div>
             )}
@@ -528,98 +578,74 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
           <div className="space-y-4 animate-fade-in p-4 rounded-2xl theme-bg-sub border theme-border">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Salary Type
-                </label>
-                <select
+                <CustomSelect
+                  label="Salary Type"
                   value={formData.salary_type}
-                  onChange={(e) => setFormData({ ...formData, salary_type: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
-                >
-                  <option value="MONTHLY_FIXED">Monthly Fixed Remuneration</option>
-                  <option value="PER_PERIOD">Hourly / Per-Period Honorarium</option>
-                  <option value="VOLUNTARY">Honorary / Voluntary Service</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, salary_type: val })}
+                  options={[
+                    { value: 'MONTHLY_FIXED', label: 'Monthly Fixed Remuneration' },
+                    { value: 'PER_PERIOD', label: 'Hourly / Per-Period Honorarium' },
+                    { value: 'VOLUNTARY', label: 'Honorary / Voluntary Service' },
+                  ]}
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Base Salary / Honorarium (BDT)
-                </label>
-                <input
+                <CustomInput
                   type="number"
+                  label="Base Salary / Honorarium (BDT)"
+                  optional
                   min={0}
                   step={100}
                   value={formData.base_salary}
-                  onChange={(e) => setFormData({ ...formData, base_salary: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary font-mono"
+                  onChange={(val) => setFormData({ ...formData, base_salary: Number(val) })}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Bank Name &amp; Branch
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Bank Name & Branch"
+                  optional
                   placeholder="e.g. Islami Bank, Dhanmondi Branch"
                   value={formData.bank_name}
-                  onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary"
+                  onChange={(val) => setFormData({ ...formData, bank_name: val })}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Bank Account Number
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Bank Account Number"
+                  optional
                   placeholder="Account Number"
                   value={formData.bank_account_no}
-                  onChange={(e) => setFormData({ ...formData, bank_account_no: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary font-mono"
+                  onChange={(val) => setFormData({ ...formData, bank_account_no: val })}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Mobile Banking (bKash / Nagad / Rocket)
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                type="phone"
+                label="Mobile Banking (bKash / Nagad / Rocket)"
+                optional
                 placeholder="01XXXXXXXXX"
                 value={formData.mobile_banking_no}
-                onChange={(e) => setFormData({ ...formData, mobile_banking_no: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border theme-border theme-bg-surface text-xs font-medium theme-text-primary font-mono"
+                onChange={(val) => setFormData({ ...formData, mobile_banking_no: val })}
               />
             </div>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="px-4 py-2.5 rounded-xl border theme-border hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-50"
-          >
-            <SparklesIcon className="w-4 h-4" />
-            <span>{isSubmitting ? 'Saving...' : isEditing ? 'Update Staff Profile' : 'Onboard Staff'}</span>
-          </button>
-        </div>
+        <DrawerFooter
+          onCancel={onCancel}
+          isSubmitting={isSubmitting}
+          saveLabel={isEditing ? 'Update Staff Profile' : 'Onboard Staff'}
+          onSubmit={true}
+        />
       </form>
-    </div>
+    </DrawerContainer>
   );
 }

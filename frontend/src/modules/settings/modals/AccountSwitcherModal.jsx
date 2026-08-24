@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { multiAccount, auth as authStore } from "../../../utils/localStore";
-import { CloseIcon, LockIcon } from "../components/Icons";
+import { CloseIcon, LockIcon } from "../../../components/ui/Icons";
 
 export default function AccountSwitcherModal({ isOpen, onClose }) {
   const { showToast } = useToast();

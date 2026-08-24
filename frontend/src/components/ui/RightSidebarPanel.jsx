@@ -11,12 +11,12 @@ import { CloseIcon } from "./Icons";
 export const RIGHT_SIDEBAR_SIZES = {
   sm: 440,
   small: 440,
-  md: 600,
-  medium: 600,
-  lg: 820,
-  big: 820,
-  large: 820,
-  xl: 1080,
+  md: 580,
+  medium: 580,
+  lg: 760,
+  big: 760,
+  large: 760,
+  xl: 960,
 };
 
 /**

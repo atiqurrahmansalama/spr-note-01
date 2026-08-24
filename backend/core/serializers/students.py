@@ -27,7 +27,7 @@ from core.models import (
     ReportStatus, UserNotificationPreference, UserSecurity, AppSectionCategory,
     AppSection, RoleSectionPermission, GroupSectionPermission, UserSectionOverride,
     FeatureFlagAuditLog, UserPasskey, QRSessionTicket, SystemSetting,
-    StudentAcademicDetail, StudentGuardian, StudentDocument, RoleInviteToken,
+    StudentAcademicDetail, StudentGuardian, StudentDocument, RoleInviteToken, AdmissionInviteToken,
     StaffProfile, TeacherDetail, GeneralStaffDetail, TeacherAssignment,
     GeneralStaffDuty, StaffAttendance, StaffLeaveRequest, AcademicCalendarEvent,
     InstitutionalTask, AttendanceSessionSlot, StudentAttendance, DynamicPeriodSlot,
@@ -284,7 +284,9 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
         model = StudentAcademicDetail
         fields = [
             'id', 'session_year', 'class_or_group_id', 'class_or_group_name',
-            'roll_number', 'admission_date', 'previous_school_name', 'previous_school_address', 'tc_number'
+            'roll_number', 'admission_date', 'previous_school_name', 'previous_school_address',
+            'previous_class', 'previous_roll_number', 'previous_result', 'previous_passing_year',
+            'previous_study_details', 'tc_number'
         ]
 
 
@@ -346,6 +348,17 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         if scoped_inst_id and not validated_data.get('institution_id'):
             validated_data['institution_id'] = scoped_inst_id
 
+        # Check for admission_token
+        token_str = (self.initial_data.get('admission_token') or self.initial_data.get('token') or '').strip()
+        token_obj = None
+        if token_str:
+            token_obj = AdmissionInviteToken.objects.filter(token__iexact=token_str).first()
+            if token_obj:
+                if not validated_data.get('institution_id') and token_obj.institution_id:
+                    validated_data['institution_id'] = token_obj.institution_id
+                if not validated_data.get('student_class') and token_obj.target_class:
+                    validated_data['student_class'] = token_obj.target_class
+
         # Auto sync class name / relation
         student_class = validated_data.get('student_class')
         if student_class and not validated_data.get('education_status'):
@@ -400,6 +413,26 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             )
         except Exception:
             pass
+
+        # Increment token applied count if token was provided
+        if token_obj:
+            token_obj.applied_count = F('applied_count') + 1
+            token_obj.save(update_fields=['applied_count'])
+
+        # Link GuardianProfile to user if guardian
+        if user and not getattr(user, 'is_staff', False):
+            try:
+                from core.models import GuardianProfile
+                if hasattr(user, 'guardian_profile'):
+                    user.guardian_profile.students.add(student)
+                else:
+                    gp, _ = GuardianProfile.objects.get_or_create(
+                        user=user,
+                        defaults={'name_en': user.name or user.phone_number or 'Guardian'}
+                    )
+                    gp.students.add(student)
+            except Exception:
+                pass
 
         return student
 
@@ -555,4 +588,117 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         if any(w in group for w in ['GENERAL', 'CLASS', 'KINDERGARTEN', 'PRIMARY']):
             return 'GENERAL'
         return 'HIFZ'
+
+
+class AdmissionInviteTokenSerializer(serializers.ModelSerializer):
+    target_class_name = serializers.CharField(source='target_class.name', read_only=True, default='')
+    target_group_name = serializers.CharField(source='target_group.name', read_only=True, default='')
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    institution_slug = serializers.CharField(source='institution.slug', read_only=True, default='')
+    created_by_name = serializers.SerializerMethodField()
+    is_valid = serializers.SerializerMethodField()
+    qr_url = serializers.SerializerMethodField()
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if mutable_data.get('target_class') == '':
+            mutable_data['target_class'] = None
+        if mutable_data.get('target_group') == '':
+            mutable_data['target_group'] = None
+        if mutable_data.get('expires_at') == '':
+            mutable_data['expires_at'] = None
+        return super().to_internal_value(mutable_data)
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.name or obj.created_by.phone_number or obj.created_by.email or "Admin"
+        return "Admin"
+
+    def get_is_valid(self, obj):
+        return obj.is_valid()
+
+    def get_qr_url(self, obj):
+        return f"/apply?token={obj.token}"
+
+    class Meta:
+        model = AdmissionInviteToken
+        fields = [
+            'id', 'token', 'title', 'session_year',
+            'target_class', 'target_class_name',
+            'target_group', 'target_group_name',
+            'max_applications', 'applied_count',
+            'expires_at', 'is_active', 'auto_enroll',
+            'institution', 'institution_name', 'institution_slug',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+            'is_valid', 'qr_url'
+        ]
+        read_only_fields = ['id', 'token', 'applied_count', 'institution', 'created_by', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'target_class': {'required': False, 'allow_null': True},
+            'target_group': {'required': False, 'allow_null': True},
+            'expires_at': {'required': False, 'allow_null': True},
+        }
+
+
+class PublicAdmissionVerifySerializer(serializers.ModelSerializer):
+    institution_id = serializers.SerializerMethodField()
+    institution_name = serializers.SerializerMethodField()
+    institution_bangla_name = serializers.SerializerMethodField()
+    institution_logo = serializers.SerializerMethodField()
+    institution_phone = serializers.SerializerMethodField()
+    institution_email = serializers.SerializerMethodField()
+    institution_address = serializers.SerializerMethodField()
+    target_class_id = serializers.SerializerMethodField()
+    target_class_name = serializers.SerializerMethodField()
+    available_classes = serializers.SerializerMethodField()
+    is_valid = serializers.SerializerMethodField()
+
+    def get_is_valid(self, obj):
+        return obj.is_valid()
+
+    def get_institution_id(self, obj):
+        return str(obj.institution_id) if obj.institution_id else None
+
+    def get_institution_name(self, obj):
+        return obj.institution.name if obj.institution else "Academic Institution"
+
+    def get_institution_bangla_name(self, obj):
+        return getattr(obj.institution, 'bangla_name', '') if obj.institution else ''
+
+    def get_institution_logo(self, obj):
+        return getattr(obj.institution, 'logo_url', '') if obj.institution else ''
+
+    def get_institution_phone(self, obj):
+        return getattr(obj.institution, 'phone', '') if obj.institution else ''
+
+    def get_institution_email(self, obj):
+        return getattr(obj.institution, 'email', '') if obj.institution else ''
+
+    def get_institution_address(self, obj):
+        return getattr(obj.institution, 'address', '') if obj.institution else ''
+
+    def get_target_class_id(self, obj):
+        return str(obj.target_class_id) if obj.target_class_id else None
+
+    def get_target_class_name(self, obj):
+        return obj.target_class.name if obj.target_class else ''
+
+    def get_available_classes(self, obj):
+        from core.models import StudentClass
+        if not obj.institution:
+            classes = StudentClass.objects.all().order_by('order_rank', 'name')
+        else:
+            classes = StudentClass.objects.filter(institution=obj.institution).order_by('order_rank', 'name')
+        return [{'id': str(c.id), 'name': c.name, 'code': getattr(c, 'code', '')} for c in classes]
+
+    class Meta:
+        model = AdmissionInviteToken
+        fields = [
+            'token', 'title', 'session_year', 'is_valid', 'expires_at', 'auto_enroll',
+            'institution_id', 'institution_name', 'institution_bangla_name',
+            'institution_logo', 'institution_phone', 'institution_email', 'institution_address',
+            'target_class_id', 'target_class_name', 'available_classes'
+        ]
+
 

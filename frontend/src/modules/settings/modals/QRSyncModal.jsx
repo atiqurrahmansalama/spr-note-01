@@ -3,7 +3,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
 import { auth as authStore } from "../../../utils/localStore";
-import { CloseIcon, RefreshIcon } from "../components/Icons";
+import { CloseIcon, RefreshIcon } from "../../../components/ui/Icons";
 
 export default function QRSyncModal({ isOpen, onClose }) {
   const { showToast } = useToast();

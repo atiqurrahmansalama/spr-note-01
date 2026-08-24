@@ -13,12 +13,13 @@ import {
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import MetricsGrid from '../../components/ui/MetricsGrid';
+import { PageContainer } from '../../components/layout';
 import TabSwitcher from '../../components/ui/TabSwitcher';
 import BranchManagementView from './BranchManagementView';
-import DepartmentManagementView from '../student-management/departments/DepartmentManagementView';
+import DepartmentManagementView from './departments/DepartmentManagementView';
 import InstitutionListView from '../app-management/institutions/InstitutionListView';
 import BranchForm from './BranchForm';
-import DepartmentForm from '../student-management/departments/DepartmentForm';
+import DepartmentForm from './departments/DepartmentForm';
 import InstitutionOnboardingForm from '../app-management/institutions/InstitutionOnboardingForm';
 import { getBranchMetrics } from '../../api/academy';
 import { getInstitutionMetrics } from '../../api/institutions';
@@ -128,7 +129,7 @@ export default function CampusProfileHubView() {
         return {
           title: 'Register Academic Branch',
           category: 'Academy & Campus',
-          width: 780,
+          size: 'md',
           content: (
             <BranchForm
               onSaved={() => {
@@ -146,7 +147,7 @@ export default function CampusProfileHubView() {
         return {
           title: 'Create Academic Department',
           category: 'Academy & Campus',
-          width: 640,
+          size: 'md',
           content: (
             <DepartmentForm
               onSaved={() => {
@@ -164,7 +165,7 @@ export default function CampusProfileHubView() {
       return {
         title: 'Onboard New Academy',
         category: 'Academy & Campus',
-        width: 640,
+        size: 'md',
         content: (
           <InstitutionOnboardingForm
             onSuccess={() => {
@@ -312,7 +313,7 @@ export default function CampusProfileHubView() {
   const ActionIcon = actionConfig.icon;
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 font-sans text-left">
+    <PageContainer>
       {/* 1. Header Overview with Reusable PageHeader */}
       <PageHeader
         title="Academies & Departments"
@@ -354,6 +355,6 @@ export default function CampusProfileHubView() {
           <DepartmentManagementView hideHeader hideMetrics isEmbedded />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

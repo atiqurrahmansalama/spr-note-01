@@ -1,1 +1,0 @@
-export { ChevronIcon as default } from "./Icons";

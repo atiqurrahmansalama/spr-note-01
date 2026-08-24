@@ -8,12 +8,15 @@ import {
   LocationIcon,
   CompassIcon,
 } from '../../../components/ui/Icons';
+import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
+import Stepper from '../../../components/ui/Stepper';
 import FileUploadZone from '../../../components/ui/FileUploadZone';
 import AddressMapModal from '../../../components/common/AddressMapModal';
 import AddressPickerInput from '../../../components/ui/AddressPickerInput';
 import { registerInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useToast } from '../../../context/ToastContext';
+import { DrawerContainer } from '../../../components/layout';
 import {
   BANGLADESH_DIVISIONS,
   BANGLADESH_DISTRICTS_BY_DIVISION,
@@ -224,82 +227,53 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
   const availableThanas = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][formData.district]) || [];
 
   return (
-    <div className="flex flex-col h-full w-full theme-text-primary select-none font-sans min-h-[660px] text-left">
+    <DrawerContainer padding="normal" spacing="normal">
       {/* Stepper Progress Bar */}
-      <div className="p-4 sm:p-5 border-b theme-border theme-bg-sub/60 shrink-0">
-        <div className="flex items-center justify-between gap-2 max-w-2xl mx-auto">
-          {[
-            { num: 1, title: 'Identity & Info', desc: 'Basic Details' },
-            { num: 2, title: 'Location & Brand', desc: 'Address & Logo' },
-            { num: 3, title: 'Admin & Presets', desc: 'Access & Setup' },
-          ].map((s) => {
-            const isActive = step === s.num;
-            const isCompleted = step > s.num;
-            return (
-              <div key={s.num} className="flex items-center gap-3">
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
-                    isCompleted
-                      ? 'theme-bg-accent theme-accent-text shadow-xs'
-                      : isActive
-                      ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
-                      : 'theme-bg-elevated theme-text-secondary border theme-border'
-                  }`}
-                >
-                  {isCompleted ? <CheckCircleIcon className="w-4 h-4" /> : s.num}
-                </div>
-                <div className="hidden sm:block">
-                  <div className={`text-xs font-bold ${isActive ? 'theme-text-primary' : 'theme-text-secondary'}`}>
-                    {s.title}
-                  </div>
-                  <div className="text-[10px] theme-text-secondary opacity-70 leading-tight">
-                    {s.desc}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="p-3 sm:p-4 border-b theme-border shrink-0 max-w-2xl mx-auto w-full">
+        <Stepper
+          steps={[
+            { id: 1, label: 'Identity & Info', description: 'Basic Details' },
+            { id: 2, label: 'Location & Brand', description: 'Address & Logo' },
+            { id: 3, label: 'Admin & Presets', description: 'Access & Setup' },
+          ]}
+          currentStep={step}
+          onStepClick={(stepNum) => {
+            if (stepNum < step) setStep(stepNum);
+          }}
+          clickable={true}
+        />
       </div>
 
-      {/* Form Body with uniform heights and locked max-width */}
-      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 pb-36 w-full">
+      {/* Form Body with standard spacing */}
+      <div className="flex-1 space-y-4 sm:space-y-5 w-full">
         {/* STEP 1: Basic Identity */}
         {step === 1 && (
-          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto min-h-[440px]">
+          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
             {/* Academy English Name */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Academy Name (English) <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Academy Name (English)"
+                required
                 value={formData.name}
-                onChange={handleNameChange}
+                onChange={(val) => handleNameChange({ target: { value: val } })}
                 placeholder="e.g. Darul Ulum Islamic Academy"
-                className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                  errors.name ? 'border-rose-500' : 'theme-border'
-                } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all`}
+                error={errors.name}
               />
-              {errors.name && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.name}</p>}
             </div>
 
             {/* Native / Regional Title */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Regional Name
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Regional Name"
+                optional
                 value={formData.bangla_name}
-                onChange={(e) => setFormData({ ...formData, bangla_name: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, bangla_name: val })}
                 placeholder="e.g. Darul Uloom Academy"
-                className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
               />
             </div>
 
             {/* Academy Type & EIIN */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
                 <CustomSelect
                   label="Academy Type"
@@ -312,50 +286,41 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Govt. Reg. No.
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Govt. Reg. No."
+                  optional
                   value={formData.eiin_or_reg_no}
-                  onChange={(e) => setFormData({ ...formData, eiin_or_reg_no: e.target.value })}
+                  onChange={(val) => setFormData({ ...formData, eiin_or_reg_no: val })}
                   placeholder="e.g. 132456"
-                  className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
                 />
               </div>
             </div>
 
             {/* Contact Phone & Email */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Official Phone <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  type="phone"
+                  label="Official Phone"
+                  required
                   value={formData.phone}
-                  onChange={(e) => {
-                    setFormData({ ...formData, phone: e.target.value });
+                  onChange={(val) => {
+                    setFormData({ ...formData, phone: val });
                     if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
                   }}
                   placeholder="e.g. 01712345678"
-                  className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                    errors.phone ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all`}
+                  error={errors.phone}
                 />
-                {errors.phone && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.phone}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Official Email
-                </label>
-                <input
+                <CustomInput
                   type="email"
+                  label="Official Email"
+                  optional
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(val) => setFormData({ ...formData, email: val })}
                   placeholder="e.g. info@academy.edu"
-                  className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
                 />
               </div>
             </div>
@@ -364,30 +329,21 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
         {/* STEP 2: Branding & Structured Address */}
         {step === 2 && (
-          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto min-h-[440px]">
+          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
             {/* Slug Identifier */}
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Unique Tenant Slug <span className="text-rose-400">*</span>
-              </label>
-              <div className="flex items-center">
-                <span className="px-3.5 py-2 h-10 rounded-l-xl theme-bg-elevated border border-r-0 theme-border theme-text-secondary text-xs font-mono font-bold flex items-center">
-                  app/
-                </span>
-                <input
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e) => {
-                    setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
-                    if (errors.slug) setErrors((prev) => ({ ...prev, slug: null }));
-                  }}
-                  placeholder="e.g. darul-ulum"
-                  className={`flex-1 h-10 px-3.5 py-2 rounded-r-xl theme-bg-sub border ${
-                    errors.slug ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-mono font-bold theme-accent focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all`}
-                />
-              </div>
-              {errors.slug && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.slug}</p>}
+              <CustomInput
+                label="Unique Tenant Slug"
+                required
+                prefix="app/"
+                value={formData.slug}
+                onChange={(val) => {
+                  setFormData({ ...formData, slug: val.toLowerCase().replace(/[^a-z0-9-]/g, '') });
+                  if (errors.slug) setErrors((prev) => ({ ...prev, slug: null }));
+                }}
+                placeholder="e.g. darul-ulum"
+                error={errors.slug}
+              />
             </div>
 
             {/* Logo File Upload */}
@@ -430,8 +386,8 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
 
         {/* STEP 3: Admin & Presets */}
         {step === 3 && (
-          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto min-h-[440px]">
-            <div className="p-4 rounded-2xl theme-bg-sub border theme-border text-xs theme-text-primary flex items-start gap-3 shadow-xs">
+          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+            <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border text-xs theme-text-primary flex items-start gap-3 shadow-2xs">
               <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
                 <UsersIcon className="w-4.5 h-4.5" />
               </div>
@@ -443,83 +399,66 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Full Name <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Admin Full Name"
+                  required
                   value={formData.admin_name}
-                  onChange={(e) => {
-                    setFormData({ ...formData, admin_name: e.target.value });
+                  onChange={(val) => {
+                    setFormData({ ...formData, admin_name: val });
                     if (errors.admin_name) setErrors((prev) => ({ ...prev, admin_name: null }));
                   }}
                   placeholder="e.g. Maulana Shamsul Haque"
-                  className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                    errors.admin_name ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  error={errors.admin_name}
                 />
-                {errors.admin_name && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.admin_name}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Phone <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  type="phone"
+                  label="Admin Phone"
+                  required
                   value={formData.admin_phone}
-                  onChange={(e) => {
-                    setFormData({ ...formData, admin_phone: e.target.value });
+                  onChange={(val) => {
+                    setFormData({ ...formData, admin_phone: val });
                     if (errors.admin_phone) setErrors((prev) => ({ ...prev, admin_phone: null }));
                   }}
                   placeholder="e.g. 01812345678"
-                  className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                    errors.admin_phone ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  error={errors.admin_phone}
                 />
-                {errors.admin_phone && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.admin_phone}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Email <span className="text-rose-400">*</span>
-                </label>
-                <input
+                <CustomInput
                   type="email"
+                  label="Admin Email"
+                  required
                   value={formData.admin_email}
-                  onChange={(e) => {
-                    setFormData({ ...formData, admin_email: e.target.value });
+                  onChange={(val) => {
+                    setFormData({ ...formData, admin_email: val });
                     if (errors.admin_email) setErrors((prev) => ({ ...prev, admin_email: null }));
                   }}
                   placeholder="admin@academy.edu"
-                  className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                    errors.admin_email ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  error={errors.admin_email}
                 />
-                {errors.admin_email && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.admin_email}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                  Admin Login Password <span className="text-rose-400">*</span>
-                </label>
-                <input
+                <CustomInput
                   type="password"
+                  label="Admin Login Password"
+                  required
                   value={formData.admin_password}
-                  onChange={(e) => {
-                    setFormData({ ...formData, admin_password: e.target.value });
+                  onChange={(val) => {
+                    setFormData({ ...formData, admin_password: val });
                     if (errors.admin_password) setErrors((prev) => ({ ...prev, admin_password: null }));
                   }}
                   placeholder="••••••••"
-                  className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                    errors.admin_password ? 'border-rose-500' : 'theme-border'
-                  } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)]`}
+                  error={errors.admin_password}
                 />
-                {errors.admin_password && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.admin_password}</p>}
               </div>
             </div>
           </div>
@@ -527,12 +466,12 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
       </div>
 
       {/* Footer Navigation Bar */}
-      <div className="p-4 sm:p-5 border-t theme-border theme-bg-sub/60 shrink-0 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-2.5 pt-4 border-t theme-border select-none">
         <button
           type="button"
           onClick={step === 1 ? onCancel : handleBack}
           disabled={isSubmitting}
-          className="px-4 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
+          className="px-4 py-2.5 rounded-xl border theme-border hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all cursor-pointer disabled:opacity-50"
         >
           {step === 1 ? 'Cancel' : 'Back'}
         </button>
@@ -541,7 +480,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
           <button
             type="button"
             onClick={handleNext}
-            className="px-5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
           >
             <span>Continue</span>
             <span>&rarr;</span>
@@ -551,7 +490,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-6 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-bold transition-all cursor-pointer shadow-sm disabled:opacity-50 active:scale-95"
           >
             {isSubmitting ? (
               <>
@@ -583,6 +522,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
           onConfirm={handleMapLocationConfirm}
         />
       )}
-    </div>
+    </DrawerContainer>
   );
 }

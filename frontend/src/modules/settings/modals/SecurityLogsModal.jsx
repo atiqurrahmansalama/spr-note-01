@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
-import { CloseIcon, ShieldCheckIcon } from "../components/Icons";
+import { CloseIcon, ShieldCheckIcon } from "../../../components/ui/Icons";
 
 export default function SecurityLogsModal({ isOpen, onClose }) {
   const [logs, setLogs] = useState([]);

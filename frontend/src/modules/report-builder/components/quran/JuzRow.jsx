@@ -1,4 +1,5 @@
-import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
+import React from "react";
+import CustomInput from "../../../../components/ui/CustomInput";
 import PageRangeInput from "./PageRangeInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";
@@ -65,8 +66,12 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz }) {
       <div className="flex items-center gap-1 shrink-0 h-[38px] sm:h-10 self-start">
         <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
         <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-14 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
-          <NumberScrollInput
+          <CustomInput
             id={rowData.juzInputId}
+            type="number"
+            variant="borderless"
+            scrollable={true}
+            allowDecimals={false}
             value={rowData.juz}
             onChange={handleJuzChange}
             onEnter={handleEnterFocusNext}
@@ -78,7 +83,8 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz }) {
             min={1}
             max={QURAN_CONSTANTS.MAX_JUZ}
             placeholder="--"
-            className="w-full h-full text-xs sm:text-sm theme-text-primary font-semibold"
+            className="w-full h-full p-0 min-h-0"
+            inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
           />
         </div>
       </div>

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
 import { auth as authStore } from "../../../utils/localStore";
-import { CloseIcon, CameraIcon, LockIcon } from "../components/Icons";
+import { CloseIcon, CameraIcon, LockIcon } from "../../../components/ui/Icons";
+import CustomInput from "../../../components/ui/CustomInput";
 
 export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdated }) {
   const { showToast } = useToast();
@@ -241,69 +242,54 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
           <div className="space-y-3.5">
             {/* Primary Full Name / Display Name Input */}
             <div>
-              <label className="text-xs font-semibold theme-text-primary mb-1.5 block">
-                Full Display Name <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Full Display Name"
+                required
                 value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
+                onChange={(val) => handleNameChange(val)}
                 placeholder="Enter full display name"
-                className="theme-bg-sub border theme-border rounded-xl px-3.5 py-2 text-sm theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:border-[var(--accent-main)] transition-colors w-full font-medium"
               />
             </div>
 
             {/* Row 2: First Name & Last Name */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium theme-text-secondary mb-1.5 block">First Name</label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="First Name"
                   value={formData.first_name}
-                  onChange={(e) => handleFirstNameChange(e.target.value)}
+                  onChange={(val) => handleFirstNameChange(val)}
                   placeholder="First Name"
-                  className="theme-bg-sub border theme-border rounded-xl px-3.5 py-2 text-sm theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:border-[var(--accent-main)] transition-colors w-full"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium theme-text-secondary mb-1.5 block">Last Name</label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Last Name"
                   value={formData.last_name}
-                  onChange={(e) => handleLastNameChange(e.target.value)}
+                  onChange={(val) => handleLastNameChange(val)}
                   placeholder="Last Name"
-                  className="theme-bg-sub border theme-border rounded-xl px-3.5 py-2 text-sm theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:border-[var(--accent-main)] transition-colors w-full"
                 />
               </div>
             </div>
 
             {/* Row 3: Email Address */}
             <div>
-              <label className="text-xs font-medium theme-text-secondary mb-1.5 block">Email Address</label>
-              <input
+              <CustomInput
                 type="email"
+                label="Email Address"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, email: val })}
                 placeholder="user@example.com"
-                className="theme-bg-sub border theme-border rounded-xl px-3.5 py-2 text-sm theme-text-primary placeholder:theme-text-secondary focus:outline-none focus:border-[var(--accent-main)] transition-colors w-full"
               />
             </div>
 
             {/* Row 4: Phone / Credential (Locked Field) */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium theme-text-secondary">Phone / Credential</label>
-                <span className="text-[10px] theme-text-secondary theme-bg-elevated border theme-border px-2 py-0.5 rounded flex items-center gap-1 font-mono">
-                  <LockIcon className="w-3 h-3 theme-text-secondary" />
-                  <span>Locked</span>
-                </span>
-              </div>
-              <input
-                type="text"
+              <CustomInput
+                label="Phone / Credential"
                 value={formData.phone_number}
                 disabled
-                className="theme-bg-elevated/40 border theme-border theme-text-secondary cursor-not-allowed select-none rounded-xl px-3.5 py-2 text-sm w-full font-mono"
+                badge="Locked"
               />
             </div>
           </div>

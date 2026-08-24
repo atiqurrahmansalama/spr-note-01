@@ -5,6 +5,7 @@ import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { fetchWithAuth } from '../../utils/authService';
 import { getStaffList, getStaffMetrics, deleteStaff } from '../../api/staff';
+import { staffRanksStore } from '../../utils/localStore';
 
 import {
   TeacherIcon,
@@ -24,8 +25,11 @@ import DataTable from '../../components/ui/DataTable';
 import DataCardGrid from '../../components/ui/DataCardGrid';
 import ActionMenu from '../../components/ui/ActionMenu';
 import CustomSelect from '../../components/ui/CustomSelect';
+import CustomInput from '../../components/ui/CustomInput';
+import { RoleSelect } from '../../components/selectors';
 import MetricsGrid from '../../components/ui/MetricsGrid';
 import PageHeader from '../../components/ui/PageHeader';
+import { PageContainer } from '../../components/layout';
 
 import StaffDrawerForm from './StaffDrawerForm';
 import TeacherAssignmentDrawerForm from './TeacherAssignmentDrawerForm';
@@ -40,6 +44,7 @@ export default function TeacherStaffRosterView() {
 
   const [staffList, setStaffList] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [ranksList, setRanksList] = useState(() => staffRanksStore.getRanks(activeTenantId));
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -53,6 +58,7 @@ export default function TeacherStaffRosterView() {
   // Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [rankFilter, setRankFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -226,9 +232,18 @@ export default function TeacherStaffRosterView() {
     }
   };
 
-  // Filter staff in memory for instantaneous search matching
+  // Listen for live rank updates from Developer Tools
+  useEffect(() => {
+    const handleRanksUpdated = () => {
+      setRanksList(staffRanksStore.getRanks(activeTenantId));
+    };
+    window.addEventListener('spr_staff_ranks_updated', handleRanksUpdated);
+    return () => window.removeEventListener('spr_staff_ranks_updated', handleRanksUpdated);
+  }, [activeTenantId]);
+
+  // Filter staff in memory for instantaneous search matching and hierarchy ranking
   const filteredStaff = React.useMemo(() => {
-    return staffList.filter((s) => {
+    const result = staffList.filter((s) => {
       const name = (s.user_name || s.name_en || '').toLowerCase();
       const bName = (s.bangla_name || '').toLowerCase();
       const empId = String(s.employee_id || '').toLowerCase();
@@ -249,6 +264,11 @@ export default function TeacherStaffRosterView() {
         matchesRole = s.staff_type === roleFilter;
       }
 
+      let matchesRank = true;
+      if (rankFilter !== 'ALL') {
+        matchesRank = s.designation === rankFilter;
+      }
+
       let matchesDept = true;
       if (deptFilter !== 'ALL') {
         matchesDept = String(s.department) === String(deptFilter);
@@ -259,9 +279,40 @@ export default function TeacherStaffRosterView() {
         matchesStatus = s.employment_status === statusFilter;
       }
 
-      return matchesSearch && matchesRole && matchesDept && matchesStatus;
+      return matchesSearch && matchesRole && matchesRank && matchesDept && matchesStatus;
     });
-  }, [staffList, searchQuery, roleFilter, deptFilter, statusFilter]);
+
+    // Sort by institutional hierarchy rank order (lowest number first, e.g. Rank 1: Principal/Muhtamim at top)
+    result.sort((a, b) => {
+      const matchedRankA = ranksList.find((r) => r.name === a.designation);
+      const matchedRankB = ranksList.find((r) => r.name === b.designation);
+      const rankA =
+        a.rank_order !== undefined && a.rank_order !== null && a.rank_order !== 99
+          ? Number(a.rank_order)
+          : matchedRankA
+          ? Number(matchedRankA.order)
+          : 99;
+      const rankB =
+        b.rank_order !== undefined && b.rank_order !== null && b.rank_order !== 99
+          ? Number(b.rank_order)
+          : matchedRankB
+          ? Number(matchedRankB.order)
+          : 99;
+
+      if (rankA !== rankB) return rankA - rankB;
+      return String(a.employee_id || '').localeCompare(String(b.employee_id || ''));
+    });
+
+    return result;
+  }, [staffList, searchQuery, roleFilter, rankFilter, deptFilter, statusFilter, ranksList]);
+
+  const rankFilterOptions = React.useMemo(() => [
+    { value: 'ALL', label: 'All Ranks / Designations' },
+    ...ranksList.map((r) => ({
+      value: r.name,
+      label: `[Rank ${r.order}] ${r.name_bn ? `${r.name_bn} (${r.name})` : r.name}`,
+    })),
+  ], [ranksList]);
 
   // Action Menu Items for Each Staff Row
   const getActionMenuItems = (s) => [
@@ -345,9 +396,45 @@ export default function TeacherStaffRosterView() {
                 <span className="text-[11px] font-mono theme-accent font-medium">
                   {s.employee_id || 'ID: —'}
                 </span>
-                <span className="text-[11px] theme-text-secondary truncate">• {s.designation || 'Staff'}</span>
               </div>
             </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'rank_designation',
+      header: 'RANK & DESIGNATION',
+      headerClassName: 'text-left',
+      align: 'left',
+      render: (s) => {
+        const matchedRank = ranksList.find((r) => r.name === s.designation || r.name_bn === s.designation);
+        const rankNum =
+          s.rank_order !== undefined && s.rank_order !== 99 && s.rank_order !== null
+            ? s.rank_order
+            : matchedRank
+            ? matchedRank.order
+            : null;
+        const title = s.designation || 'Staff';
+        const banglaTitle = matchedRank?.name_bn || '';
+
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {rankNum ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border theme-border font-mono shadow-xs">
+                  Rank {rankNum}
+                </span>
+              ) : null}
+              <span className="text-xs font-bold theme-text-primary">
+                {title}
+              </span>
+            </div>
+            {banglaTitle && (
+              <span className="text-[11px] theme-text-secondary block font-medium opacity-80">
+                {banglaTitle}
+              </span>
+            )}
           </div>
         );
       },
@@ -452,87 +539,68 @@ export default function TeacherStaffRosterView() {
       header: 'STATUS',
       headerClassName: 'text-center',
       align: 'center',
-      render: (s) => {
-        const status = s.employment_status || 'PERMANENT';
-        return (
-          <div className="flex items-center justify-center">
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                status === 'PERMANENT'
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                  : status === 'PROBATION'
-                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                  : 'theme-bg-sub theme-text-secondary theme-border'
-              }`}
-            >
-              {s.employment_status_display || status}
-            </span>
-          </div>
-        );
-      },
+      render: (s) => (
+        <span
+          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+            s.employment_status === 'PERMANENT'
+              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20'
+              : s.employment_status === 'PROBATION'
+              ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+              : 'theme-bg-sub theme-text-secondary theme-border'
+          }`}
+        >
+          {s.employment_status || 'Active'}
+        </span>
+      ),
     },
     {
       key: 'actions',
       header: '',
-      headerClassName: 'text-right w-[44px]',
+      headerClassName: 'text-right',
       align: 'right',
       render: (s) => (
-        <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-end">
+        <div onClick={(e) => e.stopPropagation()}>
           <ActionMenu items={getActionMenuItems(s)} align="right" />
         </div>
       ),
     },
   ];
 
-  // Options for Dropdowns
-  const roleOptions = [
-    { value: 'ALL', label: 'All Roles' },
-    { value: 'TEACHING', label: 'Teaching Faculty' },
-    { value: 'SUPPORT', label: 'Support & Residential Staff' },
-    { value: 'ADMIN', label: 'Administrative Officers' },
-    { value: 'MANAGEMENT', label: 'Management' },
-  ];
-
   const departmentOptions = [
     { value: 'ALL', label: 'All Departments' },
-    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+    ...departments.map((d) => ({
+      value: String(d.id),
+      label: d.name,
+    })),
   ];
 
   const statusOptions = [
-    { value: 'ALL', label: 'All Statuses' },
-    { value: 'PERMANENT', label: 'Permanent' },
+    { value: 'ALL', label: 'All Employment Status' },
+    { value: 'PERMANENT', label: 'Permanent Full-Time' },
     { value: 'PROBATION', label: 'Probationary' },
     { value: 'CONTRACT', label: 'Contractual' },
-    { value: 'PART_TIME', label: 'Part-Time' },
+    { value: 'TERMINATED', label: 'Terminated / Released' },
   ];
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
+    <PageContainer>
       {/* 1. Page Header */}
       <PageHeader
         icon={TeacherIcon}
         title="Teacher & Staff Roster"
-        subtitle="Institutional faculty and staff roster with dynamic filtering, class assignments, and operational duties"
-        badge="Multi-Tenant"
+        subtitle="Manage faculty members, institutional hierarchy ranks, department assignments, and duties"
+        breadcrumbs={[
+          { label: 'Staff Management', href: '/staff' },
+          { label: 'Teacher & Staff Roster', active: true },
+        ]}
         actions={
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => loadData(true)}
-              disabled={isRefreshing}
-              className="p-2.5 rounded-xl border theme-border hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all cursor-pointer shadow-xs disabled:opacity-50"
-              title="Refresh Roster"
-            >
-              <RefreshIcon className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              onClick={() => handleOpenStaffDrawer()}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-98"
-            >
-              <PlusIcon className="w-4 h-4" />
-              <span>Onboard Staff</span>
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/staff/onboarding')}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-98"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <span>Onboard Staff</span>
+          </button>
         }
       />
 
@@ -572,26 +640,38 @@ export default function TeacherStaffRosterView() {
 
       {/* 3. Search & Filter Toolbar */}
       <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Search Box */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by name, ID, phone, designation..."
+          <div>
+            <CustomInput
+              type="search"
+              placeholder="Search by name, ID, phone..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary"
+              onChange={(val) => setSearchQuery(val)}
             />
-            <SearchIcon className="w-4 h-4 absolute left-3 top-3 theme-text-secondary" />
           </div>
 
           {/* Role Filter */}
           <div>
-            <CustomSelect
-              options={roleOptions}
-              value={roleFilter}
-              onChange={(val) => setRoleFilter(val)}
+            <RoleSelect
+              value={roleFilter === 'ALL' ? '' : roleFilter}
+              onChange={(val) => setRoleFilter(val || 'ALL')}
+              valueKey="code"
+              allowAll={true}
+              allLabel="All Roles"
               placeholder="Filter by Role"
+              label={null}
+            />
+          </div>
+
+          {/* Rank / Designation Filter */}
+          <div>
+            <CustomSelect
+              options={rankFilterOptions}
+              value={rankFilter}
+              onChange={(val) => setRankFilter(val)}
+              placeholder="Filter by Rank"
+              searchable={true}
             />
           </div>
 
@@ -668,6 +748,13 @@ export default function TeacherStaffRosterView() {
             const initial = staffName ? staffName.charAt(0).toUpperCase() : 'S';
             const phone = s.phone_number || s.emergency_contact;
             const assignCount = s.assigned_classes_count || (s.assignments ? s.assignments.length : 0);
+            const matchedRank = ranksList.find((r) => r.name === s.designation || r.name_bn === s.designation);
+            const rankNum =
+              s.rank_order !== undefined && s.rank_order !== 99 && s.rank_order !== null
+                ? s.rank_order
+                : matchedRank
+                ? matchedRank.order
+                : null;
 
             return (
               <div
@@ -693,9 +780,16 @@ export default function TeacherStaffRosterView() {
                       <h4 className="font-bold text-xs sm:text-sm theme-text-primary truncate">
                         {staffName}
                       </h4>
-                      <p className="text-[11px] theme-text-secondary truncate">
-                        {s.designation || 'Staff'}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {rankNum ? (
+                          <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded theme-bg-accent-soft theme-accent border theme-border">
+                            Rank {rankNum}
+                          </span>
+                        ) : null}
+                        <p className="text-[11px] theme-text-secondary truncate font-medium">
+                          {s.designation || 'Staff'}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -750,6 +844,6 @@ export default function TeacherStaffRosterView() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

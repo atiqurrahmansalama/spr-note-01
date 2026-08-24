@@ -45,10 +45,9 @@ const HARD_DEFAULTS = {
   quran_hifz_tracker: true,
 
   nav_staff_management: true,
+  staff_roster: true,
+  staff_onboarding: true,
   staff_management: true,
-  teacher_period_matrix: true,
-  staff_daily_attendance: true,
-  staff_leaves: true,
 
   nav_attendance_management: true,
   attendance_policies_slots: true,

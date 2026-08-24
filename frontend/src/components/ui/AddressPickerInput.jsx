@@ -4,6 +4,7 @@ import {
   CompassIcon,
 } from './Icons';
 import CustomSelect from './CustomSelect';
+import CustomInput from './CustomInput';
 import AddressMapModal from '../common/AddressMapModal';
 import {
   BANGLADESH_DIVISIONS,
@@ -140,16 +141,17 @@ export default function AddressPickerInput({
   return (
     <div className={`space-y-4 font-sans ${className}`}>
       {/* Header bar with Interactive Google Map button */}
-      <div className="flex items-center justify-between pb-2 border-b theme-border flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <LocationIcon className="w-4 h-4 theme-accent" />
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              {title || 'Campus Address & Location'}
-            </h3>
-            {subTitle && <p className="text-[11px] theme-text-secondary">{subTitle}</p>}
+      {title !== false && (
+        <div className="flex items-center justify-between pb-2 border-b theme-border flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <LocationIcon className="w-4 h-4 theme-accent" />
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+                {title || 'Address & Location Details'}
+              </h3>
+              {subTitle && <p className="text-[11px] theme-text-secondary">{subTitle}</p>}
+            </div>
           </div>
-        </div>
 
         {/* Interactive Google Map Launcher */}
         {showMapHelper && (
@@ -165,15 +167,15 @@ export default function AddressPickerInput({
           </button>
         )}
       </div>
+      )}
 
       {/* Structured Address Form Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {/* Division */}
         <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Division {required && <span className="text-rose-400">*</span>}
-          </label>
           <CustomSelect
+            label="Division"
+            required={required}
             options={divisionOptions}
             value={division}
             onChange={(val) => updateField('division', val)}
@@ -184,10 +186,9 @@ export default function AddressPickerInput({
 
         {/* District */}
         <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            District {required && <span className="text-rose-400">*</span>}
-          </label>
           <CustomSelect
+            label="District"
+            required={required}
             options={districtOptions}
             value={district}
             onChange={(val) => updateField('district', val)}
@@ -199,11 +200,9 @@ export default function AddressPickerInput({
         {/* Upazila / Thana */}
         {showUpazila && (
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Upazila / Thana
-            </label>
             {upazilaOptions.length > 0 ? (
               <CustomSelect
+                label="Upazila / Thana"
                 options={upazilaOptions}
                 value={upazila}
                 onChange={(val) => updateField('upazila', val)}
@@ -211,13 +210,12 @@ export default function AddressPickerInput({
                 disabled={disabled || !district}
               />
             ) : (
-              <input
-                type="text"
+              <CustomInput
+                label="Upazila / Thana"
                 placeholder="e.g. Uttara, Mirpur, Sadar"
                 value={upazila}
-                onChange={(e) => updateField('upazila', e.target.value)}
+                onChange={(val) => updateField('upazila', val)}
                 disabled={disabled}
-                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm font-medium theme-text-primary placeholder:text-zinc-500 disabled:opacity-50"
               />
             )}
           </div>
@@ -226,16 +224,12 @@ export default function AddressPickerInput({
         {/* Postal Code */}
         {showPostCode && (
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Post Code
-            </label>
-            <input
-              type="text"
+            <CustomInput
+              label="Post Code"
               placeholder="e.g. 1230, 4000"
               value={postCode}
-              onChange={(e) => updateField('post_code', e.target.value)}
+              onChange={(val) => updateField('post_code', val)}
               disabled={disabled}
-              className="w-full px-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm font-mono theme-text-primary placeholder:text-zinc-500 disabled:opacity-50"
             />
           </div>
         )}
@@ -243,16 +237,15 @@ export default function AddressPickerInput({
         {/* Street / Physical / Village Address */}
         {showStreetAddress && (
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Street / Village Address {required && <span className="text-rose-400">*</span>}
-            </label>
-            <textarea
+            <CustomInput
+              type="textarea"
+              label="Street / Village Address"
+              required={required}
               rows={2}
               placeholder="e.g. House 14, Road 5, Sector 4, Uttara, Dhaka-1230"
               value={streetAddress}
-              onChange={(e) => updateField('street_address', e.target.value)}
+              onChange={(val) => updateField('street_address', val)}
               disabled={disabled}
-              className="w-full px-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm font-medium theme-text-primary resize-none placeholder:text-zinc-500 disabled:opacity-50"
             />
           </div>
         )}

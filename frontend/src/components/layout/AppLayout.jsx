@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore } from "../../utils/localStore";
-import Sidebar from "../../modules/sidebar/SidebarContainer";
+import Sidebar from "./SidebarContainer";
 import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
 import SaveStatusBadge from "../common/SaveStatusBadge";
-import SidebarScreenBlockView from "../../modules/sidebar/SidebarScreenBlockView";
+import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
 import InstitutionSwitcher from "./InstitutionSwitcher";
 import { useTheme } from "../../context/useTheme";
@@ -12,7 +12,7 @@ import { useToast } from "../../context/ToastContext";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
-import NotificationBellDropdown from "../../modules/header/components/NotificationBellDropdown";
+import NotificationBellDropdown from "./NotificationBellDropdown";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
@@ -29,10 +29,6 @@ export const ROUTE_TITLE_MAP = {
   "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
   "/attendance/monthly-register": { title: "Class Attendance", category: "Student" },
 
-  "/attendance/staff/teacher-matrix": { title: "Teacher Period Matrix", category: "Staff Management" },
-  "/attendance/staff/daily-punch": { title: "Staff Daily Timesheet", category: "Staff Management" },
-  "/attendance/staff/leaves": { title: "Leave & Substitution Desk", category: "Staff Management" },
-
   "/attendance/settings": { title: "Attendance Settings", category: "Settings" },
 
   "/student-management/departments": { title: "Department", category: "Academy" },
@@ -42,11 +38,10 @@ export const ROUTE_TITLE_MAP = {
   "/groups-students": { title: "Student Roster", category: "Student" },
   "/student-roster": { title: "Student Roster", category: "Student" },
   "/staff/roster": { title: "Teacher & Staff Roster", category: "Staff Management" },
-  "/staff": { title: "Staff Directory", category: "Staff" },
+  "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
+  "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },
-  "/short-admission": { title: "Short Admission", category: "Student" },
-  "/admission/short": { title: "Short Admission", category: "Student" },
 
   "/app-management/role-invites": { title: "Role QR & Invites", category: "App Management" },
   "/app-management/notifications": { title: "Notification Management", category: "App Management" },
@@ -190,7 +185,7 @@ export default function AppLayout() {
       const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const newWidth = window.innerWidth - clientX;
       const minW = 380;
-      const maxW = Math.min(1300, Math.floor(window.innerWidth * 0.95));
+      const maxW = Math.min(960, Math.floor(window.innerWidth * 0.75));
       const clampedWidth = Math.max(minW, Math.min(maxW, newWidth));
       setDrawerWidth(clampedWidth);
     };
@@ -214,7 +209,7 @@ export default function AppLayout() {
   };
 
   const handleDrawerResizerDoubleClick = () => {
-    setDrawerWidth((prev) => (prev > 700 ? 580 : 880));
+    setDrawerWidth((prev) => (prev > 700 ? 580 : 760));
   };
 
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
@@ -289,7 +284,7 @@ export default function AppLayout() {
   }, [showToast]);
 
   const { currentInstitution } = useTenant();
-  const isRightDock = panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
+  const isRightDock = location.pathname === "/report-builder" && panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
   // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)
   useEffect(() => {
@@ -475,7 +470,7 @@ export default function AppLayout() {
   const currentPath = location.pathname;
   const isDashboardRoute = currentPath === "/dashboard";
   const isReportBuilderRoute = currentPath === "/report-builder";
-  const isMainFormView = isReportBuilderRoute || (isRightDock && !isDashboardRoute);
+  const isMainFormView = isReportBuilderRoute;
   const showRoutePanel = !isDashboardRoute && !isReportBuilderRoute;
   let routeMeta = ROUTE_TITLE_MAP[currentPath];
   if (currentPath === "/academy/campus-profile") {
@@ -765,12 +760,11 @@ export default function AppLayout() {
           ) : (
             /* Desktop Docked Sidebar (>= 768px) */
             <div 
-              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app animate-fade-in min-w-0"
+              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none theme-bg-app animate-fade-in min-w-0"
               style={{
-                width: `${Math.min(
-                  typeof window !== 'undefined' ? window.innerWidth * 0.96 : 800,
-                  drawerWidth || 720
-                )}px`,
+                width: `${drawerWidth || 580}px`,
+                maxWidth: 'min(980px, 85vw)',
+                minWidth: '360px',
                 transition: isDrawerResizing ? "none" : "width 0.15s ease-out"
               }}
             >

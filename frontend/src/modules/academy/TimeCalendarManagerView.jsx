@@ -2,9 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader";
 import TabSwitcher from "../../components/ui/TabSwitcher";
-import MasterTimeCalendar from "../../components/common/MasterTimeCalendar";
-import TimeScheduleDrawerForm from "../../components/common/TimeScheduleDrawerForm";
-import TimeScheduleDetailDrawer from "../../components/common/TimeScheduleDetailDrawer";
+import { PageContainer } from "../../components/layout";
+import {
+  MasterTimeCalendar,
+  TimeScheduleDrawerForm,
+  TimeScheduleDetailDrawer,
+} from "../../components/calendar";
 import { masterCalendarStore } from "../../utils/localStore";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../context/ToastContext";
@@ -221,8 +224,7 @@ export default function TimeCalendarManagerView() {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-2 @sm:py-4 px-1 @sm:px-3 @lg:px-6 space-y-3 @sm:space-y-6 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none min-w-0">
-      
+    <PageContainer>
       {/* ─── 1. Header Overview with Reusable PageHeader ──────────── */}
       <div className="print:hidden">
         <PageHeader
@@ -265,6 +267,6 @@ export default function TimeCalendarManagerView() {
           onDisplayModeChange={setCalendarDisplayMode}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }

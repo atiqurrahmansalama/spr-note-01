@@ -11,9 +11,10 @@ import {
   AttendanceIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
+import { PageContainer } from '../../components/layout';
 import ActionMenu from '../../components/ui/ActionMenu';
 import CustomSelect from '../../components/ui/CustomSelect';
-import DateRangePicker from '../../components/common/DateRangePicker';
+import { ClassSelect, GroupSelect, DateRangePicker } from '../../components/selectors';
 import CheckpointForm from './CheckpointForm';
 import { fetchWithAuth } from '../../utils/authService';
 import { getMonthlyAttendanceMatrix } from '../../api/attendance';
@@ -23,12 +24,14 @@ import {
   masterCalendarStore,
 } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
-import { getEventColors } from '../../components/common/MasterTimeCalendar';
-import DayAgendaDrawer from '../../components/common/DayAgendaDrawer';
-import TimeScheduleDrawerForm from '../../components/common/TimeScheduleDrawerForm';
+import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
+import {
+  ATTENDANCE_STATUSES,
+  getAttendanceRateColor,
+} from '../../constants/attendanceConstants';
 
 const DEFAULT_INITIAL_CHECKPOINTS = [
   {
@@ -742,14 +745,8 @@ export default function ResidentialAttendanceView({
     })),
   ], [checkpoints]);
 
-  const content = (
-    <div
-      className={
-        isFullscreen
-          ? "fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen"
-          : "p-4 md:p-6 space-y-6 max-w-[1720px] w-full mx-auto min-h-screen theme-text-primary animate-fade-in select-none"
-      }
-    >
+  const innerContent = (
+    <>
       {/* 1. Page Header (Hidden when in Full Screen) */}
       {!isFullscreen && !hideHeader && (
         <div className="print:hidden">
@@ -879,27 +876,26 @@ export default function ResidentialAttendanceView({
           {/* Bottom Row: 4 Filters with Standard Project Labels (Matching Class Attendance) */}
           <div className="border-t theme-border pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-end">
             <div>
-              <CustomSelect
+              <ClassSelect
                 label="Select Class"
-                options={classOptions}
+                classes={classes}
                 value={selectedClassId}
                 onChange={(val) => {
                   setSelectedClassId(val);
                   setSelectedGroupId('');
                 }}
-                placeholder="Select Class..."
-                searchable={false}
+                allowAll={false}
               />
             </div>
 
             <div>
-              <CustomSelect
+              <GroupSelect
                 label="Select Group"
-                options={groups.length > 0 ? groupOptions : [{ value: '', label: 'All Groups (General)' }]}
+                groups={groups}
+                classId={selectedClassId}
                 value={selectedGroupId}
                 onChange={(val) => setSelectedGroupId(val)}
-                placeholder="All Groups"
-                searchable={false}
+                allLabel="All Groups (General)"
               />
             </div>
 
@@ -1040,9 +1036,9 @@ export default function ResidentialAttendanceView({
                   })}
 
                   {/* Summary Metric Headers (Matching Class Attendance) */}
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-emerald-600 dark:text-emerald-400 border-l border-b theme-border text-xs" title="Present">P</th>
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs" title="Late">L</th>
-                  <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-rose-500 dark:text-rose-400 border-l border-b theme-border text-xs" title="Absent">A</th>
+                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border text-xs`} title="Present">P</th>
+                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border text-xs`} title="Late">L</th>
+                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border text-xs`} title="Absent">A</th>
                   <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate %">Rate %</th>
                 </tr>
               </thead>
@@ -1104,7 +1100,7 @@ export default function ResidentialAttendanceView({
                           </div>
                         </td>
 
-                        {/* Day Status Cells with Exact Class Attendance Colors & Micro-animations */}
+                        {/* Day Status Cells with Semantic Design Tokens & Micro-animations */}
                         {enrichedMatrixData.days_header.map((d) => {
                           const dateStr =
                             d.date ||
@@ -1139,19 +1135,19 @@ export default function ResidentialAttendanceView({
                               }
                             >
                               {status === 'PRESENT' ? (
-                                <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                                <FilledCheckCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.PRESENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                               ) : status === 'ABSENT' ? (
-                                <FilledXCircleIcon className="w-4 h-4 text-[var(--danger-main)] hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                                <FilledXCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.ABSENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                               ) : status === 'LATE' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
+                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform`}>
                                   L
                                 </span>
                               ) : status === 'HALF_DAY' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold text-[10px]">
+                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} text-[10px]`}>
                                   H
                                 </span>
                               ) : status === 'ON_LEAVE' ? (
-                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold text-[10px]">
+                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px]`}>
                                   LV
                                 </span>
                               ) : canEditCell ? (
@@ -1163,28 +1159,20 @@ export default function ResidentialAttendanceView({
                           );
                         })}
 
-                        {/* Summary Metrics (Matching Class Attendance) */}
+                        {/* Summary Metrics with Dynamic Semantic Tokens */}
                         {isFirstRow && (
                           <>
-                            <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-emerald-600 dark:text-emerald-400 border-l border-b theme-border align-middle">
+                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border align-middle`}>
                               {studentTotals.present}
                             </td>
-                            <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-amber-600 dark:text-amber-400 border-l border-b theme-border align-middle">
+                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border align-middle`}>
                               {studentTotals.late}
                             </td>
-                            <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-rose-500 dark:text-rose-400 border-l border-b theme-border align-middle">
+                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border align-middle`}>
                               {studentTotals.absent}
                             </td>
                             <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold font-mono text-xs border-l border-r border-b theme-border align-middle">
-                              <span
-                                className={
-                                  studentTotals.attendance_rate >= 85
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : studentTotals.attendance_rate >= 70
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-rose-600 dark:text-rose-400'
-                                }
-                              >
+                              <span className={getAttendanceRateColor(studentTotals.attendance_rate)}>
                                 {studentTotals.attendance_rate}%
                               </span>
                             </td>
@@ -1199,23 +1187,23 @@ export default function ResidentialAttendanceView({
           </div>
         )}
 
-        {/* Legend Ribbon & Bottom Controls (Matching Class Attendance) */}
+        {/* Legend Ribbon & Bottom Controls (Matching Design Tokens) */}
         <div className="p-3 sm:p-3.5 border-t theme-border theme-bg-sub flex flex-wrap items-center justify-between gap-3 text-[11px] theme-text-secondary shrink-0">
           <div className="flex items-center gap-3.5 flex-wrap font-mono">
             <span className="flex items-center gap-1.5">
-              <FilledCheckCircleIcon className="w-3.5 h-3.5 text-emerald-600/85" /> Present
+              <FilledCheckCircleIcon className={`w-3.5 h-3.5 ${ATTENDANCE_STATUSES.PRESENT.circleClass}`} /> Present
             </span>
             <span className="flex items-center gap-1.5">
-              <FilledXCircleIcon className="w-3.5 h-3.5 text-[var(--danger-main)]" /> Absent
+              <FilledXCircleIcon className={`w-3.5 h-3.5 ${ATTENDANCE_STATUSES.ABSENT.circleClass}`} /> Absent
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold flex items-center justify-center text-[9px]">L</span> Late
+              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} flex items-center justify-center text-[9px]`}>L</span> Late
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold flex items-center justify-center text-[9px]">H</span> Half Day
+              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} flex items-center justify-center text-[9px]`}>H</span> Half Day
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-purple-500/10 text-purple-600/85 dark:text-purple-400/85 font-bold flex items-center justify-center text-[9px]">LV</span> Leave
+              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} flex items-center justify-center text-[9px]`}>LV</span> Leave
             </span>
             <span className="flex items-center gap-1.5">
               <span className="opacity-35 font-mono text-xs">—</span> Unmarked
@@ -1252,8 +1240,21 @@ export default function ResidentialAttendanceView({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 
-  return isFullscreen ? createPortal(content, document.body) : content;
+  if (isFullscreen) {
+    return createPortal(
+      <div className="fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen">
+        {innerContent}
+      </div>,
+      document.body
+    );
+  }
+
+  return (
+    <PageContainer maxWidth="full" className="min-h-screen">
+      {innerContent}
+    </PageContainer>
+  );
 }

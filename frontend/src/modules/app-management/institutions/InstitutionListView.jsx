@@ -19,7 +19,9 @@ import {
 import DataTable from '../../../components/ui/DataTable';
 import DataCardGrid from '../../../components/ui/DataCardGrid';
 import ActionMenu from '../../../components/ui/ActionMenu';
+import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
+import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
 import PageHeader from '../../../components/ui/PageHeader';
 import DataViewToolbar from '../../../components/ui/DataViewToolbar';
@@ -167,7 +169,7 @@ export default function InstitutionListView({
         return {
           title: `Edit: ${foundInst?.name || 'Academy'}`,
           category: 'Institutions',
-          width: 620,
+          size: 'md',
           content: (
             <InstitutionEditForm
               institution={foundInst}
@@ -185,7 +187,7 @@ export default function InstitutionListView({
       return {
         title: 'Onboard New Academy',
         category: 'Institutions',
-        width: 640,
+        size: 'md',
         content: (
           <InstitutionOnboardingForm
             onSuccess={() => {
@@ -664,42 +666,32 @@ export default function InstitutionListView({
 
               <div className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                    Type Academy Name to Confirm:
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Type Academy Name to Confirm:"
                     value={deleteConfirmText}
-                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    onChange={(val) => setDeleteConfirmText(val)}
                     placeholder={deletingInst.name}
-                    className="w-full px-3 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-rose-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                    Master Administrator Password:
-                  </label>
-                  <input
+                  <CustomInput
                     type="password"
+                    label="Master Administrator Password:"
                     value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
+                    onChange={(val) => setAdminPassword(val)}
                     placeholder="Enter security password"
-                    className="w-full px-3 py-2 text-xs rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-rose-500"
                   />
                 </div>
 
-                <div className="flex items-start gap-2.5 pt-1">
-                  <input
-                    type="checkbox"
+                <div className="pt-1">
+                  <CustomCheckbox
                     id="ack_decom"
                     checked={deleteAcknowledged}
-                    onChange={(e) => setDeleteAcknowledged(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded text-rose-500 focus:ring-rose-400 theme-bg-sub theme-border cursor-pointer"
+                    onChange={(checked) => setDeleteAcknowledged(checked)}
+                    label="I acknowledge that decommissioning this academy will suspend all active student portals immediately."
+                    size="sm"
                   />
-                  <label htmlFor="ack_decom" className="text-xs theme-text-secondary leading-snug cursor-pointer select-none">
-                    I acknowledge that decommissioning this academy will suspend all active student portals immediately.
-                  </label>
                 </div>
               </div>
 

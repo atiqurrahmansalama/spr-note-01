@@ -19,9 +19,11 @@ import {
 import { getCurrentInstitution, updateCurrentInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
 import PageHeader from '../../../components/ui/PageHeader';
+import { PageContainer } from '../../../components/layout';
 import {
   BANGLADESH_DIVISIONS,
   BANGLADESH_DISTRICTS_BY_DIVISION,
@@ -284,7 +286,7 @@ export default function AcademyProfileView({
     'Madrasa / Maktab';
 
   return (
-    <div className={`${isEmbedded ? 'w-full space-y-6 animate-fade-in text-left' : 'w-full max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fade-in text-left'}`}>
+    <PageContainer isEmbedded={isEmbedded}>
       {/* Hidden File Input for Logo upload */}
       <input
         type="file"
@@ -422,114 +424,118 @@ export default function AcademyProfileView({
           <div className="space-y-4 text-left">
             {/* Institution Name (Full Width so long names are completely visible) */}
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                Institution Official Name *
-              </label>
               {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="e.g. Darul Uloom Islamic Academy"
-                  className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
+                <CustomInput
+                  label="Institution Official Name"
                   required
+                  value={formData.name}
+                  onChange={(val) => handleInputChange('name', val)}
+                  placeholder="e.g. Darul Uloom Islamic Academy"
                 />
               ) : (
-                <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
-                  {formData.name || '--'}
-                </p>
+                <div>
+                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                    Institution Official Name <span className="theme-danger">*</span>
+                  </label>
+                  <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
+                    {formData.name || '--'}
+                  </p>
+                </div>
               )}
             </div>
 
             {/* Native / Regional Name (Full Width) */}
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                Native / Regional Name (Optional)
-              </label>
               {isEditing ? (
-                <input
-                  type="text"
+                <CustomInput
+                  label="Native / Regional Name"
+                  optional
                   value={formData.bangla_name}
-                  onChange={(e) => handleInputChange('bangla_name', e.target.value)}
+                  onChange={(val) => handleInputChange('bangla_name', val)}
                   placeholder="e.g. Local or native script title"
-                  className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
                 />
               ) : (
-                <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
-                  {formData.bangla_name || '--'}
-                </p>
+                <div>
+                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                    Native / Regional Name <span className="text-[10px] font-semibold theme-text-secondary opacity-60 uppercase tracking-wider">(Optional)</span>
+                  </label>
+                  <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
+                    {formData.bangla_name || '--'}
+                  </p>
+                </div>
               )}
             </div>
 
             {/* 2-Column Grid for Compact Properties */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t theme-border">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Institution Category / Type
-                </label>
                 {isEditing ? (
-                  <select
+                  <CustomSelect
+                    label="Institution Category / Type"
                     value={formData.institution_type}
-                    onChange={(e) => handleInputChange('institution_type', e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
-                  >
-                    {dynamicCategories.length > 0 ? (
-                      dynamicCategories.map((t) => (
-                        <option key={t.id || t.code} value={t.code}>{t.name}</option>
-                      ))
-                    ) : (
-                      FALLBACK_CATEGORIES.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))
-                    )}
-                  </select>
+                    onChange={(val) => handleInputChange('institution_type', val)}
+                    options={
+                      dynamicCategories.length > 0
+                        ? dynamicCategories.map((t) => ({ label: t.name, value: t.code }))
+                        : FALLBACK_CATEGORIES
+                    }
+                  />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary">
-                    {typeLabel}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Institution Category / Type
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary">
+                      {typeLabel}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  EIIN / Govt. Reg Number
-                </label>
                 {isEditing ? (
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="EIIN / Govt. Reg Number"
+                    optional
                     value={formData.eiin_or_reg_no}
-                    onChange={(e) => handleInputChange('eiin_or_reg_no', e.target.value)}
+                    onChange={(val) => handleInputChange('eiin_or_reg_no', val)}
                     placeholder="e.g. 132456"
-                    className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current font-mono"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
-                    {formData.eiin_or_reg_no || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      EIIN / Govt. Reg Number
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
+                      {formData.eiin_or_reg_no || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Web Slug / Portal URL
-                </label>
                 {isEditing ? (
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Web Slug / Portal URL"
+                    prefix="app/"
                     value={formData.slug}
-                    onChange={(e) => handleInputChange('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    onChange={(val) => handleInputChange('slug', val.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="e.g. darul-quran"
-                    className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-accent focus:outline-none focus:border-current font-mono"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-accent font-mono">
-                    {formData.slug ? `app/${formData.slug}` : '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Web Slug / Portal URL
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-accent font-mono">
+                      {formData.slug ? `app/${formData.slug}` : '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
+                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
                   Established / Reg Date
                 </label>
                 <p className="text-xs sm:text-sm font-semibold theme-text-primary">
@@ -559,40 +565,46 @@ export default function AcademyProfileView({
             {/* Phone & Email Row (2 Columns) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Primary Phone *
-                </label>
                 {isEditing ? (
-                  <input
-                    type="text"
+                  <CustomInput
+                    type="phone"
+                    label="Primary Phone"
+                    required
                     value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    onChange={(val) => handleInputChange('phone', val)}
                     placeholder="e.g. 01712345678"
-                    className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current font-mono"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
-                    {formData.phone || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Primary Phone <span className="theme-danger">*</span>
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
+                      {formData.phone || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Official Email *
-                </label>
                 {isEditing ? (
-                  <input
+                  <CustomInput
                     type="email"
+                    label="Official Email"
+                    required
                     value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onChange={(val) => handleInputChange('email', val)}
                     placeholder="e.g. info@academy.edu"
-                    className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
-                    {formData.email || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Official Email <span className="theme-danger">*</span>
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
+                      {formData.email || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -600,29 +612,30 @@ export default function AcademyProfileView({
             {/* Geographic Cascading Dropdowns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t theme-border">
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Division
-                </label>
                 {isEditing ? (
                   <CustomSelect
+                    label="Division"
                     value={formData.division}
                     onChange={handleDivisionChange}
                     options={BANGLADESH_DIVISIONS}
                     placeholder="Select Division"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary">
-                    {formData.division || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Division
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary">
+                      {formData.division || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  District
-                </label>
                 {isEditing ? (
                   <CustomSelect
+                    label="District"
                     value={formData.district}
                     onChange={handleDistrictChange}
                     options={availableDistricts}
@@ -630,19 +643,22 @@ export default function AcademyProfileView({
                     searchable
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary">
-                    {formData.district || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      District
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary">
+                      {formData.district || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Upazila / Thana
-                </label>
                 {isEditing ? (
                   availableThanas.length > 0 ? (
                     <CustomSelect
+                      label="Upazila / Thana"
                       value={formData.upazila_thana}
                       onChange={(val) => handleInputChange('upazila_thana', val)}
                       options={availableThanas}
@@ -650,58 +666,64 @@ export default function AcademyProfileView({
                       searchable
                     />
                   ) : (
-                    <input
-                      type="text"
+                    <CustomInput
+                      label="Upazila / Thana"
                       value={formData.upazila_thana}
-                      onChange={(e) => handleInputChange('upazila_thana', e.target.value)}
+                      onChange={(val) => handleInputChange('upazila_thana', val)}
                       placeholder="e.g. Mirpur"
-                      className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
                     />
                   )
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary">
-                    {formData.upazila_thana || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Upazila / Thana
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary">
+                      {formData.upazila_thana || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                  Postal Code
-                </label>
                 {isEditing ? (
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Postal Code"
                     value={formData.postal_code}
-                    onChange={(e) => handleInputChange('postal_code', e.target.value)}
+                    onChange={(val) => handleInputChange('postal_code', val)}
                     placeholder="e.g. 1216"
-                    className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current font-mono"
                   />
                 ) : (
-                  <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
-                    {formData.postal_code || '--'}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Postal Code
+                    </label>
+                    <p className="text-xs sm:text-sm font-semibold theme-text-primary font-mono">
+                      {formData.postal_code || '--'}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
 
             {/* Full Street Address (Full Width) */}
             <div className="pt-2 border-t theme-border">
-              <label className="block text-xs font-semibold theme-text-secondary mb-1">
-                Campus Street Address & Holding Location
-              </label>
               {isEditing ? (
-                <input
-                  type="text"
+                <CustomInput
+                  label="Campus Street Address & Holding Location"
                   value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  onChange={(val) => handleInputChange('address', val)}
                   placeholder="e.g. House #12, Road #4, Sector #7, Uttara"
-                  className="w-full px-3 py-2 text-xs sm:text-sm font-medium rounded-xl theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-current"
                 />
               ) : (
-                <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
-                  {formData.address || '--'}
-                </p>
+                <div>
+                  <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                    Campus Street Address & Holding Location
+                  </label>
+                  <p className="text-xs sm:text-sm font-semibold theme-text-primary break-words">
+                    {formData.address || '--'}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -718,6 +740,6 @@ export default function AcademyProfileView({
           <span>Active Tenant Database Context</span>
         </span>
       </div>
-    </div>
+    </PageContainer>
   );
 }

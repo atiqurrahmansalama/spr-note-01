@@ -392,3 +392,205 @@ class StudentViewSet(viewsets.ModelViewSet):
             "status": student.status or "Active"
         }, status=status.HTTP_200_OK)
 
+
+class AdmissionInviteTokenViewSet(viewsets.ModelViewSet):
+    queryset = AdmissionInviteToken.objects.all().select_related('institution', 'target_class', 'target_group', 'created_by')
+    serializer_class = AdmissionInviteTokenSerializer
+    permission_classes = [IsAuthenticated, HasSectionAccess]
+    required_section_key = 'student_admission'
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        tenant_id = get_scoped_tenant_id(self.request)
+        qs = self.queryset
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                qs = qs.filter(created_by=user)
+        return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        tenant_id = get_scoped_tenant_id(self.request) or user.institution_id
+        if not tenant_id:
+            from core.models import AcademicInstitution
+            inst = AcademicInstitution.objects.first()
+            tenant_id = inst.id if inst else None
+
+        # Generate unique token
+        generated_token = f"ADM-{uuid.uuid4().hex[:8].upper()}"
+        while AdmissionInviteToken.objects.filter(token=generated_token).exists():
+            generated_token = f"ADM-{uuid.uuid4().hex[:8].upper()}"
+
+        serializer.save(
+            token=generated_token,
+            institution_id=tenant_id,
+            created_by=user
+        )
+
+    @action(detail=True, methods=['post'], url_path='toggle-active')
+    def toggle_active(self, request, pk=None):
+        token_obj = self.get_object()
+        token_obj.is_active = not token_obj.is_active
+        token_obj.save(update_fields=['is_active'])
+        return Response({
+            'status': 'success',
+            'is_active': token_obj.is_active,
+            'message': f"Token {'activated' if token_obj.is_active else 'paused'} successfully."
+        })
+
+
+class PublicAdmissionVerifyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        token_str = request.query_params.get('token', '').strip()
+        if not token_str:
+            return Response({'error': 'Admission token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_obj = AdmissionInviteToken.objects.filter(token__iexact=token_str).select_related('institution', 'target_class').first()
+        if not token_obj:
+            return Response({'error': 'Invalid or expired admission link/QR code.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not token_obj.is_valid():
+            return Response({
+                'error': 'This admission campaign is currently inactive, expired, or has reached max applications limit.',
+                'is_valid': False,
+                'token': token_str,
+                'title': token_obj.title
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = PublicAdmissionVerifySerializer(token_obj)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AuthenticatedOnlineAdmissionApplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        token_str = request.data.get('token', '').strip()
+        if not token_str:
+            return Response({'error': 'Admission token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_obj = AdmissionInviteToken.objects.filter(token__iexact=token_str).select_related('institution', 'target_class', 'target_group').first()
+        if not token_obj:
+            return Response({'error': 'Invalid admission token.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not token_obj.is_valid():
+            return Response({'error': 'This admission link has expired or reached capacity.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Prepare Student Data
+        inst = token_obj.institution
+        student_data = request.data.get('student', {})
+        guardian_data = request.data.get('guardian', {})
+        present_address_data = request.data.get('present_address', {})
+        permanent_address_data = request.data.get('permanent_address', {})
+
+        # Resolve target class: Token's class or user's requested class
+        student_class_id = token_obj.target_class_id or student_data.get('student_class') or request.data.get('student_class')
+        student_group_id = token_obj.target_group_id or student_data.get('student_group') or request.data.get('student_group')
+
+        # Create Addresses
+        present_addr = None
+        if present_address_data and any(present_address_data.values()):
+            present_addr = Address.objects.create(
+                address_type='PRESENT',
+                street_address=present_address_data.get('street_address', ''),
+                post_office=present_address_data.get('post_office', ''),
+                post_code=present_address_data.get('post_code', ''),
+                thana_or_upazila=present_address_data.get('thana_or_upazila', ''),
+                district=present_address_data.get('district', ''),
+                division=present_address_data.get('division', ''),
+                created_by=user
+            )
+
+        perm_addr = None
+        if permanent_address_data and any(permanent_address_data.values()):
+            perm_addr = Address.objects.create(
+                address_type='PERMANENT',
+                street_address=permanent_address_data.get('perm_street') or permanent_address_data.get('street_address', ''),
+                post_office=permanent_address_data.get('perm_post_office') or permanent_address_data.get('post_office', ''),
+                post_code=permanent_address_data.get('perm_post_code') or permanent_address_data.get('post_code', ''),
+                thana_or_upazila=permanent_address_data.get('perm_thana') or permanent_address_data.get('thana_or_upazila', ''),
+                district=permanent_address_data.get('perm_district') or permanent_address_data.get('district', ''),
+                division=permanent_address_data.get('perm_division') or permanent_address_data.get('division', ''),
+                created_by=user
+            )
+
+        # Create Student
+        student = Student.objects.create(
+            institution=inst,
+            name=student_data.get('name', '').strip() or student_data.get('name_en', '').strip(),
+            name_en=student_data.get('name', '').strip() or student_data.get('name_en', '').strip(),
+            bangla_name=student_data.get('bangla_name', '').strip(),
+            gender=student_data.get('gender', 'MALE'),
+            dob=student_data.get('dob') or None,
+            blood_group=student_data.get('blood_group', ''),
+            birth_certificate_no=student_data.get('birth_certificate_no', ''),
+            nid_no=student_data.get('nid_no', ''),
+            student_class_id=student_class_id,
+            student_group_id=student_group_id,
+            present_address=present_addr,
+            permanent_address=perm_addr,
+            admission_date=timezone.now().date(),
+            admission_mode='FULL',
+            status='Active' if token_obj.auto_enroll else 'Pending',
+            created_by=user
+        )
+
+        # Create StudentGuardian
+        StudentGuardian.objects.create(
+            student=student,
+            father_name=guardian_data.get('father_name', ''),
+            father_phone=guardian_data.get('father_phone', ''),
+            father_occupation=guardian_data.get('father_occupation', ''),
+            mother_name=guardian_data.get('mother_name', ''),
+            mother_phone=guardian_data.get('mother_phone', ''),
+            mother_occupation=guardian_data.get('mother_occupation', ''),
+            primary_guardian_name=guardian_data.get('primary_guardian_name', '') or guardian_data.get('father_name', ''),
+            primary_guardian_phone=guardian_data.get('guardian_phone', '') or guardian_data.get('father_phone', '') or (user.phone_number or ''),
+            guardian_relation=guardian_data.get('guardian_relation', 'Father'),
+            guardian_nid=guardian_data.get('guardian_nid', ''),
+            emergency_contact_phone=guardian_data.get('emergency_contact_phone', '') or guardian_data.get('guardian_phone', ''),
+            created_by=user
+        )
+
+        # Link GuardianProfile to applicant User if guardian role
+        if hasattr(user, 'guardian_profile'):
+            user.guardian_profile.students.add(student)
+        elif not getattr(user, 'is_staff', False):
+            gp, _ = GuardianProfile.objects.get_or_create(user=user, defaults={'name_en': guardian_data.get('primary_guardian_name') or user.name or user.phone_number})
+            gp.students.add(student)
+
+        # Increment token applied count
+        token_obj.applied_count = F('applied_count') + 1
+        token_obj.save(update_fields=['applied_count'])
+        token_obj.refresh_from_db()
+
+        return Response({
+            'success': True,
+            'message': 'Student online admission completed successfully.',
+            'receipt': {
+                'student_id': student.id,
+                'uniq_id': student.uniq_id,
+                'name': student.name_en or student.name,
+                'bangla_name': student.bangla_name,
+                'roll_number': student.roll_number,
+                'class_name': student.student_class.name if student.student_class else "General",
+                'institution_name': inst.name,
+                'admission_date': student.admission_date.strftime('%Y-%m-%d'),
+                'session_year': token_obj.session_year,
+                'applicant_email': user.email or user.phone_number,
+                'status': student.status
+            }
+        }, status=status.HTTP_201_CREATED)
+
+

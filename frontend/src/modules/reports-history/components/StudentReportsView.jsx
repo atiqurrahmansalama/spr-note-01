@@ -13,8 +13,7 @@ import {
   CloseIcon
 } from "../../../components/ui/Icons";
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
-
-import ReportDateRangePicker from "./ReportDateRangePicker";
+import { DateRangePicker } from "../../../components/selectors";
 import RecordReportsList from "./RecordReportsList";
 import StudentGroupedList from "./StudentGroupedList";
 import ReportsAnalytics from "./ReportsAnalytics";
@@ -759,7 +758,7 @@ export default function StudentReportsView() {
           </div>
 
           {/* 2. Select Date Range Picker (moved here after Search) */}
-          <ReportDateRangePicker
+          <DateRangePicker
             startDate={startDate}
             endDate={endDate}
             onRangeSelect={(start, end) => {

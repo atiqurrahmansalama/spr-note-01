@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
-import { CloseIcon, LaptopIcon, SmartphoneIcon, LockIcon } from "../components/Icons";
+import { CloseIcon, LaptopIcon, SmartphoneIcon, LockIcon } from "../../../components/ui/Icons";
 
 export default function ActiveSessionsModal({ isOpen, onClose }) {
   const { showToast } = useToast();

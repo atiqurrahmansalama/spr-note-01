@@ -14,7 +14,10 @@ import {
 import { useToast } from "../../context/ToastContext";
 import { useRightSidebar, useDrawerRegistration } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
-import { calendarEventKindsStore } from "../../utils/localStore";
+import { calendarEventKindsStore, staffCategoriesStore } from "../../utils/localStore";
+import { DrawerContainer } from "../layout";
+import CustomInput from "../ui/CustomInput";
+import CustomSelect from "../ui/CustomSelect";
 
 /**
  * Detail View Drawer for inspecting full taxonomy details in the Right Sidebar
@@ -25,6 +28,7 @@ export function TaxonomyDetailDrawer({
   typeOptions = null,
   typeLabel = "Type",
   hideStatus = false,
+  extraFields = null,
   onEdit,
   onClose,
 }) {
@@ -33,7 +37,7 @@ export function TaxonomyDetailDrawer({
   const matchedType = typeOptions?.find((t) => t.value === item.type);
 
   return (
-    <div className="w-full max-w-md mx-auto p-1 flex-1 flex flex-col justify-between min-h-[calc(100vh-140px)] text-left animate-fade-in">
+    <DrawerContainer padding="normal" spacing="normal">
       <div className="space-y-4">
         {/* Header Badge & Name */}
         <div className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-2.5">
@@ -58,18 +62,12 @@ export function TaxonomyDetailDrawer({
             <h3 className="text-base font-bold theme-text-primary tracking-tight">
               {item.name}
             </h3>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-xs font-semibold theme-text-secondary">Code / Slug:</span>
-              <span className="font-mono text-xs font-bold theme-accent px-2 py-0.5 rounded-lg theme-bg-surface border theme-border">
-                {item.code}
-              </span>
-            </div>
           </div>
         </div>
 
         {/* Details Card */}
         <div className="p-4 rounded-2xl border theme-border theme-bg-surface space-y-3.5 text-xs">
-          {item.type && (
+          {Array.isArray(typeOptions) && typeOptions.length > 0 && item.type && (
             <div className="flex items-center justify-between py-1 border-b theme-border">
               <span className="theme-text-secondary font-medium">{typeLabel}:</span>
               <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
@@ -78,8 +76,46 @@ export function TaxonomyDetailDrawer({
             </div>
           )}
 
+          {Array.isArray(extraFields) &&
+            extraFields.map((field) => {
+              const val = item[field.name];
+              let displayContent = null;
+              if (Array.isArray(val)) {
+                displayContent = (
+                  <div className="flex flex-wrap gap-1 justify-end max-w-[280px]">
+                    {val.map((v) => {
+                      const opt = Array.isArray(field.options) ? field.options.find((o) => o.value === v) : null;
+                      return (
+                        <span
+                          key={v}
+                          className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold theme-bg-sub border theme-border theme-text-primary"
+                        >
+                          {opt ? (opt.tag || opt.label.split("(")[0].trim()) : v}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              } else {
+                const matchedOpt = Array.isArray(field.options)
+                  ? field.options.find((o) => o.value === val)
+                  : null;
+                displayContent = (
+                  <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold theme-bg-sub border theme-border theme-text-primary">
+                    {matchedOpt ? matchedOpt.label : val || "—"}
+                  </span>
+                );
+              }
+              return (
+                <div key={field.name} className="flex items-center justify-between py-1 border-b theme-border gap-2">
+                  <span className="theme-text-secondary font-medium shrink-0">{field.label}:</span>
+                  {displayContent}
+                </div>
+              );
+            })}
+
           <div className="flex items-center justify-between py-1 border-b theme-border">
-            <span className="theme-text-secondary font-medium">Display Sort Order:</span>
+            <span className="theme-text-secondary font-medium">Display Priority / Order:</span>
             <span className="font-mono font-bold theme-text-primary">{item.order ?? 0}</span>
           </div>
 
@@ -114,11 +150,9 @@ export function TaxonomyDetailDrawer({
           <span>Edit {itemTypeName}</span>
         </button>
       </div>
-    </div>
+    </DrawerContainer>
   );
 }
-
-import CustomSelect from "../ui/CustomSelect";
 
 /**
  * Drawer Form for adding / editing a taxonomy item in the Right Sidebar
@@ -129,13 +163,16 @@ export function TaxonomyDrawerForm({
   typeOptions = null,
   typeLabel = "Type",
   hideStatus = false,
+  extraFields = null,
+  onManageTypes = null,
   onSave,
   onCancel,
 }) {
   const { activeTenantId } = useTenant();
   const { showToast } = useToast();
 
-  const [kindsList, setKindsList] = useState(typeOptions || []);
+  const hasTypes = Boolean(Array.isArray(typeOptions) && typeOptions.length > 0);
+  const [kindsList, setKindsList] = useState(() => (hasTypes ? typeOptions : []));
   const [isManageOpen, setIsManageOpen] = useState(false);
 
   // Inline manage states
@@ -146,7 +183,12 @@ export function TaxonomyDrawerForm({
   const [newKindName, setNewKindName] = useState("");
 
   const refreshKinds = () => {
-    if (itemTypeName === "Event Type" || typeOptions) {
+    if (itemTypeName === "Staff Rank") {
+      const stored = staffCategoriesStore.getCategories(activeTenantId);
+      if (stored && stored.length > 0) {
+        setKindsList(stored);
+      }
+    } else if (itemTypeName === "Event Type" && onManageTypes) {
       const stored = calendarEventKindsStore.getKinds(activeTenantId);
       if (stored && stored.length > 0) {
         setKindsList(stored);
@@ -155,31 +197,28 @@ export function TaxonomyDrawerForm({
   };
 
   useEffect(() => {
-    if (typeOptions) setKindsList(typeOptions);
+    setKindsList(Array.isArray(typeOptions) ? typeOptions : []);
   }, [typeOptions]);
 
-  const [formData, setFormData] = useState(() => ({
-    name: initialData?.name || "",
-    code: initialData?.code || "",
-    type: initialData?.type || (typeOptions && typeOptions.length > 0 ? typeOptions[0].value : ""),
-    description: initialData?.description || "",
-    order: initialData?.order ?? 0,
-    is_active: initialData?.is_active ?? true,
-  }));
+  const [formData, setFormData] = useState(() => {
+    const base = {
+      name: initialData?.name || "",
+      type: initialData?.type || (typeOptions && typeOptions.length > 0 ? typeOptions[0].value : ""),
+      description: initialData?.description || "",
+      order: initialData?.order ?? 0,
+      is_active: initialData?.is_active ?? true,
+    };
+    if (Array.isArray(extraFields)) {
+      extraFields.forEach((f) => {
+        base[f.name] = initialData?.[f.name] !== undefined ? initialData[f.name] : (f.defaultValue ?? "");
+      });
+    }
+    return base;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNameChange = (val) => {
-    setFormData((prev) => {
-      const updated = { ...prev, name: val };
-      if (!initialData) {
-        updated.code = val
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "_")
-          .replace(/_+/g, "_")
-          .slice(0, 40);
-      }
-      return updated;
-    });
+    setFormData((prev) => ({ ...prev, name: val }));
   };
 
   // Inline Kind Actions
@@ -187,11 +226,15 @@ export function TaxonomyDrawerForm({
     e.preventDefault();
     if (!newKindName.trim()) return;
     try {
-      const created = calendarEventKindsStore.addKind(activeTenantId, { label: newKindName.trim() });
+      if (itemTypeName === "Staff Rank") {
+        const val = newKindName.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+        staffCategoriesStore.addCategory(activeTenantId, { value: val, label: newKindName.trim(), badge: val.slice(0, 5) });
+      } else {
+        calendarEventKindsStore.addKind(activeTenantId, { label: newKindName.trim() });
+      }
       setNewKindName("");
       refreshKinds();
-      setFormData((prev) => ({ ...prev, type: created.value }));
-      showToast(`Type "${created.label}" added!`, "success");
+      showToast(`Added new ${typeLabel.toLowerCase()}`, "success");
     } catch (err) {
       showToast("Failed to add type", "error");
     }
@@ -200,12 +243,16 @@ export function TaxonomyDrawerForm({
   const handleSaveEditKind = (oldVal) => {
     if (!editKindLabel.trim()) return;
     try {
-      calendarEventKindsStore.updateKind(activeTenantId, oldVal, { label: editKindLabel.trim() });
+      if (itemTypeName === "Staff Rank") {
+        staffCategoriesStore.updateCategory(activeTenantId, oldVal, editKindLabel.trim());
+      } else {
+        calendarEventKindsStore.updateKind(activeTenantId, oldVal, { label: editKindLabel.trim() });
+      }
       setEditingKindVal(null);
       refreshKinds();
-      showToast("Type updated!", "success");
+      showToast("Updated successfully", "success");
     } catch (err) {
-      showToast("Failed to update type", "error");
+      showToast("Failed to update", "error");
     }
   };
 
@@ -223,7 +270,11 @@ export function TaxonomyDrawerForm({
   const handleConfirmDeleteKind = () => {
     if (!deletingKindObj || !kindReplacementVal) return;
     try {
-      calendarEventKindsStore.deleteKind(activeTenantId, deletingKindObj.value, kindReplacementVal);
+      if (itemTypeName === "Staff Rank") {
+        staffCategoriesStore.deleteCategory(activeTenantId, deletingKindObj.value, kindReplacementVal);
+      } else {
+        calendarEventKindsStore.deleteKind(activeTenantId, deletingKindObj.value, kindReplacementVal);
+      }
       if (formData.type === deletingKindObj.value) {
         setFormData((prev) => ({ ...prev, type: kindReplacementVal }));
       }
@@ -238,7 +289,13 @@ export function TaxonomyDrawerForm({
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!formData.name.trim()) return;
-    if (!formData.code.trim()) return;
+
+    const generatedCode = initialData?.code || formData.name
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 40);
 
     setIsSubmitting(true);
     try {
@@ -246,7 +303,7 @@ export function TaxonomyDrawerForm({
         await onSave({
           ...formData,
           name: formData.name.trim(),
-          code: formData.code.trim().toUpperCase(),
+          code: generatedCode || `ITEM_${Date.now()}`,
           type: formData.type || undefined,
           description: formData.description.trim(),
           order: parseInt(formData.order, 10) || 0,
@@ -258,54 +315,36 @@ export function TaxonomyDrawerForm({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-1 flex-1 flex flex-col justify-between min-h-[calc(100vh-140px)] text-left">
+    <DrawerContainer padding="normal" spacing="normal">
       <form onSubmit={handleSubmit} className="flex flex-col justify-between flex-1 space-y-6">
         
         {/* Form Fields */}
         <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
-              {itemTypeName} Display Name <span className="theme-accent">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder={`e.g. General ${itemTypeName}`}
-              className="w-full text-sm px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
-            />
-          </div>
+          <CustomInput
+            label={`${itemTypeName} Display Name`}
+            required={true}
+            value={formData.name}
+            onChange={handleNameChange}
+            placeholder={`e.g. General ${itemTypeName}`}
+          />
 
-          <div>
-            <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
-              Code / Unique Identifier <span className="theme-accent">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-              placeholder={`e.g. GENERAL_${itemTypeName.toUpperCase()}`}
-              className="w-full text-sm font-mono px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub theme-text-primary uppercase focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
-            />
-          </div>
-
-          {/* Optional Type Dropdown with Inline Manage Panel Directly Underneath */}
-          {kindsList && kindsList.length > 0 && (
+          {/* Optional Type Dropdown with Inline Manage Panel (Only when typeOptions is explicitly passed) */}
+          {hasTypes && kindsList && kindsList.length > 0 && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold theme-text-secondary">
-                  {typeLabel} <span className="theme-accent">*</span>
+                <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
+                  {typeLabel} <span className="theme-danger">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsManageOpen((prev) => !prev)}
-                  className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
-                  title="Manage, edit, add, or delete types"
-                >
-                  <span>{isManageOpen ? "Close Manager" : "Manage Types"}</span>
-                </button>
+                {Boolean(onManageTypes) && (
+                  <button
+                    type="button"
+                    onClick={() => setIsManageOpen((prev) => !prev)}
+                    className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
+                    title={`Manage, edit, add, or delete ${typeLabel.toLowerCase()}s`}
+                  >
+                    <span>{isManageOpen ? "Close Manager" : `Manage ${typeLabel}s`}</span>
+                  </button>
+                )}
               </div>
 
               <CustomSelect
@@ -330,25 +369,26 @@ export function TaxonomyDrawerForm({
                       const isEditing = editingKindVal === k.value;
                       if (isEditing) {
                         return (
-                          <div key={k.value} className="flex items-center gap-1.5 p-2 rounded-xl border theme-border theme-bg-surface">
-                            <input
-                              type="text"
-                              value={editKindLabel}
-                              onChange={(e) => setEditKindLabel(e.target.value)}
-                              className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border theme-border theme-bg-sub theme-text-primary focus:outline-none"
-                              autoFocus
-                            />
+                          <div key={k.value} className="flex items-center gap-2 p-2 rounded-xl border theme-border theme-bg-surface">
+                            <div className="flex-1 min-w-0">
+                              <CustomInput
+                                value={editKindLabel}
+                                onChange={(val) => setEditKindLabel(val)}
+                                autoFocus={true}
+                                compact={true}
+                              />
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleSaveEditKind(k.value)}
-                              className="px-3 py-1.5 rounded-lg theme-bg-accent theme-accent-text text-xs font-bold cursor-pointer hover:opacity-90"
+                              className="px-3 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold cursor-pointer hover:opacity-90 shadow-xs shrink-0"
                             >
                               Save
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingKindVal(null)}
-                              className="px-2.5 py-1.5 rounded-lg border theme-border text-xs theme-text-secondary hover:theme-bg-sub cursor-pointer"
+                              className="px-2.5 py-2 rounded-xl border theme-border text-xs theme-text-secondary hover:theme-bg-sub cursor-pointer shrink-0"
                             >
                               Cancel
                             </button>
@@ -430,18 +470,19 @@ export function TaxonomyDrawerForm({
 
                   {/* Inline Add Form */}
                   <div className="pt-2.5 border-t theme-border flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newKindName}
-                      onChange={(e) => setNewKindName(e.target.value)}
-                      placeholder={`Add new ${typeLabel.toLowerCase()}...`}
-                      className="flex-1 text-xs px-3 py-2 rounded-xl border theme-border theme-bg-surface theme-text-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
-                    />
+                    <div className="flex-1 min-w-0">
+                      <CustomInput
+                        value={newKindName}
+                        onChange={(val) => setNewKindName(val)}
+                        placeholder={`Add new ${typeLabel.toLowerCase()}...`}
+                        compact={true}
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={handleAddKind}
                       disabled={!newKindName.trim()}
-                      className="px-3.5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold disabled:opacity-40 cursor-pointer shrink-0 shadow-xs hover:opacity-90"
+                      className="px-4 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold disabled:opacity-40 cursor-pointer shrink-0 shadow-xs hover:opacity-90"
                     >
                       + Add
                     </button>
@@ -451,47 +492,59 @@ export function TaxonomyDrawerForm({
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
-              Description / Remarks (Optional)
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder={`Optional details about this ${itemTypeName.toLowerCase()}...`}
-              rows={3}
-              className="w-full text-sm px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)] resize-none"
-            />
-          </div>
+          {/* Dynamic Extra Config Fields */}
+          {Array.isArray(extraFields) &&
+            extraFields.map((field) =>
+              field.type === "select" || field.type === "multiselect" || field.multiple ? (
+                <CustomSelect
+                  key={field.name}
+                  label={field.label}
+                  value={formData[field.name] || field.defaultValue}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
+                  options={field.options}
+                  multiple={Boolean(field.multiple || field.type === "multiselect")}
+                  searchable={Boolean(field.searchable || (field.options && field.options.length > 4))}
+                  placeholder={field.placeholder || `Select ${field.label.toLowerCase()}...`}
+                />
+              ) : (
+                <CustomInput
+                  key={field.name}
+                  label={field.label}
+                  value={formData[field.name] || ""}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
+                />
+              )
+            )}
+
+          <CustomInput
+            type="textarea"
+            label="Description / Remarks (Optional)"
+            value={formData.description}
+            onChange={(val) => setFormData({ ...formData, description: val })}
+            placeholder={`Optional details about this ${itemTypeName.toLowerCase()}...`}
+            rows={3}
+          />
 
           <div className={`${hideStatus ? 'block' : 'grid grid-cols-2 gap-3'} pt-2 border-t theme-border`}>
-            <div>
-              <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
-                Display Order
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.order}
-                onChange={(e) => setFormData({ ...formData, order: e.target.value })}
-                className="w-full text-sm font-mono px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
-              />
-            </div>
+            <CustomInput
+              label="Display Order"
+              type="number"
+              min="0"
+              value={formData.order}
+              onChange={(val) => setFormData({ ...formData, order: val })}
+            />
 
             {!hideStatus && (
-              <div>
-                <label className="block text-xs font-semibold theme-text-secondary mb-1.5">
-                  Status
-                </label>
-                <CustomSelect
-                  value={formData.is_active ? "YES" : "NO"}
-                  onChange={(val) => setFormData({ ...formData, is_active: val === "YES" })}
-                  options={[
-                    { value: "YES", label: "Active" },
-                    { value: "NO", label: "Inactive" },
-                  ]}
-                />
-              </div>
+              <CustomSelect
+                label="Status"
+                value={formData.is_active ? "YES" : "NO"}
+                onChange={(val) => setFormData({ ...formData, is_active: val === "YES" })}
+                options={[
+                  { value: "YES", label: "Active" },
+                  { value: "NO", label: "Inactive" },
+                ]}
+              />
             )}
           </div>
         </div>
@@ -517,7 +570,7 @@ export function TaxonomyDrawerForm({
           </button>
         </div>
       </form>
-    </div>
+    </DrawerContainer>
   );
 }
 
@@ -535,6 +588,7 @@ export default function CompactTaxonomyManager({
   typeOptions = null,
   typeLabel = "Type",
   hideStatus = false,
+  extraFields = null,
   onManageTypes = null,
   headerExtra = null,
   icon: HeaderIcon = BuildingOfficeIcon,
@@ -590,6 +644,7 @@ export default function CompactTaxonomyManager({
               typeOptions={typeOptions}
               typeLabel={typeLabel}
               hideStatus={hideStatus}
+              extraFields={extraFields}
               onEdit={(targetItem) => {
                 openDrawer(taxonomyDrawerKey, { mode: 'edit', id: targetItem.id });
               }}
@@ -611,6 +666,7 @@ export default function CompactTaxonomyManager({
               typeOptions={typeOptions}
               typeLabel={typeLabel}
               hideStatus={hideStatus}
+              extraFields={extraFields}
               onManageTypes={onManageTypes}
               onSave={async (payload) => {
                 try {
@@ -638,6 +694,7 @@ export default function CompactTaxonomyManager({
             typeOptions={typeOptions}
             typeLabel={typeLabel}
             hideStatus={hideStatus}
+            extraFields={extraFields}
             onManageTypes={onManageTypes}
             onSave={async (payload) => {
               try {
@@ -698,7 +755,7 @@ export default function CompactTaxonomyManager({
     }
   };
 
-  // Define Reusable DataTable Columns
+  // Define Reusable DataTable Columns (Clean Without Code/Slug)
   const columns = useMemo(() => [
     {
       header: "#",
@@ -720,15 +777,6 @@ export default function CompactTaxonomyManager({
         </div>
       ),
     },
-    {
-      header: "Code / Slug",
-      key: "code",
-      render: (item) => (
-        <span className="px-2 py-0.5 rounded-lg theme-bg-sub border theme-border font-mono text-[11px] theme-accent font-semibold">
-          {item.code}
-        </span>
-      ),
-    },
     ...(typeOptions && typeOptions.length > 0
       ? [
           {
@@ -744,6 +792,26 @@ export default function CompactTaxonomyManager({
             },
           },
         ]
+      : []),
+    ...(Array.isArray(extraFields)
+      ? extraFields
+          .filter((f) => f.tableHeader)
+          .map((f) => ({
+            header: f.tableHeader,
+            key: f.name,
+            render: (item) => {
+              const val = item[f.name];
+              if (f.renderBadge) {
+                return f.renderBadge(val, item);
+              }
+              const opt = Array.isArray(f.options) ? f.options.find((o) => o.value === val) : null;
+              return (
+                <span className="px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border text-[11px] font-semibold theme-text-primary">
+                  {opt ? opt.label : val || "—"}
+                </span>
+              );
+            },
+          }))
       : []),
     ...(!hideStatus
       ? [
@@ -770,18 +838,18 @@ export default function CompactTaxonomyManager({
       header: "Actions",
       key: "actions",
       align: "right",
-      headerClassName: "w-16",
+      headerClassName: "w-16 text-right",
       render: (item) => {
         const actionItems = [
-          {
-            label: "View Details",
-            icon: EyeIcon,
-            onClick: () => handleOpenDetailDrawer(item),
-          },
           {
             label: "Edit",
             icon: EditIcon,
             onClick: () => handleOpenEditDrawer(item),
+          },
+          {
+            label: "View Details",
+            icon: EyeIcon,
+            onClick: () => handleOpenDetailDrawer(item),
           },
           ...(!hideStatus
             ? [
@@ -809,56 +877,61 @@ export default function CompactTaxonomyManager({
     <div className={`space-y-4 animate-fade-in ${className}`}>
       
       {/* ─── Clean Header (Without Searchbar & Dropdowns) ──────────── */}
-      <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5">
-        <div className="flex items-center gap-3">
+      <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
           {HeaderIcon && (
-            <div className="p-2.5 rounded-xl theme-bg-accent-soft theme-accent shrink-0">
+            <div className="p-2.5 rounded-xl theme-bg-accent-soft theme-accent shrink-0 mt-0.5 sm:mt-0">
               <HeaderIcon className="w-5 h-5" />
             </div>
           )}
-          <div>
-            <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight">
-              {title}
-            </h3>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
+                {title}
+              </h2>
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                {items.length} {items.length === 1 ? itemTypeName.toLowerCase() : `${itemTypeName.toLowerCase()}s`}
+              </span>
+            </div>
             {description && (
-              <p className="text-xs theme-text-secondary mt-0.5">
+              <p className="text-xs theme-text-secondary mt-1 max-w-2xl leading-relaxed">
                 {description}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        {/* Right-aligned Header Actions: Add New Item */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
           {headerExtra}
           <button
             type="button"
             onClick={handleOpenAddDrawer}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl theme-bg-accent theme-accent-text font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
           >
-            <PlusIcon className="w-3.5 h-3.5" />
+            <PlusIcon className="w-4 h-4" />
             <span>Add {itemTypeName}</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Reusable DataTable (Without Description column, Row Click to View Details) ─── */}
+      {/* ─── Main Records DataTable ─────────────────────────────────── */}
       <DataTable
         columns={columns}
         data={items}
         isLoading={isLoading}
-        loadingMessage={`Loading ${itemTypeName.toLowerCase()} list...`}
-        emptyTitle={`No ${itemTypeName} Found`}
-        emptySubMessage={`Click "Add ${itemTypeName}" to create the first entry.`}
+        emptyTitle={`No ${itemTypeName}s Registered`}
+        emptySubMessage={`Click the "+ Add ${itemTypeName}" button above to register your first taxonomy item.`}
         emptyIcon={HeaderIcon}
-        onRowClick={(item) => handleOpenDetailDrawer(item)}
+        onRowClick={(item) => handleOpenEditDrawer(item)}
       />
 
       {/* ─── Delete Confirmation Modal ────────────────────────────── */}
       {deletingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
           <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-2xl p-5 shadow-2xl space-y-3.5 animate-scale-in text-left">
-            <div className="flex items-center gap-3 text-rose-500">
-              <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 shrink-0">
+            <div className="flex items-center gap-3 theme-danger">
+              <div className="p-2 rounded-xl theme-bg-danger-soft border theme-border shrink-0">
                 <AlertTriangleIcon className="w-5 h-5" />
               </div>
               <div>
@@ -868,7 +941,7 @@ export default function CompactTaxonomyManager({
             </div>
 
             <p className="text-xs theme-text-secondary">
-              Are you sure you want to permanently delete <strong className="theme-text-primary">"{deletingItem.name}"</strong> ({deletingItem.code})?
+              Are you sure you want to permanently delete <strong className="theme-text-primary">"{deletingItem.name}"</strong>?
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t theme-border">
@@ -884,7 +957,7 @@ export default function CompactTaxonomyManager({
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
+                className="px-4 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </button>

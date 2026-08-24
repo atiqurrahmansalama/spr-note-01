@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
-import { CloseIcon, CheckIcon } from "../components/Icons";
+import { CloseIcon, CheckIcon } from "../../../components/ui/Icons";
+import CustomInput from "../../../components/ui/CustomInput";
 
 export default function ChangePasswordModal({ isOpen, onClose }) {
   const { showToast } = useToast();
@@ -156,45 +157,27 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Current Password */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium theme-text-secondary">Current Password</label>
-            <div className="relative">
-              <input
-                type={showOldPass ? "text" : "password"}
-                value={form.old_password}
-                onChange={(e) => setForm({ ...form, old_password: e.target.value })}
-                placeholder="Enter current password"
-                className="w-full theme-bg-sub border theme-border theme-text-primary pr-12 pl-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:theme-border transition-colors font-medium"
-              />
-              <button
-                type="button"
-                onClick={() => setShowOldPass(!showOldPass)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-semibold theme-text-secondary hover:theme-text-primary cursor-pointer"
-              >
-                {showOldPass ? "Hide" : "Show"}
-              </button>
-            </div>
+          <div>
+            <CustomInput
+              type="password"
+              label="Current Password"
+              required
+              value={form.old_password}
+              onChange={(val) => setForm({ ...form, old_password: val })}
+              placeholder="Enter current password"
+            />
           </div>
 
           {/* New Password */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium theme-text-secondary">New Password</label>
-            <div className="relative">
-              <input
-                type={showNewPass ? "text" : "password"}
-                value={form.new_password}
-                onChange={(e) => setForm({ ...form, new_password: e.target.value })}
-                placeholder="Enter new password"
-                className="w-full theme-bg-sub border theme-border theme-text-primary pr-12 pl-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:theme-border transition-colors font-medium"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPass(!showNewPass)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-semibold theme-text-secondary hover:theme-text-primary cursor-pointer"
-              >
-                {showNewPass ? "Hide" : "Show"}
-              </button>
-            </div>
+          <div>
+            <CustomInput
+              type="password"
+              label="New Password"
+              required
+              value={form.new_password}
+              onChange={(val) => setForm({ ...form, new_password: val })}
+              placeholder="Enter new password"
+            />
           </div>
 
           {/* Real-time Password Strength Visualizer */}
@@ -233,24 +216,15 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
           )}
 
           {/* Confirm Password */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium theme-text-secondary">Confirm New Password</label>
-            <div className="relative">
-              <input
-                type={showConfirmPass ? "text" : "password"}
-                value={form.confirm_password}
-                onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
-                placeholder="Re-enter new password"
-                className="w-full theme-bg-sub border theme-border theme-text-primary pr-12 pl-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:theme-border transition-colors font-medium"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPass(!showConfirmPass)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-semibold theme-text-secondary hover:theme-text-primary cursor-pointer"
-              >
-                {showConfirmPass ? "Hide" : "Show"}
-              </button>
-            </div>
+          <div>
+            <CustomInput
+              type="password"
+              label="Confirm New Password"
+              required
+              value={form.confirm_password}
+              onChange={(val) => setForm({ ...form, confirm_password: val })}
+              placeholder="Re-enter new password"
+            />
           </div>
 
           {/* Action Buttons */}

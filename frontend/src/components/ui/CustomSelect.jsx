@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { SleekCheckIcon, SearchIcon } from './Icons';
+import { SleekCheckIcon, SearchIcon, AlertCircleIcon } from './Icons';
+import CustomInput from './CustomInput';
 
 export default function CustomSelect({
   value,
@@ -17,6 +18,7 @@ export default function CustomSelect({
   size = 'md', // 'sm' | 'md' | 'lg'
   compactMode = false, // compact mode for small juz-style dropdowns
   showDescription = false, // defaults to false to keep dropdown items clean and concise
+  showBadge = true, // control visibility of category/type badge
   multiple = false,
   isMulti = false,
 }) {
@@ -154,12 +156,11 @@ export default function CustomSelect({
     }
   };
 
-  const sizeClasses =
-    size === 'sm'
-      ? 'px-3 py-1.5 min-h-[38px] rounded-xl text-xs'
-      : size === 'lg'
-      ? 'px-4 py-2.5 min-h-[44px] rounded-xl text-xs sm:text-sm'
-      : 'px-3.5 py-2 min-h-[40px] rounded-xl text-xs sm:text-sm';
+  const sizeClasses = {
+    sm: 'min-h-[38px] px-3 py-1.5 text-xs rounded-xl',
+    md: 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl',
+    lg: 'min-h-[54px] px-5 py-3.5 text-sm sm:text-base rounded-2xl',
+  }[size] || 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl';
 
   const dropdownMenu =
     isOpen && typeof document !== 'undefined'
@@ -181,17 +182,15 @@ export default function CustomSelect({
             {/* Search Box (Only when searchable is true) */}
             {!compactMode && searchable && (
               <div className="p-2 border-b theme-border theme-bg-sub/60">
-                <div className="relative">
-                  <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 theme-text-secondary" />
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Search options..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-xl theme-bg-sub border theme-border text-xs theme-text-primary focus:outline-none focus:border-current"
-                  />
-                </div>
+                <CustomInput
+                  type="search"
+                  size="sm"
+                  autoFocus
+                  placeholder="Search options..."
+                  value={search}
+                  onChange={(val) => setSearch(val)}
+                  clearable={true}
+                />
               </div>
             )}
 
@@ -266,7 +265,7 @@ export default function CustomSelect({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate font-medium">{optLabel}</span>
-                            {(opt.typeLabel || opt.badge) && (
+                            {showBadge && (opt.typeLabel || opt.badge) && (
                               <span
                                 className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border ${
                                   isSelected
@@ -306,9 +305,11 @@ export default function CustomSelect({
       ref={containerRef}
     >
       {label && (
-        <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-          {label} {required && <span className="text-rose-400">*</span>}
-        </label>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
+            {label} {required && <span className="theme-danger">*</span>}
+          </label>
+        </div>
       )}
 
       {/* Trigger Button */}
@@ -350,12 +351,16 @@ export default function CustomSelect({
               : isOpen
               ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
               : error
-              ? 'border-rose-500 theme-bg-sub theme-text-primary'
+              ? 'border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 theme-bg-sub theme-text-primary'
               : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-current/20 theme-text-primary'
           }`}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {Icon && <Icon className="w-3.5 h-3.5 shrink-0 theme-accent" />}
+            {Icon && (
+              <div className="mr-3 shrink-0 flex items-center justify-center select-none pointer-events-none">
+                <Icon className="w-4 h-4 shrink-0 theme-accent" />
+              </div>
+            )}
             
             {/* Multi-Select Trigger View */}
             {isMultiple ? (
@@ -401,7 +406,7 @@ export default function CustomSelect({
             ) : selectedLabel ? (
               <div className="flex items-center justify-between gap-2 w-full min-w-0 pr-1">
                 <span className="truncate theme-text-primary font-medium">{selectedLabel}</span>
-                {(selectedOption?.typeLabel || selectedOption?.badge) && (
+                {showBadge && (selectedOption?.typeLabel || selectedOption?.badge) && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono shrink-0 theme-bg-app theme-text-secondary border theme-border">
                     {selectedOption.typeLabel || selectedOption.badge}
                   </span>
@@ -427,7 +432,12 @@ export default function CustomSelect({
         </button>
       )}
 
-      {error && <p className="mt-1 text-[11px] text-rose-400 font-medium">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium theme-danger animate-fade-in">
+          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Render Portal Dropdown Menu */}
       {dropdownMenu}

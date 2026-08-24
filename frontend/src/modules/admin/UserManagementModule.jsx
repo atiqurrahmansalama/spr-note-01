@@ -3,6 +3,7 @@ import { useToast } from "../../context/ToastContext";
 import { fetchWithAuth } from "../../utils/authService";
 import RoleManagementPanel from "./RoleManagementPanel";
 import CustomSelect from "../../components/ui/CustomSelect";
+import { RoleSelect, GroupSelect } from "../../components/selectors";
 
 // Custom Styled Checkbox Component
 function CustomCheckbox({ checked, onChange }) {
@@ -831,15 +832,18 @@ export default function UserManagementModule() {
       {/* ── CONTROL BAR: Role filter on left, Search on right ── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="w-full sm:w-64 md:w-72">
-          <CustomSelect
-            options={roleFilterOptions}
+          <RoleSelect
             value={roleFilter}
             onChange={(val) => {
               setRoleFilter(val);
               setCurrentPage(1);
             }}
+            valueKey="code"
+            allowAll={true}
+            allLabel="All Roles"
             placeholder="All Roles"
             className="w-full"
+            label={null}
           />
         </div>
 
@@ -1389,21 +1393,23 @@ export default function UserManagementModule() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-mono text-xs theme-text-secondary mb-1">Account Role *</label>
-                  <ThemeCustomSelect
-                    options={roleSelectOptions}
+                  <RoleSelect
+                    label="Account Role *"
                     value={newUser.user_type}
                     onChange={(val) => setNewUser({ ...newUser, user_type: val })}
-                    openUpward={false}
+                    valueKey="code"
+                    allowAll={false}
+                    required={true}
+                    placeholder="Select Role..."
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs theme-text-secondary mb-1">Assigned Halqa Group</label>
-                  <ThemeCustomSelect
-                    options={groupSelectOptions}
+                  <GroupSelect
+                    label="Assigned Halqa Group"
                     value={newUser.assigned_group}
                     onChange={(val) => setNewUser({ ...newUser, assigned_group: val })}
-                    openUpward={false}
+                    allowAll={false}
+                    placeholder="Unassigned Group"
                   />
                 </div>
               </div>
@@ -1489,21 +1495,22 @@ export default function UserManagementModule() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-mono text-xs theme-text-secondary mb-1">Account Role</label>
-                  <ThemeCustomSelect
-                    options={roleSelectOptions}
+                  <RoleSelect
+                    label="Account Role"
                     value={editUserForm.user_type}
                     onChange={(val) => setEditUserForm({ ...editUserForm, user_type: val })}
-                    openUpward={false}
+                    valueKey="code"
+                    allowAll={false}
+                    placeholder="Select Role..."
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs theme-text-secondary mb-1">Assigned Group</label>
-                  <ThemeCustomSelect
-                    options={groupSelectOptions}
+                  <GroupSelect
+                    label="Assigned Group"
                     value={editUserForm.assigned_group}
                     onChange={(val) => setEditUserForm({ ...editUserForm, assigned_group: val })}
-                    openUpward={false}
+                    allowAll={false}
+                    placeholder="Unassigned Group"
                   />
                 </div>
               </div>

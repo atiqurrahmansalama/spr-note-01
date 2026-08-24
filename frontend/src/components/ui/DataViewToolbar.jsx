@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchIcon } from './Icons';
+import CustomInput from './CustomInput';
 
 /**
  * Reusable Toolbar for Data Views (Search, Category Filters, Cards/Table toggle)
@@ -27,14 +27,15 @@ export default function DataViewToolbar({
     >
       {/* 1. Search Bar (Full width on narrow containers, auto/fixed width on wider containers) */}
       {onSearchChange && (
-        <div className="relative w-full @md:w-64 @xl:w-80 shrink-0">
-          <SearchIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 opacity-50 theme-text-secondary" />
-          <input
-            type="text"
+        <div className="w-full @md:w-64 @xl:w-80 shrink-0">
+          <CustomInput
+            type="search"
+            size="sm"
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(val) => onSearchChange(val)}
             placeholder={searchPlaceholder}
-            className="w-full h-9 @sm:h-10 pl-9 pr-4 py-2 rounded-xl border theme-border theme-bg-sub text-xs theme-text-primary focus:outline-none focus:border-[var(--accent-main)]/50 transition-all placeholder:text-zinc-500"
+            clearable={true}
+            className="h-9 @sm:h-10"
           />
         </div>
       )}

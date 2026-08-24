@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
 import { ChecklistIcon, RefreshIcon, SaveIcon, CloseIcon } from "../../components/ui/Icons";
+import { ClassSelect, GroupSelect } from "../../components/selectors";
 
 export default function AdHocHeadcountView() {
   const { showToast } = useToast();
@@ -398,32 +399,28 @@ export default function AdHocHeadcountView() {
               </div>
 
               <div>
-                <label className="block font-semibold mb-1 theme-text-secondary">Target Class / Grade</label>
-                <select
+                <ClassSelect
+                  label="Target Class / Grade"
                   value={newClassId}
-                  onChange={(e) => setNewClassId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => {
+                    setNewClassId(val);
+                    setNewGroupId('ALL');
+                  }}
+                  classes={classes}
+                  allowAll={false}
+                  required={true}
+                />
               </div>
 
               <div>
-                <label className="block font-semibold mb-1 theme-text-secondary">Group (Optional)</label>
-                <select
-                  value={newGroupId}
-                  onChange={(e) => setNewGroupId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value="ALL">All Groups in Class</option>
-                  {groups
-                    .filter((g) => !newClassId || String(g.student_class) === String(newClassId))
-                    .map((g) => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                </select>
+                <GroupSelect
+                  label="Group (Optional)"
+                  value={newGroupId === 'ALL' ? '' : newGroupId}
+                  onChange={(val) => setNewGroupId(val || 'ALL')}
+                  classId={newClassId}
+                  groups={groups}
+                  allLabel="All Groups in Class"
+                />
               </div>
 
               <div>

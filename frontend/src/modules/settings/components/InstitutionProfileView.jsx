@@ -15,6 +15,8 @@ import {
 import { getCurrentInstitution, updateCurrentInstitution } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import CustomInput from '../../../components/ui/CustomInput';
+import CustomSelect from '../../../components/ui/CustomSelect';
 import AddressLocationPicker from '../../../components/common/AddressLocationPicker';
 import DocumentStudioEngine from '../../../components/documents/DocumentStudioEngine';
 
@@ -208,73 +210,58 @@ export default function InstitutionProfileView() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Official Institution Name (English) *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="e.g. Darul Uloom Islamic Academy"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
+                <CustomInput
+                  label="Official Institution Name (English)"
                   required
+                  value={formData.name}
+                  onChange={(val) => handleInputChange('name', val)}
+                  placeholder="e.g. Darul Uloom Islamic Academy"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Native / Regional Script Name
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Native / Regional Script Name"
+                  optional
                   value={formData.bangla_name}
-                  onChange={(e) => handleInputChange('bangla_name', e.target.value)}
+                  onChange={(val) => handleInputChange('bangla_name', val)}
                   placeholder="e.g. Local or native script title"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Institution Type
-                </label>
-                <select
+                <CustomSelect
+                  label="Institution Type"
                   value={formData.institution_type}
-                  onChange={(e) => handleInputChange('institution_type', e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
-                >
-                  <option value="MADRASA">Madrasa / Maktab</option>
-                  <option value="SCHOOL">General School</option>
-                  <option value="COLLEGE">College</option>
-                  <option value="COACHING">Coaching</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  EIIN / Govt. Reg. No.
-                </label>
-                <input
-                  type="text"
-                  value={formData.eiin_or_reg_no}
-                  onChange={(e) => handleInputChange('eiin_or_reg_no', e.target.value)}
-                  placeholder="e.g. 132456"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs font-mono theme-text-primary focus:outline-none focus:border-sky-500"
+                  onChange={(val) => handleInputChange('institution_type', val)}
+                  options={[
+                    { label: "Madrasa / Maktab", value: "MADRASA" },
+                    { label: "General School", value: "SCHOOL" },
+                    { label: "College", value: "COLLEGE" },
+                    { label: "Coaching", value: "COACHING" },
+                    { label: "Other", value: "OTHER" },
+                  ]}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Tenant Identifier (Slug)
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="EIIN / Govt. Reg. No."
+                  optional
+                  value={formData.eiin_or_reg_no}
+                  onChange={(val) => handleInputChange('eiin_or_reg_no', val)}
+                  placeholder="e.g. 132456"
+                />
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Tenant Identifier (Slug)"
+                  prefix="app/"
                   value={formData.slug}
                   disabled
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-mono text-sky-400 opacity-80 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -291,29 +278,24 @@ export default function InstitutionProfileView() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Official Phone Number *
-                </label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="e.g. 01700000000"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
+                <CustomInput
+                  type="phone"
+                  label="Official Phone Number"
                   required
+                  value={formData.phone}
+                  onChange={(val) => handleInputChange('phone', val)}
+                  placeholder="e.g. 01700000000"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Official Email Address
-                </label>
-                <input
+                <CustomInput
                   type="email"
+                  label="Official Email Address"
+                  optional
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onChange={(val) => handleInputChange('email', val)}
                   placeholder="e.g. info@institution.edu"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                 />
               </div>
 
@@ -349,41 +331,29 @@ export default function InstitutionProfileView() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">
-                    District / City
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="District / City"
                     value={formData.district}
-                    onChange={(e) => handleInputChange('district', e.target.value)}
+                    onChange={(val) => handleInputChange('district', val)}
                     placeholder="e.g. Dhaka"
-                    className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold theme-text-secondary mb-1">
-                    Division / State
-                  </label>
-                  <input
-                    type="text"
+                  <CustomInput
+                    label="Division / State"
                     value={formData.division}
-                    onChange={(e) => handleInputChange('division', e.target.value)}
+                    onChange={(val) => handleInputChange('division', val)}
                     placeholder="e.g. Dhaka Division"
-                    className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold theme-text-secondary mb-1">
-                  Principal / Muhtamim Signatory Preset
-                </label>
-                <input
-                  type="text"
+                <CustomInput
+                  label="Principal / Muhtamim Signatory Preset"
                   value={formData.principal_name}
-                  onChange={(e) => handleInputChange('principal_name', e.target.value)}
+                  onChange={(val) => handleInputChange('principal_name', val)}
                   placeholder="e.g. Maulana Shamsul Haque (Principal / Muhtamim)"
-                  className="w-full px-3 py-2 rounded-xl theme-bg-app border theme-border text-xs theme-text-primary focus:outline-none focus:border-sky-500"
                 />
               </div>
             </div>

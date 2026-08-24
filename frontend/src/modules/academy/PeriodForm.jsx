@@ -6,8 +6,11 @@ import {
   SleekCheckIcon,
 } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
+import CustomInput from '../../components/ui/CustomInput';
+import { ClassSelect, TeacherSelect } from '../../components/selectors';
 import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { createPeriodSlot, updatePeriodSlot } from '../../api/academy';
+import { DrawerContainer, DrawerFooter } from '../../components/layout';
 
 const SLOT_TYPES = [
   { label: 'Academic Teaching Period', value: 'TEACHING_PERIOD' },
@@ -186,33 +189,44 @@ export default function PeriodForm({
     })),
   ];
 
+  // Determine if form has been modified
+  const isDirty = Boolean(
+    !editingSlot
+      ? formData.period_name.trim() || formData.start_time !== '08:00' || formData.end_time !== '08:45'
+      : formData.period_name !== (editingSlot.period_name || '') ||
+        formData.slot_type !== (editingSlot.slot_type || 'TEACHING_PERIOD') ||
+        formData.period_order !== (editingSlot.period_order ?? nextOrder) ||
+        formData.start_time !== (editingSlot.start_time ? editingSlot.start_time.slice(0, 5) : '08:00') ||
+        formData.end_time !== (editingSlot.end_time ? editingSlot.end_time.slice(0, 5) : '08:45') ||
+        formData.department !== (editingSlot.department || '') ||
+        formData.student_class !== (editingSlot.student_class || '') ||
+        formData.teacher !== (editingSlot.teacher || '')
+  );
+
+  const isFormValid = Boolean(formData.period_name.trim() && formData.start_time && formData.end_time);
+  const canSave = isDirty && isFormValid && !submitting;
+
   return (
-    <div className="p-4 sm:p-5 space-y-4 h-full overflow-y-auto theme-text-primary text-left">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <DrawerContainer padding="normal" spacing="normal">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 text-left">
         {/* Slot Name */}
         <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Period Name <span className="theme-accent font-bold">*</span>
-          </label>
-          <input
-            type="text"
+          <CustomInput
+            label="Period Name"
             required
             placeholder="e.g. 1st Period: Hifz Revision, Tiffin Break, Zuhr Salah"
             value={formData.period_name}
-            onChange={(e) =>
-              setFormData({ ...formData, period_name: e.target.value })
+            onChange={(val) =>
+              setFormData({ ...formData, period_name: val })
             }
-            className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary placeholder-[var(--text-secondary)]/50 transition-all"
           />
         </div>
 
         {/* Slot Category & Order */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Period Category
-            </label>
             <CustomSelect
+              label="Period Category"
               options={SLOT_TYPES}
               value={formData.slot_type}
               onChange={(val) =>
@@ -223,27 +237,24 @@ export default function PeriodForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Order
-            </label>
-            <input
+            <CustomInput
               type="number"
-              min="1"
-              max="50"
+              label="Order Rank"
+              min={1}
+              max={50}
               value={formData.period_order}
-              onChange={(e) =>
+              onChange={(val) =>
                 setFormData({
                   ...formData,
-                  period_order: parseInt(e.target.value, 10) || 1,
+                  period_order: parseInt(val, 10) || 1,
                 })
               }
-              className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-mono theme-text-primary transition-all"
             />
           </div>
         </div>
 
         {/* Start Time & End Time (Custom Time Picker) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <CustomTimePicker
               label="Start Time"
@@ -268,22 +279,21 @@ export default function PeriodForm({
         </div>
 
         {/* Calculated Slot Duration Display Chip */}
-        <div className="theme-bg-sub border theme-border p-3.5 rounded-2xl flex items-center justify-between shadow-xs">
+        <div className="theme-bg-sub border theme-border p-3.5 rounded-2xl flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
             <TimerIcon className="w-4 h-4 theme-accent" />
             <span className="text-xs font-medium theme-text-secondary">Calculated Slot Duration:</span>
           </div>
-          <span className="px-3 py-1 theme-bg-accent-soft theme-accent font-mono font-bold text-xs rounded-xl border border-[var(--accent-main)]/20 shadow-xs">
+          <span className="px-3 py-1 theme-bg-accent-soft theme-accent font-mono font-bold text-xs rounded-xl border border-[var(--accent-main)]/20 shadow-2xs">
             {durationMinutes} Minutes
           </span>
         </div>
 
         {/* Department Scope */}
         <div>
-          <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Target Department
-          </label>
           <CustomSelect
+            label="Target Department"
+            optional
             options={deptOptions}
             value={formData.department}
             onChange={(val) =>
@@ -295,32 +305,32 @@ export default function PeriodForm({
         </div>
 
         {/* Class & Assigned Teacher */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Target Class
-            </label>
-            <CustomSelect
-              options={classOptions}
+            <ClassSelect
+              label="Target Class"
+              classes={filteredClasses}
               value={formData.student_class}
               onChange={(val) =>
                 setFormData({ ...formData, student_class: val })
               }
+              allowAll={true}
+              allLabel="All Classes in Department"
               placeholder="All Classes"
               disabled={loadingLookups}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-              Assigned Teacher (Optional)
-            </label>
-            <CustomSelect
-              options={teacherOptions}
+            <TeacherSelect
+              label="Assigned Teacher (Optional)"
+              teachers={teachers}
               value={formData.teacher}
               onChange={(val) =>
                 setFormData({ ...formData, teacher: val })
               }
+              allowAll={true}
+              allLabel="No Specific Teacher Assigned"
               placeholder="Select Teacher"
               disabled={loadingLookups}
             />
@@ -328,32 +338,14 @@ export default function PeriodForm({
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-4 border-t theme-border flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer disabled:opacity-50 text-center"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full sm:w-auto px-5 py-2.5 sm:py-2 text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 shadow-md cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-          >
-            {submitting ? (
-              <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <SleekCheckIcon className="w-3.5 h-3.5" />
-            )}
-            <span>{submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Period Slot'}</span>
-          </button>
-        </div>
+        <DrawerFooter
+          onCancel={onCancel}
+          isSubmitting={submitting}
+          isSaveDisabled={!canSave}
+          saveLabel={isEdit ? 'Save Changes' : 'Add Period Slot'}
+          onSubmit={true}
+        />
       </form>
-    </div>
+    </DrawerContainer>
   );
 }

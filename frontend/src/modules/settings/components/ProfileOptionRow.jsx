@@ -1,4 +1,4 @@
-import { ChevronRightIcon } from "./Icons";
+import { ChevronRightIcon } from "../../../components/ui/Icons";
 
 export default function ProfileOptionRow({
   icon,

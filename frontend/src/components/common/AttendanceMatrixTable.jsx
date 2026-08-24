@@ -6,6 +6,10 @@ import {
   TimerIcon,
 } from '../ui/Icons';
 import { getHijriDateString } from '../../utils/hijriUtils';
+import {
+  ATTENDANCE_STATUSES,
+  getAttendanceRateColor,
+} from '../../constants/attendanceConstants';
 
 /**
  * Reusable Attendance Matrix Table Component
@@ -146,9 +150,9 @@ export default function AttendanceMatrixTable({
             })}
 
             {/* Summary Metric Headers with EXACT same width as date columns */}
-            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-emerald-600 dark:text-emerald-400 border-l border-b theme-border text-xs" title="Present">P</th>
-            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold text-amber-600 dark:text-amber-400 border-l border-b theme-border text-xs" title="Late">L</th>
-            <th className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold theme-danger border-l border-b theme-border text-xs" title="Absent">A</th>
+            <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border text-xs`} title="Present">P</th>
+            <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border text-xs`} title="Late">L</th>
+            <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border text-xs`} title="Absent">A</th>
             <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate % (Excludes holidays)">Rate %</th>
           </tr>
         </thead>
@@ -211,7 +215,7 @@ export default function AttendanceMatrixTable({
                   )}
                 </td>
 
-                {/* Day Status Cells (Driven 100% dynamically from calendar event colors) */}
+                {/* Day Status Cells (Driven dynamically from semantic status tokens and event colors) */}
                 {matrixData.days_header.map((d) => {
                   const dateStr =
                     d.date ||
@@ -257,19 +261,19 @@ export default function AttendanceMatrixTable({
                       {isHoliday ? (
                         <span className={`text-[9px] opacity-30 font-bold select-none ${isEditing ? 'cursor-not-allowed' : 'cursor-default'}`}>--</span>
                       ) : status === 'PRESENT' ? (
-                        <FilledCheckCircleIcon className="w-4 h-4 text-emerald-600/80 dark:text-emerald-400/85 hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                        <FilledCheckCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.PRESENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                       ) : status === 'ABSENT' ? (
-                        <FilledXCircleIcon className="w-4 h-4 text-[var(--danger-main)] hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs" />
+                        <FilledXCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.ABSENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                       ) : status === 'LATE' ? (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/10 text-amber-600/85 dark:text-amber-400/85 font-bold text-[10px] hover:scale-125 active:scale-95 transition-transform">
+                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform`}>
                           L
                         </span>
                       ) : status === 'HALF_DAY' ? (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 text-sky-600/85 dark:text-sky-400/85 font-bold text-[10px]">
+                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} text-[10px]`}>
                           H
                         </span>
                       ) : status === 'ON_LEAVE' ? (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/10 text-purple-600/85 dark:purple-400/85 font-bold text-[10px]">
+                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px]`}>
                           LV
                         </span>
                       ) : canEditCell ? (
@@ -282,25 +286,17 @@ export default function AttendanceMatrixTable({
                 })}
 
                 {/* Totals & Attendance Percentage with EXACT matching widths */}
-                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-emerald-600 dark:text-emerald-400 border-l border-b theme-border">
+                <td className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border`}>
                   {row.totals.present}
                 </td>
-                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-amber-600 dark:text-amber-400 border-l border-b theme-border">
+                <td className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border`}>
                   {row.totals.late}
                 </td>
-                <td className="py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono text-rose-500 dark:text-rose-400 border-l border-b theme-border">
+                <td className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border`}>
                   {row.totals.absent}
                 </td>
                 <td className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold font-mono text-xs border-l border-r border-b theme-border">
-                  <span
-                    className={
-                      rate >= 85
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : rate >= 70
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-rose-600 dark:text-rose-400'
-                    }
-                  >
+                  <span className={getAttendanceRateColor(rate)}>
                     {rate}%
                   </span>
                 </td>

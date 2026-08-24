@@ -1,4 +1,4 @@
-import { CameraIcon, EditPencilIcon } from "./Icons";
+import { CameraIcon, EditIcon as EditPencilIcon } from "../../../components/ui/Icons";
 
 export default function ProfileHeroCard({ user, onEditProfile, onChangeAvatar }) {
   if (!user) return null;

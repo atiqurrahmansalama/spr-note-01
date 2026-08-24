@@ -17,6 +17,69 @@
     --danger-soft: rgba(244, 63, 94, 0.12);
     --danger-hover: rgba(244, 63, 94, 0.22);
     --danger-text: #fb7185;
+
+    /* Global Semantic Status Tokens (Dark Default) */
+    --color-success: #10b981;
+    --color-success-soft: rgba(16, 185, 129, 0.12);
+    --color-success-border: rgba(16, 185, 129, 0.25);
+    --color-success-text: #34d399;
+
+    --color-warning: #f59e0b;
+    --color-warning-soft: rgba(245, 158, 11, 0.12);
+    --color-warning-border: rgba(245, 158, 11, 0.25);
+    --color-warning-text: #fbbf24;
+
+    --color-danger: #f43f5e;
+    --color-danger-soft: rgba(244, 63, 94, 0.12);
+    --color-danger-border: rgba(244, 63, 94, 0.25);
+    --color-danger-text: #fb7185;
+
+    --color-info: #0ea5e9;
+    --color-info-soft: rgba(14, 165, 233, 0.12);
+    --color-info-border: rgba(14, 165, 233, 0.25);
+    --color-info-text: #38bdf8;
+
+    --color-purple: #a855f7;
+    --color-purple-soft: rgba(168, 85, 247, 0.12);
+    --color-purple-border: rgba(168, 85, 247, 0.25);
+    --color-purple-text: #c084fc;
+
+    --color-neutral: #64748b;
+    --color-neutral-soft: rgba(100, 116, 139, 0.12);
+    --color-neutral-border: rgba(100, 116, 139, 0.25);
+    --color-neutral-text: #94a3b8;
+  }
+
+  html[data-mode="light"] {
+    --color-success: #059669;
+    --color-success-soft: rgba(5, 150, 105, 0.10);
+    --color-success-border: rgba(5, 150, 105, 0.20);
+    --color-success-text: #047857;
+
+    --color-warning: #d97706;
+    --color-warning-soft: rgba(217, 119, 6, 0.10);
+    --color-warning-border: rgba(217, 119, 6, 0.20);
+    --color-warning-text: #b45309;
+
+    --color-danger: #e11d48;
+    --color-danger-soft: rgba(225, 29, 72, 0.10);
+    --color-danger-border: rgba(225, 29, 72, 0.20);
+    --color-danger-text: #be123c;
+
+    --color-info: #0284c7;
+    --color-info-soft: rgba(2, 132, 199, 0.10);
+    --color-info-border: rgba(2, 132, 199, 0.20);
+    --color-info-text: #0369a1;
+
+    --color-purple: #7e22ce;
+    --color-purple-soft: rgba(126, 34, 206, 0.10);
+    --color-purple-border: rgba(126, 34, 206, 0.20);
+    --color-purple-text: #6b21a8;
+
+    --color-neutral: #475569;
+    --color-neutral-soft: rgba(71, 85, 105, 0.08);
+    --color-neutral-border: rgba(71, 85, 105, 0.18);
+    --color-neutral-text: #334155;
   }
 }
 
@@ -116,6 +179,43 @@ body {
 .theme-bg-danger-soft {
   background-color: var(--danger-soft);
 }
+
+/* Global Semantic Status Utility Classes */
+.theme-success { color: var(--color-success-text); }
+.theme-bg-success { background-color: var(--color-success); color: #ffffff; }
+.theme-bg-success-soft { background-color: var(--color-success-soft); }
+.theme-border-success { border-color: var(--color-success-border); }
+.theme-success-badge { background-color: var(--color-success-soft); color: var(--color-success-text); border: 1px solid var(--color-success-border); }
+
+.theme-warning { color: var(--color-warning-text); }
+.theme-bg-warning { background-color: var(--color-warning); color: #000000; }
+.theme-bg-warning-soft { background-color: var(--color-warning-soft); }
+.theme-border-warning { border-color: var(--color-warning-border); }
+.theme-warning-badge { background-color: var(--color-warning-soft); color: var(--color-warning-text); border: 1px solid var(--color-warning-border); }
+
+.theme-danger { color: var(--color-danger-text); }
+.theme-bg-danger { background-color: var(--color-danger); color: #ffffff; }
+.theme-bg-danger-soft { background-color: var(--color-danger-soft); }
+.theme-border-danger { border-color: var(--color-danger-border); }
+.theme-danger-badge { background-color: var(--color-danger-soft); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); }
+
+.theme-info { color: var(--color-info-text); }
+.theme-bg-info { background-color: var(--color-info); color: #ffffff; }
+.theme-bg-info-soft { background-color: var(--color-info-soft); }
+.theme-border-info { border-color: var(--color-info-border); }
+.theme-info-badge { background-color: var(--color-info-soft); color: var(--color-info-text); border: 1px solid var(--color-info-border); }
+
+.theme-purple { color: var(--color-purple-text); }
+.theme-bg-purple { background-color: var(--color-purple); color: #ffffff; }
+.theme-bg-purple-soft { background-color: var(--color-purple-soft); }
+.theme-border-purple { border-color: var(--color-purple-border); }
+.theme-purple-badge { background-color: var(--color-purple-soft); color: var(--color-purple-text); border: 1px solid var(--color-purple-border); }
+
+.theme-neutral { color: var(--color-neutral-text); }
+.theme-bg-neutral { background-color: var(--color-neutral); color: #ffffff; }
+.theme-bg-neutral-soft { background-color: var(--color-neutral-soft); }
+.theme-border-neutral { border-color: var(--color-neutral-border); }
+.theme-neutral-badge { background-color: var(--color-neutral-soft); color: var(--color-neutral-text); border: 1px solid var(--color-neutral-border); }
 
 /* 1. Enterprise Slate Theme */
 html[data-theme="slate"][data-mode="dark"] {

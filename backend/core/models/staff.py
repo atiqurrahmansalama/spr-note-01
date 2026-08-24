@@ -50,6 +50,7 @@ class StaffProfile(models.Model):
         db_index=True
     )
     designation = models.CharField(max_length=100, help_text="e.g. Senior Ustadh, Accountant, Warden")
+    rank_order = models.IntegerField(default=99, db_index=True, help_text="Institutional hierarchy rank order (1=Principal, 2=VP, etc.)")
     department = models.ForeignKey('core.AcademicDepartment',
         null=True,
         blank=True,
@@ -97,7 +98,7 @@ class StaffProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at', 'employee_id']
+        ordering = ['rank_order', 'employee_id']
         verbose_name = "Staff Profile"
         verbose_name_plural = "Staff Profiles"
 
@@ -336,4 +337,60 @@ class StaffLeaveRequest(models.Model):
 
     def __str__(self):
         return f"{self.staff.employee_id} - {self.get_leave_type_display()} [{self.start_date} to {self.end_date}] ({self.get_status_display()})"
+
+
+class StaffOnboardingToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='staff_onboarding_tokens'
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    title = models.CharField(max_length=150, help_text="e.g. Senior Faculty Recruitment 2026")
+    staff_type = models.CharField(
+        max_length=20,
+        choices=StaffProfile.STAFF_TYPE_CHOICES,
+        default='TEACHING',
+        db_index=True
+    )
+    designation = models.CharField(max_length=100, blank=True, default='', help_text="Preset designation/title")
+    rank_order = models.IntegerField(default=99, help_text="Default hierarchy rank")
+    department = models.ForeignKey(
+        'core.AcademicDepartment',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='staff_onboarding_tokens'
+    )
+    max_applications = models.PositiveIntegerField(default=0, help_text="0 for unlimited uses")
+    applied_count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    auto_approve = models.BooleanField(default=True, help_text="Automatically create active StaffProfile upon submission")
+    include_payroll = models.BooleanField(default=False, help_text="Whether to request salary/banking info in public candidate form")
+    created_by = models.ForeignKey(
+        'core.User',
+        on_delete=models.CASCADE,
+        related_name='created_staff_onboarding_tokens'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Staff Onboarding Token"
+        verbose_name_plural = "Staff Onboarding Tokens"
+
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        if self.max_applications > 0 and self.applied_count >= self.max_applications:
+            return False
+        return True
+
+    def __str__(self):
+        return f"Staff Onboarding Token: {self.title} ({self.token})"
 

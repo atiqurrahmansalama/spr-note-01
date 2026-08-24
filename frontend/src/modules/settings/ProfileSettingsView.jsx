@@ -25,7 +25,7 @@ import {
   LogOutIcon,
   LockIcon,
   UserCheckIcon,
-} from "./components/Icons";
+} from "../../components/ui/Icons";
 
 export default function ProfileSettingsView() {
   const { showToast } = useToast();

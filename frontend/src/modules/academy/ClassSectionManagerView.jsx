@@ -19,10 +19,11 @@ import DataViewToolbar from '../../components/ui/DataViewToolbar';
 import DataViewFooter from '../../components/ui/DataViewFooter';
 import ActionMenu from '../../components/ui/ActionMenu';
 import CustomSelect from '../../components/ui/CustomSelect';
-import SectionFormModal from './SectionFormModal';
+import SectionForm from './SectionForm';
 import { getSections, getSectionMetrics, deleteSection, getBranches } from '../../api/academy';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
+import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 
 const TYPE_CONFIG = {
   GENERAL_SECTION: 'General Section',
@@ -64,9 +65,40 @@ export default function ClassSectionManagerView() {
   const [classFilter, setClassFilter] = useState(queryClass);
   const [branchFilter, setBranchFilter] = useState(queryBranch);
 
-  // Modals
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingSection, setEditingSection] = useState(null);
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Universal Drawer Registration for Section Form (survives F5 refresh)
+  useDrawerRegistration(
+    'section',
+    (params) => {
+      const mode = params.get('mode') || 'add';
+      const sectionId = params.get('id');
+      const foundSection = sectionId ? sections.find((s) => String(s.id) === String(sectionId)) : null;
+
+      return {
+        title: mode === 'add' ? 'Create Class Section / Halqa' : `Edit: ${foundSection?.section_name || 'Section'}`,
+        category: 'Classes & Groups',
+        size: 'md',
+        content: (
+          <SectionForm
+            section={foundSection}
+            classes={classes}
+            branches={branches}
+            teachers={teachers}
+            defaultClassId={classFilter !== 'ALL' ? classFilter : null}
+            defaultBranchId={branchFilter !== 'ALL' ? branchFilter : null}
+            onSaved={() => {
+              loadData();
+              closeDrawer();
+              showToast(mode === 'add' ? 'Class section created successfully.' : 'Class section updated successfully.', 'success');
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [sections, classes, branches, teachers, classFilter, branchFilter, loadData, closeDrawer, showToast]
+  );
 
   const handleToggleViewMode = (mode) => {
     setViewMode(mode);
@@ -150,13 +182,11 @@ export default function ClassSectionManagerView() {
   };
 
   const handleCreateNew = () => {
-    setEditingSection(null);
-    setIsFormModalOpen(true);
+    openDrawer('section', { mode: 'add' });
   };
 
   const handleEdit = (section) => {
-    setEditingSection(section);
-    setIsFormModalOpen(true);
+    openDrawer('section', { mode: 'edit', id: section.id });
   };
 
   const handleDelete = async (section) => {
@@ -534,17 +564,6 @@ export default function ClassSectionManagerView() {
           />
         )}
       </div>
-
-      {/* Section Form Modal */}
-      <SectionFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        section={editingSection}
-        classes={classes}
-        branches={branches}
-        teachers={teachers}
-        onSaved={loadData}
-      />
     </div>
   );
 }

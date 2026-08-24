@@ -21,6 +21,9 @@ from .views import (
     SessionViewSet,
     SavedMessageViewSet,
     StudentDailyReportViewSet, 
+    AdmissionInviteTokenViewSet,
+    PublicAdmissionVerifyView,
+    AuthenticatedOnlineAdmissionApplyView, 
     CustomTokenObtainPairView,
     GoogleOAuthExchangeView,
     RegisterView,
@@ -83,6 +86,9 @@ from .views import (
     GeneralStaffDutyViewSet,
     StaffAttendanceViewSet,
     StaffLeaveRequestViewSet,
+    StaffOnboardingTokenViewSet,
+    PublicStaffOnboardingVerifyView,
+    StaffOnboardingApplyView,
     CalendarEventViewSet,
     InstitutionalTaskViewSet,
     AttendanceSlotViewSet,
@@ -124,6 +130,7 @@ router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'document-templates', DocumentTemplateViewSet, basename='document-templates')
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
+router.register(r'admissions/tokens', AdmissionInviteTokenViewSet, basename='admission-tokens')
 
 # Enterprise Teacher & Staff Management Routers
 router.register(r'staff/teachers', TeacherAssignmentViewSet, basename='staff-teachers')
@@ -131,6 +138,8 @@ router.register(r'staff/general/duties', GeneralStaffDutyViewSet, basename='staf
 router.register(r'staff/general', GeneralStaffDutyViewSet, basename='staff-general')
 router.register(r'staff/attendance', StaffAttendanceViewSet, basename='staff-attendance')
 router.register(r'staff/leaves', StaffLeaveRequestViewSet, basename='staff-leaves')
+router.register(r'staff-onboarding/tokens', StaffOnboardingTokenViewSet, basename='staff-onboarding-tokens')
+router.register(r'staff/tokens', StaffOnboardingTokenViewSet, basename='staff-tokens')
 router.register(r'staff', StaffProfileViewSet, basename='staff-profile')
 
 # Enterprise Attendance, Calendar & Task Ecosystem Routers
@@ -237,6 +246,11 @@ urlpatterns = [
     # IAM & Security Suite Endpoints
     path('api/v1/invites/verify/', PublicInviteVerificationView.as_view(), name='invite_verify'),
     path('api/v1/invites/claim/', PublicInviteClaimView.as_view(), name='invite_claim'),
+    path('api/v1/public/admission/verify/', PublicAdmissionVerifyView.as_view(), name='public_admission_verify'),
+    path('api/v1/admissions/apply/', AuthenticatedOnlineAdmissionApplyView.as_view(), name='authenticated_admission_apply'),
+    path('api/v1/public/staff-onboard/verify/', PublicStaffOnboardingVerifyView.as_view(), name='public_staff_onboard_verify'),
+    path('api/v1/staff-onboarding/apply/', StaffOnboardingApplyView.as_view(), name='staff_onboarding_apply'),
+    path('api/v1/public/staff-onboard/apply/', StaffOnboardingApplyView.as_view(), name='public_staff_onboarding_apply'),
     path('api/v1/auth/accounts/verify-session/', VerifySessionView.as_view(), name='auth_verify_session'),
     path('api/v1/auth/qr/generate/', QRGenerateView.as_view(), name='auth_qr_generate'),
     path('api/v1/auth/qr/status/<uuid:ticket_id>/', QRStatusView.as_view(), name='auth_qr_status'),

@@ -10,7 +10,9 @@ import {
   CloseIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
+import { PageContainer } from '../../components/layout';
 import CustomSelect from '../../components/ui/CustomSelect';
+import { ClassSelect, TeacherSelect } from '../../components/selectors';
 import DataTable from '../../components/ui/DataTable';
 import DataCardGrid from '../../components/ui/DataCardGrid';
 import ActionMenu from '../../components/ui/ActionMenu';
@@ -157,8 +159,7 @@ export default function ClassPeriodScheduleView({
       return {
         title: mode === 'add' ? 'Add Period Slot' : `Edit: ${foundSlot?.period_name || 'Period'}`,
         category: 'Class Routine & Periods',
-        size: 'lg',
-        width: 680,
+        size: 'md',
         content: (
           <PeriodForm
             editingSlot={foundSlot}
@@ -552,7 +553,7 @@ export default function ClassPeriodScheduleView({
     : 'Add academic lecture periods, break times, and study sessions to build the routine schedule.';
 
   return (
-    <div className={`${isEmbedded ? 'w-full space-y-4 sm:space-y-6 animate-fade-in' : 'p-3 sm:p-5 md:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-fade-in'} theme-text-primary`}>
+    <PageContainer isEmbedded={isEmbedded}>
       {/* Header */}
       {!hideHeader && (
         <PageHeader
@@ -612,21 +613,27 @@ export default function ClassPeriodScheduleView({
 
           {/* Class Filter */}
           <div className="col-span-1 w-full">
-            <CustomSelect
-              options={classOptions}
-              value={classFilter}
-              onChange={(val) => setClassFilter(val)}
+            <ClassSelect
+              classes={classes}
+              value={classFilter === 'ALL' ? '' : classFilter}
+              onChange={(val) => setClassFilter(val || 'ALL')}
+              allowAll={true}
+              allLabel="All Classes"
               placeholder="All Classes"
+              label={null}
             />
           </div>
 
           {/* Teacher Filter */}
           <div className="col-span-1 w-full">
-            <CustomSelect
-              options={teacherOptions}
-              value={teacherFilter}
-              onChange={(val) => setTeacherFilter(val)}
+            <TeacherSelect
+              teachers={teachers}
+              value={teacherFilter === 'ALL' ? '' : teacherFilter}
+              onChange={(val) => setTeacherFilter(val || 'ALL')}
+              allowAll={true}
+              allLabel="All Teachers"
               placeholder="All Teachers"
+              label={null}
             />
           </div>
 
@@ -751,6 +758,6 @@ export default function ClassPeriodScheduleView({
           />
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

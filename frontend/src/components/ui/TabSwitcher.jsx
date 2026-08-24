@@ -15,10 +15,12 @@ export default function TabSwitcher({
   tabs = [],
   activeTab,
   onChange,
+  onTabChange,
   rightContent = null,
   className = '',
 }) {
   const tabsContainerRef = useRef(null);
+  const handleTabSelect = onChange || onTabChange;
 
   // Setup horizontal mouse wheel and drag scrolling on tabs
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function TabSwitcher({
 
   return (
     <div
-      className={`flex flex-col @lg:flex-row items-stretch @lg:items-center justify-between gap-2.5 @lg:gap-3 overflow-x-auto pb-0.5 scrollbar-none border-b theme-border w-full min-w-0 ${className}`}
+      className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pb-0.5 border-b theme-border w-full min-w-0 ${className}`}
     >
       {/* Tabs List with Wheel & Drag Scrolling */}
       <div
@@ -99,7 +101,7 @@ export default function TabSwitcher({
             e.currentTarget.scrollLeft += delta;
           }
         }}
-        className="flex items-center gap-1.5 @sm:gap-2 overflow-x-auto scrollbar-none shrink-0 min-w-0 cursor-grab active:cursor-grabbing"
+        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none shrink-0 min-w-0 cursor-grab active:cursor-grabbing"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -110,8 +112,8 @@ export default function TabSwitcher({
               key={tab.id}
               data-active={isActive}
               type="button"
-              onClick={() => onChange(tab.id)}
-              className={`group h-9 @sm:h-10 px-3 @sm:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 @sm:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
+              onClick={() => (handleTabSelect && handleTabSelect(tab.id))}
+              className={`group h-9 sm:h-10 px-3 sm:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 sm:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
                 isActive
                   ? 'theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-xs border-b-[var(--bg-surface,theme-bg-surface)]'
                   : 'border-t-transparent border-x-transparent theme-bg-sub/50 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border-b-theme-border'
@@ -143,7 +145,7 @@ export default function TabSwitcher({
 
       {/* Right-aligned Slot (Action button, search box, filters, etc.) */}
       {rightContent && (
-        <div className="flex items-center justify-start @lg:justify-end gap-2 shrink-0 pb-1 @lg:pb-0 w-full @lg:w-auto">
+        <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0 pb-1 sm:pb-0 w-full sm:w-auto">
           {rightContent}
         </div>
       )}

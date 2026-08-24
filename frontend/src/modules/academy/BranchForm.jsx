@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
+import { useTenant } from '../../context/TenantContext';
 import {
   BuildingOfficeIcon,
   SleekCheckIcon,
@@ -10,7 +11,9 @@ import {
   MailIcon,
   SparklesIcon,
 } from '../../components/ui/Icons';
+import CustomInput from '../../components/ui/CustomInput';
 import CustomSelect from '../../components/ui/CustomSelect';
+import { TeacherSelect } from '../../components/selectors';
 import CustomCheckbox from '../../components/ui/CustomCheckbox';
 import AddressPickerInput from '../../components/ui/AddressPickerInput';
 import {
@@ -18,6 +21,7 @@ import {
   BD_GEO_DATA,
 } from '../../utils/bangladeshGeoData';
 import { createBranch, updateBranch } from '../../api/academy';
+import { DrawerContainer, DrawerSection, DrawerFooter } from '../../components/layout';
 
 const BRANCH_TYPES = [
   { label: 'Main Campus', value: 'MAIN_CAMPUS' },
@@ -164,15 +168,10 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
   }));
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 h-full overflow-y-auto theme-text-primary font-sans">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        
+    <DrawerContainer padding="normal" spacing="normal">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Section 1: Basic Campus Profile */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <BuildingOfficeIcon className="w-4 h-4 theme-accent" />
-            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">Campus Information</h3>
-          </div>
+        <DrawerSection title="Campus Information" icon={BuildingOfficeIcon}>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             {(institutions.length > 1 || activeTenantId === 'ALL' || isMultiTenantAdmin) && (
@@ -191,37 +190,27 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
             )}
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Branch / Campus Name <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Branch / Campus Name"
                 required
                 placeholder="e.g. Uttara Main Campus, Mirpur Sub-Branch"
                 value={formData.branch_name}
-                onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })}
-                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm font-medium theme-text-primary placeholder:text-zinc-500"
+                onChange={(val) => setFormData({ ...formData, branch_name: val })}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Branch Code
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Branch Code"
                 placeholder="e.g. UTT-01"
                 value={formData.branch_code}
-                onChange={(e) => setFormData({ ...formData, branch_code: e.target.value.toUpperCase() })}
-                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm font-mono theme-text-primary placeholder:text-zinc-500"
+                onChange={(val) => setFormData({ ...formData, branch_code: val.toUpperCase() })}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Campus Category
-              </label>
               <CustomSelect
+                label="Campus Category"
                 options={BRANCH_TYPES}
                 value={formData.branch_type}
                 onChange={(val) => setFormData({ ...formData, branch_type: val })}
@@ -229,7 +218,7 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
               />
             </div>
           </div>
-        </div>
+        </DrawerSection>
 
         {/* Section 2: Geo Location & Google Maps Intelligence */}
         <AddressPickerInput
@@ -263,54 +252,42 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                <span>Campus In-Charge / Principal</span>
-                {loadingStaff && <span className="text-[10px] theme-accent font-normal">Loading staff...</span>}
-              </label>
-              <CustomSelect
-                options={staffOptions}
+              <TeacherSelect
+                label="Campus In-Charge / Principal"
+                teachers={staffList}
                 value={formData.in_charge_staff}
                 onChange={(val) => setFormData({ ...formData, in_charge_staff: val })}
+                allowAll={true}
+                allLabel="No Staff Assigned"
                 placeholder="Assign Staff In-Charge"
+                disabled={loadingStaff}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Contact Phone
-              </label>
-              <div className="relative">
-                <PhoneIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 opacity-50 theme-text-secondary" />
-                <input
-                  type="text"
-                  placeholder="e.g. +880 1711-223344"
-                  value={formData.contact_phone}
-                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                  className="w-full pl-9 pr-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm theme-text-primary placeholder:text-zinc-500"
-                />
-              </div>
+              <CustomInput
+                type="phone"
+                label="Contact Phone"
+                placeholder="e.g. 01711223344"
+                value={formData.contact_phone}
+                onChange={(val) => setFormData({ ...formData, contact_phone: val })}
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Contact Email
-              </label>
-              <div className="relative">
-                <MailIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 opacity-50 theme-text-secondary" />
-                <input
-                  type="email"
-                  placeholder="e.g. campus@institution.edu"
-                  value={formData.contact_email}
-                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                  className="w-full pl-9 pr-4 py-2.5 sm:py-3 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/50 text-sm theme-text-primary placeholder:text-zinc-500"
-                />
-              </div>
+              <CustomInput
+                type="email"
+                label="Contact Email"
+                placeholder="e.g. campus@institution.edu"
+                value={formData.contact_email}
+                onChange={(val) => setFormData({ ...formData, contact_email: val })}
+              />
             </div>
           </div>
         </div>
 
         {/* Section 4: Operational Status Checkbox */}
-        <div className="pt-2">
+        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
           <CustomCheckbox
             checked={formData.is_active}
             onChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
@@ -321,25 +298,14 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-bold theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSave}
-            className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-95 shadow cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
-          >
-            <SleekCheckIcon className="w-4 h-4" />
-            <span>{submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Register Branch'}</span>
-          </button>
-        </div>
+        <DrawerFooter
+          onCancel={onCancel}
+          isSubmitting={submitting}
+          isSaveDisabled={!canSave}
+          saveLabel={isEdit ? 'Save Changes' : 'Register Branch'}
+          onSubmit={true}
+        />
       </form>
-    </div>
+    </DrawerContainer>
   );
 }

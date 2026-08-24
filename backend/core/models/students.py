@@ -265,6 +265,11 @@ class StudentAcademicDetail(models.Model):
     admission_date = models.DateField(default=timezone.localdate)
     previous_school_name = models.CharField(max_length=255, blank=True, null=True)
     previous_school_address = models.CharField(max_length=255, blank=True, null=True)
+    previous_class = models.CharField(max_length=150, blank=True, null=True)
+    previous_roll_number = models.CharField(max_length=64, blank=True, null=True)
+    previous_result = models.CharField(max_length=128, blank=True, null=True)
+    previous_passing_year = models.CharField(max_length=32, blank=True, null=True)
+    previous_study_details = models.TextField(blank=True, default='')
     tc_number = models.CharField(max_length=64, blank=True, null=True)
     created_by = models.ForeignKey(
         'User',
@@ -320,4 +325,58 @@ class StudentDocument(models.Model):
 
     def __str__(self):
         return f"{self.get_doc_type_display()} for {self.student.name_en or self.student.uniq_id}"
+
+
+class AdmissionInviteToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='admission_invite_tokens'
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    title = models.CharField(max_length=150, help_text="e.g. Hifz Admission 2026-2027")
+    session_year = models.CharField(max_length=50, default="2026-2027")
+    target_class = models.ForeignKey(
+        'core.StudentClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admission_invite_tokens'
+    )
+    target_group = models.ForeignKey(
+        'core.StudentGroup',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admission_invite_tokens'
+    )
+    max_applications = models.PositiveIntegerField(default=0, help_text="0 for unlimited uses")
+    applied_count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    auto_enroll = models.BooleanField(default=True, help_text="Automatically enroll student upon submission")
+    created_by = models.ForeignKey(
+        'core.User',
+        on_delete=models.CASCADE,
+        related_name='created_admission_tokens'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        if self.max_applications > 0 and self.applied_count >= self.max_applications:
+            return False
+        return True
+
+    def __str__(self):
+        return f"Admission Token: {self.title} ({self.token})"
+
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "../../../context/ToastContext";
 import { fetchWithAuth } from "../../../utils/authService";
-import { CloseIcon, LockIcon } from "../components/Icons";
+import { CloseIcon, LockIcon } from "../../../components/ui/Icons";
 
 export default function Setup2FAModal({ isOpen, onClose, is2FAEnabled, onStatusChanged }) {
   const { showToast } = useToast();

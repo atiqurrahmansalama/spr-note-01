@@ -8,6 +8,8 @@ import { getTeacherAssignments, assignTeacherClass, deleteTeacherAssignment } fr
 import { useToast } from '../../context/ToastContext';
 import { fetchWithAuth } from '../../utils/authService';
 import CustomSelect from '../../components/ui/CustomSelect';
+import { ClassSelect, GroupSelect } from '../../components/selectors';
+import { DrawerContainer, DrawerBanner, DrawerSection, DrawerFooter } from '../../components/layout';
 
 export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCancel }) {
   const { showToast } = useToast();
@@ -144,93 +146,85 @@ export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCanc
   ];
 
   return (
-    <div className="p-4 sm:p-5 space-y-5 h-full overflow-y-auto theme-text-primary text-left">
+    <DrawerContainer padding="normal" spacing="normal">
       {/* Teacher Header Banner */}
-      <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center border theme-border shrink-0">
-          <ClassIcon className="w-5 h-5" />
-        </div>
-        <div>
-          <h4 className="text-sm font-bold theme-text-primary">
-            {teacher?.user_name || teacher?.employee_id || 'Teacher'}
-          </h4>
-          <p className="text-xs theme-text-secondary">
-            {teacher?.designation} • {teacher?.department_name || 'General Dept'}
-          </p>
-        </div>
-      </div>
+      <DrawerBanner
+        icon={ClassIcon}
+        title={teacher?.user_name || teacher?.employee_id || 'Teacher'}
+        subtitle={`${teacher?.designation || 'Staff'} • ${teacher?.department_name || 'General Dept'}`}
+      />
 
       {/* Add New Assignment Form */}
-      <form onSubmit={handleAssignSubmit} className="space-y-4 p-4 rounded-2xl theme-bg-sub border theme-border">
-        <div className="flex items-center gap-2">
-          <PlusIcon className="w-4 h-4 theme-accent" />
-          <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-            New Academic Class Assignment
-          </h4>
-        </div>
+      <form onSubmit={handleAssignSubmit}>
+        <DrawerSection title="New Academic Class Assignment" icon={PlusIcon}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <CustomSelect
+                label="Academic Session *"
+                options={sessionOptions}
+                value={form.session}
+                onChange={(val) => setForm({ ...form, session: val })}
+                placeholder="Select Session"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <CustomSelect
-              label="Academic Session *"
-              options={sessionOptions}
-              value={form.session}
-              onChange={(val) => setForm({ ...form, session: val })}
-              placeholder="Select Session"
-            />
+            <div>
+              <ClassSelect
+                label="Student Class"
+                required={true}
+                classes={classes}
+                value={form.student_class}
+                onChange={(val) => setForm({ ...form, student_class: val, student_group: '' })}
+                allowAll={false}
+                placeholder="Select Class"
+              />
+            </div>
           </div>
 
-          <div>
-            <CustomSelect
-              label="Student Class *"
-              options={classOptions}
-              value={form.student_class}
-              onChange={(val) => setForm({ ...form, student_class: val })}
-              placeholder="Select Class"
-            />
-          </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <GroupSelect
+                label="Student Group"
+                classId={form.student_class}
+                groups={groups}
+                value={form.student_group}
+                onChange={(val) => setForm({ ...form, student_group: val })}
+                allowAll={true}
+                allLabel="All Groups (General)"
+                placeholder="Select Group"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <CustomSelect
-              label="Student Group"
-              options={groupOptions}
-              value={form.student_group}
-              onChange={(val) => setForm({ ...form, student_group: val })}
-              placeholder="Select Group"
-            />
+            <div>
+              <CustomSelect
+                label="Role in Class"
+                options={roleOptions}
+                value={form.role_in_class}
+                onChange={(val) => setForm({ ...form, role_in_class: val })}
+                placeholder="Select Role"
+              />
+            </div>
           </div>
 
-          <div>
-            <CustomSelect
-              label="Role in Class"
-              options={roleOptions}
-              value={form.role_in_class}
-              onChange={(val) => setForm({ ...form, role_in_class: val })}
-              placeholder="Select Role"
-            />
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-bold transition-all cursor-pointer shadow-sm disabled:opacity-50"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>{isSubmitting ? 'Assigning...' : 'Assign to Class'}</span>
+            </button>
           </div>
-        </div>
-
-        <div className="pt-2 flex justify-end">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-semibold hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>{isSubmitting ? 'Assigning...' : 'Assign Class'}</span>
-          </button>
-        </div>
+        </DrawerSection>
       </form>
 
-      {/* Existing Assignments List */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-          Active Class Assignments ({assignments.length})
-        </h4>
-
+      {/* Current Active Assignments List */}
+      <DrawerSection
+        title="Active Class Assignments"
+        icon={ClassIcon}
+        badge={String(assignments.length)}
+      >
         {isLoading ? (
           <div className="p-4 text-center text-xs theme-text-secondary">
             Loading assigned classes...
@@ -274,19 +268,11 @@ export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCanc
             ))}
           </div>
         )}
-      </div>
+      </DrawerSection>
 
       {onCancel && (
-        <div className="pt-4 border-t theme-border flex justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl border theme-border hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all cursor-pointer"
-          >
-            Close
-          </button>
-        </div>
+        <DrawerFooter onCancel={onCancel} cancelLabel="Close" />
       )}
-    </div>
+    </DrawerContainer>
   );
 }

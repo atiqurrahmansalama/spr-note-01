@@ -20,14 +20,17 @@ import {
 } from '../../components/ui/Icons';
 import { getStaffDetail, getTeacherAssignments, getStaffDuties, getStaffAttendance, getLeaveRequests, applyLeave } from '../../api/staff';
 import { useToast } from '../../context/ToastContext';
-import StaffFormModal from './StaffFormModal';
-import TeacherAssignmentModal from './TeacherAssignmentModal';
-import GeneralDutyModal from './GeneralDutyModal';
+import { useRightSidebar } from '../../context/RightSidebarContext';
+import { PageContainer } from '../../components/layout';
+import StaffDrawerForm from './StaffDrawerForm';
+import TeacherAssignmentDrawerForm from './TeacherAssignmentDrawerForm';
+import GeneralDutyDrawerForm from './GeneralDutyDrawerForm';
 
 export default function StaffProfileDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const [staff, setStaff] = useState(null);
   const [assignments, setAssignments] = useState([]);
@@ -38,10 +41,7 @@ export default function StaffProfileDetailView() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'classes' | 'duties' | 'attendance' | 'payroll' | 'leaves'
 
-  // Modals
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [isDutyOpen, setIsDutyOpen] = useState(false);
+  // Modals & Drawers
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
   const [leaveForm, setLeaveForm] = useState({
@@ -116,6 +116,59 @@ export default function StaffProfileDetailView() {
     }
   };
 
+  const handleOpenEditDrawer = () => {
+    openRightSidebar({
+      title: `Edit ${staff?.user_name || 'Staff'} Profile`,
+      subtitle: 'Modify designation, qualifications, credentials, and hierarchy rank',
+      width: 650,
+      content: (
+        <StaffDrawerForm
+          staffData={staff}
+          onSaved={() => {
+            showToast('Profile updated!', 'success');
+            loadStaffData();
+            closeRightSidebar();
+          }}
+          onCancel={() => closeRightSidebar()}
+        />
+      ),
+    });
+  };
+
+  const handleOpenAssignDrawer = () => {
+    openRightSidebar({
+      title: 'Class & Subject Assignments',
+      subtitle: `Manage assigned academic classes and groups for ${staff?.user_name || staff?.employee_id}`,
+      width: 'md',
+      content: (
+        <TeacherAssignmentDrawerForm
+          teacher={staff}
+          onUpdated={() => {
+            loadStaffData();
+          }}
+          onCancel={() => closeRightSidebar()}
+        />
+      ),
+    });
+  };
+
+  const handleOpenDutyDrawer = () => {
+    openRightSidebar({
+      title: 'General & Campus Duties',
+      subtitle: `Assign residential, dining, or gate duties for ${staff?.user_name || staff?.employee_id}`,
+      width: 'md',
+      content: (
+        <GeneralDutyDrawerForm
+          staff={staff}
+          onUpdated={() => {
+            loadStaffData();
+          }}
+          onCancel={() => closeRightSidebar()}
+        />
+      ),
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="p-12 text-center theme-text-secondary flex flex-col items-center justify-center gap-3 min-h-[60vh]">
@@ -133,10 +186,10 @@ export default function StaffProfileDetailView() {
       <div className="p-12 text-center space-y-4">
         <h2 className="text-lg font-bold theme-text-primary">Staff Profile Not Found</h2>
         <button
-          onClick={() => navigate('/staff')}
+          onClick={() => navigate('/staff/roster')}
           className="px-4 py-2 theme-bg-sub hover:theme-bg-elevated theme-text-primary rounded-xl text-xs font-semibold cursor-pointer"
         >
-          ← Return to Directory
+          ← Return to Staff Roster
         </button>
       </div>
     );
@@ -148,20 +201,20 @@ export default function StaffProfileDetailView() {
     : staff.employee_id?.slice(0, 2) || 'ST';
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto min-h-screen theme-text-primary animate-fade-in select-none">
+    <PageContainer maxWidth="6xl">
       {/* 1. Top Breadcrumb & Return Bar */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/staff')}
+          onClick={() => navigate('/staff/roster')}
           className="flex items-center gap-2 text-xs font-medium theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer"
         >
-          <span>← Back to Staff Directory</span>
+          <span>← Back to Staff Roster</span>
         </button>
 
         <div className="flex items-center gap-2">
           {isTeaching ? (
             <button
-              onClick={() => setIsAssignOpen(true)}
+              onClick={handleOpenAssignDrawer}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold transition-colors cursor-pointer"
             >
               <ClassIcon className="w-4 h-4" />
@@ -169,7 +222,7 @@ export default function StaffProfileDetailView() {
             </button>
           ) : (
             <button
-              onClick={() => setIsDutyOpen(true)}
+              onClick={handleOpenDutyDrawer}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-semibold transition-colors cursor-pointer"
             >
               <DutyIcon className="w-4 h-4" />
@@ -186,7 +239,7 @@ export default function StaffProfileDetailView() {
           </button>
 
           <button
-            onClick={() => setIsEditOpen(true)}
+            onClick={handleOpenEditDrawer}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border text-xs font-semibold transition-colors cursor-pointer"
           >
             <EditIcon className="w-3.5 h-3.5" />
@@ -636,37 +689,6 @@ export default function StaffProfileDetailView() {
         </div>
       )}
 
-      {/* Modals */}
-      {isEditOpen && (
-        <StaffFormModal
-          isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
-          staffData={staff}
-          onSaved={() => {
-            showToast('Profile updated!', 'success');
-            loadStaffData();
-          }}
-        />
-      )}
-
-      {isAssignOpen && (
-        <TeacherAssignmentModal
-          isOpen={isAssignOpen}
-          onClose={() => setIsAssignOpen(false)}
-          teacher={staff}
-          onUpdated={loadStaffData}
-        />
-      )}
-
-      {isDutyOpen && (
-        <GeneralDutyModal
-          isOpen={isDutyOpen}
-          onClose={() => setIsDutyOpen(false)}
-          staff={staff}
-          onUpdated={loadStaffData}
-        />
-      )}
-
       {/* Apply Leave Modal */}
       {isLeaveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -749,6 +771,6 @@ export default function StaffProfileDetailView() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

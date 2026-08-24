@@ -14,7 +14,7 @@ import {
   calendarEventKindsStore,
   attendanceEventRestrictionsStore,
 } from "../../utils/localStore";
-import { EVENT_COLOR_MAP } from "../../components/common/MasterTimeCalendar";
+import { EVENT_COLOR_MAP } from "../../components/calendar";
 import DataTable from "../../components/ui/DataTable";
 
 const SECTIONS = [

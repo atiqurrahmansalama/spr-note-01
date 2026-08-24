@@ -1,4 +1,5 @@
-import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
+import React from "react";
+import CustomInput from "../../../../components/ui/CustomInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 
 export default function PageRangeInput({ range, onChange, onRemove, juzValue, isLast, onAddNextRange, onAddJuzRow }) {
@@ -19,16 +20,16 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
 
   return (
     <div className="flex items-center theme-bg-sub rounded-lg border theme-border overflow-hidden h-9 sm:h-10 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 shrink-0">
-      <NumberScrollInput
+      <CustomInput
         id={`${range.id}-start`}
+        type="number"
+        variant="borderless"
+        scrollable={true}
+        allowDecimals={false}
         value={range.start}
         onChange={(val) => onChange({ ...range, start: val })}
         onEnter={handleEnterFocusNext}
-        onAdd={() => {
-          if (onAddNextRange) {
-            onAddNextRange();
-          }
-        }}
+        onAdd={onAddNextRange}
         onAddShift={onAddJuzRow}
         onEmptyBackspace={(e) => {
           handleBackspaceFocusPrev(e, true);
@@ -37,22 +38,21 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
         min={1}
         max={maxStartPage}
         placeholder="--"
-        className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"
+        className="w-8 sm:w-10 h-full p-0 min-h-0"
+        inputClassName="w-8 sm:w-10 h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
       />
       <div className="w-px h-5 sm:h-6 theme-border border-r mx-[2px] sm:mx-1"></div>
       <span className="theme-text-secondary font-mono text-[11px] sm:text-xs">-</span>
       <div className="w-px h-5 sm:h-6 theme-border border-r mx-[2px] sm:mx-1"></div>
-      <NumberScrollInput
+      <CustomInput
+        type="number"
+        variant="borderless"
+        scrollable={true}
+        allowDecimals={false}
         value={range.end}
         onChange={(val) => onChange({ ...range, end: val })}
-        onEnter={(e) => {
-          handleEnterFocusNext(e);
-        }}
-        onAdd={() => {
-          if (onAddNextRange) {
-            onAddNextRange();
-          }
-        }}
+        onEnter={handleEnterFocusNext}
+        onAdd={onAddNextRange}
         onAddShift={onAddJuzRow}
         onEmptyBackspace={(e) => {
           handleBackspaceFocusPrev(e, true);
@@ -60,7 +60,8 @@ export default function PageRangeInput({ range, onChange, onRemove, juzValue, is
         min={minEndPage}
         max={maxPage}
         placeholder="--"
-        className="w-8 sm:w-10 h-full text-xs sm:text-sm theme-text-primary font-semibold"
+        className="w-8 sm:w-10 h-full p-0 min-h-0"
+        inputClassName="w-8 sm:w-10 h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import ChevronIcon from "./ChevronIcon";
+import { ChevronIcon } from "./Icons";
 import { focusNextInput } from "../../utils/keyboardUtils";
 
 export default function AutocompleteDropdown({

@@ -16,6 +16,7 @@ import {
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import MetricsGrid from '../../components/ui/MetricsGrid';
+import { PageContainer } from '../../components/layout';
 import DataTable from '../../components/ui/DataTable';
 import DataCardGrid from '../../components/ui/DataCardGrid';
 import ActionMenu from '../../components/ui/ActionMenu';
@@ -140,8 +141,7 @@ export default function BranchManagementView({
       return {
         title: mode === 'add' ? 'Register Academic Branch' : `Edit: ${foundBranch?.branch_name || 'Branch'}`,
         category: 'Academy & Branches',
-        size: 'lg',
-        width: 780,
+        size: 'md',
         content: (
           <BranchForm
             branch={foundBranch}
@@ -409,7 +409,7 @@ export default function BranchManagementView({
     : 'Register campuses, main branches, and residential buildings to start organizing class sections.';
 
   return (
-    <div className={`${isEmbedded ? 'w-full space-y-6 animate-fadeIn' : 'p-6 max-w-7xl mx-auto space-y-6 animate-fadeIn'}`}>
+    <PageContainer isEmbedded={isEmbedded}>
       {/* Page Header */}
       {!hideHeader && (
         <PageHeader
@@ -507,6 +507,6 @@ export default function BranchManagementView({
           />
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

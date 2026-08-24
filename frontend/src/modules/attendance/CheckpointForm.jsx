@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CustomInput from '../../components/ui/CustomInput';
 import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { FilledCheckCircleIcon } from '../../components/ui/Icons';
 import { useToast } from '../../context/ToastContext';
@@ -74,16 +75,12 @@ export default function CheckpointForm({
 
       {/* Checkpoint Name */}
       <div>
-        <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-          Checkpoint Title <span className="text-rose-400 font-bold">*</span>
-        </label>
-        <input
-          type="text"
+        <CustomInput
+          label="Checkpoint Title"
           required
           placeholder="e.g. Night Dormitory Bed Check, Fajr Roll Call"
           value={formData.name}
-          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-          className="w-full px-4 py-2.5 rounded-xl border theme-border theme-bg-sub focus:outline-none focus:border-[var(--accent-main)]/60 text-xs font-medium theme-text-primary"
+          onChange={(val) => setFormData((prev) => ({ ...prev, name: val }))}
         />
       </div>
 

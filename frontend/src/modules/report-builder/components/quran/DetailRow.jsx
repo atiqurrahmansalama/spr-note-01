@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import CustomSelect from "../../../../components/ui/CustomSelect";
-import NumberScrollInput from "../../../../components/ui/NumberScrollInput";
+import CustomInput from "../../../../components/ui/CustomInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";
 
@@ -201,8 +201,12 @@ export default function DetailRow({
             <div className="flex items-center gap-1 shrink-0">
               <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Page</label>
               <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-[42px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
-                <NumberScrollInput
+                <CustomInput
                   id={`page-${rowData.id}`}
+                  type="number"
+                  variant="borderless"
+                  scrollable={true}
+                  allowDecimals={false}
                   value={rowData.page}
                   onChange={handlePageChange}
                   onEnter={handleEnterFocusNext}
@@ -213,7 +217,8 @@ export default function DetailRow({
                   min={minPage}
                   max={maxPage}
                   placeholder="--"
-                  className="w-full h-full text-xs sm:text-sm theme-text-primary font-semibold"
+                  className="w-full h-full p-0 min-h-0"
+                  inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
                 />
               </div>
             </div>
@@ -237,8 +242,12 @@ export default function DetailRow({
                       return (
                         <div key={ayah.id} className="flex items-center gap-0.5 shrink-0">
                           <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-[42px] sm:w-14 shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
-                            <NumberScrollInput
+                            <CustomInput
                               id={`ayah-${ayah.id}`}
+                              type="number"
+                              variant="borderless"
+                              scrollable={true}
+                              allowDecimals={false}
                               value={ayah.value}
                               onChange={(val) => handleAyahChange(globalIdx, val)}
                               onEnter={(e) => {
@@ -259,7 +268,8 @@ export default function DetailRow({
                               }}
                               min={1}
                               placeholder="--"
-                              className="w-full h-full text-xs sm:text-sm theme-text-primary font-semibold"
+                              className="w-full h-full p-0 min-h-0"
+                              inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
                             />
                           </div>
                           {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px] select-none">,</span>}
@@ -297,8 +307,12 @@ export default function DetailRow({
                     return (
                       <div key={ayah.id} className="flex items-center gap-0.5 shrink-0">
                         <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] w-[42px] shadow-sm transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
-                          <NumberScrollInput
+                          <CustomInput
                             id={`ayah-${ayah.id}`}
+                            type="number"
+                            variant="borderless"
+                            scrollable={true}
+                            allowDecimals={false}
                             value={ayah.value}
                             onChange={(val) => handleAyahChange(globalIdx, val)}
                             onEnter={(e) => {
@@ -319,7 +333,8 @@ export default function DetailRow({
                             }}
                             min={1}
                             placeholder="--"
-                            className="w-full h-full text-xs theme-text-primary font-semibold"
+                            className="w-full h-full p-0 min-h-0"
+                            inputClassName="w-full h-full text-center text-xs theme-text-primary font-semibold font-mono p-0"
                           />
                         </div>
                         {!isLastTotal && <span className="theme-text-secondary font-bold text-xs opacity-60 px-[1px] select-none">,</span>}

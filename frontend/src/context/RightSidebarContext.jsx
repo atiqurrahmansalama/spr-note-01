@@ -7,10 +7,10 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
  * - lg (Big / Large): 760px -> Multi-column forms, detailed logs, complex matrices
  */
 export const DRAWER_SIZES = {
-  sm: 420,
-  small: 420,
-  md: 560,
-  medium: 560,
+  sm: 440,
+  small: 440,
+  md: 580,
+  medium: 580,
   lg: 760,
   big: 760,
   large: 760,
@@ -56,7 +56,7 @@ function getUrlParams() {
 const RightSidebarContext = createContext({
   isRightSidebarOpen: false,
   rightSidebarConfig: null,
-  drawerWidth: 560,
+  drawerWidth: 580,
   setDrawerWidth: () => {},
   openRightSidebar: () => {},
   closeRightSidebar: () => {},
@@ -66,14 +66,7 @@ const RightSidebarContext = createContext({
 
 export function RightSidebarProvider({ children }) {
   const [rightSidebarConfig, setRightSidebarConfig] = useState(null);
-  const [drawerWidth, setDrawerWidthState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('spr_right_drawer_width');
-      const parsed = parseInt(saved, 10);
-      if (!isNaN(parsed) && parsed >= 360) return parsed;
-    } catch {}
-    return 580;
-  });
+  const [drawerWidth, setDrawerWidthState] = useState(580);
 
   const setDrawerWidth = useCallback((widthOrFn) => {
     setDrawerWidthState((prev) => {
@@ -116,29 +109,24 @@ export function RightSidebarProvider({ children }) {
     if (!config) return;
     const { title, content, size = 'md', width, onClose, ownerId, drawerKey, ...restConfig } = config;
 
-    setRightSidebarConfig((prevConfig) => {
-      const isNewDrawer = !prevConfig || (drawerKey && prevConfig.drawerKey !== drawerKey);
-      if (isNewDrawer || width) {
-        const resolvedWidth = resolveDrawerWidth(width || size);
-        setDrawerWidth(resolvedWidth);
-      }
+    const resolvedWidth = resolveDrawerWidth(width || size);
+    setDrawerWidth(resolvedWidth);
 
-      if (drawerKey) {
-        updateUrlParams((params) => {
-          params.set('drawer', drawerKey);
-        });
-      }
+    if (drawerKey) {
+      updateUrlParams((params) => {
+        params.set('drawer', drawerKey);
+      });
+    }
 
-      return {
-        title: title || 'Action Panel',
-        content: content || null,
-        size: size || 'md',
-        width: width || (prevConfig?.width || resolveDrawerWidth(size)),
-        drawerKey: drawerKey || null,
-        onClose: onClose || null,
-        ownerId: ownerId || null,
-        ...restConfig,
-      };
+    setRightSidebarConfig({
+      title: title || 'Action Panel',
+      content: content || null,
+      size: size || 'md',
+      width: resolvedWidth,
+      drawerKey: drawerKey || null,
+      onClose: onClose || null,
+      ownerId: ownerId || null,
+      ...restConfig,
     });
   }, [setDrawerWidth]);
 
@@ -146,8 +134,15 @@ export function RightSidebarProvider({ children }) {
    * openDrawer
    * Industry-standard: opens a registered drawer by key and syncs query params to the URL
    */
-  const openDrawer = useCallback((drawerKey, queryParams = {}) => {
-    if (!drawerKey) return;
+  const openDrawer = useCallback((drawerKeyOrConfig, queryParams = {}) => {
+    if (!drawerKeyOrConfig) return;
+
+    if (typeof drawerKeyOrConfig === 'object' && drawerKeyOrConfig !== null) {
+      openRightSidebar(drawerKeyOrConfig);
+      return;
+    }
+
+    const drawerKey = drawerKeyOrConfig;
 
     updateUrlParams((params) => {
       params.set('drawer', drawerKey);

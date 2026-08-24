@@ -1,5 +1,5 @@
 import AutocompleteDropdown from "../../../components/ui/AutocompleteDropdown";
-import StudentSavePanel from "../../student-directory/components/StudentSavePanel";
+import StudentSavePanel from "../../student-directory/StudentSavePanel";
 
 export default function StudentInputSection({
   studentDatabase,

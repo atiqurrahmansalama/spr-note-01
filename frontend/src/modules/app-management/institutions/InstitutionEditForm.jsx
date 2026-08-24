@@ -5,6 +5,7 @@ import {
   LocationIcon,
   CompassIcon,
 } from '../../../components/ui/Icons';
+import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import FileUploadZone from '../../../components/ui/FileUploadZone';
@@ -202,35 +203,26 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           {/* Identity Names */}
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Academy Name (English) <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Academy Name (English)"
                 required
                 value={formData.name}
-                onChange={(e) => {
-                  setFormData({ ...formData, name: e.target.value });
+                onChange={(val) => {
+                  setFormData({ ...formData, name: val });
                   if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
                 }}
                 placeholder="e.g. Darul Ulum Islamic Academy"
-                className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                  errors.name ? 'border-rose-500' : 'theme-border'
-                } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all`}
+                error={errors.name}
               />
-              {errors.name && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.name}</p>}
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Native / Regional Name (Optional)
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Native / Regional Name"
+                optional
                 value={formData.bangla_name}
-                onChange={(e) => setFormData({ ...formData, bangla_name: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, bangla_name: val })}
                 placeholder="e.g. Darul Uloom Academy"
-                className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
               />
             </div>
           </div>
@@ -249,15 +241,12 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                EIIN / Govt. Reg No.
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="EIIN / Govt. Reg No."
+                optional
                 value={formData.eiin_or_reg_no}
-                onChange={(e) => setFormData({ ...formData, eiin_or_reg_no: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, eiin_or_reg_no: val })}
                 placeholder="e.g. 132456"
-                className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
               />
             </div>
           </div>
@@ -289,35 +278,27 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           {/* Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Official Contact Phone
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                type="phone"
+                label="Official Contact Phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, phone: val })}
                 placeholder="e.g. 01712345678"
-                className="w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Official Email Address
-              </label>
-              <input
+              <CustomInput
                 type="email"
+                label="Official Email Address"
                 value={formData.email}
-                onChange={(e) => {
-                  setFormData({ ...formData, email: e.target.value });
+                onChange={(val) => {
+                  setFormData({ ...formData, email: val });
                   if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
                 }}
                 placeholder="e.g. info@academy.edu"
-                className={`w-full h-10 px-3.5 py-2 rounded-xl theme-bg-sub border ${
-                  errors.email ? 'border-rose-500' : 'theme-border'
-                } text-xs font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/15 transition-all`}
+                error={errors.email}
               />
-              {errors.email && <p className="mt-1 text-xs text-rose-400 font-medium">{errors.email}</p>}
             </div>
           </div>
 

@@ -4,6 +4,8 @@ import { useToast } from "../../context/ToastContext";
 import { useTenant } from "../../context/TenantContext";
 import { attendanceFilters } from "../../utils/localStore";
 import { GateIcon, RefreshIcon, SaveIcon } from "../../components/ui/Icons";
+import CustomInput from "../../components/ui/CustomInput";
+import CustomSelect from "../../components/ui/CustomSelect";
 
 export default function GateEntryLogView() {
   const { showToast } = useToast();
@@ -169,31 +171,24 @@ export default function GateEntryLogView() {
 
             {/* Barcode / RFID Input */}
             <div>
-              <label className="block font-semibold mb-1 theme-text-secondary">
-                Barcode / Student Roll / RFID
-              </label>
-              <input
+              <CustomInput
                 ref={barcodeInputRef}
-                type="text"
+                label="Barcode / Student Roll / RFID"
                 autoFocus
                 value={scanBarcode}
-                onChange={(e) => setScanBarcode(e.target.value)}
+                onChange={(val) => setScanBarcode(val)}
                 placeholder="Scan or type ID / Roll number..."
-                className="w-full px-3 py-2.5 rounded-xl border theme-border theme-bg-sub theme-text-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
             {/* Reason / Gate Pass Note */}
             <div>
-              <label className="block font-semibold mb-1 theme-text-secondary">
-                Gate Pass Reason (Optional)
-              </label>
-              <input
-                type="text"
+              <CustomInput
+                label="Gate Pass Reason"
+                optional
                 value={scanReason}
-                onChange={(e) => setScanReason(e.target.value)}
+                onChange={(val) => setScanReason(val)}
                 placeholder="e.g., Medical visit, Family leave, Daily outing"
-                className="w-full px-3 py-2 rounded-xl border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
 
@@ -215,24 +210,29 @@ export default function GateEntryLogView() {
             <h2 className="font-bold text-sm">Recent Gate Movements</h2>
 
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Search person or roll..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchLogs()}
-                className="px-2.5 py-1.5 rounded-lg border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+              <div className="w-48">
+                <CustomInput
+                  type="search"
+                  size="sm"
+                  placeholder="Search person or roll..."
+                  value={searchQuery}
+                  onChange={(val) => setSearchQuery(val)}
+                  onKeyDown={(e) => e.key === "Enter" && fetchLogs()}
+                />
+              </div>
 
-              <select
-                value={selectedDirection}
-                onChange={(e) => setSelectedDirection(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border theme-border theme-bg-sub theme-text-primary focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                <option value="ALL">All Movements</option>
-                <option value="ENTRY">Entries Only</option>
-                <option value="EXIT">Exits Only</option>
-              </select>
+              <div className="w-40">
+                <CustomSelect
+                  size="sm"
+                  value={selectedDirection}
+                  onChange={(val) => setSelectedDirection(val)}
+                  options={[
+                    { value: "ALL", label: "All Movements" },
+                    { value: "ENTRY", label: "Entries Only" },
+                    { value: "EXIT", label: "Exits Only" },
+                  ]}
+                />
+              </div>
             </div>
           </div>
 

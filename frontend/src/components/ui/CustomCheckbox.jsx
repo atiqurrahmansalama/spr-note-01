@@ -41,15 +41,17 @@ export default function CustomCheckbox({
     e.stopPropagation();
   };
 
+  const hasMultipleLines = Boolean(subLabel || description);
+
   return (
     <label
       htmlFor={inputId}
       onClick={handleContainerClick}
-      className={`inline-flex items-start gap-2.5 select-none transition-opacity ${
+      className={`inline-flex ${hasMultipleLines ? 'items-start' : 'items-center'} gap-2.5 select-none transition-opacity ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'
       } ${className}`}
     >
-      <div className="relative flex items-center justify-center shrink-0 mt-0.5">
+      <div className={`relative flex items-center justify-center shrink-0 ${hasMultipleLines ? 'mt-0.5' : ''}`}>
         <input
           type="checkbox"
           id={inputId}
@@ -75,10 +77,10 @@ export default function CustomCheckbox({
       </div>
 
       {(label || subLabel || description) && (
-        <div className="flex flex-col text-left">
+        <div className="flex flex-col text-left justify-center">
           {label && (
             <span
-              className={`text-xs font-bold leading-tight ${
+              className={`text-xs font-bold leading-normal ${
                 disabled ? 'theme-text-secondary' : 'theme-text-primary'
               }`}
             >
