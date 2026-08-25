@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import {
   RefreshIcon,
   CalendarIcon,
@@ -9,6 +8,8 @@ import {
   FilledCheckCircleIcon,
   FilledXCircleIcon,
   AttendanceIcon,
+  FullScreenIcon,
+  MinimizeIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
@@ -31,7 +32,10 @@ import { useRightSidebar, useDrawerRegistration } from '../../context/RightSideb
 import {
   ATTENDANCE_STATUSES,
   getAttendanceRateColor,
+  cycleAttendanceStatus,
 } from '../../constants/attendanceConstants';
+import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import { useFullscreen } from '../../hooks/useFullscreen';
 
 const DEFAULT_INITIAL_CHECKPOINTS = [
   {
@@ -97,8 +101,9 @@ export default function ResidentialAttendanceView({
 
   // Attendance Marking & UI State
   const [isEditing, setIsEditing] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { isFullscreen, setIsFullscreen, toggleFullscreen } = useFullscreen();
   const [isLoading, setIsLoading] = useState(true);
+  const [metadataLoaded, setMetadataLoaded] = useState(false);
   const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
   const [calendarEventsVersion, setCalendarEventsVersion] = useState(0);
 
@@ -125,6 +130,19 @@ export default function ResidentialAttendanceView({
       return {};
     }
   });
+
+  // Update Checkpoints and Records on activeTenantId change
+  useEffect(() => {
+    try {
+      const savedCp = localStorage.getItem(`spr_res_checkpoints_${activeTenantId || 'default'}`);
+      setCheckpoints(savedCp ? JSON.parse(savedCp) : DEFAULT_INITIAL_CHECKPOINTS);
+      const savedRec = localStorage.getItem(`spr_res_records_${activeTenantId || 'default'}`);
+      setResidentialRecords(savedRec ? JSON.parse(savedRec) : {});
+    } catch {
+      setCheckpoints(DEFAULT_INITIAL_CHECKPOINTS);
+      setResidentialRecords({});
+    }
+  }, [activeTenantId]);
 
   // Persist filters to localStorage
   useEffect(() => {
@@ -165,24 +183,20 @@ export default function ResidentialAttendanceView({
     };
   }, []);
 
-  // Listen to Escape key to exit full screen
+  // Fetch Lookups & Initial Groups in parallel
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+    let isMounted = true;
 
-  // Fetch Lookups
-  useEffect(() => {
     const fetchLookups = async () => {
       try {
-        const [clsRes] = await Promise.allSettled([
+        setMetadataLoaded(false);
+        const initialClass = propClassId || savedFilters.classId || '';
+        const [clsRes, grpRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
+          fetchWithAuth(initialClass ? `/api/v1/groups/?student_class=${initialClass}` : '/api/v1/groups/?page_size=500'),
         ]);
+
+        if (!isMounted) return;
 
         if (clsRes.status === 'fulfilled' && clsRes.value.ok) {
           const data = await clsRes.value.json();
@@ -198,23 +212,42 @@ export default function ResidentialAttendanceView({
             setSelectedClassId('');
           }
         }
+
+        if (grpRes.status === 'fulfilled' && grpRes.value.ok) {
+          const gData = await grpRes.value.json();
+          setGroups(Array.isArray(gData) ? gData : gData.results || []);
+        }
       } catch (err) {
         console.error('Failed to load classes for residential attendance:', err);
+      } finally {
+        if (isMounted) {
+          setMetadataLoaded(true);
+        }
       }
     };
 
     fetchLookups();
+
+    const handleTenantChanged = () => {
+      fetchLookups();
+    };
+    window.addEventListener('spr_tenant_changed', handleTenantChanged);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+    };
   }, [activeTenantId]);
 
-  // Fetch Groups when Class changes
+  // Fetch Groups when Class changes subsequently
   useEffect(() => {
+    if (!metadataLoaded || !selectedClassId) return;
+    let isMounted = true;
+
     const fetchGroups = async () => {
       try {
-        const url = selectedClassId
-          ? `/api/v1/groups/?student_class=${selectedClassId}`
-          : `/api/v1/groups/?page_size=500`;
-        const res = await fetchWithAuth(url);
-        if (res.ok) {
+        const res = await fetchWithAuth(`/api/v1/groups/?student_class=${selectedClassId}`);
+        if (res.ok && isMounted) {
           const data = await res.json();
           setGroups(Array.isArray(data) ? data : data.results || []);
         }
@@ -224,14 +257,22 @@ export default function ResidentialAttendanceView({
     };
 
     fetchGroups();
-  }, [selectedClassId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedClassId, metadataLoaded]);
 
   // Load Residential Attendance Matrix
   const loadMatrix = useCallback(async () => {
+    if (!metadataLoaded && !propClassId) {
+      return;
+    }
     if (!selectedClassId && classes.length > 0) {
       return;
     }
     if (!selectedClassId && !propClassId && classes.length === 0) {
+      setIsLoading(false);
       return;
     }
 
@@ -258,7 +299,7 @@ export default function ResidentialAttendanceView({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedClassId, selectedGroupId, selectedYear, selectedMonth, startDate, endDate, classes.length, propClassId, showToast]);
+  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedYear, selectedMonth, startDate, endDate, classes.length, propClassId, showToast]);
 
   useEffect(() => {
     loadMatrix();
@@ -551,21 +592,15 @@ export default function ResidentialAttendanceView({
 
   // Toggle Cell Checkpoint Attendance (Always allowed, never blocked)
   const handleToggleCell = (studentId, dateStr, currentStatus, checkpointId) => {
-    const nextStatus =
-      !currentStatus || currentStatus === 'PRESENT'
-        ? 'ABSENT'
-        : currentStatus === 'ABSENT'
-        ? 'LATE'
-        : currentStatus === 'LATE'
-        ? 'HALF_DAY'
-        : currentStatus === 'HALF_DAY'
-        ? 'ON_LEAVE'
-        : currentStatus === 'ON_LEAVE'
-        ? null
-        : 'PRESENT';
+    const nextStatus = cycleAttendanceStatus(currentStatus);
 
     const recordKey = `${studentId}_${checkpointId}_${dateStr}`;
-    const newRecords = { ...residentialRecords, [recordKey]: nextStatus };
+    const newRecords = { ...residentialRecords };
+    if (nextStatus) {
+      newRecords[recordKey] = nextStatus;
+    } else {
+      delete newRecords[recordKey];
+    }
     setResidentialRecords(newRecords);
 
     try {
@@ -582,16 +617,30 @@ export default function ResidentialAttendanceView({
     return found.length > 0 ? found : checkpoints;
   }, [checkpoints, selectedCheckpointId]);
 
-  // Unique Students from matrix
+  // Unique Students from matrix with guaranteed unique IDs
   const uniqueStudents = useMemo(() => {
     if (!enrichedMatrixData?.students_matrix) return [];
-    return enrichedMatrixData.students_matrix;
+    const seen = new Set();
+    const list = [];
+    enrichedMatrixData.students_matrix.forEach((st) => {
+      const sId = st.student_id || st.id;
+      if (sId !== undefined && sId !== null && !seen.has(String(sId))) {
+        seen.add(String(sId));
+        list.push({
+          ...st,
+          student_id: sId,
+          id: sId,
+          name: st.name || st.student_name,
+        });
+      }
+    });
+    return list;
   }, [enrichedMatrixData]);
 
   // Compute student totals across active checkpoints
   const computeStudentTotals = useCallback((studentId) => {
     let p = 0, l = 0, a = 0, hd = 0, lv = 0;
-    if (!enrichedMatrixData?.days_header) {
+    if (!enrichedMatrixData?.days_header || !studentId) {
       return { present: 0, late: 0, absent: 0, half_day: 0, on_leave: 0, total_recorded: 0, attendance_rate: 100 };
     }
 
@@ -610,7 +659,7 @@ export default function ResidentialAttendanceView({
 
     const total = p + l + a + hd + lv;
     const effective = p + l + hd * 0.5;
-    const rate = total > 0 ? Math.round((effective / total) * 1000) / 10 : 100.0;
+    const rate = total > 0 ? Math.round((effective / total) * 100) : 100;
     return { present: p, late: l, absent: a, half_day: hd, on_leave: lv, total_recorded: total, attendance_rate: rate };
   }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords]);
 
@@ -638,14 +687,15 @@ export default function ResidentialAttendanceView({
 
     const rows = [];
     uniqueStudents.forEach((student) => {
+      const studentId = student.student_id || student.id;
       activeCheckpoints.forEach((chk) => {
         const dayStatuses = matrixData.days_header.map((d) => {
           const fullDateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-          const recordKey = `${student.student_id}_${chk.id}_${fullDateStr}`;
+          const recordKey = `${studentId}_${chk.id}_${fullDateStr}`;
           return residentialRecords[recordKey] || '—';
         });
 
-        const totals = computeStudentTotals(student.student_id);
+        const totals = computeStudentTotals(studentId);
 
         rows.push([
           `"${student.roll_number || ''}"`,
@@ -679,15 +729,7 @@ export default function ResidentialAttendanceView({
   const headerActionMenuItems = [
     {
       label: isFullscreen ? 'Exit Full Screen' : 'Full Screen View',
-      icon: isFullscreen ? (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
-        </svg>
-      ) : (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-        </svg>
-      ),
+      icon: isFullscreen ? MinimizeIcon : FullScreenIcon,
       onClick: () => setIsFullscreen((prev) => !prev),
     },
     {
@@ -756,28 +798,10 @@ export default function ResidentialAttendanceView({
             subtitle="Time & Checkpoint roll-call attendance register for boarding/dormitory students"
             actions={
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleToggleTakeAttendance}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer ${
-                    isEditing
-                      ? 'theme-bg-accent theme-accent-text hover:opacity-90 ring-2 ring-[var(--accent-main)]/40 shadow-sm'
-                      : 'theme-bg-accent theme-accent-text hover:opacity-90'
-                  }`}
-                >
-                  {isEditing ? (
-                    <>
-                      <FilledCheckCircleIcon className="w-4 h-4" />
-                      <span>Done Marking</span>
-                    </>
-                  ) : (
-                    <>
-                      <AttendanceIcon className="w-4 h-4" />
-                      <span>Take Attendance</span>
-                    </>
-                  )}
-                </button>
-
+                <TakeAttendanceButton
+                  isEditing={isEditing}
+                  onToggle={handleToggleTakeAttendance}
+                />
                 <ActionMenu items={headerActionMenuItems} />
               </div>
             }
@@ -796,27 +820,11 @@ export default function ResidentialAttendanceView({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleTakeAttendance}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer ${
-                isEditing
-                  ? 'theme-bg-accent theme-accent-text hover:opacity-90 ring-2 ring-[var(--accent-main)]/40 shadow-sm'
-                  : 'theme-bg-accent theme-accent-text hover:opacity-90'
-              }`}
-            >
-              {isEditing ? (
-                <>
-                  <FilledCheckCircleIcon className="w-4 h-4" />
-                  <span>Done</span>
-                </>
-              ) : (
-                <>
-                  <AttendanceIcon className="w-4 h-4" />
-                  <span>Take Attendance</span>
-                </>
-              )}
-            </button>
+            <TakeAttendanceButton
+              isEditing={isEditing}
+              onToggle={handleToggleTakeAttendance}
+              size="sm"
+            />
           </div>
         </div>
       )}
@@ -945,315 +953,83 @@ export default function ResidentialAttendanceView({
             : "rounded-3xl theme-bg-surface border theme-border shadow-xs overflow-hidden"
         }
       >
-        {isLoading ? (
-          <div className="p-16 text-center text-xs theme-text-secondary flex flex-col items-center justify-center gap-3">
-            <RefreshIcon className="w-6 h-6 animate-spin theme-accent" />
-            <span>Generating residential attendance register...</span>
-          </div>
-        ) : !enrichedMatrixData || uniqueStudents.length === 0 ? (
-          <div className="p-16 text-center text-xs theme-text-secondary">
-            No students found for this class and residential selection.
-          </div>
-        ) : (
-          <div ref={tableScrollRef} className={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}>
-            <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
-              {/* Sticky Headers (Exact Match with Class Attendance) */}
-              <thead className="sticky top-0 z-30 theme-bg-sub select-none">
-                <tr className="text-center font-bold">
-                  {/* Sticky Roll No */}
-                  <th className="py-2.5 px-0.5 sm:px-1 w-[36px] min-w-[36px] max-w-[36px] sm:w-[42px] sm:min-w-[42px] sm:max-w-[42px] sticky left-0 z-40 theme-bg-sub border-r border-b theme-border text-xs text-center">
-                    Roll
-                  </th>
+        <AttendanceMatrixTable
+          daysHeader={enrichedMatrixData?.days_header || []}
+          rows={uniqueStudents.flatMap((student) => {
+            const studentId = student.student_id || student.id;
+            return activeCheckpoints.map((chk, chkIdx) => {
+              const dailyStatuses = {};
+              let chkP = 0, chkL = 0, chkA = 0, chkHd = 0, chkLv = 0;
 
-                  {/* Sticky Student Name */}
-                  <th className="py-2.5 px-2 sm:px-2.5 w-[110px] min-w-[110px] max-w-[110px] sm:w-[140px] sm:min-w-[140px] sm:max-w-[140px] left-[36px] sm:left-[42px] sticky z-40 theme-bg-sub border-r border-b theme-border text-left text-xs shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-1px_rgba(0,0,0,0.25)]">
-                    Student Name
-                  </th>
+              (enrichedMatrixData?.days_header || []).forEach((d) => {
+                const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+                const key = `${studentId}_${chk.id}_${dateStr}`;
+                const st = residentialRecords[key];
+                if (st) {
+                  dailyStatuses[dateStr] = st;
+                  if (st === 'PRESENT') chkP += 1;
+                  else if (st === 'LATE') chkL += 1;
+                  else if (st === 'ABSENT') chkA += 1;
+                  else if (st === 'HALF_DAY') chkHd += 1;
+                  else if (st === 'ON_LEAVE') chkLv += 1;
+                }
+              });
 
-                  {/* Dedicated Time & Checkpoint Header */}
-                  <th className="py-2.5 px-1.5 sm:px-2 w-[100px] min-w-[100px] max-w-[100px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[130px] border-r border-b theme-border text-left text-xs">
-                    <div className="flex items-center gap-1">
-                      <TimerIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-                      <span className="truncate">Time &amp; Checkpoint</span>
-                    </div>
-                  </th>
+              const chkTotal = chkP + chkL + chkA + chkHd + chkLv;
+              const chkEffective = chkP + chkL + chkHd * 0.5;
+              const chkRate = chkTotal > 0 ? Math.round((chkEffective / chkTotal) * 100) : 100;
 
-                  {/* Dynamic Date Headers with 3 Lines (Day -> Hijri -> Weekday) & Event Color Priority */}
-                  {enrichedMatrixData.days_header.map((d) => {
-                    const fullDateStr =
-                      d.date ||
-                      `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-                    const hijriDayNumber = isHijriEnabled
-                      ? getHijriDateString(fullDateStr).split(' ')[0]
-                      : null;
-
-                    const isHoliday = Boolean(d.is_holiday);
-                    const hasEvent = Boolean(d.event_colors);
-                    const eventTitle = d.event_title || d.calendar_event?.title || d.holiday_title;
-
-                    return (
-                      <th
-                        key={d.date || d.day}
-                        onClick={() => handleOpenDayAgenda(fullDateStr)}
-                        className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] font-mono border-r border-b theme-border transition-colors cursor-pointer hover:brightness-95 select-none ${
-                          hasEvent
-                            ? `${d.event_colors.bg} ${d.event_colors.text} font-bold`
-                            : isHoliday
-                            ? 'theme-bg-accent-soft theme-accent font-bold'
-                            : ''
-                        }`}
-                        title={
-                          eventTitle
-                            ? `${eventTitle} [${fullDateStr}] - Click to view schedule & events`
-                            : `${d.weekday} - ${fullDateStr}${hijriDayNumber ? ` (Hijri: ${hijriDayNumber})` : ''} - Click to view day agenda`
-                        }
-                      >
-                        <div className="flex flex-col items-center justify-between min-h-[50px] sm:min-h-[56px] py-0.5">
-                          {/* Top Group: Gregorian & Hijri Dates */}
-                          <div className="space-y-0.5 flex flex-col items-center">
-                            <div className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${hasEvent ? d.event_colors.text : 'theme-text-primary'}`}>
-                              {d.day}
-                            </div>
-
-                            {isHijriEnabled && hijriDayNumber && (
-                              <div className="text-[9px] sm:text-[10px] font-mono theme-accent font-semibold leading-none pt-0.5">
-                                {hijriDayNumber}
-                              </div>
-                            )}
-
-                            {hasEvent && (
-                              <span className={`w-1 h-1 rounded-full mt-0.5 shrink-0 ${d.event_colors.dot}`} />
-                            )}
-                          </div>
-
-                          {/* Bottom: Weekday Name with clear spacing and subtle separator line */}
-                          <div className="text-[8px] sm:text-[9px] font-semibold uppercase opacity-60 leading-none mt-1.5 sm:mt-2 pt-1 border-t theme-border w-full text-center">
-                            {d.weekday.slice(0, 2)}
-                          </div>
-                        </div>
-                      </th>
-                    );
-                  })}
-
-                  {/* Summary Metric Headers (Matching Class Attendance) */}
-                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border text-xs`} title="Present">P</th>
-                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border text-xs`} title="Late">L</th>
-                  <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border text-xs`} title="Absent">A</th>
-                  <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate %">Rate %</th>
-                </tr>
-              </thead>
-
-              {/* Student Rows Iterated Across Checkpoints */}
-              <tbody className="divide-y theme-border font-sans">
-                {uniqueStudents.map((student) => {
-                  const studentTotals = computeStudentTotals(student.student_id);
-
-                  return activeCheckpoints.map((chk, chkIdx) => {
-                    const isFirstRow = chkIdx === 0;
-
-                    return (
-                      <tr
-                        key={`${student.student_id}_${chk.id}`}
-                        className={`hover:theme-bg-sub/60 transition-colors ${
-                          isFirstRow && activeCheckpoints.length > 1 ? 'border-t-2 theme-border' : ''
-                        }`}
-                      >
-                        {/* Sticky Roll No */}
-                        {isFirstRow && (
-                          <td
-                            rowSpan={activeCheckpoints.length}
-                            className="py-2 px-0.5 sm:px-1 w-[36px] min-w-[36px] max-w-[36px] sm:w-[42px] sm:min-w-[42px] sm:max-w-[42px] text-center font-bold font-mono sticky left-0 z-20 theme-bg-surface border-r border-b theme-border theme-text-primary align-middle"
-                          >
-                            <span className="inline-flex items-center justify-center font-bold font-mono text-xs">
-                              {student.roll_number || '—'}
-                            </span>
-                          </td>
-                        )}
-
-                        {/* Sticky Student Name */}
-                        {isFirstRow && (
-                          <td
-                            rowSpan={activeCheckpoints.length}
-                            onClick={() => onStudentClick && onStudentClick(student.student_id)}
-                            className={`py-2 px-2 sm:px-2.5 w-[110px] min-w-[110px] max-w-[110px] sm:w-[140px] sm:min-w-[140px] sm:max-w-[140px] left-[36px] sm:left-[42px] sticky z-20 theme-bg-surface border-r border-b theme-border align-middle shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-1px_rgba(0,0,0,0.25)] ${
-                              onStudentClick ? 'cursor-pointer hover:underline' : ''
-                            }`}
-                          >
-                            <div className="font-bold text-xs theme-text-primary truncate max-w-[95px] sm:max-w-[125px]" title={student.name}>
-                              {student.name}
-                            </div>
-                            <div className="text-[10px] theme-text-secondary truncate max-w-[95px] sm:max-w-[125px] mt-0.5">
-                              {student.group_name || student.class_name}
-                            </div>
-                          </td>
-                        )}
-
-                        {/* Dedicated Time & Checkpoint Column */}
-                        <td className="py-2 px-1.5 sm:px-2 border-r border-b theme-border w-[100px] min-w-[100px] max-w-[100px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[130px]">
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono font-bold text-xs theme-accent truncate">
-                              {chk.time || '--:--'}
-                            </span>
-                          </div>
-                          <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[90px] sm:max-w-[120px] mt-0.5" title={chk.name}>
-                            {chk.name}
-                          </div>
-                        </td>
-
-                        {/* Day Status Cells with Semantic Design Tokens & Micro-animations */}
-                        {enrichedMatrixData.days_header.map((d) => {
-                          const dateStr =
-                            d.date ||
-                            `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-                          const recordKey = `${student.student_id}_${chk.id}_${dateStr}`;
-                          const status = residentialRecords[recordKey];
-                          const canEditCell = isEditing;
-
-                          return (
-                            <td
-                              key={d.date || d.day}
-                              onClick={() => {
-                                if (canEditCell) {
-                                  handleToggleCell(student.student_id, dateStr, status, chk.id);
-                                }
-                              }}
-                              className={`py-2 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-mono text-[10px] border-r border-b theme-border transition-colors ${
-                                d.event_colors
-                                  ? `${d.event_colors.bg} ${d.event_colors.text}`
-                                  : d.is_holiday
-                                  ? 'theme-bg-accent-soft/30'
-                                  : ''
-                              } ${
-                                canEditCell
-                                  ? 'cursor-pointer select-none hover:brightness-95'
-                                  : 'cursor-default'
-                              }`}
-                              title={
-                                isEditing
-                                  ? `${dateStr} [${chk.name}]: ${status || 'Unrecorded'} (Click to toggle status)`
-                                  : `${dateStr} [${chk.name}]: ${status || 'Unrecorded'}`
-                              }
-                            >
-                              {status === 'PRESENT' ? (
-                                <FilledCheckCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.PRESENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
-                              ) : status === 'ABSENT' ? (
-                                <FilledXCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.ABSENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
-                              ) : status === 'LATE' ? (
-                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform`}>
-                                  L
-                                </span>
-                              ) : status === 'HALF_DAY' ? (
-                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} text-[10px]`}>
-                                  H
-                                </span>
-                              ) : status === 'ON_LEAVE' ? (
-                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px]`}>
-                                  LV
-                                </span>
-                              ) : canEditCell ? (
-                                <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present"></span>
-                              ) : (
-                                <span className="opacity-35 font-mono text-xs select-none theme-text-secondary">—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-
-                        {/* Summary Metrics with Dynamic Semantic Tokens */}
-                        {isFirstRow && (
-                          <>
-                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border align-middle`}>
-                              {studentTotals.present}
-                            </td>
-                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border align-middle`}>
-                              {studentTotals.late}
-                            </td>
-                            <td rowSpan={activeCheckpoints.length} className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border align-middle`}>
-                              {studentTotals.absent}
-                            </td>
-                            <td rowSpan={activeCheckpoints.length} className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold font-mono text-xs border-l border-r border-b theme-border align-middle">
-                              <span className={getAttendanceRateColor(studentTotals.attendance_rate)}>
-                                {studentTotals.attendance_rate}%
-                              </span>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  });
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Legend Ribbon & Bottom Controls (Matching Design Tokens) */}
-        <div className="p-3 sm:p-3.5 border-t theme-border theme-bg-sub flex flex-wrap items-center justify-between gap-3 text-[11px] theme-text-secondary shrink-0">
-          <div className="flex items-center gap-3.5 flex-wrap font-mono">
-            <span className="flex items-center gap-1.5">
-              <FilledCheckCircleIcon className={`w-3.5 h-3.5 ${ATTENDANCE_STATUSES.PRESENT.circleClass}`} /> Present
-            </span>
-            <span className="flex items-center gap-1.5">
-              <FilledXCircleIcon className={`w-3.5 h-3.5 ${ATTENDANCE_STATUSES.ABSENT.circleClass}`} /> Absent
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} flex items-center justify-center text-[9px]`}>L</span> Late
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} flex items-center justify-center text-[9px]`}>H</span> Half Day
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} flex items-center justify-center text-[9px]`}>LV</span> Leave
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="opacity-35 font-mono text-xs">—</span> Unmarked
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3.5">
-            <div className="font-mono font-medium">
-              Total Students: <strong className="theme-text-primary">{uniqueStudents.length}</strong>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsFullscreen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-xs"
-              title={isFullscreen ? "Exit Full Screen View (Esc)" : "Enter Full Screen View"}
-            >
-              {isFullscreen ? (
-                <>
-                  <svg className="w-3.5 h-3.5 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
-                  </svg>
-                  <span>Minimize</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                  <span>Full Screen</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+              return {
+                row_key: `${studentId}_${chk.id}_${chkIdx}`,
+                id: studentId,
+                student_id: studentId,
+                roll_number: student.roll_number,
+                name: student.name || student.student_name,
+                group_name: student.group_name || student.class_name,
+                schedule_time: chk.time,
+                checkpoint_time: chk.name,
+                checkpoint_id: chk.id,
+                checkpoint_count: activeCheckpoints.length,
+                checkpoint_index: chkIdx,
+                daily_statuses: dailyStatuses,
+                totals: {
+                  present: chkP,
+                  late: chkL,
+                  absent: chkA,
+                  half_day: chkHd,
+                  on_leave: chkLv,
+                  attendance_rate: chkRate,
+                },
+              };
+            });
+          })}
+          idLabel="Roll"
+          nameLabel="Student Name"
+          descriptorLabel="Time & Checkpoint"
+          descriptorIcon={TimerIcon}
+          isEditing={isEditing}
+          onToggleCell={(studentId, dateStr, currentStatus, checkpointId) => {
+            handleToggleCell(studentId, dateStr, currentStatus, checkpointId);
+          }}
+          isHijriEnabled={isHijriEnabled}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          onStudentClick={onStudentClick}
+          onDateClick={handleOpenDayAgenda}
+          isLoading={isLoading}
+          emptyMessage="No students found for this class and residential selection."
+          totalCount={uniqueStudents.length}
+          totalCountLabel="Total Students"
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
+          tableContainerClass={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}
+        />
       </div>
     </>
   );
 
-  if (isFullscreen) {
-    return createPortal(
-      <div className="fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen">
-        {innerContent}
-      </div>,
-      document.body
-    );
-  }
-
   return (
-    <PageContainer maxWidth="full" className="min-h-screen">
+    <PageContainer isFullscreen={isFullscreen} className="space-y-4">
       {innerContent}
     </PageContainer>
   );

@@ -7,10 +7,16 @@ import {
   TrashIcon,
   EditIcon,
   PlusIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  GridIcon,
+  TimelineIcon,
 } from "../ui/Icons";
+import DateHeaderCell from "../common/DateHeaderCell";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { EVENT_COLORS } from "./TimeScheduleDrawerForm";
-import { calendarEventTypesStore } from "../../utils/localStore";
+import { calendarEventTypesStore, calendarSettings } from "../../utils/localStore";
+import { getHijriDateString, getHijriDetails } from "../../utils/hijriUtils";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -182,6 +188,15 @@ export default function MasterTimeCalendar({
   const [displayMode, setDisplayMode] = useState(() => {
     return localStorage.getItem("spr_calendar_display_mode") || "grid";
   });
+  const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setIsHijriEnabled(calendarSettings.getHijriEnabled());
+    };
+    window.addEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+    return () => window.removeEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+  }, []);
 
   const monthStripRef = useRef(null);
   const dayStripRef = useRef(null);
@@ -189,6 +204,23 @@ export default function MasterTimeCalendar({
   const viewMode = propViewMode || (selectedCategory === "AGENDA" ? "list" : "month");
   const viewYear = currentDate.getFullYear();
   const viewMonth = currentDate.getMonth();
+
+  const hijriMonthHeader = useMemo(() => {
+    if (!isHijriEnabled) return "";
+    try {
+      const firstDayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const lastDayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const firstDetails = getHijriDetails(new Date(firstDayStr));
+      const lastDetails = getHijriDetails(new Date(lastDayStr));
+      if (firstDetails.monthName === lastDetails.monthName) {
+        return `${firstDetails.monthName} ${firstDetails.year}h`;
+      }
+      return `${firstDetails.monthName} – ${lastDetails.monthName} ${lastDetails.year}h`;
+    } catch {
+      return "";
+    }
+  }, [viewYear, viewMonth, isHijriEnabled]);
 
   const handleSetDisplayMode = (mode) => {
     setDisplayMode(mode);
@@ -542,9 +574,7 @@ export default function MasterTimeCalendar({
                 className="p-0.5 @sm:p-1 theme-text-secondary hover:theme-text-primary transition cursor-pointer flex items-center justify-center bg-transparent border-0 shadow-none hover:bg-transparent active:scale-90"
                 title="Previous Month"
               >
-                <svg className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                </svg>
+                <ChevronLeftIcon className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" />
               </button>
               <button
                 type="button"
@@ -552,15 +582,20 @@ export default function MasterTimeCalendar({
                 className="p-0.5 @sm:p-1 theme-text-secondary hover:theme-text-primary transition cursor-pointer flex items-center justify-center bg-transparent border-0 shadow-none hover:bg-transparent active:scale-90"
                 title="Next Month"
               >
-                <svg className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
+                <ChevronRightIcon className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" />
               </button>
             </div>
 
-            <h3 className="text-sm @sm:text-lg font-bold theme-text-primary tracking-tight">
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </h3>
+            <div className="flex flex-col">
+              <h3 className="text-sm @sm:text-lg font-bold theme-text-primary tracking-tight leading-tight">
+                {MONTH_NAMES[viewMonth]} {viewYear}
+              </h3>
+              {isHijriEnabled && hijriMonthHeader && (
+                <span className="text-[10px] @sm:text-xs font-mono theme-accent font-semibold leading-none pt-0.5">
+                  {hijriMonthHeader}
+                </span>
+              )}
+            </div>
 
             <button
               type="button"
@@ -596,16 +631,12 @@ export default function MasterTimeCalendar({
             >
               {displayMode === "grid" ? (
                 <>
-                  <svg className="w-3.5 h-3.5 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
+                  <TimelineIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span className="hidden @sm:inline">Timeline</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-3.5 h-3.5 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
+                  <GridIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span className="hidden @sm:inline">Grid</span>
                 </>
               )}
@@ -639,8 +670,8 @@ export default function MasterTimeCalendar({
           <div className="flex flex-col w-full min-w-0">
             {/* Weekday Header Columns (SUN to SAT) */}
             <div className="grid grid-cols-7 border-b theme-border theme-bg-sub/60 text-center select-none shrink-0">
-              {WEEKDAY_NAMES_SHORT.map((wd, i) => (
-                <div key={wd} className={`py-1 @sm:py-2 text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-r theme-border last:border-r-0 ${i === 5 || i === 6 ? "text-rose-500/80" : "theme-text-secondary"}`}>
+              {WEEKDAY_NAMES_SHORT.map((wd) => (
+                <div key={wd} className="py-1 @sm:py-2 text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-r theme-border last:border-r-0 theme-text-secondary">
                   {wd}
                 </div>
               ))}
@@ -675,8 +706,8 @@ export default function MasterTimeCalendar({
                     }`}
                     title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view all works.` : cell.dateStr}
                   >
-                    {/* Top: Day Number (Top Center Aligned on compact/small, top-left on wide) */}
-                    <div className="flex items-center justify-center @xl:justify-between relative w-full mb-0.5">
+                    {/* Top: Day Number (Top Left/Center) & Hijri Day Number (Top Right) */}
+                    <div className="flex items-center justify-between relative w-full mb-0.5">
                       <span
                         className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
                           isToday
@@ -687,13 +718,22 @@ export default function MasterTimeCalendar({
                         {cell.dayNum}
                       </span>
 
+                      {isHijriEnabled && (
+                        <span
+                          className="text-[9px] @sm:text-[10px] font-mono theme-accent font-semibold leading-none select-none opacity-85"
+                          title={`Hijri: ${getHijriDateString(cell.dateStr)}`}
+                        >
+                          {getHijriDateString(cell.dateStr).split(' ')[0]}
+                        </span>
+                      )}
+
                       {!readOnly && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenAddDrawer(cell.dateStr);
                           }}
-                          className="hidden @xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-sub cursor-pointer"
+                          className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-sub cursor-pointer"
                           title="Add schedule"
                         >
                           +
@@ -771,7 +811,7 @@ export default function MasterTimeCalendar({
                   e.currentTarget.scrollLeft += delta;
                 }
               }}
-              className="px-2 @sm:px-4 py-2 flex items-start gap-1 overflow-x-auto scrollbar-none select-none theme-bg-surface min-w-0 cursor-grab active:cursor-grabbing border-b border-[var(--border-color,rgba(0,0,0,0.07))]"
+              className="flex items-stretch overflow-x-auto scrollbar-none select-none theme-bg-surface min-w-0 cursor-grab active:cursor-grabbing border-b theme-border"
             >
               {timelineStripDays.map((item) => {
                 const isSelected = item.isCurrentMonth && item.dayNum === safeSelectedDay;
@@ -781,11 +821,20 @@ export default function MasterTimeCalendar({
                 const topColor = topEvent ? getEventColors(topEvent) : null;
 
                 return (
-                  <button
+                  <DateHeaderCell
                     key={`${item.yearNum}-${item.monthIdx}-${item.dayNum}`}
-                    data-active={isSelected}
-                    data-today={isToday}
+                    as="button"
                     type="button"
+                    dateStr={item.dateStr}
+                    dayNum={item.dayNum}
+                    weekday={item.weekday}
+                    isHijriEnabled={isHijriEnabled}
+                    hasEvent={Boolean(topEvent)}
+                    eventColors={topColor}
+                    eventTitle={topEvent ? topEvent.title : ""}
+                    isSelected={isSelected}
+                    isToday={isToday}
+                    isCurrentMonth={item.isCurrentMonth}
                     onClick={() => {
                       if (item.isCurrentMonth) {
                         setSelectedDay(item.dayNum);
@@ -794,37 +843,8 @@ export default function MasterTimeCalendar({
                         setSelectedDay(item.dayNum);
                       }
                     }}
-                    className={`h-[50px] min-w-[34px] @sm:min-w-[38px] p-1 rounded-xl flex flex-col items-center justify-between transition-colors cursor-pointer shrink-0 ${
-                      isSelected
-                        ? "theme-bg-accent text-white font-bold shadow-xs"
-                        : isToday
-                        ? "theme-bg-accent-soft theme-accent font-semibold hover:theme-bg-sub"
-                        : !item.isCurrentMonth
-                        ? "opacity-40 hover:opacity-90 hover:theme-bg-sub/50 theme-text-secondary"
-                        : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
-                    }`}
-                    title={`${MONTH_NAMES_SHORT[item.monthIdx]} ${item.dayNum}, ${item.yearNum}${topEvent ? ` • ${topEvent.title}` : ""}`}
-                  >
-                    {/* Top Weekday Slot */}
-                    <span className={`text-[8px] @sm:text-[9px] font-mono uppercase leading-none ${isSelected ? "text-white/80" : "theme-text-secondary"}`}>
-                      {WEEKDAY_NAMES_SHORT[item.weekday]}
-                    </span>
-
-                    {/* Middle Day Number Slot */}
-                    <span className="text-xs @sm:text-sm font-bold font-mono leading-none">
-                      {item.dayNum}
-                    </span>
-
-                    {/* Bottom Indicator Dot Slot: Displays priority event color */}
-                    <div className="w-full h-1.5 flex items-center justify-center">
-                      {topColor && (
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${isSelected ? "ring-1 ring-white/80" : "shadow-2xs"} ${topColor.dot}`}
-                          style={topColor.hex ? { backgroundColor: topColor.hex } : undefined}
-                        />
-                      )}
-                    </div>
-                  </button>
+                    className="w-[34px] min-w-[34px] max-w-[34px] @sm:w-[40px] @sm:min-w-[40px] @sm:max-w-[40px] shrink-0"
+                  />
                 );
               })}
             </div>
@@ -832,6 +852,23 @@ export default function MasterTimeCalendar({
             {/* Selected Day Main View: Vertical Timeline (Maximized width for sidebars) */}
             <div className="p-1.5 @sm:p-3 @md:p-5 space-y-2 @sm:space-y-3.5 min-w-0">
               
+              {/* Top Selected Day Date Header with Hijri Date */}
+              <div className="flex items-center justify-between gap-2 px-1 pb-1.5 border-b theme-border flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs @sm:text-sm font-bold theme-text-primary">
+                    {WEEKDAY_NAMES_FULL[selectedWeekday]}, {selectedDay} {MONTH_NAMES[viewMonth]} {viewYear}
+                  </span>
+                  {isHijriEnabled && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] @sm:text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border theme-border">
+                      {getHijriDateString(selectedDateStr)}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] font-mono theme-text-secondary">
+                  {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'entry' : 'entries'}
+                </span>
+              </div>
+
               {/* Timeline Cards Container */}
               {selectedDayEvents.length === 0 ? (
                 <div className="p-6 @sm:p-10 text-center border theme-border rounded-xl @sm:rounded-2xl theme-bg-sub/30 my-2 flex flex-col items-center justify-center gap-2">
@@ -920,9 +957,7 @@ export default function MasterTimeCalendar({
                             <div className={`w-6 h-6 @sm:w-8 @sm:h-8 rounded-full flex items-center justify-center font-bold font-mono text-[9px] @sm:text-xs ${style.bg} ${style.text} border ${style.border} shadow-2xs`}>
                               {(evt.audience || "ALL").slice(0, 2).toUpperCase()}
                             </div>
-                            <svg className="w-3 h-3 @sm:w-4 @sm:h-4 theme-text-secondary group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
+                            <ChevronRightIcon className="w-3 h-3 @sm:w-4 @sm:h-4 theme-text-secondary group-hover:translate-x-0.5 transition-transform" />
                           </div>
                         </div>
                       </div>
@@ -976,8 +1011,11 @@ export default function MasterTimeCalendar({
                       ) : (
                         <div className="text-xs font-semibold theme-text-secondary">Full Day</div>
                       )}
-                      <div className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 font-mono">
-                        {evt.repeats ? `Repeats weekly` : evt.startDate}
+                      <div className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 font-mono flex items-center gap-1.5 flex-wrap">
+                        <span>{evt.repeats ? `Repeats weekly` : evt.startDate}</span>
+                        {isHijriEnabled && evt.startDate && !evt.repeats && (
+                          <span className="theme-accent font-semibold">• {getHijriDateString(evt.startDate)}</span>
+                        )}
                       </div>
                     </div>
                   </div>

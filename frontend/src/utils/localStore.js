@@ -18,6 +18,7 @@ export const KEYS = {
   // Student & Session data
   STUDENTS:       "spr_students",
   SESSIONS:       "spr_sessions",
+  ACADEMIC_YEARS: "spr_academic_years",
 
   // Comment templates
   SAVED_COMMENTS: "spr_saved_comments",
@@ -495,7 +496,7 @@ export const calendarSettings = {
   getFirstDay:    () => readString(KEYS.FIRST_DAY, "Saturday"),
   saveFirstDay:   (v) => writeString(KEYS.FIRST_DAY, v),
 
-  getHijriEnabled:  () => readString(KEYS.ENABLE_HIJRI, "false") === "true",
+  getHijriEnabled:  () => readString(KEYS.ENABLE_HIJRI, "true") === "true",
   saveHijriEnabled: (v) => writeString(KEYS.ENABLE_HIJRI, v.toString()),
 };
 
@@ -2187,6 +2188,202 @@ export const staffRecruitmentRequirementsStore = {
     return activeReqs[0]?.required_docs || ["National ID Card (NID)", "Curriculum Vitae (CV) / Resume"];
   },
 };
+
+// ─── Academic Years & Terms Store ──────────────────────────────────────────
+
+export const DEFAULT_ACADEMIC_YEARS = [
+  {
+    id: "ay_2026_2027",
+    name: "2026-2027",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    termSystem: "SEMESTER",
+    isCurrent: true,
+    terms: [
+      {
+        id: "sem_2026_1",
+        name: "1st Semester",
+        startDate: "2026-01-01",
+        endDate: "2026-06-30",
+      },
+      {
+        id: "sem_2026_2",
+        name: "2nd Semester",
+        startDate: "2026-07-01",
+        endDate: "2026-12-31",
+      },
+    ],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+];
+
+function shiftDateByYears(dateStr, years = 1) {
+  if (!dateStr) return "";
+  const parts = String(dateStr).split("-");
+  if (parts.length < 3) return dateStr;
+  const y = parseInt(parts[0], 10) + years;
+  return `${y}-${parts[1]}-${parts[2]}`;
+}
+
+function suggestNextYearName(prevName) {
+  if (!prevName) return `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+  const numbers = prevName.match(/\d{4}/g);
+  if (numbers && numbers.length >= 2) {
+    const y1 = parseInt(numbers[0], 10) + 1;
+    const y2 = parseInt(numbers[1], 10) + 1;
+    return prevName.replace(numbers[0], String(y1)).replace(numbers[1], String(y2));
+  } else if (numbers && numbers.length === 1) {
+    const y = parseInt(numbers[0], 10) + 1;
+    return prevName.replace(numbers[0], String(y));
+  }
+  const currentY = new Date().getFullYear();
+  return `${currentY}-${currentY + 1}`;
+}
+
+export function getAcademicYearStatus(startDate, endDate) {
+  const today = new Date().toISOString().split("T")[0];
+  if (!startDate || !endDate) return "UPCOMING";
+  if (today >= startDate && today <= endDate) return "ACTIVE";
+  if (today < startDate) return "UPCOMING";
+  return "COMPLETED";
+}
+
+export const academicYearsStore = {
+  getAcademicYears: (tenantId) => {
+    const key = `spr_academic_years_${tenantId || 'default'}`;
+    const raw = readJSON(key, null);
+    if (!raw || !Array.isArray(raw) || raw.length === 0) {
+      writeJSON(key, DEFAULT_ACADEMIC_YEARS);
+      return DEFAULT_ACADEMIC_YEARS;
+    }
+    return raw;
+  },
+
+  getActiveYear: (tenantId) => {
+    const list = academicYearsStore.getAcademicYears(tenantId);
+    const active = list.find((y) => getAcademicYearStatus(y.startDate, y.endDate) === "ACTIVE");
+    return active || list[0] || null;
+  },
+
+  saveAcademicYears: (tenantId, years) => {
+    const key = `spr_academic_years_${tenantId || 'default'}`;
+    const safeYears = Array.isArray(years) ? years : [];
+    writeJSON(key, safeYears);
+
+    // Synchronize session names with legacy sessions store
+    try {
+      const existingSessions = sessions.getAll() || [];
+      const updatedSessions = [...existingSessions];
+      safeYears.forEach((y) => {
+        if (y.name && !updatedSessions.some((s) => (s.name || s).toLowerCase() === y.name.toLowerCase())) {
+          updatedSessions.push({ id: `sess_${y.id}`, name: y.name, _local: true });
+        }
+      });
+      sessions.saveAll(updatedSessions);
+    } catch {}
+
+    window.dispatchEvent(new CustomEvent("spr_academic_years_updated", { detail: safeYears }));
+    return safeYears;
+  },
+
+  addAcademicYear: (tenantId, yearData) => {
+    const list = academicYearsStore.getAcademicYears(tenantId);
+    const newId = yearData.id || `ay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const newYear = {
+      id: newId,
+      name: yearData.name || "New Academic Year",
+      startDate: yearData.startDate || new Date().toISOString().split("T")[0],
+      endDate: yearData.endDate || new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0],
+      termSystem: yearData.termSystem || "SEMESTER",
+      terms: Array.isArray(yearData.terms) ? yearData.terms.map((t, idx) => ({
+        id: t.id || `term_${Date.now()}_${idx}`,
+        name: t.name || `Term ${idx + 1}`,
+        startDate: t.startDate || "",
+        endDate: t.endDate || "",
+      })) : [],
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedList = [newYear, ...list];
+    academicYearsStore.saveAcademicYears(tenantId, updatedList);
+    return newYear;
+  },
+
+  updateAcademicYear: (tenantId, id, updatedData) => {
+    const list = academicYearsStore.getAcademicYears(tenantId);
+    const updatedList = list.map((y) => {
+      if (y.id === id) {
+        return {
+          ...y,
+          ...updatedData,
+          terms: Array.isArray(updatedData.terms) ? updatedData.terms : y.terms,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return y;
+    });
+
+    academicYearsStore.saveAcademicYears(tenantId, updatedList);
+    return updatedList.find((y) => y.id === id);
+  },
+
+  deleteAcademicYear: (tenantId, id) => {
+    const list = academicYearsStore.getAcademicYears(tenantId);
+    const updatedList = list.filter((y) => y.id !== id);
+    academicYearsStore.saveAcademicYears(tenantId, updatedList);
+    return updatedList;
+  },
+
+  /**
+   * Smart Suggestion Engine:
+   * Pre-fills "+ Add Academic Year" inputs based on previous academic year
+   */
+  getSuggestedNextYear: (tenantId) => {
+    const list = academicYearsStore.getAcademicYears(tenantId);
+    if (!list || list.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return {
+        name: `${currentYear}-${currentYear + 1}`,
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`,
+        termSystem: "SEMESTER",
+        terms: [
+          { id: `term_new_1`, name: "1st Semester", startDate: `${currentYear}-01-01`, endDate: `${currentYear}-06-30` },
+          { id: `term_new_2`, name: "2nd Semester", startDate: `${currentYear}-07-01`, endDate: `${currentYear}-12-31` },
+        ],
+      };
+    }
+
+    // Latest academic year (sorted by end date or first item)
+    const sorted = [...list].sort((a, b) => (b.endDate || "").localeCompare(a.endDate || ""));
+    const latest = sorted[0] || list[0];
+
+    const nextName = suggestNextYearName(latest.name);
+    const nextStartDate = shiftDateByYears(latest.startDate, 1);
+    const nextEndDate = shiftDateByYears(latest.endDate, 1);
+
+    const nextTerms = (latest.terms || []).map((t, idx) => ({
+      id: `term_new_${idx + 1}`,
+      name: t.name || `Term ${idx + 1}`,
+      startDate: shiftDateByYears(t.startDate, 1),
+      endDate: shiftDateByYears(t.endDate, 1),
+    }));
+
+    return {
+      name: nextName,
+      startDate: nextStartDate || `${new Date().getFullYear()}-01-01`,
+      endDate: nextEndDate || `${new Date().getFullYear()}-12-31`,
+      termSystem: latest.termSystem || "SEMESTER",
+      isCurrent: false,
+      terms: nextTerms.length > 0 ? nextTerms : [
+        { id: `term_new_1`, name: "1st Semester", startDate: nextStartDate || `${new Date().getFullYear()}-01-01`, endDate: shiftDateByYears(nextStartDate, 0.5) || `${new Date().getFullYear()}-06-30` },
+        { id: `term_new_2`, name: "2nd Semester", startDate: `${new Date().getFullYear()}-07-01`, endDate: nextEndDate || `${new Date().getFullYear()}-12-31` },
+      ],
+    };
+  },
+};
+
 
 
 

@@ -28,6 +28,7 @@ import {
   BuildingOfficeIcon,
   TeacherIcon,
   AttendanceIcon,
+  DutyIcon,
   LeaveIcon,
   GateIcon,
   FingerprintIcon,
@@ -108,6 +109,8 @@ export default function SidebarContainer({
       key: "nav_staff_management",
       subItems: [
         { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", path: "/staff/roster", Icon: TeacherIcon, key: "staff_roster" },
+        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", path: "/staff/teacher-attendance", Icon: ClassIcon, key: "staff_roster" },
+        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", path: "/staff/attendance", Icon: DutyIcon, key: "staff_roster" },
         { id: "Staff Onboarding", name: "Staff Onboarding", path: "/staff/onboarding", Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },

@@ -142,7 +142,15 @@ export function TenantProvider({ children }) {
 export function useTenant() {
   const context = useContext(TenantContext);
   if (!context) {
-    throw new Error('useTenant must be used within a TenantProvider');
+    return {
+      institutions: [],
+      currentInstitution: null,
+      activeTenantId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_tenant_id') || 'default') : 'default',
+      isMultiTenantAdmin: false,
+      isLoadingInstitutions: false,
+      switchInstitution: () => {},
+      refreshInstitutions: async () => {},
+    };
   }
   return context;
 }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import {
   MatrixIcon,
   RefreshIcon,
@@ -9,13 +8,16 @@ import {
   AttendanceIcon,
   FilledCheckCircleIcon,
   FilledXCircleIcon,
+  FullScreenIcon,
+  MinimizeIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
 import CustomSelect from '../../components/ui/CustomSelect';
 import { ClassSelect, GroupSelect, TeacherSelect, DateRangePicker } from '../../components/selectors';
 import ActionMenu from '../../components/ui/ActionMenu';
-import AttendanceMatrixTable from '../../components/common/AttendanceMatrixTable';
+import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import { useFullscreen } from '../../hooks/useFullscreen';
 import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
@@ -24,8 +26,9 @@ import { useRightSidebar } from '../../context/RightSidebarContext';
 import { calendarSettings, attendanceFilters, masterCalendarStore, attendanceEventRestrictionsStore } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import { cycleAttendanceStatus } from '../../constants/attendanceConstants';
 
-export default function MonthlyAttendanceRegisterView({
+export default function ClassAttendanceView({
   classId: propClassId,
   groupId: propGroupId,
   hideHeader = false,
@@ -70,7 +73,7 @@ export default function MonthlyAttendanceRegisterView({
   const [isEditing, setIsEditing] = useState(false);
 
   // Full Screen Mode
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { isFullscreen, setIsFullscreen, toggleFullscreen } = useFullscreen();
 
   // Hijri Setting State
   const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
@@ -78,6 +81,7 @@ export default function MonthlyAttendanceRegisterView({
   // Matrix Data & Loading
   const [matrixData, setMatrixData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [metadataLoaded, setMetadataLoaded] = useState(false);
 
   // Version counter to trigger re-enrichment when master calendar updates
   const [calendarEventsVersion, setCalendarEventsVersion] = useState(0);
@@ -115,30 +119,26 @@ export default function MonthlyAttendanceRegisterView({
     };
   }, []);
 
-  // Listen to Escape key to exit full screen
+  // 1. Fetch Classes, Teachers, and Groups on Mount & Tenant Change
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+    let isMounted = true;
 
-  // 1. Fetch Classes and Teachers on Mount
-  useEffect(() => {
-    const fetchMetadata = async () => {
+    const fetchAllMetadata = async () => {
       try {
-        const [classRes, staffRes] = await Promise.allSettled([
+        setMetadataLoaded(false);
+        const [classRes, staffRes, grpRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
           fetchWithAuth('/api/v1/staff/'),
+          fetchWithAuth('/api/v1/groups/?page_size=500'),
         ]);
+
+        if (!isMounted) return;
 
         if (classRes.status === 'fulfilled' && classRes.value.ok) {
           const data = await classRes.value.json();
           const classList = Array.isArray(data) ? data : data.results || [];
           setClasses(classList);
+
           if (classList.length > 0) {
             const isValid = selectedClassId && classList.some(c => String(c.id) === String(selectedClassId));
             if (!isValid) {
@@ -154,23 +154,10 @@ export default function MonthlyAttendanceRegisterView({
           const sData = await staffRes.value.json();
           setTeachers(Array.isArray(sData) ? sData : sData.results || []);
         }
-      } catch (err) {
-        console.error('Error fetching classes or staff:', err);
-      }
-    };
 
-    fetchMetadata();
-  }, [activeTenantId]);
-
-  // 2. Fetch All Groups (with page_size=500 to ensure 100% of all groups appear)
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        const url = `/api/v1/groups/?page_size=500`;
-        const res = await fetchWithAuth(url);
-        if (res.ok) {
-          const data = await res.json();
-          const grpList = Array.isArray(data) ? data : data.results || [];
+        if (grpRes.status === 'fulfilled' && grpRes.value.ok) {
+          const gData = await grpRes.value.json();
+          const grpList = Array.isArray(gData) ? gData : gData.results || [];
           setGroups(grpList);
           if (savedFilters.groupId && grpList.some(g => String(g.id) === String(savedFilters.groupId))) {
             setSelectedGroupId(String(savedFilters.groupId));
@@ -179,19 +166,37 @@ export default function MonthlyAttendanceRegisterView({
           }
         }
       } catch (err) {
-        console.warn('Error fetching groups:', err);
+        console.error('Error fetching attendance metadata:', err);
+      } finally {
+        if (isMounted) {
+          setMetadataLoaded(true);
+        }
       }
     };
 
-    fetchGroups();
+    fetchAllMetadata();
+
+    const handleTenantChanged = () => {
+      fetchAllMetadata();
+    };
+    window.addEventListener('spr_tenant_changed', handleTenantChanged);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+    };
   }, [activeTenantId]);
 
-  // 3. Fetch Monthly / Range Attendance Matrix
+  // 2. Fetch Monthly / Range Attendance Matrix
   const loadMatrix = useCallback(async () => {
+    if (!metadataLoaded && !propClassId) {
+      return;
+    }
     if (!selectedClassId && classes.length > 0) {
       return;
     }
     if (!selectedClassId && !propClassId && classes.length === 0) {
+      setIsLoading(false);
       return;
     }
 
@@ -219,7 +224,7 @@ export default function MonthlyAttendanceRegisterView({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, classes.length, propClassId, showToast]);
+  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, classes.length, propClassId, showToast]);
 
   useEffect(() => {
     loadMatrix();
@@ -524,14 +529,7 @@ export default function MonthlyAttendanceRegisterView({
     }
 
     // Determine next status in cycle
-    let nextStatus = 'PRESENT';
-    if (currentStatus === 'PRESENT') {
-      nextStatus = 'ABSENT';
-    } else if (currentStatus === 'ABSENT') {
-      nextStatus = 'LATE';
-    } else if (currentStatus === 'LATE') {
-      nextStatus = 'PRESENT';
-    }
+    const nextStatus = cycleAttendanceStatus(currentStatus);
 
     // Optimistic Update
     setMatrixData((prev) => {
@@ -737,15 +735,7 @@ export default function MonthlyAttendanceRegisterView({
   const headerActionMenuItems = [
     {
       label: isFullscreen ? 'Exit Full Screen' : 'Full Screen View',
-      icon: isFullscreen ? (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
-        </svg>
-      ) : (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-        </svg>
-      ),
+      icon: isFullscreen ? MinimizeIcon : FullScreenIcon,
       onClick: () => setIsFullscreen((prev) => !prev),
     },
     {
@@ -827,27 +817,10 @@ export default function MonthlyAttendanceRegisterView({
             subtitle="Monthly attendance matrix and register for classes & groups with automated computations"
             actions={
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleToggleTakeAttendance}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer ${
-                    isEditing
-                      ? 'theme-bg-accent theme-accent-text hover:opacity-90 ring-2 ring-[var(--accent-main)]/40 shadow-sm'
-                      : 'theme-bg-accent theme-accent-text hover:opacity-90'
-                  }`}
-                >
-                  {isEditing ? (
-                    <>
-                      <FilledCheckCircleIcon className="w-4 h-4" />
-                      <span>Done Marking</span>
-                    </>
-                  ) : (
-                    <>
-                      <AttendanceIcon className="w-4 h-4" />
-                      <span>Take Attendance</span>
-                    </>
-                  )}
-                </button>
+                <TakeAttendanceButton
+                  isEditing={isEditing}
+                  onToggle={handleToggleTakeAttendance}
+                />
                 <ActionMenu items={headerActionMenuItems} />
               </div>
             }
@@ -865,27 +838,11 @@ export default function MonthlyAttendanceRegisterView({
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleTakeAttendance}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer ${
-                isEditing
-                  ? 'theme-bg-accent theme-accent-text hover:opacity-90 ring-2 ring-[var(--accent-main)]/40 shadow-sm'
-                  : 'theme-bg-accent theme-accent-text hover:opacity-90'
-              }`}
-            >
-              {isEditing ? (
-                <>
-                  <FilledCheckCircleIcon className="w-4 h-4" />
-                  <span>Done</span>
-                </>
-              ) : (
-                <>
-                  <AttendanceIcon className="w-4 h-4" />
-                  <span>Take Attendance</span>
-                </>
-              )}
-            </button>
+            <TakeAttendanceButton
+              isEditing={isEditing}
+              onToggle={handleToggleTakeAttendance}
+              size="sm"
+            />
           </div>
         </div>
       )}
@@ -1001,77 +958,18 @@ export default function MonthlyAttendanceRegisterView({
           onStudentClick={onStudentClick}
           onDateClick={handleDateHeaderClick}
           isLoading={isLoading}
+          totalCount={enrichedMatrixData?.total_students || 0}
+          totalCountLabel="Total Students"
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
           tableContainerClass={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}
         />
-
-        {/* Legend Ribbon & Bottom Controls */}
-        <div className="p-3 sm:p-3.5 border-t theme-border theme-bg-sub flex flex-wrap items-center justify-between gap-3 text-[11px] theme-text-secondary shrink-0">
-          <div className="flex items-center gap-3.5 flex-wrap font-mono">
-            <span className="flex items-center gap-1.5">
-              <FilledCheckCircleIcon className="w-3.5 h-3.5 text-emerald-600/85 dark:text-emerald-400/90" /> Present
-            </span>
-            <span className="flex items-center gap-1.5">
-              <FilledXCircleIcon className="w-3.5 h-3.5 text-rose-500/80 dark:text-rose-400/85" /> Absent
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-amber-500/10 text-amber-600/90 dark:text-amber-400/90 font-bold flex items-center justify-center text-[9px]">L</span> Late
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-sky-500/10 text-sky-600/90 dark:text-sky-400/90 font-bold flex items-center justify-center text-[9px]">H</span> Half Day
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-purple-500/10 text-purple-600/90 dark:text-purple-400/90 font-bold flex items-center justify-center text-[9px]">LV</span> Leave
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="opacity-35 font-mono text-xs">—</span> Holiday / Weekend
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3.5">
-            <div className="font-mono font-medium">
-              Total Students: <strong className="theme-text-primary">{enrichedMatrixData?.total_students || 0}</strong>
-            </div>
-
-            {/* Bottom-Right Full Screen / Minimize Button */}
-            <button
-              type="button"
-              onClick={() => setIsFullscreen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-primary text-xs font-semibold transition-all cursor-pointer shadow-xs"
-              title={isFullscreen ? "Exit Full Screen View (Esc)" : "Enter Full Screen View"}
-            >
-              {isFullscreen ? (
-                <>
-                  <svg className="w-3.5 h-3.5 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
-                  </svg>
-                  <span>Minimize</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                  <span>Full Screen</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
       </div>
     </>
   );
 
-  if (isFullscreen) {
-    return createPortal(
-      <div className="fixed inset-0 z-[99999] theme-bg-app p-3 sm:p-4 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen">
-        {innerContent}
-      </div>,
-      document.body
-    );
-  }
-
   return (
-    <PageContainer maxWidth="full" className="min-h-screen">
+    <PageContainer isFullscreen={isFullscreen} className="space-y-4">
       {innerContent}
     </PageContainer>
   );

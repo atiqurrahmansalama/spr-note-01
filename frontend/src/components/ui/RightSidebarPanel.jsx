@@ -116,17 +116,17 @@ export default function RightSidebarPanel({
       role="region"
       aria-label={typeof title === "string" ? title : "Right Sidebar Panel"}
     >
-      {/* ─── Top Header Bar ────────────────────────────────────────── */}
-      <div className="theme-bg-surface border-b theme-border px-3 sm:px-5 py-2.5 flex items-center justify-between shrink-0 shadow-xs select-none gap-2">
+      {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
+      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md select-none gap-2 h-[48px] @sm:h-[52px]">
         
         {/* Left: Clean Icon Back Button + Icon + Title + Breadcrumbs */}
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+        <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">
           {/* Universal Clean Icon Back Button to Parent Page */}
           {(onBack || onClose) && (
             <button
               type="button"
               onClick={onBack || onClose}
-              className="p-1.5 sm:p-2 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-2xs group"
+              className="p-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-xs group"
               title="Back to parent page"
               aria-label="Back to parent page"
             >
@@ -137,28 +137,20 @@ export default function RightSidebarPanel({
           )}
 
           {Icon && (
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 border border-[var(--accent-main)]/20 shadow-2xs">
-              <Icon className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 border border-[var(--accent-main)]/20 shadow-xs">
+              <Icon className="w-3.5 h-3.5" />
             </div>
           )}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              {category && (
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary truncate">
-                  {category}
-                </span>
-              )}
-              {category && title && <span className="text-[10px] theme-text-secondary">/</span>}
-              <span className="text-xs sm:text-sm font-bold theme-text-primary truncate">
-                {title}
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            {category && (
+              <span className="text-[10px] @sm:text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
+                {category} /
               </span>
-            </div>
-            {subtitle && (
-              <p className="text-[11px] theme-text-secondary truncate mt-0.5 font-normal">
-                {subtitle}
-              </p>
             )}
+            <span className="text-xs @sm:text-sm font-bold theme-text-primary truncate">
+              {title}
+            </span>
           </div>
         </div>
 
@@ -171,7 +163,7 @@ export default function RightSidebarPanel({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 sm:p-2 rounded-xl border theme-border theme-bg-sub theme-text-secondary hover:text-rose-500 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all cursor-pointer flex items-center justify-center shadow-2xs active:scale-95"
+              className="p-1.5 rounded-xl border theme-border theme-bg-sub theme-text-secondary hover:text-rose-500 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all cursor-pointer flex items-center justify-center shadow-xs active:scale-95"
               title="Close Panel (Esc)"
               aria-label="Close Panel"
             >

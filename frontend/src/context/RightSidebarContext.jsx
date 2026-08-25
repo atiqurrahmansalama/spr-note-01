@@ -106,7 +106,10 @@ export function RightSidebarProvider({ children }) {
   }, []);
 
   const openRightSidebar = useCallback((config) => {
-    if (!config) return;
+    if (!config) {
+      closeRightSidebar();
+      return;
+    }
     const { title, content, size = 'md', width, onClose, ownerId, drawerKey, ...restConfig } = config;
 
     const resolvedWidth = resolveDrawerWidth(width || size);

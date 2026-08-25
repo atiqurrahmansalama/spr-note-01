@@ -25,14 +25,15 @@ const StudentProfileHubView = lazy(() => import("./modules/student-directory/Stu
 
 // ─── Protected Staff Management Views (Lazy Loaded) ─────────────────────────
 const TeacherStaffRosterView = lazy(() => import("./modules/staff-management/TeacherStaffRosterView"));
+const TeacherAttendanceView = lazy(() => import("./modules/staff-management/TeacherAttendanceView"));
+const StaffDailyAttendanceView = lazy(() => import("./modules/staff-management/StaffDailyAttendanceView"));
 const StaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/StaffOnboardingView"));
 const StaffProfileDetailView = lazy(() => import("./modules/staff-management/StaffProfileDetailView"));
 
 // ─── Protected Attendance Views (Lazy Loaded) ───────────────────────────────
-const MonthlyAttendanceRegisterView = lazy(() => import("./modules/attendance/MonthlyAttendanceRegisterView"));
+const ClassAttendanceView = lazy(() => import("./modules/attendance/ClassAttendanceView"));
 const AttendanceSettingsView = lazy(() => import("./modules/attendance/AttendanceSettingsView"));
 const ResidentialAttendanceView = lazy(() => import("./modules/attendance/ResidentialAttendanceView"));
-const GateEntryLogView = lazy(() => import("./modules/attendance/GateEntryLogView"));
 const AdHocHeadcountView = lazy(() => import("./modules/attendance/AdHocHeadcountView"));
 
 // ─── Protected Academy & Campus Structure Views (Lazy Loaded) ───────────────
@@ -125,6 +126,9 @@ export default function App() {
             <Route path="/student-reports" element={<FeatureGuard sectionKey="report_history" fallback={<Navigate to="/dashboard" replace />}><StudentReportsView /></FeatureGuard>} />
             <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
             <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
+            <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />
+            <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><StaffDailyAttendanceView /></FeatureGuard>} />
+            <Route path="/staff/daily-attendance" element={<Navigate to="/staff/attendance" replace />} />
             <Route path="/staff/onboarding" element={<FeatureGuard sectionKey="staff_onboarding" fallback={<Navigate to="/dashboard" replace />}><StaffOnboardingView /></FeatureGuard>} />
             <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
             <Route path="/staff" element={<Navigate to="/staff/roster" replace />} />
@@ -132,12 +136,11 @@ export default function App() {
             
             {/* Student Attendance Multi-Dimensional Routes */}
             <Route path="/attendance/students/roll-call" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
-            <Route path="/attendance/students/gate-log" element={<FeatureGuard sectionKey="student_gate_tracker" fallback={<Navigate to="/dashboard" replace />}><GateEntryLogView /></FeatureGuard>} />
             <Route path="/attendance/students/adhoc" element={<FeatureGuard sectionKey="student_adhoc_headcount" fallback={<Navigate to="/dashboard" replace />}><AdHocHeadcountView /></FeatureGuard>} />
-            <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
+            <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><ClassAttendanceView /></FeatureGuard>} />
             <Route path="/attendance/students/residential" element={<FeatureGuard sectionKey="residential_attendance" fallback={<Navigate to="/dashboard" replace />}><ResidentialAttendanceView /></FeatureGuard>} />
             <Route path="/attendance/student" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
-            <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><MonthlyAttendanceRegisterView /></FeatureGuard>} />
+            <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><ClassAttendanceView /></FeatureGuard>} />
 
             {/* Attendance Settings Route */}
             <Route path="/attendance/settings" element={<FeatureGuard sectionKey="attendance_policies_slots" fallback={<Navigate to="/dashboard" replace />}><AttendanceSettingsView /></FeatureGuard>} />

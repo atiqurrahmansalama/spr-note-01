@@ -33,7 +33,7 @@ export default function SidebarScreenBlockView({
       dockPosition === "right" ? "border-l theme-border shadow-2xl" : ""
     }`}>
       {/* Header Bar with Back Button & Breadcrumbs */}
-      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex justify-between items-center shrink-0 shadow-md select-none gap-2">
+      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex justify-between items-center shrink-0 shadow-md select-none gap-2 h-[48px] @sm:h-[52px]">
         <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">
           {/* Universal Back Navigation Button */}
           <button

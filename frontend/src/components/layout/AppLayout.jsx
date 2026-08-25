@@ -23,7 +23,6 @@ export const ROUTE_TITLE_MAP = {
   "/copy-report": { title: "Report Settings", category: "Report Generator" },
   "/sessions-comments": { title: "Sessions & Comments", category: "Report Generator" },
 
-  "/attendance/students/gate-log": { title: "Gate Entry & Pass", category: "Student Management" },
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
   "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Student" },
   "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
@@ -38,6 +37,9 @@ export const ROUTE_TITLE_MAP = {
   "/groups-students": { title: "Student Roster", category: "Student" },
   "/student-roster": { title: "Student Roster", category: "Student" },
   "/staff/roster": { title: "Teacher & Staff Roster", category: "Staff Management" },
+  "/staff/teacher-attendance": { title: "Teacher Class Attendance", category: "Staff Management" },
+  "/staff/attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
+  "/staff/daily-attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
   "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
   "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
   "/group-roster": { title: "Group", category: "Academy" },
@@ -283,7 +285,7 @@ export default function AppLayout() {
     claimPendingInvite();
   }, [showToast]);
 
-  const { currentInstitution } = useTenant();
+  const { currentInstitution, activeTenantId } = useTenant();
   const isRightDock = location.pathname === "/report-builder" && panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
   // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)

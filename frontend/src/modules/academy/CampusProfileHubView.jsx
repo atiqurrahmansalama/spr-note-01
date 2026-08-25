@@ -10,6 +10,8 @@ import {
   TeacherIcon,
   SparklesIcon,
   PlusIcon,
+  SessionsIcon,
+  CalendarIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import MetricsGrid from '../../components/ui/MetricsGrid';
@@ -18,12 +20,14 @@ import TabSwitcher from '../../components/ui/TabSwitcher';
 import BranchManagementView from './BranchManagementView';
 import DepartmentManagementView from './departments/DepartmentManagementView';
 import InstitutionListView from '../app-management/institutions/InstitutionListView';
+import { AcademicYearsManagementView, AcademicYearDrawerForm } from './academic-years';
 import BranchForm from './BranchForm';
 import DepartmentForm from './departments/DepartmentForm';
 import InstitutionOnboardingForm from '../app-management/institutions/InstitutionOnboardingForm';
 import { getBranchMetrics } from '../../api/academy';
 import { getInstitutionMetrics } from '../../api/institutions';
 import { fetchWithAuth } from '../../utils/authService';
+import { academicYearsStore } from '../../utils/localStore';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import { useToast } from '../../context/ToastContext';
@@ -32,18 +36,19 @@ const TABS = [
   { id: 'academies', label: 'Academies', icon: BuildingOfficeIcon },
   { id: 'branches', label: 'Branches', icon: BuildingOfficeIcon },
   { id: 'departments', label: 'Departments', icon: DepartmentIcon },
+  { id: 'academic_years', label: 'Academic Years', icon: SessionsIcon },
 ];
 
 export default function CampusProfileHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTabParam = searchParams.get('tab') || 'academies';
   
-  // Valid active tabs: academies -> branches -> departments
-  const activeTab = ['academies', 'branches', 'departments'].includes(activeTabParam)
+  // Valid active tabs: academies -> branches -> departments -> academic_years
+  const activeTab = ['academies', 'branches', 'departments', 'academic_years'].includes(activeTabParam)
     ? activeTabParam
     : 'academies';
 
-  const { refreshInstitutions } = useTenant();
+  const { refreshInstitutions, activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { showToast } = useToast();
 
@@ -68,6 +73,13 @@ export default function CampusProfileHubView() {
     verified_institutions: 0,
     total_active_students: 0,
     total_staff: 0,
+  });
+
+  const [academicYearMetrics, setAcademicYearMetrics] = useState({
+    total_years: 0,
+    active_year_name: 'None',
+    total_terms: 0,
+    avg_terms_per_year: 0,
   });
 
   const loadAllMetrics = useCallback(async () => {
@@ -103,7 +115,20 @@ export default function CampusProfileHubView() {
     } catch {
       // Graceful fallback
     }
-  }, []);
+
+    // Load Academic Years metrics
+    try {
+      const years = academicYearsStore.getAcademicYears(activeTenantId);
+      const activeYear = academicYearsStore.getActiveYear(activeTenantId);
+      const totalTerms = years.reduce((acc, y) => acc + (y.terms?.length || 0), 0);
+      setAcademicYearMetrics({
+        total_years: years.length,
+        active_year_name: activeYear ? activeYear.name : 'None',
+        total_terms: totalTerms,
+        avg_terms_per_year: years.length > 0 ? (totalTerms / years.length).toFixed(1) : 0,
+      });
+    } catch {}
+  }, [activeTenantId]);
 
   useEffect(() => {
     loadAllMetrics();
@@ -111,8 +136,15 @@ export default function CampusProfileHubView() {
     const handleTenantChanged = () => {
       loadAllMetrics();
     };
+    const handleYearsUpdated = () => {
+      loadAllMetrics();
+    };
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
-    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+    window.addEventListener('spr_academic_years_updated', handleYearsUpdated);
+    return () => {
+      window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+      window.removeEventListener('spr_academic_years_updated', handleYearsUpdated);
+    };
   }, [loadAllMetrics]);
 
   const handleTabChange = (tabId) => {
@@ -161,6 +193,36 @@ export default function CampusProfileHubView() {
         };
       }
 
+      if (type === 'academic_years') {
+        const mode = params.get('mode') || 'add';
+        const yearId = params.get('yearId');
+        const years = academicYearsStore.getAcademicYears(activeTenantId);
+        const foundYear = yearId ? years.find((y) => y.id === yearId) : null;
+
+        return {
+          title: mode === 'edit' ? 'Edit Academic Year & Terms' : 'Create Academic Year',
+          category: 'Academy & Campus',
+          size: 'md',
+          content: (
+            <AcademicYearDrawerForm
+              year={foundYear}
+              onSave={(savedData) => {
+                if (savedData.id && foundYear) {
+                  academicYearsStore.updateAcademicYear(activeTenantId, savedData.id, savedData);
+                  showToast('Academic year updated successfully.', 'success');
+                } else {
+                  academicYearsStore.addAcademicYear(activeTenantId, savedData);
+                  showToast('New academic year created successfully.', 'success');
+                }
+                loadAllMetrics();
+                closeDrawer();
+              }}
+              onCancel={closeDrawer}
+            />
+          ),
+        };
+      }
+
       // type === 'academies'
       return {
         title: 'Onboard New Academy',
@@ -179,7 +241,7 @@ export default function CampusProfileHubView() {
         ),
       };
     },
-    [activeTab, loadAllMetrics, refreshInstitutions, closeDrawer, showToast]
+    [activeTab, activeTenantId, loadAllMetrics, refreshInstitutions, closeDrawer, showToast]
   );
 
   // Primary Action Button handler based on active tab
@@ -197,6 +259,12 @@ export default function CampusProfileHubView() {
     if (activeTab === 'departments') {
       return {
         label: 'Add Department',
+        icon: PlusIcon,
+      };
+    }
+    if (activeTab === 'academic_years') {
+      return {
+        label: 'Add Academic Year',
         icon: PlusIcon,
       };
     }
@@ -271,6 +339,39 @@ export default function CampusProfileHubView() {
           icon: UsersIcon,
           color: 'accent',
           subLabel: 'Department Roll',
+        },
+      ];
+    }
+
+    if (activeTab === 'academic_years') {
+      return [
+        {
+          label: 'Total Academic Years',
+          value: academicYearMetrics.total_years ?? 0,
+          icon: SessionsIcon,
+          color: 'accent',
+          subLabel: 'Recorded Sessions',
+        },
+        {
+          label: 'Current Active Year',
+          value: academicYearMetrics.active_year_name || 'None',
+          icon: CheckCircleIcon,
+          color: 'accent',
+          subLabel: 'Default Session',
+        },
+        {
+          label: 'Configured Terms',
+          value: academicYearMetrics.total_terms ?? 0,
+          icon: CalendarIcon,
+          color: 'accent',
+          subLabel: 'Semesters & Cycles',
+        },
+        {
+          label: 'Avg Terms Per Year',
+          value: academicYearMetrics.avg_terms_per_year ?? 0,
+          icon: SparklesIcon,
+          color: 'accent',
+          subLabel: 'System Density',
         },
       ];
     }
@@ -353,6 +454,9 @@ export default function CampusProfileHubView() {
         </div>
         <div className={activeTab === 'departments' ? 'block' : 'hidden'}>
           <DepartmentManagementView hideHeader hideMetrics isEmbedded />
+        </div>
+        <div className={activeTab === 'academic_years' ? 'block' : 'hidden'}>
+          <AcademicYearsManagementView isEmbedded hideHeader hideMetrics />
         </div>
       </div>
     </PageContainer>

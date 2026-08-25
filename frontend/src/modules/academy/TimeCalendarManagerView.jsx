@@ -70,8 +70,12 @@ export default function TimeCalendarManagerView() {
     loadEvents();
 
     const handleUpdate = () => loadEvents();
+    window.addEventListener("spr_tenant_changed", handleUpdate);
     window.addEventListener("spr_calendar_events_updated", handleUpdate);
-    return () => window.removeEventListener("spr_calendar_events_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("spr_tenant_changed", handleUpdate);
+      window.removeEventListener("spr_calendar_events_updated", handleUpdate);
+    };
   }, [loadEvents]);
 
   // Handle Save Event

@@ -109,6 +109,27 @@ export const ATTENDANCE_STATUS_LIST = [
   ATTENDANCE_STATUSES.HOLIDAY_EXCUSED,
 ];
 
+export const STATUS_CYCLE_LIST = [
+  'PRESENT',
+  'LATE',
+  'ABSENT',
+  'HALF_DAY',
+  'ON_LEAVE',
+];
+
+/**
+ * Cycles to the next attendance status in order:
+ * PRESENT -> LATE -> ABSENT -> HALF_DAY -> ON_LEAVE -> [cleared/unmarked]
+ */
+export function cycleAttendanceStatus(currentStatus) {
+  if (!currentStatus) return 'PRESENT';
+  const idx = STATUS_CYCLE_LIST.indexOf(currentStatus);
+  if (idx !== -1 && idx < STATUS_CYCLE_LIST.length - 1) {
+    return STATUS_CYCLE_LIST[idx + 1];
+  }
+  return ''; // Cleared
+}
+
 /**
  * Retrieves full metadata for any given attendance status key safely.
  * Handles aliases like 'LEAVE' -> 'ON_LEAVE', 'HOLIDAY' -> 'HOLIDAY_EXCUSED'.
