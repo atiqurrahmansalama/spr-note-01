@@ -207,25 +207,82 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     continue
 
                 slot_uuid = None
-                if slot_id_val and str(slot_id_val).upper() not in ['ALL', 'DEFAULT', 'NULL', 'NONE', '']:
+                if slot_id_val and str(slot_id_val).upper() not in ['ALL', 'DEFAULT', 'NULL', 'NONE', '', 'MAIN']:
                     try:
                         slot_uuid = uuid.UUID(str(slot_id_val))
                     except (ValueError, TypeError):
                         slot_uuid = None
 
-                StudentAttendance.objects.update_or_create(
-                    student=student,
-                    period_slot_id=slot_uuid,
-                    date=date_val,
-                    defaults={
-                        'status': target_status,
-                        'student_class': student.student_class,
-                        'in_time': in_time,
-                        'remarks': remarks,
-                        'marked_by': request.user if request.user.is_authenticated else None,
-                        'source': 'WEB_PORTAL'
-                    }
-                )
+                if slot_uuid:
+                    if not DynamicPeriodSlot.objects.filter(id=slot_uuid).exists():
+                        cps = ClassPeriodSlot.objects.filter(id=slot_uuid).first()
+                        if cps:
+                            try:
+                                DynamicPeriodSlot.objects.create(
+                                    id=cps.id,
+                                    institution_id=cps.institution_id,
+                                    department_id=cps.department_id,
+                                    student_class_id=cps.student_class_id,
+                                    period_name=cps.period_name,
+                                    period_order=cps.period_order,
+                                    start_time=cps.start_time,
+                                    end_time=cps.end_time,
+                                    is_active=cps.is_active,
+                                    is_deleted=cps.is_deleted
+                                )
+                            except Exception:
+                                slot_uuid = None
+                        else:
+                            slot_uuid = None
+
+                # If status is cleared / unmarked
+                if not target_status or str(target_status).upper() in ['', 'UNMARKED', 'CLEAR', 'NONE', 'NULL', 'DELETE']:
+                    if slot_uuid:
+                        StudentAttendance.objects.filter(student=student, period_slot_id=slot_uuid, date=date_val).delete()
+                    else:
+                        StudentAttendance.objects.filter(student=student, period_slot__isnull=True, date=date_val).delete()
+                    created_or_updated += 1
+                    continue
+
+                # Validate valid choice
+                valid_choices = [c[0] for c in StudentAttendance.ATTENDANCE_STATUS_CHOICES]
+                clean_status = str(target_status).upper()
+                if clean_status not in valid_choices:
+                    clean_status = 'PRESENT'
+
+                conductor_teacher = None
+                if request.user.is_authenticated and hasattr(request.user, 'teacher_profile'):
+                    conductor_teacher = request.user.teacher_profile
+
+                if slot_uuid:
+                    existing = StudentAttendance.objects.filter(student=student, period_slot_id=slot_uuid, date=date_val).first()
+                else:
+                    existing = StudentAttendance.objects.filter(student=student, period_slot__isnull=True, date=date_val).first()
+
+                if existing:
+                    existing.status = clean_status
+                    existing.student_class = student.student_class
+                    existing.in_time = in_time
+                    existing.remarks = remarks
+                    if conductor_teacher:
+                        existing.taken_by_teacher = conductor_teacher
+                    if request.user.is_authenticated:
+                        existing.marked_by = request.user
+                    existing.source = 'WEB_PORTAL'
+                    existing.save()
+                else:
+                    StudentAttendance.objects.create(
+                        student=student,
+                        period_slot_id=slot_uuid,
+                        date=date_val,
+                        status=clean_status,
+                        student_class=student.student_class,
+                        in_time=in_time,
+                        remarks=remarks,
+                        taken_by_teacher=conductor_teacher,
+                        marked_by=request.user if request.user.is_authenticated else None,
+                        source='WEB_PORTAL'
+                    )
                 created_or_updated += 1
 
         return Response({
@@ -334,7 +391,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             ))
 
         policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first() if tenant_id else None
-        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+        weekend_days = policy.weekend_days if (policy and policy.weekend_days is not None) else ['FRIDAY']
 
         days_header = []
         curr_d = start_date
@@ -466,6 +523,258 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                 }
                 for p in period_slots
             ]
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='teacher-monthly-matrix')
+    def teacher_monthly_matrix(self, request):
+        dept_id = request.query_params.get('department_id') or request.query_params.get('department')
+        class_id = request.query_params.get('class_id')
+        teacher_id = request.query_params.get('teacher_id') or request.query_params.get('teacher')
+        start_date_param = request.query_params.get('start_date')
+        end_date_param = request.query_params.get('end_date')
+
+        try:
+            year = int(request.query_params.get('year', timezone.localdate().year))
+            month = int(request.query_params.get('month', timezone.localdate().month))
+        except ValueError:
+            year = timezone.localdate().year
+            month = timezone.localdate().month
+
+        if start_date_param and end_date_param:
+            try:
+                start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+                year = start_date.year
+                month = start_date.month
+            except ValueError:
+                num_days = calendar.monthrange(year, month)[1]
+                start_date = date(year, month, 1)
+                end_date = date(year, month, num_days)
+        else:
+            num_days = calendar.monthrange(year, month)[1]
+            start_date = date(year, month, 1)
+            end_date = date(year, month, num_days)
+
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+
+        # 1. Query teaching staff
+        teachers_qs = StaffProfile.objects.filter(
+            is_deleted=False,
+            is_active=True
+        ).filter(
+            Q(staff_type='TEACHING') |
+            Q(designation__icontains='Teacher') |
+            Q(designation__icontains='Ustadh') |
+            Q(designation__icontains='Muallim') |
+            Q(designation__icontains='Qari') |
+            Q(designation__icontains='Faculty')
+        ).select_related('user', 'department', 'institution')
+
+        if tenant_id:
+            teachers_qs = teachers_qs.filter(institution_id=tenant_id)
+        if dept_id and dept_id != 'ALL':
+            teachers_qs = teachers_qs.filter(department_id=dept_id)
+        if teacher_id and teacher_id != 'ALL':
+            teachers_qs = teachers_qs.filter(id=teacher_id)
+
+        teachers = list(teachers_qs.order_by('rank_order', 'employee_id'))
+
+        # 2. Query configured period slots
+        slots_qs = ClassPeriodSlot.objects.filter(
+            is_deleted=False,
+            is_active=True
+        ).select_related('student_class', 'department', 'teacher', 'teacher__user')
+
+        if tenant_id:
+            slots_qs = slots_qs.filter(institution_id=tenant_id)
+        if class_id and class_id != 'ALL':
+            slots_qs = slots_qs.filter(student_class_id=class_id)
+
+        teacher_slots_map = {}
+        for slot in slots_qs:
+            if slot.teacher_id:
+                teacher_slots_map.setdefault(str(slot.teacher_id), []).append(slot)
+
+        # 3. Query student attendances within date range
+        att_qs = StudentAttendance.objects.filter(
+            date__gte=start_date,
+            date__lte=end_date
+        )
+        if tenant_id:
+            att_qs = att_qs.filter(student__institution_id=tenant_id)
+
+        conducted_period_statuses = {}
+        conducted_general_class_statuses = {}
+        conducted_teacher_direct_statuses = {}
+        for att in att_qs:
+            d_str = att.date.isoformat()
+            if att.period_slot_id:
+                conducted_period_statuses.setdefault((str(att.period_slot_id), d_str), []).append(att.status)
+            if att.student_class_id:
+                conducted_general_class_statuses.setdefault((str(att.student_class_id), d_str), []).append(att.status)
+            elif att.student and att.student.student_class_id:
+                conducted_general_class_statuses.setdefault((str(att.student.student_class_id), d_str), []).append(att.status)
+            if att.taken_by_teacher_id:
+                conducted_teacher_direct_statuses.setdefault((str(att.taken_by_teacher_id), d_str), []).append(att.status)
+
+        # 4. Holidays & Weekends
+        holidays = []
+        if tenant_id:
+            holidays = list(AcademicCalendarEvent.objects.filter(
+                institution_id=tenant_id,
+                is_deleted=False,
+                start_date__lte=end_date,
+                end_date__gte=start_date,
+                event_type__in=['PUBLIC_HOLIDAY', 'INSTITUTIONAL_HOLIDAY', 'VACATION']
+            ))
+
+        policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first() if tenant_id else None
+        weekend_days = policy.weekend_days if (policy and policy.weekend_days is not None) else ['FRIDAY']
+
+        days_header = []
+        curr_d = start_date
+
+        while curr_d <= end_date:
+            weekday_str = curr_d.strftime('%a').upper()
+            is_weekend = curr_d.strftime('%A').upper() in weekend_days
+            matching_holiday = next((h for h in holidays if h.start_date <= curr_d <= h.end_date), None)
+
+            days_header.append({
+                "date": curr_d.isoformat(),
+                "day": curr_d.day,
+                "month": curr_d.month,
+                "year": curr_d.year,
+                "weekday": weekday_str,
+                "is_weekend": is_weekend,
+                "is_holiday": is_weekend or bool(matching_holiday),
+                "holiday_title": matching_holiday.title if matching_holiday else ("Weekend" if is_weekend else "")
+            })
+            curr_d += timedelta(days=1)
+
+        # 5. Build Teacher Matrix Rows
+        matrix_rows = []
+        for t_idx, teacher in enumerate(teachers):
+            assigned_slots = teacher_slots_map.get(str(teacher.id), [])
+            if assigned_slots:
+                assigned_slots.sort(key=lambda s: (s.period_order or 0, str(s.start_time or '')))
+                slots_to_iterate = assigned_slots
+            else:
+                slots_to_iterate = [None]
+
+            t_name = teacher.user.name if (teacher.user and teacher.user.name) else teacher.employee_id
+            t_desig = teacher.designation or 'Faculty Teacher'
+            t_dept = teacher.department.name if teacher.department else 'General Academic'
+
+            for p_idx, slot in enumerate(slots_to_iterate):
+                slot_id_str = str(slot.id) if slot else 'DEFAULT'
+                daily_statuses = {}
+
+                p_count = 0
+                l_count = 0
+                a_count = 0
+                hol_count = 0
+
+                for d_info in days_header:
+                    d_key = d_info["date"]
+
+                    if d_info["is_holiday"]:
+                        hol_count += 1
+                        daily_statuses[d_key] = 'HOLIDAY_EXCUSED'
+                    else:
+                        statuses = []
+                        if slot and slot_id_str != 'DEFAULT':
+                            # 1. Strictly match this teacher's specific assigned period slot
+                            if (slot_id_str, d_key) in conducted_period_statuses:
+                                statuses = conducted_period_statuses[(slot_id_str, d_key)]
+                            elif (str(teacher.id), d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(str(teacher.id), d_key)]
+                            elif slot.student_class_id and (str(slot.student_class_id), d_key) in conducted_general_class_statuses:
+                                statuses = conducted_general_class_statuses[(str(slot.student_class_id), d_key)]
+                        else:
+                            # 2. General teaching staff without dedicated period slots
+                            if (str(teacher.id), d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(str(teacher.id), d_key)]
+                            elif slot and slot.student_class_id and (str(slot.student_class_id), d_key) in conducted_general_class_statuses:
+                                statuses = conducted_general_class_statuses[(str(slot.student_class_id), d_key)]
+                            elif (None, d_key) in conducted_general_class_statuses:
+                                statuses = conducted_general_class_statuses[(None, d_key)]
+
+                        if statuses:
+                            if any(st in ['PRESENT', 'HALF_DAY'] for st in statuses):
+                                p_count += 1
+                                daily_statuses[d_key] = 'PRESENT'
+                            elif any(st == 'LATE' for st in statuses):
+                                l_count += 1
+                                daily_statuses[d_key] = 'LATE'
+                            elif all(st == 'ON_LEAVE' for st in statuses):
+                                daily_statuses[d_key] = 'ON_LEAVE'
+                            elif all(st == 'ABSENT' for st in statuses):
+                                # If all students were marked absent in roll-call, teacher conducted the period
+                                p_count += 1
+                                daily_statuses[d_key] = 'PRESENT'
+                            else:
+                                p_count += 1
+                                daily_statuses[d_key] = 'PRESENT'
+                        else:
+                            # If date is in the past (< today) and period was unconducted: auto-resolve to ABSENT
+                            today_iso = timezone.localdate().isoformat()
+                            if d_key < today_iso and not d_info["is_holiday"]:
+                                a_count += 1
+                                daily_statuses[d_key] = 'ABSENT'
+                            else:
+                                daily_statuses[d_key] = ''
+
+                total_recorded = p_count + l_count + a_count
+                conduction_rate = round((p_count + l_count) / total_recorded * 100, 1) if total_recorded > 0 else 100.0
+
+                desc_parts = []
+                if slot:
+                    if slot.start_time and slot.end_time:
+                        desc_parts.append(f"{str(slot.start_time)[:5]} - {str(slot.end_time)[:5]}")
+                    if slot.period_name:
+                        desc_parts.append(slot.period_name)
+                    if slot.student_class:
+                        desc_parts.append(f"({slot.student_class.name})")
+                desc_str = " • ".join(desc_parts) if desc_parts else t_dept
+
+                matrix_rows.append({
+                    "row_key": f"{teacher.id}_{slot_id_str}",
+                    "teacher_id": str(teacher.id),
+                    "id": str(teacher.id),
+                    "roll_number": str(t_idx + 1),
+                    "name": t_name,
+                    "sub_title": t_desig,
+                    "department_name": desc_str,
+                    "class_name": slot.student_class.name if (slot and slot.student_class) else '',
+                    "period_name": slot.period_name if slot else 'General Routine',
+                    "period_slot_id": slot_id_str if slot else None,
+                    "period_order": slot.period_order if slot else (p_idx + 1),
+                    "start_time": str(slot.start_time)[:5] if (slot and slot.start_time) else None,
+                    "end_time": str(slot.end_time)[:5] if (slot and slot.end_time) else None,
+                    "period_count": len(slots_to_iterate),
+                    "period_index": p_idx,
+                    "daily_statuses": daily_statuses,
+                    "totals": {
+                        "present": p_count,
+                        "late": l_count,
+                        "absent": a_count,
+                        "half_day": 0,
+                        "leave": 0,
+                        "total_recorded": total_recorded,
+                        "conduction_rate": conduction_rate,
+                        "attendance_rate": conduction_rate,
+                    }
+                })
+
+        return Response({
+            "year": year,
+            "month": month,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "total_days": len(days_header),
+            "days_header": days_header,
+            "teachers_matrix": matrix_rows,
+            "total_teachers": len(teachers),
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='daily-summary')
@@ -746,7 +1055,7 @@ class TeacherMatrixViewSet(viewsets.ViewSet):
             ))
 
         policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first() if tenant_id else None
-        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+        weekend_days = policy.weekend_days if (policy and policy.weekend_days is not None) else ['FRIDAY']
 
         days_header = []
         for day in range(1, num_days + 1):
@@ -1117,7 +1426,7 @@ class AttendancePolicyViewSet(viewsets.ViewSet):
 
         policy, _ = AttendancePolicySetting.objects.get_or_create(
             institution_id=tenant_id,
-            defaults={'weekend_days': ['FRIDAY', 'SATURDAY'], 'default_mode': 'DAILY_SINGLE'}
+            defaults={'weekend_days': ['FRIDAY'], 'default_mode': 'DAILY_SINGLE'}
         )
         return Response(AttendancePolicySettingSerializer(policy).data, status=status.HTTP_200_OK)
 

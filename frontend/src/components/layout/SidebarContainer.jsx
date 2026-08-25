@@ -122,9 +122,7 @@ export default function SidebarContainer({
       key: "nav_report_generator",
       subItems: [
         { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon, key: "report_builder" },
-        { id: "Sessions & Comments", name: "Sessions & Comments", path: "/sessions-comments", Icon: SessionsIcon, key: "report_sessions_comments" },
         { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
-        { id: "Report Settings", name: "Report Settings", path: "/copy-report", Icon: CopyIcon, key: "report_copy_settings" },
       ]
     },
     {
@@ -154,7 +152,6 @@ export default function SidebarContainer({
         { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon, key: "settings_security" },
         { id: "Personalize", name: "Personalize", path: "/personalize", Icon: AppearanceIcon, key: "settings_personalize" },
         { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
-        { id: "Trash", name: "Trash", path: "/trash-restoration", Icon: SavedMessagesIcon, key: "nav_trash" },
         { id: "Admin Tools", name: "Admin Tools", path: "/admin-tools", Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
       ]
     },

@@ -59,7 +59,7 @@ const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestoration
 const ProfileSettingsView = lazy(() => import("./modules/settings/ProfileSettingsView"));
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
 const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/PersonalizeSettingsHubView"));
-const CopyReportSettingsView = lazy(() => import("./modules/settings/components/CopyReportSettingsView"));
+const ReportSettingsView = lazy(() => import("./modules/settings/ReportSettingsView"));
 const DataBackupView = lazy(() => import("./modules/settings/components/DataBackupView"));
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));
 const AppGuideView = lazy(() => import("./modules/settings/components/AppGuideView"));
@@ -184,7 +184,8 @@ export default function App() {
             <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
             <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
             <Route path="/language" element={<PersonalizeSettingsHubView />} />
-            <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><CopyReportSettingsView /></FeatureGuard>} />
+            <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ReportSettingsView /></FeatureGuard>} />
+            <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ReportSettingsView /></FeatureGuard>} />
             <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup" fallback={<Navigate to="/dashboard" replace />}><DataBackupView /></FeatureGuard>} />
             <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts" fallback={<Navigate to="/dashboard" replace />}><ShortcutsGuide /></FeatureGuard>} />
             <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide" fallback={<Navigate to="/dashboard" replace />}><AppGuideView /></FeatureGuard>} />

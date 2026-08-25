@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -67,34 +67,7 @@ export default function PeriodForm({
     }
   }, [formData.start_time, formData.end_time]);
 
-  useEffect(() => {
-    loadLookups();
-    if (editingSlot) {
-      setFormData({
-        period_name: editingSlot.period_name || '',
-        slot_type: editingSlot.slot_type || 'TEACHING_PERIOD',
-        period_order: editingSlot.period_order ?? nextOrder,
-        start_time: editingSlot.start_time ? editingSlot.start_time.slice(0, 5) : '08:00',
-        end_time: editingSlot.end_time ? editingSlot.end_time.slice(0, 5) : '08:45',
-        department: editingSlot.department || '',
-        student_class: editingSlot.student_class || '',
-        teacher: editingSlot.teacher || '',
-      });
-    } else {
-      setFormData({
-        period_name: '',
-        slot_type: 'TEACHING_PERIOD',
-        period_order: nextOrder,
-        start_time: '08:00',
-        end_time: '08:45',
-        department: defaultDepartmentId || '',
-        student_class: defaultClassId || '',
-        teacher: '',
-      });
-    }
-  }, [editingSlot, defaultDepartmentId, defaultClassId, nextOrder]);
-
-  const loadLookups = async () => {
+  const loadLookups = useCallback(async () => {
     setLoadingLookups(true);
     try {
       const [deptRes, classRes, staffRes] = await Promise.allSettled([
@@ -120,7 +93,34 @@ export default function PeriodForm({
     } finally {
       setLoadingLookups(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadLookups();
+    if (editingSlot) {
+      setFormData({
+        period_name: editingSlot.period_name || '',
+        slot_type: editingSlot.slot_type || 'TEACHING_PERIOD',
+        period_order: editingSlot.period_order ?? nextOrder,
+        start_time: editingSlot.start_time ? editingSlot.start_time.slice(0, 5) : '08:00',
+        end_time: editingSlot.end_time ? editingSlot.end_time.slice(0, 5) : '08:45',
+        department: editingSlot.department || '',
+        student_class: editingSlot.student_class || '',
+        teacher: editingSlot.teacher || '',
+      });
+    } else {
+      setFormData({
+        period_name: '',
+        slot_type: 'TEACHING_PERIOD',
+        period_order: nextOrder,
+        start_time: '08:00',
+        end_time: '08:45',
+        department: defaultDepartmentId || '',
+        student_class: defaultClassId || '',
+        teacher: '',
+      });
+    }
+  }, [loadLookups, editingSlot, defaultDepartmentId, defaultClassId, nextOrder]);
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();

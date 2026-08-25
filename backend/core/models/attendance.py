@@ -337,6 +337,32 @@ class AttendancePolicySetting(models.Model):
         default=False,
         help_text="Send automated SMS / App alerts to guardians on unexcused absence"
     )
+
+    # Class Attendance Timing & Lock Rules
+    class_late_start_minutes = models.IntegerField(default=10, help_text="Minutes after period start when LATE status begins")
+    class_late_end_minutes = models.IntegerField(default=25, help_text="Minutes after period start when LATE window ends (cutoff)")
+    class_end_buffer_minutes = models.IntegerField(default=15, help_text="Minutes after period end before closing")
+    class_teacher_edit_window_hours = models.IntegerField(default=4, help_text="Hours after period end a regular teacher can edit")
+    class_auto_absent_on_expiry = models.BooleanField(default=True)
+
+    # Residential Attendance Timing & Lock Rules
+    residential_late_start_minutes = models.IntegerField(default=15, help_text="Minutes after checkpoint start when LATE begins")
+    residential_late_end_minutes = models.IntegerField(default=35, help_text="Minutes after checkpoint start when LATE window ends")
+    residential_end_buffer_minutes = models.IntegerField(default=45, help_text="Duration/buffer for checkpoint")
+    residential_teacher_edit_window_hours = models.IntegerField(default=4)
+    residential_auto_absent_on_expiry = models.BooleanField(default=True)
+
+    # Staff Daily Attendance Timing & Lock Rules
+    staff_start_time = models.TimeField(null=True, blank=True, default="07:30")
+    staff_late_start_time = models.TimeField(null=True, blank=True, default="08:15")
+    staff_late_end_time = models.TimeField(null=True, blank=True, default="09:00")
+    staff_end_time = models.TimeField(null=True, blank=True, default="10:00")
+    staff_teacher_edit_window_hours = models.IntegerField(default=2)
+    staff_auto_absent_on_expiry = models.BooleanField(default=True)
+
+    # Universal Admin Override Policy
+    admin_edit_window_days = models.IntegerField(default=30, help_text="Days after attendance date that an Admin can edit any record")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

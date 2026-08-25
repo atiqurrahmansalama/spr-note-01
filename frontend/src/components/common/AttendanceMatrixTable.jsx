@@ -38,6 +38,7 @@ export default function AttendanceMatrixTable({
   // State & Interactivity
   isEditing = false,
   onToggleCell,
+  onAdminEditCell,
   isHijriEnabled = false,
   selectedYear,
   selectedMonth,
@@ -84,7 +85,6 @@ export default function AttendanceMatrixTable({
     let totalPresent = 0;
     let totalLate = 0;
     let totalAbsent = 0;
-    let totalHalfDay = 0;
     let totalLeave = 0;
 
     rows.forEach((row) => {
@@ -94,20 +94,18 @@ export default function AttendanceMatrixTable({
         if (st === 'PRESENT') totalPresent += 1;
         else if (st === 'LATE') totalLate += 1;
         else if (st === 'ABSENT') totalAbsent += 1;
-        else if (st === 'HALF_DAY') totalHalfDay += 1;
         else if (st === 'ON_LEAVE') totalLeave += 1;
       });
     });
 
-    const attendedUnits = totalPresent + totalLate + totalHalfDay * 0.5;
-    const totalMarked = totalPresent + totalLate + totalAbsent + totalHalfDay + totalLeave;
+    const attendedUnits = totalPresent + totalLate;
+    const totalMarked = totalPresent + totalLate + totalAbsent + totalLeave;
     const overallRate = totalMarked > 0 ? Math.round((attendedUnits / totalMarked) * 100) : 100;
 
     return {
       present: totalPresent,
       late: totalLate,
       absent: totalAbsent,
-      halfDay: totalHalfDay,
       leave: totalLeave,
       rate: overallRate,
     };
@@ -182,7 +180,7 @@ export default function AttendanceMatrixTable({
                     eventTitle={d.event_title || d.calendar_event?.title}
                     isHoliday={Boolean(d.is_holiday || d.is_disabled)}
                     holidayTitle={d.holiday_title}
-                    onClick={() => onDateClick && onDateClick(d.date ? d.date : d)}
+                    onClick={() => onDateClick && onDateClick(fullDateStr)}
                     className="w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px]"
                   />
                 );
@@ -322,6 +320,12 @@ export default function AttendanceMatrixTable({
                             onToggleCell(rowId, dateStr, status, slotId);
                           }
                         }}
+                        onContextMenu={(e) => {
+                          if (onAdminEditCell && !isHoliday) {
+                            e.preventDefault();
+                            onAdminEditCell(row, dateStr, status, slotId);
+                          }
+                        }}
                         className={`py-2 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-mono text-[10px] border-r border-b theme-border transition-colors ${
                           hasEvent
                             ? `${d.event_colors.bg} ${d.event_colors.text}`
@@ -333,6 +337,8 @@ export default function AttendanceMatrixTable({
                             ? 'cursor-pointer select-none hover:brightness-95'
                             : isEditing && isHoliday
                             ? 'cursor-not-allowed select-none'
+                            : onAdminEditCell
+                            ? 'cursor-pointer select-none hover:brightness-95'
                             : 'cursor-default select-none'
                         }`}
                         title={
@@ -341,7 +347,9 @@ export default function AttendanceMatrixTable({
                             : isHoliday
                             ? `${d.holiday_title || 'Scheduled Holiday'} (Attendance Disabled)`
                             : isEditing
-                            ? `${dateStr} [${nameVal}]: ${status || 'Unrecorded'} (Click to toggle)`
+                            ? `${dateStr} [${nameVal}]: ${status || 'Unrecorded'} (Click to cycle / Right-click to edit details)`
+                            : onAdminEditCell
+                            ? `${dateStr} [${nameVal}]: ${status || 'Unrecorded'} (Right-click or click to edit)`
                             : `${dateStr} [${nameVal}]: ${status || 'Unrecorded'}`
                         }
                       >
@@ -351,20 +359,16 @@ export default function AttendanceMatrixTable({
                           <FilledCheckCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.PRESENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                         ) : status === 'ABSENT' ? (
                           <FilledXCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.ABSENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
-                        ) : status === 'LATE' ? (
-                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform`}>
+                        ) : status === 'LATE' || status === 'HALF_DAY' ? (
+                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform font-bold`}>
                             L
                           </span>
-                        ) : status === 'HALF_DAY' ? (
-                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} text-[10px]`}>
-                            H
-                          </span>
                         ) : status === 'ON_LEAVE' ? (
-                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px]`}>
+                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px] font-bold`}>
                             LV
                           </span>
                         ) : canEditCell ? (
-                          <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Present" />
+                          <span className="inline-block w-3.5 h-3.5 rounded-md border border-dashed theme-border hover:border-[var(--accent-main)] hover:theme-bg-accent-soft transition-all opacity-70 hover:opacity-100" title="Click to mark Attendance" />
                         ) : (
                           <span className="opacity-35 font-mono text-xs select-none theme-text-secondary">—</span>
                         )}
@@ -407,9 +411,6 @@ export default function AttendanceMatrixTable({
             </span>
             <span className="flex items-center gap-1.5">
               <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} flex items-center justify-center text-[9px]`}>L</span> Late
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.HALF_DAY.circleClass} flex items-center justify-center text-[9px]`}>H</span> Half Day
             </span>
             <span className="flex items-center gap-1.5">
               <span className={`w-3.5 h-3.5 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} flex items-center justify-center text-[9px]`}>LV</span> Leave

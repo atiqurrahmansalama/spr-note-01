@@ -98,6 +98,7 @@ const CustomInput = forwardRef(function CustomInput(
     currencySymbol = "৳",
     prefix,
     suffix,
+    unit,
     icon: CustomIcon,
     startAdornment,
     endAdornment,
@@ -487,6 +488,8 @@ const CustomInput = forwardRef(function CustomInput(
     stateClasses = "";
   } else if (disabled) {
     stateClasses = "opacity-50 cursor-not-allowed theme-bg-sub theme-border";
+  } else if (readOnly) {
+    stateClasses = "cursor-default select-none theme-bg-sub/70 theme-border";
   } else if (isInvalid) {
     stateClasses =
       "border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 shadow-xs";
@@ -699,12 +702,13 @@ const CustomInput = forwardRef(function CustomInput(
           />
         )}
 
-        {/* Right Side Suffix / Steppers / Password Toggle / Clear Button */}
+        {/* Right Side Suffix / Unit / Steppers / Password Toggle / Clear Button */}
         {((normalizedType === "number" && stepper && !disabled && !readOnly) ||
           (normalizedType === "password" && showPasswordToggle && !disabled) ||
           (clearable && stringValue.length > 0 && !disabled && !readOnly) ||
           (!isBorderless && isValid && !isInvalid) ||
           suffix ||
+          unit ||
           endAdornment) && (
           <div className="flex items-center gap-1.5 ml-2 shrink-0">
             {/* Stepper Buttons for Number mode */}
@@ -766,10 +770,10 @@ const CustomInput = forwardRef(function CustomInput(
               <CheckCircleIcon className="w-4 h-4 theme-success shrink-0" />
             )}
 
-            {/* Custom End Adornment / Suffix */}
-            {suffix && (
-              <span className="text-xs font-bold theme-text-secondary font-mono select-none">
-                {suffix}
+            {/* Custom End Adornment / Suffix / Unit (Placeholder-style) */}
+            {(suffix || unit) && (
+              <span className="text-xs font-semibold theme-text-secondary opacity-60 select-none pointer-events-none pr-0.5">
+                {suffix || unit}
               </span>
             )}
             {endAdornment}

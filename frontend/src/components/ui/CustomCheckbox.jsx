@@ -10,6 +10,7 @@ export default function CustomCheckbox({
   subLabel,
   description,
   disabled = false,
+  readOnly = false,
   size = 'md', // 'sm' | 'md' | 'lg'
   className = '',
   boxClassName = '',
@@ -32,13 +33,16 @@ export default function CustomCheckbox({
       : 'w-3.5 h-3.5';
 
   const handleChange = (e) => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     onChange?.(e.target.checked, e);
   };
 
   const handleContainerClick = (e) => {
-    if (disabled) return;
-    e.stopPropagation();
+    if (disabled || readOnly) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
   };
 
   const hasMultipleLines = Boolean(subLabel || description);
@@ -48,7 +52,7 @@ export default function CustomCheckbox({
       htmlFor={inputId}
       onClick={handleContainerClick}
       className={`inline-flex ${hasMultipleLines ? 'items-start' : 'items-center'} gap-2.5 select-none transition-opacity ${
-        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'
+        disabled ? 'opacity-50 cursor-not-allowed' : readOnly ? 'cursor-default' : 'cursor-pointer group'
       } ${className}`}
     >
       <div className={`relative flex items-center justify-center shrink-0 ${hasMultipleLines ? 'mt-0.5' : ''}`}>
@@ -58,7 +62,7 @@ export default function CustomCheckbox({
           name={name}
           checked={Boolean(checked)}
           onChange={handleChange}
-          disabled={disabled}
+          disabled={disabled || readOnly}
           className="sr-only"
         />
         <div

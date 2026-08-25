@@ -115,19 +115,19 @@ class StudentAttendanceSerializer(serializers.ModelSerializer):
 
 class BulkStudentAttendanceRecordItemSerializer(serializers.Serializer):
     student_id = serializers.IntegerField()
-    period_slot_id = serializers.CharField(required=False, allow_null=True)
-    session_slot_id = serializers.CharField(required=False, allow_null=True)
-    status = serializers.ChoiceField(choices=StudentAttendance.ATTENDANCE_STATUS_CHOICES, default='PRESENT')
+    period_slot_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    session_slot_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    status = serializers.CharField(required=False, allow_blank=True, allow_null=True, default='PRESENT')
     in_time = serializers.TimeField(required=False, allow_null=True)
     remarks = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class BulkStudentAttendancePunchSerializer(serializers.Serializer):
     date = serializers.DateField()
-    period_slot_id = serializers.CharField(required=False, allow_null=True)
-    session_slot_id = serializers.CharField(required=False, allow_null=True)
-    class_id = serializers.IntegerField(required=False, allow_null=True)
-    group_id = serializers.IntegerField(required=False, allow_null=True)
+    period_slot_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    session_slot_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    class_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    group_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     override_holiday = serializers.BooleanField(default=False)
     records = BulkStudentAttendanceRecordItemSerializer(many=True)
 
@@ -148,6 +148,23 @@ class AttendancePolicySettingSerializer(serializers.ModelSerializer):
             'default_late_cutoff_time',
             'auto_excuse_holidays',
             'auto_notify_absent',
+            'class_late_start_minutes',
+            'class_late_end_minutes',
+            'class_end_buffer_minutes',
+            'class_teacher_edit_window_hours',
+            'class_auto_absent_on_expiry',
+            'residential_late_start_minutes',
+            'residential_late_end_minutes',
+            'residential_end_buffer_minutes',
+            'residential_teacher_edit_window_hours',
+            'residential_auto_absent_on_expiry',
+            'staff_start_time',
+            'staff_late_start_time',
+            'staff_late_end_time',
+            'staff_end_time',
+            'staff_teacher_edit_window_hours',
+            'staff_auto_absent_on_expiry',
+            'admin_edit_window_days',
             'created_at',
             'updated_at',
         ]

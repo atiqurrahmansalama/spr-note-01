@@ -65,10 +65,10 @@ export default function DateHeaderCell({
 
   // Construct comprehensive title tooltip if not provided
   const tooltipText = title || (
-    eventTitle
+    isHoliday
+      ? `Holiday / Class Off: ${holidayTitle || eventTitle || 'Class Attendance Closed'} [${dateStr || resolvedDayNum}]`
+      : eventTitle
       ? `${eventTitle} [${dateStr || resolvedDayNum}]`
-      : holidayTitle
-      ? `${holidayTitle} [${dateStr || resolvedDayNum}]`
       : `${resolvedWeekday2Letter} - ${dateStr || resolvedDayNum}${resolvedHijriDay ? ` (Hijri: ${resolvedHijriDay})` : ""}`
   );
 
@@ -80,8 +80,8 @@ export default function DateHeaderCell({
     statusClasses = "theme-bg-accent-soft theme-accent font-bold hover:brightness-95";
   } else if (hasEvent && eventColors && showEventBackground) {
     statusClasses = `${eventColors.bg} ${eventColors.text} font-bold hover:brightness-95`;
-  } else if (isHoliday && showEventBackground) {
-    statusClasses = "theme-bg-accent-soft theme-accent font-bold hover:brightness-95";
+  } else if (isHoliday) {
+    statusClasses = "theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary";
   } else if (!isCurrentMonth) {
     statusClasses = "theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary";
   } else {

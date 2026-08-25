@@ -1207,13 +1207,40 @@ export const calendarEventTypesStore = {
 
 export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
   {
-    id: "attendance",
-    name: "Class & Staff Attendance",
-    code: "ATTENDANCE",
-    badge: "Attendance",
-    description: "Sync as scheduled activity or holiday in student and staff attendance registers",
+    id: "class_attendance",
+    name: "Class Attendance",
+    code: "CLASS_ATTENDANCE",
+    badge: "Class Attendance",
+    description: "Sync events, schedules, and holidays to student class periodic registers",
     is_active: true,
     order: 1,
+  },
+  {
+    id: "residential_attendance",
+    name: "Residential Attendance",
+    code: "RESIDENTIAL_ATTENDANCE",
+    badge: "Residential",
+    description: "Sync events and roll-calls to boarding hostel & prayer checkpoints",
+    is_active: true,
+    order: 2,
+  },
+  {
+    id: "teacher_attendance",
+    name: "Teacher Class Attendance",
+    code: "TEACHER_ATTENDANCE",
+    badge: "Teacher Attendance",
+    description: "Sync class schedule changes and leaves to teacher class conduction registers",
+    is_active: true,
+    order: 3,
+  },
+  {
+    id: "staff_attendance",
+    name: "Staff Daily Attendance",
+    code: "STAFF_ATTENDANCE",
+    badge: "Staff Attendance",
+    description: "Sync institutional holidays and duty shifts to employee daily registers",
+    is_active: true,
+    order: 4,
   },
   {
     id: "notifications",
@@ -1222,7 +1249,7 @@ export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
     badge: "Notifications",
     description: "Send instant alert and reminders to target audience members",
     is_active: true,
-    order: 2,
+    order: 5,
   },
   {
     id: "routine",
@@ -1231,7 +1258,7 @@ export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
     badge: "Routine",
     description: "Adjust period slots, bells, and classroom routine during this time",
     is_active: true,
-    order: 3,
+    order: 6,
   },
   {
     id: "reports",
@@ -1240,7 +1267,7 @@ export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
     badge: "Reports",
     description: "Include event timetable in exam schedules and report builders",
     is_active: true,
-    order: 4,
+    order: 7,
   },
   {
     id: "gate_access",
@@ -1249,14 +1276,31 @@ export const DEFAULT_SYSTEM_IMPACT_SCOPES = [
     badge: "Gate & RFID",
     description: "Synchronize campus entry/exit timings and biometric RFID gates",
     is_active: true,
-    order: 5,
+    order: 8,
   },
 ];
 
 export const calendarImpactScopesStore = {
   getScopes: (tenantId) => {
     const key = `spr_calendar_impact_scopes_${tenantId || 'default'}`;
-    return readJSON(key, DEFAULT_SYSTEM_IMPACT_SCOPES);
+    const stored = readJSON(key, null);
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      return DEFAULT_SYSTEM_IMPACT_SCOPES;
+    }
+    // Auto-migrate to ensure all modern scopes are present
+    let hasChanges = false;
+    const merged = [...stored];
+    DEFAULT_SYSTEM_IMPACT_SCOPES.forEach((def) => {
+      const exists = merged.some((s) => s.id === def.id || s.code === def.code);
+      if (!exists) {
+        merged.push(def);
+        hasChanges = true;
+      }
+    });
+    if (hasChanges) {
+      writeJSON(key, merged);
+    }
+    return merged;
   },
   saveScopes: (tenantId, scopes) => {
     const key = `spr_calendar_impact_scopes_${tenantId || 'default'}`;
@@ -1371,6 +1415,91 @@ export const attendanceEventRestrictionsStore = {
       return true;
     }
     return false;
+  },
+};
+
+// ─── Attendance Timing & Lockout Policy Store ────────────────────────────────
+export const DEFAULT_ATTENDANCE_TIMING_POLICY = {
+  // Class Attendance Timing
+  class_late_start_minutes: 10,
+  class_late_end_minutes: 25,
+  class_end_buffer_minutes: 15,
+  class_teacher_edit_window_hours: 4,
+  class_auto_absent_on_expiry: true,
+
+  // Residential Attendance Timing
+  residential_late_start_minutes: 15,
+  residential_late_end_minutes: 35,
+  residential_end_buffer_minutes: 45,
+  residential_teacher_edit_window_hours: 4,
+  residential_auto_absent_on_expiry: true,
+
+  // Staff Daily Attendance Timing
+  staff_start_time: "07:30",
+  staff_late_start_time: "08:15",
+  staff_late_end_time: "09:00",
+  staff_end_time: "10:00",
+  staff_teacher_edit_window_hours: 2,
+  staff_auto_absent_on_expiry: true,
+
+  // Universal Admin Override Window
+  admin_edit_window_days: 30,
+};
+
+export const attendanceTimingPolicyStore = {
+  getPolicy: (tenantId) => {
+    const key = `spr_attendance_timing_policy_${tenantId || 'default'}`;
+    const raw = readJSON(key, null);
+    if (!raw || typeof raw !== 'object') {
+      writeJSON(key, DEFAULT_ATTENDANCE_TIMING_POLICY);
+      return DEFAULT_ATTENDANCE_TIMING_POLICY;
+    }
+    return { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...raw };
+  },
+  savePolicy: (tenantId, policyData) => {
+    const key = `spr_attendance_timing_policy_${tenantId || 'default'}`;
+    const merged = { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...policyData };
+    writeJSON(key, merged);
+    window.dispatchEvent(new CustomEvent("spr_attendance_timing_policy_updated", { detail: merged }));
+    return merged;
+  },
+  fetchRemotePolicy: async (tenantId) => {
+    try {
+      const res = await fetch(`/api/v1/attendance/policy/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('spr_auth_token') || ''}`,
+          'X-Tenant-Id': tenantId || '',
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return attendanceTimingPolicyStore.savePolicy(tenantId, data);
+      }
+    } catch (err) {
+      console.warn("Could not fetch remote attendance policy, using local store:", err);
+    }
+    return attendanceTimingPolicyStore.getPolicy(tenantId);
+  },
+  saveRemotePolicy: async (tenantId, policyData) => {
+    attendanceTimingPolicyStore.savePolicy(tenantId, policyData);
+    try {
+      const res = await fetch(`/api/v1/attendance/policy/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('spr_auth_token') || ''}`,
+          'X-Tenant-Id': tenantId || '',
+        },
+        body: JSON.stringify(policyData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return attendanceTimingPolicyStore.savePolicy(tenantId, data);
+      }
+    } catch (err) {
+      console.warn("Could not save remote attendance policy:", err);
+    }
+    return attendanceTimingPolicyStore.getPolicy(tenantId);
   },
 };
 
@@ -1896,6 +2025,7 @@ export const DEFAULT_ADMISSION_REQUIREMENTS = [
     name_bn: "প্রাথমিক ও হিফজ বিভাগ (প্লে - ৫ম শ্রেণি, হিফজ)",
     code: "PRIMARY_HIFZ_REQ",
     target_class_pattern: "ALL_PRIMARY_HIFZ",
+    applicable_class_id: "ALL",
     required_docs: [
       "Birth Registration Certificate (BRN)",
       "Guardian National ID (NID)",
@@ -1910,6 +2040,7 @@ export const DEFAULT_ADMISSION_REQUIREMENTS = [
     name_bn: "মাধ্যমিক ও উচ্চতর বিভাগ (৬ষ্ঠ - ১০ম, আলিম, দাওরায়ে হাদিস)",
     code: "SECONDARY_HIGHER_REQ",
     target_class_pattern: "SECONDARY_HIGHER",
+    applicable_class_id: "ALL",
     required_docs: [
       "Birth Registration Certificate (BRN)",
       "Guardian National ID (NID)",
@@ -1947,12 +2078,15 @@ export const classAdmissionRequirementsStore = {
       : (typeof reqData.required_docs === 'string'
           ? reqData.required_docs.split(',').map((s) => s.trim()).filter(Boolean)
           : []);
+    const singleClassId = reqData.applicable_class_id || (Array.isArray(reqData.applicable_class_ids) ? reqData.applicable_class_ids[0] : "ALL");
+
     const newReq = {
       ...reqData,
       id: reqData.id || `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       code: code || `REQ_${Date.now()}`,
       name: reqData.name || code,
       name_bn: reqData.name_bn || "",
+      applicable_class_id: singleClassId || "ALL",
       required_docs: docs.length > 0 ? docs : ["Birth Registration Certificate (BRN)", "Guardian National ID (NID)"],
       order: reqData.order !== undefined ? Number(reqData.order) : list.length + 1,
       description: reqData.description || "",
@@ -1970,6 +2104,9 @@ export const classAdmissionRequirementsStore = {
         ? {
             ...r,
             ...updatedData,
+            applicable_class_id: updatedData.applicable_class_id !== undefined
+              ? (updatedData.applicable_class_id || "ALL")
+              : (r.applicable_class_id || (Array.isArray(r.applicable_class_ids) ? r.applicable_class_ids[0] : "ALL")),
             required_docs: Array.isArray(updatedData.required_docs)
               ? updatedData.required_docs
               : (typeof updatedData.required_docs === 'string'
@@ -1999,6 +2136,18 @@ export const classAdmissionRequirementsStore = {
       return ["Birth Registration Certificate (BRN)", "Guardian National ID (NID)"];
     }
 
+    // 1. Direct match by specific class ID
+    if (classId) {
+      const directMatch = activeReqs.find((r) => {
+        const targetId = r.applicable_class_id || (Array.isArray(r.applicable_class_ids) ? r.applicable_class_ids[0] : null);
+        return targetId && String(targetId) === String(classId);
+      });
+      if (directMatch && Array.isArray(directMatch.required_docs) && directMatch.required_docs.length > 0) {
+        return directMatch.required_docs;
+      }
+    }
+
+    // 2. Pattern match by class name string
     const cNameLower = (className || "").toLowerCase();
     const isHigher = /6|7|8|9|10|alim|fazil|kamil|dawra|hsc|ssc|ten|nine|eight|seven|six|উচ্চ|মাস্টার্স|স্নাতক|ফাজিল|দাওরা/.test(cNameLower);
 
@@ -2022,6 +2171,12 @@ export const classAdmissionRequirementsStore = {
     );
     if (primaryRule && Array.isArray(primaryRule.required_docs) && primaryRule.required_docs.length > 0) {
       return primaryRule.required_docs;
+    }
+
+    // 3. Fallback to general ALL classes rule
+    const generalRule = activeReqs.find((r) => !r.applicable_class_id || r.applicable_class_id === "ALL");
+    if (generalRule && Array.isArray(generalRule.required_docs) && generalRule.required_docs.length > 0) {
+      return generalRule.required_docs;
     }
 
     return activeReqs[0]?.required_docs || ["Birth Registration Certificate (BRN)", "Guardian National ID (NID)"];
@@ -2265,6 +2420,28 @@ export const academicYearsStore = {
     return active || list[0] || null;
   },
 
+  getDateBounds: (tenantId) => {
+    const activeYear = academicYearsStore.getActiveYear(tenantId);
+    if (activeYear && activeYear.startDate && activeYear.endDate) {
+      return {
+        minDate: activeYear.startDate,
+        maxDate: activeYear.endDate,
+        activeYear,
+      };
+    }
+    const all = academicYearsStore.getAcademicYears(tenantId);
+    if (all.length > 0) {
+      const validStarts = all.map((y) => y.startDate).filter(Boolean).sort();
+      const validEnds = all.map((y) => y.endDate).filter(Boolean).sort();
+      return {
+        minDate: validStarts[0] || "",
+        maxDate: validEnds[validEnds.length - 1] || "",
+        activeYear: all[0],
+      };
+    }
+    return { minDate: "", maxDate: "", activeYear: null };
+  },
+
   saveAcademicYears: (tenantId, years) => {
     const key = `spr_academic_years_${tenantId || 'default'}`;
     const safeYears = Array.isArray(years) ? years : [];
@@ -2383,6 +2560,275 @@ export const academicYearsStore = {
     };
   },
 };
+
+// ─── Curriculum & Syllabus Store ──────────────────────────────────────────
+
+export const DEFAULT_CURRICULUM_ITEMS = [
+  {
+    id: "syllabus_1",
+    name: "Mukhtasar al-Quduri",
+    subject: "Islamic Jurisprudence (Fiqh)",
+    className: "Mizaan / Hidayah-1",
+    classId: "1",
+    semester: "1st Semester",
+    teacherName: "Mawlana Saqib",
+    teacherId: "1",
+    startPage: 1,
+    endPage: 220,
+    currentPage: 165,
+    totalPages: 220,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Chapters on Purification, Prayer, and Marriage included for semester evaluation.",
+    updatedAt: "2026-08-20T10:00:00.000Z",
+  },
+  {
+    id: "syllabus_2",
+    name: "Al-Hidayah Sharh Bidayat al-Mubtadi",
+    subject: "Principles of Jurisprudence (Usul al-Fiqh)",
+    className: "Dawra-e-Hadith",
+    classId: "2",
+    semester: "1st Semester",
+    teacherName: "Mufti Abdullah",
+    teacherId: "2",
+    startPage: 1,
+    endPage: 340,
+    currentPage: 340,
+    totalPages: 340,
+    targetDate: "2026-06-30",
+    status: "COMPLETED",
+    notes: "Commercial Transactions and Monetary Contracts completed with extensive review.",
+    updatedAt: "2026-08-22T14:30:00.000Z",
+  },
+  {
+    id: "syllabus_3",
+    name: "Mishkat al-Masabih",
+    subject: "Prophetic Traditions (Hadith)",
+    className: "Dawra-e-Hadith",
+    classId: "2",
+    semester: "1st Semester",
+    teacherName: "Mawlana Saqib",
+    teacherId: "1",
+    startPage: 50,
+    endPage: 280,
+    currentPage: 140,
+    totalPages: 231,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Chapters on Daily Prayers & Funeral Rites.",
+    updatedAt: "2026-08-24T09:15:00.000Z",
+  },
+  {
+    id: "syllabus_4",
+    name: "Sharh Mi'ata Amil",
+    subject: "Arabic Syntax & Grammar (Nahw)",
+    className: "Nahw-Mir",
+    classId: "3",
+    semester: "2nd Semester",
+    teacherName: "Hafez Ahmad",
+    teacherId: "3",
+    startPage: 1,
+    endPage: 90,
+    currentPage: 45,
+    totalPages: 90,
+    targetDate: "2026-11-30",
+    status: "IN_PROGRESS",
+    notes: "Grammatical governing agents and practical sentence structures.",
+    updatedAt: "2026-08-25T11:20:00.000Z",
+  },
+  {
+    id: "syllabus_5",
+    name: "Tafsir al-Jalalayn",
+    subject: "Quranic Exegesis (Tafsir)",
+    className: "Jalalayn Class",
+    classId: "4",
+    semester: "1st Semester",
+    teacherName: "Mufti Abdullah",
+    teacherId: "2",
+    startPage: 1,
+    endPage: 240,
+    currentPage: 85,
+    totalPages: 240,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Surah Al-Baqarah through Surah Ali 'Imran.",
+    updatedAt: "2026-08-23T16:00:00.000Z",
+  },
+  {
+    id: "syllabus_6",
+    name: "Nurul Idah wa Najat al-Arwah",
+    subject: "Islamic Jurisprudence (Fiqh)",
+    className: "Mizaan / Hidayah-1",
+    classId: "1",
+    semester: "2nd Semester",
+    teacherName: "Hafez Ahmad",
+    teacherId: "3",
+    startPage: 1,
+    endPage: 160,
+    currentPage: 0,
+    totalPages: 160,
+    targetDate: "2026-12-15",
+    status: "NOT_STARTED",
+    notes: "Scheduled for upcoming 2nd semester syllabus.",
+    updatedAt: "2026-08-15T08:00:00.000Z",
+  },
+];
+
+export const curriculumStore = {
+  getItems: (tenantId) => {
+    const key = `spr_curriculum_syllabus_${tenantId || "default"}`;
+    const legacyKey = `spr_curriculum_kitabs_${tenantId || "default"}`;
+    let raw = readJSON(key, null);
+    if (!raw) {
+      raw = readJSON(legacyKey, null);
+    }
+    if (!raw || !Array.isArray(raw) || raw.length === 0) {
+      writeJSON(key, DEFAULT_CURRICULUM_ITEMS);
+      return DEFAULT_CURRICULUM_ITEMS;
+    }
+    return raw;
+  },
+
+  saveItems: (tenantId, items) => {
+    const key = `spr_curriculum_syllabus_${tenantId || "default"}`;
+    const safe = Array.isArray(items) ? items : [];
+    writeJSON(key, safe);
+    window.dispatchEvent(new CustomEvent("spr_curriculum_updated", { detail: safe }));
+    window.dispatchEvent(new CustomEvent("spr_curriculum_kitabs_updated", { detail: safe }));
+    return safe;
+  },
+
+  addItem: (tenantId, data) => {
+    const list = curriculumStore.getItems(tenantId);
+    const start = Number(data.startPage) || 1;
+    const end = Number(data.endPage) || start;
+    const cur = Number(data.currentPage) || 0;
+    const total = end >= start ? end - start + 1 : 1;
+    let status = "NOT_STARTED";
+    if (cur >= end && end > 0) status = "COMPLETED";
+    else if (cur > start || cur > 0) status = "IN_PROGRESS";
+
+    const newItem = {
+      id: `syllabus_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      ...data,
+      startPage: start,
+      endPage: end,
+      currentPage: cur,
+      totalPages: total,
+      status: data.status || status,
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [newItem, ...list];
+    curriculumStore.saveItems(tenantId, updated);
+    return newItem;
+  },
+
+  updateItem: (tenantId, id, data) => {
+    const list = curriculumStore.getItems(tenantId);
+    const updated = list.map((item) => {
+      if (item.id === id) {
+        const start = data.startPage !== undefined ? Number(data.startPage) : item.startPage;
+        const end = data.endPage !== undefined ? Number(data.endPage) : item.endPage;
+        const cur = data.currentPage !== undefined ? Number(data.currentPage) : item.currentPage;
+        const total = end >= start ? end - start + 1 : 1;
+        let status = "NOT_STARTED";
+        if (cur >= end && end > 0) status = "COMPLETED";
+        else if (cur > start || cur > 0) status = "IN_PROGRESS";
+
+        return {
+          ...item,
+          ...data,
+          startPage: start,
+          endPage: end,
+          currentPage: cur,
+          totalPages: total,
+          status: data.status || status,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return item;
+    });
+    curriculumStore.saveItems(tenantId, updated);
+  },
+
+  updateProgress: (tenantId, id, newPage, note) => {
+    const list = curriculumStore.getItems(tenantId);
+    const updated = list.map((item) => {
+      if (item.id === id) {
+        const cur = Number(newPage);
+        let status = item.status;
+        if (cur >= item.endPage && item.endPage > 0) status = "COMPLETED";
+        else if (cur >= item.startPage || cur > 0) status = "IN_PROGRESS";
+        else status = "NOT_STARTED";
+
+        return {
+          ...item,
+          currentPage: cur,
+          status,
+          notes: note !== undefined && note !== null && note.trim() !== "" ? note : item.notes,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return item;
+    });
+    curriculumStore.saveItems(tenantId, updated);
+  },
+
+  deleteItem: (tenantId, id) => {
+    const list = curriculumStore.getItems(tenantId);
+    const updated = list.filter((item) => item.id !== id);
+    curriculumStore.saveItems(tenantId, updated);
+  },
+
+  getMetrics: (tenantId) => {
+    const list = curriculumStore.getItems(tenantId);
+    const total = list.length;
+    const completed = list.filter((k) => k.status === "COMPLETED" || (k.currentPage >= k.endPage && k.endPage > 0)).length;
+    const inProgress = list.filter((k) => k.status === "IN_PROGRESS" && k.currentPage < k.endPage).length;
+    const notStarted = list.filter((k) => k.status === "NOT_STARTED" || !k.currentPage || k.currentPage === 0).length;
+
+    let sumPct = 0;
+    list.forEach((k) => {
+      const start = Number(k.startPage) || 1;
+      const end = Number(k.endPage) || start;
+      const cur = Number(k.currentPage) || 0;
+      const span = Math.max(1, end - start + 1);
+      const covered = Math.max(0, cur - start + 1);
+      const pct = Math.min(100, Math.round((covered / span) * 100));
+      sumPct += isNaN(pct) ? 0 : pct;
+    });
+    const avgProgress = total > 0 ? Math.round(sumPct / total) : 0;
+
+    return {
+      totalItems: total,
+      completedItems: completed,
+      inProgressItems: inProgress,
+      notStartedItems: notStarted,
+      overallProgressPct: avgProgress,
+    };
+  },
+};
+
+// Aliases for backward compatibility
+export const curriculumKitabsStore = {
+  getKitabs: (tenantId) => curriculumStore.getItems(tenantId),
+  saveKitabs: (tenantId, list) => curriculumStore.saveItems(tenantId, list),
+  addKitab: (tenantId, data) => curriculumStore.addItem(tenantId, data),
+  updateKitab: (tenantId, id, data) => curriculumStore.updateItem(tenantId, id, data),
+  updateProgress: (tenantId, id, p, n) => curriculumStore.updateProgress(tenantId, id, p, n),
+  deleteKitab: (tenantId, id) => curriculumStore.deleteItem(tenantId, id),
+  getMetrics: (tenantId) => {
+    const m = curriculumStore.getMetrics(tenantId);
+    return {
+      totalKitabs: m.totalItems,
+      completedKitabs: m.completedItems,
+      inProgressKitabs: m.inProgressItems,
+      notStartedKitabs: m.notStartedItems,
+      overallProgressPct: m.overallProgressPct,
+    };
+  },
+};
+
 
 
 

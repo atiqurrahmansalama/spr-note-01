@@ -18,6 +18,7 @@ import { calendarEventKindsStore, staffCategoriesStore } from "../../utils/local
 import { DrawerContainer } from "../layout";
 import CustomInput from "../ui/CustomInput";
 import CustomSelect from "../ui/CustomSelect";
+import ClassSelect from "../selectors/ClassSelect";
 
 /**
  * Detail View Drawer for inspecting full taxonomy details in the Right Sidebar
@@ -215,6 +216,27 @@ export function TaxonomyDrawerForm({
     }
     return base;
   });
+
+  // Automatically update form state when editing a different item while drawer is open
+  useEffect(() => {
+    const base = {
+      name: initialData?.name || "",
+      type: initialData?.type || (typeOptions && typeOptions.length > 0 ? typeOptions[0].value : ""),
+      description: initialData?.description || "",
+      order: initialData?.order ?? 0,
+      is_active: initialData?.is_active ?? true,
+    };
+    if (Array.isArray(extraFields)) {
+      extraFields.forEach((f) => {
+        base[f.name] = initialData?.[f.name] !== undefined ? initialData[f.name] : (f.defaultValue ?? "");
+      });
+    }
+    setFormData(base);
+    setIsManageOpen(false);
+    setEditingKindVal(null);
+    setDeletingKindObj(null);
+  }, [initialData, typeOptions, extraFields]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNameChange = (val) => {
@@ -494,19 +516,39 @@ export function TaxonomyDrawerForm({
 
           {/* Dynamic Extra Config Fields */}
           {Array.isArray(extraFields) &&
-            extraFields.map((field) =>
-              field.type === "select" || field.type === "multiselect" || field.multiple ? (
-                <CustomSelect
-                  key={field.name}
-                  label={field.label}
-                  value={formData[field.name] || field.defaultValue}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
-                  options={field.options}
-                  multiple={Boolean(field.multiple || field.type === "multiselect")}
-                  searchable={Boolean(field.searchable || (field.options && field.options.length > 4))}
-                  placeholder={field.placeholder || `Select ${field.label.toLowerCase()}...`}
-                />
-              ) : (
+            extraFields.map((field) => {
+              if (field.type === "class_select" || field.type === "class") {
+                return (
+                  <ClassSelect
+                    key={field.name}
+                    label={field.label}
+                    value={formData[field.name] !== undefined ? formData[field.name] : field.defaultValue}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
+                    allowAll={field.allowAll !== undefined ? field.allowAll : true}
+                    allLabel={field.allLabel || "All Classes (General / Default)"}
+                    allValue={field.allValue || "ALL"}
+                    searchable={Boolean(field.searchable)}
+                    placeholder={field.placeholder || `Select ${field.label.toLowerCase()}...`}
+                  />
+                );
+              }
+
+              if (field.type === "select" || field.type === "multiselect" || field.multiple) {
+                return (
+                  <CustomSelect
+                    key={field.name}
+                    label={field.label}
+                    value={formData[field.name] || field.defaultValue}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
+                    options={field.options}
+                    multiple={Boolean(field.multiple || field.type === "multiselect")}
+                    searchable={Boolean(field.searchable)}
+                    placeholder={field.placeholder || `Select ${field.label.toLowerCase()}...`}
+                  />
+                );
+              }
+
+              return (
                 <CustomInput
                   key={field.name}
                   label={field.label}
@@ -514,8 +556,8 @@ export function TaxonomyDrawerForm({
                   onChange={(val) => setFormData((prev) => ({ ...prev, [field.name]: val }))}
                   placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
                 />
-              )
-            )}
+              );
+            })}
 
           <CustomInput
             type="textarea"
@@ -639,6 +681,7 @@ export default function CompactTaxonomyManager({
           width: 480,
           content: (
             <TaxonomyDetailDrawer
+              key={`taxonomy-detail-${foundItem?.id || 'none'}`}
               item={foundItem}
               itemTypeName={itemTypeName}
               typeOptions={typeOptions}
@@ -661,6 +704,7 @@ export default function CompactTaxonomyManager({
           width: 480,
           content: (
             <TaxonomyDrawerForm
+              key={`taxonomy-form-edit-${foundItem?.id || 'edit'}`}
               initialData={foundItem}
               itemTypeName={itemTypeName}
               typeOptions={typeOptions}
@@ -690,6 +734,7 @@ export default function CompactTaxonomyManager({
         width: 480,
         content: (
           <TaxonomyDrawerForm
+            key={`taxonomy-form-add-${itemTypeName}`}
             itemTypeName={itemTypeName}
             typeOptions={typeOptions}
             typeLabel={typeLabel}
@@ -711,7 +756,7 @@ export default function CompactTaxonomyManager({
         ),
       };
     },
-    [taxonomyDrawerKey, items, itemTypeName, typeOptions, typeLabel, hideStatus, onManageTypes, createItem, updateItem, loadData, closeDrawer, showToast]
+    [taxonomyDrawerKey, items, itemTypeName, typeOptions, typeLabel, hideStatus, extraFields, onManageTypes, createItem, updateItem, loadData, closeDrawer, showToast]
   );
 
   // Open Right Sidebar for Details

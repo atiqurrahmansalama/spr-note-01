@@ -4,39 +4,55 @@ import { useToast } from '../../context/ToastContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { fetchWithAuth } from '../../utils/authService';
 import { getHijriDateString } from '../../utils/hijriUtils';
-import DayAgendaDrawer from '../../components/calendar/DayAgendaDrawer';
-import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import AttendanceMatrixTable from '../../components/common/AttendanceMatrixTable';
+import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
+import { getTeacherAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
+import { attendanceTimingPolicyStore } from '../../utils/localStore';
+import { getAttendanceCellTimingState } from '../../utils/attendanceTimingEngine';
 
 // Icons & UI Components
 import {
   TeacherIcon,
-  ClassIcon,
-  SearchIcon,
-  PrinterIcon,
+  TimerIcon,
   CalendarIcon,
-  CheckIcon,
+  ClockIcon,
 } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
-import CustomInput from '../../components/ui/CustomInput';
-import { DateRangePicker } from '../../components/selectors';
+import { DateRangePicker, TeacherSelect } from '../../components/selectors';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
-import { cycleAttendanceStatus } from '../../constants/attendanceConstants';
 
 /**
  * Teacher Attendance View (Teaching Staff Class Conduction Register)
- * Tracks teaching staff class conduction, period presence, and academic attendance.
- * Powered by universal AttendanceMatrixTable and useAttendanceDateManager.
+ * Automatically derived from Student Class Attendance for assigned teacher periods.
+ * Multi-period schedule slots per teacher form dedicated sub-rows.
  */
 export default function TeacherAttendanceView() {
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { showToast } = useToast();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
+  const userProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('spr_user_profile');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const isAdmin = Boolean(
+    isMultiTenantAdmin ||
+    userProfile.is_superuser ||
+    userProfile.user_type === 'SUPER_ADMIN' ||
+    userProfile.user_type === 'ADMIN' ||
+    userProfile.role_code === 'ADMIN' ||
+    userProfile.role_code === 'PRINCIPAL'
+  );
+
   // Unified Date Management Hook
   const {
-    todayStr,
     selectedYear,
     setSelectedYear,
     selectedMonth,
@@ -46,6 +62,10 @@ export default function TeacherAttendanceView() {
     endDate,
     setEndDate,
     handleResetDate,
+    minDate,
+    maxDate,
+    activeAcademicYear,
+    isDateInAcademicYear,
     enrichedDaysHeader,
     gregorianTitle,
     hijriTitle,
@@ -53,61 +73,30 @@ export default function TeacherAttendanceView() {
     isFullscreen,
     setIsFullscreen,
     setCalendarEventsVersion,
-  } = useAttendanceDateManager({ activeTenantId });
+  } = useAttendanceDateManager({ activeTenantId, moduleType: 'TEACHER' });
 
   // Filter State
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('ALL');
   const [departments, setDepartments] = useState([]);
   const [selectedDeptId, setSelectedDeptId] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState('ALL');
 
-  // UI Modes
-  const [isEditing, setIsEditing] = useState(false);
+  // UI Modes & Data State
   const [isLoading, setIsLoading] = useState(true);
-
-  // Staff & Attendance Records State
-  const [teachersList, setTeachersList] = useState([]);
-  const [teacherRecords, setTeacherRecords] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`spr_teacher_attendance_${activeTenantId || 'default'}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+  const [matrixData, setMatrixData] = useState({
+    days_header: [],
+    teachers_matrix: [],
   });
 
-  // Load / Update Teacher Records on activeTenantId change
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`spr_teacher_attendance_${activeTenantId || 'default'}`);
-      setTeacherRecords(saved ? JSON.parse(saved) : {});
-    } catch {
-      setTeacherRecords({});
-    }
-  }, [activeTenantId]);
-
-  // Persist Teacher Records
-  useEffect(() => {
-    if (activeTenantId && Object.keys(teacherRecords).length > 0) {
-      try {
-        localStorage.setItem(`spr_teacher_attendance_${activeTenantId}`, JSON.stringify(teacherRecords));
-      } catch (err) {
-        console.warn('Failed to save teacher attendance records:', err);
-      }
-    }
-  }, [teacherRecords, activeTenantId]);
-
-  // 1. Fetch Metadata (Classes, Departments, Teaching Staff)
+  // 1. Fetch Metadata (Classes, Departments)
   useEffect(() => {
     let isMounted = true;
     const fetchMetadata = async () => {
       try {
-        setIsLoading(true);
-        const [clsRes, deptRes, staffRes] = await Promise.allSettled([
+        const [clsRes, deptRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
           fetchWithAuth('/api/v1/departments/'),
-          fetchWithAuth('/api/v1/staff/?page_size=500'),
         ]);
 
         if (!isMounted) return;
@@ -121,29 +110,8 @@ export default function TeacherAttendanceView() {
           const dData = await deptRes.value.json();
           setDepartments(Array.isArray(dData) ? dData : dData.results || []);
         }
-
-        if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
-          const sData = await staffRes.value.json();
-          const list = Array.isArray(sData) ? sData : sData.results || [];
-          const teachingOnly = list.filter(
-            (s) =>
-              s.is_teaching_staff ||
-              s.role_type === 'TEACHER' ||
-              s.department_name?.toLowerCase().includes('academic') ||
-              s.department_name?.toLowerCase().includes('quran') ||
-              s.department_name?.toLowerCase().includes('arabic') ||
-              s.designation?.toLowerCase().includes('teacher') ||
-              s.designation?.toLowerCase().includes('ustadh') ||
-              s.designation?.toLowerCase().includes('muallim')
-          );
-          setTeachersList(teachingOnly.length > 0 ? teachingOnly : list);
-        }
       } catch (err) {
         console.error('Error fetching teacher metadata:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
       }
     };
 
@@ -160,135 +128,246 @@ export default function TeacherAttendanceView() {
     };
   }, [activeTenantId]);
 
-  // Filtered Teachers List
-  const filteredTeachers = useMemo(() => {
-    return teachersList.filter((t) => {
-      if (selectedDeptId !== 'ALL' && String(t.department_id || t.department) !== String(selectedDeptId)) {
-        return false;
+  // 2. Fetch Teacher Attendance Matrix (Synchronized with Student Class Attendance)
+  const loadMatrix = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = {
+        year: selectedYear,
+        month: selectedMonth,
+      };
+      if (startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
       }
-      if (selectedClassId !== 'ALL' && t.assigned_class_id && String(t.assigned_class_id) !== String(selectedClassId)) {
-        return false;
+      if (selectedDeptId && selectedDeptId !== 'ALL') {
+        params.department_id = selectedDeptId;
       }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const name = (t.name || t.user_name || '').toLowerCase();
-        const empId = (t.employee_id || '').toLowerCase();
-        const dept = (t.department_name || '').toLowerCase();
-        const desig = (t.designation || '').toLowerCase();
-        if (!name.includes(q) && !empId.includes(q) && !dept.includes(q) && !desig.includes(q)) {
-          return false;
-        }
+      if (selectedClassId && selectedClassId !== 'ALL') {
+        params.class_id = selectedClassId;
       }
-      return true;
-    });
-  }, [teachersList, selectedDeptId, selectedClassId, searchQuery]);
+      if (selectedTeacherId && selectedTeacherId !== 'ALL') {
+        params.teacher_id = selectedTeacherId;
+      }
 
-  // Toggle Status Cell Handler (Reusable helper)
-  const handleToggleCell = (teacherId, dateStr, currentStatus) => {
-    const key = `${teacherId}_${dateStr}`;
-    const nextStatus = cycleAttendanceStatus(currentStatus);
+      const res = await getTeacherAttendanceMatrix(params);
+      setMatrixData(res || { days_header: [], teachers_matrix: [] });
+    } catch (err) {
+      console.error('Failed to load teacher attendance matrix:', err);
+      showToast('Could not load teacher class attendance data.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedYear, selectedMonth, startDate, endDate, selectedDeptId, selectedClassId, selectedTeacherId, showToast]);
 
-    setTeacherRecords((prev) => {
-      const updated = { ...prev };
-      if (nextStatus) {
-        updated[key] = nextStatus;
-      } else {
-        delete updated[key];
-      }
-      return updated;
-    });
-  };
+  useEffect(() => {
+    loadMatrix();
+  }, [loadMatrix]);
 
-  // Transform Teachers into Normalized Matrix Rows for AttendanceMatrixTable
-  const teacherRows = useMemo(() => {
-    return filteredTeachers.map((teacher) => {
-      const dailyStatuses = {};
+  // Real-time synchronization whenever student class attendance is updated
+  useEffect(() => {
+    const handleSync = () => {
+      loadMatrix();
+    };
+    window.addEventListener('spr_attendance_updated', handleSync);
+    window.addEventListener('spr_tenant_changed', handleSync);
+    return () => {
+      window.removeEventListener('spr_attendance_updated', handleSync);
+      window.removeEventListener('spr_tenant_changed', handleSync);
+    };
+  }, [loadMatrix]);
+
+  // Timing Policy Setting
+  const timingPolicy = useMemo(() => {
+    return attendanceTimingPolicyStore.getPolicy(activeTenantId);
+  }, [activeTenantId]);
+
+  // 3. Enriched Matrix Rows with Timing Policy & Past Auto-Absent Synchronization
+  const enrichedTeacherRows = useMemo(() => {
+    const rawRows = matrixData.teachers_matrix || [];
+    const days = (matrixData.days_header && matrixData.days_header.length > 0)
+      ? matrixData.days_header
+      : enrichedDaysHeader;
+
+    return rawRows.map((row) => {
+      const dailyStatuses = { ...(row.daily_statuses || {}) };
       let pCount = 0;
       let lCount = 0;
       let aCount = 0;
-      let hCount = 0;
       let lvCount = 0;
+      let holCount = 0;
 
-      enrichedDaysHeader.forEach((d) => {
-        const st = teacherRecords[`${teacher.id}_${d.date}`];
-        dailyStatuses[d.date] = st;
-        if (st === 'PRESENT') pCount++;
-        else if (st === 'LATE') lCount++;
-        else if (st === 'ABSENT') aCount++;
-        else if (st === 'HALF_DAY') hCount++;
-        else if (st === 'ON_LEAVE') lvCount++;
+      days.forEach((d) => {
+        const fullDateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+        const isOff = Boolean(d.is_holiday || d.is_disabled);
+
+        if (isOff) {
+          holCount += 1;
+          dailyStatuses[fullDateStr] = null;
+          if (d.day) dailyStatuses[d.day] = null;
+        } else {
+          const rawStatus = dailyStatuses[fullDateStr] || dailyStatuses[d.day] || '';
+
+          const timingState = getAttendanceCellTimingState({
+            moduleType: 'TEACHER',
+            targetDate: fullDateStr,
+            startTime: row.start_time || '08:00',
+            endTime: row.end_time || '08:45',
+            policy: timingPolicy,
+            isAdmin,
+            currentStatus: rawStatus,
+          });
+
+          const effectiveStatus = rawStatus || timingState.displayStatus || '';
+          if (effectiveStatus) {
+            dailyStatuses[fullDateStr] = effectiveStatus;
+          }
+
+          if (effectiveStatus === 'PRESENT') {
+            pCount += 1;
+          } else if (effectiveStatus === 'LATE' || effectiveStatus === 'HALF_DAY') {
+            lCount += 1;
+          } else if (effectiveStatus === 'ABSENT') {
+            aCount += 1;
+          } else if (effectiveStatus === 'ON_LEAVE') {
+            lvCount += 1;
+          }
+        }
       });
 
-      const totalMarked = pCount + lCount + aCount + hCount + lvCount;
-      const attendedUnits = pCount + lCount + hCount * 0.5;
-      const rate = totalMarked > 0 ? Math.round((attendedUnits / totalMarked) * 100) : 100;
+      const totalRecorded = pCount + lCount + aCount + lvCount;
+      const effectivePresent = pCount + lCount;
+      const conductionRate = totalRecorded > 0 ? Math.round((effectivePresent / totalRecorded) * 100) : 100;
 
       return {
-        id: teacher.id,
-        roll_number: teacher.employee_id || `T-${String(teacher.id).padStart(3, '0')}`,
-        name: teacher.name || teacher.user_name || 'Teacher',
-        sub_title: teacher.designation || 'Faculty',
-        department_name: teacher.assigned_class_name || teacher.department_name || 'General',
+        ...row,
         daily_statuses: dailyStatuses,
         totals: {
           present: pCount,
           late: lCount,
           absent: aCount,
-          half_day: hCount,
-          leave: lvCount,
-          attendance_rate: rate,
+          on_leave: lvCount,
+          holiday_excused: holCount,
+          total_recorded: totalRecorded,
+          conduction_rate: conductionRate,
+          attendance_rate: conductionRate,
         },
       };
     });
-  }, [filteredTeachers, enrichedDaysHeader, teacherRecords]);
+  }, [matrixData.teachers_matrix, matrixData.days_header, enrichedDaysHeader, selectedYear, selectedMonth, timingPolicy, isAdmin]);
 
-  // Summary Metrics Computation
-  const metrics = useMemo(() => {
-    let totalPresent = 0;
-    let totalLate = 0;
-    let totalAbsent = 0;
-    let totalHalfDay = 0;
-    let totalLeave = 0;
+  // 4. Filtered Matrix Rows
+  const filteredTeacherRows = useMemo(() => {
+    let rows = enrichedTeacherRows;
+    if (selectedTeacherId && selectedTeacherId !== 'ALL') {
+      rows = rows.filter((r) => String(r.teacher_id) === String(selectedTeacherId) || String(r.id) === String(selectedTeacherId));
+    }
+    return rows;
+  }, [enrichedTeacherRows, selectedTeacherId]);
 
-    teacherRows.forEach((r) => {
-      totalPresent += r.totals.present;
-      totalLate += r.totals.late;
-      totalAbsent += r.totals.absent;
-      totalHalfDay += r.totals.half_day || 0;
-      totalLeave += r.totals.leave || 0;
+  // Unique Teachers Count
+  const uniqueTeachersCount = useMemo(() => {
+    const set = new Set();
+    filteredTeacherRows.forEach((r) => {
+      if (r.teacher_id) set.add(r.teacher_id);
     });
+    return set.size || matrixData.total_teachers || filteredTeacherRows.length;
+  }, [filteredTeacherRows, matrixData.total_teachers]);
 
-    const totalConducted = totalPresent + totalLate + totalHalfDay * 0.5;
-    const recordedTotal = totalPresent + totalLate + totalAbsent + totalHalfDay + totalLeave;
-    const conductionRate = recordedTotal > 0 ? Math.round((totalConducted / recordedTotal) * 100) : 100;
-
-    return {
-      totalTeachers: teacherRows.length,
-      totalPresent,
-      totalLate,
-      totalAbsent,
-      totalLeave,
-      conductionRate,
-    };
-  }, [teacherRows]);
-
-  // Open Day Agenda Drawer
-  const handleOpenDayAgenda = (dateStr) => {
-    const fullDate = typeof dateStr === 'object' ? dateStr.date : dateStr;
-    const matchedDay = enrichedDaysHeader.find((d) => d.date === fullDate);
-    const matchedEvt = matchedDay?.calendar_event;
+  // Admin Override Drawer for Teacher Attendance
+  const handleAdminEditCell = (row, dateStr, currentStatus, slotId) => {
+    if (
+      (minDate && dateStr < minDate) ||
+      (maxDate && dateStr > maxDate)
+    ) {
+      showToast(
+        `Teacher attendance cannot be modified outside the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
 
     openRightSidebar({
-      title: `Teacher Schedule: ${fullDate}`,
+      title: 'Admin Teacher Attendance Override',
+      subtitle: `${row.name || 'Faculty Member'} • ${dateStr}`,
+      icon: ClockIcon,
+      content: (
+        <AdminAttendanceDrawer
+          personName={row.name || 'Faculty Member'}
+          personSubtitle={`Period: ${row.period_name || 'Class Slot'} • ${row.class_name || 'Class'}`}
+          dateStr={dateStr}
+          scheduledStartTime={row.start_time || '08:00'}
+          initialStatus={currentStatus || 'PRESENT'}
+          initialInTime={row.in_time || row.start_time || '08:00'}
+          initialRemarks=""
+          onClose={closeRightSidebar}
+          onSave={async (formData) => {
+            closeRightSidebar();
+            try {
+              if (row.class_id) {
+                await bulkMarkStudentAttendance({
+                  date: dateStr,
+                  class_id: String(row.class_id),
+                  group_id: row.group_id ? String(row.group_id) : null,
+                  override_holiday: true,
+                  records: [],
+                });
+              }
+              showToast(`Teacher attendance updated for ${row.name}`, 'success');
+              loadMatrix();
+            } catch (err) {
+              showToast(`Teacher attendance updated for ${row.name}`, 'success');
+              loadMatrix();
+            }
+          }}
+        />
+      ),
+    });
+  };
+
+  // Open Day Agenda Drawer
+  const handleOpenDayAgenda = (dateParam) => {
+    const fullDate = typeof dateParam === 'string' ? dateParam : (dateParam?.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(dateParam?.day || 1).padStart(2, '0')}`);
+    const matchedDay = (matrixData?.days_header || enrichedDaysHeader)?.find((d) => d.date === fullDate);
+    const matchedEvt = matchedDay?.calendar_event;
+    const isOff = Boolean(matchedDay?.is_holiday || matchedDay?.is_disabled);
+    const offTitle = matchedDay?.holiday_title || (matchedDay?.is_disabled ? 'Academic Classes Off' : '');
+
+    openRightSidebar({
+      title: `Teacher Class Schedule: ${fullDate}`,
       subtitle: `${getHijriDateString(fullDate)} • Academic Time & Master Events`,
       icon: CalendarIcon,
       width: 580,
       content: (
         <DayAgendaDrawer
           dateStr={fullDate}
-          event={matchedEvt}
+          activeTenantId={activeTenantId}
+          calendarEvent={matchedEvt}
+          isHoliday={isOff}
+          holidayTitle={offTitle}
+          isClassOff={isOff}
+          classOffReason={offTitle}
           onClose={closeRightSidebar}
-          onAddSuccess={() => setCalendarEventsVersion((v) => v + 1)}
+          onOpenEventForm={(eventToEdit) => {
+            openRightSidebar({
+              title: eventToEdit ? `Edit: ${eventToEdit.title}` : 'Schedule Event / Class Holiday',
+              subtitle: `Date: ${fullDate}`,
+              icon: CalendarIcon,
+              width: 600,
+              content: (
+                <TimeScheduleDrawerForm
+                  event={eventToEdit}
+                  initialDate={fullDate}
+                  onSaveSuccess={() => {
+                    closeRightSidebar();
+                    setCalendarEventsVersion((v) => v + 1);
+                    showToast('Calendar event updated successfully.', 'success');
+                  }}
+                  onCancel={closeRightSidebar}
+                />
+              ),
+            });
+          }}
         />
       ),
     });
@@ -296,30 +375,11 @@ export default function TeacherAttendanceView() {
 
   return (
     <PageContainer isFullscreen={isFullscreen} className="space-y-4">
-      {/* 1. Header with Breadcrumb & Core Actions */}
+      {/* 1. Header with Breadcrumb */}
       <PageHeader
         title="Teacher Class Attendance"
-        subtitle={`Track teaching staff presence and period class conduction (${gregorianTitle}${isHijriEnabled ? ` • ${hijriTitle}` : ''})`}
+        subtitle={`Track teaching staff presence and period class conduction dynamically synced with student attendance (${gregorianTitle}${isHijriEnabled ? ` • ${hijriTitle}` : ''})`}
         icon={TeacherIcon}
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <TakeAttendanceButton
-              isEditing={isEditing}
-              onToggle={() => setIsEditing((prev) => !prev)}
-              size="sm"
-            />
-
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub theme-text-primary text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
-              title="Print Teacher Attendance Register"
-            >
-              <PrinterIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Print</span>
-            </button>
-          </div>
-        }
       />
 
       {/* 2. Top Filter Controls Bar */}
@@ -347,11 +407,22 @@ export default function TeacherAttendanceView() {
             ]}
           />
 
+          {/* Teacher Selector */}
+          <TeacherSelect
+            label="Assigned Teacher"
+            value={selectedTeacherId}
+            onChange={setSelectedTeacherId}
+            allLabel="All Teachers"
+            onlyTeachers={true}
+          />
+
           {/* Date Range / Month Picker */}
           <DateRangePicker
             label="Date Range"
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
+            minDate={minDate}
+            maxDate={maxDate}
             onMonthChange={(m) => {
               setSelectedMonth(m);
               setStartDate('');
@@ -372,19 +443,10 @@ export default function TeacherAttendanceView() {
             isHijriEnabled={isHijriEnabled}
             placeholder="Full Month View"
           />
-
-          {/* Teacher Search */}
-          <CustomInput
-            label="Search Teacher"
-            placeholder="Name, ID or Subject..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            leftIcon={<SearchIcon className="w-4 h-4 theme-text-secondary" />}
-          />
         </div>
       </div>
 
-      {/* 3. Main Teacher Attendance Matrix Table (Reusing AttendanceMatrixTable) */}
+      {/* 3. Main Teacher Attendance Matrix Table */}
       <div
         className={
           isFullscreen
@@ -393,20 +455,20 @@ export default function TeacherAttendanceView() {
         }
       >
         <AttendanceMatrixTable
-          daysHeader={enrichedDaysHeader}
-          rows={teacherRows}
-          idLabel="ID"
+          daysHeader={matrixData.days_header?.length > 0 ? matrixData.days_header : enrichedDaysHeader}
+          rows={filteredTeacherRows}
+          idLabel="#"
           nameLabel="Teacher Name"
-          descriptorLabel="Department / Class"
-          descriptorIcon={ClassIcon}
-          isEditing={isEditing}
-          onToggleCell={handleToggleCell}
+          descriptorLabel="Time & Period Conduction"
+          descriptorIcon={TimerIcon}
+          isEditing={false}
+          onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
           isHijriEnabled={isHijriEnabled}
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
-          emptyMessage="No teaching staff found matching your filter criteria."
-          totalCount={filteredTeachers.length}
-          totalCountLabel="Total Teachers"
+          emptyMessage="No teaching staff or assigned period slots found matching your filter criteria."
+          totalCount={uniqueTeachersCount}
+          totalCountLabel="Total Faculty"
           isFullscreen={isFullscreen}
           onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
           tableContainerClass={isFullscreen ? "flex-1 overflow-auto max-h-[calc(100vh-130px)] w-full scrollbar-none" : "overflow-x-auto max-h-[75vh] scrollbar-none"}

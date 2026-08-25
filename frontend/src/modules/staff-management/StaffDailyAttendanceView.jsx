@@ -4,27 +4,32 @@ import { useToast } from '../../context/ToastContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { fetchWithAuth } from '../../utils/authService';
 import { getHijriDateString } from '../../utils/hijriUtils';
-import DayAgendaDrawer from '../../components/calendar/DayAgendaDrawer';
+import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
 import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
+import {
+  attendanceTimingPolicyStore,
+} from '../../utils/localStore';
+import {
+  getAttendanceCellTimingState,
+  cycleStatusWithinAllowed,
+  calculateLateDelayMinutes,
+} from '../../utils/attendanceTimingEngine';
 
 // Icons & UI Components
 import {
   DutyIcon,
-  SearchIcon,
   PrinterIcon,
   CalendarIcon,
   BuildingOfficeIcon,
   CheckIcon,
+  ClockIcon,
 } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
-import CustomInput from '../../components/ui/CustomInput';
-import { DateRangePicker } from '../../components/selectors';
+import { DateRangePicker, TeacherSelect } from '../../components/selectors';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
-import {
-  cycleAttendanceStatus,
-} from '../../constants/attendanceConstants';
 
 /**
  * Staff Daily Attendance View (Institutional Employee Attendance Register)
@@ -32,13 +37,46 @@ import {
  * Powered by universal AttendanceMatrixTable and useAttendanceDateManager.
  */
 export default function StaffDailyAttendanceView() {
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { showToast } = useToast();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
+  const userProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('spr_user_profile');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const isAdmin = Boolean(
+    isMultiTenantAdmin ||
+    userProfile.is_superuser ||
+    userProfile.user_type === 'SUPER_ADMIN' ||
+    userProfile.user_type === 'ADMIN' ||
+    userProfile.role_code === 'ADMIN' ||
+    userProfile.role_code === 'PRINCIPAL'
+  );
+
+  const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));
+
+  useEffect(() => {
+    attendanceTimingPolicyStore.fetchRemotePolicy(activeTenantId).then((res) => {
+      if (res) setTimingPolicy(res);
+    });
+
+    const handlePolicyUpdate = (e) => {
+      setTimingPolicy(e.detail || attendanceTimingPolicyStore.getPolicy(activeTenantId));
+    };
+
+    window.addEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    return () => {
+      window.removeEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    };
+  }, [activeTenantId]);
+
   // Unified Date Management Hook
   const {
-    todayStr,
     selectedYear,
     setSelectedYear,
     selectedMonth,
@@ -48,6 +86,10 @@ export default function StaffDailyAttendanceView() {
     endDate,
     setEndDate,
     handleResetDate,
+    minDate,
+    maxDate,
+    activeAcademicYear,
+    isDateInAcademicYear,
     enrichedDaysHeader,
     gregorianTitle,
     hijriTitle,
@@ -55,17 +97,24 @@ export default function StaffDailyAttendanceView() {
     isFullscreen,
     setIsFullscreen,
     setCalendarEventsVersion,
-  } = useAttendanceDateManager({ activeTenantId });
+  } = useAttendanceDateManager({ activeTenantId, moduleType: 'STAFF' });
 
   // Filter State
   const [departments, setDepartments] = useState([]);
   const [selectedDeptId, setSelectedDeptId] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState('ALL');
 
-  // UI Modes
-  const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleToggleTakeAttendance = () => {
+    const nextState = !isEditing;
+    setIsEditing(nextState);
+    if (nextState) {
+      showToast('Attendance marking mode enabled. Click any staff cell to mark attendance.', 'info');
+    }
+  };
 
   // Staff & Attendance Records State
   const [allStaffList, setAllStaffList] = useState([]);
@@ -77,16 +126,6 @@ export default function StaffDailyAttendanceView() {
       return {};
     }
   });
-
-  // Load / Update Staff Records on activeTenantId change
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`spr_staff_daily_attendance_${activeTenantId || 'default'}`);
-      setStaffRecords(saved ? JSON.parse(saved) : {});
-    } catch {
-      setStaffRecords({});
-    }
-  }, [activeTenantId]);
 
   // Persist Staff Records
   useEffect(() => {
@@ -122,59 +161,108 @@ export default function StaffDailyAttendanceView() {
           setAllStaffList(Array.isArray(sData) ? sData : sData.results || []);
         }
       } catch (err) {
-        console.error('Error fetching staff metadata:', err);
+        console.error('Error loading staff metadata:', err);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchMetadata();
-
-    const handleTenantChanged = () => {
-      fetchMetadata();
-    };
-    window.addEventListener('spr_tenant_changed', handleTenantChanged);
-
     return () => {
       isMounted = false;
-      window.removeEventListener('spr_tenant_changed', handleTenantChanged);
     };
   }, [activeTenantId]);
 
-  // Filtered Staff List
+  // Filtered Staff Roster
   const filteredStaff = useMemo(() => {
     return allStaffList.filter((s) => {
-      if (selectedDeptId !== 'ALL' && String(s.department_id || s.department) !== String(selectedDeptId)) {
+      if (selectedDeptId && selectedDeptId !== 'ALL' && String(s.department_id || s.department) !== String(selectedDeptId)) {
         return false;
       }
-      if (roleFilter !== 'ALL' && s.role_type !== roleFilter) {
+      if (roleFilter && roleFilter !== 'ALL' && s.role !== roleFilter && s.user_type !== roleFilter) {
         return false;
       }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const name = (s.name || s.user_name || '').toLowerCase();
-        const empId = (s.employee_id || '').toLowerCase();
-        const dept = (s.department_name || '').toLowerCase();
-        const desig = (s.designation || '').toLowerCase();
-        if (!name.includes(q) && !empId.includes(q) && !dept.includes(q) && !desig.includes(q)) {
-          return false;
-        }
+      if (selectedStaffId && selectedStaffId !== 'ALL' && String(s.id) !== String(selectedStaffId)) {
+        return false;
       }
       return true;
     });
-  }, [allStaffList, selectedDeptId, roleFilter, searchQuery]);
+  }, [allStaffList, selectedDeptId, roleFilter, selectedStaffId]);
 
-  // Toggle Status Cell Handler (Reusable helper)
+  // Helper to extract status from either string or rich object record
+  const getStaffStatus = (rec) => {
+    if (!rec) return '';
+    if (typeof rec === 'string') return rec;
+    return rec.status || '';
+  };
+
+  // Toggle Status Cell Handler with Timing Enforcement and Self-Only Attendance Rule
   const handleToggleCell = (staffId, dateStr, currentStatus) => {
+    // 0. Ownership Authorization: Staff can only mark their own attendance
+    if (!isAdmin) {
+      const currentUserId = userProfile.id || userProfile.user_id;
+      const currentStaffId = userProfile.staff_id || userProfile.employee_id || userProfile.id;
+      const matchingStaff = allStaffList.find((s) => String(s.id) === String(staffId));
+
+      const isSelf =
+        String(staffId) === String(currentUserId) ||
+        String(staffId) === String(currentStaffId) ||
+        (matchingStaff && (
+          String(matchingStaff.user_id) === String(currentUserId) ||
+          String(matchingStaff.id) === String(currentUserId) ||
+          (userProfile.phone_number && matchingStaff.phone_number === userProfile.phone_number)
+        ));
+
+      if (!isSelf) {
+        showToast('You can only mark daily attendance for your own name.', 'warning');
+        return;
+      }
+    }
+
+    // 0. Check Academic Year Date Guard
+    if (
+      (minDate && dateStr < minDate) ||
+      (maxDate && dateStr > maxDate)
+    ) {
+      showToast(
+        `Staff attendance cannot be marked outside the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
+
+    const timingState = getAttendanceCellTimingState({
+      moduleType: 'STAFF',
+      targetDate: dateStr,
+      policy: timingPolicy,
+      isAdmin,
+      currentStatus,
+    });
+
+    if (!timingState.isEditable) {
+      showToast(timingState.tooltip || 'Staff attendance cannot be marked at this time.', 'warning');
+      return;
+    }
+
     const key = `${staffId}_${dateStr}`;
-    const nextStatus = cycleAttendanceStatus(currentStatus);
+    const nextStatus = cycleStatusWithinAllowed(currentStatus, timingState.allowedStatuses);
+
+    const conductorName =
+      userProfile.name ||
+      userProfile.name_en ||
+      (userProfile.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : '') ||
+      'Staff';
 
     setStaffRecords((prev) => {
       const updated = { ...prev };
       if (nextStatus) {
-        updated[key] = nextStatus;
+        updated[key] = {
+          status: nextStatus,
+          recorded_by_id: userProfile.id || null,
+          recorded_by_name: conductorName,
+          self_marked: !isAdmin,
+          recorded_at: new Date().toISOString(),
+        };
       } else {
         delete updated[key];
       }
@@ -182,33 +270,90 @@ export default function StaffDailyAttendanceView() {
     });
   };
 
+  // Admin Override Drawer for Staff Attendance
+  const handleAdminEditCell = (row, dateStr, currentStatus) => {
+    if (
+      (minDate && dateStr < minDate) ||
+      (maxDate && dateStr > maxDate)
+    ) {
+      showToast(
+        `Staff attendance cannot be modified outside the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
+
+    openRightSidebar({
+      title: 'Admin Staff Attendance Override',
+      subtitle: `${row.name || 'Staff Member'} • ${dateStr}`,
+      icon: ClockIcon,
+      content: (
+        <AdminAttendanceDrawer
+          personName={row.name || 'Staff Member'}
+          personSubtitle={`ID: ${row.employee_id || row.roll_number || '—'} • Dept: ${row.department_name || 'General'}`}
+          dateStr={dateStr}
+          scheduledStartTime={timingPolicy.staff_start_time || '07:30'}
+          initialStatus={currentStatus || 'PRESENT'}
+          initialInTime={timingPolicy.staff_start_time || '07:30'}
+          initialRemarks=""
+          onClose={closeRightSidebar}
+          onSave={async (formData) => {
+            closeRightSidebar();
+            const key = `${row.id}_${dateStr}`;
+            setStaffRecords((prev) => ({
+              ...prev,
+              [key]: {
+                status: formData.status,
+                recorded_by_id: userProfile.id || null,
+                recorded_by_name: userProfile.name || 'Admin',
+                self_marked: false,
+                recorded_at: new Date().toISOString(),
+                in_time: formData.in_time,
+                remarks: formData.remarks,
+              },
+            }));
+            showToast(`Attendance updated for ${row.name}`, 'success');
+          }}
+        />
+      ),
+    });
+  };
+
   // Transform Staff into Normalized Matrix Rows for AttendanceMatrixTable
   const staffRows = useMemo(() => {
-    return filteredStaff.map((staff) => {
+    return filteredStaff.map((staff, idx) => {
       const dailyStatuses = {};
       let pCount = 0;
       let lCount = 0;
       let aCount = 0;
-      let hCount = 0;
       let lvCount = 0;
 
       enrichedDaysHeader.forEach((d) => {
-        const st = staffRecords[`${staff.id}_${d.date}`];
+        const rawRec = staffRecords[`${staff.id}_${d.date}`];
+        const rawStatus = getStaffStatus(rawRec);
+        const timingState = getAttendanceCellTimingState({
+          moduleType: 'STAFF',
+          targetDate: d.date,
+          policy: timingPolicy,
+          isAdmin,
+          currentStatus: rawStatus,
+        });
+
+        const st = rawStatus || timingState.displayStatus || '';
         dailyStatuses[d.date] = st;
         if (st === 'PRESENT') pCount++;
-        else if (st === 'LATE') lCount++;
+        else if (st === 'LATE' || st === 'HALF_DAY') lCount++;
         else if (st === 'ABSENT') aCount++;
-        else if (st === 'HALF_DAY') hCount++;
         else if (st === 'ON_LEAVE') lvCount++;
       });
 
-      const totalMarked = pCount + lCount + aCount + hCount + lvCount;
-      const attendedUnits = pCount + lCount + hCount * 0.5;
+      const totalMarked = pCount + lCount + aCount + lvCount;
+      const attendedUnits = pCount + lCount;
       const rate = totalMarked > 0 ? Math.round((attendedUnits / totalMarked) * 100) : 100;
 
       return {
         id: staff.id,
-        roll_number: staff.employee_id || `S-${String(staff.id).padStart(3, '0')}`,
+        roll_number: String(idx + 1),
         name: staff.name || staff.user_name || 'Staff Member',
         sub_title: staff.designation || 'Staff',
         department_name: staff.department_name || 'General',
@@ -217,32 +362,29 @@ export default function StaffDailyAttendanceView() {
           present: pCount,
           late: lCount,
           absent: aCount,
-          half_day: hCount,
           leave: lvCount,
           attendance_rate: rate,
         },
       };
     });
-  }, [filteredStaff, enrichedDaysHeader, staffRecords]);
+  }, [filteredStaff, enrichedDaysHeader, staffRecords, timingPolicy, isAdmin]);
 
   // Summary Metrics Computation
   const metrics = useMemo(() => {
     let totalPresent = 0;
     let totalLate = 0;
     let totalAbsent = 0;
-    let totalHalfDay = 0;
     let totalLeave = 0;
 
     staffRows.forEach((r) => {
       totalPresent += r.totals.present;
       totalLate += r.totals.late;
       totalAbsent += r.totals.absent;
-      totalHalfDay += r.totals.half_day || 0;
       totalLeave += r.totals.leave || 0;
     });
 
-    const totalConducted = totalPresent + totalLate + totalHalfDay * 0.5;
-    const recordedTotal = totalPresent + totalLate + totalAbsent + totalHalfDay + totalLeave;
+    const totalConducted = totalPresent + totalLate;
+    const recordedTotal = totalPresent + totalLate + totalAbsent + totalLeave;
     const attendanceRate = recordedTotal > 0 ? Math.round((totalConducted / recordedTotal) * 100) : 100;
 
     return {
@@ -256,10 +398,12 @@ export default function StaffDailyAttendanceView() {
   }, [staffRows]);
 
   // Open Day Agenda Drawer
-  const handleOpenDayAgenda = (dateStr) => {
-    const fullDate = typeof dateStr === 'object' ? dateStr.date : dateStr;
+  const handleOpenDayAgenda = (dateParam) => {
+    const fullDate = typeof dateParam === 'string' ? dateParam : (dateParam?.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(dateParam?.day || 1).padStart(2, '0')}`);
     const matchedDay = enrichedDaysHeader.find((d) => d.date === fullDate);
     const matchedEvt = matchedDay?.calendar_event;
+    const isOff = Boolean(matchedDay?.is_holiday || matchedDay?.is_disabled);
+    const offTitle = matchedDay?.holiday_title || (matchedDay?.is_disabled ? 'Staff Duty / Attendance Off' : '');
 
     openRightSidebar({
       title: `Staff Day Roster: ${fullDate}`,
@@ -269,9 +413,33 @@ export default function StaffDailyAttendanceView() {
       content: (
         <DayAgendaDrawer
           dateStr={fullDate}
-          event={matchedEvt}
+          activeTenantId={activeTenantId}
+          calendarEvent={matchedEvt}
+          isHoliday={isOff}
+          holidayTitle={offTitle}
+          isClassOff={isOff}
+          classOffReason={offTitle}
           onClose={closeRightSidebar}
-          onAddSuccess={() => setCalendarEventsVersion((v) => v + 1)}
+          onOpenEventForm={(eventToEdit) => {
+            openRightSidebar({
+              title: eventToEdit ? `Edit: ${eventToEdit.title}` : 'Schedule Event / Shift',
+              subtitle: `Date: ${fullDate}`,
+              icon: CalendarIcon,
+              width: 600,
+              content: (
+                <TimeScheduleDrawerForm
+                  event={eventToEdit}
+                  initialDate={fullDate}
+                  onSaveSuccess={() => {
+                    closeRightSidebar();
+                    setCalendarEventsVersion((v) => v + 1);
+                    showToast('Calendar event updated successfully.', 'success');
+                  }}
+                  onCancel={closeRightSidebar}
+                />
+              ),
+            });
+          }}
         />
       ),
     });
@@ -279,29 +447,18 @@ export default function StaffDailyAttendanceView() {
 
   return (
     <PageContainer isFullscreen={isFullscreen} className="space-y-4">
-      {/* 1. Header with Breadcrumb & Core Actions */}
+      {/* 1. Header with Breadcrumb */}
       <PageHeader
         title="Staff Daily Attendance"
         subtitle={`Daily attendance register for all institutional employees & staff (${gregorianTitle}${isHijriEnabled ? ` • ${hijriTitle}` : ''})`}
         icon={DutyIcon}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <TakeAttendanceButton
-              isEditing={isEditing}
-              onToggle={() => setIsEditing((prev) => !prev)}
-              size="sm"
-            />
-
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub theme-text-primary text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
-              title="Print Staff Attendance Register"
-            >
-              <PrinterIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Print</span>
-            </button>
-          </div>
+          <TakeAttendanceButton
+            isEditing={isEditing}
+            onClick={handleToggleTakeAttendance}
+            activeLabel="Marking Mode"
+            inactiveLabel="Take Attendance"
+          />
         }
       />
 
@@ -338,6 +495,8 @@ export default function StaffDailyAttendanceView() {
             label="Date Range"
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
+            minDate={minDate}
+            maxDate={maxDate}
             onMonthChange={(m) => {
               setSelectedMonth(m);
               setStartDate('');
@@ -359,18 +518,19 @@ export default function StaffDailyAttendanceView() {
             placeholder="Full Month View"
           />
 
-          {/* Staff Search */}
-          <CustomInput
-            label="Search Staff"
-            placeholder="Name, ID or Designation..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            leftIcon={<SearchIcon className="w-4 h-4 theme-text-secondary" />}
+          {/* Staff Member Selector */}
+          <TeacherSelect
+            label="Staff Member"
+            value={selectedStaffId}
+            onChange={setSelectedStaffId}
+            teachers={allStaffList}
+            allLabel="All Staff Members"
+            onlyTeachers={false}
           />
         </div>
       </div>
 
-      {/* 3. Main Staff Daily Attendance Matrix Table (Reusing AttendanceMatrixTable) */}
+      {/* 3. Main Staff Daily Attendance Matrix Table */}
       <div
         className={
           isFullscreen
@@ -381,12 +541,13 @@ export default function StaffDailyAttendanceView() {
         <AttendanceMatrixTable
           daysHeader={enrichedDaysHeader}
           rows={staffRows}
-          idLabel="ID"
+          idLabel="#"
           nameLabel="Staff Name"
           descriptorLabel="Department"
           descriptorIcon={BuildingOfficeIcon}
           isEditing={isEditing}
           onToggleCell={handleToggleCell}
+          onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
           isHijriEnabled={isHijriEnabled}
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}

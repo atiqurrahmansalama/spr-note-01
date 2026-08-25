@@ -5,10 +5,12 @@ import {
   PlusIcon,
   EditIcon,
   ChevronIcon,
+  AlertTriangleIcon,
 } from "../ui/Icons";
 import { getEventColors, getEventDisplayType } from "./MasterTimeCalendar";
 import TimeScheduleDetailDrawer from "./TimeScheduleDetailDrawer";
 import { DrawerContainer, DrawerBanner, DrawerFooter } from "../layout";
+import { masterCalendarStore, attendanceEventRestrictionsStore } from "../../utils/localStore";
 
 function formatTime12(timeStr) {
   if (!timeStr) return "";
@@ -43,9 +45,16 @@ function formatFullDate(dateStr) {
 
 export default function DayAgendaDrawer({
   dateStr,
+  activeTenantId,
+  calendarEvent,
   events = [],
+  isHoliday = false,
+  holidayTitle = "",
+  isClassOff = false,
+  classOffReason = "",
   onClose,
   onEditEvent,
+  onOpenEventForm,
   onDeleteEvent,
   onAddEvent,
   readOnly = false,
@@ -54,17 +63,77 @@ export default function DayAgendaDrawer({
 
   const dateDetails = useMemo(() => formatFullDate(dateStr), [dateStr]);
 
+  // Query and resolve all calendar events on this date
+  const resolvedEvents = useMemo(() => {
+    if (events && events.length > 0) return events;
+    if (calendarEvent && !activeTenantId) return [calendarEvent];
+
+    if (activeTenantId && dateStr) {
+      const stored = masterCalendarStore.getEvents(activeTenantId) || [];
+      const dObj = new Date(dateStr);
+      const weekdayNum = isNaN(dObj.getDay()) ? 0 : dObj.getDay();
+
+      const matched = stored.filter((evt) => {
+        if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) return false;
+        if (evt.startDate === dateStr && (!evt.endDate || evt.endDate === dateStr)) return true;
+        if (evt.startDate && evt.endDate && dateStr >= evt.startDate && dateStr <= evt.endDate) return true;
+        if (evt.repeats && Array.isArray(evt.repeatDays) && evt.repeatDays.includes(weekdayNum)) {
+          if (!evt.startDate || dateStr >= evt.startDate) {
+            if (evt.until === "DATE" && evt.untilDate && dateStr > evt.untilDate) return false;
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (matched.length > 0) return matched;
+    }
+
+    if (calendarEvent) return [calendarEvent];
+    return [];
+  }, [events, calendarEvent, activeTenantId, dateStr]);
+
   const sortedEvents = useMemo(() => {
-    return [...events].sort((a, b) => {
+    return [...resolvedEvents].sort((a, b) => {
       const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
       const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
       return rankA - rankB;
     });
-  }, [events]);
+  }, [resolvedEvents]);
+
+  // Check if class attendance is off on this date
+  const isOffDay = Boolean(
+    isClassOff ||
+    isHoliday ||
+    sortedEvents.some((e) => {
+      if (e.category === "HOLIDAY" || e.is_holiday) return true;
+      if (activeTenantId && attendanceEventRestrictionsStore.isAttendanceDisabledForEvent(activeTenantId, e)) return true;
+      const impacts = Array.isArray(e.impacts) ? e.impacts : (typeof e.impacts === "string" ? e.impacts.split(",") : []);
+      return impacts.some((imp) => {
+        const s = String(imp).trim().toUpperCase();
+        return s === "ALL" || s === "ATTENDANCE" || s === "CLASS_ATTENDANCE";
+      });
+    })
+  );
+
+  const offReason =
+    classOffReason ||
+    holidayTitle ||
+    sortedEvents.find((e) => e.category === "HOLIDAY" || e.is_holiday)?.title ||
+    sortedEvents[0]?.title ||
+    "Scheduled Holiday / Institutional Recess";
 
   const selectedEvent = useMemo(() => {
     return sortedEvents.find((e) => e.id === selectedEventId) || null;
   }, [sortedEvents, selectedEventId]);
+
+  const handleEdit = (evt) => {
+    if (onOpenEventForm) {
+      onOpenEventForm(evt);
+    } else if (onEditEvent) {
+      onEditEvent(evt);
+    }
+  };
 
   // If a single event was clicked or chosen for details, show its full drawer
   if (selectedEvent) {
@@ -76,13 +145,13 @@ export default function DayAgendaDrawer({
             onClick={() => setSelectedEventId(null)}
             className="flex items-center gap-1.5 text-xs font-semibold theme-accent hover:underline cursor-pointer pb-1"
           >
-            <span>&larr; Back to all day tasks ({events.length})</span>
+            <span>&larr; Back to all day tasks ({sortedEvents.length})</span>
           </button>
         )}
         <TimeScheduleDetailDrawer
           event={selectedEvent}
           currentDate={dateStr}
-          onEdit={readOnly ? undefined : () => onEditEvent && onEditEvent(selectedEvent)}
+          onEdit={readOnly ? undefined : () => handleEdit(selectedEvent)}
           onDelete={readOnly ? undefined : (deleteInfo) => onDeleteEvent && onDeleteEvent(deleteInfo || selectedEvent.id)}
           onClose={onClose}
           readOnly={readOnly}
@@ -105,10 +174,13 @@ export default function DayAgendaDrawer({
             : "No active shifts or events scheduled"
         }
         actions={
-          !readOnly && onAddEvent && (
+          !readOnly && (onAddEvent || onOpenEventForm) && (
             <button
               type="button"
-              onClick={() => onAddEvent(dateStr)}
+              onClick={() => {
+                if (onOpenEventForm) onOpenEventForm(null);
+                else if (onAddEvent) onAddEvent(dateStr);
+              }}
               className="px-3.5 py-2 rounded-xl theme-bg-accent text-white text-xs font-bold hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs w-full sm:w-auto"
             >
               <PlusIcon className="w-3.5 h-3.5" />
@@ -117,6 +189,28 @@ export default function DayAgendaDrawer({
           )
         }
       />
+
+      {/* Prominent Class Off / Holiday Notification Banner */}
+      {isOffDay && (
+        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 dark:bg-rose-950/30 flex items-start gap-3 shadow-xs animate-fade-in text-left">
+          <div className="p-2 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+            <AlertTriangleIcon className="w-5 h-5" />
+          </div>
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                Class Attendance is Closed / Off
+              </h4>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30">
+                Class Off
+              </span>
+            </div>
+            <p className="text-xs text-rose-600/90 dark:text-rose-300/90 leading-relaxed font-medium">
+              Reason: <strong>{offReason}</strong>. Attendance marking for all class periods is disabled on this date.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Events Worklist & Perfectly Centered Empty State */}
       {sortedEvents.length === 0 ? (

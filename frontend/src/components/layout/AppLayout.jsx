@@ -7,6 +7,7 @@ import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
 import InstitutionSwitcher from "./InstitutionSwitcher";
+import InstitutionSwitchModal from "./InstitutionSwitchModal";
 import { useTheme } from "../../context/useTheme";
 import { useToast } from "../../context/ToastContext";
 import { useRightSidebar } from "../../context/RightSidebarContext";
@@ -20,8 +21,9 @@ export const ROUTE_TITLE_MAP = {
   "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
   "/report-builder": { title: "Generate Report", category: "Report Generator" },
   "/student-reports": { title: "Student Reports", category: "Report Generator" },
-  "/copy-report": { title: "Report Settings", category: "Report Generator" },
-  "/sessions-comments": { title: "Sessions & Comments", category: "Report Generator" },
+  "/copy-report": { title: "Report Settings", category: "Admin Tools" },
+  "/sessions-comments": { title: "Report Sessions", category: "Admin Tools" },
+  "/report-sessions": { title: "Report Sessions", category: "Admin Tools" },
 
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
   "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Student" },
@@ -72,7 +74,7 @@ export const ROUTE_TITLE_MAP = {
   "/shortcuts": { title: "Shortcuts", category: "Shortcuts" },
   "/guide": { title: "App Guide", category: "App Guide" },
   "/about": { title: "About", category: "About" },
-  "/trash-restoration": { title: "Trash", category: "Settings" },
+  "/trash-restoration": { title: "Trash & Restoration", category: "Admin Tools" },
 };
 
 
@@ -739,6 +741,7 @@ export default function AppLayout() {
               >
                 <div className="w-full h-full flex-1 overflow-hidden min-w-0">
                   <RightSidebarPanel
+                    key={rightSidebarConfig?._renderKey || rightSidebarConfig?.drawerKey || 'panel-mobile'}
                     title={rightSidebarConfig?.title || "Action Panel"}
                     subtitle={rightSidebarConfig?.subtitle}
                     category={rightSidebarConfig?.category || "Action Panel"}
@@ -785,6 +788,7 @@ export default function AppLayout() {
 
               <div className="w-full h-full flex-1 overflow-hidden">
                 <RightSidebarPanel
+                  key={rightSidebarConfig?._renderKey || rightSidebarConfig?.drawerKey || 'panel-desktop'}
                   title={rightSidebarConfig?.title || "Action Panel"}
                   subtitle={rightSidebarConfig?.subtitle}
                   category={rightSidebarConfig?.category || "Action Panel"}
@@ -809,6 +813,9 @@ export default function AppLayout() {
           )
         )}
       </div>
+
+      {/* Global Institution Workspace Switch Alert Modal */}
+      <InstitutionSwitchModal />
     </div>
   );
 }

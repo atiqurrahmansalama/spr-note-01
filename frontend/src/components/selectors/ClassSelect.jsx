@@ -7,7 +7,7 @@ import { useTenant } from '../../context/TenantContext';
  * Enterprise Reusable Class Selector Component
  * 
  * Automatically loads classes if not supplied via props.
- * Supports tenant isolation, custom formatting, "All Classes" mode, search,
+ * Supports tenant isolation, custom formatting, "All Classes" filter mode, search,
  * and seamless design token synchronization.
  * 
  * @param {Object} props
@@ -18,6 +18,7 @@ import { useTenant } from '../../context/TenantContext';
  * @param {string} [props.placeholder='Select Class...'] - Placeholder text
  * @param {boolean} [props.allowAll=true] - Whether to include an "All Classes" option
  * @param {string} [props.allLabel='All Classes'] - Label for the "All Classes" option
+ * @param {string} [props.allValue='ALL'] - Value for the "All Classes" option
  * @param {boolean} [props.autoSelectFirst=false] - Auto select first class if none selected & allowAll is false
  * @param {boolean} [props.required=false] - Required indicator
  * @param {boolean} [props.disabled=false] - Disabled state
@@ -36,6 +37,7 @@ export default function ClassSelect({
   placeholder = 'Select Class...',
   allowAll = true,
   allLabel = 'All Classes',
+  allValue = 'ALL',
   autoSelectFirst = false,
   required = false,
   disabled = false,
@@ -63,7 +65,7 @@ export default function ClassSelect({
     const loadClasses = async () => {
       setLoading(true);
       try {
-        const res = await fetchWithAuth('/api/v1/classes/');
+        const res = await fetchWithAuth('/api/v1/classes/?page_size=500&all=true');
         if (res.ok && isMounted) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.results || [];
@@ -100,7 +102,7 @@ export default function ClassSelect({
     const list = [];
     if (allowAll) {
       list.push({
-        value: '',
+        value: allValue || 'ALL',
         label: allLabel,
         raw: null,
       });
@@ -117,16 +119,25 @@ export default function ClassSelect({
     });
 
     return list;
-  }, [activeClasses, allowAll, allLabel, showBadge]);
+  }, [activeClasses, allowAll, allLabel, allValue, showBadge]);
 
   const handleChange = (selectedVal) => {
     const foundObj = activeClasses.find((c) => String(c.id) === String(selectedVal)) || null;
     onChange(selectedVal, foundObj);
   };
 
+  const normalizedValue = useMemo(() => {
+    if (value === undefined || value === null) return allowAll ? (allValue || 'ALL') : '';
+    const strVal = String(value);
+    if (strVal === '' || strVal === 'ALL') {
+      return allowAll ? (allValue || 'ALL') : '';
+    }
+    return strVal;
+  }, [value, allowAll, allValue]);
+
   return (
     <CustomSelect
-      value={value !== undefined && value !== null ? String(value) : ''}
+      value={normalizedValue}
       onChange={handleChange}
       options={options}
       label={label}

@@ -175,6 +175,23 @@ class ClassPeriodSlot(models.Model):
             diff = (t2 - t1).total_seconds() / 60
             self.duration_minutes = max(1, int(diff))
         super().save(*args, **kwargs)
+        try:
+            DynamicPeriodSlot.objects.update_or_create(
+                id=self.id,
+                defaults={
+                    'institution_id': self.institution_id,
+                    'department_id': self.department_id,
+                    'student_class_id': self.student_class_id,
+                    'period_name': self.period_name,
+                    'period_order': self.period_order,
+                    'start_time': self.start_time,
+                    'end_time': self.end_time,
+                    'is_active': self.is_active,
+                    'is_deleted': self.is_deleted
+                }
+            )
+        except Exception:
+            pass
 
     def __str__(self):
         return f"{self.period_name} ({self.start_time}-{self.end_time})"

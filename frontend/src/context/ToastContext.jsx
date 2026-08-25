@@ -1,10 +1,12 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { CheckIcon, CloseIcon, InfoIcon, AlertCircleIcon } from '../components/ui/Icons';
 
 const ToastContext = createContext(null);
 
 // Helper to format nested error objects into clean strings
 const formatErrorMessage = (err) => {
-  if (!err) return "Action updated successfully";
+  if (!err) return "Action completed successfully";
   if (typeof err === 'string') return err.trim() || "An issue occurred";
   if (Array.isArray(err)) {
     const list = err.map(formatErrorMessage).filter(Boolean);
@@ -28,18 +30,23 @@ const formatErrorMessage = (err) => {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const showToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
     const formattedMsg = formatErrorMessage(message);
     setToasts((prev) => {
       const next = [...prev, { id, message: formattedMsg, type }];
-      return next.slice(-3); // Keep only the 3 most recent toasts
+      return next.slice(-4); // Keep recent toasts
     });
 
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3500);
+    }, 3800);
   }, []);
 
   const removeToast = useCallback((id) => {
@@ -47,7 +54,6 @@ export function ToastProvider({ children }) {
   }, []);
 
   const handleCopyToast = useCallback(async (e, toast) => {
-    // If the user clicked the close button, let it be handled separately
     if (e.target.closest('[data-toast-close="true"]')) {
       return;
     }
@@ -75,50 +81,80 @@ export function ToastProvider({ children }) {
     }
   }, []);
 
+  // Toast Container element always rendered on top via Portal
+  const toastContainer = (
+    <aside
+      aria-live="polite"
+      aria-label="Notifications"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-[99999999] flex flex-col items-center sm:items-end gap-2.5 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:w-full pointer-events-none select-none"
+    >
+      {toasts.map((toast) => {
+        const isCopied = copiedId === toast.id;
+
+        return (
+          <div
+            key={toast.id}
+            role="alert"
+            onClick={(e) => handleCopyToast(e, toast)}
+            title="Click to copy message"
+            className="pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl theme-bg-surface border theme-border theme-text-primary shadow-2xl relative overflow-hidden backdrop-blur-xl transition-all duration-200 w-full sm:w-auto animate-fade-in cursor-pointer select-none active:scale-[0.98] ring-1 ring-white/10 dark:ring-white/5"
+          >
+            {/* Left Status Bar / Accent */}
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-500'
+                  : toast.type === 'error'
+                  ? 'bg-rose-500'
+                  : toast.type === 'warning'
+                  ? 'bg-amber-500'
+                  : 'bg-[var(--accent-main)]'
+              }`}
+            />
+
+            {/* Icon & Message Body */}
+            <div className="flex items-center gap-2.5 pl-1.5 min-w-0">
+              <span className="shrink-0 flex items-center justify-center">
+                {toast.type === 'success' ? (
+                  <CheckIcon className="w-4 h-4 text-emerald-500" />
+                ) : toast.type === 'error' ? (
+                  <AlertCircleIcon className="w-4 h-4 text-rose-500" />
+                ) : toast.type === 'warning' ? (
+                  <AlertCircleIcon className="w-4 h-4 text-amber-500" />
+                ) : (
+                  <InfoIcon className="w-4 h-4 text-[var(--accent-main)]" />
+                )}
+              </span>
+
+              <p className="text-xs font-semibold theme-text-primary leading-relaxed truncate-2-lines break-words">
+                {isCopied ? 'Copied to clipboard!' : toast.message}
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              data-toast-close="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeToast(toast.id);
+              }}
+              className="p-1 rounded-lg hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition shrink-0 cursor-pointer ml-1"
+              title="Dismiss notification"
+              aria-label="Dismiss notification"
+            >
+              <CloseIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </aside>
+  );
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      
-      {/* 🌟 Responsive Centered Mobile & Bottom-Right Desktop Toast Container 🌟 */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 flex flex-col items-center sm:items-end gap-2.5 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:w-full pointer-events-none">
-        {toasts.map((toast) => {
-          const isCopied = copiedId === toast.id;
-          return (
-            <div
-              key={toast.id}
-              onClick={(e) => handleCopyToast(e, toast)}
-              title="Click to copy message"
-              className="pointer-events-auto flex items-center justify-between px-4 py-3 rounded-full sm:rounded-xl theme-bg-surface border theme-border theme-text-primary shadow-2xl relative overflow-hidden backdrop-blur-md transition-all duration-200 w-full sm:w-auto animate-fade-in cursor-pointer select-none active:scale-[0.98] hover:border-sky-500/50 hover:shadow-sky-500/10"
-            >
-              {/* Left Color Accent Bar */}
-              <div className={`absolute left-0 top-0 bottom-0 w-1.5 sm:w-1 ${
-                toast.type === 'success' ? 'bg-emerald-500' :
-                toast.type === 'error' ? 'bg-rose-500' :
-                toast.type === 'warning' ? 'bg-amber-500' :
-                'bg-[var(--accent-main)]'
-              }`} />
-
-              <div className="flex items-center gap-3 pl-2 pr-1">
-                <p className="text-xs font-semibold theme-text-primary leading-relaxed">
-                  {isCopied ? 'Copied to clipboard!' : toast.message}
-                </p>
-              </div>
-
-              <button
-                data-toast-close="true"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeToast(toast.id);
-                }}
-                className="theme-text-secondary hover:theme-text-primary text-xs p-1 transition ml-3 shrink-0 cursor-pointer"
-                title="Dismiss"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })}
-      </div>
+      {mounted && typeof document !== 'undefined' && createPortal(toastContainer, document.body)}
     </ToastContext.Provider>
   );
 }

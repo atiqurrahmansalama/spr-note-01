@@ -45,7 +45,7 @@ export default function InstitutionListView({
 }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { switchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
+  const { requestSwitchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
@@ -58,6 +58,7 @@ export default function InstitutionListView({
     verified_institutions: 0,
     total_active_students: 0,
     total_staff: 0,
+    total_revenue_bdt: 0,
   });
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,8 +154,7 @@ export default function InstitutionListView({
   });
 
   const handleSwitchContext = (inst) => {
-    switchInstitution(inst.id);
-    showToast(`Switched active workspace to ${inst.name}`, 'success');
+    requestSwitchInstitution(inst);
   };
 
   // Universal Drawer Registration for Institution Form (survives F5 refresh)

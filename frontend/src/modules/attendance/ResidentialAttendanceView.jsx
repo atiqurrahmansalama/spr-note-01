@@ -10,6 +10,7 @@ import {
   AttendanceIcon,
   FullScreenIcon,
   MinimizeIcon,
+  ClockIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
@@ -17,12 +18,15 @@ import ActionMenu from '../../components/ui/ActionMenu';
 import CustomSelect from '../../components/ui/CustomSelect';
 import { ClassSelect, GroupSelect, DateRangePicker } from '../../components/selectors';
 import CheckpointForm from './CheckpointForm';
+import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
 import { fetchWithAuth } from '../../utils/authService';
 import { getMonthlyAttendanceMatrix } from '../../api/attendance';
 import {
   calendarSettings,
   attendanceFilters,
   masterCalendarStore,
+  attendanceTimingPolicyStore,
+  academicYearsStore,
 } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
@@ -32,8 +36,12 @@ import { useRightSidebar, useDrawerRegistration } from '../../context/RightSideb
 import {
   ATTENDANCE_STATUSES,
   getAttendanceRateColor,
-  cycleAttendanceStatus,
 } from '../../constants/attendanceConstants';
+import {
+  getAttendanceCellTimingState,
+  cycleStatusWithinAllowed,
+  calculateLateDelayMinutes,
+} from '../../utils/attendanceTimingEngine';
 import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
 import { useFullscreen } from '../../hooks/useFullscreen';
 
@@ -68,8 +76,53 @@ export default function ResidentialAttendanceView({
   onStudentClick,
 } = {}) {
   const { showToast } = useToast();
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { openRightSidebar, closeRightSidebar, openDrawer } = useRightSidebar();
+
+  const userProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('spr_user_profile');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const isAdmin = Boolean(
+    isMultiTenantAdmin ||
+    userProfile.is_superuser ||
+    userProfile.user_type === 'SUPER_ADMIN' ||
+    userProfile.user_type === 'ADMIN' ||
+    userProfile.role_code === 'ADMIN' ||
+    userProfile.role_code === 'PRINCIPAL'
+  );
+
+  const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));
+
+  useEffect(() => {
+    attendanceTimingPolicyStore.fetchRemotePolicy(activeTenantId).then((res) => {
+      if (res) setTimingPolicy(res);
+    });
+
+    const handlePolicyUpdate = (e) => {
+      setTimingPolicy(e.detail || attendanceTimingPolicyStore.getPolicy(activeTenantId));
+    };
+
+    window.addEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    return () => {
+      window.removeEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    };
+  }, [activeTenantId]);
+
+  const [academicYearsVersion, setAcademicYearsVersion] = useState(0);
+  useEffect(() => {
+    const handleAcademicUpdate = () => setAcademicYearsVersion((v) => v + 1);
+    window.addEventListener('spr_academic_years_updated', handleAcademicUpdate);
+    return () => window.removeEventListener('spr_academic_years_updated', handleAcademicUpdate);
+  }, []);
+
+  const academicBounds = useMemo(() => {
+    return academicYearsStore.getDateBounds(activeTenantId);
+  }, [activeTenantId, academicYearsVersion]);
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -203,13 +256,13 @@ export default function ResidentialAttendanceView({
           const list = Array.isArray(data) ? data : data.results || [];
           setClasses(list);
           if (list.length > 0) {
-            const isValid = selectedClassId && list.some(c => String(c.id) === String(selectedClassId));
+            const isValid = selectedClassId && (selectedClassId === 'ALL' || list.some(c => String(c.id) === String(selectedClassId)));
             if (!isValid) {
-              const matchingSaved = savedFilters.classId && list.some(c => String(c.id) === String(savedFilters.classId));
-              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : String(list[0].id));
+              const matchingSaved = savedFilters.classId && (savedFilters.classId === 'ALL' || list.some(c => String(c.id) === String(savedFilters.classId)));
+              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : 'ALL');
             }
           } else {
-            setSelectedClassId('');
+            setSelectedClassId('ALL');
           }
         }
 
@@ -241,7 +294,15 @@ export default function ResidentialAttendanceView({
 
   // Fetch Groups when Class changes subsequently
   useEffect(() => {
-    if (!metadataLoaded || !selectedClassId) return;
+    if (!metadataLoaded || !selectedClassId || selectedClassId === 'ALL') {
+      if (selectedClassId === 'ALL') {
+        fetchWithAuth('/api/v1/groups/?page_size=500')
+          .then((r) => r.json())
+          .then((data) => setGroups(Array.isArray(data) ? data : data.results || []))
+          .catch(() => {});
+      }
+      return;
+    }
     let isMounted = true;
 
     const fetchGroups = async () => {
@@ -268,19 +329,12 @@ export default function ResidentialAttendanceView({
     if (!metadataLoaded && !propClassId) {
       return;
     }
-    if (!selectedClassId && classes.length > 0) {
-      return;
-    }
-    if (!selectedClassId && !propClassId && classes.length === 0) {
-      setIsLoading(false);
-      return;
-    }
 
     setIsLoading(true);
     try {
       const params = {
-        class_id: selectedClassId || undefined,
-        group_id: selectedGroupId || undefined,
+        class_id: selectedClassId && selectedClassId !== 'ALL' ? selectedClassId : undefined,
+        group_id: selectedGroupId && selectedGroupId !== 'ALL' ? selectedGroupId : undefined,
       };
 
       if (startDate && endDate) {
@@ -411,17 +465,15 @@ export default function ResidentialAttendanceView({
 
   // Toggle "Take Attendance" mode & automatically trigger Full Screen
   const handleToggleTakeAttendance = () => {
-    setIsEditing((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsFullscreen(true);
-        showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark checkpoint attendance.', 'info');
-      } else {
-        setIsFullscreen(false);
-        showToast('Attendance marking finished. Exited full screen.', 'success');
-      }
-      return next;
-    });
+    const nextIsEditing = !isEditing;
+    setIsEditing(nextIsEditing);
+    setIsFullscreen(nextIsEditing);
+
+    if (nextIsEditing) {
+      showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark checkpoint attendance.', 'info');
+    } else {
+      showToast('Attendance marking finished. Exited full screen.', 'success');
+    }
   };
 
   // Month Names
@@ -480,7 +532,7 @@ export default function ResidentialAttendanceView({
       if (impacts.length > 0) {
         return impacts.some((imp) => {
           const s = String(imp).toUpperCase();
-          return s === 'ALL' || s === 'ATTENDANCE' || s === 'RESIDENTIAL_ATTENDANCE';
+          return s === 'ALL' || s === 'ATTENDANCE' || s === 'RESIDENTIAL_ATTENDANCE' || s === 'RESIDENTIAL';
         });
       }
       return Boolean(evt.category === 'HOLIDAY' || evt.category === 'EXAM' || evt.category === 'ACADEMIC_EVENT' || evt.is_holiday || evt.affects_students);
@@ -590,14 +642,59 @@ export default function ResidentialAttendanceView({
     });
   };
 
-  // Toggle Cell Checkpoint Attendance (Always allowed, never blocked)
+  // Helper to extract status from either string or rich object record
+  const getResidentialStatus = (rec) => {
+    if (!rec) return '';
+    if (typeof rec === 'string') return rec;
+    return rec.status || '';
+  };
+
+  // Toggle Cell Checkpoint Attendance with Timing & Lockout Enforcement and Conductor Tracking
   const handleToggleCell = (studentId, dateStr, currentStatus, checkpointId) => {
-    const nextStatus = cycleAttendanceStatus(currentStatus);
+    // 0. Check Academic Year Date Guard
+    if (
+      (academicBounds.minDate && dateStr < academicBounds.minDate) ||
+      (academicBounds.maxDate && dateStr > academicBounds.maxDate)
+    ) {
+      showToast(
+        `Checkpoint attendance cannot be marked outside the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
+
+    const chk = checkpoints.find((c) => String(c.id) === String(checkpointId)) || {};
+    const timingState = getAttendanceCellTimingState({
+      moduleType: 'RESIDENTIAL',
+      targetDate: dateStr,
+      startTime: chk.time,
+      policy: timingPolicy,
+      isAdmin,
+      currentStatus,
+    });
+
+    if (!timingState.isEditable) {
+      showToast(timingState.tooltip || 'Checkpoint attendance cannot be marked at this time.', 'warning');
+      return;
+    }
+
+    const nextStatus = cycleStatusWithinAllowed(currentStatus, timingState.allowedStatuses);
+
+    const conductorName =
+      userProfile.name ||
+      userProfile.name_en ||
+      (userProfile.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : '') ||
+      'Warden';
 
     const recordKey = `${studentId}_${checkpointId}_${dateStr}`;
     const newRecords = { ...residentialRecords };
     if (nextStatus) {
-      newRecords[recordKey] = nextStatus;
+      newRecords[recordKey] = {
+        status: nextStatus,
+        recorded_by_id: userProfile.id || userProfile.teacher_profile_id || null,
+        recorded_by_name: conductorName,
+        recorded_at: new Date().toISOString(),
+      };
     } else {
       delete newRecords[recordKey];
     }
@@ -606,6 +703,50 @@ export default function ResidentialAttendanceView({
     try {
       localStorage.setItem(`spr_res_records_${activeTenantId || 'default'}`, JSON.stringify(newRecords));
     } catch {}
+  };
+
+  // Admin Override Drawer for Residential Attendance
+  const handleAdminEditCell = (row, dateStr, currentStatus, checkpointId) => {
+    const chk = checkpoints.find((c) => String(c.id) === String(checkpointId)) || {};
+    const conductorName = userProfile.name || userProfile.name_en || 'Admin';
+
+    openRightSidebar({
+      title: 'Admin Checkpoint Override',
+      subtitle: `${row.name || 'Student'} • ${dateStr}`,
+      icon: ClockIcon,
+      content: (
+        <AdminAttendanceDrawer
+          personName={row.name || 'Student'}
+          personSubtitle={`Roll: ${row.roll_number || '—'} • Checkpoint: ${chk.name || 'Roll Call'}`}
+          dateStr={dateStr}
+          scheduledStartTime={chk.time || '05:30'}
+          initialStatus={currentStatus || 'PRESENT'}
+          initialInTime={chk.time || '05:30'}
+          initialRemarks=""
+          onClose={closeRightSidebar}
+          onSave={async (formData) => {
+            closeRightSidebar();
+            const recordKey = `${row.id || row.student_id}_${checkpointId}_${dateStr}`;
+            const newRecords = {
+              ...residentialRecords,
+              [recordKey]: {
+                status: formData.status,
+                recorded_by_id: userProfile.id || null,
+                recorded_by_name: conductorName,
+                recorded_at: new Date().toISOString(),
+                in_time: formData.in_time,
+                remarks: formData.remarks,
+              },
+            };
+            setResidentialRecords(newRecords);
+            try {
+              localStorage.setItem(`spr_res_records_${activeTenantId || 'default'}`, JSON.stringify(newRecords));
+            } catch {}
+            showToast(`Attendance updated for ${row.name}`, 'success');
+          }}
+        />
+      ),
+    });
   };
 
   // Active checkpoints to show
@@ -639,29 +780,40 @@ export default function ResidentialAttendanceView({
 
   // Compute student totals across active checkpoints
   const computeStudentTotals = useCallback((studentId) => {
-    let p = 0, l = 0, a = 0, hd = 0, lv = 0;
+    let p = 0, l = 0, a = 0, lv = 0;
     if (!enrichedMatrixData?.days_header || !studentId) {
-      return { present: 0, late: 0, absent: 0, half_day: 0, on_leave: 0, total_recorded: 0, attendance_rate: 100 };
+      return { present: 0, late: 0, absent: 0, on_leave: 0, total_recorded: 0, attendance_rate: 100 };
     }
 
     enrichedMatrixData.days_header.forEach((d) => {
       const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
       activeCheckpoints.forEach((chk) => {
         const key = `${studentId}_${chk.id}_${dateStr}`;
-        const st = residentialRecords[key];
+        const rawRec = residentialRecords[key];
+        const rawStatus = getResidentialStatus(rawRec);
+        const timingState = getAttendanceCellTimingState({
+          moduleType: 'RESIDENTIAL',
+          targetDate: dateStr,
+          startTime: chk.time,
+          policy: timingPolicy,
+          isAdmin,
+          currentStatus: rawStatus,
+        });
+
+        const st = rawStatus || timingState.displayStatus || '';
+
         if (st === 'PRESENT') p += 1;
-        else if (st === 'LATE') l += 1;
+        else if (st === 'LATE' || st === 'HALF_DAY') l += 1;
         else if (st === 'ABSENT') a += 1;
-        else if (st === 'HALF_DAY') hd += 1;
         else if (st === 'ON_LEAVE') lv += 1;
       });
     });
 
-    const total = p + l + a + hd + lv;
-    const effective = p + l + hd * 0.5;
+    const total = p + l + a + lv;
+    const effective = p + l;
     const rate = total > 0 ? Math.round((effective / total) * 100) : 100;
-    return { present: p, late: l, absent: a, half_day: hd, on_leave: lv, total_recorded: total, attendance_rate: rate };
-  }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords]);
+    return { present: p, late: l, absent: a, on_leave: lv, total_recorded: total, attendance_rate: rate };
+  }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords, timingPolicy, isAdmin]);
 
   // Export CSV
   const handleExportCSV = () => {
@@ -890,9 +1042,11 @@ export default function ResidentialAttendanceView({
                 value={selectedClassId}
                 onChange={(val) => {
                   setSelectedClassId(val);
-                  setSelectedGroupId('');
+                  setSelectedGroupId('ALL');
                 }}
-                allowAll={false}
+                allowAll={true}
+                allLabel="All Classes"
+                allValue="ALL"
               />
             </div>
 
@@ -923,6 +1077,8 @@ export default function ResidentialAttendanceView({
                 label="Date Range"
                 selectedYear={selectedYear}
                 selectedMonth={selectedMonth}
+                minDate={academicBounds.minDate}
+                maxDate={academicBounds.maxDate}
                 onMonthChange={(m) => {
                   setSelectedMonth(m);
                   setStartDate('');
@@ -959,24 +1115,34 @@ export default function ResidentialAttendanceView({
             const studentId = student.student_id || student.id;
             return activeCheckpoints.map((chk, chkIdx) => {
               const dailyStatuses = {};
-              let chkP = 0, chkL = 0, chkA = 0, chkHd = 0, chkLv = 0;
+              let chkP = 0, chkL = 0, chkA = 0, chkLv = 0;
 
               (enrichedMatrixData?.days_header || []).forEach((d) => {
                 const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
                 const key = `${studentId}_${chk.id}_${dateStr}`;
-                const st = residentialRecords[key];
+                const rawRec = residentialRecords[key];
+                const rawStatus = getResidentialStatus(rawRec);
+                const timingState = getAttendanceCellTimingState({
+                  moduleType: 'RESIDENTIAL',
+                  targetDate: dateStr,
+                  startTime: chk.time,
+                  policy: timingPolicy,
+                  isAdmin,
+                  currentStatus: rawStatus,
+                });
+
+                const st = rawStatus || timingState.displayStatus || '';
                 if (st) {
                   dailyStatuses[dateStr] = st;
                   if (st === 'PRESENT') chkP += 1;
-                  else if (st === 'LATE') chkL += 1;
+                  else if (st === 'LATE' || st === 'HALF_DAY') chkL += 1;
                   else if (st === 'ABSENT') chkA += 1;
-                  else if (st === 'HALF_DAY') chkHd += 1;
                   else if (st === 'ON_LEAVE') chkLv += 1;
                 }
               });
 
-              const chkTotal = chkP + chkL + chkA + chkHd + chkLv;
-              const chkEffective = chkP + chkL + chkHd * 0.5;
+              const chkTotal = chkP + chkL + chkA + chkLv;
+              const chkEffective = chkP + chkL;
               const chkRate = chkTotal > 0 ? Math.round((chkEffective / chkTotal) * 100) : 100;
 
               return {
@@ -996,7 +1162,6 @@ export default function ResidentialAttendanceView({
                   present: chkP,
                   late: chkL,
                   absent: chkA,
-                  half_day: chkHd,
                   on_leave: chkLv,
                   attendance_rate: chkRate,
                 },
@@ -1011,6 +1176,7 @@ export default function ResidentialAttendanceView({
           onToggleCell={(studentId, dateStr, currentStatus, checkpointId) => {
             handleToggleCell(studentId, dateStr, currentStatus, checkpointId);
           }}
+          onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
           isHijriEnabled={isHijriEnabled}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}

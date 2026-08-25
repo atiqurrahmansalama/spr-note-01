@@ -134,8 +134,26 @@ export default function ReusableCalendar({
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
+  // Guard against navigating before minDate or after maxDate
+  const isPrevMonthDisabled = Boolean(
+    minDate && (() => {
+      const prevMonthLastDay = new Date(viewYear, viewMonth, 0);
+      const prevMonthLastDayStr = `${prevMonthLastDay.getFullYear()}-${String(prevMonthLastDay.getMonth() + 1).padStart(2, "0")}-${String(prevMonthLastDay.getDate()).padStart(2, "0")}`;
+      return prevMonthLastDayStr < minDate;
+    })()
+  );
+
+  const isNextMonthDisabled = Boolean(
+    maxDate && (() => {
+      const nextMonthFirstDay = new Date(viewYear, viewMonth + 1, 1);
+      const nextMonthFirstDayStr = `${nextMonthFirstDay.getFullYear()}-${String(nextMonthFirstDay.getMonth() + 1).padStart(2, "0")}-01`;
+      return nextMonthFirstDayStr > maxDate;
+    })()
+  );
+
   const handlePrevMonth = (e) => {
     if (e) e.stopPropagation();
+    if (isPrevMonthDisabled) return;
     if (viewMonth === 0) {
       setViewMonth(11);
       setViewYear((y) => y - 1);
@@ -146,6 +164,7 @@ export default function ReusableCalendar({
 
   const handleNextMonth = (e) => {
     if (e) e.stopPropagation();
+    if (isNextMonthDisabled) return;
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
@@ -286,17 +305,19 @@ export default function ReusableCalendar({
         <div className="flex items-center gap-1">
           <button
             type="button"
+            disabled={isPrevMonthDisabled}
             onClick={handlePrevMonth}
-            className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-sm transition cursor-pointer"
-            title="Previous Month"
+            className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-sm transition cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed"
+            title={isPrevMonthDisabled ? "Outside academic year range" : "Previous Month"}
           >
             ‹
           </button>
           <button
             type="button"
+            disabled={isNextMonthDisabled}
             onClick={handleNextMonth}
-            className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-sm transition cursor-pointer"
-            title="Next Month"
+            className="w-7 h-7 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary flex items-center justify-center text-sm transition cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed"
+            title={isNextMonthDisabled ? "Outside academic year range" : "Next Month"}
           >
             ›
           </button>
@@ -374,13 +395,22 @@ export default function ReusableCalendar({
         <span className="text-[10px] theme-text-secondary font-medium">
           Click date to select
         </span>
-        <button
-          type="button"
-          onClick={handleSelectToday}
-          className="text-xs font-bold theme-accent hover:underline cursor-pointer"
-        >
-          Today
-        </button>
+        {(() => {
+          const t = new Date();
+          const tStr = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+          const isTodayDisabled = Boolean((minDate && tStr < minDate) || (maxDate && tStr > maxDate));
+          return (
+            <button
+              type="button"
+              disabled={isTodayDisabled}
+              onClick={handleSelectToday}
+              className="text-xs font-bold theme-accent hover:underline cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
+              title={isTodayDisabled ? "Today is outside the academic year" : "Select Today"}
+            >
+              Today
+            </button>
+          );
+        })()}
       </div>
     </div>
   );

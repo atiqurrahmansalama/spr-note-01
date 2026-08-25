@@ -13,7 +13,11 @@ import {
   TrashIcon,
   TeacherIcon,
   SessionsIcon,
+  CopyIcon,
 } from "../../../components/ui/Icons";
+import SessionManager from "../../student-directory/SessionManager";
+import ReportSettingsView from "../../settings/ReportSettingsView";
+import TrashRestorationView from "../../admin/TrashRestorationView";
 import {
   getInstitutionCategories,
   createInstitutionCategory,
@@ -36,6 +40,7 @@ import {
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../../constants/version";
 import { useToast } from "../../../context/ToastContext";
 import { useTenant } from "../../../context/TenantContext";
+import { fetchWithAuth } from "../../../utils/authService";
 
 const SECTIONS = [
   // Group 1: Academic & Faculty Structure
@@ -89,7 +94,7 @@ const SECTIONS = [
     id: "admission-doc-requirements",
     group: "Admissions & Recruitment",
     title: "Admission Requirements",
-    description: "Configure mandatory admission document requirements by class (প্লে-৫ম, হিফজ, ৬ষ্ঠ-১০ম, দাওরায়ে হাদিস)",
+    description: "Configure mandatory admission document requirements by class level (e.g. Play-5th, Hifz, 6th-10th, Dawra-e Hadith)",
     icon: ChecklistIcon,
   },
   {
@@ -100,7 +105,30 @@ const SECTIONS = [
     icon: ChecklistIcon,
   },
 
-  // Group 4: System & Platform Environment
+  // Group 4: Report Configuration
+  {
+    id: "report-sessions",
+    group: "Report Configuration",
+    title: "Report Sessions",
+    description: "Manage pre-configured report session topics and lesson progress categories (e.g. Sabaq, Saat Sabaq, Amukta, Hifz Revision, Nazira)",
+    icon: SessionsIcon,
+  },
+  {
+    id: "report-settings",
+    group: "Report Configuration",
+    title: "Report Settings",
+    description: "Configure default report card copy formats, teacher attribution tags, student group mentions, and date format standards",
+    icon: CopyIcon,
+  },
+
+  // Group 5: System & Platform Environment
+  {
+    id: "trash",
+    group: "System & Runtime",
+    title: "Trash & Restoration",
+    description: "Inspect soft-deleted records and restore them back to system history",
+    icon: TrashIcon,
+  },
   {
     id: "system",
     group: "System & Runtime",
@@ -118,6 +146,7 @@ export default function DeveloperToolsHubView() {
 
   const [eventKinds, setEventKinds] = useState(() => calendarEventKindsStore.getKinds(activeTenantId));
   const [docTypes, setDocTypes] = useState(() => documentTypesStore.getDocumentTypes(activeTenantId));
+  const [classesList, setClassesList] = useState([]);
 
   useEffect(() => {
     const handleKindsUpdated = () => {
@@ -133,6 +162,36 @@ export default function DeveloperToolsHubView() {
       window.removeEventListener("spr_document_types_updated", handleDocsUpdated);
     };
   }, [activeTenantId]);
+
+  // Load institutional classes for class-specific admission requirement mapping
+  useEffect(() => {
+    let isMounted = true;
+    fetchWithAuth('/api/v1/classes/?page_size=500&all=true')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) {
+          const list = Array.isArray(data) ? data : data.results || [];
+          setClassesList(list);
+        }
+      })
+      .catch((err) => console.warn('Failed to load classes for requirements:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTenantId]);
+
+  const availableClassOptions = useMemo(() => {
+    const list = [
+      { value: 'ALL', label: 'All Classes (General / Default)' }
+    ];
+    classesList.forEach((c) => {
+      list.push({
+        value: String(c.id),
+        label: c.code ? `${c.name} (${c.code})` : c.name,
+      });
+    });
+    return list;
+  }, [classesList]);
 
   const availableDocTitles = useMemo(() => {
     return docTypes.map((d) => ({
@@ -315,6 +374,34 @@ export default function DeveloperToolsHubView() {
             itemTypeName="Admission Rule"
             extraFields={[
               {
+                name: "applicable_class_id",
+                label: "Target Academic Class",
+                type: "class_select",
+                allowAll: true,
+                allLabel: "All Classes (General / Default)",
+                allValue: "ALL",
+                defaultValue: "ALL",
+                searchable: false,
+                tableHeader: "Target Class",
+                renderBadge: (val) => {
+                  if (!val || val === "ALL" || (Array.isArray(val) && (val.length === 0 || val[0] === "ALL"))) {
+                    return (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-sub border theme-border theme-text-secondary">
+                        All Classes (General)
+                      </span>
+                    );
+                  }
+                  const singleId = Array.isArray(val) ? val[0] : val;
+                  const matchedClass = classesList.find((c) => String(c.id) === String(singleId));
+                  const label = matchedClass ? (matchedClass.code ? `${matchedClass.name} (${matchedClass.code})` : matchedClass.name) : singleId;
+                  return (
+                    <span className="px-2.5 py-1 rounded-md text-xs font-bold theme-bg-elevated theme-text-primary border theme-border shadow-2xs">
+                      {label}
+                    </span>
+                  );
+                },
+              },
+              {
                 name: "required_docs",
                 label: "Mandatory Required Documents",
                 type: "multiselect",
@@ -406,7 +493,29 @@ export default function DeveloperToolsHubView() {
           />
         )}
 
-        {/* Section 4: System Diagnostics & Cache */}
+
+        {/* Section: Report Sessions */}
+        {(activeSection === "report-sessions" || activeSection === "sessions-comments" || activeSection === "sessions") && (
+          <div className="w-full animate-fade-in">
+            <SessionManager />
+          </div>
+        )}
+
+        {/* Section: Report Settings */}
+        {activeSection === "report-settings" && (
+          <div className="w-full animate-fade-in">
+            <ReportSettingsView />
+          </div>
+        )}
+
+        {/* Section: Trash & Restoration */}
+        {activeSection === "trash" && (
+          <div className="w-full animate-fade-in">
+            <TrashRestorationView />
+          </div>
+        )}
+
+        {/* Section: System Diagnostics & Cache */}
         {activeSection === "system" && (
           <div className="space-y-4 animate-fade-in text-left">
             {/* Environment Overview Card */}

@@ -10,6 +10,7 @@ import {
   FilledXCircleIcon,
   FullScreenIcon,
   MinimizeIcon,
+  ClockIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
@@ -17,16 +18,28 @@ import CustomSelect from '../../components/ui/CustomSelect';
 import { ClassSelect, GroupSelect, TeacherSelect, DateRangePicker } from '../../components/selectors';
 import ActionMenu from '../../components/ui/ActionMenu';
 import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
 import { useFullscreen } from '../../hooks/useFullscreen';
 import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
-import { calendarSettings, attendanceFilters, masterCalendarStore, attendanceEventRestrictionsStore } from '../../utils/localStore';
+import {
+  calendarSettings,
+  attendanceFilters,
+  masterCalendarStore,
+  attendanceEventRestrictionsStore,
+  attendanceTimingPolicyStore,
+  academicYearsStore,
+} from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
-import { cycleAttendanceStatus } from '../../constants/attendanceConstants';
+import {
+  getAttendanceCellTimingState,
+  cycleStatusWithinAllowed,
+  calculateLateDelayMinutes,
+} from '../../utils/attendanceTimingEngine';
 
 export default function ClassAttendanceView({
   classId: propClassId,
@@ -35,8 +48,54 @@ export default function ClassAttendanceView({
   onStudentClick,
 } = {}) {
   const { showToast } = useToast();
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
+
+  const userProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('spr_user_profile');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const isAdmin = Boolean(
+    isMultiTenantAdmin ||
+    userProfile.is_superuser ||
+    userProfile.user_type === 'SUPER_ADMIN' ||
+    userProfile.user_type === 'ADMIN' ||
+    userProfile.role_code === 'ADMIN' ||
+    userProfile.role_code === 'PRINCIPAL'
+  );
+
+  const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));
+  const [periodSlots, setPeriodSlots] = useState([]);
+
+  useEffect(() => {
+    attendanceTimingPolicyStore.fetchRemotePolicy(activeTenantId).then((res) => {
+      if (res) setTimingPolicy(res);
+    });
+
+    const handlePolicyUpdate = (e) => {
+      setTimingPolicy(e.detail || attendanceTimingPolicyStore.getPolicy(activeTenantId));
+    };
+
+    window.addEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    return () => {
+      window.removeEventListener('spr_attendance_timing_policy_updated', handlePolicyUpdate);
+    };
+  }, [activeTenantId]);
+
+  const [academicYearsVersion, setAcademicYearsVersion] = useState(0);
+  useEffect(() => {
+    const handleAcademicUpdate = () => setAcademicYearsVersion((v) => v + 1);
+    window.addEventListener('spr_academic_years_updated', handleAcademicUpdate);
+    return () => window.removeEventListener('spr_academic_years_updated', handleAcademicUpdate);
+  }, []);
+
+  const academicBounds = useMemo(() => {
+    return academicYearsStore.getDateBounds(activeTenantId);
+  }, [activeTenantId, academicYearsVersion]);
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -126,13 +185,20 @@ export default function ClassAttendanceView({
     const fetchAllMetadata = async () => {
       try {
         setMetadataLoaded(false);
-        const [classRes, staffRes, grpRes] = await Promise.allSettled([
+        const [classRes, staffRes, grpRes, slotRes] = await Promise.allSettled([
           fetchWithAuth('/api/v1/classes/'),
           fetchWithAuth('/api/v1/staff/'),
           fetchWithAuth('/api/v1/groups/?page_size=500'),
+          fetchWithAuth('/api/v1/period-slots/?page_size=500'),
         ]);
 
         if (!isMounted) return;
+
+        if (slotRes.status === 'fulfilled' && slotRes.value.ok) {
+          const slotData = await slotRes.value.json();
+          const slotList = Array.isArray(slotData) ? slotData : slotData.results || [];
+          setPeriodSlots(slotList);
+        }
 
         if (classRes.status === 'fulfilled' && classRes.value.ok) {
           const data = await classRes.value.json();
@@ -140,13 +206,13 @@ export default function ClassAttendanceView({
           setClasses(classList);
 
           if (classList.length > 0) {
-            const isValid = selectedClassId && classList.some(c => String(c.id) === String(selectedClassId));
+            const isValid = selectedClassId && (selectedClassId === 'ALL' || classList.some(c => String(c.id) === String(selectedClassId)));
             if (!isValid) {
-              const matchingSaved = savedFilters.classId && classList.some(c => String(c.id) === String(savedFilters.classId));
-              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : String(classList[0].id));
+              const matchingSaved = savedFilters.classId && (savedFilters.classId === 'ALL' || classList.some(c => String(c.id) === String(savedFilters.classId)));
+              setSelectedClassId(matchingSaved ? String(savedFilters.classId) : 'ALL');
             }
           } else {
-            setSelectedClassId('');
+            setSelectedClassId('ALL');
           }
         }
 
@@ -159,9 +225,9 @@ export default function ClassAttendanceView({
           const gData = await grpRes.value.json();
           const grpList = Array.isArray(gData) ? gData : gData.results || [];
           setGroups(grpList);
-          if (savedFilters.groupId && grpList.some(g => String(g.id) === String(savedFilters.groupId))) {
+          if (savedFilters.groupId && (savedFilters.groupId === 'ALL' || grpList.some(g => String(g.id) === String(savedFilters.groupId)))) {
             setSelectedGroupId(String(savedFilters.groupId));
-          } else if (selectedGroupId && !grpList.some(g => String(g.id) === String(selectedGroupId))) {
+          } else if (selectedGroupId && selectedGroupId !== 'ALL' && !grpList.some(g => String(g.id) === String(selectedGroupId))) {
             setSelectedGroupId('');
           }
         }
@@ -192,20 +258,13 @@ export default function ClassAttendanceView({
     if (!metadataLoaded && !propClassId) {
       return;
     }
-    if (!selectedClassId && classes.length > 0) {
-      return;
-    }
-    if (!selectedClassId && !propClassId && classes.length === 0) {
-      setIsLoading(false);
-      return;
-    }
 
     setIsLoading(true);
     try {
       const params = {
-        class_id: selectedClassId || undefined,
-        group_id: selectedGroupId || undefined,
-        teacher_id: selectedTeacherId || undefined,
+        class_id: selectedClassId && selectedClassId !== 'ALL' ? selectedClassId : undefined,
+        group_id: selectedGroupId && selectedGroupId !== 'ALL' ? selectedGroupId : undefined,
+        teacher_id: selectedTeacherId && selectedTeacherId !== 'ALL' ? selectedTeacherId : undefined,
       };
 
       if (startDate && endDate) {
@@ -224,7 +283,7 @@ export default function ClassAttendanceView({
     } finally {
       setIsLoading(false);
     }
-  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, classes.length, propClassId, showToast]);
+  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, propClassId, showToast]);
 
   useEffect(() => {
     loadMatrix();
@@ -298,17 +357,15 @@ export default function ClassAttendanceView({
 
   // Toggle "Take Attendance" mode & automatically trigger Full Screen / Exit Full Screen
   const handleToggleTakeAttendance = () => {
-    setIsEditing((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsFullscreen(true);
-        showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark attendance.', 'info');
-      } else {
-        setIsFullscreen(false);
-        showToast('Attendance marking finished. Exited full screen.', 'success');
-      }
-      return next;
-    });
+    const nextIsEditing = !isEditing;
+    setIsEditing(nextIsEditing);
+    setIsFullscreen(nextIsEditing);
+
+    if (nextIsEditing) {
+      showToast('Attendance marking mode enabled in Full Screen. Click any student cell to mark attendance.', 'info');
+    } else {
+      showToast('Attendance marking finished. Exited full screen.', 'success');
+    }
   };
 
   // Month Names
@@ -376,7 +433,7 @@ export default function ClassAttendanceView({
       if (impacts.length > 0) {
         return impacts.some((imp) => {
           const s = String(imp).toUpperCase();
-          return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE';
+          return s === 'ALL' || s === 'ATTENDANCE' || s === 'IMP-1' || s === 'CLASS_ATTENDANCE' || s === 'CLASS';
         });
       }
 
@@ -461,37 +518,49 @@ export default function ClassAttendanceView({
       let p_count = 0;
       let l_count = 0;
       let a_count = 0;
-      let hd_count = 0;
       let lv_count = 0;
       let hol_count = 0;
 
+      const pSlot = periodSlots.find((p) => String(p.id) === String(row.period_slot_id)) || {};
       const cleanedDailyStatuses = { ...(row.daily_statuses || {}) };
 
       enrichedDaysHeader.forEach((d) => {
         const isOff = Boolean(d.is_holiday || d.is_disabled);
         if (isOff) {
           hol_count += 1;
-          // Clear any previous status for this off day so it's not marked or shown
           if (d.date) cleanedDailyStatuses[d.date] = null;
           if (d.day) cleanedDailyStatuses[d.day] = null;
         } else {
-          const st = cleanedDailyStatuses[d.date] || cleanedDailyStatuses[d.day];
-          if (st === 'PRESENT') {
+          const rawStatus = cleanedDailyStatuses[d.date] || cleanedDailyStatuses[d.day];
+          const timingState = getAttendanceCellTimingState({
+            moduleType: 'CLASS',
+            targetDate: d.date,
+            startTime: pSlot.start_time,
+            endTime: pSlot.end_time,
+            policy: timingPolicy,
+            isAdmin,
+            currentStatus: rawStatus,
+          });
+
+          const effectiveStatus = rawStatus || timingState.displayStatus || '';
+          if (effectiveStatus) {
+            cleanedDailyStatuses[d.date] = effectiveStatus;
+          }
+
+          if (effectiveStatus === 'PRESENT') {
             p_count += 1;
-          } else if (st === 'LATE') {
+          } else if (effectiveStatus === 'LATE' || effectiveStatus === 'HALF_DAY') {
             l_count += 1;
-          } else if (st === 'ABSENT') {
+          } else if (effectiveStatus === 'ABSENT') {
             a_count += 1;
-          } else if (st === 'HALF_DAY') {
-            hd_count += 1;
-          } else if (st === 'ON_LEAVE') {
+          } else if (effectiveStatus === 'ON_LEAVE') {
             lv_count += 1;
           }
         }
       });
 
-      const totalRecorded = p_count + l_count + a_count + hd_count + lv_count;
-      const effectivePresent = p_count + l_count + hd_count * 0.5;
+      const totalRecorded = p_count + l_count + a_count + lv_count;
+      const effectivePresent = p_count + l_count;
       const attendanceRate = totalRecorded > 0 ? Math.round((effectivePresent / totalRecorded) * 1000) / 10 : 0.0;
 
       return {
@@ -501,7 +570,6 @@ export default function ClassAttendanceView({
           present: p_count,
           late: l_count,
           absent: a_count,
-          half_day: hd_count,
           on_leave: lv_count,
           holiday_excused: hol_count,
           total_recorded: totalRecorded,
@@ -515,11 +583,98 @@ export default function ClassAttendanceView({
       days_header: enrichedDaysHeader,
       students_matrix: enrichedStudentsMatrix,
     };
-  }, [matrixData, activeTenantId, selectedYear, selectedMonth, calendarEventsVersion]);
+  }, [matrixData, activeTenantId, selectedYear, selectedMonth, calendarEventsVersion, periodSlots, timingPolicy, isAdmin]);
 
-  // Interactive Click to Mark/Toggle Cell Attendance (Excludes Holidays defined in Calendar)
+  // Open Day Agenda Drawer on Header Date Click
+  const handleOpenDayAgenda = (dateParam) => {
+    const fullDate = typeof dateParam === 'string' ? dateParam : (dateParam?.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(dateParam?.day || 1).padStart(2, '0')}`);
+    const matchedDay = enrichedMatrixData?.days_header?.find((d) => d.date === fullDate);
+    const matchedEvt = matchedDay?.calendar_event;
+    const isOff = Boolean(matchedDay?.is_holiday || matchedDay?.is_disabled);
+    const offTitle = matchedDay?.holiday_title || (matchedDay?.is_disabled ? 'Class Attendance Off' : '');
+
+    openRightSidebar({
+      title: `Day Agenda: ${fullDate}`,
+      subtitle: `${getHijriDateString(fullDate)} • Master Calendar & Events`,
+      icon: CalendarIcon,
+      width: 580,
+      content: (
+        <DayAgendaDrawer
+          dateStr={fullDate}
+          activeTenantId={activeTenantId}
+          calendarEvent={matchedEvt}
+          isHoliday={isOff}
+          holidayTitle={offTitle}
+          isClassOff={isOff}
+          classOffReason={offTitle}
+          onClose={closeRightSidebar}
+          onOpenEventForm={(eventToEdit) => {
+            openRightSidebar({
+              title: eventToEdit ? `Edit: ${eventToEdit.title}` : 'Schedule Event / Holiday',
+              subtitle: `Date: ${fullDate}`,
+              icon: CalendarIcon,
+              width: 600,
+              content: (
+                <TimeScheduleDrawerForm
+                  event={eventToEdit}
+                  initialDate={fullDate}
+                  onSaveSuccess={() => {
+                    closeRightSidebar();
+                    setCalendarEventsVersion((v) => v + 1);
+                    showToast('Calendar event updated successfully.', 'success');
+                  }}
+                  onCancel={closeRightSidebar}
+                />
+              ),
+            });
+          }}
+        />
+      ),
+    });
+  };
+
+  // Interactive Click to Mark/Toggle Cell Attendance with Dynamic Timing & Lockout Enforcement
   const handleToggleCellAttendance = async (studentId, dateStr, currentStatus, periodSlotId) => {
-    // Strictly disable on holidays defined in event calendar
+    // 0. Conductor / Period Teacher Ownership Check
+    const pSlot = periodSlots.find((p) => String(p.id) === String(periodSlotId)) || {};
+    const matchingRow = enrichedMatrixData?.students_matrix?.find(
+      (r) => r.student_id === studentId && (periodSlotId ? String(r.period_slot_id) === String(periodSlotId) : true)
+    );
+    const assignedTeacherId = matchingRow?.teacher_id || pSlot?.teacher_id || pSlot?.teacher?.id;
+    const assignedTeacherName = matchingRow?.teacher_name || pSlot?.teacher_name || pSlot?.teacher?.name || '';
+
+    if (!isAdmin && assignedTeacherId) {
+      const currentTeacherId = userProfile.teacher_profile_id || userProfile.teacher_id || userProfile.id;
+      const currentUserId = userProfile.id || userProfile.user_id;
+      const assignedTeacherUserId = matchingRow?.teacher_user_id || pSlot?.teacher?.user?.id || pSlot?.teacher_user_id;
+
+      const isAssigned =
+        (currentTeacherId && String(currentTeacherId) === String(assignedTeacherId)) ||
+        (currentUserId && assignedTeacherUserId && String(currentUserId) === String(assignedTeacherUserId)) ||
+        (userProfile.phone_number && matchingRow?.teacher_phone === userProfile.phone_number);
+
+      if (!isAssigned) {
+        showToast(
+          `Only the assigned teacher (${assignedTeacherName || 'Period Teacher'}) can mark attendance for this period.`,
+          'warning'
+        );
+        return;
+      }
+    }
+
+    // 0. Check Academic Year Date Guard
+    if (
+      (academicBounds.minDate && dateStr < academicBounds.minDate) ||
+      (academicBounds.maxDate && dateStr > academicBounds.maxDate)
+    ) {
+      showToast(
+        `Attendance cannot be marked outside the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
+
+    // 1. Check Holiday Lock
     const dayHeader = enrichedMatrixData?.days_header?.find(
       (d) => d.date === dateStr || String(d.day) === String(dateStr)
     );
@@ -528,8 +683,24 @@ export default function ClassAttendanceView({
       return;
     }
 
-    // Determine next status in cycle
-    const nextStatus = cycleAttendanceStatus(currentStatus);
+    // 2. Resolve Timing Rules & Allowed Statuses
+    const timingState = getAttendanceCellTimingState({
+      moduleType: 'CLASS',
+      targetDate: dateStr,
+      startTime: pSlot.start_time,
+      endTime: pSlot.end_time,
+      policy: timingPolicy,
+      isAdmin,
+      currentStatus,
+    });
+
+    if (!timingState.isEditable) {
+      showToast(timingState.tooltip || 'Attendance cannot be marked at this time.', 'warning');
+      return;
+    }
+
+    // 3. Determine Next Status based on Allowed Cycle
+    const nextStatus = cycleStatusWithinAllowed(currentStatus, timingState.allowedStatuses);
 
     // Optimistic Update
     setMatrixData((prev) => {
@@ -543,11 +714,9 @@ export default function ClassAttendanceView({
 
         const updatedStatuses = { ...row.daily_statuses, [dateStr]: nextStatus };
 
-        // Recalculate totals (Excludes calendar holidays)
         let p_count = 0;
         let l_count = 0;
         let a_count = 0;
-        let hd_count = 0;
         let lv_count = 0;
         let hol_count = 0;
 
@@ -559,19 +728,17 @@ export default function ClassAttendanceView({
             hol_count += 1;
           } else if (st === 'PRESENT') {
             p_count += 1;
-          } else if (st === 'LATE') {
+          } else if (st === 'LATE' || st === 'HALF_DAY') {
             l_count += 1;
           } else if (st === 'ABSENT') {
             a_count += 1;
-          } else if (st === 'HALF_DAY') {
-            hd_count += 1;
           } else if (st === 'ON_LEAVE') {
             lv_count += 1;
           }
         });
 
-        const totalRecorded = p_count + l_count + a_count + hd_count + lv_count;
-        const effectivePresent = p_count + l_count + hd_count * 0.5;
+        const totalRecorded = p_count + l_count + a_count + lv_count;
+        const effectivePresent = p_count + l_count;
         const attendanceRate = totalRecorded > 0 ? Math.round((effectivePresent / totalRecorded) * 1000) / 10 : 0.0;
 
         return {
@@ -581,7 +748,6 @@ export default function ClassAttendanceView({
             present: p_count,
             late: l_count,
             absent: a_count,
-            half_day: hd_count,
             on_leave: lv_count,
             holiday_excused: hol_count,
             total_recorded: totalRecorded,
@@ -599,22 +765,108 @@ export default function ClassAttendanceView({
     try {
       await bulkMarkStudentAttendance({
         date: dateStr,
-        class_id: selectedClassId ? Number(selectedClassId) : null,
-        group_id: selectedGroupId ? Number(selectedGroupId) : null,
+        class_id: selectedClassId && selectedClassId !== 'ALL' ? String(selectedClassId) : null,
+        group_id: selectedGroupId && selectedGroupId !== 'ALL' ? String(selectedGroupId) : null,
         override_holiday: true,
+        taken_by_teacher_id: userProfile.teacher_profile_id || userProfile.teacher_id || null,
         records: [
           {
-            student_id: studentId,
-            period_slot_id: periodSlotId && periodSlotId !== 'DEFAULT' ? periodSlotId : null,
-            status: nextStatus,
+            student_id: Number(studentId),
+            period_slot_id: periodSlotId && periodSlotId !== 'DEFAULT' && periodSlotId !== 'main' ? String(periodSlotId) : null,
+            status: nextStatus || 'UNMARKED',
           },
         ],
       });
+
+      // Dispatch global attendance event for real-time synchronization with Teacher Attendance
+      window.dispatchEvent(new CustomEvent('spr_attendance_updated', {
+        detail: { date: dateStr, student_id: studentId, period_slot_id: periodSlotId, status: nextStatus },
+      }));
     } catch (err) {
-      console.error('Failed to update student attendance cell:', err);
-      showToast('Could not save attendance change', 'error');
-      loadMatrix();
+      console.error('Error saving attendance mark:', err);
+      showToast('Failed to save attendance record', 'error');
     }
+  };
+
+  // Admin Override Drawer Handler (Full status & arrival time modification)
+  const handleAdminEditCell = (row, dateStr, currentStatus, periodSlotId) => {
+    if (
+      (academicBounds.minDate && dateStr < academicBounds.minDate) ||
+      (academicBounds.maxDate && dateStr > academicBounds.maxDate)
+    ) {
+      showToast(
+        `Attendance cannot be modified outside the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`,
+        'warning'
+      );
+      return;
+    }
+
+    const pSlot = periodSlots.find((p) => String(p.id) === String(periodSlotId)) || {};
+    openRightSidebar({
+      title: 'Admin Attendance Override',
+      subtitle: `${row.student_name || row.name} • ${dateStr}`,
+      icon: ClockIcon,
+      content: (
+        <AdminAttendanceDrawer
+          personName={row.student_name || row.name}
+          personSubtitle={`Roll: ${row.roll_number || '—'} • ${pSlot.period_name || 'Class Period'}`}
+          dateStr={dateStr}
+          scheduledStartTime={pSlot.start_time || '08:00'}
+          initialStatus={currentStatus || 'PRESENT'}
+          initialInTime={row.in_time || pSlot.start_time || '08:00'}
+          initialRemarks={row.remarks || ''}
+          onClose={closeRightSidebar}
+          onSave={async (formData) => {
+            closeRightSidebar();
+
+            // Optimistic update
+            setMatrixData((prev) => {
+              if (!prev || !prev.students_matrix) return prev;
+              const updatedMatrix = prev.students_matrix.map((r) => {
+                const isMatch =
+                  r.student_id === row.student_id &&
+                  (periodSlotId ? String(r.period_slot_id) === String(periodSlotId) : true);
+                if (!isMatch) return r;
+                return {
+                  ...r,
+                  daily_statuses: { ...r.daily_statuses, [dateStr]: formData.status },
+                };
+              });
+              return { ...prev, students_matrix: updatedMatrix };
+            });
+
+            try {
+              await bulkMarkStudentAttendance({
+                date: dateStr,
+                class_id: selectedClassId && selectedClassId !== 'ALL' ? String(selectedClassId) : null,
+                group_id: selectedGroupId && selectedGroupId !== 'ALL' ? String(selectedGroupId) : null,
+                override_holiday: true,
+                records: [
+                  {
+                    student_id: Number(row.student_id),
+                    period_slot_id: periodSlotId && periodSlotId !== 'DEFAULT' && periodSlotId !== 'main' ? String(periodSlotId) : null,
+                    status: formData.status,
+                    in_time: formData.in_time,
+                    remarks: formData.remarks,
+                  },
+                ],
+              });
+              showToast(`Attendance updated for ${row.student_name || row.name}`, 'success');
+
+              // Dispatch global event for synchronization
+              window.dispatchEvent(new CustomEvent('spr_attendance_updated', {
+                detail: { date: dateStr, student_id: row.student_id, period_slot_id: periodSlotId, status: formData.status },
+              }));
+
+              loadMatrix();
+            } catch (err) {
+              console.error('Failed to save admin attendance update:', err);
+              showToast('Failed to save attendance record', 'error');
+            }
+          }}
+        />
+      ),
+    });
   };
 
   // Click on date header -> Open Day Schedule & Event Details (Strictly Read-Only from Attendance)
@@ -887,7 +1139,9 @@ export default function ClassAttendanceView({
                 value={selectedClassId}
                 onChange={setSelectedClassId}
                 classes={classes}
-                allowAll={false}
+                allowAll={true}
+                allLabel="All Classes"
+                allValue="ALL"
               />
             </div>
 
@@ -920,6 +1174,8 @@ export default function ClassAttendanceView({
                 label="Date Range"
                 startDate={startDate}
                 endDate={endDate}
+                minDate={academicBounds.minDate}
+                maxDate={academicBounds.maxDate}
                 onRangeSelect={handleDateRangeSelect}
                 onReset={handleResetDateRange}
                 isHijriEnabled={isHijriEnabled}
@@ -952,11 +1208,12 @@ export default function ClassAttendanceView({
           matrixData={enrichedMatrixData}
           isEditing={isEditing}
           onToggleCell={handleToggleCellAttendance}
+          onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
           isHijriEnabled={isHijriEnabled}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
           onStudentClick={onStudentClick}
-          onDateClick={handleDateHeaderClick}
+          onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
           totalCount={enrichedMatrixData?.total_students || 0}
           totalCountLabel="Total Students"

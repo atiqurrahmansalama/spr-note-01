@@ -103,8 +103,11 @@ export function TenantProvider({ children }) {
     fetchInstitutionsList();
   }, [fetchInstitutionsList]);
 
+  const [pendingSwitchInstitution, setPendingSwitchInstitution] = useState(null);
+
   // Handle switching active institution
   const switchInstitution = useCallback((targetId) => {
+    let targetName = 'All Institutions';
     if (!targetId || targetId === 'ALL') {
       localStorage.setItem('active_tenant_id', 'ALL');
       setActiveTenantId('ALL');
@@ -115,12 +118,45 @@ export function TenantProvider({ children }) {
       const found = institutions.find(i => String(i.id) === String(targetId));
       if (found) {
         setCurrentInstitution(found);
+        targetName = found.name;
       }
     }
 
     // Dispatch sync event for active views to reload data
-    window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: targetId } }));
+    window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: targetId, targetName } }));
   }, [institutions]);
+
+  const requestSwitchInstitution = useCallback((target) => {
+    if (!target) return;
+    if (target === 'ALL') {
+      if (activeTenantId === 'ALL') return;
+      setPendingSwitchInstitution({
+        id: 'ALL',
+        name: 'All Institutions',
+        slug: 'global',
+        institution_type: 'GLOBAL',
+        description: 'Viewing aggregate data across all registered institutions.',
+      });
+      return;
+    }
+
+    const instObj = typeof target === 'object' ? target : institutions.find(i => String(i.id) === String(target));
+    if (instObj) {
+      if (String(instObj.id) === String(activeTenantId)) return;
+      setPendingSwitchInstitution(instObj);
+    }
+  }, [institutions, activeTenantId]);
+
+  const confirmSwitchInstitution = useCallback(() => {
+    if (!pendingSwitchInstitution) return;
+    const targetId = pendingSwitchInstitution.id;
+    switchInstitution(targetId);
+    setPendingSwitchInstitution(null);
+  }, [pendingSwitchInstitution, switchInstitution]);
+
+  const cancelSwitchInstitution = useCallback(() => {
+    setPendingSwitchInstitution(null);
+  }, []);
 
   const value = {
     institutions,
@@ -129,6 +165,10 @@ export function TenantProvider({ children }) {
     isMultiTenantAdmin,
     isLoadingInstitutions,
     switchInstitution,
+    pendingSwitchInstitution,
+    requestSwitchInstitution,
+    confirmSwitchInstitution,
+    cancelSwitchInstitution,
     refreshInstitutions: fetchInstitutionsList,
   };
 
@@ -149,6 +189,10 @@ export function useTenant() {
       isMultiTenantAdmin: false,
       isLoadingInstitutions: false,
       switchInstitution: () => {},
+      pendingSwitchInstitution: null,
+      requestSwitchInstitution: () => {},
+      confirmSwitchInstitution: () => {},
+      cancelSwitchInstitution: () => {},
       refreshInstitutions: async () => {},
     };
   }

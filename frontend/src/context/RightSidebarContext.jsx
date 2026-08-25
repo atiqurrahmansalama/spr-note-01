@@ -129,6 +129,7 @@ export function RightSidebarProvider({ children }) {
       drawerKey: drawerKey || null,
       onClose: onClose || null,
       ownerId: ownerId || null,
+      _renderKey: `${drawerKey || 'panel'}-${Date.now()}-${Math.random()}`,
       ...restConfig,
     });
   }, [setDrawerWidth]);

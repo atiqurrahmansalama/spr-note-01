@@ -21,6 +21,8 @@ import TabSwitcher from '../../../components/ui/TabSwitcher';
 import { PageContainer } from '../../../components/layout';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useToast } from '../../../context/ToastContext';
+import { useTenant } from '../../../context/TenantContext';
+import { academicYearsStore } from '../../../utils/localStore';
 import {
   getAdmissionTokens,
   toggleAdmissionTokenActive,
@@ -30,11 +32,14 @@ import {
 export default function StudentAdmissionView() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeTab = searchParams.get('tab') || 'direct'; // 'direct' | 'online_qr'
   const [admittedStudent, setAdmittedStudent] = useState(null);
+
+  const activeYear = academicYearsStore.getActiveYear(activeTenantId);
 
   // QR Tokens state
   const [tokens, setTokens] = useState([]);
@@ -50,7 +55,7 @@ export default function StudentAdmissionView() {
     dob: '',
     blood_group: '',
     birth_certificate_no: '',
-    session_year: '2026-2027',
+    session_year: activeYear?.name || '',
     student_class: '',
     education_status: '',
     roll_number: '',
@@ -96,6 +101,20 @@ export default function StudentAdmissionView() {
       loadTokens();
     }
   }, [activeTab, loadTokens]);
+
+  useEffect(() => {
+    const handleTenantChanged = () => {
+      const currentYear = academicYearsStore.getActiveYear(activeTenantId);
+      if (currentYear?.name) {
+        setSharedData((prev) => ({ ...prev, session_year: currentYear.name }));
+      }
+      if (activeTab === 'online_qr') {
+        loadTokens();
+      }
+    };
+    window.addEventListener('spr_tenant_changed', handleTenantChanged);
+    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+  }, [activeTenantId, activeTab, loadTokens]);
 
   const handleTabChange = (tabId) => {
     setSearchParams((prev) => {

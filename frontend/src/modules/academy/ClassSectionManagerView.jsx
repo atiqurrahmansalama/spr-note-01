@@ -122,15 +122,7 @@ export default function ClassSectionManagerView() {
     }
   }, []);
 
-  useEffect(() => {
-    loadLookups();
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [classFilter, branchFilter]);
-
-  const loadLookups = async () => {
+  const loadLookups = useCallback(async () => {
     try {
       const [classRes, branchRes, teacherRes] = await Promise.allSettled([
         fetchWithAuth('/api/v1/classes/'),
@@ -151,9 +143,9 @@ export default function ClassSectionManagerView() {
         setTeachers(Array.isArray(d) ? d : d.results || []);
       }
     } catch {}
-  };
+  }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -179,7 +171,24 @@ export default function ClassSectionManagerView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [classFilter, branchFilter, showToast]);
+
+  useEffect(() => {
+    loadLookups();
+  }, [loadLookups]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleTenantChanged = () => {
+      loadLookups();
+      loadData();
+    };
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+  }, [loadLookups, loadData]);
 
   const handleCreateNew = () => {
     openDrawer('section', { mode: 'add' });

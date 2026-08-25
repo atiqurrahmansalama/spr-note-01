@@ -90,8 +90,15 @@ export default function StudentReportsView() {
     const handleReportSaved = () => {
       loadReports();
     };
+    const handleTenantChanged = () => {
+      loadReports();
+    };
     window.addEventListener("spr_report_saved", handleReportSaved);
-    return () => window.removeEventListener("spr_report_saved", handleReportSaved);
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => {
+      window.removeEventListener("spr_report_saved", handleReportSaved);
+      window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper: Normalize a single report object

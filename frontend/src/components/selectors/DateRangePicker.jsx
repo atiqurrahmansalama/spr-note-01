@@ -137,51 +137,57 @@ export default function DateRangePicker({
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
 
+    let start = "";
+    let end = "";
+
     if (presetKey === "today") {
-      return { start: todayStr, end: todayStr };
-    }
-    if (presetKey === "yesterday") {
+      start = todayStr;
+      end = todayStr;
+    } else if (presetKey === "yesterday") {
       const yest = new Date(today);
       yest.setDate(yest.getDate() - 1);
       const yestStr = yest.toISOString().split("T")[0];
-      return { start: yestStr, end: yestStr };
-    }
-    if (presetKey === "past_week") {
+      start = yestStr;
+      end = yestStr;
+    } else if (presetKey === "past_week") {
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 6);
-      const startStr = weekAgo.toISOString().split("T")[0];
-      return { start: startStr, end: todayStr };
-    }
-    if (presetKey === "past_2weeks") {
+      start = weekAgo.toISOString().split("T")[0];
+      end = todayStr;
+    } else if (presetKey === "past_2weeks") {
       const twoWeeksAgo = new Date(today);
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
-      const startStr = twoWeeksAgo.toISOString().split("T")[0];
-      return { start: startStr, end: todayStr };
-    }
-    if (presetKey === "this_month") {
+      start = twoWeeksAgo.toISOString().split("T")[0];
+      end = todayStr;
+    } else if (presetKey === "this_month") {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const startStr = startOfMonth.toISOString().split("T")[0];
-      return { start: startStr, end: todayStr };
-    }
-    if (presetKey === "full_hijri_month") {
+      start = startOfMonth.toISOString().split("T")[0];
+      end = todayStr;
+    } else if (presetKey === "full_hijri_month") {
       const hijriRange = getCurrentHijriMonthRange(today);
-      return { start: hijriRange.start, end: hijriRange.end };
-    }
-    if (presetKey === "past_month") {
+      start = hijriRange.start;
+      end = hijriRange.end;
+    } else if (presetKey === "past_month") {
       const monthAgo = new Date(today);
       monthAgo.setDate(monthAgo.getDate() - 29);
-      const startStr = monthAgo.toISOString().split("T")[0];
-      return { start: startStr, end: todayStr };
-    }
-    if (presetKey === "past_3months") {
+      start = monthAgo.toISOString().split("T")[0];
+      end = todayStr;
+    } else if (presetKey === "past_3months") {
       const ago = new Date(today);
       ago.setDate(ago.getDate() - 89);
-      return { start: ago.toISOString().split("T")[0], end: todayStr };
+      start = ago.toISOString().split("T")[0];
+      end = todayStr;
+    } else if (presetKey === "all_time") {
+      return { start: minDate || "", end: maxDate || "" };
     }
-    if (presetKey === "all_time") {
-      return { start: "", end: "" };
-    }
-    return { start: "", end: "" };
+
+    // Boundary Clamp: Restrict preset range strictly within Academic Year minDate/maxDate
+    if (start && minDate && start < minDate) start = minDate;
+    if (end && maxDate && end > maxDate) end = maxDate;
+    if (start && maxDate && start > maxDate) start = maxDate;
+    if (end && minDate && end < minDate) end = minDate;
+
+    return { start, end };
   };
 
   const handleSelectPreset = (presetKey) => {

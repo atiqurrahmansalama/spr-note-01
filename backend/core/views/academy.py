@@ -528,7 +528,7 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         # 2. Check institutional weekend policy
         policy = AttendancePolicySetting.objects.filter(institution_id=tenant_id).first()
         weekday_name = target_date.strftime('%A').upper()
-        weekend_days = policy.weekend_days if policy and policy.weekend_days else ['FRIDAY', 'SATURDAY']
+        weekend_days = policy.weekend_days if (policy and policy.weekend_days is not None) else ['FRIDAY']
 
         if weekday_name in weekend_days:
             return Response({

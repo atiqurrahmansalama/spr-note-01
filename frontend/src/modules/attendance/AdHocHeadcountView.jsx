@@ -3,6 +3,7 @@ import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
 import { ChecklistIcon, RefreshIcon, SaveIcon, CloseIcon } from "../../components/ui/Icons";
 import { ClassSelect, GroupSelect } from "../../components/selectors";
+import { academicYearsStore } from "../../utils/localStore";
 
 export default function AdHocHeadcountView() {
   const { showToast } = useToast();
@@ -68,6 +69,19 @@ export default function AdHocHeadcountView() {
     e.preventDefault();
     if (!newTitle.trim()) {
       showToast("Please enter a session title.", "warning");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const academicBounds = academicYearsStore.getDateBounds();
+    if (
+      (academicBounds.minDate && todayStr < academicBounds.minDate) ||
+      (academicBounds.maxDate && todayStr > academicBounds.maxDate)
+    ) {
+      showToast(
+        `Headcount sessions cannot be initiated outside the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`,
+        "warning"
+      );
       return;
     }
 

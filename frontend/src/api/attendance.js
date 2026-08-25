@@ -46,6 +46,11 @@ export const getMonthlyAttendanceMatrix = async (params = {}) => {
   return res.data;
 };
 
+export const getTeacherAttendanceMatrix = async (params = {}) => {
+  const res = await axiosInstance.get('/api/v1/attendance/students/teacher-monthly-matrix/', { params });
+  return res.data;
+};
+
 /**
  * Attendance Policy & Weekend Settings API Services
  */

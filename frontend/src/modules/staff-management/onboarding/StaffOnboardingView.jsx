@@ -60,6 +60,16 @@ export default function StaffOnboardingView() {
     }
   }, [activeTab, loadTokens]);
 
+  useEffect(() => {
+    const handleTenantChanged = () => {
+      if (activeTab === 'online_qr') {
+        loadTokens();
+      }
+    };
+    window.addEventListener('spr_tenant_changed', handleTenantChanged);
+    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+  }, [activeTab, loadTokens]);
+
   const handleTabChange = (tabId) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
