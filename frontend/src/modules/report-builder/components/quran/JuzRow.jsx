@@ -1,6 +1,7 @@
 import React from "react";
 import CustomInput from "../../../../components/ui/CustomInput";
 import PageRangeInput from "./PageRangeInput";
+import { CloseIcon } from "../../../../components/ui/Icons";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";
 
@@ -65,7 +66,7 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz }) {
       {/* Left Column: Juz Label & Input — fixed width, matching DetailRow */}
       <div className="flex items-center gap-1 shrink-0 h-[38px] sm:h-10 self-start">
         <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
-        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-14 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30">
+        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-[38px] sm:h-10 w-14 sm:w-16 shadow-sm shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 flex items-center justify-center">
           <CustomInput
             id={rowData.juzInputId}
             type="number"
@@ -84,6 +85,7 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz }) {
             max={QURAN_CONSTANTS.MAX_JUZ}
             placeholder="--"
             className="w-full h-full p-0 min-h-0"
+            wrapperClassName="w-full h-full"
             inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
           />
         </div>
@@ -157,12 +159,10 @@ export default function JuzRow({ rowData, onChange, onRemoveJuz, onAddJuz }) {
         <button
           type="button"
           onClick={onRemoveJuz}
-          className="p-1 theme-text-secondary hover:text-red-400 transition-colors shrink-0 flex items-center justify-center h-[38px] sm:h-10 cursor-pointer self-start"
+          className="p-1 theme-text-secondary hover:theme-danger transition-colors shrink-0 flex items-center justify-center h-[38px] sm:h-10 cursor-pointer self-start"
           title="Remove Juz Row"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+          <CloseIcon className="w-3.5 h-3.5" />
         </button>
       )}
     </div>

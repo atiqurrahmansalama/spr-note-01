@@ -91,6 +91,14 @@ export default function DetailSection({
 
   const totalCount = calculateTotalCount();
 
+  const hasContent = data && data.length > 0 && data.some((row, idx) => {
+    if (idx > 0) return true;
+    if (row.page && String(row.page).trim() !== "") return true;
+    if (row.ayahs && row.ayahs.length > 1) return true;
+    if (row.ayahs && row.ayahs.some((a) => a.value && String(a.value).trim() !== "")) return true;
+    return false;
+  });
+
   return (
     <div 
       data-list-type={listType}
@@ -107,7 +115,7 @@ export default function DetailSection({
             </span>
           )}
         </h3>
-        {onReset && (
+        {onReset && hasContent && (
           <button
             type="button"
             onClick={onReset}

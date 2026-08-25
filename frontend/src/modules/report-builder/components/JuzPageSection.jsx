@@ -76,6 +76,14 @@ export default function JuzPageSection({ data, onChange, onReset }) {
     return sum + rowSum;
   }, 0);
 
+  const hasContent = data && data.length > 0 && data.some((row, idx) => {
+    if (idx > 0) return true;
+    if (row.juz && String(row.juz).trim() !== "") return true;
+    if (row.ranges && row.ranges.length > 1) return true;
+    if (row.ranges && row.ranges.some((r) => (r.start && String(r.start).trim() !== "") || (r.end && String(r.end).trim() !== ""))) return true;
+    return false;
+  });
+
   return (
     <div className="relative">
       {/* Title Header Row with Refresh Icon */}
@@ -88,14 +96,16 @@ export default function JuzPageSection({ data, onChange, onReset }) {
             </span>
           )}
         </h3>
-        <button
-          type="button"
-          onClick={handleReset}
-          className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm"
-          title="Reset Juz / Page Details"
-        >
-          <RefreshIcon className="w-4 h-4 text-inherit transition-colors" />
-        </button>
+        {hasContent && (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm"
+            title="Reset Juz / Page Details"
+          >
+            <RefreshIcon className="w-4 h-4 text-inherit transition-colors" />
+          </button>
+        )}
       </div>
 
       {/* Rows Container */}

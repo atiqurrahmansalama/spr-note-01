@@ -1,4 +1,5 @@
 import { ShareDropdown } from "./ShareDropdown";
+import { EditIcon, CopyIcon, SleekCheckIcon, ShareIcon } from "../../../components/ui/Icons";
 
 export function ReportFooter({
   viewMode,
@@ -33,9 +34,7 @@ export function ReportFooter({
             : "theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary theme-border"
         }`}
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
+        <EditIcon className="w-3.5 h-3.5" />
         <span>{isEditing ? "Done" : "Edit"}</span>
       </button>
 
@@ -49,13 +48,11 @@ export function ReportFooter({
             : "theme-bg-accent hover:opacity-90 theme-accent-text border-[var(--accent-main)]"
         }`}
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          {copied ? (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          ) : (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          )}
-        </svg>
+        {copied ? (
+          <SleekCheckIcon className="w-3.5 h-3.5" />
+        ) : (
+          <CopyIcon className="w-3.5 h-3.5" />
+        )}
         <span>{copied ? "Copied!" : "Copy"}</span>
       </button>
 
@@ -68,9 +65,7 @@ export function ReportFooter({
             isShareDropdownOpen ? "border-[var(--accent-main)]" : ""
           }`}
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 10-5.367-2.684 3 3 0 005.367 2.684zm0 9.316a3 3 0 10-5.368 2.684 3 3 0 005.368-2.684z" />
-          </svg>
+          <ShareIcon className="w-3.5 h-3.5" />
           <span>Export</span>
         </button>
 

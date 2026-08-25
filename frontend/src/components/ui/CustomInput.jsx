@@ -452,12 +452,17 @@ const CustomInput = forwardRef(function CustomInput(
   // UI SIZES & STYLING TOKENS
   // ----------------------------------------------------------------------------
   const isCompactNumber = variant === "compact-number";
+  const isBorderless = variant === "borderless";
 
-  const sizeContainerClasses = {
+  let sizeContainerClasses = {
     sm: isCompactNumber ? "h-[36px] sm:h-[38px]" : "min-h-[38px] px-3 py-1.5 text-xs rounded-xl",
     md: isCompactNumber ? "h-[42px] sm:h-[46px]" : "min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl",
     lg: isCompactNumber ? "h-[48px] sm:h-[54px]" : "min-h-[54px] px-5 py-3.5 text-sm sm:text-base rounded-2xl",
   }[size] || "min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl";
+
+  if (isBorderless) {
+    sizeContainerClasses = "w-full h-full p-0 min-h-0";
+  }
 
   const isInvalid = Boolean(explicitError || (touched && validationError));
   const activeError = explicitError || validationError;
@@ -472,13 +477,15 @@ const CustomInput = forwardRef(function CustomInput(
     variantClasses = "theme-bg-elevated theme-border border";
   } else if (variant === "elevated") {
     variantClasses = "theme-bg-elevated theme-border border shadow-sm";
-  } else if (variant === "borderless") {
-    variantClasses = "bg-transparent border-transparent";
+  } else if (isBorderless) {
+    variantClasses = "bg-transparent border-0 outline-none shadow-none";
   }
 
   // Focus & State Border/Ring classes
   let stateClasses = "";
-  if (disabled) {
+  if (isBorderless) {
+    stateClasses = "";
+  } else if (disabled) {
     stateClasses = "opacity-50 cursor-not-allowed theme-bg-sub theme-border";
   } else if (isInvalid) {
     stateClasses =
@@ -588,7 +595,7 @@ const CustomInput = forwardRef(function CustomInput(
   };
 
   return (
-    <div className={`w-full text-left font-sans ${wrapperClassName}`}>
+    <div className={`text-left font-sans ${isBorderless && !label && !subLabel && !badge && !optional ? (wrapperClassName || "w-full h-full") : `w-full ${wrapperClassName}`}`}>
       {/* Top Bar: Label, Optional Sublabel, and Badges */}
       {(label || subLabel || badge || optional) && (
         <div className="flex items-center justify-between gap-2 mb-2">
@@ -693,74 +700,81 @@ const CustomInput = forwardRef(function CustomInput(
         )}
 
         {/* Right Side Suffix / Steppers / Password Toggle / Clear Button */}
-        <div className="flex items-center gap-1.5 ml-2 shrink-0">
-          {/* Stepper Buttons for Number mode */}
-          {normalizedType === "number" && stepper && !disabled && !readOnly && (
-            <div className="flex flex-col items-center gap-0.5 shrink-0">
+        {((normalizedType === "number" && stepper && !disabled && !readOnly) ||
+          (normalizedType === "password" && showPasswordToggle && !disabled) ||
+          (clearable && stringValue.length > 0 && !disabled && !readOnly) ||
+          (!isBorderless && isValid && !isInvalid) ||
+          suffix ||
+          endAdornment) && (
+          <div className="flex items-center gap-1.5 ml-2 shrink-0">
+            {/* Stepper Buttons for Number mode */}
+            {normalizedType === "number" && stepper && !disabled && !readOnly && (
+              <div className="flex flex-col items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => updateNumberValue(step || 1)}
+                  className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                  title="Increase value"
+                >
+                  <PlusIcon className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => updateNumberValue(-(step || 1))}
+                  className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                  title="Decrease value"
+                >
+                  <MinusIcon className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Password Show/Hide Toggle */}
+            {normalizedType === "password" && showPasswordToggle && !disabled && (
               <button
                 type="button"
                 tabIndex={-1}
-                onClick={() => updateNumberValue(step || 1)}
-                className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
-                title="Increase value"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition cursor-pointer focus:outline-none"
+                title={showPassword ? "Hide password" : "Show password"}
               >
-                <PlusIcon className="w-3 h-3" />
+                {showPassword ? (
+                  <EyeOffIcon className="w-4 h-4" />
+                ) : (
+                  <EyeIcon className="w-4 h-4" />
+                )}
               </button>
+            )}
+
+            {/* Instant Clear Button */}
+            {clearable && stringValue.length > 0 && !disabled && !readOnly && (
               <button
                 type="button"
                 tabIndex={-1}
-                onClick={() => updateNumberValue(-(step || 1))}
-                className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
-                title="Decrease value"
+                onClick={handleClear}
+                className="p-1 rounded-full theme-bg-elevated theme-text-secondary hover:theme-text-primary hover:theme-danger transition cursor-pointer"
+                title="Clear input"
               >
-                <MinusIcon className="w-3 h-3" />
+                <CloseIcon className="w-3 h-3" />
               </button>
-            </div>
-          )}
+            )}
 
-          {/* Password Show/Hide Toggle */}
-          {normalizedType === "password" && showPasswordToggle && !disabled && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition cursor-pointer focus:outline-none"
-              title={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? (
-                <EyeOffIcon className="w-4 h-4" />
-              ) : (
-                <EyeIcon className="w-4 h-4" />
-              )}
-            </button>
-          )}
+            {/* Valid Success Check Icon */}
+            {!isBorderless && isValid && !isInvalid && (
+              <CheckCircleIcon className="w-4 h-4 theme-success shrink-0" />
+            )}
 
-          {/* Instant Clear Button */}
-          {clearable && stringValue.length > 0 && !disabled && !readOnly && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={handleClear}
-              className="p-1 rounded-full theme-bg-elevated theme-text-secondary hover:theme-text-primary hover:theme-danger transition cursor-pointer"
-              title="Clear input"
-            >
-              <CloseIcon className="w-3 h-3" />
-            </button>
-          )}
-
-          {/* Valid Success Check Icon */}
-          {isValid && !isInvalid && (
-            <CheckCircleIcon className="w-4 h-4 theme-success shrink-0" />
-          )}
-
-          {/* Custom End Adornment / Suffix */}
-          {suffix && (
-            <span className="text-xs font-bold theme-text-secondary font-mono select-none">
-              {suffix}
-            </span>
-          )}
-          {endAdornment}
-        </div>
+            {/* Custom End Adornment / Suffix */}
+            {suffix && (
+              <span className="text-xs font-bold theme-text-secondary font-mono select-none">
+                {suffix}
+              </span>
+            )}
+            {endAdornment}
+          </div>
+        )}
       </div>
 
       {/* Bottom Status / Error / Helper Text */}

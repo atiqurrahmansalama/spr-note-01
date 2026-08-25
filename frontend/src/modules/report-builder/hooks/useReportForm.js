@@ -500,8 +500,17 @@ export function useReportForm() {
 
     initLoad();
 
+    const handleTenantChanged = () => {
+      if (isMounted) {
+        fetchData();
+      }
+    };
+
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("spr_tenant_changed", handleTenantChanged);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -674,7 +683,7 @@ export function useReportForm() {
               body: JSON.stringify(payload),
             });
             if (response.ok) {
-              showToast(`Report for "${studentName}" updated in Database! ✏️`, "success");
+              showToast(`Report for "${studentName}" updated in Database!`, "success");
               saveStatusStore.set("database", "Database Synced");
             } else {
               showToast(`Report updated locally. Will sync when possible.`, "info");
@@ -685,7 +694,7 @@ export function useReportForm() {
             saveStatusStore.set("local", "Saved (Local)");
           }
         } else {
-          showToast(`Report for "${studentName}" updated locally! ✏️`, "success");
+          showToast(`Report for "${studentName}" updated locally!`, "success");
           saveStatusStore.set("local", "Saved (Local)");
         }
 
