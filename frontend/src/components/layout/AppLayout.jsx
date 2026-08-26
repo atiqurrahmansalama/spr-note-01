@@ -13,6 +13,7 @@ import { useToast } from "../../context/ToastContext";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
+import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 
 // Route details mapping for titles and path lookup
@@ -337,16 +338,12 @@ export default function AppLayout() {
 
   // Automatic Offline-to-Online Sync & Cloud Taxonomy Sync triggers
   useEffect(() => {
-    import("../../utils/syncEngine").then(({ triggerCloudSync, syncTenantTaxonomies }) => {
-      triggerCloudSync();
-      syncTenantTaxonomies(activeTenantId);
-    });
+    triggerCloudSync();
+    syncTenantTaxonomies(activeTenantId);
 
     const handleOnline = () => {
-      import("../../utils/syncEngine").then(({ triggerCloudSync, syncTenantTaxonomies }) => {
-        triggerCloudSync();
-        syncTenantTaxonomies(activeTenantId);
-      });
+      triggerCloudSync();
+      syncTenantTaxonomies(activeTenantId);
     };
 
     window.addEventListener("online", handleOnline);

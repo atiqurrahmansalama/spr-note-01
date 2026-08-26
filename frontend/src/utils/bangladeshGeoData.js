@@ -13,7 +13,17 @@ export const BANGLADESH_DIVISIONS = [
 
 export const BD_GEO_DATA = {
   Dhaka: {
-    Dhaka: ['Uttara', 'Mirpur', 'Dhanmondi', 'Gulshan', 'Banani', 'Mohammadpur', 'Badda', 'Motijheel', 'Paltan', 'Tejgaon', 'Ramna', 'Jatrabari', 'Khilgaon', 'Shahbagh', 'Lalbagh', 'Savar', 'Dhamrai', 'Keraniganj', 'Nawabganj', 'Dohar'],
+    Dhaka: [
+      'Uttara', 'Uttarkhan', 'Dakshinkhan', 'Turag', 'Airport',
+      'Mirpur', 'Pallabi', 'Kafrul', 'Shah Ali', 'Darussalam', 'Rupnagar',
+      'Gulshan', 'Banani', 'Cantonment', 'Badda', 'Vatara', 'Khilkhet',
+      'Dhanmondi', 'Mohammadpur', 'Adabor', 'Kalabagan', 'New Market', 'Sher-e-Bangla Nagar',
+      'Tejgaon', 'Tejgaon Industrial Area', 'Hatirjheel', 'Ramna', 'Shahbagh', 'Paltan', 'Motijheel',
+      'Khilgaon', 'Rampura', 'Sabujbagh', 'Mugda', 'Jatrabari', 'Demra', 'Kadamtali', 'Shyampur',
+      'Lalbagh', 'Kotwali', 'Chawkbazar', 'Bangshal', 'Sutrapur', 'Wari', 'Gandaria', 'Hazaribagh', 'Kamrangirchar',
+      'Savar', 'Dhamrai', 'Keraniganj', 'Nawabganj', 'Dohar',
+      'Dhaka Metropolitan', 'Dhaka Sadar',
+    ],
     Gazipur: ['Gazipur Sadar', 'Kaliakair', 'Kapasia', 'Sreepur', 'Kaliganj', 'Tongi'],
     Narayanganj: ['Narayanganj Sadar', 'Bandar', 'Rupganj', 'Sonargaon', 'Araihazar'],
     Tangail: ['Tangail Sadar', 'Basail', 'Bhuapur', 'Delduar', 'Ghatail', 'Gopalpur', 'Kalihati', 'Madhupur', 'Mirzapur', 'Nagarpur', 'Sakhipur', 'Dhanbari'],
@@ -104,3 +114,168 @@ export const BANGLADESH_DISTRICTS_BY_DIVISION = Object.fromEntries(
 export const MAJOR_THANAS_BY_DISTRICT = Object.fromEntries(
   Object.values(BD_GEO_DATA).flatMap((districts) => Object.entries(districts))
 );
+
+/**
+ * Normalizes Division name to standard Bangladesh division naming convention.
+ */
+export function normalizeDivision(raw = '') {
+  if (!raw || typeof raw !== 'string') return '';
+  const clean = raw.replace(/Division|Bibhag|বিভাগ/gi, '').trim().toLowerCase();
+
+  const aliases = {
+    chittagong: 'Chattogram',
+    chattogram: 'Chattogram',
+    dhaka: 'Dhaka',
+    rajshahi: 'Rajshahi',
+    khulna: 'Khulna',
+    barisal: 'Barishal',
+    barishal: 'Barishal',
+    sylhet: 'Sylhet',
+    rangpur: 'Rangpur',
+    mymensingh: 'Mymensingh',
+  };
+
+  if (aliases[clean]) return aliases[clean];
+  const found = BANGLADESH_DIVISIONS.find((d) => d.toLowerCase() === clean);
+  return found || (clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : '');
+}
+
+/**
+ * Normalizes District name to standard Bangladesh 64 district naming convention.
+ */
+export function normalizeDistrict(raw = '', divisionHint = null) {
+  if (!raw || typeof raw !== 'string') return '';
+  const clean = raw.replace(/District|Zila|Zilla|জেলা/gi, '').trim().toLowerCase();
+
+  const aliases = {
+    bogra: 'Bogura',
+    bogura: 'Bogura',
+    comilla: 'Cumilla',
+    cumilla: 'Cumilla',
+    jessore: 'Jashore',
+    jashore: 'Jashore',
+    barisal: 'Barishal',
+    barishal: 'Barishal',
+    chittagong: 'Chattogram',
+    chattogram: 'Chattogram',
+    coxsbazar: "Cox's Bazar",
+    "cox's bazar": "Cox's Bazar",
+    chapainawabganj: 'Chapai Nawabganj',
+    'chapai nawabganj': 'Chapai Nawabganj',
+    nawabganj: 'Chapai Nawabganj',
+    moulvibazar: 'Moulvibazar',
+    maulvibazar: 'Moulvibazar',
+    moulavibazar: 'Moulvibazar',
+    netrokona: 'Netrokona',
+    netrakona: 'Netrokona',
+  };
+
+  if (aliases[clean]) return aliases[clean];
+
+  const allDistricts = Object.keys(MAJOR_THANAS_BY_DISTRICT);
+  const directMatch = allDistricts.find((dst) => dst.toLowerCase() === clean);
+  if (directMatch) return directMatch;
+
+  if (divisionHint && BD_GEO_DATA[divisionHint]) {
+    const divDistricts = Object.keys(BD_GEO_DATA[divisionHint]);
+    const divMatch = divDistricts.find((dst) => clean.includes(dst.toLowerCase()) || dst.toLowerCase().includes(clean));
+    if (divMatch) return divMatch;
+  }
+
+  const subMatch = allDistricts.find((dst) => clean.includes(dst.toLowerCase()) || dst.toLowerCase().includes(clean));
+  if (subMatch) return subMatch;
+
+  return raw.replace(/District|Zila|Zilla/gi, '').trim();
+}
+
+const SUB_AREA_TO_THANA = {
+  'joar sahara': 'Vatara',
+  'joarsahara': 'Vatara',
+  'baridhara dohs': 'Cantonment',
+  'baridhara': 'Gulshan',
+  'bashundhara': 'Vatara',
+  'mohakhali dohs': 'Cantonment',
+  'banani dohs': 'Cantonment',
+  'mirpur dohs': 'Pallabi',
+  'nikunja': 'Khilkhet',
+  'kuril': 'Vatara',
+  'farmgate': 'Tejgaon',
+  'karwan bazar': 'Tejgaon',
+  'moghbazar': 'Ramna',
+  'malibagh': 'Ramna',
+  'shantinagar': 'Paltan',
+  'kakrail': 'Ramna',
+  'elephant road': 'New Market',
+  'science lab': 'New Market',
+  'aftabnagar': 'Badda',
+  'banasree': 'Rampura',
+  'tongi': 'Gazipur Sadar',
+};
+
+/**
+ * Matches Upazila / Thana from district's known upazilas or candidates.
+ */
+export function findUpazila(district = '', candidates = [], fullAddressText = '') {
+  const normDist = normalizeDistrict(district);
+  const upazilaList = MAJOR_THANAS_BY_DISTRICT[normDist] || [];
+
+  const candidateArray = Array.isArray(candidates) ? candidates : [candidates];
+  const allTextToSearch = [
+    ...candidateArray,
+    fullAddressText,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!allTextToSearch) return '';
+
+  // 1. Sub-area specific dictionary match
+  const lowerSearchText = allTextToSearch.toLowerCase();
+  for (const [subArea, matchedThana] of Object.entries(SUB_AREA_TO_THANA)) {
+    if (lowerSearchText.includes(subArea)) {
+      if (upazilaList.length === 0 || upazilaList.some((u) => u.toLowerCase() === matchedThana.toLowerCase())) {
+        return matchedThana;
+      }
+    }
+  }
+
+  // 2. Exact or word-boundary search in district's known upazilas
+  if (upazilaList.length > 0) {
+    for (const upz of upazilaList) {
+      const pattern = new RegExp(`\\b${upz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (pattern.test(allTextToSearch)) {
+        return upz;
+      }
+    }
+
+    // Secondary check without 'Sadar' (e.g. text has 'Gazipur' and upazila is 'Gazipur Sadar')
+    for (const upz of upazilaList) {
+      const baseName = upz.replace(/\s*Sadar$/i, '').trim();
+      if (baseName.length >= 3) {
+        const pattern = new RegExp(`\\b${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        if (pattern.test(allTextToSearch)) {
+          return upz;
+        }
+      }
+    }
+  }
+
+  // 3. Global search across all upazilas in Bangladesh if not found in district
+  const allUpazilas = Object.values(MAJOR_THANAS_BY_DISTRICT).flat();
+  for (const upz of allUpazilas) {
+    if (upz.length >= 5 && !upz.toLowerCase().includes('sadar')) {
+      const pattern = new RegExp(`\\b${upz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (pattern.test(allTextToSearch)) {
+        return upz;
+      }
+    }
+  }
+
+  // 4. Fallback: Clean up subdistrict / upazila / thana suffixes from the first candidate
+  const firstCandidate = candidateArray.find((c) => c && typeof c === 'string' && c.trim().length > 0);
+  if (firstCandidate) {
+    return firstCandidate.replace(/\s*(Subdistrict|Upazila|Thana|Sadar|Municipality|Paurashava)\s*/gi, '').trim();
+  }
+
+  return '';
+}

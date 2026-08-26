@@ -64,15 +64,15 @@ export default function DateRangePicker({
     const rect = containerRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const requiredHeight = showCustomCalendar ? 340 : 270;
+    const requiredHeight = showCustomCalendar ? 370 : 270;
 
     const shouldOpenUpward = spaceBelow < requiredHeight && spaceAbove > spaceBelow;
     const availableHeight = shouldOpenUpward
       ? Math.max(120, spaceAbove - 16)
       : Math.max(120, spaceBelow - 16);
 
-    const minPopupW = showCustomCalendar ? 290 : 230;
-    const maxScreenW = typeof window !== "undefined" ? window.innerWidth - 16 : 320;
+    const minPopupW = showCustomCalendar ? 320 : 230;
+    const maxScreenW = typeof window !== "undefined" ? window.innerWidth - 16 : 340;
     const calculatedWidth = Math.min(maxScreenW, Math.max(rect.width, minPopupW));
 
     let targetLeft = rect.left;

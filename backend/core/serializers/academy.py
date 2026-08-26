@@ -83,7 +83,7 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
     institution = serializers.PrimaryKeyRelatedField(queryset=AcademicInstitution.objects.all(), required=False, allow_null=True)
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
-    department_name = serializers.CharField(source='department.name', read_only=True, default='')
+    department_name = serializers.SerializerMethodField()
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     teacher = serializers.PrimaryKeyRelatedField(queryset=StaffProfile.objects.all(), required=False, allow_null=True)
     teacher_name = serializers.SerializerMethodField()
@@ -99,14 +99,22 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
             'teacher', 'teacher_name', 'teacher_designation',
             'period_name', 'slot_type', 'period_order',
             'start_time', 'end_time', 'duration_minutes',
+            'effective_from', 'effective_to', 'deleted_at', 'history_log',
             'is_active', 'is_deleted',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at',
+            'id', 'created_at', 'updated_at', 'deleted_at',
             'institution_name', 'branch_name', 'department_name', 'student_class_name',
             'teacher_name', 'teacher_designation'
         ]
+
+    def get_department_name(self, obj):
+        if obj.department:
+            return obj.department.name
+        if obj.student_class and obj.student_class.department:
+            return obj.student_class.department.name
+        return ''
 
     def get_teacher_name(self, obj):
         if obj.teacher:
@@ -116,6 +124,9 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
         return ""
 
     def validate(self, attrs):
+        if attrs.get('student_class') and not attrs.get('department'):
+            if getattr(attrs['student_class'], 'department', None):
+                attrs['department'] = attrs['student_class'].department
         start_time = attrs.get('start_time') or (self.instance.start_time if self.instance else None)
         end_time = attrs.get('end_time') or (self.instance.end_time if self.instance else None)
         if start_time and end_time:

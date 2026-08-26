@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
+import { useTenant } from '../../context/TenantContext';
 import {
   TimerIcon,
   SleekCheckIcon,
@@ -11,13 +12,7 @@ import { ClassSelect, TeacherSelect } from '../../components/selectors';
 import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { createPeriodSlot, updatePeriodSlot } from '../../api/academy';
 import { DrawerContainer, DrawerFooter } from '../../components/layout';
-
-const SLOT_TYPES = [
-  { label: 'Academic Teaching Period', value: 'TEACHING_PERIOD' },
-  { label: 'Break / Tiffin Interval', value: 'BREAK_TIFFIN' },
-  { label: 'Salah / Prayer Break', value: 'PRAYER_BREAK' },
-  { label: 'Mutala / Self Study Session', value: 'MUTALA_SESSION' },
-];
+import { periodCategoriesStore, academicYearsStore } from '../../utils/localStore';
 
 export default function PeriodForm({
   editingSlot = null,
@@ -28,7 +23,34 @@ export default function PeriodForm({
   onCancel,
 }) {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
   const isEdit = Boolean(editingSlot?.id);
+  const sessionMinDate = useMemo(() => {
+    const bounds = academicYearsStore.getDateBounds(activeTenantId);
+    return bounds.minDate || '';
+  }, [activeTenantId]);
+
+  const [periodCategories, setPeriodCategories] = useState(() =>
+    periodCategoriesStore.getCategories(activeTenantId)
+  );
+
+  useEffect(() => {
+    const handleCategoriesUpdated = () => {
+      setPeriodCategories(periodCategoriesStore.getCategories(activeTenantId));
+    };
+    window.addEventListener('spr_period_categories_updated', handleCategoriesUpdated);
+    return () => {
+      window.removeEventListener('spr_period_categories_updated', handleCategoriesUpdated);
+    };
+  }, [activeTenantId]);
+
+  const slotTypeOptions = useMemo(() => {
+    return (periodCategories || []).map((c) => ({
+      label: c.name || c.badge,
+      value: c.code || c.id,
+      description: c.description,
+    }));
+  }, [periodCategories]);
 
   const [formData, setFormData] = useState({
     period_name: '',
@@ -39,6 +61,7 @@ export default function PeriodForm({
     department: defaultDepartmentId || '',
     student_class: defaultClassId || '',
     teacher: '',
+    effective_from: sessionMinDate,
   });
 
   const [durationMinutes, setDurationMinutes] = useState(45);
@@ -107,6 +130,7 @@ export default function PeriodForm({
         department: editingSlot.department || '',
         student_class: editingSlot.student_class || '',
         teacher: editingSlot.teacher || '',
+        effective_from: editingSlot.effective_from || sessionMinDate,
       });
     } else {
       setFormData({
@@ -118,9 +142,10 @@ export default function PeriodForm({
         department: defaultDepartmentId || '',
         student_class: defaultClassId || '',
         teacher: '',
+        effective_from: sessionMinDate,
       });
     }
-  }, [loadLookups, editingSlot, defaultDepartmentId, defaultClassId, nextOrder]);
+  }, [loadLookups, editingSlot, defaultDepartmentId, defaultClassId, nextOrder, sessionMinDate]);
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -134,13 +159,17 @@ export default function PeriodForm({
     }
 
     setSubmitting(true);
+    const selectedClassObj = classes.find((c) => String(c.id) === String(formData.student_class));
+    const finalDepartment = formData.department || (selectedClassObj?.department ? String(selectedClassObj.department) : null);
+
     const payload = {
       period_name: formData.period_name.trim(),
       slot_type: formData.slot_type,
       period_order: parseInt(formData.period_order, 10) || 1,
       start_time: formData.start_time,
       end_time: formData.end_time,
-      department: formData.department || null,
+      effective_from: formData.effective_from || sessionMinDate,
+      department: finalDepartment,
       student_class: formData.student_class || null,
       branch: null,
       teacher: formData.teacher || null,
@@ -227,7 +256,7 @@ export default function PeriodForm({
           <div>
             <CustomSelect
               label="Period Category"
-              options={SLOT_TYPES}
+              options={slotTypeOptions}
               value={formData.slot_type}
               onChange={(val) =>
                 setFormData({ ...formData, slot_type: val })
@@ -335,6 +364,19 @@ export default function PeriodForm({
               disabled={loadingLookups}
             />
           </div>
+        </div>
+
+        {/* Effective From Date (Temporal Validity Start) */}
+        <div>
+          <CustomInput
+            type="date"
+            label="Effective From Date"
+            value={formData.effective_from}
+            onChange={(val) =>
+              setFormData({ ...formData, effective_from: val })
+            }
+            helperText="Date from which this period schedule is active in the academic routine"
+          />
         </div>
 
         {/* Action Buttons */}

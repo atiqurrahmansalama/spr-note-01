@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   TimerIcon,
   PlusIcon,
-  SearchIcon,
   EditIcon,
   TrashIcon,
   ClassIcon,
@@ -19,6 +18,7 @@ import DataTable from '../../components/ui/DataTable';
 import DataCardGrid from '../../components/ui/DataCardGrid';
 import ActionMenu from '../../components/ui/ActionMenu';
 import DataViewFooter from '../../components/ui/DataViewFooter';
+import DeleteImpactModal from '../../components/common/DeleteImpactModal';
 import PeriodForm from './PeriodForm';
 import { CurriculumTrackerView, SyllabusDrawerForm } from './curriculum';
 import {
@@ -31,21 +31,7 @@ import { fetchWithAuth } from '../../utils/authService';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
-
-const SLOT_TYPE_CONFIG = {
-  TEACHING_PERIOD: {
-    label: 'Teaching Period',
-  },
-  BREAK_TIFFIN: {
-    label: 'Break / Tiffin',
-  },
-  PRAYER_BREAK: {
-    label: 'Prayer Break',
-  },
-  MUTALA_SESSION: {
-    label: 'Mutala Session',
-  },
-};
+import { periodCategoriesStore } from '../../utils/localStore';
 
 const TABS = [
   { id: 'periods', label: 'Daily Period Slots', icon: TimerIcon },
@@ -62,11 +48,31 @@ export default function ClassPeriodScheduleView({
 
   const [activeTab, setActiveTab] = useState('periods');
   const [periodSlots, setPeriodSlots] = useState([]);
+  const [periodCategories, setPeriodCategories] = useState(() =>
+    periodCategoriesStore.getCategories(activeTenantId)
+  );
+
+  useEffect(() => {
+    const handleCategoriesUpdated = () => {
+      setPeriodCategories(periodCategoriesStore.getCategories(activeTenantId));
+    };
+    window.addEventListener('spr_period_categories_updated', handleCategoriesUpdated);
+    return () => {
+      window.removeEventListener('spr_period_categories_updated', handleCategoriesUpdated);
+    };
+  }, [activeTenantId]);
+
+  const getCategoryLabel = React.useCallback((typeCode) => {
+    const found = periodCategories.find((c) => c.code === typeCode || c.id === typeCode);
+    return found ? (found.badge || found.name) : (typeCode ? typeCode.replace(/_/g, ' ') : 'Teaching Period');
+  }, [periodCategories]);
   const [departments, setDepartments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [deletingSlot, setDeletingSlot] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // View Mode: 'grid' (Cards) or 'table' (Data Table)
   const [viewMode, setViewMode] = useState(() => {
@@ -100,7 +106,6 @@ export default function ClassPeriodScheduleView({
   }, []);
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
   const [teacherFilter, setTeacherFilter] = useState('ALL');
@@ -235,16 +240,22 @@ export default function ClassPeriodScheduleView({
     openDrawer('period-slot', { mode: 'edit', id: slot.id });
   };
 
-  const handleDelete = async (slot) => {
-    if (!window.confirm(`Are you sure you want to delete "${slot.period_name}"?`)) {
-      return;
-    }
+  const handleDelete = (slot) => {
+    setDeletingSlot(slot);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingSlot) return;
+    setIsDeleting(true);
     try {
-      await deletePeriodSlot(slot.id);
-      showToast(`Period slot "${slot.period_name}" deleted.`, 'success');
+      await deletePeriodSlot(deletingSlot.id);
+      showToast(`Period slot "${deletingSlot.period_name}" deleted.`, 'success');
+      setDeletingSlot(null);
       loadSlots();
     } catch (err) {
       showToast(err.message || 'Failed to delete period slot.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -280,7 +291,6 @@ export default function ClassPeriodScheduleView({
   };
 
   const hasActiveFilters = Boolean(
-    searchQuery.trim() ||
     deptFilter !== 'ALL' ||
     classFilter !== 'ALL' ||
     teacherFilter !== 'ALL' ||
@@ -288,51 +298,87 @@ export default function ClassPeriodScheduleView({
   );
 
   const handleResetFilters = () => {
-    setSearchQuery('');
     setDeptFilter('ALL');
     setClassFilter('ALL');
     setTeacherFilter('ALL');
     setSlotTypeFilter('ALL');
   };
 
-  const filteredSlots = periodSlots.filter((s) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (s.period_name && s.period_name.toLowerCase().includes(q)) ||
-      (s.teacher_name && s.teacher_name.toLowerCase().includes(q)) ||
-      (s.teacher_designation && s.teacher_designation.toLowerCase().includes(q)) ||
-      (s.department_name && s.department_name.toLowerCase().includes(q)) ||
-      (s.student_class_name && s.student_class_name.toLowerCase().includes(q)) ||
-      (s.branch_name && s.branch_name.toLowerCase().includes(q))
-    );
-  });
+  const handleDepartmentChange = (val) => {
+    setDeptFilter(val);
+    if (val && val !== 'ALL' && classFilter !== 'ALL') {
+      const selectedClass = classes.find((c) => String(c.id) === String(classFilter));
+      if (selectedClass && String(selectedClass.department) !== String(val)) {
+        setClassFilter('ALL');
+      }
+    }
+  };
+
+  const filteredClassesForFilter = React.useMemo(() => {
+    if (!deptFilter || deptFilter === 'ALL') return classes;
+    return classes.filter((c) => String(c.department) === String(deptFilter));
+  }, [classes, deptFilter]);
+
+  const filteredSlots = React.useMemo(() => {
+    return periodSlots.filter((s) => {
+      if (deptFilter && deptFilter !== 'ALL') {
+        const slotDeptId = s.department || s.department_id;
+        const selectedDept = departments.find((d) => String(d.id) === String(deptFilter));
+        const matchesId = slotDeptId && String(slotDeptId) === String(deptFilter);
+        const matchesName = selectedDept && s.department_name && s.department_name.toLowerCase().trim() === selectedDept.name.toLowerCase().trim();
+        const classObj = classes.find((c) => String(c.id) === String(s.student_class || s.student_class_id));
+        const matchesClassDept = classObj && String(classObj.department) === String(deptFilter);
+
+        if (!matchesId && !matchesName && !matchesClassDept) {
+          return false;
+        }
+      }
+      if (classFilter && classFilter !== 'ALL') {
+        const slotClassId = s.student_class || s.student_class_id;
+        if (!slotClassId || String(slotClassId) !== String(classFilter)) {
+          return false;
+        }
+      }
+      if (teacherFilter && teacherFilter !== 'ALL') {
+        const slotTeacherId = s.teacher || s.teacher_id;
+        if (!slotTeacherId || String(slotTeacherId) !== String(teacherFilter)) {
+          return false;
+        }
+      }
+      if (slotTypeFilter && slotTypeFilter !== 'ALL') {
+        if (s.slot_type !== slotTypeFilter) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [periodSlots, deptFilter, classFilter, teacherFilter, slotTypeFilter, departments, classes]);
 
   const deptOptions = [
     { label: 'All Departments', value: 'ALL' },
-    ...departments.map((d) => ({ label: d.name, value: d.id })),
+    ...departments.map((d) => ({ label: d.name, value: String(d.id) })),
   ];
 
   const classOptions = [
     { label: 'All Classes', value: 'ALL' },
-    ...classes.map((c) => ({ label: c.name, value: c.id })),
+    ...classes.map((c) => ({ label: c.name, value: String(c.id) })),
   ];
 
   const teacherOptions = [
     { label: 'All Teachers', value: 'ALL' },
     ...teachers.map((t) => ({
       label: `${t.user_name || t.employee_id || 'Teacher'} (${t.designation || 'Faculty'})`,
-      value: t.id,
+      value: String(t.id),
     })),
   ];
 
-  const slotTypeOptions = [
+  const slotTypeOptions = React.useMemo(() => [
     { label: 'All Slot Types', value: 'ALL' },
-    { label: 'Teaching Periods', value: 'TEACHING_PERIOD' },
-    { label: 'Tiffin Breaks', value: 'BREAK_TIFFIN' },
-    { label: 'Prayer Breaks', value: 'PRAYER_BREAK' },
-    { label: 'Mutala Sessions', value: 'MUTALA_SESSION' },
-  ];
+    ...periodCategories.map((c) => ({
+      label: c.name || c.badge,
+      value: c.code || c.id,
+    })),
+  ], [periodCategories]);
 
   // Reusable 3-Dots Action Items Menu for Period Slots
   const getActionMenuItems = (slot) => [
@@ -354,7 +400,8 @@ export default function ClassPeriodScheduleView({
 
   // Reusable Card Renderer for Mobile / Grid View Mode
   const renderPeriodCard = (slot, index) => {
-    const conf = SLOT_TYPE_CONFIG[slot.slot_type] || SLOT_TYPE_CONFIG.TEACHING_PERIOD;
+    const categoryLabel = getCategoryLabel(slot.slot_type);
+    const isAttendanceTracked = periodCategoriesStore.isAttendanceTrackedForSlot(activeTenantId, slot);
 
     return (
       <div
@@ -395,8 +442,13 @@ export default function ClassPeriodScheduleView({
               </div>
 
               <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-xs truncate">
-                {conf.label}
+                {categoryLabel}
               </span>
+              {!isAttendanceTracked && (
+                <span className="px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider theme-bg-sub theme-text-secondary border theme-border opacity-85 shrink-0">
+                  No Attendance
+                </span>
+              )}
             </div>
 
             <div className="shrink-0">
@@ -446,23 +498,26 @@ export default function ClassPeriodScheduleView({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              {slot.department_name && (
-                <span className="px-2.5 py-1 rounded-lg theme-bg-sub border theme-border theme-text-secondary flex items-center gap-1">
-                  <span className="opacity-70">Dept:</span>
-                  <span className="font-medium theme-text-primary">{slot.department_name}</span>
-                </span>
-              )}
-              {slot.student_class_name && (
-                <span className="px-2.5 py-1 rounded-lg theme-bg-sub border theme-border theme-text-secondary flex items-center gap-1">
-                  <span className="opacity-70">Class:</span>
-                  <span className="font-medium theme-text-primary">{slot.student_class_name}</span>
-                </span>
-              )}
-              {!slot.department_name && !slot.student_class_name && (
-                <span className="px-2.5 py-1 rounded-lg theme-bg-sub border theme-border text-[11px] theme-text-secondary opacity-75 italic">
+            <div className="text-xs space-y-0.5">
+              {slot.student_class_name ? (
+                <div className="font-semibold theme-text-primary">
+                  <span className="text-[11px] font-normal theme-text-secondary">Class: </span>
+                  <span>{slot.student_class_name}</span>
+                  {slot.department_name && (
+                    <span className="text-[11px] font-normal theme-text-secondary ml-1.5 opacity-80">
+                      • {slot.department_name}
+                    </span>
+                  )}
+                </div>
+              ) : slot.department_name ? (
+                <div className="text-xs font-semibold theme-text-primary">
+                  <span className="text-[11px] font-normal theme-text-secondary">Dept: </span>
+                  <span>{slot.department_name}</span>
+                </div>
+              ) : (
+                <div className="text-[11px] theme-text-secondary opacity-60 italic">
                   Institution-Wide Routine
-                </span>
+                </div>
               )}
             </div>
           </div>
@@ -474,54 +529,26 @@ export default function ClassPeriodScheduleView({
   // Reusable Table Columns Definition
   const tableColumns = [
     {
-      header: 'Order',
-      key: 'period_order',
-      align: 'center',
-      headerClassName: 'w-20',
-      render: (slot, index) => (
-        <div className="flex items-center justify-center gap-1.5" data-no-row-click="true">
-          <div className="flex flex-col items-center gap-0.5">
-            <button
-              onClick={() => handleMoveOrder(index, -1)}
-              disabled={index === 0}
-              className="p-0.5 theme-text-secondary hover:theme-accent hover:theme-bg-sub rounded transition-all disabled:opacity-15 disabled:hover:bg-transparent cursor-pointer"
-              title="Move Up"
-            >
-              <svg className="w-3 h-3 rotate-180" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-            <button
-              onClick={() => handleMoveOrder(index, 1)}
-              disabled={index === filteredSlots.length - 1}
-              className="p-0.5 theme-text-secondary hover:theme-accent hover:theme-bg-sub rounded transition-all disabled:opacity-15 disabled:hover:bg-transparent cursor-pointer"
-              title="Move Down"
-            >
-              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <span className="font-mono font-bold text-xs theme-text-secondary">
-            #{slot.period_order || index + 1}
-          </span>
-        </div>
-      ),
-    },
-    {
       header: 'Period Name & Category',
       key: 'period_name',
       render: (slot) => {
-        const conf = SLOT_TYPE_CONFIG[slot.slot_type] || SLOT_TYPE_CONFIG.TEACHING_PERIOD;
+        const categoryLabel = getCategoryLabel(slot.slot_type);
+        const isAttendanceTracked = periodCategoriesStore.isAttendanceTrackedForSlot(activeTenantId, slot);
+
         return (
           <div className="space-y-1">
             <div className="font-bold theme-text-primary text-xs sm:text-sm">
               {slot.period_name}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-xs">
-                {conf.label}
+                {categoryLabel}
               </span>
+              {!isAttendanceTracked && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider theme-bg-sub theme-text-secondary border theme-border opacity-85">
+                  No Attendance
+                </span>
+              )}
             </div>
           </div>
         );
@@ -568,19 +595,21 @@ export default function ClassPeriodScheduleView({
     {
       header: 'Target Class / Dept',
       render: (slot) => (
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-          {slot.department_name && (
-            <span className="px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
-              Dept: {slot.department_name}
-            </span>
-          )}
+        <div className="space-y-0.5 text-xs">
           {slot.student_class_name && (
-            <span className="px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
-              Class: {slot.student_class_name}
-            </span>
+            <div className="font-semibold theme-text-primary">
+              {slot.student_class_name}
+            </div>
+          )}
+          {slot.department_name && (
+            <div className="text-[11px] theme-text-secondary">
+              {slot.department_name}
+            </div>
           )}
           {!slot.department_name && !slot.student_class_name && (
-            <span className="theme-text-secondary opacity-70 italic">Institution-Wide</span>
+            <div className="text-[11px] theme-text-secondary opacity-60 italic">
+              Institution-Wide
+            </div>
           )}
         </div>
       ),
@@ -637,44 +666,24 @@ export default function ClassPeriodScheduleView({
       {activeTab === 'periods' && (
         <div className="space-y-4 animate-fade-in">
           {/* Responsive Filters & ViewMode Toolbar */}
-          <div className="theme-bg-surface border theme-border p-3 sm:p-4 rounded-2xl shadow-xs space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-2.5 items-center">
-              {/* Search (Full width on small phones, 2 col on tablet, 1 col on desktop) */}
-              <div className="col-span-1 sm:col-span-2 lg:col-span-1 relative w-full">
-                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 theme-text-secondary opacity-60 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search period slots..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-10 theme-bg-sub border theme-border pl-10 pr-8 py-2 rounded-xl text-xs theme-text-primary placeholder-[var(--text-secondary)]/50 focus:outline-none focus:border-[var(--accent-main)]/60 transition-all font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
-                    title="Clear search"
-                  >
-                    <CloseIcon className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
+          <div className="theme-bg-surface border theme-border p-3.5 sm:p-4 rounded-2xl shadow-xs space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               {/* Department Filter */}
-              <div className="col-span-1 w-full">
+              <div className="w-full">
                 <CustomSelect
+                  label="Department"
                   options={deptOptions}
                   value={deptFilter}
-                  onChange={(val) => setDeptFilter(val)}
+                  onChange={handleDepartmentChange}
                   placeholder="All Departments"
                 />
               </div>
 
               {/* Class Filter */}
-              <div className="col-span-1 w-full">
+              <div className="w-full">
                 <ClassSelect
-                  classes={classes}
+                  label="Target Class"
+                  classes={filteredClassesForFilter}
                   value={classFilter === 'ALL' ? '' : classFilter}
                   onChange={(val) => setClassFilter(val || 'ALL')}
                   allowAll={true}
@@ -683,8 +692,9 @@ export default function ClassPeriodScheduleView({
               </div>
 
               {/* Teacher Filter */}
-              <div className="col-span-1 w-full">
+              <div className="w-full">
                 <TeacherSelect
+                  label="Assigned Teacher"
                   teachers={teachers}
                   value={teacherFilter === 'ALL' ? '' : teacherFilter}
                   onChange={(val) => setTeacherFilter(val || 'ALL')}
@@ -695,8 +705,9 @@ export default function ClassPeriodScheduleView({
               </div>
 
               {/* Slot Type Filter */}
-              <div className="col-span-1 w-full">
+              <div className="w-full">
                 <CustomSelect
+                  label="Slot Type"
                   options={slotTypeOptions}
                   value={slotTypeFilter}
                   onChange={(val) => setSlotTypeFilter(val)}
@@ -706,7 +717,7 @@ export default function ClassPeriodScheduleView({
             </div>
 
             {/* Active Filter Summary Bar & View Mode Switcher */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t theme-border text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t theme-border text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 {hasActiveFilters ? (
                   <>
@@ -719,10 +730,10 @@ export default function ClassPeriodScheduleView({
                     <button
                       type="button"
                       onClick={handleResetFilters}
-                      className="px-2 py-0.5 rounded-lg text-[11px] font-bold theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition cursor-pointer flex items-center gap-1 shadow-xs ml-1"
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition cursor-pointer flex items-center gap-1 shadow-xs ml-1"
                     >
                       <CloseIcon className="w-3 h-3" />
-                      <span>Reset</span>
+                      <span>Reset Filters</span>
                     </button>
                   </>
                 ) : (
@@ -737,7 +748,7 @@ export default function ClassPeriodScheduleView({
                 <button
                   type="button"
                   onClick={() => handleToggleViewMode('grid')}
-                  className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
+                  className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
                     viewMode === 'grid'
                       ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
                       : 'theme-text-secondary hover:theme-text-primary font-medium'
@@ -748,7 +759,7 @@ export default function ClassPeriodScheduleView({
                 <button
                   type="button"
                   onClick={() => handleToggleViewMode('table')}
-                  className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
+                  className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs transition-colors duration-150 cursor-pointer outline-none focus:outline-none border-0 text-center ${
                     viewMode === 'table'
                       ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
                       : 'theme-text-secondary hover:theme-text-primary font-medium'
@@ -829,6 +840,22 @@ export default function ClassPeriodScheduleView({
           />
         </div>
       )}
+
+      {/* Reusable Delete Impact Confirmation Modal */}
+      <DeleteImpactModal
+        isOpen={Boolean(deletingSlot)}
+        onClose={() => !isDeleting && setDeletingSlot(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Period Slot"
+        subtitle={`You are about to delete routine period "${deletingSlot?.period_name}".`}
+        entityName={deletingSlot?.period_name || ''}
+        entityType="Period Slot"
+        requireAck={false}
+        requireNameMatch={false}
+        isDeleting={isDeleting}
+        confirmButtonText="Delete Slot"
+        warningMessage="Deleting this period slot will permanently remove it from institutional routines, teacher timetables, and period schedules."
+      />
     </PageContainer>
   );
 }

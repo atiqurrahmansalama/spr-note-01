@@ -73,27 +73,14 @@ export function loadGoogleMaps() {
   return loadPromise;
 }
 
-/**
- * Standard Bangladesh Divisions lookup and normalizer
- */
-const BD_DIVISIONS = [
-  'Dhaka',
-  'Chattogram',
-  'Chittagong',
-  'Rajshahi',
-  'Khulna',
-  'Barishal',
-  'Barisal',
-  'Sylhet',
-  'Rangpur',
-  'Mymensingh',
-];
+import {
+  normalizeDivision,
+  normalizeDistrict,
+  findUpazila,
+} from '../utils/bangladeshGeoData';
 
 export function cleanDivisionName(rawDivision = '') {
-  if (!rawDivision) return '';
-  let cleaned = rawDivision.replace(/Division/gi, '').trim();
-  const match = BD_DIVISIONS.find((d) => d.toLowerCase() === cleaned.toLowerCase());
-  return match || cleaned;
+  return normalizeDivision(rawDivision);
 }
 
 /**
@@ -106,28 +93,33 @@ export function parseGooglePlaceComponents(place) {
   let streetNumber = '';
   let route = '';
   let sublocality = '';
-  let upazila = '';
-  let district = '';
-  let division = '';
+  let locality = '';
+  let adminArea3 = '';
+  let rawDistrict = '';
+  let rawDivision = '';
   let postalCode = '';
   let country = 'Bangladesh';
+  const allCandidateNames = [];
 
   for (const c of components) {
     const types = c.types || [];
+    if (c.long_name) {
+      allCandidateNames.push(c.long_name);
+    }
     if (types.includes('street_number')) {
       streetNumber = c.long_name;
     } else if (types.includes('route')) {
       route = c.long_name;
     } else if (types.includes('sublocality_level_1') || types.includes('sublocality') || types.includes('neighborhood')) {
       sublocality = c.long_name;
-    } else if (types.includes('administrative_area_level_3') || types.includes('locality')) {
-      upazila = c.long_name;
+    } else if (types.includes('locality')) {
+      locality = c.long_name;
+    } else if (types.includes('administrative_area_level_3')) {
+      adminArea3 = c.long_name;
     } else if (types.includes('administrative_area_level_2')) {
-      // In Bangladesh, administrative_area_level_2 is the District (Zilla)
-      district = c.long_name.replace(/District|Zila/gi, '').trim();
+      rawDistrict = c.long_name;
     } else if (types.includes('administrative_area_level_1')) {
-      // In Bangladesh, administrative_area_level_1 is the Division (Bibhag)
-      division = cleanDivisionName(c.long_name);
+      rawDivision = c.long_name;
     } else if (types.includes('postal_code')) {
       postalCode = c.long_name;
     } else if (types.includes('country')) {
@@ -135,10 +127,17 @@ export function parseGooglePlaceComponents(place) {
     }
   }
 
-  // Fallback: If district was not detected in level 2, try level 3 or sublocality
-  if (!district && upazila) {
-    district = upazila;
-  }
+  // Normalize division & district using Bangladesh Geo Dataset
+  const division = normalizeDivision(rawDivision);
+  const district = normalizeDistrict(rawDistrict || adminArea3 || locality || '', division);
+
+  // Match Upazila / Thana
+  const upazilaCandidates = [adminArea3, sublocality, locality, ...allCandidateNames].filter(Boolean);
+  const upazila = findUpazila(district, upazilaCandidates, place.formatted_address || '')
+    || adminArea3
+    || sublocality
+    || locality
+    || '';
 
   // Build clean street address
   let streetAddress = place.formatted_address || '';
@@ -163,7 +162,7 @@ export function parseGooglePlaceComponents(place) {
     street_address: streetAddress || '',
     district: district || '',
     division: division || '',
-    upazila_thana: upazila || sublocality || '',
+    upazila_thana: upazila || '',
     postal_code: postalCode || '',
     post_code: postalCode || '',
     country: country || 'Bangladesh',
@@ -190,11 +189,36 @@ export async function reverseGeocodeOSM(latitude, longitude) {
     const data = await res.json();
     const addr = data.address || {};
 
-    const division = cleanDivisionName(addr.state || addr.province || addr.region || '');
-    const district = (addr.state_district || addr.county || addr.city || '').replace(/District|Zila/gi, '').trim();
-    const upazila = addr.suburb || addr.town || addr.municipality || addr.village || addr.neighbourhood || '';
+    const rawDivision = addr.state || addr.province || addr.region || '';
+    const rawDistrict = addr.state_district || addr.district || addr.county || addr.city || '';
+
+    const division = normalizeDivision(rawDivision);
+    const district = normalizeDistrict(rawDistrict, division);
+
+    // Candidates for Upazila/Thana in Nominatim
+    const upazilaCandidates = [
+      addr.subdistrict,
+      addr.county,
+      addr.city_district,
+      addr.borough,
+      addr.municipality,
+      addr.town,
+      addr.suburb,
+      addr.village,
+      addr.neighbourhood,
+    ].filter(Boolean);
+
+    const upazila = findUpazila(district, upazilaCandidates, data.display_name || '');
+
     const postalCode = addr.postcode || '';
-    const streetAddress = [addr.road, addr.house_number, upazila].filter(Boolean).join(', ') || data.display_name || '';
+    const streetAddress = [
+      addr.building,
+      addr.house_number,
+      addr.road,
+      addr.suburb || addr.neighbourhood || addr.village,
+    ]
+      .filter(Boolean)
+      .join(', ') || data.display_name || '';
 
     return {
       address: data.display_name || streetAddress || '',

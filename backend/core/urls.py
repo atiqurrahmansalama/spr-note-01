@@ -83,6 +83,9 @@ from .views import (
     PublicInviteVerificationView,
     PublicInviteClaimView,
     StaffProfileViewSet,
+    SystemHealthDiagnosticsView,
+    EnterpriseComplianceDataExportView,
+    EnterpriseCompliancePurgeView,
     TeacherAssignmentViewSet,
     GeneralStaffDutyViewSet,
     StaffAttendanceViewSet,
@@ -195,8 +198,18 @@ urlpatterns = [
     path('api/v1/control-panel/evaluated-config/', EvaluatedConfigView.as_view(), name='control_panel_evaluated_config'),
     path('api/v1/control-panel/rules/', ControlPanelRulesView.as_view(), name='control_panel_rules'),
     path('api/v1/control-panel/rules/batch-update/', ControlPanelBatchUpdateView.as_view(), name='control_panel_batch_update'),
-    path('api/v1/control-panel/rules/reset/', ControlPanelResetRulesView.as_view(), name='control_panel_reset'),
     path('api/v1/control-panel/audit-logs/', ControlPanelAuditLogView.as_view(), name='control_panel_audit_logs'),
+
+    # Enterprise APM System Diagnostics & Observability
+    path('api/system/health/', SystemHealthDiagnosticsView.as_view(), name='system_health_diagnostics'),
+    path('api/v1/system/health/', SystemHealthDiagnosticsView.as_view(), name='system_health_diagnostics_v1'),
+
+    # Enterprise GDPR/SOC2 Self-Service Compliance & Data Export
+    path('api/compliance/export/', EnterpriseComplianceDataExportView.as_view(), name='compliance_export'),
+    path('api/v1/compliance/export/', EnterpriseComplianceDataExportView.as_view(), name='compliance_export_v1'),
+    path('api/compliance/purge/', EnterpriseCompliancePurgeView.as_view(), name='compliance_purge'),
+    path('api/v1/compliance/purge/', EnterpriseCompliancePurgeView.as_view(), name='compliance_purge_v1'),
+
 
     # Dynamic Role Management Endpoints
     path('api/v1/admin/roles/', UserRoleListCreateView.as_view(), name='admin_role_list_create'),

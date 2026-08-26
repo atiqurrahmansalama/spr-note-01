@@ -24,6 +24,7 @@ export default function CheckpointForm({
   const [formData, setFormData] = useState({
     name: editingCheckpoint ? editingCheckpoint.name : '',
     time: editingCheckpoint ? editingCheckpoint.time || '22:00' : '22:00',
+    effective_from: editingCheckpoint ? (editingCheckpoint.effective_from || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = (e) => {
@@ -33,16 +34,50 @@ export default function CheckpointForm({
       return;
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    let history = editingCheckpoint?.history_log ? [...editingCheckpoint.history_log] : [];
+
+    if (editingCheckpoint) {
+      const diffs = [];
+      if (editingCheckpoint.name !== formData.name.trim()) {
+        diffs.push(`Name changed: "${editingCheckpoint.name}" -> "${formData.name.trim()}"`);
+      }
+      if (editingCheckpoint.time !== formData.time) {
+        diffs.push(`Time adjusted: ${editingCheckpoint.time} -> ${formData.time}`);
+      }
+      if (diffs.length > 0) {
+        history.push({
+          timestamp: new Date().toISOString(),
+          action: 'MODIFIED',
+          effective_date: formData.effective_from || todayStr,
+          details: diffs.join('; '),
+          diffs,
+        });
+      }
+    } else {
+      history = [{
+        timestamp: new Date().toISOString(),
+        action: 'CREATED',
+        effective_date: formData.effective_from || todayStr,
+        details: `Residential checkpoint "${formData.name.trim()}" created at ${formData.time}.`,
+      }];
+    }
+
     const checkpointData = editingCheckpoint
       ? {
           ...editingCheckpoint,
           name: formData.name.trim(),
           time: formData.time,
+          effective_from: formData.effective_from || todayStr,
+          history_log: history,
         }
       : {
           id: `chk_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
           name: formData.name.trim(),
           time: formData.time,
+          effective_from: formData.effective_from || todayStr,
+          is_active: true,
+          history_log: history,
         };
 
     onSaved?.(checkpointData);
@@ -91,6 +126,17 @@ export default function CheckpointForm({
           required
           value={formData.time}
           onChange={(val) => setFormData((prev) => ({ ...prev, time: val }))}
+        />
+      </div>
+
+      {/* Effective From Date */}
+      <div>
+        <CustomInput
+          type="date"
+          label="Effective From Date"
+          value={formData.effective_from}
+          onChange={(val) => setFormData((prev) => ({ ...prev, effective_from: val }))}
+          helperText="Date from which this checkpoint is active in the hostel routine"
         />
       </div>
 

@@ -10,6 +10,9 @@ import {
   BANGLADESH_DIVISIONS,
   BD_GEO_DATA,
   MAJOR_THANAS_BY_DISTRICT,
+  normalizeDivision,
+  normalizeDistrict,
+  findUpazila,
 } from '../../utils/bangladeshGeoData';
 
 /**
@@ -43,26 +46,41 @@ export default function AddressPickerInput({
   const longitude = value.longitude != null ? Number(value.longitude) : null;
 
   // 1. Division Dropdown Options
-  const divisionOptions = useMemo(() => 
-    BANGLADESH_DIVISIONS.map((d) => ({ label: d, value: d })),
-  []);
+  const divisionOptions = useMemo(() => {
+    let list = [...BANGLADESH_DIVISIONS];
+    if (division && !list.includes(division)) {
+      list.unshift(division);
+    }
+    return list.map((d) => ({ label: d, value: d }));
+  }, [division]);
 
   // 2. District Dropdown Options (Cascaded by Division)
   const districtOptions = useMemo(() => {
-    if (!division || !BD_GEO_DATA[division]) {
-      return [];
+    let districts = [];
+    if (division && BD_GEO_DATA[division]) {
+      districts = Object.keys(BD_GEO_DATA[division]);
+    } else {
+      districts = Object.keys(MAJOR_THANAS_BY_DISTRICT);
     }
-    const districts = Object.keys(BD_GEO_DATA[division]);
+    if (district && !districts.includes(district)) {
+      districts = [district, ...districts];
+    }
     return districts.map((dst) => ({ label: dst, value: dst }));
-  }, [division]);
+  }, [division, district]);
 
   // 3. Upazila / Thana Options (Cascaded by District)
   const upazilaOptions = useMemo(() => {
     let list = [];
     if (division && district && BD_GEO_DATA[division]?.[district]) {
-      list = BD_GEO_DATA[division][district];
+      list = [...BD_GEO_DATA[division][district]];
     } else if (district && MAJOR_THANAS_BY_DISTRICT[district]) {
-      list = MAJOR_THANAS_BY_DISTRICT[district];
+      list = [...MAJOR_THANAS_BY_DISTRICT[district]];
+    }
+
+    // Crucial: if upazila is set to a custom or mapped value (e.g. from Google Maps or OSM),
+    // ensure it's always included in upazilaOptions so CustomSelect can display it!
+    if (upazila && !list.some((u) => u.toLowerCase() === upazila.toLowerCase())) {
+      list.unshift(upazila);
     }
 
     if (!list || list.length === 0) {
@@ -70,7 +88,7 @@ export default function AddressPickerInput({
     }
 
     return list.map((u) => ({ label: u, value: u }));
-  }, [division, district]);
+  }, [division, district, upazila]);
 
   // Update a single field
   const updateField = (key, val) => {
@@ -119,17 +137,30 @@ export default function AddressPickerInput({
 
   // When user picks and confirms on the interactive Google Map Modal
   const handleMapConfirm = (mapData) => {
+    const rawDiv = mapData.division || division;
+    const rawDist = mapData.district || district;
+    const rawUpz = mapData.upazila_thana || mapData.upazila || upazila;
+
+    const normDiv = normalizeDivision(rawDiv) || rawDiv;
+    const normDist = normalizeDistrict(rawDist, normDiv) || rawDist;
+    const normUpz = findUpazila(normDist, [rawUpz], mapData.address || mapData.street_address) || rawUpz;
+
+    const postCodeVal = mapData.postal_code || mapData.post_code || postCode;
+    const streetVal = mapData.street_address || mapData.address || streetAddress;
+
     const updated = {
       ...value,
-      division: mapData.division || division,
-      district: mapData.district || district,
-      upazila: mapData.upazila_thana || mapData.upazila || upazila,
-      upazila_thana: mapData.upazila_thana || mapData.upazila || upazila,
-      thana_or_upazila: mapData.upazila_thana || mapData.upazila || upazila,
-      post_code: mapData.postal_code || mapData.post_code || postCode,
-      postal_code: mapData.postal_code || mapData.post_code || postCode,
-      street_address: mapData.street_address || mapData.address || streetAddress,
-      address: mapData.street_address || mapData.address || streetAddress,
+      division: normDiv,
+      district: normDist,
+      upazila: normUpz,
+      upazila_thana: normUpz,
+      thana_or_upazila: normUpz,
+      thana: normUpz,
+      post_code: postCodeVal,
+      postal_code: postCodeVal,
+      street_address: streetVal,
+      address: streetVal,
+      street: streetVal,
       latitude: mapData.latitude != null ? Number(mapData.latitude) : latitude,
       longitude: mapData.longitude != null ? Number(mapData.longitude) : longitude,
       map_place_id: mapData.map_place_id || value.map_place_id || '',

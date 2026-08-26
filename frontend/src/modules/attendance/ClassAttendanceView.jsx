@@ -11,13 +11,14 @@ import {
   FullScreenIcon,
   MinimizeIcon,
   ClockIcon,
+  TimelineIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
 import CustomSelect from '../../components/ui/CustomSelect';
 import { ClassSelect, GroupSelect, TeacherSelect, DateRangePicker } from '../../components/selectors';
 import ActionMenu from '../../components/ui/ActionMenu';
-import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import AttendanceTable, { TakeAttendanceButton, AttendanceDateStepper } from '../../components/common/AttendanceTable';
 import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
 import { useFullscreen } from '../../hooks/useFullscreen';
 import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
@@ -32,6 +33,7 @@ import {
   attendanceEventRestrictionsStore,
   attendanceTimingPolicyStore,
   academicYearsStore,
+  periodCategoriesStore,
 } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
@@ -40,6 +42,7 @@ import {
   cycleStatusWithinAllowed,
   calculateLateDelayMinutes,
 } from '../../utils/attendanceTimingEngine';
+import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDrawer';
 
 export default function ClassAttendanceView({
   classId: propClassId,
@@ -197,7 +200,10 @@ export default function ClassAttendanceView({
         if (slotRes.status === 'fulfilled' && slotRes.value.ok) {
           const slotData = await slotRes.value.json();
           const slotList = Array.isArray(slotData) ? slotData : slotData.results || [];
-          setPeriodSlots(slotList);
+          const trackedSlots = slotList.filter((s) =>
+            periodCategoriesStore.isAttendanceTrackedForSlot(activeTenantId, s)
+          );
+          setPeriodSlots(trackedSlots);
         }
 
         if (classRes.status === 'fulfilled' && classRes.value.ok) {
@@ -245,11 +251,16 @@ export default function ClassAttendanceView({
     const handleTenantChanged = () => {
       fetchAllMetadata();
     };
+    const handleCategoriesUpdated = () => {
+      fetchAllMetadata();
+    };
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
+    window.addEventListener('spr_period_categories_updated', handleCategoriesUpdated);
 
     return () => {
       isMounted = false;
       window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+      window.removeEventListener('spr_period_categories_updated', handleCategoriesUpdated);
     };
   }, [activeTenantId]);
 
@@ -261,10 +272,12 @@ export default function ClassAttendanceView({
 
     setIsLoading(true);
     try {
+      const trackedCategories = periodCategoriesStore.getAttendanceTrackedCategoryCodes(activeTenantId);
       const params = {
         class_id: selectedClassId && selectedClassId !== 'ALL' ? selectedClassId : undefined,
         group_id: selectedGroupId && selectedGroupId !== 'ALL' ? selectedGroupId : undefined,
         teacher_id: selectedTeacherId && selectedTeacherId !== 'ALL' ? selectedTeacherId : undefined,
+        slot_types: trackedCategories.length > 0 ? trackedCategories.join(',') : undefined,
       };
 
       if (startDate && endDate) {
@@ -283,7 +296,7 @@ export default function ClassAttendanceView({
     } finally {
       setIsLoading(false);
     }
-  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, propClassId, showToast]);
+  }, [metadataLoaded, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate, propClassId, activeTenantId, showToast]);
 
   useEffect(() => {
     loadMatrix();
@@ -305,14 +318,66 @@ export default function ClassAttendanceView({
 
   const stepLabels = getStepLabels();
 
+  const isAtMinBound = useMemo(() => {
+    if (isAdmin || !academicBounds.minDate) return false;
+    if (startDate) {
+      return startDate <= academicBounds.minDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const currentMonthEnd = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+    return currentMonthStart <= academicBounds.minDate || currentMonthEnd <= academicBounds.minDate;
+  }, [isAdmin, academicBounds.minDate, startDate, selectedYear, selectedMonth]);
+
+  const isAtMaxBound = useMemo(() => {
+    if (isAdmin || !academicBounds.maxDate) return false;
+    if (endDate) {
+      return endDate >= academicBounds.maxDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const maxMonthPrefix = academicBounds.maxDate.slice(0, 7);
+    return currentMonthStart >= `${maxMonthPrefix}-01`;
+  }, [isAdmin, academicBounds.maxDate, endDate, selectedYear, selectedMonth]);
+
+  const handleGoToToday = useCallback(() => {
+    const now = new Date();
+    setSelectedYear(now.getFullYear());
+    setSelectedMonth(now.getMonth() + 1);
+    setStartDate('');
+    setEndDate('');
+  }, []);
+
+  const isCurrentPeriodToday = useMemo(() => {
+    const now = new Date();
+    if (startDate && endDate) {
+      return todayStr >= startDate && todayStr <= endDate;
+    }
+    return selectedYear === now.getFullYear() && selectedMonth === (now.getMonth() + 1);
+  }, [startDate, endDate, selectedYear, selectedMonth, todayStr]);
+
   const handleStepBackward = () => {
     if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
       if (selectedMonth === 1) {
-        setSelectedMonth(12);
-        setSelectedYear((y) => y - 1);
+        targetMonth = 12;
+        targetYear = selectedYear - 1;
       } else {
-        setSelectedMonth((m) => m - 1);
+        targetMonth = selectedMonth - 1;
       }
+
+      // Enforce Academic Year bounds for non-admins
+      if (!isAdmin && academicBounds.minDate) {
+        const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+        const targetMonthEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(lastDayOfTargetMonth).padStart(2, '0')}`;
+        if (targetMonthEnd < academicBounds.minDate) {
+          showToast(`Navigation before the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
       return;
     }
 
@@ -321,18 +386,40 @@ export default function ClassAttendanceView({
     const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
     s.setDate(s.getDate() - dayCount);
     e.setDate(e.getDate() - dayCount);
-    setStartDate(s.toISOString().split('T')[0]);
-    setEndDate(e.toISOString().split('T')[0]);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && academicBounds.minDate && newEnd < academicBounds.minDate) {
+      showToast(`Navigation before the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const handleStepForward = () => {
     if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
       if (selectedMonth === 12) {
-        setSelectedMonth(1);
-        setSelectedYear((y) => y + 1);
+        targetMonth = 1;
+        targetYear = selectedYear + 1;
       } else {
-        setSelectedMonth((m) => m + 1);
+        targetMonth = selectedMonth + 1;
       }
+
+      // Enforce Academic Year bounds for non-admins
+      if (!isAdmin && academicBounds.maxDate) {
+        const targetMonthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`;
+        if (targetMonthStart > academicBounds.maxDate) {
+          showToast(`Navigation beyond the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
       return;
     }
 
@@ -341,13 +428,31 @@ export default function ClassAttendanceView({
     const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
     s.setDate(s.getDate() + dayCount);
     e.setDate(e.getDate() + dayCount);
-    setStartDate(s.toISOString().split('T')[0]);
-    setEndDate(e.toISOString().split('T')[0]);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && academicBounds.maxDate && newStart > academicBounds.maxDate) {
+      showToast(`Navigation beyond the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const handleDateRangeSelect = (start, end) => {
-    setStartDate(start);
-    setEndDate(end);
+    let safeStart = start;
+    let safeEnd = end;
+    if (!isAdmin && academicBounds.minDate && safeStart && safeStart < academicBounds.minDate) {
+      showToast(`Selected date cannot precede the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`, 'warning');
+      safeStart = academicBounds.minDate;
+    }
+    if (!isAdmin && academicBounds.maxDate && safeEnd && safeEnd > academicBounds.maxDate) {
+      showToast(`Selected date cannot exceed the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`, 'warning');
+      safeEnd = academicBounds.maxDate;
+    }
+    setStartDate(safeStart);
+    setEndDate(safeEnd);
   };
 
   const handleResetDateRange = () => {
@@ -535,21 +640,30 @@ export default function ClassAttendanceView({
           const timingState = getAttendanceCellTimingState({
             moduleType: 'CLASS',
             targetDate: d.date,
-            startTime: pSlot.start_time,
-            endTime: pSlot.end_time,
+            startTime: pSlot.start_time || row.start_time,
+            endTime: pSlot.end_time || row.end_time,
             policy: timingPolicy,
             isAdmin,
-            currentStatus: rawStatus,
+            currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
           });
 
-          const effectiveStatus = rawStatus || timingState.displayStatus || '';
+          let effectiveStatus = '';
+          if (rawStatus === 'NOT_APPLICABLE') {
+            effectiveStatus = 'NOT_APPLICABLE';
+          } else if (rawStatus) {
+            effectiveStatus = rawStatus;
+          } else {
+            effectiveStatus = timingState.displayStatus || '';
+          }
+
           if (effectiveStatus) {
             cleanedDailyStatuses[d.date] = effectiveStatus;
+            if (d.day) cleanedDailyStatuses[d.day] = effectiveStatus;
           }
 
           if (effectiveStatus === 'PRESENT') {
             p_count += 1;
-          } else if (effectiveStatus === 'LATE' || effectiveStatus === 'HALF_DAY') {
+          } else if (effectiveStatus === 'LATE') {
             l_count += 1;
           } else if (effectiveStatus === 'ABSENT') {
             a_count += 1;
@@ -564,7 +678,19 @@ export default function ClassAttendanceView({
       const attendanceRate = totalRecorded > 0 ? Math.round((effectivePresent / totalRecorded) * 1000) / 10 : 0.0;
 
       return {
+        ...pSlot,
         ...row,
+        period_name: row.period_name || pSlot.name || pSlot.period_name || 'Class Period',
+        start_time: row.start_time || pSlot.start_time,
+        end_time: row.end_time || pSlot.end_time,
+        time: pSlot.start_time ? `${pSlot.start_time} – ${pSlot.end_time || ''}` : row.schedule_time,
+        teacher_name: row.teacher_name || pSlot.teacher_name,
+        class_name: row.class_name || pSlot.class_name || selectedClassName,
+        effective_from: row.effective_from || pSlot.effective_from || pSlot.created_at?.slice(0, 10),
+        effective_to: row.effective_to || pSlot.effective_to,
+        is_deleted: row.is_deleted || pSlot.is_deleted,
+        history_log: row.history_log || pSlot.history_log || [],
+        has_history: Boolean((row.history_log && row.history_log.length > 0) || (pSlot.history_log && pSlot.history_log.length > 0)),
         daily_statuses: cleanedDailyStatuses,
         totals: {
           present: p_count,
@@ -728,7 +854,7 @@ export default function ClassAttendanceView({
             hol_count += 1;
           } else if (st === 'PRESENT') {
             p_count += 1;
-          } else if (st === 'LATE' || st === 'HALF_DAY') {
+          } else if (st === 'LATE') {
             l_count += 1;
           } else if (st === 'ABSENT') {
             a_count += 1;
@@ -940,7 +1066,6 @@ export default function ClassAttendanceView({
       'Present (P)',
       'Late (L)',
       'Absent (A)',
-      'Half Day (H)',
       'Leave (LV)',
       'Attendance Rate %',
     ];
@@ -961,7 +1086,6 @@ export default function ClassAttendanceView({
         r.totals.present,
         r.totals.late,
         r.totals.absent,
-        r.totals.half_day,
         r.totals.on_leave,
         `"${r.totals.attendance_rate}%"`,
       ].join(',');
@@ -1125,8 +1249,28 @@ export default function ClassAttendanceView({
                   Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
                 </p>
               ) : null}
+
+              {/* Tracking Baseline Date Indicator */}
+              <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary pt-1 pl-6">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium theme-bg-sub border theme-border theme-text-secondary">
+                  <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                  <span>Calculated from: <strong className="theme-text-primary">{academicBounds.activeYear?.startDate || academicBounds.minDate || 'Session Start'}</strong> ({academicBounds.activeYear?.name || 'Active Academic Year'})</span>
+                </span>
+              </div>
             </div>
 
+            {/* Reusable Enterprise Stepper Controls */}
+            <AttendanceDateStepper
+              stepLabels={stepLabels}
+              onStepBackward={handleStepBackward}
+              onStepForward={handleStepForward}
+              onToday={handleGoToToday}
+              isToday={isCurrentPeriodToday}
+              isAtMinBound={isAtMinBound}
+              isAtMaxBound={isAtMaxBound}
+              minBoundTooltip={`Reached start of Academic Year (${academicBounds.activeYear?.name || 'Active Year'})`}
+              maxBoundTooltip={`Reached end of Academic Year (${academicBounds.activeYear?.name || 'Active Year'})`}
+            />
           </div>
 
           {/* Bottom Row: 4-Column Clean Filters (Class, Group, Teacher, Date Range) */}
@@ -1203,18 +1347,35 @@ export default function ClassAttendanceView({
           </p>
         </div>
 
-        {/* Reusable AttendanceMatrixTable Component */}
-        <AttendanceMatrixTable
+        {/* Reusable AttendanceTable Component */}
+        <AttendanceTable
           matrixData={enrichedMatrixData}
           isEditing={isEditing}
           onToggleCell={handleToggleCellAttendance}
           onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
+          onInspectHistory={(row) => {
+            if (!row) return;
+            openRightSidebar({
+              title: 'Schedule Timeline & Evolution',
+              subtitle: `${row.period_name || row.name || 'Period Slot'} • ${row.class_name || selectedClassName || 'Class Routine'}`,
+              icon: TimelineIcon,
+              width: 520,
+              content: (
+                <ScheduleTimelineDrawer
+                  item={row}
+                  onClose={closeRightSidebar}
+                />
+              ),
+            });
+          }}
           isHijriEnabled={isHijriEnabled}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
           onStudentClick={onStudentClick}
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
+          calculationBaselineDate={academicBounds.activeYear?.startDate || academicBounds.minDate || 'Session Start'}
+          calculationBaselineLabel="Tracking Since"
           totalCount={enrichedMatrixData?.total_students || 0}
           totalCountLabel="Total Students"
           isFullscreen={isFullscreen}

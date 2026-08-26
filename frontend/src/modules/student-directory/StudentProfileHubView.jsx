@@ -67,6 +67,49 @@ const getDocUrl = (rawUrl) => {
   return clean.startsWith('/') ? clean : `/${clean}`;
 };
 
+/**
+ * Enterprise Helper: Resolve standardized curriculum subjects & modules based on class and department.
+ */
+const getClassSubjects = (className = "", departmentType = "") => {
+  const clean = `${className} ${departmentType}`.toLowerCase();
+  if (clean.includes("hifz") || clean.includes("quran") || clean.includes("juz") || clean.includes("para")) {
+    return [
+      { code: "HIFZ", name: "Hifzul Quran (হিফজুল কুরআন)", type: "Core" },
+      { code: "TAJW", name: "Tajweed & Makhraj (তাজবীদ ও উচ্চারণ)", type: "Recitation" },
+      { code: "DOUR", name: "Daily Sabaq & Dour (সবক ও রিভিশন)", type: "Revision" },
+      { code: "TAFS", name: "Surah Meaning & Duas (জরুরি দোয়া ও অর্থ)", type: "Islamic" },
+      { code: "ADAB", name: "Akhlaq & Islamic Manners (আখলাক ও তারবিয়াত)", type: "Character" },
+    ];
+  }
+  if (clean.includes("nazera") || clean.includes("noorani") || clean.includes("play") || clean.includes("kg") || clean.includes("nursery")) {
+    return [
+      { code: "NOOR", name: "Noorani Qaida & Haroof (নূরানী কায়দা ও বর্ণমালা)", type: "Foundation" },
+      { code: "NAZR", name: "Quran Nazera Reading (কুরআন পাঠ)", type: "Reading" },
+      { code: "MASL", name: "Essential Masail & Namaz (নামাজ ও মাসআলা)", type: "Practical" },
+      { code: "LANG", name: "Bangla & English Alphabets (বাংলা ও ইংরেজি)", type: "Language" },
+      { code: "MATH", name: "Basic Numeracy & Count (গণিত)", type: "Numeracy" },
+    ];
+  }
+  if (clean.includes("kitab") || clean.includes("mizan") || clean.includes("nahw") || clean.includes("fazilat") || clean.includes("dawra") || clean.includes("alim")) {
+    return [
+      { code: "NAHW", name: "Arabic Grammar & Sarf (ইলমুন নাহু ও সরফ)", type: "Grammar" },
+      { code: "LITR", name: "Arabic Literature & Composition (আরবি সাহিত্য)", type: "Language" },
+      { code: "FIQH", name: "Fiqh & Usul-ul-Fiqh (ইসলামি আইন ও নীতি)", type: "Jurisprudence" },
+      { code: "HDTH", name: "Hadith Studies & Sunnah (হাদিস শরিফ)", type: "Hadith" },
+      { code: "TFSR", name: "Tafsir-ul-Quran (কুরআনের তাফসীর)", type: "Exegesis" },
+      { code: "GENL", name: "General Academic Studies (সাধারণ বিষয়াবলি)", type: "Academic" },
+    ];
+  }
+  return [
+    { code: "QURN", name: "Quran & Islamic Studies (কুরআন ও ইসলামি শিক্ষা)", type: "Core" },
+    { code: "ARBC", name: "Arabic Language (আরবি ভাষা)", type: "Language" },
+    { code: "BNGL", name: "Bengali Language & Literature (বাংলা)", type: "General" },
+    { code: "ENG",  name: "English Communication (ইংরেজি)", type: "Language" },
+    { code: "MATH", name: "General Mathematics (গণিত)", type: "Math" },
+    { code: "SCNC", name: "General Science & ICT (বিজ্ঞান ও তথ্যপ্রযুক্তি)", type: "Science" },
+  ];
+};
+
 export default function StudentProfileHubView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -647,134 +690,386 @@ export default function StudentProfileHubView() {
 
         {/* TAB 2: UNIFIED PERSONAL & FAMILY WITH DEDICATED ADDRESS CARD */}
         {activeTab === "personal" && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-8 animate-fade-in">
             {/* Card 1: Biographical & Institutional Profile */}
-            <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-5">
-              <div className="flex items-center gap-2 border-b theme-border pb-3">
-                <StudentIcon className="w-4 h-4 theme-accent" />
-                <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
-                  Biographical &amp; Institutional Profile
-                </h3>
+            <div className="theme-bg-surface border theme-border p-7 sm:p-8 rounded-3xl shadow-xs space-y-7">
+              <div className="flex items-center justify-between border-b theme-border pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-xs">
+                    <StudentIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base uppercase tracking-wider theme-text-primary">
+                      Biographical &amp; Institutional Profile
+                    </h3>
+                    <p className="text-[11px] theme-text-secondary mt-0.5">
+                      Core personal credentials and academy enrolment status
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 text-xs">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-12 text-xs">
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                     Full Legal Name (English)
                   </span>
-                  <p className="font-bold theme-text-primary text-sm">{student.name_en || student.name || "--"}</p>
+                  <p className="font-bold theme-text-primary text-base">{student.name_en || student.name || "--"}</p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Bangla Name
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Native / Bangla Name
                   </span>
-                  <p className="font-semibold theme-text-primary text-sm">{student.bangla_name || "--"}</p>
+                  <p className="font-semibold theme-text-primary text-base">{student.bangla_name || student.details?.name_bn || "--"}</p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Unique Student ID / Roll
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Unique Student ID &amp; Roll
                   </span>
-                  <p className="font-mono font-bold text-sm theme-accent">
+                  <p className="font-mono font-bold text-base theme-accent">
                     {student.uniq_id || `STU-${student.id}`} {student.roll_number ? `(Roll #${student.roll_number})` : ""}
                   </p>
                 </div>
+
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Date of Birth / Age
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Date of Birth &amp; Calculated Age
                   </span>
-                  <p className="font-semibold theme-text-primary">
-                    {student.details?.date_of_birth || "--"}{" "}
-                    {student.details?.date_of_birth && `(${calculateAge(student.details.date_of_birth)} yrs)`}
+                  {(() => {
+                    const dob = student.dob || student.date_of_birth || student.details?.date_of_birth || student.details?.dob;
+                    return (
+                      <p className="font-medium theme-text-primary text-sm sm:text-base">
+                        {dob ? `${dob} (${calculateAge(dob)} years)` : <span className="text-zinc-500">Not Specified</span>}
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Gender
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base capitalize">
+                    {student.gender ? student.gender.toLowerCase() : "Male"}
                   </p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                     Blood Group
                   </span>
-                  <p className="font-bold text-rose-400">{student.details?.blood_group || "--"}</p>
+                  <p className="font-bold text-rose-500 text-sm sm:text-base">
+                    {student.blood_group || student.details?.blood_group || "--"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Campus Branch
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.branch_name || "Main Campus"}
+                  </p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Class &amp; Section / Group
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.student_class_name || student.education_status || "General Class"} {student.group_name ? `• ${student.group_name}` : ""}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Admission Session Year
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.session_year || student.session_year || "--"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                     Admission Date
                   </span>
-                  <p className="font-mono font-semibold theme-text-primary">
-                    {student.admission_date || "--"}
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.admission_date || student.academic_detail?.admission_date || student.details?.admission_date || "--"}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Identity Document (BRN / NID)
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.birth_certificate_no
+                      ? `BRN: ${student.birth_certificate_no}`
+                      : student.nid_no
+                      ? `NID: ${student.nid_no}`
+                      : <span className="text-zinc-500">Not Submitted</span>}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Residential Status
+                  </span>
+                  <p className="font-semibold theme-text-primary text-xs sm:text-sm uppercase tracking-wide">
+                    {(student.target_status || "NON_RESIDENTIAL").replace(/_/g, " ")}
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Card 2: Guardians & Family Information */}
-            <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-5">
-              <div className="flex items-center gap-2 border-b theme-border pb-3">
-                <GroupIcon className="w-4 h-4 theme-accent" />
-                <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
-                  Guardian &amp; Family Contacts
-                </h3>
+            <div className="theme-bg-surface border theme-border p-7 sm:p-8 rounded-3xl shadow-xs space-y-7">
+              <div className="flex items-center justify-between border-b theme-border pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-xs">
+                    <GroupIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base uppercase tracking-wider theme-text-primary">
+                      Guardian &amp; Family Contacts
+                    </h3>
+                    <p className="text-[11px] theme-text-secondary mt-0.5">
+                      Parents, primary guardians, emergency contact details
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 text-xs">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-12 text-xs">
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                     Primary Guardian Name
                   </span>
-                  <p className="font-bold text-sm theme-text-primary">
-                    {student.details?.guardian_name || student.details?.father_name || "--"}
+                  <p className="font-bold text-base theme-text-primary">
+                    {student.guardian_detail?.primary_guardian_name ||
+                     student.guardian_detail?.father_name ||
+                     student.details?.guardian_name ||
+                     student.details?.father_name ||
+                     "--"}
                   </p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Guardian Phone / WhatsApp
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Guardian Phone &amp; WhatsApp
                   </span>
-                  {student.details?.guardian_phone ? (
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-mono font-bold text-sm theme-text-primary">
-                        {student.details.guardian_phone}
-                      </span>
-                      <a
-                        href={`https://wa.me/${student.details.guardian_phone.replace(/[^\d]/g, "")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-emerald-400 hover:scale-110 transition-transform p-1 rounded-md hover:bg-emerald-500/10"
-                        title="Chat on WhatsApp"
-                      >
-                        <WhatsAppIcon className="w-4 h-4" />
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="font-semibold text-zinc-500 italic">Not Specified</p>
-                  )}
+                  {(() => {
+                    const phone =
+                      student.guardian_detail?.primary_guardian_phone ||
+                      student.guardian_detail?.father_phone ||
+                      student.details?.guardian_phone ||
+                      student.details?.emergency_phone;
+                    return phone ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono font-bold text-base theme-text-primary">
+                          {phone}
+                        </span>
+                        <a
+                          href={`https://wa.me/${phone.replace(/[^\d]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-400 hover:scale-110 transition-transform p-1 rounded-md hover:bg-emerald-500/10"
+                          title="Chat on WhatsApp"
+                        >
+                          <WhatsAppIcon className="w-4 h-4" />
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="font-normal text-zinc-500">Not Specified</p>
+                    );
+                  })()}
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Guardian Relation
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.guardian_relation || student.details?.guardian_relation || "--"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Guardian National ID (NID)
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.guardian_nid || <span className="text-zinc-500">Not Provided</span>}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                     Father's Name
                   </span>
-                  <p className="font-semibold theme-text-primary">{student.details?.father_name || "--"}</p>
-                </div>
-                <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Mother's Name
-                  </span>
-                  <p className="font-semibold theme-text-primary">{student.details?.mother_name || "--"}</p>
-                </div>
-                <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Emergency Contact
-                  </span>
-                  <p className="font-mono font-semibold theme-text-primary">
-                    {student.details?.emergency_contact_phone || "--"}
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.father_name || student.details?.father_name || "--"}
                   </p>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                    Guardian Relation / Profession
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Father's Phone &amp; WhatsApp
                   </span>
-                  <p className="font-semibold theme-text-primary">
-                    {student.details?.guardian_relation || student.details?.father_occupation || "--"}
+                  {(() => {
+                    const fPhone = student.guardian_detail?.father_phone;
+                    return fPhone ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono font-medium text-sm sm:text-base theme-text-primary">{fPhone}</span>
+                        <a
+                          href={`https://wa.me/${fPhone.replace(/[^\d]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-400 hover:scale-110 transition-transform p-0.5 rounded"
+                          title="WhatsApp Father"
+                        >
+                          <WhatsAppIcon className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="font-normal text-zinc-500">--</p>
+                    );
+                  })()}
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Father's Occupation
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.father_occupation || student.details?.father_occupation || "--"}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Mother's Name
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.mother_name || student.details?.mother_name || "--"}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Mother's Phone
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.mother_phone || <span className="text-zinc-500">--</span>}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Mother's Occupation
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.guardian_detail?.mother_occupation || <span className="text-zinc-500">--</span>}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Emergency Contact Number
+                  </span>
+                  <p className="font-mono font-medium text-sm sm:text-base theme-text-primary">
+                    {student.guardian_detail?.emergency_contact_phone ||
+                     student.details?.emergency_contact_phone ||
+                     student.details?.emergency_phone ||
+                     <span className="text-zinc-500">--</span>}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Card 3: Dedicated Comprehensive Address Card (Minimal Flat Grid with full details) */}
+            {/* Card 3: Previous Academic Background (পূর্ববর্তী শিক্ষার বিস্তারিত) */}
+            <div className="theme-bg-surface border theme-border p-7 sm:p-8 rounded-3xl shadow-xs space-y-7">
+              <div className="flex items-center justify-between border-b theme-border pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-xs">
+                    <AcademicCapIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base uppercase tracking-wider theme-text-primary">
+                      Previous Academic Background
+                    </h3>
+                    <p className="text-[11px] theme-text-secondary mt-0.5">
+                      Prior madrasa/school credentials, passing grade, TC and records
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-12 text-xs">
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Previous Academy / Madrasa
+                  </span>
+                  <p className="font-bold text-base theme-text-primary">
+                    {student.academic_detail?.previous_school_name || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Previous Academy Location
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.previous_school_address || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Previous Class / Level
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.previous_class || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Previous Exam Grade / Division
+                  </span>
+                  <p className="font-bold theme-accent text-sm sm:text-base">
+                    {student.academic_detail?.previous_grade ||
+                     student.academic_detail?.previous_result?.split(" (")[0] ||
+                     student.academic_detail?.previous_result ||
+                     <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Average / Percentage / GPA
+                  </span>
+                  <p className="font-mono font-bold theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.previous_average ||
+                     (student.academic_detail?.previous_result?.includes("(")
+                       ? student.academic_detail?.previous_result?.split("(")[1]?.replace(")", "")
+                       : <span className="text-zinc-500 font-normal">--</span>)}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Passing Year
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.previous_passing_year || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Transfer Certificate (TC) Number
+                  </span>
+                  <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
+                    {student.academic_detail?.tc_number || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                    Academic &amp; Study Notes
+                  </span>
+                  <p className="font-medium theme-text-primary text-sm leading-relaxed">
+                    {student.academic_detail?.previous_study_details || <span className="text-zinc-500 font-normal">--</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Dedicated Comprehensive Address Card (Minimal Flat Grid with full details) */}
             {(() => {
               const presAddr = student.present_address || (typeof student.details?.present_address === "object" ? student.details?.present_address : null);
               const presStreet = (presAddr && presAddr.street_address) || (typeof student.details?.present_address === "string" ? student.details?.present_address : "") || (typeof student.address === "string" ? student.address : "") || "--";
@@ -782,6 +1077,7 @@ export default function StudentProfileHubView() {
               const presDistrict = (presAddr && presAddr.district) || student.district || "--";
               const presDivision = (presAddr && presAddr.division) || student.division || "--";
               const presPost = (presAddr && (presAddr.post_code || presAddr.post_office)) ? `${presAddr.post_office || ""} ${presAddr.post_code ? `(${presAddr.post_code})` : ""}`.trim() : "--";
+              const presCoords = student.latitude && student.longitude ? `${student.latitude}, ${student.longitude}` : (presAddr?.latitude && presAddr?.longitude ? `${presAddr.latitude}, ${presAddr.longitude}` : null);
 
               const permAddr = student.permanent_address || (typeof student.details?.permanent_address === "object" ? student.details?.permanent_address : null);
               const permStreet = (permAddr && permAddr.street_address) || (typeof student.details?.permanent_address === "string" ? student.details?.permanent_address : "") || "--";
@@ -791,57 +1087,73 @@ export default function StudentProfileHubView() {
               const permPost = (permAddr && (permAddr.post_code || permAddr.post_office)) ? `${permAddr.post_office || ""} ${permAddr.post_code ? `(${permAddr.post_code})` : ""}`.trim() : "--";
 
               return (
-                <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-6">
-                  <div className="flex items-center gap-2 border-b theme-border pb-3">
-                    <LocationPinIcon className="w-4 h-4 theme-accent" />
-                    <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
-                      Residential &amp; Address Information
-                    </h3>
+                <div className="theme-bg-surface border theme-border p-7 sm:p-8 rounded-3xl shadow-xs space-y-7">
+                  <div className="flex items-center justify-between border-b theme-border pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-xs">
+                        <LocationPinIcon className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm sm:text-base uppercase tracking-wider theme-text-primary">
+                          Residential &amp; Address Information
+                        </h3>
+                        <p className="text-[11px] theme-text-secondary mt-0.5">
+                          Present and permanent residence locations
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Present Address Details */}
-                  <div className="space-y-3">
-                    <span className="text-xs font-bold uppercase tracking-wider theme-text-primary block">
-                      Present / Current Address
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider theme-text-primary block">
+                        Present / Current Address
+                      </span>
+                      {presCoords && (
+                        <span className="text-[10px] font-mono font-bold theme-accent px-2.5 py-1 rounded-lg theme-bg-accent-soft border theme-border">
+                          GPS: {presCoords}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-7 gap-x-12 text-xs">
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Street / Village / Area
                         </span>
-                        <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary leading-relaxed text-sm sm:text-base">
                           {presStreet}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Thana / Upazila
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {presThana}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           District
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {presDistrict}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Division
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {presDivision}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                          Post Office / Code
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                          Post Office &amp; Code
                         </span>
-                        <p className="font-semibold theme-text-primary font-mono text-xs sm:text-sm">
+                        <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
                           {presPost}
                         </p>
                       </div>
@@ -849,48 +1161,48 @@ export default function StudentProfileHubView() {
                   </div>
 
                   {/* Permanent Address Details */}
-                  <div className="space-y-3 pt-4 border-t theme-border">
+                  <div className="space-y-4 pt-6 border-t theme-border">
                     <span className="text-xs font-bold uppercase tracking-wider theme-text-primary block">
                       Permanent / Village Address
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-7 gap-x-12 text-xs">
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Street / Village / Area
                         </span>
-                        <p className="font-semibold theme-text-primary leading-relaxed text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary leading-relaxed text-sm sm:text-base">
                           {permStreet}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Thana / Upazila
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {permThana}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           District
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {permDistrict}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
                           Division
                         </span>
-                        <p className="font-semibold theme-text-primary text-xs sm:text-sm">
+                        <p className="font-medium theme-text-primary text-sm sm:text-base">
                           {permDivision}
                         </p>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                          Post Office / Code
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider theme-text-secondary mb-1.5">
+                          Post Office &amp; Code
                         </span>
-                        <p className="font-semibold theme-text-primary font-mono text-xs sm:text-sm">
+                        <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
                           {permPost}
                         </p>
                       </div>
@@ -1040,18 +1352,25 @@ export default function StudentProfileHubView() {
           </div>
         )}
 
-        {/* TAB 4: LIFECYCLE & TIMELINE (Minimal Clean Design) */}
+        {/* TAB 4: LIFECYCLE & TIMELINE (Concise Single-Line Format) */}
         {activeTab === "timeline" && (
           <div className="space-y-6 animate-fade-in">
-            <div className="theme-bg-surface border theme-border p-6 rounded-3xl shadow-xs space-y-6">
+            <div className="theme-bg-surface border theme-border p-6 sm:p-7 rounded-3xl shadow-xs space-y-6">
               
               {/* Header & Transfer Action */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b theme-border pb-4">
-                <div className="flex items-center gap-2">
-                  <HistoryIcon className="w-4 h-4 theme-accent" />
-                  <h3 className="font-bold text-sm uppercase tracking-wider theme-text-primary">
-                    Academic Progression &amp; Lifecycle Timeline
-                  </h3>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-xs">
+                    <HistoryIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base uppercase tracking-wider theme-text-primary">
+                      Academic Progression &amp; Lifecycle Timeline
+                    </h3>
+                    <p className="text-[11px] theme-text-secondary mt-0.5">
+                      Chronological summary of admissions, class progression, and academic transitions
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1063,99 +1382,176 @@ export default function StudentProfileHubView() {
                 </button>
               </div>
 
-              {/* Vertical Timeline with Centered Tracks & Clean Nodes */}
-              <div className="space-y-0 pt-2">
+              {/* Concise Vertical Timeline */}
+              <div className="space-y-0 pt-1">
                 
                 {/* 1. Current Active Stage */}
-                <div className="flex gap-4 items-start">
+                <div className="flex items-start gap-3 sm:gap-4 group">
                   <div className="flex flex-col items-center self-stretch shrink-0">
-                    <div className="w-8 h-8 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs z-10">
-                      <CheckCircleIcon className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs z-10">
+                      <CheckCircleIcon className="w-3.5 h-3.5" />
                     </div>
-                    <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1"></div>
+                    <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1.5"></div>
                   </div>
 
-                  <div className="flex-1 pb-6 space-y-1 pt-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-sm theme-text-primary">
-                        {student.student_class_name || "General Class"}
-                      </span>
-                      {(student.group_name || student.student_group_name) && (
-                        <span className="text-xs theme-text-secondary font-medium">
-                          • {student.group_name || student.student_group_name}
+                  <div className="flex-1 pb-5 min-w-0">
+                    <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub/40 border theme-border flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs shadow-2xs hover:border-[var(--border-hover)] transition-all">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs font-bold theme-accent px-2 py-0.5 rounded-md theme-bg-accent-soft border theme-border shrink-0">
+                          {student.admission_date || "Current Session"}
                         </span>
-                      )}
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/25 uppercase tracking-wider">
-                        Current Enrolment
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-xs theme-text-secondary">
-                      <span>Status: <strong className="theme-text-primary font-medium">{student.status || "Active"}</strong></span>
-                      {student.academic_history?.[0]?.transition_reason && (
-                        <span>• Reason: <strong className="theme-text-primary font-medium">{student.academic_history[0].transition_reason}</strong></span>
-                      )}
+                        <span className="font-bold text-xs sm:text-sm theme-text-primary">
+                          {student.student_class_name || student.education_status || "General Class"}
+                        </span>
+                        {(student.group_name || student.student_group_name) && (
+                          <span className="theme-text-secondary font-medium">
+                            • {student.group_name || student.student_group_name}
+                          </span>
+                        )}
+                        <span className="theme-text-secondary">
+                          • Campus: {student.branch_name || "Main Campus"}
+                        </span>
+                        {student.roll_number && (
+                          <span className="theme-text-secondary font-mono font-medium">
+                            • Roll #{student.roll_number}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft text-emerald-500 border border-emerald-500/20 uppercase tracking-wider">
+                          Active Enrolment
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. Historical Transitions (excluding current if duplicate) */}
+                {/* 2. Historical Transitions */}
                 {student.academic_history && student.academic_history.filter((r) => !r.is_current).map((record) => (
-                  <div key={record.id} className="flex gap-4 items-start">
+                  <div key={record.id} className="flex items-start gap-3 sm:gap-4 group">
                     <div className="flex flex-col items-center self-stretch shrink-0">
-                      <div className="w-8 h-8 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-text-secondary shadow-xs z-10">
-                        <HistoryIcon className="w-4 h-4" />
+                      <div className="w-7 h-7 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-text-secondary shadow-xs z-10">
+                        <HistoryIcon className="w-3.5 h-3.5" />
                       </div>
-                      <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1"></div>
+                      <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1.5"></div>
                     </div>
 
-                    <div className="flex-1 pb-6 space-y-1 pt-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-sm theme-text-primary">
-                          {record.student_class_name || record.class_name || "General Class"}
-                        </span>
-                        {(record.student_group_name || record.group_name) && (
-                          <span className="text-xs theme-text-secondary font-medium">
-                            • {record.student_group_name || record.group_name}
+                    <div className="flex-1 pb-5 min-w-0">
+                      <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub/20 border theme-border flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs hover:border-[var(--border-hover)] transition-all">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <span className="font-mono text-xs font-semibold theme-text-secondary px-2 py-0.5 rounded-md theme-bg-surface border theme-border shrink-0">
+                            {record.start_date || "--"} &rarr; {record.end_date || "Completed"}
                           </span>
-                        )}
-                        <span className="font-mono text-[11px] theme-text-secondary">
-                          ({record.start_date || "--"} &rarr; {record.end_date || "--"})
-                        </span>
+                          <span className="font-semibold text-xs sm:text-sm theme-text-primary">
+                            Class Transfer: {record.student_class_name || record.class_name || "General Class"}
+                          </span>
+                          {(record.student_group_name || record.group_name) && (
+                            <span className="theme-text-secondary font-medium">
+                              • {record.student_group_name || record.group_name}
+                            </span>
+                          )}
+                          <span className="theme-text-secondary">
+                            • Reason: {record.transition_reason || "Annual Progression"}
+                          </span>
+                          {record.transferred_by_name && (
+                            <span className="theme-text-secondary font-medium">
+                              • By {record.transferred_by_name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-surface border theme-border theme-text-secondary uppercase tracking-wider">
+                            Completed Stage
+                          </span>
+                        </div>
                       </div>
-
-                      <p className="text-xs theme-text-secondary">
-                        Reason: <span className="theme-text-primary">{record.transition_reason || "Annual Progression"}</span>
-                        {record.transferred_by_name && <span> • By {record.transferred_by_name}</span>}
-                      </p>
                     </div>
                   </div>
                 ))}
 
-                {/* 3. Admission Origin Node */}
-                <div className="flex gap-4 items-start">
-                  <div className="flex flex-col items-center shrink-0">
-                    <div className="w-8 h-8 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-accent shadow-xs z-10">
-                      <SparklesIcon className="w-4 h-4" />
+                {/* 3. Official Academy Admission Milestone */}
+                <div className="flex items-start gap-3 sm:gap-4 group">
+                  <div className="flex flex-col items-center self-stretch shrink-0">
+                    <div className="w-7 h-7 rounded-full theme-bg-surface border theme-border flex items-center justify-center theme-accent shadow-xs z-10">
+                      <SparklesIcon className="w-3.5 h-3.5" />
                     </div>
+                    {student.academic_detail?.previous_school_name && (
+                      <div className="w-0.5 flex-1 theme-bg-sub border-l theme-border my-1.5"></div>
+                    )}
                   </div>
 
-                  <div className="flex-1 space-y-1 pt-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-sm theme-text-primary">
-                        Academy Admission
-                      </span>
-                      {student.admission_date && (
-                        <span className="font-mono text-[11px] theme-text-secondary">
-                          ({student.admission_date})
+                  <div className="flex-1 pb-5 min-w-0">
+                    <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub/20 border theme-border flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs hover:border-[var(--border-hover)] transition-all">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs font-semibold theme-text-primary px-2 py-0.5 rounded-md theme-bg-surface border theme-border shrink-0">
+                          {student.admission_date || (student.created_at ? new Date(student.created_at).toLocaleDateString() : "--")}
                         </span>
-                      )}
+                        <span className="font-semibold text-xs sm:text-sm theme-text-primary">
+                          Academy Admission: Enrolled into {student.student_class_name || "Academy"}
+                        </span>
+                        <span className="theme-text-secondary font-mono font-medium">
+                          • ID: {student.uniq_id || `STU-${student.id}`}
+                        </span>
+                        <span className="theme-text-secondary">
+                          • Mode: {student.admission_mode === "FULL" ? "Full Institutional" : "Quick Entry"}
+                        </span>
+                        <span className="theme-text-secondary">
+                          • Branch: {student.branch_name || "Main Campus"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 uppercase tracking-wider">
+                          Enrolled
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs theme-text-secondary">
-                      Officially registered and enrolled into academy records.
-                    </p>
                   </div>
                 </div>
+
+                {/* 4. Prior Academic Background Record (If exists) */}
+                {student.academic_detail?.previous_school_name && (
+                  <div className="flex items-start gap-3 sm:gap-4 group">
+                    <div className="flex flex-col items-center shrink-0">
+                      <div className="w-7 h-7 rounded-full theme-bg-surface border theme-border flex items-center justify-center text-sky-400 shadow-xs z-10">
+                        <AcademicCapIcon className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub/20 border theme-border flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs hover:border-[var(--border-hover)] transition-all">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <span className="font-mono text-xs font-semibold theme-text-secondary px-2 py-0.5 rounded-md theme-bg-surface border theme-border shrink-0">
+                            {student.academic_detail.previous_passing_year || "Prior Record"}
+                          </span>
+                          <span className="font-semibold text-xs sm:text-sm theme-text-primary">
+                            Prior School: {student.academic_detail.previous_school_name}
+                          </span>
+                          {student.academic_detail.previous_class && (
+                            <span className="theme-text-secondary">
+                              • Class: {student.academic_detail.previous_class}
+                            </span>
+                          )}
+                          {(student.academic_detail.previous_grade || student.academic_detail.previous_result) && (
+                            <span className="theme-text-secondary">
+                              • Result: {student.academic_detail.previous_grade || student.academic_detail.previous_result}
+                              {student.academic_detail.previous_average ? ` (${student.academic_detail.previous_average})` : ""}
+                            </span>
+                          )}
+                          {student.academic_detail.tc_number && (
+                            <span className="theme-text-secondary font-mono">
+                              • TC #{student.academic_detail.tc_number}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-surface border theme-border text-sky-400 uppercase tracking-wider">
+                            Prior Education
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
             </div>

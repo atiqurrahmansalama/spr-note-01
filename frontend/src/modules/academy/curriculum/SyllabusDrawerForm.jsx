@@ -5,6 +5,7 @@ import {
   ClassIcon,
   CloseIcon,
 } from '../../../components/ui/Icons';
+import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import { ClassSelect, TeacherSelect } from '../../../components/selectors';
 import { useToast } from '../../../context/ToastContext';
@@ -191,16 +192,12 @@ export default function SyllabusDrawerForm({
       {/* 1. Textbook Name & Subject Category */}
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Textbook / Syllabus Title *
-          </label>
-          <input
-            type="text"
+          <CustomInput
+            label="Textbook / Syllabus Title *"
             required
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(val) => setFormData({ ...formData, name: val })}
             placeholder="e.g. Mukhtasar al-Quduri"
-            className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-medium focus:outline-none focus:border-[var(--accent-main)]"
           />
         </div>
 
@@ -257,58 +254,52 @@ export default function SyllabusDrawerForm({
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <span className="block text-[11px] font-semibold theme-text-secondary mb-1">
-              Start Page *
-            </span>
-            <input
+            <CustomInput
+              label="Start Page *"
               type="number"
               min={1}
               required
               value={formData.startPage}
-              onChange={(e) =>
+              onChange={(val) =>
                 setFormData({
                   ...formData,
-                  startPage: e.target.value === '' ? '' : Number(e.target.value),
+                  startPage: val === '' ? '' : Number(val),
                 })
               }
-              className="w-full text-center px-3 py-2 rounded-xl theme-bg-surface border theme-border theme-text-primary text-xs font-bold focus:outline-none focus:border-[var(--accent-main)]"
+              className="text-center font-bold"
             />
           </div>
 
           <div>
-            <span className="block text-[11px] font-semibold theme-text-secondary mb-1">
-              Target End *
-            </span>
-            <input
+            <CustomInput
+              label="Target End *"
               type="number"
               min={1}
               required
               value={formData.endPage}
-              onChange={(e) =>
+              onChange={(val) =>
                 setFormData({
                   ...formData,
-                  endPage: e.target.value === '' ? '' : Number(e.target.value),
+                  endPage: val === '' ? '' : Number(val),
                 })
               }
-              className="w-full text-center px-3 py-2 rounded-xl theme-bg-surface border theme-border theme-text-primary text-xs font-bold focus:outline-none focus:border-[var(--accent-main)]"
+              className="text-center font-bold"
             />
           </div>
 
           <div>
-            <span className="block text-[11px] font-semibold theme-text-secondary mb-1">
-              Current Page
-            </span>
-            <input
+            <CustomInput
+              label="Current Page"
               type="number"
               min={0}
               value={formData.currentPage}
-              onChange={(e) =>
+              onChange={(val) =>
                 setFormData({
                   ...formData,
-                  currentPage: e.target.value === '' ? '' : Number(e.target.value),
+                  currentPage: val === '' ? '' : Number(val),
                 })
               }
-              className="w-full text-center px-3 py-2 rounded-xl theme-bg-surface border theme-border theme-text-primary text-xs font-bold focus:outline-none focus:border-[var(--accent-main)]"
+              className="text-center font-bold"
             />
           </div>
         </div>
@@ -317,14 +308,11 @@ export default function SyllabusDrawerForm({
       {/* 4. Target Completion Date & Notes */}
       <div className="space-y-3.5">
         <div>
-          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-1.5">
-            Target Completion Date (Optional)
-          </label>
-          <input
+          <CustomInput
+            label="Target Completion Date (Optional)"
             type="date"
             value={formData.targetDate}
-            onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })}
-            className="w-full px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs focus:outline-none focus:border-[var(--accent-main)]"
+            onChange={(val) => setFormData({ ...formData, targetDate: val })}
           />
         </div>
 

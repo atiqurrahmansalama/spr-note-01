@@ -200,9 +200,12 @@ export default function AdHocHeadcountView() {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight">Surprise Roll Call & Night Mutala'a Headcount</h1>
-            <p className="text-xs theme-text-secondary">
-              Instant physical presence verification for study hours, dormitories, and surprise inspections.
-            </p>
+            <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary mt-0.5">
+              <span>Instant physical presence verification for study hours, dormitories, and surprise inspections.</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium theme-bg-sub border theme-border">
+                Active Year: <strong className="theme-text-primary">{academicYearsStore.getActiveYear()?.name || "Active Session"}</strong>
+              </span>
+            </div>
           </div>
         </div>
 

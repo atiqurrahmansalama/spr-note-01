@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '../ui/CustomSelect';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
+import { admissionSettingsStore } from '../../utils/localStore';
 
 /**
  * Enterprise Reusable Class Selector Component
  * 
  * Automatically loads classes if not supplied via props.
- * Supports tenant isolation, custom formatting, "All Classes" filter mode, search,
+ * Supports tenant isolation, admission filters, branch binding, search,
  * and seamless design token synchronization.
  * 
  * @param {Object} props
@@ -20,6 +21,9 @@ import { useTenant } from '../../context/TenantContext';
  * @param {string} [props.allLabel='All Classes'] - Label for the "All Classes" option
  * @param {string} [props.allValue='ALL'] - Value for the "All Classes" option
  * @param {boolean} [props.autoSelectFirst=false] - Auto select first class if none selected & allowAll is false
+ * @param {boolean} [props.admissionFilter=false] - Whether to apply admission settings filter
+ * @param {string|number} [props.branchId=null] - Target branch ID for admission rules
+ * @param {Array} [props.allowedClassIds=null] - Explicit allowed class IDs array
  * @param {boolean} [props.required=false] - Required indicator
  * @param {boolean} [props.disabled=false] - Disabled state
  * @param {boolean} [props.searchable=true] - Enable search filter
@@ -39,6 +43,9 @@ export default function ClassSelect({
   allLabel = 'All Classes',
   allValue = 'ALL',
   autoSelectFirst = false,
+  admissionFilter = false,
+  branchId = null,
+  allowedClassIds = null,
   required = false,
   disabled = false,
   searchable = false,
@@ -53,6 +60,18 @@ export default function ClassSelect({
   const { activeTenantId } = useTenant();
   const [internalClasses, setInternalClasses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [admissionSettingsVersion, setAdmissionSettingsVersion] = useState(0);
+
+  // Listen to admission settings updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      setAdmissionSettingsVersion((v) => v + 1);
+    };
+    window.addEventListener("spr_admission_settings_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("spr_admission_settings_updated", handleUpdate);
+    };
+  }, []);
 
   // Fetch classes if propClasses is not supplied
   useEffect(() => {
@@ -87,7 +106,18 @@ export default function ClassSelect({
     };
   }, [propClasses, activeTenantId]);
 
-  const activeClasses = propClasses && Array.isArray(propClasses) ? propClasses : internalClasses;
+  const rawClasses = propClasses && Array.isArray(propClasses) ? propClasses : internalClasses;
+
+  // Filter classes according to admission rules if admissionFilter is true or allowedClassIds provided
+  const activeClasses = useMemo(() => {
+    if (Array.isArray(allowedClassIds) && allowedClassIds.length > 0) {
+      return rawClasses.filter((c) => allowedClassIds.map(String).includes(String(c.id)));
+    }
+    if (admissionFilter) {
+      return admissionSettingsStore.getAllowedAdmissionClasses(activeTenantId, branchId, rawClasses);
+    }
+    return rawClasses;
+  }, [rawClasses, allowedClassIds, admissionFilter, activeTenantId, branchId, admissionSettingsVersion]);
 
   // Auto-select first class if requested
   useEffect(() => {

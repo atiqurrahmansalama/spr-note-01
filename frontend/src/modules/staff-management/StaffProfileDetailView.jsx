@@ -17,6 +17,7 @@ import {
   SleekCheckIcon,
   CloseIcon,
   PlusIcon,
+  ChevronLeftIcon,
 } from '../../components/ui/Icons';
 import { getStaffDetail, getTeacherAssignments, getStaffDuties, getStaffAttendance, getLeaveRequests, applyLeave } from '../../api/staff';
 import { useToast } from '../../context/ToastContext';
@@ -187,9 +188,10 @@ export default function StaffProfileDetailView() {
         <h2 className="text-lg font-bold theme-text-primary">Staff Profile Not Found</h2>
         <button
           onClick={() => navigate('/staff/roster')}
-          className="px-4 py-2 theme-bg-sub hover:theme-bg-elevated theme-text-primary rounded-xl text-xs font-semibold cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-4 py-2 theme-bg-sub hover:theme-bg-elevated theme-text-primary rounded-xl text-xs font-semibold cursor-pointer"
         >
-          ← Return to Staff Roster
+          <ChevronLeftIcon className="w-3.5 h-3.5" />
+          <span>Return to Staff Roster</span>
         </button>
       </div>
     );
@@ -206,9 +208,10 @@ export default function StaffProfileDetailView() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/staff/roster')}
-          className="flex items-center gap-2 text-xs font-medium theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-medium theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer"
         >
-          <span>← Back to Staff Roster</span>
+          <ChevronLeftIcon className="w-3.5 h-3.5" />
+          <span>Back to Staff Roster</span>
         </button>
 
         <div className="flex items-center gap-2">

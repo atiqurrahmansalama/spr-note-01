@@ -47,6 +47,8 @@ class StudentAcademicHistorySerializer(serializers.ModelSerializer):
     student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True, default='')
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+    department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
+    department_type = serializers.CharField(source='student_class.department_type', read_only=True, default='')
     transferred_by_name = serializers.CharField(source='transferred_by.name', read_only=True, default='')
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
@@ -71,6 +73,7 @@ class StudentAcademicHistorySerializer(serializers.ModelSerializer):
             'id', 'student', 'student_name', 'student_uniq_id',
             'student_class', 'student_class_name',
             'student_group', 'student_group_name',
+            'department_name', 'department_type',
             'start_date', 'end_date', 'is_current',
             'transition_reason', 'transferred_by', 'transferred_by_name',
             'created_at'
@@ -285,7 +288,8 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'session_year', 'class_or_group_id', 'class_or_group_name',
             'roll_number', 'admission_date', 'previous_school_name', 'previous_school_address',
-            'previous_class', 'previous_roll_number', 'previous_result', 'previous_passing_year',
+            'previous_class', 'previous_roll_number', 'previous_grade', 'previous_average',
+            'previous_result', 'previous_passing_year',
             'previous_study_details', 'tc_number'
         ]
 
@@ -312,8 +316,8 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             'blood_group', 'birth_certificate_no', 'nid_no', 'photo', 'present_address_data',
             'permanent_address_data', 'academic_data', 'guardian_data',
             'latitude', 'longitude', 'map_place_id',
-            'admission_mode', 'status', 'group_name', 'roll_number', 'education_status',
-            'student_class', 'student_group'
+            'admission_mode', 'status', 'target_status', 'group_name', 'roll_number', 'education_status',
+            'student_class', 'student_group', 'branch'
         ]
 
     @transaction.atomic
@@ -444,9 +448,11 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     guardian_detail = StudentGuardianSerializer(read_only=True)
     documents = StudentDocumentSerializer(many=True, read_only=True)
     academic_history = StudentAcademicHistorySerializer(many=True, read_only=True)
+    details = StudentDetailSerializer(read_only=True)
 
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
+    branch_name = serializers.CharField(source='branch.name', read_only=True, default='')
 
     completed_juz_count = serializers.SerializerMethodField()
     active_juz = serializers.SerializerMethodField()
@@ -463,15 +469,43 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'uniq_id', 'roll_number', 'name', 'name_en', 'bangla_name', 
-            'student_id_card_number', 'gender', 'dob', 'blood_group', 
+            'student_id_card_number', 'gender', 'dob', 'blood_group', 'admission_date',
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
-            'latitude', 'longitude', 'map_place_id',
-            'academic_detail', 'guardian_detail', 'documents', 'academic_history', 'admission_mode', 
+            'latitude', 'longitude', 'map_place_id', 'branch', 'branch_name',
+            'academic_detail', 'guardian_detail', 'details', 'documents', 'academic_history', 'admission_mode', 
             'status', 'student_class', 'student_class_name', 'student_group', 'student_group_name',
             'group_name', 'created_at', 'updated_at', 'education_status',
             'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data',
             'completed_juz_count', 'active_juz', 'recent_error_average', 'quran_progress', 'department_type'
         ]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        g_detail = ret.get('guardian_detail') or {}
+        a_detail = ret.get('academic_detail') or {}
+        details_obj = ret.get('details') or {}
+
+        # Ensure admission_date is present from instance or academic_detail
+        if not ret.get('admission_date') and a_detail.get('admission_date'):
+            ret['admission_date'] = a_detail.get('admission_date')
+
+        # Deep unified details dictionary for frontend consumers
+        ret['details'] = {
+            'date_of_birth': instance.dob or details_obj.get('date_of_birth'),
+            'dob': instance.dob or details_obj.get('date_of_birth'),
+            'blood_group': instance.blood_group or details_obj.get('blood_group'),
+            'father_name': g_detail.get('father_name') or details_obj.get('father_name'),
+            'mother_name': g_detail.get('mother_name') or details_obj.get('mother_name'),
+            'guardian_name': g_detail.get('primary_guardian_name') or g_detail.get('father_name') or details_obj.get('guardian_name'),
+            'guardian_phone': g_detail.get('primary_guardian_phone') or g_detail.get('father_phone') or details_obj.get('guardian_phone'),
+            'emergency_phone': g_detail.get('emergency_contact_phone') or details_obj.get('emergency_phone'),
+            'emergency_contact_phone': g_detail.get('emergency_contact_phone') or details_obj.get('emergency_phone'),
+            'guardian_relation': g_detail.get('guardian_relation') or details_obj.get('guardian_relation'),
+            'father_occupation': g_detail.get('father_occupation'),
+            'guardian_profession': g_detail.get('father_occupation'),
+            'initial_completed_juz': details_obj.get('initial_completed_juz', 0),
+        }
+        return ret
 
     @transaction.atomic
     def update(self, instance, validated_data):

@@ -4,9 +4,9 @@ import { useToast } from '../../context/ToastContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { fetchWithAuth } from '../../utils/authService';
 import { getHijriDateString } from '../../utils/hijriUtils';
-import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
-import AttendanceMatrixTable from '../../components/common/AttendanceMatrixTable';
+import AttendanceTable, { AttendanceDateStepper } from '../../components/common/AttendanceTable';
 import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
+import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDrawer';
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
 import { getTeacherAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
 import { attendanceTimingPolicyStore } from '../../utils/localStore';
@@ -69,11 +69,19 @@ export default function TeacherAttendanceView() {
     enrichedDaysHeader,
     gregorianTitle,
     hijriTitle,
+    isFullHijriMonth,
     isHijriEnabled,
     isFullscreen,
     setIsFullscreen,
     setCalendarEventsVersion,
-  } = useAttendanceDateManager({ activeTenantId, moduleType: 'TEACHER' });
+    stepLabels,
+    isAtMinBound,
+    isAtMaxBound,
+    handleStepBackward,
+    handleStepForward,
+    handleGoToToday,
+    isCurrentPeriodToday,
+  } = useAttendanceDateManager({ activeTenantId, moduleType: 'TEACHER', isAdmin });
 
   // Filter State
   const [classes, setClasses] = useState([]);
@@ -208,24 +216,35 @@ export default function TeacherAttendanceView() {
         } else {
           const rawStatus = dailyStatuses[fullDateStr] || dailyStatuses[d.day] || '';
 
+          const teacherJoiningDate = row.joining_date || row.hire_date || (row.created_at ? row.created_at.slice(0, 10) : null);
           const timingState = getAttendanceCellTimingState({
-            moduleType: 'TEACHER',
+            moduleType: 'TEACHER_CLASS',
             targetDate: fullDateStr,
             startTime: row.start_time || '08:00',
             endTime: row.end_time || '08:45',
             policy: timingPolicy,
             isAdmin,
-            currentStatus: rawStatus,
+            currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
+            effectiveStartDate: teacherJoiningDate,
           });
 
-          const effectiveStatus = rawStatus || timingState.displayStatus || '';
+          let effectiveStatus = '';
+          if (rawStatus === 'NOT_APPLICABLE') {
+            effectiveStatus = 'NOT_APPLICABLE';
+          } else if (rawStatus) {
+            effectiveStatus = rawStatus;
+          } else {
+            effectiveStatus = timingState.displayStatus || '';
+          }
+
           if (effectiveStatus) {
             dailyStatuses[fullDateStr] = effectiveStatus;
+            if (d.day) dailyStatuses[d.day] = effectiveStatus;
           }
 
           if (effectiveStatus === 'PRESENT') {
             pCount += 1;
-          } else if (effectiveStatus === 'LATE' || effectiveStatus === 'HALF_DAY') {
+          } else if (effectiveStatus === 'LATE') {
             lCount += 1;
           } else if (effectiveStatus === 'ABSENT') {
             aCount += 1;
@@ -241,6 +260,13 @@ export default function TeacherAttendanceView() {
 
       return {
         ...row,
+        period_name: row.period_name || row.subject_name || row.slot_name || 'Class Period',
+        time: row.start_time ? `${row.start_time} – ${row.end_time || ''}` : row.schedule_time,
+        effective_from: row.effective_from || row.joining_date || 'Session Start',
+        effective_to: row.effective_to,
+        history_log: row.history_log || [],
+        has_history: Boolean(row.history_log && row.history_log.length > 0),
+        is_deleted: row.is_deleted,
         daily_statuses: dailyStatuses,
         totals: {
           present: pCount,
@@ -383,8 +409,51 @@ export default function TeacherAttendanceView() {
       />
 
       {/* 2. Top Filter Controls Bar */}
-      <div className="p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4">
+        {/* Top Row: Date Display & Reusable Stepper */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+              <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
+                {isFullHijriMonth ? hijriTitle : gregorianTitle}
+              </h2>
+            </div>
+
+            {isFullHijriMonth ? (
+              <p className="text-xs theme-accent font-medium pl-6">
+                Gregorian Range: <span className="font-semibold">{gregorianTitle}</span>
+              </p>
+            ) : isHijriEnabled ? (
+              <p className="text-xs theme-accent font-medium pl-6">
+                Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
+              </p>
+            ) : null}
+
+            {/* Tracking Baseline Date Indicator */}
+            <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary pt-1 pl-6">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium theme-bg-sub border theme-border theme-text-secondary">
+                <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                <span>Calculated from: <strong className="theme-text-primary">{activeAcademicYear?.startDate || minDate || 'Session Start'}</strong> ({activeAcademicYear?.name || 'Active Academic Year'})</span>
+              </span>
+            </div>
+          </div>
+
+          <AttendanceDateStepper
+            stepLabels={stepLabels}
+            onStepBackward={handleStepBackward}
+            onStepForward={handleStepForward}
+            onToday={handleGoToToday}
+            isToday={isCurrentPeriodToday}
+            isAtMinBound={isAtMinBound}
+            isAtMaxBound={isAtMaxBound}
+            minBoundTooltip={`Reached start of Academic Year (${activeAcademicYear?.name || 'Active Year'})`}
+            maxBoundTooltip={`Reached end of Academic Year (${activeAcademicYear?.name || 'Active Year'})`}
+          />
+        </div>
+
+        {/* Bottom Row: 4 Filter Selectors */}
+        <div className="border-t theme-border pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-end">
           {/* Department Filter */}
           <CustomSelect
             label="Department"
@@ -436,8 +505,18 @@ export default function TeacherAttendanceView() {
             startDate={startDate}
             endDate={endDate}
             onRangeSelect={(start, end) => {
-              setStartDate(start);
-              setEndDate(end);
+              let safeStart = start;
+              let safeEnd = end;
+              if (!isAdmin && minDate && safeStart && safeStart < minDate) {
+                showToast(`Selected date cannot precede the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`, 'warning');
+                safeStart = minDate;
+              }
+              if (!isAdmin && maxDate && safeEnd && safeEnd > maxDate) {
+                showToast(`Selected date cannot exceed the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`, 'warning');
+                safeEnd = maxDate;
+              }
+              setStartDate(safeStart);
+              setEndDate(safeEnd);
             }}
             onReset={handleResetDate}
             isHijriEnabled={isHijriEnabled}
@@ -454,7 +533,7 @@ export default function TeacherAttendanceView() {
             : 'rounded-3xl theme-bg-surface border theme-border shadow-xs overflow-hidden'
         }
       >
-        <AttendanceMatrixTable
+        <AttendanceTable
           daysHeader={matrixData.days_header?.length > 0 ? matrixData.days_header : enrichedDaysHeader}
           rows={filteredTeacherRows}
           idLabel="#"
@@ -463,10 +542,27 @@ export default function TeacherAttendanceView() {
           descriptorIcon={TimerIcon}
           isEditing={false}
           onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
+          onInspectHistory={(row) => {
+            if (!row) return;
+            openRightSidebar({
+              title: 'Teacher Period Timeline & Evolution',
+              subtitle: `${row.period_name || 'Class Period'} • ${row.name || 'Faculty Member'}`,
+              icon: TimelineIcon,
+              width: 520,
+              content: (
+                <ScheduleTimelineDrawer
+                  item={row}
+                  onClose={closeRightSidebar}
+                />
+              ),
+            });
+          }}
           isHijriEnabled={isHijriEnabled}
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
           emptyMessage="No teaching staff or assigned period slots found matching your filter criteria."
+          calculationBaselineDate={activeAcademicYear?.startDate || minDate || 'Session Start'}
+          calculationBaselineLabel="Tracking Since"
           totalCount={uniqueTeachersCount}
           totalCountLabel="Total Faculty"
           isFullscreen={isFullscreen}

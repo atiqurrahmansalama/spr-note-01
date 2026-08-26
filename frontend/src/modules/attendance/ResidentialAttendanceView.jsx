@@ -11,6 +11,7 @@ import {
   FullScreenIcon,
   MinimizeIcon,
   ClockIcon,
+  TimelineIcon,
 } from '../../components/ui/Icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { PageContainer } from '../../components/layout';
@@ -42,7 +43,8 @@ import {
   cycleStatusWithinAllowed,
   calculateLateDelayMinutes,
 } from '../../utils/attendanceTimingEngine';
-import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import AttendanceTable, { TakeAttendanceButton, AttendanceDateStepper } from '../../components/common/AttendanceTable';
+import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDrawer';
 import { useFullscreen } from '../../hooks/useFullscreen';
 
 const DEFAULT_INITIAL_CHECKPOINTS = [
@@ -174,7 +176,7 @@ export default function ResidentialAttendanceView({
     }
   });
 
-  // Checkpoint-specific Attendance Records: { [`${studentId}_${checkpointId}_${dateStr}`]: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'ON_LEAVE' }
+  // Checkpoint-specific Attendance Records: { [`${studentId}_${checkpointId}_${dateStr}`]: 'PRESENT' | 'ABSENT' | 'LATE' | 'ON_LEAVE' }
   const [residentialRecords, setResidentialRecords] = useState(() => {
     try {
       const saved = localStorage.getItem(`spr_res_records_${activeTenantId || 'default'}`);
@@ -375,14 +377,66 @@ export default function ResidentialAttendanceView({
 
   const stepLabels = getStepLabels();
 
+  const isAtMinBound = useMemo(() => {
+    if (isAdmin || !academicBounds.minDate) return false;
+    if (startDate) {
+      return startDate <= academicBounds.minDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const currentMonthEnd = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+    return currentMonthStart <= academicBounds.minDate || currentMonthEnd <= academicBounds.minDate;
+  }, [isAdmin, academicBounds.minDate, startDate, selectedYear, selectedMonth]);
+
+  const isAtMaxBound = useMemo(() => {
+    if (isAdmin || !academicBounds.maxDate) return false;
+    if (endDate) {
+      return endDate >= academicBounds.maxDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const maxMonthPrefix = academicBounds.maxDate.slice(0, 7);
+    return currentMonthStart >= `${maxMonthPrefix}-01`;
+  }, [isAdmin, academicBounds.maxDate, endDate, selectedYear, selectedMonth]);
+
+  const handleGoToToday = useCallback(() => {
+    const now = new Date();
+    setSelectedYear(now.getFullYear());
+    setSelectedMonth(now.getMonth() + 1);
+    setStartDate('');
+    setEndDate('');
+  }, []);
+
+  const isCurrentPeriodToday = useMemo(() => {
+    const now = new Date();
+    if (startDate && endDate) {
+      return todayStr >= startDate && todayStr <= endDate;
+    }
+    return selectedYear === now.getFullYear() && selectedMonth === (now.getMonth() + 1);
+  }, [startDate, endDate, selectedYear, selectedMonth, todayStr]);
+
   const handleStepBackward = () => {
     if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
       if (selectedMonth === 1) {
-        setSelectedMonth(12);
-        setSelectedYear((y) => y - 1);
+        targetMonth = 12;
+        targetYear = selectedYear - 1;
       } else {
-        setSelectedMonth((m) => m - 1);
+        targetMonth = selectedMonth - 1;
       }
+
+      // Enforce Academic Year bounds for non-admins
+      if (!isAdmin && academicBounds.minDate) {
+        const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+        const targetMonthEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(lastDayOfTargetMonth).padStart(2, '0')}`;
+        if (targetMonthEnd < academicBounds.minDate) {
+          showToast(`Navigation before the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
       return;
     }
 
@@ -391,18 +445,40 @@ export default function ResidentialAttendanceView({
     const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
     s.setDate(s.getDate() - dayCount);
     e.setDate(e.getDate() - dayCount);
-    setStartDate(s.toISOString().split('T')[0]);
-    setEndDate(e.toISOString().split('T')[0]);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && academicBounds.minDate && newEnd < academicBounds.minDate) {
+      showToast(`Navigation before the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const handleStepForward = () => {
     if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
       if (selectedMonth === 12) {
-        setSelectedMonth(1);
-        setSelectedYear((y) => y + 1);
+        targetMonth = 1;
+        targetYear = selectedYear + 1;
       } else {
-        setSelectedMonth((m) => m + 1);
+        targetMonth = selectedMonth + 1;
       }
+
+      // Enforce Academic Year bounds for non-admins
+      if (!isAdmin && academicBounds.maxDate) {
+        const targetMonthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`;
+        if (targetMonthStart > academicBounds.maxDate) {
+          showToast(`Navigation beyond the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
       return;
     }
 
@@ -411,13 +487,31 @@ export default function ResidentialAttendanceView({
     const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
     s.setDate(s.getDate() + dayCount);
     e.setDate(e.getDate() + dayCount);
-    setStartDate(s.toISOString().split('T')[0]);
-    setEndDate(e.toISOString().split('T')[0]);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && academicBounds.maxDate && newStart > academicBounds.maxDate) {
+      showToast(`Navigation beyond the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}) is restricted to administrators.`, 'warning');
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const handleDateRangeSelect = (start, end) => {
-    setStartDate(start);
-    setEndDate(end);
+    let safeStart = start;
+    let safeEnd = end;
+    if (!isAdmin && academicBounds.minDate && safeStart && safeStart < academicBounds.minDate) {
+      showToast(`Selected date cannot precede the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`, 'warning');
+      safeStart = academicBounds.minDate;
+    }
+    if (!isAdmin && academicBounds.maxDate && safeEnd && safeEnd > academicBounds.maxDate) {
+      showToast(`Selected date cannot exceed the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`, 'warning');
+      safeEnd = academicBounds.maxDate;
+    }
+    setStartDate(safeStart);
+    setEndDate(safeEnd);
   };
 
   const handleResetDateRange = () => {
@@ -749,14 +843,44 @@ export default function ResidentialAttendanceView({
     });
   };
 
-  // Active checkpoints to show
+  // Active checkpoints to show with temporal validity filtering
   const activeCheckpoints = useMemo(() => {
+    const monthStart = startDate || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const monthEnd = endDate || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+    const temporallyValid = checkpoints.filter((chk) => {
+      if (chk.is_deleted) {
+        if (chk.deleted_at && chk.deleted_at.slice(0, 10) < monthStart) {
+          // Check if there are recorded attendances in this window
+          const hasRecorded = Object.keys(residentialRecords || {}).some((k) => {
+            if (!k.includes(`_${chk.id}_`)) return false;
+            const dPart = k.split('_').pop();
+            return dPart >= monthStart && dPart <= monthEnd;
+          });
+          if (!hasRecorded) return false;
+        }
+      }
+      if (chk.effective_from && chk.effective_from > monthEnd) {
+        return false;
+      }
+      if (chk.effective_to && chk.effective_to < monthStart) {
+        const hasRecorded = Object.keys(residentialRecords || {}).some((k) => {
+          if (!k.includes(`_${chk.id}_`)) return false;
+          const dPart = k.split('_').pop();
+          return dPart >= monthStart && dPart <= monthEnd;
+        });
+        if (!hasRecorded) return false;
+      }
+      return true;
+    });
+
     if (selectedCheckpointId === 'ALL') {
-      return checkpoints;
+      return temporallyValid.length > 0 ? temporallyValid : checkpoints;
     }
-    const found = checkpoints.filter((c) => String(c.id) === String(selectedCheckpointId));
-    return found.length > 0 ? found : checkpoints;
-  }, [checkpoints, selectedCheckpointId]);
+    const found = temporallyValid.filter((c) => String(c.id) === String(selectedCheckpointId));
+    return found.length > 0 ? found : (temporallyValid.length > 0 ? temporallyValid : checkpoints);
+  }, [checkpoints, selectedCheckpointId, startDate, endDate, selectedYear, selectedMonth, residentialRecords]);
 
   // Unique Students from matrix with guaranteed unique IDs
   const uniqueStudents = useMemo(() => {
@@ -803,7 +927,7 @@ export default function ResidentialAttendanceView({
         const st = rawStatus || timingState.displayStatus || '';
 
         if (st === 'PRESENT') p += 1;
-        else if (st === 'LATE' || st === 'HALF_DAY') l += 1;
+        else if (st === 'LATE') l += 1;
         else if (st === 'ABSENT') a += 1;
         else if (st === 'ON_LEAVE') lv += 1;
       });
@@ -832,7 +956,6 @@ export default function ResidentialAttendanceView({
       'Present',
       'Late',
       'Absent',
-      'Half Day',
       'Leave',
       'Rate %',
     ];
@@ -859,7 +982,6 @@ export default function ResidentialAttendanceView({
           totals.present,
           totals.late,
           totals.absent,
-          totals.half_day,
           totals.on_leave,
           `"${totals.attendance_rate}%"`,
         ].join(','));
@@ -1008,29 +1130,28 @@ export default function ResidentialAttendanceView({
                   Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
                 </p>
               ) : null}
+
+              {/* Tracking Baseline Date Indicator */}
+              <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary pt-1 pl-6">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium theme-bg-sub border theme-border theme-text-secondary">
+                  <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                  <span>Calculated from: <strong className="theme-text-primary">{academicBounds.activeYear?.startDate || academicBounds.minDate || 'Session Start'}</strong> ({academicBounds.activeYear?.name || 'Active Academic Year'})</span>
+                </span>
+              </div>
             </div>
 
-            {/* Smart Stepper Controls */}
-            <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-              <button
-                type="button"
-                onClick={handleStepBackward}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
-                title={stepLabels.prev}
-              >
-                <span>←</span>
-                <span>{stepLabels.prev}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleStepForward}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary text-xs font-medium transition-all cursor-pointer shadow-xs"
-                title={stepLabels.next}
-              >
-                <span>{stepLabels.next}</span>
-                <span>→</span>
-              </button>
-            </div>
+            {/* Reusable Enterprise Stepper Controls */}
+            <AttendanceDateStepper
+              stepLabels={stepLabels}
+              onStepBackward={handleStepBackward}
+              onStepForward={handleStepForward}
+              onToday={handleGoToToday}
+              isToday={isCurrentPeriodToday}
+              isAtMinBound={isAtMinBound}
+              isAtMaxBound={isAtMaxBound}
+              minBoundTooltip={`Reached start of Academic Year (${academicBounds.activeYear?.name || 'Active Year'})`}
+              maxBoundTooltip={`Reached end of Academic Year (${academicBounds.activeYear?.name || 'Active Year'})`}
+            />
           </div>
 
           {/* Bottom Row: 4 Filters with Standard Project Labels (Matching Class Attendance) */}
@@ -1109,10 +1230,11 @@ export default function ResidentialAttendanceView({
             : "rounded-3xl theme-bg-surface border theme-border shadow-xs overflow-hidden"
         }
       >
-        <AttendanceMatrixTable
+        <AttendanceTable
           daysHeader={enrichedMatrixData?.days_header || []}
           rows={uniqueStudents.flatMap((student) => {
             const studentId = student.student_id || student.id;
+
             return activeCheckpoints.map((chk, chkIdx) => {
               const dailyStatuses = {};
               let chkP = 0, chkL = 0, chkA = 0, chkLv = 0;
@@ -1125,36 +1247,49 @@ export default function ResidentialAttendanceView({
                 const timingState = getAttendanceCellTimingState({
                   moduleType: 'RESIDENTIAL',
                   targetDate: dateStr,
-                  startTime: chk.time,
                   policy: timingPolicy,
+                  slotType: 'RESIDENTIAL',
                   isAdmin,
-                  currentStatus: rawStatus,
                 });
 
-                const st = rawStatus || timingState.displayStatus || '';
-                if (st) {
-                  dailyStatuses[dateStr] = st;
-                  if (st === 'PRESENT') chkP += 1;
-                  else if (st === 'LATE' || st === 'HALF_DAY') chkL += 1;
-                  else if (st === 'ABSENT') chkA += 1;
-                  else if (st === 'ON_LEAVE') chkLv += 1;
-                }
+                if (rawStatus === 'PRESENT') chkP += 1;
+                else if (rawStatus === 'LATE') chkL += 1;
+                else if (rawStatus === 'ABSENT') chkA += 1;
+                else if (rawStatus === 'ON_LEAVE' || rawStatus === 'LEAVE') chkLv += 1;
+
+                dailyStatuses[dateStr] = {
+                  status: rawStatus,
+                  time_in: rawRec?.time_in,
+                  late_minutes: rawRec?.late_minutes || 0,
+                  verified_by: rawRec?.verified_by_name,
+                  locked: timingState.isLocked,
+                  notes: rawRec?.notes,
+                };
               });
 
-              const chkTotal = chkP + chkL + chkA + chkLv;
-              const chkEffective = chkP + chkL;
-              const chkRate = chkTotal > 0 ? Math.round((chkEffective / chkTotal) * 100) : 100;
+              const totalUnits = chkP + chkL + chkA + chkLv;
+              const ratePct = totalUnits > 0 ? Math.round(((chkP + chkL) / totalUnits) * 100) : 100;
 
               return {
-                row_key: `${studentId}_${chk.id}_${chkIdx}`,
+                ...chk,
                 id: studentId,
                 student_id: studentId,
-                roll_number: student.roll_number,
-                name: student.name || student.student_name,
-                group_name: student.group_name || student.class_name,
-                schedule_time: chk.time,
-                checkpoint_time: chk.name,
+                roll_number: student.roll_number || '—',
+                name: student.name_en || student.name || 'Student',
+                student_name: student.name_en || student.name || 'Student',
+                group_name: student.group_name || student.student_group_name || student.student_class_name,
+                class_name: selectedClassName || student.class_name,
                 checkpoint_id: chk.id,
+                checkpoint_name: chk.name,
+                period_name: chk.name,
+                checkpoint_time: chk.time,
+                time: chk.time,
+                warden_name: chk.warden_name,
+                effective_from: chk.effective_from || student.admission_date || 'Session Start',
+                effective_to: chk.effective_to,
+                history_log: chk.history_log || [],
+                has_history: Boolean(chk.history_log && chk.history_log.length > 0),
+                is_deleted: chk.is_deleted,
                 checkpoint_count: activeCheckpoints.length,
                 checkpoint_index: chkIdx,
                 daily_statuses: dailyStatuses,
@@ -1162,8 +1297,8 @@ export default function ResidentialAttendanceView({
                   present: chkP,
                   late: chkL,
                   absent: chkA,
-                  on_leave: chkLv,
-                  attendance_rate: chkRate,
+                  leave: chkLv,
+                  rate: ratePct,
                 },
               };
             });
@@ -1173,10 +1308,29 @@ export default function ResidentialAttendanceView({
           descriptorLabel="Time & Checkpoint"
           descriptorIcon={TimerIcon}
           isEditing={isEditing}
-          onToggleCell={(studentId, dateStr, currentStatus, checkpointId) => {
-            handleToggleCell(studentId, dateStr, currentStatus, checkpointId);
+          onToggleCell={(row, d, rawStatus) => {
+            const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+            handleToggleCell(row.student_id || row.id, dateStr, rawStatus, row.checkpoint_id);
           }}
-          onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
+          onAdminEditCell={isAdmin ? (row, d, rawStatus) => {
+            const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+            handleAdminEditCell(row, dateStr, rawStatus, row.checkpoint_id);
+          } : undefined}
+          onInspectHistory={(row) => {
+            if (!row) return;
+            openRightSidebar({
+              title: 'Residential Checkpoint Timeline',
+              subtitle: `${row.checkpoint_name || row.period_name || 'Checkpoint'} • ${row.student_name || row.name || 'Student Routine'}`,
+              icon: TimelineIcon,
+              width: 520,
+              content: (
+                <ScheduleTimelineDrawer
+                  item={row}
+                  onClose={closeRightSidebar}
+                />
+              ),
+            });
+          }}
           isHijriEnabled={isHijriEnabled}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
@@ -1184,6 +1338,8 @@ export default function ResidentialAttendanceView({
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
           emptyMessage="No students found for this class and residential selection."
+          calculationBaselineDate={academicBounds.activeYear?.startDate || academicBounds.minDate || 'Session Start'}
+          calculationBaselineLabel="Tracking Since"
           totalCount={uniqueStudents.length}
           totalCountLabel="Total Students"
           isFullscreen={isFullscreen}

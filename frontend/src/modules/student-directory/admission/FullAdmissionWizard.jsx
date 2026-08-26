@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import CustomInput from "../../../components/ui/CustomInput";
@@ -9,11 +9,26 @@ import Stepper from "../../../components/ui/Stepper";
 import ReusableCalendar from "../../../components/common/ReusableCalendar";
 import { BD_GEO_DATA } from "../../../utils/bangladeshGeoData";
 import { calculateAge, validateBDPhone, validateBRN, validateNID } from "../../../utils/inputValidators";
-import { CameraIcon, UploadIcon, ChevronIcon, CheckCircleIcon, IdentificationIcon } from "../../../components/ui/Icons";
+import {
+  CameraIcon,
+  UploadIcon,
+  ChevronIcon,
+  CheckCircleIcon,
+  IdentificationIcon,
+  SearchIcon,
+  BuildingOffice2Icon,
+} from "../../../components/ui/Icons";
 import AddressPickerInput from "../../../components/ui/AddressPickerInput";
 import MultiDocumentManager from "../../../components/ui/MultiDocumentManager";
 import DocumentFilePicker from "../../../components/ui/DocumentFilePicker";
-import { classAdmissionRequirementsStore } from "../../../utils/localStore";
+import { getBranches } from "../../../api/academy";
+import {
+  classAdmissionRequirementsStore,
+  academicYearsStore,
+  admissionSettingsStore,
+  getAcademicYearStatus,
+  DEFAULT_PREVIOUS_CLASSES,
+} from "../../../utils/localStore";
 import { useTenant } from "../../../context/TenantContext";
 
 const ADMISSION_STEPS = [
@@ -28,19 +43,13 @@ const RELATION_OPTIONS = [
   "Mother",
   "Brother",
   "Sister",
-  "Uncle",
+  "Uncle (Paternal)",
+  "Uncle (Maternal)",
   "Aunt",
   "Grandfather",
   "Grandmother",
-  "Other",
-];
-
-const SESSION_YEAR_OPTIONS = [
-  { label: "2026-2027 (Current Session)", value: "2026-2027" },
-  { label: "2025-2026 (Previous Session)", value: "2025-2026" },
-  { label: "2027-2028 (Upcoming Session)", value: "2027-2028" },
-  { label: "2028-2029", value: "2028-2029" },
-  { label: "2024-2025", value: "2024-2025" },
+  "Legal Guardian",
+  "Other Relative",
 ];
 
 const IDENTITY_DOC_OPTIONS = [
@@ -48,7 +57,13 @@ const IDENTITY_DOC_OPTIONS = [
   { label: "National ID", value: "NID" },
 ];
 
-function RelationCombobox({ value, onChange, placeholder = "Select or type relation..." }) {
+export function SmartCombobox({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select or type...",
+  required = false,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -62,6 +77,13 @@ function RelationCombobox({ value, onChange, placeholder = "Select or type relat
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const filtered = useMemo(() => {
+    if (!value) return options;
+    const valLower = value.toLowerCase();
+    const matches = options.filter((opt) => opt.toLowerCase().includes(valLower));
+    return matches.length > 0 ? matches : options;
+  }, [options, value]);
+
   return (
     <div ref={dropdownRef} className="relative w-full">
       <div className="relative flex items-center">
@@ -71,7 +93,7 @@ function RelationCombobox({ value, onChange, placeholder = "Select or type relat
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          required
+          required={required}
           className="w-full px-4 py-3 pr-10 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all"
         />
         <button
@@ -86,7 +108,7 @@ function RelationCombobox({ value, onChange, placeholder = "Select or type relat
 
       {isOpen && (
         <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 max-h-56 overflow-y-auto animate-fade-in custom-scrollbar">
-          {RELATION_OPTIONS.map((opt) => (
+          {filtered.map((opt) => (
             <button
               key={opt}
               type="button"
@@ -110,6 +132,18 @@ function RelationCombobox({ value, onChange, placeholder = "Select or type relat
   );
 }
 
+function RelationCombobox({ value, onChange, placeholder = "Select or type relation..." }) {
+  return (
+    <SmartCombobox
+      value={value}
+      onChange={onChange}
+      options={RELATION_OPTIONS}
+      placeholder={placeholder}
+      required={true}
+    />
+  );
+}
+
 export default function FullAdmissionWizard({
   onCancel,
   onSuccess,
@@ -124,8 +158,80 @@ export default function FullAdmissionWizard({
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
 
+  const { activeTenantId } = useTenant();
+  const [academicYears, setAcademicYears] = useState(() => academicYearsStore.getAcademicYears(activeTenantId));
+  const [admissionSettings, setAdmissionSettings] = useState(() => admissionSettingsStore.getSettings(activeTenantId));
+
+  useEffect(() => {
+    setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
+    setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
+
+    const handleAcademicUpdate = () => {
+      setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
+    };
+    const handleSettingsUpdate = () => {
+      setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
+    };
+
+    window.addEventListener("spr_academic_years_updated", handleAcademicUpdate);
+    window.addEventListener("spr_admission_settings_updated", handleSettingsUpdate);
+    window.addEventListener("spr_tenant_changed", handleAcademicUpdate);
+    window.addEventListener("spr_tenant_changed", handleSettingsUpdate);
+
+    return () => {
+      window.removeEventListener("spr_academic_years_updated", handleAcademicUpdate);
+      window.removeEventListener("spr_admission_settings_updated", handleSettingsUpdate);
+      window.removeEventListener("spr_tenant_changed", handleAcademicUpdate);
+      window.removeEventListener("spr_tenant_changed", handleSettingsUpdate);
+    };
+  }, [activeTenantId]);
+
+  const allowedAdmissionYears = useMemo(() => {
+    return admissionSettingsStore.getAllowedAdmissionYears(activeTenantId);
+  }, [activeTenantId, academicYears, admissionSettings]);
+
+  const ongoingAdmissionYear = useMemo(() => {
+    return admissionSettingsStore.getActiveAdmissionYear(activeTenantId);
+  }, [activeTenantId, academicYears, admissionSettings]);
+
+  const configuredPreviousClasses = useMemo(() => {
+    return admissionSettingsStore.getPreviousClasses(activeTenantId);
+  }, [activeTenantId, admissionSettings]);
+
+  const sessionOptions = useMemo(() => {
+    const list = allowedAdmissionYears && allowedAdmissionYears.length > 0 ? allowedAdmissionYears : academicYears;
+    if (!list || list.length === 0) {
+      return [{ label: "2026-2027 (Current Session)", value: "2026-2027" }];
+    }
+    return list.map((ay) => {
+      const status = getAcademicYearStatus(ay.startDate, ay.endDate);
+      const isOngoingTarget =
+        String(ay.id) === String(ongoingAdmissionYear?.id) ||
+        String(ay.name) === String(ongoingAdmissionYear?.name);
+      const statusTag = isOngoingTarget
+        ? " (Ongoing Admissions)"
+        : status === "ACTIVE"
+        ? " (Active)"
+        : status === "UPCOMING"
+        ? " (Upcoming)"
+        : " (Completed)";
+      return {
+        label: `${ay.name}${statusTag}`,
+        value: ay.name,
+        startDate: ay.startDate,
+        endDate: ay.endDate,
+        status,
+        isOngoing: isOngoingTarget,
+      };
+    });
+  }, [allowedAdmissionYears, academicYears, ongoingAdmissionYear]);
+
   // Internal state fallback if not managed by parent container
   const [internalSharedData, setInternalSharedData] = useState({
+    student_type: "NEW", // 'NEW' | 'EXISTING'
+    existing_student_id: null,
+    branch_id: tokenMeta?.branch_id || "",
+    target_status: "NON_RESIDENTIAL", // 'NON_RESIDENTIAL' | 'RESIDENTIAL' | 'DAY_CARE'
     name: "",
     bangla_name: "",
     gender: "MALE",
@@ -135,12 +241,13 @@ export default function FullAdmissionWizard({
     nid_no: "",
     student_class: tokenMeta?.target_class_id || "",
     education_status: tokenMeta?.target_class_name || "",
-    session_year: tokenMeta?.session_year || "2026-2027",
+    session_year: tokenMeta?.session_year || ongoingAdmissionYear?.name || "2026-2027",
     admission_date: new Date().toISOString().split("T")[0],
     previous_school_name: "",
     previous_school_address: "",
     previous_class: "",
-    previous_roll_number: "",
+    previous_grade: "",
+    previous_average: "",
     previous_result: "",
     previous_passing_year: "",
     previous_study_details: "",
@@ -176,6 +283,196 @@ export default function FullAdmissionWizard({
 
   const sharedData = propSharedData || internalSharedData;
   const setSharedData = propSetSharedData || setInternalSharedData;
+
+  // Institutional Branches
+  const [branches, setBranches] = useState([]);
+  useEffect(() => {
+    let isMounted = true;
+    getBranches()
+      .then((data) => {
+        if (isMounted) {
+          const list = Array.isArray(data) ? data : (data.results || []);
+          setBranches(list);
+          const allowedList = admissionSettingsStore.getAllowedAdmissionBranches(activeTenantId, list);
+          if (allowedList.length > 0 && !sharedData.branch_id) {
+            setSharedData((prev) => ({ ...prev, branch_id: allowedList[0].id }));
+          }
+        }
+      })
+      .catch((err) => console.warn("Failed to load branches:", err));
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTenantId]);
+
+  const branchOptions = useMemo(() => {
+    const allowed = admissionSettingsStore.getAllowedAdmissionBranches(activeTenantId, branches);
+    return allowed.map((b) => {
+      const bName = b.branch_name || b.name || "Branch";
+      const bCode = b.branch_code || b.code;
+      return {
+        label: bName + (bCode ? ` (${bCode})` : ""),
+        value: b.id,
+      };
+    });
+  }, [branches, activeTenantId, admissionSettings]);
+
+  // Residential Status Options
+  const residentialOptions = [
+    { label: "Non-Residential / Day Scholar", value: "NON_RESIDENTIAL" },
+    { label: "Residential / Boarding", value: "RESIDENTIAL" },
+    { label: "Day Care", value: "DAY_CARE" },
+  ];
+
+  // Existing Student Lookup & Auto-fill State
+  const [studentType, setStudentType] = useState(sharedData.student_type || "NEW");
+  const [existingStudentQuery, setExistingStudentQuery] = useState("");
+  const [existingStudentResults, setExistingStudentResults] = useState([]);
+  const [isSearchingExisting, setIsSearchingExisting] = useState(false);
+  const [selectedExistingStudent, setSelectedExistingStudent] = useState(null);
+
+  const handleStudentTypeChange = (type) => {
+    setStudentType(type);
+    handleChange("student_type", type);
+    if (type === "NEW") {
+      setSelectedExistingStudent(null);
+      setExistingStudentQuery("");
+      setExistingStudentResults([]);
+    }
+  };
+
+  // Debounced search for existing student
+  useEffect(() => {
+    if (studentType !== "EXISTING" || !existingStudentQuery || existingStudentQuery.trim().length < 2) {
+      setExistingStudentResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsSearchingExisting(true);
+      fetchWithAuth(`/api/v1/students/?search=${encodeURIComponent(existingStudentQuery.trim())}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          const list = Array.isArray(data) ? data : (data.results || []);
+          setExistingStudentResults(list);
+        })
+        .catch(() => setExistingStudentResults([]))
+        .finally(() => setIsSearchingExisting(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [existingStudentQuery, studentType]);
+
+  const handleSelectExistingStudent = (stu) => {
+    if (!stu) return;
+    setSelectedExistingStudent(stu);
+    setExistingStudentResults([]);
+    setExistingStudentQuery(`${stu.name_en || stu.name || ""} (Roll: ${stu.roll_number || "--"})`);
+
+    const g = Array.isArray(stu.guardians) && stu.guardians.length > 0 ? stu.guardians[0] : (stu.details || {});
+    const pAddr = stu.present_address || {};
+    const permAddr = stu.permanent_address || {};
+
+    setSharedData((prev) => ({
+      ...prev,
+      student_type: "EXISTING",
+      existing_student_id: stu.id,
+      name: stu.name_en || stu.name || prev.name,
+      bangla_name: stu.bangla_name || stu.details?.name_bn || prev.bangla_name,
+      gender: stu.gender || prev.gender,
+      dob: stu.dob || stu.details?.date_of_birth || prev.dob,
+      blood_group: stu.blood_group || stu.details?.blood_group || prev.blood_group,
+      birth_certificate_no: stu.birth_certificate_no || prev.birth_certificate_no,
+      nid_no: stu.nid_no || prev.nid_no,
+      target_status: stu.target_status || prev.target_status || "NON_RESIDENTIAL",
+      branch_id: stu.branch?.id || stu.branch || prev.branch_id,
+      father_name: g.father_name || stu.father_name || prev.father_name,
+      father_phone: g.father_phone || stu.father_phone || prev.father_phone,
+      father_occupation: g.father_occupation || prev.father_occupation,
+      mother_name: g.mother_name || stu.mother_name || prev.mother_name,
+      mother_phone: g.mother_phone || prev.mother_phone,
+      mother_occupation: g.mother_occupation || prev.mother_occupation,
+      primary_guardian_name: g.primary_guardian_name || g.guardian_name || prev.primary_guardian_name,
+      guardian_phone: g.primary_guardian_phone || g.guardian_phone || prev.guardian_phone,
+      guardian_relation: g.guardian_relation || prev.guardian_relation || "Father",
+      guardian_nid: g.guardian_nid || prev.guardian_nid,
+      emergency_contact_phone: g.emergency_contact_phone || stu.details?.emergency_phone || prev.emergency_contact_phone,
+      street_address: pAddr.street_address || pAddr.street || prev.street_address,
+      post_code: pAddr.post_code || prev.post_code,
+      thana_or_upazila: pAddr.upazila || pAddr.thana_or_upazila || prev.thana_or_upazila,
+      district: pAddr.district || prev.district,
+      division: pAddr.division || prev.division,
+      perm_street: permAddr.street_address || permAddr.street || prev.perm_street,
+      perm_post_code: permAddr.post_code || prev.perm_post_code,
+      perm_thana: permAddr.upazila || permAddr.thana_or_upazila || prev.perm_thana,
+      perm_district: permAddr.district || prev.perm_district,
+      perm_division: permAddr.division || prev.perm_division,
+      previous_school_name: stu.academic_detail?.previous_school_name || stu.institution_name || prev.previous_school_name,
+      previous_class: stu.education_status || stu.student_class_name || prev.previous_class,
+    }));
+
+    if (stu.photo_url || stu.photo || stu.details?.photo) {
+      setPhotoPreview(stu.photo_url || stu.photo || stu.details?.photo);
+    }
+
+    showToast(`Loaded details for ${stu.name_en || stu.name}`, "success");
+  };
+
+  const handleClearExistingStudent = () => {
+    setSelectedExistingStudent(null);
+    setExistingStudentQuery("");
+    setExistingStudentResults([]);
+    showToast("Existing student selection cleared.", "info");
+  };
+
+  // Effective Policy for Gender & Field Visibility
+  const effectivePolicy = useMemo(() => {
+    return admissionSettingsStore.getEffectivePolicyForBranch(
+      activeTenantId,
+      sharedData.branch_id || tokenMeta?.branch_id
+    );
+  }, [activeTenantId, admissionSettings, sharedData.branch_id, tokenMeta]);
+
+  // Dynamic Gender Options based on campus lock
+  const genderOptions = useMemo(() => {
+    if (effectivePolicy.isMaleOnly) {
+      return [{ label: "Male (Campus Policy: Boys Only)", value: "MALE" }];
+    }
+    if (effectivePolicy.isFemaleOnly) {
+      return [{ label: "Female (Campus Policy: Girls Only)", value: "FEMALE" }];
+    }
+    return [
+      { label: "Male", value: "MALE" },
+      { label: "Female", value: "FEMALE" },
+      { label: "Other", value: "OTHER" },
+    ];
+  }, [effectivePolicy]);
+
+  // Automatically enforce gender lock if restricted
+  useEffect(() => {
+    if (effectivePolicy.isMaleOnly && sharedData.gender !== "MALE") {
+      setSharedData((prev) => ({ ...prev, gender: "MALE" }));
+    } else if (effectivePolicy.isFemaleOnly && sharedData.gender !== "FEMALE") {
+      setSharedData((prev) => ({ ...prev, gender: "FEMALE" }));
+    }
+  }, [effectivePolicy, sharedData.gender, setSharedData]);
+
+  // Selected academic year object based on sharedData.session_year
+  const selectedAcademicYear = useMemo(() => {
+    if (!sharedData.session_year) return ongoingAdmissionYear;
+    const found = academicYears.find(
+      (ay) => String(ay.name).toLowerCase() === String(sharedData.session_year).toLowerCase()
+    );
+    return found || ongoingAdmissionYear;
+  }, [academicYears, sharedData.session_year, ongoingAdmissionYear]);
+
+  // Synchronize default session_year if unset
+  useEffect(() => {
+    if (!sharedData.session_year && ongoingAdmissionYear?.name) {
+      setSharedData((prev) => ({
+        ...prev,
+        session_year: ongoingAdmissionYear.name,
+      }));
+    }
+  }, [ongoingAdmissionYear, sharedData.session_year, setSharedData]);
 
   // Unified Identity Document Selection State (BRN or NID)
   const [identityDocType, setIdentityDocType] = useState(() => {
@@ -224,9 +521,6 @@ export default function FullAdmissionWizard({
   const [lookupLoading, setLookupLoading] = useState(false);
 
   // Dynamic class admission document requirements synchronization
-  const tenantContext = useTenant ? useTenant() : {};
-  const activeTenantId = tenantContext?.activeTenantId || "default";
-
   useEffect(() => {
     const requiredTitles = classAdmissionRequirementsStore.getRequiredDocsForClass(
       activeTenantId,
@@ -507,7 +801,11 @@ export default function FullAdmissionWizard({
       previous_school_address: sharedData.previous_school_address || "",
       previous_class: sharedData.previous_class || "",
       previous_roll_number: sharedData.previous_roll_number || "",
-      previous_result: sharedData.previous_result || "",
+      previous_grade: sharedData.previous_grade || "",
+      previous_average: sharedData.previous_average || "",
+      previous_result: sharedData.previous_grade && sharedData.previous_average
+        ? `${sharedData.previous_grade} (${sharedData.previous_average})`
+        : (sharedData.previous_grade || sharedData.previous_average || sharedData.previous_result || ""),
       previous_passing_year: sharedData.previous_passing_year || "",
       previous_study_details: sharedData.previous_study_details || "",
       tc_number: sharedData.tc_number || "",
@@ -543,6 +841,8 @@ export default function FullAdmissionWizard({
       map_place_id: sharedData.map_place_id || "",
       admission_mode: "FULL",
       status: "ACTIVE",
+      target_status: sharedData.target_status || "NON_RESIDENTIAL",
+      branch: sharedData.branch_id || (branches[0] ? branches[0].id : null),
       student_class: sharedData.student_class || null,
       education_status: selectedClassObj ? selectedClassObj.name : (sharedData.education_status || ""),
       present_address_data: presentAddressData,
@@ -692,10 +992,110 @@ export default function FullAdmissionWizard({
         {/* STEP 1: PERSONAL INFORMATION & PHOTO */}
         {currentStep === 1 && (
           <div className="space-y-6 animate-fade-in">
-            {/* Top Row: Names in 2 Lines (Left, Bottom-Aligned) + Large Photo Card (Far Right) */}
+            {/* Top Row: Left Column (Admission Type + English & Bangla Names) & Right Column (Photo Card) */}
             <div className="flex flex-col-reverse md:flex-row items-center md:items-end justify-between gap-6 md:gap-10 lg:gap-12">
-              {/* Left Side: English & Bangla Full Names in 2 Clean Stacked Lines (Reduced Width on Large Screens) */}
+              {/* Left Side: Admission Type Toggle, Search (if existing), and English & Native Names */}
               <div className="w-full space-y-4 sm:space-y-4.5 max-w-md">
+                {/* Applicant Admission Type Segment */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                      Admission Type
+                    </label>
+                    <div className="inline-flex p-1 rounded-2xl theme-bg-sub border theme-border">
+                      <button
+                        type="button"
+                        onClick={() => handleStudentTypeChange("NEW")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          studentType === "NEW"
+                            ? "theme-bg-accent theme-accent-text shadow-xs font-black"
+                            : "theme-text-secondary hover:theme-text-primary"
+                        }`}
+                      >
+                        New Student
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStudentTypeChange("EXISTING")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          studentType === "EXISTING"
+                            ? "theme-bg-accent theme-accent-text shadow-xs font-black"
+                            : "theme-text-secondary hover:theme-text-primary"
+                        }`}
+                      >
+                        Existing Student
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Existing Student Search Bar & Autocomplete */}
+                  {studentType === "EXISTING" && (
+                    <div className="pt-1 space-y-2 animate-fade-in relative">
+                      <div className="relative">
+                        <CustomInput
+                          type="search"
+                          value={existingStudentQuery}
+                          onChange={(val) => setExistingStudentQuery(val)}
+                          placeholder="Search existing student by name, roll, ID..."
+                        />
+                        {isSearchingExisting && (
+                          <div className="absolute right-9 top-1/2 -translate-y-1/2 text-[10px] theme-accent animate-pulse font-bold pointer-events-none">
+                            Searching...
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Autocomplete suggestions list */}
+                      {existingStudentResults.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 max-h-52 overflow-y-auto animate-fade-in custom-scrollbar">
+                          {existingStudentResults.map((stu) => (
+                            <div
+                              key={stu.id}
+                              onClick={() => handleSelectExistingStudent(stu)}
+                              className="p-2.5 rounded-xl hover:theme-bg-elevated cursor-pointer transition-all flex items-center justify-between border-b last:border-b-0 theme-border"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold theme-text-primary truncate">
+                                  {stu.name_en || stu.name || "Unnamed Student"}
+                                </div>
+                                <div className="text-[10px] theme-text-secondary flex items-center gap-1.5 mt-0.5">
+                                  <span>Roll: {stu.roll_number || "--"}</span>
+                                  <span>•</span>
+                                  <span>Class: {stu.education_status || stu.student_class_name || "--"}</span>
+                                  <span>•</span>
+                                  <span>ID: {stu.uniq_id || "--"}</span>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border shrink-0 ml-2">
+                                Load
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Loaded Confirmation Card */}
+                      {selectedExistingStudent && (
+                        <div className="p-2.5 rounded-2xl theme-bg-accent-soft border theme-border text-xs flex items-center justify-between gap-2 animate-fade-in">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
+                            <span className="font-bold theme-text-primary truncate text-xs">
+                              Loaded: {selectedExistingStudent.name_en || selectedExistingStudent.name} (Roll: {selectedExistingStudent.roll_number || "--"})
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearExistingStudent}
+                            className="px-2.5 py-1 rounded-xl theme-bg-surface border theme-border text-[11px] font-bold theme-text-secondary hover:theme-danger transition-colors cursor-pointer shrink-0"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <CustomInput
                     label="Full Name (English)"
@@ -711,7 +1111,7 @@ export default function FullAdmissionWizard({
                     label="Full Name (Native)"
                     value={sharedData.bangla_name || ""}
                     onChange={(val) => handleChange("bangla_name", val)}
-                    placeholder="উদা: আব্দুল্লাহ বিন আরিফ"
+                    placeholder="e.g. Abdullah Bin Arif (In Native Script)"
                   />
                 </div>
               </div>
@@ -770,14 +1170,17 @@ export default function FullAdmissionWizard({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 border-t theme-border pt-5">
               <div>
                 <CustomSelect
-                  label="Gender"
-                  options={[
-                    { label: "Male", value: "MALE" },
-                    { label: "Female", value: "FEMALE" },
-                    { label: "Other", value: "OTHER" },
-                  ]}
+                  label={
+                    effectivePolicy.isMaleOnly
+                      ? "Gender (Campus Locked: Boys Only)"
+                      : effectivePolicy.isFemaleOnly
+                      ? "Gender (Campus Locked: Girls Only)"
+                      : "Gender"
+                  }
+                  options={genderOptions}
                   value={sharedData.gender || "MALE"}
                   onChange={(val) => handleChange("gender", val)}
+                  disabled={effectivePolicy.isMaleOnly || effectivePolicy.isFemaleOnly}
                   required
                 />
               </div>
@@ -820,6 +1223,33 @@ export default function FullAdmissionWizard({
               </div>
             </div>
 
+            {/* Campus Branch & Residential Status Grid */}
+            <div className={`grid grid-cols-1 ${branches.length > 1 ? "sm:grid-cols-2" : ""} gap-5 border-t theme-border pt-5`}>
+              {branches.length > 1 && (
+                <div>
+                  <CustomSelect
+                    label="Admission Branch / Campus"
+                    options={branchOptions}
+                    value={sharedData.branch_id || (branches[0] && branches[0].id)}
+                    onChange={(val) => handleChange("branch_id", val)}
+                    placeholder="Select Target Branch..."
+                    required={true}
+                  />
+                </div>
+              )}
+
+              <div>
+                <CustomSelect
+                  label="Residential Status"
+                  options={residentialOptions}
+                  value={sharedData.target_status || "NON_RESIDENTIAL"}
+                  onChange={(val) => handleChange("target_status", val)}
+                  placeholder="Select Residential Status..."
+                  required={true}
+                />
+              </div>
+            </div>
+
             {/* Unified Identity Document Section: BRN or NID */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t theme-border pt-5">
               <div>
@@ -852,9 +1282,23 @@ export default function FullAdmissionWizard({
               <div>
                 <CustomSelect
                   label="Academic Session Year"
-                  options={SESSION_YEAR_OPTIONS}
-                  value={sharedData.session_year || "2026-2027"}
-                  onChange={(val) => handleChange("session_year", val)}
+                  options={sessionOptions}
+                  value={sharedData.session_year || activeAcademicYear?.name || ""}
+                  onChange={(val) => {
+                    const matchedYear = academicYears.find((ay) => ay.name === val);
+                    setSharedData((prev) => {
+                      const updated = { ...prev, session_year: val };
+                      if (matchedYear && matchedYear.startDate && matchedYear.endDate) {
+                        const today = new Date().toISOString().split("T")[0];
+                        if (today >= matchedYear.startDate && today <= matchedYear.endDate) {
+                          updated.admission_date = today;
+                        } else if (prev.admission_date < matchedYear.startDate || prev.admission_date > matchedYear.endDate) {
+                          updated.admission_date = matchedYear.startDate;
+                        }
+                      }
+                      return updated;
+                    });
+                  }}
                   required
                 />
               </div>
@@ -870,6 +1314,9 @@ export default function FullAdmissionWizard({
                       education_status: clsObj ? clsObj.name : "",
                     }));
                   }}
+                  branchId={sharedData.branch_id}
+                  admissionFilter={true}
+                  onClassesLoaded={(loaded) => setClasses(loaded)}
                   allowAll={false}
                   placeholder="Select Institutional Class..."
                   required={true}
@@ -882,69 +1329,82 @@ export default function FullAdmissionWizard({
                 </label>
                 <ReusableCalendar
                   selectedDate={sharedData.admission_date || new Date().toISOString().split("T")[0]}
+                  minDate={selectedAcademicYear?.startDate || ""}
+                  maxDate={selectedAcademicYear?.endDate || ""}
                   onSelectDate={(val) => handleChange("admission_date", val)}
                   placeholder="Select Admission Date"
                 />
               </div>
             </div>
 
-            {/* Previous Academic Background */}
-            <div className="border-t theme-border pt-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <CustomInput
-                    label="Previous Academy Name"
-                    value={sharedData.previous_school_name || ""}
-                    onChange={(val) => handleChange("previous_school_name", val)}
-                    placeholder="e.g. Jamia Rahmania Madrasa"
-                  />
+            {/* Previous Academic Background (Only for New Students) */}
+            {studentType !== "EXISTING" && (
+              <div className="border-t theme-border pt-4 space-y-4 animate-fade-in">
+                <div className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                  Previous Academic Background
                 </div>
-                <div>
-                  <CustomInput
-                    label="Previous Academy Address"
-                    value={sharedData.previous_school_address || ""}
-                    onChange={(val) => handleChange("previous_school_address", val)}
-                    placeholder="e.g. Mirpur, Dhaka"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <CustomInput
+                      label="Previous Academy Name"
+                      value={sharedData.previous_school_name || ""}
+                      onChange={(val) => handleChange("previous_school_name", val)}
+                      placeholder="e.g. Jamia Rahmania Madrasa"
+                    />
+                  </div>
+                  <div>
+                    <CustomInput
+                      label="Previous Academy Address"
+                      value={sharedData.previous_school_address || ""}
+                      onChange={(val) => handleChange("previous_school_address", val)}
+                      placeholder="e.g. Mirpur, Dhaka"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                <div>
-                  <CustomInput
-                    label="Previous Class"
-                    value={sharedData.previous_class || ""}
-                    onChange={(val) => handleChange("previous_class", val)}
-                    placeholder="e.g. Class 4 / Hifz 15 Para / Nazera"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
+                      Previous Class / Stage
+                    </label>
+                    <SmartCombobox
+                      value={sharedData.previous_class || ""}
+                      onChange={(val) => handleChange("previous_class", val)}
+                      options={configuredPreviousClasses}
+                      placeholder="Pick or type previous class..."
+                    />
+                  </div>
+                  <div>
+                    <CustomInput
+                      label="Previous Exam Grade / Division"
+                      value={sharedData.previous_grade || sharedData.previous_result || ""}
+                      onChange={(val) => {
+                        handleChange("previous_grade", val);
+                        handleChange("previous_result", val);
+                      }}
+                      placeholder="e.g. A+ / Mumtaz / 1st Div"
+                    />
+                  </div>
+                  <div>
+                    <CustomInput
+                      label="Average / Percentage / GPA"
+                      value={sharedData.previous_average || ""}
+                      onChange={(val) => handleChange("previous_average", val)}
+                      placeholder="e.g. 88% / 4.50 GPA / 780 Marks"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <CustomInput
-                    label="Previous Exam Roll Number"
-                    value={sharedData.previous_roll_number || ""}
-                    onChange={(val) => handleChange("previous_roll_number", val)}
-                    placeholder="e.g. 15"
-                  />
-                </div>
-                <div>
-                  <CustomInput
-                    label="Previous Exam Result & Average"
-                    value={sharedData.previous_result || ""}
-                    onChange={(val) => handleChange("previous_result", val)}
-                    placeholder="e.g. Mumtaz / 88% "
-                  />
-                </div>
-              </div>
 
-              <div>
-                <CustomInput
-                  label="Academic & Study Details"
-                  value={sharedData.previous_study_details || ""}
-                  onChange={(val) => handleChange("previous_study_details", val)}
-                  placeholder="e.g. Completed 10 Paras Hifz with Tajweed."
-                />
+                <div>
+                  <CustomInput
+                    label="Academic & Study Details"
+                    value={sharedData.previous_study_details || ""}
+                    onChange={(val) => handleChange("previous_study_details", val)}
+                    placeholder="e.g. Completed 10 Paras Hifz with Tajweed."
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1031,34 +1491,43 @@ export default function FullAdmissionWizard({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div>
-                <CustomInput
-                  label="Mother Name"
-                  value={sharedData.mother_name || ""}
-                  onChange={(val) => handleChange("mother_name", val)}
-                  placeholder="Mother's Full Name"
-                />
+            {/* Conditional Mother & Emergency Contacts Row */}
+            {(effectivePolicy.motherNameVisible || effectivePolicy.motherPhoneVisible || effectivePolicy.emergencyPhoneVisible) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                {effectivePolicy.motherNameVisible && (
+                  <div>
+                    <CustomInput
+                      label="Mother Name"
+                      value={sharedData.mother_name || ""}
+                      onChange={(val) => handleChange("mother_name", val)}
+                      placeholder="Mother's Full Name"
+                    />
+                  </div>
+                )}
+                {effectivePolicy.motherPhoneVisible && (
+                  <div>
+                    <CustomInput
+                      type="phone"
+                      label="Mother Phone"
+                      value={sharedData.mother_phone || ""}
+                      onChange={(val) => handleChange("mother_phone", val)}
+                      placeholder="Mother's Phone"
+                    />
+                  </div>
+                )}
+                {effectivePolicy.emergencyPhoneVisible && (
+                  <div>
+                    <CustomInput
+                      type="phone"
+                      label="Emergency Phone"
+                      value={sharedData.emergency_contact_phone || ""}
+                      onChange={(val) => handleChange("emergency_contact_phone", val)}
+                      placeholder="Emergency Alternate"
+                    />
+                  </div>
+                )}
               </div>
-              <div>
-                <CustomInput
-                  type="phone"
-                  label="Mother Phone"
-                  value={sharedData.mother_phone || ""}
-                  onChange={(val) => handleChange("mother_phone", val)}
-                  placeholder="Mother's Phone"
-                />
-              </div>
-              <div>
-                <CustomInput
-                  type="phone"
-                  label="Emergency Phone"
-                  value={sharedData.emergency_contact_phone || ""}
-                  onChange={(val) => handleChange("emergency_contact_phone", val)}
-                  placeholder="Emergency Alternate"
-                />
-              </div>
-            </div>
+            )}
 
             {/* DUAL ADDRESS SECTION: PRESENT & PERMANENT */}
             <div className="space-y-5 border-t theme-border pt-5">
@@ -1149,6 +1618,31 @@ export default function FullAdmissionWizard({
                 <div className="theme-bg-surface border theme-border p-5 rounded-3xl space-y-2.5 shadow-xs">
                   <h5 className="font-bold theme-accent uppercase tracking-wider text-[11px] mb-2">Student &amp; Class</h5>
                   <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Applicant Type</span>
+                    <span className="font-bold theme-text-primary">
+                      {sharedData.student_type === "EXISTING" ? "Existing / Re-Admission" : "New Student"}
+                    </span>
+                  </div>
+                  {branches.length > 1 && (
+                    <div className="flex justify-between py-1 border-b theme-border">
+                      <span className="theme-text-secondary">Campus Branch</span>
+                      <span className="font-bold theme-text-primary">
+                        {branches.find((b) => b.id === sharedData.branch_id)?.branch_name ||
+                         branches.find((b) => b.id === sharedData.branch_id)?.name || "Main Campus"}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 border-b theme-border">
+                    <span className="theme-text-secondary">Residential Status</span>
+                    <span className="font-bold theme-accent">
+                      {sharedData.target_status === "RESIDENTIAL"
+                        ? "Residential / Boarding"
+                        : sharedData.target_status === "DAY_CARE"
+                        ? "Day Care"
+                        : "Non-Residential / Day Scholar"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b theme-border">
                     <span className="theme-text-secondary">Student Name</span>
                     <span className="font-bold theme-text-primary">{sharedData.name || "--"}</span>
                   </div>
@@ -1164,7 +1658,7 @@ export default function FullAdmissionWizard({
                     <span className="theme-text-secondary">Class / Track</span>
                     <span className="font-bold theme-accent">{sharedData.education_status || "--"}</span>
                   </div>
-                  {sharedData.previous_school_name && (
+                  {sharedData.student_type !== "EXISTING" && sharedData.previous_school_name && (
                     <div className="flex justify-between py-1 border-b theme-border">
                       <span className="theme-text-secondary">Previous Academy</span>
                       <span className="font-bold theme-text-primary">

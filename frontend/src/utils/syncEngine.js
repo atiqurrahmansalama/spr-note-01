@@ -1,5 +1,6 @@
 import { fetchWithAuth } from "./authService";
 import { students as studentStore, sessions as sessionStore, savedComments as commentStore } from "./localStore";
+import { createReport } from "../api/reports";
 
 /**
  * Hybrid Sync Engine (LocalStorage <-> Django PostgreSQL)
@@ -8,6 +9,16 @@ import { students as studentStore, sessions as sessionStore, savedComments as co
 
 const LOCAL_STORAGE_KEY = "spr_reports_local_v1";
 const PENDING_SYNC_KEY = "spr_reports_pending_queue";
+
+// Listen to decoupled taxonomy push events from localStore
+if (typeof window !== 'undefined') {
+  window.addEventListener('spr_taxonomy_changed', (e) => {
+    const { tenantId, taxonomyKey, value } = e.detail || {};
+    if (tenantId && taxonomyKey) {
+      queueTaxonomyPush(tenantId, taxonomyKey, value);
+    }
+  });
+}
 
 // 1. Save Report Locally (Offline-First)
 export const saveReportLocally = (reportData) => {
@@ -45,7 +56,8 @@ export const saveReportLocally = (reportData) => {
 // 2. Fetch All Local Reports
 export const getLocalReports = () => {
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch (error) {
     console.error("[SyncEngine] Failed to parse local storage:", error);
     return [];
@@ -69,8 +81,6 @@ export const triggerCloudSync = async () => {
 
   const pendingItems = reports.filter((r) => pendingIds.includes(r.id));
   let updatedIds = [...pendingIds];
-
-  const { createReport } = await import("../api/reports");
 
   for (const item of pendingItems) {
     // Safety check: skip completely blank or default empty reports (student is N/A/empty and no pages/errors)

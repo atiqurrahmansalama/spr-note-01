@@ -22,9 +22,8 @@ import {
 const DEFAULT_LAT = 23.8103;
 const DEFAULT_LNG = 90.4125;
 
-// Tile Layer URLs
-const DARK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png';
-const LIGHT_TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+// OpenStreetMap Clean Tile Layer (Watermark-Free, API-Key-Free)
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // Google Maps Dark Theme Styling
 const GOOGLE_MAPS_DARK_STYLES = [
@@ -215,10 +214,9 @@ export default function AddressMapModal({
         leafletMapRef.current.removeLayer(tileLayerRef.current);
       }
 
-      const tileUrl = isDark ? DARK_TILE_URL : LIGHT_TILE_URL;
-      const newTileLayer = L.tileLayer(tileUrl, {
+      const newTileLayer = L.tileLayer(OSM_TILE_URL, {
         maxZoom: 19,
-        subdomains: 'abcd',
+        subdomains: 'abc',
         className: isDark ? 'dark-leaflet-tiles' : 'light-leaflet-tiles',
       }).addTo(leafletMapRef.current);
 
@@ -321,10 +319,9 @@ export default function AddressMapModal({
 
           L.control.zoom({ position: 'topright' }).addTo(lMap);
 
-          const tileUrl = isDark ? DARK_TILE_URL : LIGHT_TILE_URL;
-          const tileLayer = L.tileLayer(tileUrl, {
+          const tileLayer = L.tileLayer(OSM_TILE_URL, {
             maxZoom: 19,
-            subdomains: 'abcd',
+            subdomains: 'abc',
             className: isDark ? 'dark-leaflet-tiles' : 'light-leaflet-tiles',
           }).addTo(lMap);
 
@@ -548,8 +545,13 @@ export default function AddressMapModal({
           background-color: ${isDark ? '#09090b' : '#f8fafc'} !important;
           font-family: inherit !important;
         }
-        .dark-leaflet-tiles img.leaflet-tile {
-          filter: brightness(1.2) contrast(1.1) !important;
+        .dark-leaflet-tiles img.leaflet-tile,
+        .dark-leaflet-tiles .leaflet-tile {
+          filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7) !important;
+        }
+        .light-leaflet-tiles img.leaflet-tile,
+        .light-leaflet-tiles .leaflet-tile {
+          filter: none !important;
         }
         .leaflet-control-zoom {
           border: 1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)'} !important;

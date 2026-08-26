@@ -5,9 +5,12 @@ import {
   FilledXCircleIcon,
   TimerIcon,
   AttendanceIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarIcon,
+  TimelineIcon,
 } from '../ui/Icons';
 import FullscreenButton from '../ui/FullscreenButton';
-import { getHijriDateString } from '../../utils/hijriUtils';
 import DateHeaderCell from './DateHeaderCell';
 import {
   ATTENDANCE_STATUSES,
@@ -15,14 +18,14 @@ import {
 } from '../../constants/attendanceConstants';
 
 /**
- * Universal Attendance Matrix Table Component
+ * Universal Attendance Table Component (formerly AttendanceMatrixTable)
  * Enterprise spreadsheet register supporting:
  * - Student Class Attendance (with multi-period schedule slots)
  * - Student Residential Attendance (with prayer & hostel checkpoints)
  * - Teacher Class Attendance (with assigned classes & subjects)
  * - Staff Daily Attendance (with departments & roles)
  */
-export default function AttendanceMatrixTable({
+export default function AttendanceTable({
   // Matrix data (Supports both legacy matrixData format and normalized props)
   matrixData,
   daysHeader: propDaysHeader,
@@ -39,6 +42,7 @@ export default function AttendanceMatrixTable({
   isEditing = false,
   onToggleCell,
   onAdminEditCell,
+  onInspectHistory,
   isHijriEnabled = false,
   selectedYear,
   selectedMonth,
@@ -49,10 +53,12 @@ export default function AttendanceMatrixTable({
   emptyMessage = 'No attendance records found matching your filter criteria.',
   tableContainerClass = 'overflow-x-auto max-h-[75vh]',
 
-  // Footer Legend Ribbon Config
+  // Footer Legend Ribbon & Baseline Config
   showFooter = true,
   totalCount,
   totalCountLabel,
+  calculationBaselineDate = null,
+  calculationBaselineLabel = 'Calculated Since',
   isFullscreen = false,
   onToggleFullscreen,
 }) {
@@ -94,7 +100,7 @@ export default function AttendanceMatrixTable({
         if (st === 'PRESENT') totalPresent += 1;
         else if (st === 'LATE') totalLate += 1;
         else if (st === 'ABSENT') totalAbsent += 1;
-        else if (st === 'ON_LEAVE') totalLeave += 1;
+        else if (st === 'ON_LEAVE' || st === 'LEAVE') totalLeave += 1;
       });
     });
 
@@ -133,7 +139,7 @@ export default function AttendanceMatrixTable({
   const countLabelDisplay = totalCountLabel || `Total ${nameLabel}s`;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full select-none">
       <div ref={containerRef} className={`${tableContainerClass} scrollbar-none overflow-x-auto flex-1`}>
         <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
           {/* Table Sticky Headers */}
@@ -159,7 +165,7 @@ export default function AttendanceMatrixTable({
                 </th>
               )}
 
-              {/* Dynamic Date Headers with 3 Lines (Gregorian Day -> Hijri -> Centered Weekday) */}
+              {/* Dynamic Date Headers */}
               {daysHeader.map((d) => {
                 const fullDateStr =
                   d.date ||
@@ -171,6 +177,7 @@ export default function AttendanceMatrixTable({
                   <DateHeaderCell
                     key={d.date || d.day}
                     as="th"
+                    dayData={d}
                     dateStr={fullDateStr}
                     dayNum={d.day}
                     weekday={d.weekday}
@@ -186,10 +193,11 @@ export default function AttendanceMatrixTable({
                 );
               })}
 
-              {/* Summary Metric Headers with EXACT same width as date columns */}
+              {/* Summary Metric Headers */}
               <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.PRESENT.textClass} border-l border-b theme-border text-xs`} title="Present (P)">P</th>
               <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.LATE.textClass} border-l border-b theme-border text-xs`} title="Late (L)">L</th>
               <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border text-xs`} title="Absent (A)">A</th>
+              <th className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold ${ATTENDANCE_STATUSES.ON_LEAVE.textClass} border-l border-b theme-border text-xs`} title="Leave (LV)">LV</th>
               <th className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold text-xs border-l border-r border-b theme-border" title="Attendance Rate %">Rate %</th>
             </tr>
           </thead>
@@ -201,32 +209,35 @@ export default function AttendanceMatrixTable({
               const rollVal = row.roll_number || row.employee_id || row.code || '—';
               const nameVal = row.name || row.student_name || row.user_name || 'Member';
               const subVal = row.group_name || row.class_name || row.designation || row.sub_title;
-              const descMain = row.start_time ? `${row.start_time} - ${row.end_time || '--:--'}` : row.department_name || row.assigned_class_name || row.schedule_time || row.checkpoint_name;
-              const descSub = row.period_name || row.checkpoint_time || row.role_title;
-              const descExtra = row.teacher_name;
+              const descMain = row.start_time
+                ? `${row.start_time} - ${row.end_time || '--:--'}`
+                : row.schedule_time || row.department_name || row.assigned_class_name || row.checkpoint_name || '';
+              const descSub = row.checkpoint_time || row.period_name || row.name_display || row.role_title || '';
+              const descExtra = row.teacher_name || (row.warden_name ? `Warden: ${row.warden_name}` : '');
 
               const totals = row.totals || {};
               let pCount = totals.present !== undefined ? totals.present : totals.present_count;
               let lCount = totals.late !== undefined ? totals.late : totals.late_count;
               let aCount = totals.absent !== undefined ? totals.absent : totals.absent_count;
+              let lvCount = totals.on_leave !== undefined ? totals.on_leave : totals.leave_count;
               let rate = totals.attendance_rate !== undefined ? totals.attendance_rate : totals.rate;
 
               if (pCount === undefined || aCount === undefined) {
-                let p = 0, l = 0, a = 0, hd = 0, lv = 0;
+                let p = 0, l = 0, a = 0, lv = 0;
                 const daily = row.daily_statuses || row.records || {};
                 Object.values(daily).forEach((status) => {
                   const st = typeof status === 'object' ? status?.status : status;
                   if (st === 'PRESENT') p += 1;
                   else if (st === 'LATE') l += 1;
                   else if (st === 'ABSENT') a += 1;
-                  else if (st === 'HALF_DAY') hd += 1;
-                  else if (st === 'ON_LEAVE') lv += 1;
+                  else if (st === 'ON_LEAVE' || st === 'LEAVE') lv += 1;
                 });
                 pCount = p;
                 lCount = l;
                 aCount = a;
-                const total = p + l + a + hd + lv;
-                const effective = p + l + hd * 0.5;
+                lvCount = lv;
+                const total = p + l + a + lv;
+                const effective = p + l;
                 rate = total > 0 ? Math.round((effective / total) * 100) : 100;
               }
 
@@ -276,18 +287,38 @@ export default function AttendanceMatrixTable({
                   {/* Dedicated Descriptor Column (Period, Checkpoint, Department) */}
                   {showDescriptor && (
                     <td className="py-2 px-1.5 sm:px-2 border-r border-b theme-border theme-bg-sub/30 w-[100px] min-w-[100px] max-w-[100px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[130px]">
-                      {descMain && (
-                        <div className="font-mono font-bold text-[11px] sm:text-xs theme-text-primary truncate">
-                          {descMain}
+                      {/* First line: Main Descriptor & top-right borderless timeline icon */}
+                      <div className="flex items-center justify-between gap-1 group/desc">
+                        <div className="font-mono font-bold text-[11px] sm:text-xs theme-text-primary truncate min-w-0 flex-1">
+                          {descMain || '—'}
                         </div>
-                      )}
+
+                        {onInspectHistory && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onInspectHistory(row);
+                            }}
+                            className="p-0.5 rounded text-zinc-400 hover:theme-accent hover:theme-bg-sub/60 transition-colors opacity-70 group-hover/desc:opacity-100 shrink-0 cursor-pointer"
+                            title="Inspect schedule timeline & evolution"
+                            aria-label="Inspect History"
+                          >
+                            <TimelineIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Second line: Sub Descriptor (Full Width) */}
                       {descSub && (
-                        <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[90px] sm:max-w-[120px] mt-0.5" title={descSub}>
+                        <div className="text-[10px] theme-text-secondary font-medium truncate max-w-[95px] sm:max-w-[125px] mt-0.5" title={descSub}>
                           {descSub}
                         </div>
                       )}
+
+                      {/* Third line: Extra Descriptor (Full Width) */}
                       {descExtra && (
-                        <div className="text-[9px] theme-accent font-semibold truncate max-w-[90px] sm:max-w-[120px] mt-0.5" title={descExtra}>
+                        <div className="text-[9px] theme-accent font-semibold truncate max-w-[95px] sm:max-w-[125px] mt-0.5" title={descExtra}>
                           {descExtra}
                         </div>
                       )}
@@ -359,11 +390,11 @@ export default function AttendanceMatrixTable({
                           <FilledCheckCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.PRESENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
                         ) : status === 'ABSENT' ? (
                           <FilledXCircleIcon className={`w-4 h-4 ${ATTENDANCE_STATUSES.ABSENT.circleClass} hover:scale-125 active:scale-95 transition-transform inline-block drop-shadow-xs`} />
-                        ) : status === 'LATE' || status === 'HALF_DAY' ? (
+                        ) : status === 'LATE' ? (
                           <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.LATE.circleClass} text-[10px] hover:scale-125 active:scale-95 transition-transform font-bold`}>
                             L
                           </span>
-                        ) : status === 'ON_LEAVE' ? (
+                        ) : status === 'ON_LEAVE' || status === 'LEAVE' ? (
                           <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${ATTENDANCE_STATUSES.ON_LEAVE.circleClass} text-[10px] font-bold`}>
                             LV
                           </span>
@@ -385,6 +416,9 @@ export default function AttendanceMatrixTable({
                   </td>
                   <td className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.ABSENT.textClass} border-l border-b theme-border`}>
                     {aCount}
+                  </td>
+                  <td className={`py-2 sm:py-2.5 px-0.5 sm:px-1 w-[32px] min-w-[32px] max-w-[32px] sm:w-[38px] sm:min-w-[38px] sm:max-w-[38px] text-center font-bold font-mono ${ATTENDANCE_STATUSES.ON_LEAVE.textClass} border-l border-b theme-border`}>
+                    {lvCount ?? 0}
                   </td>
                   <td className="py-2 sm:py-2.5 px-1 w-[46px] min-w-[46px] max-w-[46px] sm:w-[54px] sm:min-w-[54px] sm:max-w-[54px] text-center font-bold font-mono text-xs border-l border-r border-b theme-border">
                     <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${getAttendanceRateColor(rate)}`}>
@@ -422,6 +456,11 @@ export default function AttendanceMatrixTable({
 
           {/* Right: Overall Aggregate Attendance Summary Metrics Banner */}
           <div className="flex items-center gap-3 sm:gap-4 flex-wrap font-mono text-[11px]">
+            {calculationBaselineDate && (
+              <span className="theme-text-secondary border-r theme-border pr-3">
+                {calculationBaselineLabel}: <strong className="theme-text-primary">{calculationBaselineDate}</strong>
+              </span>
+            )}
             <span>{countLabelDisplay}: <strong className="theme-text-primary">{countDisplay}</strong></span>
             <span>Present: <strong className="theme-accent">{summaryMetrics.present}</strong></span>
             <span>Late: <strong className="text-amber-500">{summaryMetrics.late}</strong></span>
@@ -438,6 +477,118 @@ export default function AttendanceMatrixTable({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Universal Standalone Today Button Component
+ */
+export function TodayButton({
+  onToday,
+  isToday = false,
+  size = 'md',
+  className = '',
+  title = "Jump to Today's date",
+}) {
+  if (!onToday) return null;
+  const paddingClass = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-xs';
+  const iconClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+
+  return (
+    <button
+      type="button"
+      onClick={onToday}
+      className={`flex items-center gap-1.5 rounded-xl border font-semibold transition-all shadow-xs select-none ${paddingClass} ${
+        isToday
+          ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/40 cursor-default'
+          : 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary cursor-pointer active:scale-95'
+      } ${className}`}
+      title={title}
+      aria-label="Go to Today"
+    >
+      <CalendarIcon className={`${iconClass} shrink-0`} />
+      <span>Today</span>
+    </button>
+  );
+}
+
+/**
+ * Universal Attendance Date Stepper Controls Component
+ * Provides unified, theme-compliant prev/today/next navigation across all attendance registers.
+ */
+export function AttendanceDateStepper({
+  stepLabels = { prev: 'Prev Month', next: 'Next Month' },
+  onStepBackward,
+  onStepForward,
+  onToday,
+  isToday = false,
+  isAtMinBound = false,
+  isAtMaxBound = false,
+  minBoundTooltip = 'Reached start of active Academic Year',
+  maxBoundTooltip = 'Reached end of active Academic Year',
+  className = '',
+  size = 'md',
+}) {
+  const prevTitle = isAtMinBound ? minBoundTooltip : (stepLabels?.prev || 'Previous');
+  const nextTitle = isAtMaxBound ? maxBoundTooltip : (stepLabels?.next || 'Next');
+
+  const paddingClass = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-xs';
+  const iconClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+
+  return (
+    <div className={`flex items-center gap-1.5 sm:gap-2 shrink-0 ${className}`}>
+      {/* Previous Step Button */}
+      <button
+        type="button"
+        onClick={onStepBackward}
+        disabled={isAtMinBound}
+        className={`flex items-center gap-1.5 rounded-xl border font-medium transition-all shadow-xs select-none ${paddingClass} ${
+          isAtMinBound
+            ? 'opacity-40 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
+            : 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary cursor-pointer active:scale-95'
+        }`}
+        title={prevTitle}
+        aria-label={prevTitle}
+      >
+        <ChevronLeftIcon className={`${iconClass} shrink-0`} />
+        <span>{stepLabels?.prev || 'Prev'}</span>
+      </button>
+
+      {/* Reusable Today Quick Button */}
+      {onToday && (
+        <button
+          type="button"
+          onClick={onToday}
+          className={`flex items-center gap-1.5 rounded-xl border font-semibold transition-all shadow-xs select-none ${paddingClass} ${
+            isToday
+              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/40 cursor-default'
+              : 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary cursor-pointer active:scale-95'
+          }`}
+          title="Jump to Today's date"
+          aria-label="Go to Today"
+        >
+          <CalendarIcon className={`${iconClass} shrink-0`} />
+          <span>Today</span>
+        </button>
+      )}
+
+      {/* Next Step Button */}
+      <button
+        type="button"
+        onClick={onStepForward}
+        disabled={isAtMaxBound}
+        className={`flex items-center gap-1.5 rounded-xl border font-medium transition-all shadow-xs select-none ${paddingClass} ${
+          isAtMaxBound
+            ? 'opacity-40 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
+            : 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary cursor-pointer active:scale-95'
+        }`}
+        title={nextTitle}
+        aria-label={nextTitle}
+      >
+        <span>{stepLabels?.next || 'Next'}</span>
+        <ChevronRightIcon className={`${iconClass} shrink-0`} />
+      </button>
     </div>
   );
 }
@@ -504,6 +655,12 @@ export function TakeAttendanceButton({
   );
 }
 
-// Compound component attachment
-AttendanceMatrixTable.TakeButton = TakeAttendanceButton;
-AttendanceMatrixTable.TakeAttendanceButton = TakeAttendanceButton;
+// Compound component attachments
+AttendanceTable.TodayButton = TodayButton;
+AttendanceTable.TakeButton = TakeAttendanceButton;
+AttendanceTable.TakeAttendanceButton = TakeAttendanceButton;
+AttendanceTable.DateStepper = AttendanceDateStepper;
+AttendanceTable.AttendanceDateStepper = AttendanceDateStepper;
+
+// Alias export for backward compatibility
+export const AttendanceMatrixTable = AttendanceTable;

@@ -77,6 +77,7 @@ export function isEventImpactedForModule(evt, moduleType = 'ALL') {
 export function useAttendanceDateManager({
   activeTenantId,
   moduleType = 'ALL',
+  isAdmin = false,
   initialYear,
   initialMonth,
   initialStartDate = '',
@@ -95,6 +96,17 @@ export function useAttendanceDateManager({
   const minDate = academicBounds.minDate || '';
   const maxDate = academicBounds.maxDate || '';
   const activeAcademicYear = academicBounds.activeYear || null;
+
+  const isDateInAcademicYear = useCallback(
+    (dStr) => {
+      if (isAdmin) return true;
+      if (!dStr) return true;
+      if (minDate && dStr < minDate) return false;
+      if (maxDate && dStr > maxDate) return false;
+      return true;
+    },
+    [isAdmin, minDate, maxDate]
+  );
 
   // Initial clamped year & month within academic boundaries
   const resolvedInitialYear = useMemo(() => {
@@ -150,12 +162,14 @@ export function useAttendanceDateManager({
     window.addEventListener('spr_calendar_events_updated', handleCalendarUpdate);
     window.addEventListener('spr_attendance_event_restrictions_updated', handleCalendarUpdate);
     window.addEventListener('spr_academic_years_updated', handleAcademicYearsUpdate);
+    window.addEventListener('spr_tenant_changed', handleAcademicYearsUpdate);
 
     return () => {
       window.removeEventListener('spr_calendar_settings_updated', handleSettingsUpdate);
       window.removeEventListener('spr_calendar_events_updated', handleCalendarUpdate);
       window.removeEventListener('spr_attendance_event_restrictions_updated', handleCalendarUpdate);
       window.removeEventListener('spr_academic_years_updated', handleAcademicYearsUpdate);
+      window.removeEventListener('spr_tenant_changed', handleAcademicYearsUpdate);
     };
   }, []);
 
@@ -266,17 +280,24 @@ export function useAttendanceDateManager({
   // Gregorian & Hijri Header Strings
   const getHeaderDateDetails = useCallback(() => {
     if (startDate && endDate) {
-      const gregorianTitle = `${startDate} to ${endDate}`;
-      const hijriTitle = `${getHijriDateString(startDate)} — ${getHijriDateString(endDate)}`;
-      return { gregorianTitle, hijriTitle };
+      const isSingleDay = startDate === endDate;
+      const hijriRange = calendarSettings.getHijriMonthRange(selectedYear, selectedMonth);
+      const isFullHijri = Boolean(hijriRange && startDate === hijriRange.start && endDate === hijriRange.end);
+
+      const gregorianTitle = isSingleDay ? startDate : `${startDate} to ${endDate}`;
+      const hijriTitle = isSingleDay
+        ? getHijriDateString(startDate)
+        : `${getHijriDateString(startDate)} — ${getHijriDateString(endDate)}`;
+
+      return { gregorianTitle, hijriTitle, isSingleDay, isFullHijriMonth: isFullHijri };
     }
     const gregorianTitle = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
     const firstDayStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
     const hijriTitle = getHijriDateString(firstDayStr);
-    return { gregorianTitle, hijriTitle };
+    return { gregorianTitle, hijriTitle, isSingleDay: false, isFullHijriMonth: false };
   }, [startDate, endDate, selectedYear, selectedMonth]);
 
-  const { gregorianTitle, hijriTitle } = getHeaderDateDetails();
+  const { gregorianTitle, hijriTitle, isSingleDay, isFullHijriMonth } = getHeaderDateDetails();
 
   const handleResetDate = useCallback(() => {
     setStartDate('');
@@ -285,16 +306,135 @@ export function useAttendanceDateManager({
     setSelectedYear(resolvedInitialYear);
   }, [resolvedInitialMonth, resolvedInitialYear]);
 
-  // Validation helper: verifies if a given date is strictly within the active Academic Year
-  const isDateInAcademicYear = useCallback(
-    (dateStr) => {
-      if (!dateStr) return false;
-      if (minDate && dateStr < minDate) return false;
-      if (maxDate && dateStr > maxDate) return false;
-      return true;
-    },
-    [minDate, maxDate]
-  );
+  const handleGoToToday = useCallback(() => {
+    const curY = todayObj.getFullYear();
+    const curM = todayObj.getMonth() + 1;
+    setSelectedYear(curY);
+    setSelectedMonth(curM);
+    setStartDate('');
+    setEndDate('');
+  }, [todayObj]);
+
+  const isCurrentPeriodToday = useMemo(() => {
+    if (startDate && endDate) {
+      return todayStr >= startDate && todayStr <= endDate;
+    }
+    return selectedYear === todayObj.getFullYear() && selectedMonth === (todayObj.getMonth() + 1);
+  }, [startDate, endDate, selectedYear, selectedMonth, todayStr, todayObj]);
+
+  // Stepper Labels & Adaptive Shifting
+  const stepLabels = useMemo(() => {
+    if (!startDate || !endDate) {
+      return { prev: 'Prev Month', next: 'Next Month' };
+    }
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayCount === 7) return { prev: 'Prev Week', next: 'Next Week' };
+    if (dayCount === 14) return { prev: 'Prev 2 Weeks', next: 'Next 2 Weeks' };
+    if (dayCount === 1) return { prev: 'Prev Day', next: 'Next Day' };
+    return { prev: 'Prev Period', next: 'Next Period' };
+  }, [startDate, endDate]);
+
+  const isAtMinBound = useMemo(() => {
+    if (isAdmin || !minDate) return false;
+    if (startDate) {
+      return startDate <= minDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const currentMonthEnd = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+    return currentMonthStart <= minDate || currentMonthEnd <= minDate;
+  }, [isAdmin, minDate, startDate, selectedYear, selectedMonth]);
+
+  const isAtMaxBound = useMemo(() => {
+    if (isAdmin || !maxDate) return false;
+    if (endDate) {
+      return endDate >= maxDate;
+    }
+    const currentMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const maxMonthPrefix = maxDate.slice(0, 7);
+    return currentMonthStart >= `${maxMonthPrefix}-01`;
+  }, [isAdmin, maxDate, endDate, selectedYear, selectedMonth]);
+
+  const handleStepBackward = useCallback(() => {
+    if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
+      if (selectedMonth === 1) {
+        targetMonth = 12;
+        targetYear = selectedYear - 1;
+      } else {
+        targetMonth = selectedMonth - 1;
+      }
+
+      if (!isAdmin && minDate) {
+        const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+        const targetMonthEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(lastDayOfTargetMonth).padStart(2, '0')}`;
+        if (targetMonthEnd < minDate) {
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
+      return;
+    }
+
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    s.setDate(s.getDate() - dayCount);
+    e.setDate(e.getDate() - dayCount);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && minDate && newEnd < minDate) {
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  }, [startDate, endDate, selectedMonth, selectedYear, isAdmin, minDate]);
+
+  const handleStepForward = useCallback(() => {
+    if (!startDate || !endDate) {
+      let targetMonth = selectedMonth;
+      let targetYear = selectedYear;
+      if (selectedMonth === 12) {
+        targetMonth = 1;
+        targetYear = selectedYear + 1;
+      } else {
+        targetMonth = selectedMonth + 1;
+      }
+
+      if (!isAdmin && maxDate) {
+        const targetMonthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`;
+        if (targetMonthStart > maxDate) {
+          return;
+        }
+      }
+
+      setSelectedMonth(targetMonth);
+      setSelectedYear(targetYear);
+      return;
+    }
+
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dayCount = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    s.setDate(s.getDate() + dayCount);
+    e.setDate(e.getDate() + dayCount);
+    const newStart = s.toISOString().split('T')[0];
+    const newEnd = e.toISOString().split('T')[0];
+
+    if (!isAdmin && maxDate && newStart > maxDate) {
+      return;
+    }
+
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  }, [startDate, endDate, selectedMonth, selectedYear, isAdmin, maxDate]);
 
   return {
     todayStr,
@@ -315,11 +455,20 @@ export function useAttendanceDateManager({
     enrichedDaysHeader,
     gregorianTitle,
     hijriTitle,
+    isSingleDay,
+    isFullHijriMonth,
     isHijriEnabled,
     isFullscreen,
     setIsFullscreen,
     calendarEventsVersion,
     setCalendarEventsVersion,
+    stepLabels,
+    isAtMinBound,
+    isAtMaxBound,
+    handleStepBackward,
+    handleStepForward,
+    handleGoToToday,
+    isCurrentPeriodToday,
   };
 }
 

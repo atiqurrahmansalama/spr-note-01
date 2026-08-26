@@ -24,7 +24,22 @@ ALLOWED_HOSTS = ['*']
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "core.User"
 
-INSTALLED_APPS = [
+INSTALLED_APPS = []
+
+# Optional ASGI Daphne & Channels (if installed in environment)
+try:
+    import daphne  # noqa
+    INSTALLED_APPS.append("daphne")
+except ImportError:
+    pass
+
+try:
+    import channels  # noqa
+    INSTALLED_APPS.append("channels")
+except ImportError:
+    pass
+
+INSTALLED_APPS += [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -75,6 +90,8 @@ TEMPLATES = [
 
 ROOT_URLCONF = "urls"
 WSGI_APPLICATION = "core.wsgi.application"
+ASGI_APPLICATION = "core.asgi.application"
+
 
 
 # Database Configuration
@@ -217,6 +234,40 @@ else:
             "TIMEOUT": 300,
         }
     }
+
+# Django Channels Real-Time WebSocket Layer
+if "channels" in INSTALLED_APPS:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer" if (REDIS_URL and not DEBUG) else "channels.layers.InMemoryChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL] if (REDIS_URL and not DEBUG) else [],
+            },
+        },
+    }
+
+# Sentry & System APM Observability (Production Ready)
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN and not DEBUG:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        from sentry_sdk.integrations.redis import RedisIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[
+                DjangoIntegration(),
+                CeleryIntegration(),
+                RedisIntegration(),
+            ],
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.2")),
+            send_default_pii=False,
+            environment=os.getenv("ENVIRONMENT", "production"),
+        )
+    except Exception as _sentry_err:
+        pass
 
 # CORS Configuration
 from corsheaders.defaults import default_headers

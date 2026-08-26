@@ -172,7 +172,7 @@ class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
 
         dept_id = self.request.query_params.get('department')
         if dept_id and dept_id != 'ALL':
-            qs = qs.filter(department_id=dept_id)
+            qs = qs.filter(Q(department_id=dept_id) | Q(student_class__department_id=dept_id))
 
         class_id = self.request.query_params.get('class') or self.request.query_params.get('student_class')
         if class_id and class_id != 'ALL':

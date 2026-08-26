@@ -22,7 +22,7 @@ import { PageContainer } from '../../../components/layout';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useToast } from '../../../context/ToastContext';
 import { useTenant } from '../../../context/TenantContext';
-import { academicYearsStore } from '../../../utils/localStore';
+import { academicYearsStore, admissionSettingsStore } from '../../../utils/localStore';
 import {
   getAdmissionTokens,
   toggleAdmissionTokenActive,
@@ -30,16 +30,17 @@ import {
 } from '../../../api/admissions';
 
 export default function StudentAdmissionView() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
-  const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const activeTab = searchParams.get('tab') || 'direct'; // 'direct' | 'online_qr'
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [admittedStudent, setAdmittedStudent] = useState(null);
 
-  const activeYear = academicYearsStore.getActiveYear(activeTenantId);
+  const ongoingYear = admissionSettingsStore.getActiveAdmissionYear(activeTenantId);
 
   // QR Tokens state
   const [tokens, setTokens] = useState([]);
@@ -55,7 +56,7 @@ export default function StudentAdmissionView() {
     dob: '',
     blood_group: '',
     birth_certificate_no: '',
-    session_year: activeYear?.name || '',
+    session_year: ongoingYear?.name || '',
     student_class: '',
     education_status: '',
     roll_number: '',
@@ -103,8 +104,8 @@ export default function StudentAdmissionView() {
   }, [activeTab, loadTokens]);
 
   useEffect(() => {
-    const handleTenantChanged = () => {
-      const currentYear = academicYearsStore.getActiveYear(activeTenantId);
+    const handleAcademicUpdate = () => {
+      const currentYear = admissionSettingsStore.getActiveAdmissionYear(activeTenantId);
       if (currentYear?.name) {
         setSharedData((prev) => ({ ...prev, session_year: currentYear.name }));
       }
@@ -112,8 +113,14 @@ export default function StudentAdmissionView() {
         loadTokens();
       }
     };
-    window.addEventListener('spr_tenant_changed', handleTenantChanged);
-    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+    window.addEventListener('spr_academic_years_updated', handleAcademicUpdate);
+    window.addEventListener('spr_admission_settings_updated', handleAcademicUpdate);
+    window.addEventListener('spr_tenant_changed', handleAcademicUpdate);
+    return () => {
+      window.removeEventListener('spr_academic_years_updated', handleAcademicUpdate);
+      window.removeEventListener('spr_admission_settings_updated', handleAcademicUpdate);
+      window.removeEventListener('spr_tenant_changed', handleAcademicUpdate);
+    };
   }, [activeTenantId, activeTab, loadTokens]);
 
   const handleTabChange = (tabId) => {

@@ -176,7 +176,7 @@ export default function MultiDocumentManager({
                   </span>
                   {doc.is_required && (
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-xs">
-                      Mandatory / বাধ্যতামূলক
+                      Mandatory
                     </span>
                   )}
                 </div>

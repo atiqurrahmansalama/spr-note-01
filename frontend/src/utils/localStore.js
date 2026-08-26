@@ -91,14 +91,17 @@ function writeJSON(key, value) {
           "impact_scopes",
           "admission_doc_requirements",
           "staff_recruitment_requirements",
+          "period_categories",
         ];
 
         if (monitoredKeys.includes(taxonomyKey)) {
-          import("./syncEngine")
-            .then(({ queueTaxonomyPush }) => {
-              queueTaxonomyPush(tenantId, taxonomyKey, value);
-            })
-            .catch(() => {});
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("spr_taxonomy_changed", {
+                detail: { tenantId, taxonomyKey, value },
+              })
+            );
+          }
         }
       }
     }
@@ -1005,11 +1008,21 @@ export const calendarWorkingSchedulesStore = {
   },
   updateSchedule: (tenantId, id, updatedData) => {
     const list = calendarWorkingSchedulesStore.getSchedules(tenantId);
-    const existing = list.find((s) => s.id === id);
+    const existing = list.find((s) => s.id === id || s.code === id);
     const oldName = existing?.name;
     const newName = updatedData.name || oldName;
 
-    const updated = list.map((s) => (s.id === id ? { ...s, ...updatedData, updatedAt: new Date().toISOString() } : s));
+    const updated = list.map((s) =>
+      s.id === id || s.code === id
+        ? {
+            ...s,
+            ...updatedData,
+            id: s.id, // IMMUTABLE ID
+            code: s.code, // IMMUTABLE SLUG/CODE
+            updatedAt: new Date().toISOString(),
+          }
+        : s
+    );
     calendarWorkingSchedulesStore.saveSchedules(tenantId, updated);
 
     // Synchronize existing master calendar events if schedule name or description changed
@@ -1149,13 +1162,23 @@ export const calendarEventTypesStore = {
   },
   updateEventType: (tenantId, id, updatedData) => {
     const list = calendarEventTypesStore.getEventTypes(tenantId);
-    const existing = list.find((t) => t.id === id);
+    const existing = list.find((t) => t.id === id || t.code === id);
     const oldName = existing?.name;
     const newName = updatedData.name || oldName;
     const oldType = existing?.type;
     const newType = updatedData.type || oldType;
 
-    const updated = list.map((t) => (t.id === id ? { ...t, ...updatedData, updatedAt: new Date().toISOString() } : t));
+    const updated = list.map((t) =>
+      t.id === id || t.code === id
+        ? {
+            ...t,
+            ...updatedData,
+            id: t.id, // IMMUTABLE ID
+            code: t.code, // IMMUTABLE SLUG/CODE
+            updatedAt: new Date().toISOString(),
+          }
+        : t
+    );
     calendarEventTypesStore.saveEventTypes(tenantId, updated);
 
     // Synchronize master calendar events if event name, type, or description changed
@@ -1328,15 +1351,170 @@ export const calendarImpactScopesStore = {
   },
   updateScope: (tenantId, id, updatedData) => {
     const list = calendarImpactScopesStore.getScopes(tenantId);
-    const updated = list.map((s) => (s.id === id ? { ...s, ...updatedData, updatedAt: new Date().toISOString() } : s));
+    const updated = list.map((s) =>
+      s.id === id || s.code === id
+        ? {
+            ...s,
+            ...updatedData,
+            id: s.id, // IMMUTABLE ID
+            code: s.code, // IMMUTABLE SLUG/CODE
+            updatedAt: new Date().toISOString(),
+          }
+        : s
+    );
     calendarImpactScopesStore.saveScopes(tenantId, updated);
     return updated;
   },
   deleteScope: (tenantId, id) => {
     const list = calendarImpactScopesStore.getScopes(tenantId);
-    const updated = list.filter((s) => s.id !== id);
+    const updated = list.filter((s) => s.id !== id && s.code !== id);
     calendarImpactScopesStore.saveScopes(tenantId, updated);
     return updated;
+  },
+};
+
+// ─── Period Categories Store (Class Schedules & Routines) ──────────────────
+export const DEFAULT_PERIOD_CATEGORIES = [
+  {
+    id: "TEACHING_PERIOD",
+    code: "TEACHING_PERIOD",
+    name: "Academic Teaching Period",
+    badge: "Teaching Period",
+    description: "Standard classroom lecture and syllabus teaching period",
+    affects_class_attendance: true,
+    is_active: true,
+    order: 1,
+  },
+  {
+    id: "BREAK_TIFFIN",
+    code: "BREAK_TIFFIN",
+    name: "Break / Tiffin Interval",
+    badge: "Break / Tiffin",
+    description: "Food, meal, snacks, and tiffin recess interval",
+    affects_class_attendance: false,
+    is_active: true,
+    order: 2,
+  },
+  {
+    id: "PRAYER_BREAK",
+    code: "PRAYER_BREAK",
+    name: "Salah / Prayer Break",
+    badge: "Prayer Break",
+    description: "Congregational prayer break for Zuhr, Asr, or Maghrib",
+    affects_class_attendance: false,
+    is_active: true,
+    order: 3,
+  },
+  {
+    id: "MUTALA_SESSION",
+    code: "MUTALA_SESSION",
+    name: "Mutala / Self Study Session",
+    badge: "Mutala Session",
+    description: "Dedicated revision, memorization, and self-study session",
+    affects_class_attendance: true,
+    is_active: true,
+    order: 4,
+  },
+];
+
+export const periodCategoriesStore = {
+  getCategories: (tenantId) => {
+    const key = `spr_period_categories_${tenantId || 'default'}`;
+    const stored = readJSON(key, null);
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      return DEFAULT_PERIOD_CATEGORIES;
+    }
+    // Auto-migrate to ensure all standard default categories exist with modern fields
+    let hasChanges = false;
+    const merged = stored.map((item) => {
+      const def = DEFAULT_PERIOD_CATEGORIES.find((d) => d.id === item.id || d.code === item.code);
+      if (def && item.affects_class_attendance === undefined) {
+        hasChanges = true;
+        return { ...item, affects_class_attendance: def.affects_class_attendance };
+      }
+      return item;
+    });
+
+    DEFAULT_PERIOD_CATEGORIES.forEach((def) => {
+      const exists = merged.some((c) => c.id === def.id || c.code === def.code);
+      if (!exists) {
+        merged.push(def);
+        hasChanges = true;
+      }
+    });
+    if (hasChanges) {
+      writeJSON(key, merged);
+    }
+    return merged;
+  },
+  saveCategories: (tenantId, categories) => {
+    const key = `spr_period_categories_${tenantId || 'default'}`;
+    writeJSON(key, categories);
+    window.dispatchEvent(new CustomEvent("spr_period_categories_updated", { detail: categories }));
+    return categories;
+  },
+  addCategory: (tenantId, catData) => {
+    const list = periodCategoriesStore.getCategories(tenantId);
+    const code = (catData.code || catData.name || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_").slice(0, 30);
+    const newCategory = {
+      ...catData,
+      id: catData.id || code || `cat_${Date.now()}`,
+      code: code || `CAT_${Date.now()}`,
+      name: catData.name || code,
+      badge: catData.badge || catData.name || code,
+      description: catData.description || "",
+      affects_class_attendance: catData.affects_class_attendance !== undefined ? Boolean(catData.affects_class_attendance) : true,
+      order: catData.order || list.length + 1,
+      is_active: catData.is_active !== undefined ? catData.is_active : true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newCategory];
+    periodCategoriesStore.saveCategories(tenantId, updated);
+    return newCategory;
+  },
+  updateCategory: (tenantId, id, updatedData) => {
+    const list = periodCategoriesStore.getCategories(tenantId);
+    const updated = list.map((c) =>
+      c.id === id || c.code === id
+        ? {
+            ...c,
+            ...updatedData,
+            id: c.id, // IMMUTABLE ID
+            code: c.code, // IMMUTABLE SLUG/CODE
+            updatedAt: new Date().toISOString(),
+          }
+        : c
+    );
+    periodCategoriesStore.saveCategories(tenantId, updated);
+    return updated;
+  },
+  deleteCategory: (tenantId, id) => {
+    const list = periodCategoriesStore.getCategories(tenantId);
+    const updated = list.filter((c) => c.id !== id && c.code !== id);
+    periodCategoriesStore.saveCategories(tenantId, updated);
+    return updated;
+  },
+  isAttendanceTrackedForSlot: (tenantId, slotOrTypeCode) => {
+    if (!slotOrTypeCode) return true;
+    const typeCode = typeof slotOrTypeCode === 'string'
+      ? slotOrTypeCode
+      : (slotOrTypeCode.slot_type || slotOrTypeCode.code || slotOrTypeCode.id);
+    const categories = periodCategoriesStore.getCategories(tenantId);
+    const found = categories.find((c) => c.code === typeCode || c.id === typeCode);
+    if (found) {
+      return found.affects_class_attendance !== false;
+    }
+    // Default fallback rules if category is unrecognized
+    if (typeCode === 'BREAK_TIFFIN' || typeCode === 'PRAYER_BREAK') {
+      return false;
+    }
+    return true;
+  },
+  getAttendanceTrackedCategoryCodes: (tenantId) => {
+    const categories = periodCategoriesStore.getCategories(tenantId);
+    return categories
+      .filter((c) => c.affects_class_attendance !== false)
+      .map((c) => c.code || c.id);
   },
 };
 
@@ -1726,10 +1904,12 @@ export const staffRanksStore = {
   updateRank: (tenantId, id, updatedData) => {
     const list = staffRanksStore.getRanks(tenantId);
     const updated = list.map((r) =>
-      r.id === id
+      r.id === id || r.code === id
         ? {
             ...r,
             ...updatedData,
+            id: r.id, // IMMUTABLE ID
+            code: r.code, // IMMUTABLE SLUG/CODE
             order: updatedData.order !== undefined ? Number(updatedData.order) : r.order,
             updatedAt: new Date().toISOString(),
           }
@@ -1990,10 +2170,12 @@ export const documentTypesStore = {
   updateType: (tenantId, id, updatedData) => {
     const list = documentTypesStore.getTypes(tenantId);
     const updated = list.map((d) =>
-      d.id === id
+      d.id === id || d.code === id
         ? {
             ...d,
             ...updatedData,
+            id: d.id, // IMMUTABLE ID
+            code: d.code, // IMMUTABLE SLUG/CODE
             allowed_formats: Array.isArray(updatedData.allowed_formats)
               ? updatedData.allowed_formats
               : (updatedData.allowed_format ? [updatedData.allowed_format] : (d.allowed_formats || ["PDF", "JPG", "PNG", "WEBP"])),
@@ -2007,7 +2189,7 @@ export const documentTypesStore = {
   },
   deleteType: (tenantId, id) => {
     const list = documentTypesStore.getTypes(tenantId);
-    const updated = list.filter((d) => d.id !== id);
+    const updated = list.filter((d) => d.id !== id && d.code !== id);
     documentTypesStore.saveTypes(tenantId, updated);
     return updated;
   },
@@ -2100,10 +2282,12 @@ export const classAdmissionRequirementsStore = {
   updateRequirement: (tenantId, id, updatedData) => {
     const list = classAdmissionRequirementsStore.getRequirements(tenantId);
     const updated = list.map((r) =>
-      r.id === id
+      r.id === id || r.code === id
         ? {
             ...r,
             ...updatedData,
+            id: r.id, // IMMUTABLE ID
+            code: r.code, // IMMUTABLE SLUG/CODE
             applicable_class_id: updatedData.applicable_class_id !== undefined
               ? (updatedData.applicable_class_id || "ALL")
               : (r.applicable_class_id || (Array.isArray(r.applicable_class_ids) ? r.applicable_class_ids[0] : "ALL")),
@@ -2122,7 +2306,7 @@ export const classAdmissionRequirementsStore = {
   },
   deleteRequirement: (tenantId, id) => {
     const list = classAdmissionRequirementsStore.getRequirements(tenantId);
-    const updated = list.filter((r) => r.id !== id);
+    const updated = list.filter((r) => r.id !== id && r.code !== id);
     classAdmissionRequirementsStore.saveRequirements(tenantId, updated);
     return updated;
   },
@@ -2295,10 +2479,12 @@ export const staffRecruitmentRequirementsStore = {
   updateRequirement: (tenantId, id, updatedData) => {
     const list = staffRecruitmentRequirementsStore.getRequirements(tenantId);
     const updated = list.map((r) =>
-      r.id === id
+      r.id === id || r.code === id
         ? {
             ...r,
             ...updatedData,
+            id: r.id, // IMMUTABLE ID
+            code: r.code, // IMMUTABLE SLUG/CODE
             required_docs: Array.isArray(updatedData.required_docs)
               ? updatedData.required_docs
               : (typeof updatedData.required_docs === 'string'
@@ -2314,7 +2500,7 @@ export const staffRecruitmentRequirementsStore = {
   },
   deleteRequirement: (tenantId, id) => {
     const list = staffRecruitmentRequirementsStore.getRequirements(tenantId);
-    const updated = list.filter((r) => r.id !== id);
+    const updated = list.filter((r) => r.id !== id && r.code !== id);
     staffRecruitmentRequirementsStore.saveRequirements(tenantId, updated);
     return updated;
   },
@@ -2825,6 +3011,277 @@ export const curriculumKitabsStore = {
       inProgressKitabs: m.inProgressItems,
       notStartedKitabs: m.notStartedItems,
       overallProgressPct: m.overallProgressPct,
+    };
+  },
+};
+
+// Standard Default Previous Classes List
+export const DEFAULT_PREVIOUS_CLASSES = [
+  "Play / Nursery",
+  "KG (Kindergarten)",
+  "Class 1",
+  "Class 2",
+  "Class 3",
+  "Class 4",
+  "Class 5",
+  "Class 6",
+  "Class 7",
+  "Class 8",
+  "Class 9",
+  "Class 10",
+  "Nazera",
+  "Hifz (1-5 Para)",
+  "Hifz (6-15 Para)",
+  "Hifz (16-25 Para)",
+  "Hifz (26-30 Para / Completed)",
+  "Qirat",
+  "Kitab (Ibtidaiyah)",
+  "Kitab (Mutawassitah)",
+  "Kitab (Sanawiyyah)",
+  "Fazilat / Dawrah Hadith",
+  "None / First Admission",
+];
+
+// Admission Policies & Field Controls Configuration
+const DEFAULT_ADMISSION_SETTINGS = {
+  ongoing_academic_year_mode: "AUTO", // 'AUTO' (Active year only) | 'ALL' (All years) | 'CUSTOM' (Selected specific years)
+  ongoing_academic_year_id: "AUTO",
+  ongoing_academic_year_name: "",
+  allowed_admission_years: [], // IDs of academic years allowed in CUSTOM mode
+  branch_admission_mode: "ALL", // 'ALL' | 'SPECIFIC'
+  allowed_admission_branches: [], // Array of branch IDs allowed for admission
+  gender_policy: "BRANCH_SPECIFIC", // 'MALE_ONLY' | 'FEMALE_ONLY' | 'BRANCH_SPECIFIC'
+  branch_gender_rules: {}, // { [branchId]: 'MALE_ONLY' | 'FEMALE_ONLY' }
+  mother_info_visibility: "VISIBLE", // 'VISIBLE' | 'HIDDEN' | 'BRANCH_SPECIFIC'
+  branch_mother_info_rules: {}, // { [branchId]: 'VISIBLE' | 'HIDDEN' }
+  department_admission_mode: "ALL", // 'ALL' | 'BRANCH_SPECIFIC' | 'SPECIFIC'
+  allowed_admission_departments: [], // Array of department IDs (for SPECIFIC mode)
+  branch_department_rules: {}, // { [branchId]: [departmentId1, departmentId2] }
+  class_admission_mode: "ALL", // 'ALL' | 'SPECIFIC' | 'BRANCH_SPECIFIC'
+  allowed_admission_classes: [], // Array of class IDs (for SPECIFIC mode)
+  branch_class_rules: {}, // { [branchId]: [classId1, classId2] }
+  previous_classes_list: DEFAULT_PREVIOUS_CLASSES,
+};
+
+export const admissionSettingsStore = {
+  getSettings: (tenantId) => {
+    const key = `spr_admission_settings_${tenantId || 'default'}`;
+    const raw = readJSON(key, null);
+    if (!raw || typeof raw !== 'object') {
+      return { ...DEFAULT_ADMISSION_SETTINGS };
+    }
+    return {
+      ...DEFAULT_ADMISSION_SETTINGS,
+      ...raw,
+      allowed_admission_years: Array.isArray(raw.allowed_admission_years) ? raw.allowed_admission_years : [],
+      branch_admission_mode: raw.branch_admission_mode || 'ALL',
+      allowed_admission_branches: Array.isArray(raw.allowed_admission_branches) ? raw.allowed_admission_branches : [],
+      branch_gender_rules: { ...DEFAULT_ADMISSION_SETTINGS.branch_gender_rules, ...(raw.branch_gender_rules || {}) },
+      branch_mother_info_rules: { ...DEFAULT_ADMISSION_SETTINGS.branch_mother_info_rules, ...(raw.branch_mother_info_rules || {}) },
+      allowed_admission_departments: Array.isArray(raw.allowed_admission_departments) ? raw.allowed_admission_departments : [],
+      branch_department_rules: { ...DEFAULT_ADMISSION_SETTINGS.branch_department_rules, ...(raw.branch_department_rules || {}) },
+      allowed_admission_classes: Array.isArray(raw.allowed_admission_classes) ? raw.allowed_admission_classes : [],
+      branch_class_rules: { ...DEFAULT_ADMISSION_SETTINGS.branch_class_rules, ...(raw.branch_class_rules || {}) },
+      previous_classes_list: Array.isArray(raw.previous_classes_list) && raw.previous_classes_list.length > 0 ? raw.previous_classes_list : DEFAULT_PREVIOUS_CLASSES,
+    };
+  },
+
+  getPreviousClasses: (tenantId) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+    return Array.isArray(settings.previous_classes_list) && settings.previous_classes_list.length > 0
+      ? settings.previous_classes_list
+      : DEFAULT_PREVIOUS_CLASSES;
+  },
+
+  savePreviousClasses: (tenantId, classesList) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+    const updated = {
+      ...settings,
+      previous_classes_list: Array.isArray(classesList) ? classesList : DEFAULT_PREVIOUS_CLASSES,
+    };
+    return admissionSettingsStore.saveSettings(tenantId, updated);
+  },
+
+  saveSettings: (tenantId, settings) => {
+    const key = `spr_admission_settings_${tenantId || 'default'}`;
+    const safeSettings = {
+      ...DEFAULT_ADMISSION_SETTINGS,
+      ...(settings || {}),
+      updatedAt: new Date().toISOString(),
+    };
+    writeJSON(key, safeSettings);
+
+    try {
+      window.dispatchEvent(new CustomEvent('spr_admission_settings_updated', { detail: safeSettings }));
+    } catch {}
+
+    return safeSettings;
+  },
+
+  getAllowedAdmissionBranches: (tenantId, allBranches = []) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+    const mode = settings.branch_admission_mode || 'ALL';
+    if (mode === 'ALL') {
+      return allBranches;
+    }
+    const allowed = Array.isArray(settings.allowed_admission_branches) ? settings.allowed_admission_branches : [];
+    if (allowed.length === 0) return allBranches;
+    return allBranches.filter((b) => allowed.map(String).includes(String(b.id)));
+  },
+
+  getAllowedAdmissionYears: (tenantId) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+    const academicYears = academicYearsStore.getAcademicYears(tenantId);
+    const activeYear = academicYearsStore.getActiveYear(tenantId);
+    const allowed = Array.isArray(settings.allowed_admission_years) ? settings.allowed_admission_years : [];
+
+    if (allowed.length === 0) {
+      return activeYear ? [activeYear] : academicYears;
+    }
+
+    const matchedMap = new Map();
+
+    // If ACTIVE_YEAR or AUTO is selected, dynamically include active year
+    if (allowed.includes("ACTIVE_YEAR") || allowed.includes("AUTO")) {
+      if (activeYear) {
+        matchedMap.set(String(activeYear.id), activeYear);
+      }
+    }
+
+    // Add specifically selected years
+    academicYears.forEach((ay) => {
+      if (allowed.includes(ay.id) || allowed.includes(ay.name)) {
+        matchedMap.set(String(ay.id), ay);
+      }
+    });
+
+    const result = Array.from(matchedMap.values());
+    return result.length > 0 ? result : (activeYear ? [activeYear] : academicYears);
+  },
+
+  getActiveAdmissionYear: (tenantId) => {
+    const academicYears = academicYearsStore.getAcademicYears(tenantId);
+    const activeYear = academicYearsStore.getActiveYear(tenantId);
+    const allowedYears = admissionSettingsStore.getAllowedAdmissionYears(tenantId);
+
+    if (activeYear && allowedYears.some((ay) => String(ay.id) === String(activeYear.id) || String(ay.name) === String(activeYear.name))) {
+      return activeYear;
+    }
+
+    return allowedYears[0] || activeYear || academicYears[0] || null;
+  },
+
+  getAllowedAdmissionDepartments: (tenantId, branchId = null, allDepartments = []) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+    const mode = settings.department_admission_mode || 'ALL';
+
+    // 1. Filter departments by branch association if branchId provided
+    let candidateDepts = allDepartments;
+    if (branchId) {
+      candidateDepts = allDepartments.filter((d) => {
+        const bVal = d.branch !== undefined && d.branch !== null ? d.branch : d.branch_id;
+        const bId = bVal && typeof bVal === 'object' ? bVal.id : bVal;
+        return !bId || String(bId) === String(branchId);
+      });
+    }
+
+    if (mode === 'ALL') {
+      return candidateDepts;
+    }
+
+    if (mode === 'SPECIFIC') {
+      const allowed = Array.isArray(settings.allowed_admission_departments) ? settings.allowed_admission_departments : [];
+      if (allowed.length === 0) return candidateDepts;
+      return candidateDepts.filter((d) => allowed.map(String).includes(String(d.id)));
+    }
+
+    if (mode === 'BRANCH_SPECIFIC' && branchId) {
+      const branchRules = settings.branch_department_rules || {};
+      const allowed = Array.isArray(branchRules[branchId]) ? branchRules[branchId] : [];
+      if (allowed.length === 0) return candidateDepts;
+      return candidateDepts.filter((d) => allowed.map(String).includes(String(d.id)));
+    }
+
+    return candidateDepts;
+  },
+
+  getAllowedAdmissionClasses: (tenantId, branchId = null, allClasses = [], allDepartments = []) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+
+    // 1. Department filter (if departments are restricted, classes must also belong to allowed departments)
+    let filteredClasses = [...allClasses];
+    const deptMode = settings.department_admission_mode || 'ALL';
+
+    let allowedDeptIds = null;
+    if (deptMode === 'SPECIFIC') {
+      const allowed = Array.isArray(settings.allowed_admission_departments) ? settings.allowed_admission_departments : [];
+      if (allowed.length > 0) {
+        allowedDeptIds = allowed.map(String);
+      }
+    } else if (deptMode === 'BRANCH_SPECIFIC' && branchId) {
+      const branchRules = settings.branch_department_rules || {};
+      const allowed = Array.isArray(branchRules[branchId]) ? branchRules[branchId] : [];
+      if (allowed.length > 0) {
+        allowedDeptIds = allowed.map(String);
+      }
+    }
+
+    if (allowedDeptIds && allowedDeptIds.length > 0) {
+      filteredClasses = filteredClasses.filter((c) => {
+        const deptVal = c.department !== undefined && c.department !== null ? c.department : c.department_id;
+        const cDeptId = deptVal && typeof deptVal === 'object' ? deptVal.id : deptVal;
+        if (cDeptId !== null && cDeptId !== undefined && cDeptId !== '') {
+          return allowedDeptIds.includes(String(cDeptId));
+        }
+        return true;
+      });
+    }
+
+    // 2. Class admission mode filter
+    const classMode = settings.class_admission_mode || 'ALL';
+    if (classMode === 'ALL') {
+      return filteredClasses;
+    }
+
+    if (classMode === 'SPECIFIC') {
+      const allowed = Array.isArray(settings.allowed_admission_classes) ? settings.allowed_admission_classes : [];
+      if (allowed.length === 0) return filteredClasses;
+      return filteredClasses.filter((c) => allowed.map(String).includes(String(c.id)));
+    }
+
+    if (classMode === 'BRANCH_SPECIFIC' && branchId) {
+      const branchRules = settings.branch_class_rules || {};
+      const allowed = Array.isArray(branchRules[branchId]) ? branchRules[branchId] : [];
+      if (allowed.length === 0) return filteredClasses;
+      return filteredClasses.filter((c) => allowed.map(String).includes(String(c.id)));
+    }
+
+    return filteredClasses;
+  },
+
+  getEffectivePolicyForBranch: (tenantId, branchId) => {
+    const settings = admissionSettingsStore.getSettings(tenantId);
+
+    let effectiveGender = settings.gender_policy || 'MALE_ONLY';
+    if (settings.gender_policy === 'BRANCH_SPECIFIC' && branchId) {
+      effectiveGender = settings.branch_gender_rules?.[branchId] || 'MALE_ONLY';
+    }
+
+    let effectiveMotherInfo = settings.mother_info_visibility || 'VISIBLE';
+    if (settings.mother_info_visibility === 'BRANCH_SPECIFIC' && branchId) {
+      effectiveMotherInfo = settings.branch_mother_info_rules?.[branchId] || 'VISIBLE';
+    }
+
+    const isVisible = effectiveMotherInfo !== 'HIDDEN';
+
+    return {
+      genderPolicy: effectiveGender, // 'MALE_ONLY' | 'FEMALE_ONLY'
+      isMaleOnly: effectiveGender === 'MALE_ONLY',
+      isFemaleOnly: effectiveGender === 'FEMALE_ONLY',
+      motherInfoVisible: isVisible,
+      motherNameVisible: isVisible,
+      motherPhoneVisible: isVisible,
+      emergencyPhoneVisible: isVisible,
     };
   },
 };

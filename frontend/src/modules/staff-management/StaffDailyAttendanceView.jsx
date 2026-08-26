@@ -4,9 +4,9 @@ import { useToast } from '../../context/ToastContext';
 import { useRightSidebar } from '../../context/RightSidebarContext';
 import { fetchWithAuth } from '../../utils/authService';
 import { getHijriDateString } from '../../utils/hijriUtils';
-import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
-import AttendanceMatrixTable, { TakeAttendanceButton } from '../../components/common/AttendanceMatrixTable';
+import AttendanceTable, { TakeAttendanceButton, AttendanceDateStepper } from '../../components/common/AttendanceTable';
 import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer';
+import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDrawer';
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
 import {
   attendanceTimingPolicyStore,
@@ -25,6 +25,7 @@ import {
   BuildingOfficeIcon,
   CheckIcon,
   ClockIcon,
+  TimelineIcon,
 } from '../../components/ui/Icons';
 import CustomSelect from '../../components/ui/CustomSelect';
 import { DateRangePicker, TeacherSelect } from '../../components/selectors';
@@ -93,11 +94,19 @@ export default function StaffDailyAttendanceView() {
     enrichedDaysHeader,
     gregorianTitle,
     hijriTitle,
+    isFullHijriMonth,
     isHijriEnabled,
     isFullscreen,
     setIsFullscreen,
     setCalendarEventsVersion,
-  } = useAttendanceDateManager({ activeTenantId, moduleType: 'STAFF' });
+    stepLabels,
+    isAtMinBound,
+    isAtMaxBound,
+    handleStepBackward,
+    handleStepForward,
+    handleGoToToday,
+    isCurrentPeriodToday,
+  } = useAttendanceDateManager({ activeTenantId, moduleType: 'STAFF', isAdmin });
 
   // Filter State
   const [departments, setDepartments] = useState([]);
@@ -175,6 +184,9 @@ export default function StaffDailyAttendanceView() {
 
   // Filtered Staff Roster
   const filteredStaff = useMemo(() => {
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const periodEndDate = endDate || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
     return allStaffList.filter((s) => {
       if (selectedDeptId && selectedDeptId !== 'ALL' && String(s.department_id || s.department) !== String(selectedDeptId)) {
         return false;
@@ -185,9 +197,19 @@ export default function StaffDailyAttendanceView() {
       if (selectedStaffId && selectedStaffId !== 'ALL' && String(s.id) !== String(selectedStaffId)) {
         return false;
       }
+
+      // Exclude staff who joined after the requested attendance period
+      const staffJoiningDate = s.joining_date || s.hire_date || (s.created_at ? s.created_at.slice(0, 10) : null);
+      if (staffJoiningDate && staffJoiningDate > periodEndDate) {
+        const hasStaffRecordInPeriod = Object.keys(staffRecords || {}).some((k) => k.startsWith(`${s.id}_`));
+        if (!hasStaffRecordInPeriod) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [allStaffList, selectedDeptId, roleFilter, selectedStaffId]);
+  }, [allStaffList, selectedDeptId, roleFilter, selectedStaffId, selectedYear, selectedMonth, endDate, staffRecords]);
 
   // Helper to extract status from either string or rich object record
   const getStaffStatus = (rec) => {
@@ -328,6 +350,8 @@ export default function StaffDailyAttendanceView() {
       let aCount = 0;
       let lvCount = 0;
 
+      const staffJoiningDate = staff.joining_date || staff.hire_date || (staff.created_at ? staff.created_at.slice(0, 10) : null);
+
       enrichedDaysHeader.forEach((d) => {
         const rawRec = staffRecords[`${staff.id}_${d.date}`];
         const rawStatus = getStaffStatus(rawRec);
@@ -337,14 +361,15 @@ export default function StaffDailyAttendanceView() {
           policy: timingPolicy,
           isAdmin,
           currentStatus: rawStatus,
+          effectiveStartDate: staffJoiningDate,
         });
 
         const st = rawStatus || timingState.displayStatus || '';
         dailyStatuses[d.date] = st;
         if (st === 'PRESENT') pCount++;
-        else if (st === 'LATE' || st === 'HALF_DAY') lCount++;
+        else if (st === 'LATE') lCount++;
         else if (st === 'ABSENT') aCount++;
-        else if (st === 'ON_LEAVE') lvCount++;
+        else if (st === 'ON_LEAVE' || st === 'LEAVE') lvCount++;
       });
 
       const totalMarked = pCount + lCount + aCount + lvCount;
@@ -352,11 +377,22 @@ export default function StaffDailyAttendanceView() {
       const rate = totalMarked > 0 ? Math.round((attendedUnits / totalMarked) * 100) : 100;
 
       return {
+        ...staff,
         id: staff.id,
+        staff_id: staff.id,
         roll_number: String(idx + 1),
         name: staff.name || staff.user_name || 'Staff Member',
         sub_title: staff.designation || 'Staff',
-        department_name: staff.department_name || 'General',
+        department_name: staff.department_name || staff.department || 'General',
+        period_name: staff.designation || staff.role || 'Staff Member',
+        start_time: staff.shift_start || '09:00',
+        end_time: staff.shift_end || '17:00',
+        time: staff.shift_start ? `${staff.shift_start} – ${staff.shift_end || ''}` : 'Daily Shift',
+        effective_from: staff.joining_date || staff.hire_date || staff.created_at?.slice(0, 10) || 'Active Tenure',
+        effective_to: staff.resignation_date || (staff.is_active === false ? 'Terminated' : null),
+        is_deleted: Boolean(staff.is_active === false),
+        history_log: staff.history_log || staff.audit_log || [],
+        has_history: Boolean((staff.history_log && staff.history_log.length > 0) || staff.joining_date),
         daily_statuses: dailyStatuses,
         totals: {
           present: pCount,
@@ -463,8 +499,51 @@ export default function StaffDailyAttendanceView() {
       />
 
       {/* 2. Top Filter Controls Bar */}
-      <div className="p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4">
+        {/* Top Row: Date Display & Reusable Stepper */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
+              <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
+                {isFullHijriMonth ? hijriTitle : gregorianTitle}
+              </h2>
+            </div>
+
+            {isFullHijriMonth ? (
+              <p className="text-xs theme-accent font-medium pl-6">
+                Gregorian Range: <span className="font-semibold">{gregorianTitle}</span>
+              </p>
+            ) : isHijriEnabled ? (
+              <p className="text-xs theme-accent font-medium pl-6">
+                Islamic Hijri: <span className="font-semibold">{hijriTitle}</span>
+              </p>
+            ) : null}
+
+            {/* Tracking Baseline Date Indicator */}
+            <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary pt-1 pl-6">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium theme-bg-sub border theme-border theme-text-secondary">
+                <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                <span>Calculated from: <strong className="theme-text-primary">{activeAcademicYear?.startDate || minDate || 'Session Start'}</strong> ({activeAcademicYear?.name || 'Active Academic Year'})</span>
+              </span>
+            </div>
+          </div>
+
+          <AttendanceDateStepper
+            stepLabels={stepLabels}
+            onStepBackward={handleStepBackward}
+            onStepForward={handleStepForward}
+            onToday={handleGoToToday}
+            isToday={isCurrentPeriodToday}
+            isAtMinBound={isAtMinBound}
+            isAtMaxBound={isAtMaxBound}
+            minBoundTooltip={`Reached start of Academic Year (${activeAcademicYear?.name || 'Active Year'})`}
+            maxBoundTooltip={`Reached end of Academic Year (${activeAcademicYear?.name || 'Active Year'})`}
+          />
+        </div>
+
+        {/* Bottom Row: 4 Filter Selectors */}
+        <div className="border-t theme-border pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-end">
           {/* Department Filter */}
           <CustomSelect
             label="Department"
@@ -510,8 +589,18 @@ export default function StaffDailyAttendanceView() {
             startDate={startDate}
             endDate={endDate}
             onRangeSelect={(start, end) => {
-              setStartDate(start);
-              setEndDate(end);
+              let safeStart = start;
+              let safeEnd = end;
+              if (!isAdmin && minDate && safeStart && safeStart < minDate) {
+                showToast(`Selected date cannot precede the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`, 'warning');
+                safeStart = minDate;
+              }
+              if (!isAdmin && maxDate && safeEnd && safeEnd > maxDate) {
+                showToast(`Selected date cannot exceed the active Academic Year (${activeAcademicYear?.name || 'Active Year'}).`, 'warning');
+                safeEnd = maxDate;
+              }
+              setStartDate(safeStart);
+              setEndDate(safeEnd);
             }}
             onReset={handleResetDate}
             isHijriEnabled={isHijriEnabled}
@@ -538,7 +627,7 @@ export default function StaffDailyAttendanceView() {
             : 'rounded-3xl theme-bg-surface border theme-border shadow-xs overflow-hidden'
         }
       >
-        <AttendanceMatrixTable
+        <AttendanceTable
           daysHeader={enrichedDaysHeader}
           rows={staffRows}
           idLabel="#"
@@ -548,10 +637,27 @@ export default function StaffDailyAttendanceView() {
           isEditing={isEditing}
           onToggleCell={handleToggleCell}
           onAdminEditCell={isAdmin ? handleAdminEditCell : undefined}
+          onInspectHistory={(row) => {
+            if (!row) return;
+            openRightSidebar({
+              title: 'Staff Shift & Duty Timeline',
+              subtitle: `${row.period_name || row.designation || 'Staff Role'} • ${row.name || 'Staff Member'}`,
+              icon: TimelineIcon,
+              width: 520,
+              content: (
+                <ScheduleTimelineDrawer
+                  item={row}
+                  onClose={closeRightSidebar}
+                />
+              ),
+            });
+          }}
           isHijriEnabled={isHijriEnabled}
           onDateClick={handleOpenDayAgenda}
           isLoading={isLoading}
           emptyMessage="No employees found matching your filter criteria."
+          calculationBaselineDate={activeAcademicYear?.startDate || minDate || 'Session Start'}
+          calculationBaselineLabel="Tracking Since"
           totalCount={filteredStaff.length}
           totalCountLabel="Total Staff"
           isFullscreen={isFullscreen}

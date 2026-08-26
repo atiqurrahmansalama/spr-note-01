@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { CloudIcon, SaveIcon, RefreshIcon } from "../../../components/ui/Icons";
+import { CloudIcon, SaveIcon, RefreshIcon, UploadIcon, ServerStackIcon } from "../../../components/ui/Icons";
 import { useToast } from "../../../context/ToastContext";
 import {
   KEYS,
@@ -13,17 +13,6 @@ import {
 } from "../../../utils/localStore";
 
 import { fetchWithAuth } from "../../../utils/authService";
-
-// ─── UploadIcon (inline, no dependency) ──────────────────────────────────────
-function UploadIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  );
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +172,24 @@ export default function DataBackupView() {
     }
   };
 
+  // ── Enterprise Cloud Compliance & Vault Export ────────────────────────────
+  const handleCloudComplianceExport = async () => {
+    try {
+      showToast("Generating verified enterprise compliance export...", "info");
+      const res = await fetchWithAuth("/compliance/export/");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `enterprise_vault_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Enterprise compliance vault exported successfully!", "success");
+    } catch (err) {
+      showToast("Export failed: " + err.message, "error");
+    }
+  };
+
   // ── Clear Cache ───────────────────────────────────────────────────────────
   const handleClearCache = () => {
     if (window.confirm("Are you sure you want to clear the local report cache?")) {
@@ -295,8 +302,8 @@ export default function DataBackupView() {
 
       {/* ── Action Buttons ───────────────────────────────────────────────── */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-6 shadow-2xl space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Export */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Local Export */}
           <button
             type="button"
             onClick={handleExportData}
@@ -304,11 +311,25 @@ export default function DataBackupView() {
           >
             <div className="flex items-center gap-2.5 theme-accent font-bold text-xs">
               <SaveIcon className="w-4 h-4" />
-              <span>Export Backup (JSON)</span>
+              <span>Export Local (JSON)</span>
             </div>
             <p className="text-[11px] theme-text-secondary leading-relaxed">
-              Download all data (students, sessions, reports, settings) as a JSON file.
-              Use this file to import data on another device.
+              Download all local app settings, cached records, and theme configurations as a single JSON file.
+            </p>
+          </button>
+
+          {/* Enterprise Cloud Vault Export */}
+          <button
+            type="button"
+            onClick={handleCloudComplianceExport}
+            className="p-5 theme-bg-sub rounded-xl hover:theme-bg-elevated transition cursor-pointer text-left space-y-2 border theme-border"
+          >
+            <div className="flex items-center gap-2.5 text-emerald-400 font-bold text-xs">
+              <ServerStackIcon className="w-4 h-4" />
+              <span>Enterprise Vault Export</span>
+            </div>
+            <p className="text-[11px] theme-text-secondary leading-relaxed">
+              GDPR &amp; SOC2 compliant one-click verified backup of all students, faculty, attendance, and audit logs.
             </p>
           </button>
 

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { useTenant } from '../../../context/TenantContext';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
@@ -8,11 +9,75 @@ import ReusableCalendar from '../../../components/common/ReusableCalendar';
 import { DrawerContainer, DrawerFooter } from '../../../components/layout';
 import { createAdmissionToken, updateAdmissionToken } from '../../../api/admissions';
 import { fetchWithAuth } from '../../../utils/authService';
+import { academicYearsStore, admissionSettingsStore, getAcademicYearStatus } from '../../../utils/localStore';
 
 export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess, onCancel }) {
   const { showToast } = useToast();
   const { closeDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
   const isEditing = Boolean(tokenData && tokenData.id);
+
+  const [academicYears, setAcademicYears] = useState(() => academicYearsStore.getAcademicYears(activeTenantId));
+  const [admissionSettings, setAdmissionSettings] = useState(() => admissionSettingsStore.getSettings(activeTenantId));
+
+  useEffect(() => {
+    setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
+    setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
+
+    const handleAcademicUpdate = () => {
+      setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
+    };
+    const handleSettingsUpdate = () => {
+      setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
+    };
+
+    window.addEventListener('spr_academic_years_updated', handleAcademicUpdate);
+    window.addEventListener('spr_admission_settings_updated', handleSettingsUpdate);
+    window.addEventListener('spr_tenant_changed', handleAcademicUpdate);
+    window.addEventListener('spr_tenant_changed', handleSettingsUpdate);
+
+    return () => {
+      window.removeEventListener('spr_academic_years_updated', handleAcademicUpdate);
+      window.removeEventListener('spr_admission_settings_updated', handleSettingsUpdate);
+      window.removeEventListener('spr_tenant_changed', handleAcademicUpdate);
+      window.removeEventListener('spr_tenant_changed', handleSettingsUpdate);
+    };
+  }, [activeTenantId]);
+
+  const allowedAdmissionYears = useMemo(() => {
+    return admissionSettingsStore.getAllowedAdmissionYears(activeTenantId);
+  }, [activeTenantId, academicYears, admissionSettings]);
+
+  const ongoingAdmissionYear = useMemo(() => {
+    return admissionSettingsStore.getActiveAdmissionYear(activeTenantId);
+  }, [activeTenantId, academicYears, admissionSettings]);
+
+  const sessionOptions = useMemo(() => {
+    const list = allowedAdmissionYears && allowedAdmissionYears.length > 0 ? allowedAdmissionYears : academicYears;
+    if (!list || list.length === 0) {
+      return [{ label: '2026-2027 (Current Session)', value: '2026-2027' }];
+    }
+    return list.map((ay) => {
+      const status = getAcademicYearStatus(ay.startDate, ay.endDate);
+      const isOngoingTarget =
+        String(ay.id) === String(ongoingAdmissionYear?.id) ||
+        String(ay.name) === String(ongoingAdmissionYear?.name);
+      const statusTag = isOngoingTarget
+        ? ' (Ongoing Admissions)'
+        : status === 'ACTIVE'
+        ? ' (Active)'
+        : status === 'UPCOMING'
+        ? ' (Upcoming)'
+        : ' (Completed)';
+      return {
+        label: `${ay.name}${statusTag}`,
+        value: ay.name,
+        startDate: ay.startDate,
+        endDate: ay.endDate,
+        status,
+      };
+    });
+  }, [allowedAdmissionYears, academicYears, ongoingAdmissionYear]);
 
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,7 +85,7 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
 
   const [formData, setFormData] = useState({
     title: tokenData?.title || '',
-    session_year: tokenData?.session_year || '2026-2027',
+    session_year: tokenData?.session_year || ongoingAdmissionYear?.name || '2026-2027',
     target_class: tokenData?.target_class || '',
     max_applications: tokenData?.max_applications || 0,
     expires_at: tokenData?.expires_at ? tokenData.expires_at.split('T')[0] : '',
@@ -107,12 +172,11 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
         />
 
         {/* Academic Session */}
-        <CustomInput
+        <CustomSelect
           label="Academic Session Year *"
-          name="session_year"
-          value={formData.session_year}
+          options={sessionOptions}
+          value={formData.session_year || activeAcademicYear?.name || ''}
           onChange={(val) => handleChange('session_year', val)}
-          placeholder="2026-2027"
           required
         />
 

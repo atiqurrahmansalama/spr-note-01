@@ -50,21 +50,6 @@ export const ATTENDANCE_STATUSES = {
     kpiCardClass: "theme-bg-danger-soft border theme-border-danger",
     kpiTextClass: "theme-danger",
   },
-  HALF_DAY: {
-    id: "HALF_DAY",
-    code: "H",
-    label: "Half Day",
-    textClass: "theme-info",
-    bgClass: "theme-bg-info",
-    bgSoftClass: "theme-bg-info-soft",
-    borderClass: "theme-border-info",
-    badgeClass: "theme-info-badge",
-    btnClass: "theme-bg-info text-white shadow-xs",
-    quickFillClass: "theme-info-badge hover:opacity-90",
-    circleClass: "theme-bg-info-soft theme-info font-bold",
-    kpiCardClass: "theme-bg-info-soft border theme-border-info",
-    kpiTextClass: "theme-info",
-  },
   ON_LEAVE: {
     id: "ON_LEAVE",
     code: "LV",
@@ -104,7 +89,6 @@ export const ATTENDANCE_STATUS_LIST = [
   ATTENDANCE_STATUSES.PRESENT,
   ATTENDANCE_STATUSES.LATE,
   ATTENDANCE_STATUSES.ABSENT,
-  ATTENDANCE_STATUSES.HALF_DAY,
   ATTENDANCE_STATUSES.ON_LEAVE,
   ATTENDANCE_STATUSES.HOLIDAY_EXCUSED,
 ];
@@ -113,13 +97,12 @@ export const STATUS_CYCLE_LIST = [
   'PRESENT',
   'LATE',
   'ABSENT',
-  'HALF_DAY',
   'ON_LEAVE',
 ];
 
 /**
  * Cycles to the next attendance status in order:
- * PRESENT -> LATE -> ABSENT -> HALF_DAY -> ON_LEAVE -> [cleared/unmarked]
+ * PRESENT -> LATE -> ABSENT -> ON_LEAVE -> [cleared/unmarked]
  */
 export function cycleAttendanceStatus(currentStatus) {
   if (!currentStatus) return 'PRESENT';

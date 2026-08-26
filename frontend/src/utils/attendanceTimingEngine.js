@@ -74,6 +74,7 @@ export function getAttendanceCellTimingState({
   policy = DEFAULT_ATTENDANCE_TIMING_POLICY,
   isAdmin = false,
   currentStatus = '',
+  effectiveStartDate = null,
   nowDate = new Date(),
 }) {
   const safePolicy = { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...(policy || {}) };
@@ -90,7 +91,29 @@ export function getAttendanceCellTimingState({
   const LATE_STATUS_OPTIONS = ['LATE', 'ABSENT'];
 
   // Normalize currentStatus
-  const normalizedCurrentStatus = currentStatus === 'HALF_DAY' ? 'LATE' : (currentStatus || '');
+  const normalizedCurrentStatus = currentStatus || '';
+
+  // ─── 0. Target Date Precedes Admission / Joining Date ─────────────────────
+  if (effectiveStartDate && targetDate < effectiveStartDate && !normalizedCurrentStatus) {
+    return {
+      state: 'BEFORE_ONBOARDING',
+      isEditable: false,
+      allowedStatuses: [],
+      displayStatus: 'NOT_APPLICABLE',
+      lateMinutes: 0,
+      tooltip: `Date precedes official joining / admission date (${effectiveStartDate}).`,
+      canEditArrivalTime: false,
+      reason: 'BEFORE_ONBOARDING',
+    };
+  }
+
+  // Dynamically resolve auto-absent policy flag based on moduleType
+  const isAutoAbsentEnabled =
+    moduleType === 'RESIDENTIAL'
+      ? Boolean(safePolicy.residential_auto_absent_on_expiry)
+      : moduleType === 'STAFF'
+      ? Boolean(safePolicy.staff_auto_absent_on_expiry)
+      : Boolean(safePolicy.class_auto_absent_on_expiry);
 
   // ─── 1. Target Date is in the Future ──────────────────────────────────────
   if (targetDate > todayStr) {
@@ -121,7 +144,7 @@ export function getAttendanceCellTimingState({
           state: 'ADMIN_OVERRIDE',
           isEditable: true,
           allowedStatuses: ADMIN_STATUS_OPTIONS,
-          displayStatus: normalizedCurrentStatus || (safePolicy.class_auto_absent_on_expiry ? 'ABSENT' : ''),
+          displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
           lateMinutes: 0,
           tooltip: `Admin Override (${diffDays} days past). Full status & arrival editing available.`,
           canEditArrivalTime: true,
@@ -132,7 +155,7 @@ export function getAttendanceCellTimingState({
         state: 'ADMIN_WINDOW_EXPIRED',
         isEditable: false,
         allowedStatuses: [],
-        displayStatus: normalizedCurrentStatus || 'ABSENT',
+        displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
         lateMinutes: 0,
         tooltip: `Admin edit window (${adminWindowDays} days) has expired.`,
         canEditArrivalTime: false,
@@ -145,7 +168,7 @@ export function getAttendanceCellTimingState({
       state: 'PAST_LOCKED',
       isEditable: false,
       allowedStatuses: [],
-      displayStatus: normalizedCurrentStatus || 'ABSENT',
+      displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
       lateMinutes: 0,
       tooltip: 'Attendance window expired for past dates. Automatically resolved to Absent.',
       canEditArrivalTime: false,
@@ -160,7 +183,7 @@ export function getAttendanceCellTimingState({
   let slotEndMin = 0;
   let teacherEditLimitMin = 0;
 
-  if (moduleType === 'CLASS' || moduleType === 'TEACHER_CLASS') {
+  if (moduleType === 'CLASS' || moduleType === 'TEACHER_CLASS' || moduleType === 'TEACHER') {
     const defaultStart = startTime || '08:00';
     const defaultEnd = endTime || '08:45';
     slotStartMin = timeStringToMinutes(defaultStart);
@@ -266,7 +289,7 @@ export function getAttendanceCellTimingState({
       state: 'TEACHER_EDIT_WINDOW',
       isEditable: true,
       allowedStatuses: isAdmin ? ADMIN_STATUS_OPTIONS : LATE_STATUS_OPTIONS,
-      displayStatus: normalizedCurrentStatus || (safePolicy.class_auto_absent_on_expiry ? 'ABSENT' : ''),
+      displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
       lateMinutes: delay,
       tooltip: `Teacher edit window active until ${minutesToTimeString(teacherEditLimitMin)}.`,
       canEditArrivalTime: isAdmin,
@@ -280,7 +303,7 @@ export function getAttendanceCellTimingState({
       state: 'ADMIN_OVERRIDE',
       isEditable: true,
       allowedStatuses: ADMIN_STATUS_OPTIONS,
-      displayStatus: normalizedCurrentStatus || 'ABSENT',
+      displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
       lateMinutes: 0,
       tooltip: `Session ended. Admin full override permitted.`,
       canEditArrivalTime: true,
@@ -292,7 +315,7 @@ export function getAttendanceCellTimingState({
     state: 'SESSION_EXPIRED_LOCKED',
     isEditable: false,
     allowedStatuses: [],
-    displayStatus: normalizedCurrentStatus || 'ABSENT',
+    displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
     lateMinutes: 0,
     tooltip: `Attendance window expired at ${minutesToTimeString(teacherEditLimitMin)}. Unrecorded marked Absent.`,
     canEditArrivalTime: false,

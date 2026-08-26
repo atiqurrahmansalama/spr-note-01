@@ -374,34 +374,28 @@ export default function CustomSelect({
                   });
                   const allLabel = (typeof allOption === 'object' ? allOption?.label || allOption?.name : allOption) || 'All';
                   return (
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-accent theme-accent-text font-mono">
-                        ALL
-                      </span>
-                      <span className="text-xs theme-text-primary truncate">{allLabel}</span>
-                    </div>
+                    <span className="truncate theme-text-primary font-medium">{allLabel}</span>
                   );
                 })()
               ) : (
-                <div className="flex items-center gap-1 flex-wrap min-w-0 pr-1 py-0.5">
-                  {options
+                (() => {
+                  const selectedLabels = options
                     .filter((opt) => {
                       const optVal = typeof opt === 'string' ? opt : opt.value ?? opt.id;
                       return currentValues.includes(String(optVal));
                     })
-                    .map((opt, i) => {
-                      const optLabel = typeof opt === 'string' ? opt : opt.label || opt.name;
-                      const optBadge = typeof opt === 'object' ? opt.badge || opt.typeLabel : null;
-                      return (
-                        <span
-                          key={i}
-                          className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold theme-bg-surface border theme-border theme-text-primary flex items-center gap-1 shrink-0 shadow-2xs"
-                        >
-                          <span className="truncate max-w-[120px]">{optBadge || optLabel}</span>
-                        </span>
-                      );
-                    })}
-                </div>
+                    .map((opt) => (typeof opt === 'string' ? opt : opt.label || opt.name));
+
+                  if (selectedLabels.length === 0) {
+                    return <span className="truncate theme-text-secondary opacity-60">{placeholder}</span>;
+                  }
+
+                  return (
+                    <span className="truncate theme-text-primary font-medium">
+                      {selectedLabels.join(', ')}
+                    </span>
+                  );
+                })()
               )
             ) : selectedLabel ? (
               <div className="flex items-center justify-between gap-2 w-full min-w-0 pr-1">

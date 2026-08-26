@@ -334,12 +334,49 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         if group_id and group_id != 'ALL':
             students_qs = students_qs.filter(student_group_id=group_id)
 
+        # Exclude students who were not yet admitted during the requested attendance period
+        students_qs = students_qs.filter(
+            Q(admission_date__isnull=True, created_at__date__lte=end_date) |
+            Q(admission_date__lte=end_date) |
+            Q(attendances__date__gte=start_date, attendances__date__lte=end_date)
+        ).distinct()
+
         students = list(students_qs.order_by('roll_number', 'name'))
 
         # Fetch configured period slots for this class / institution
-        periods_qs = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('teacher', 'teacher__user')
+        # 1. Temporal Resolution Rule:
+        # Fetch slots active in [start_date, end_date] OR having recorded student attendance in this date range
+        recorded_slot_ids = list(StudentAttendance.objects.filter(
+            student__in=students,
+            date__gte=start_date,
+            date__lte=end_date,
+            period_slot_id__isnull=False
+        ).values_list('period_slot_id', flat=True).distinct())
+
+        temporal_active_q = (
+            (Q(effective_from__isnull=True) | Q(effective_from__lte=end_date)) &
+            (Q(effective_to__isnull=True) | Q(effective_to__gte=start_date)) &
+            (Q(is_deleted=False) | Q(deleted_at__date__gte=start_date))
+        )
+
+        periods_qs = ClassPeriodSlot.objects.filter(
+            temporal_active_q | Q(id__in=recorded_slot_ids)
+        ).select_related('teacher', 'teacher__user')
+
         if tenant_id:
             periods_qs = periods_qs.filter(institution_id=tenant_id)
+
+        # Dynamic slot_types filtering based on admin configuration / attendance tracker
+        slot_types_param = request.query_params.get('slot_types')
+        excluded_slot_types = request.query_params.get('excluded_slot_types')
+        if slot_types_param:
+            types_list = [t.strip() for t in slot_types_param.split(',') if t.strip()]
+            periods_qs = periods_qs.filter(slot_type__in=types_list)
+        elif excluded_slot_types:
+            types_list = [t.strip() for t in excluded_slot_types.split(',') if t.strip()]
+            periods_qs = periods_qs.exclude(slot_type__in=types_list)
+        elif request.query_params.get('include_all_slots') != 'true':
+            periods_qs = periods_qs.exclude(slot_type__in=['BREAK_TIFFIN', 'PRAYER_BREAK'])
 
         if class_id and class_id != 'ALL':
             class_periods = list(periods_qs.filter(student_class_id=class_id).order_by('period_order', 'start_time'))
@@ -443,21 +480,45 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                 lv_count = 0
                 hol_count = 0
 
+                slot_eff_from = str(slot.effective_from) if (slot and slot.effective_from) else None
+                slot_eff_to = str(slot.effective_to) if (slot and slot.effective_to) else None
+                adm_date_str = str(s.admission_date) if s.admission_date else (str(s.created_at.date()) if getattr(s, 'created_at', None) else None)
+
+                resolved_daily_statuses = {}
                 for d_info in days_header:
                     d_key = d_info["date"]
                     st = s_map.get(d_key) or s_map.get(d_info["day"])
-                    if st == 'PRESENT':
-                        p_count += 1
-                    elif st == 'LATE':
-                        l_count += 1
-                    elif st == 'ABSENT':
-                        a_count += 1
-                    elif st == 'HALF_DAY':
-                        hd_count += 1
-                    elif st == 'ON_LEAVE':
-                        lv_count += 1
-                    elif st == 'HOLIDAY_EXCUSED':
-                        hol_count += 1
+
+                    # Day-level validity check:
+                    # 1. Date is before student admission date
+                    is_before_admission = bool(adm_date_str and d_key < adm_date_str)
+
+                    # 2. Slot did not exist on this day
+                    is_inactive_slot = False
+                    if slot:
+                        if slot_eff_from and d_key < slot_eff_from and not st:
+                            is_inactive_slot = True
+                        elif slot_eff_to and d_key > slot_eff_to and not st:
+                            is_inactive_slot = True
+
+                    if (is_before_admission or is_inactive_slot) and not st:
+                        resolved_daily_statuses[d_key] = 'NOT_APPLICABLE'
+                    elif st:
+                        resolved_daily_statuses[d_key] = st
+                        if st == 'PRESENT':
+                            p_count += 1
+                        elif st == 'LATE':
+                            l_count += 1
+                        elif st == 'ABSENT':
+                            a_count += 1
+                        elif st == 'HALF_DAY':
+                            hd_count += 1
+                        elif st == 'ON_LEAVE':
+                            lv_count += 1
+                        elif st == 'HOLIDAY_EXCUSED':
+                            hol_count += 1
+                    else:
+                        resolved_daily_statuses[d_key] = ''
 
                 total_recorded = p_count + l_count + a_count + hd_count + lv_count
                 effective_present = p_count + l_count + (hd_count * 0.5)
@@ -475,6 +536,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     "student_id": s.id,
                     "name": s.name or s.name_en or 'Student',
                     "roll_number": s.roll_number,
+                    "admission_date": adm_date_str,
                     "class_name": s.student_class.name if s.student_class else '',
                     "group_name": s.student_group.name if s.student_group else '',
                     "period_slot_id": slot_id_str if slot else None,
@@ -483,12 +545,18 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     "start_time": str(slot.start_time)[:5] if (slot and slot.start_time) else None,
                     "end_time": str(slot.end_time)[:5] if (slot and slot.end_time) else None,
                     "duration_minutes": slot.duration_minutes if slot else None,
+                    "effective_from": str(slot.effective_from) if (slot and slot.effective_from) else None,
+                    "effective_to": str(slot.effective_to) if (slot and slot.effective_to) else None,
+                    "is_active": slot.is_active if slot else True,
+                    "is_deleted": slot.is_deleted if slot else False,
+                    "history_log": slot.history_log if slot else [],
+                    "has_history": bool(slot and slot.history_log and len(slot.history_log) > 0),
                     "teacher_id": str(slot.teacher_id) if (slot and slot.teacher_id) else None,
                     "teacher_name": t_name,
                     "teacher_designation": t_desig,
                     "period_count": len(s_slots_to_iterate),
                     "period_index": p_idx,
-                    "daily_statuses": s_map,
+                    "daily_statuses": resolved_daily_statuses,
                     "totals": {
                         "present": p_count,
                         "late": l_count,
@@ -577,18 +645,49 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         if teacher_id and teacher_id != 'ALL':
             teachers_qs = teachers_qs.filter(id=teacher_id)
 
+        # Exclude teachers whose joining date is after the requested attendance period
+        teachers_qs = teachers_qs.filter(
+            Q(joining_date__isnull=True, created_at__date__lte=end_date) |
+            Q(joining_date__lte=end_date)
+        ).distinct()
+
         teachers = list(teachers_qs.order_by('rank_order', 'employee_id'))
 
-        # 2. Query configured period slots
+        # 2. Query configured period slots with temporal validity + teacher conducted roll-calls
+        teacher_user_ids = [t.user_id for t in teachers if t.user_id]
+        teacher_conducted_slot_ids = list(StudentAttendance.objects.filter(
+            Q(taken_by_teacher__user_id__in=teacher_user_ids) | Q(marked_by_id__in=teacher_user_ids),
+            date__gte=start_date,
+            date__lte=end_date,
+            period_slot_id__isnull=False
+        ).values_list('period_slot_id', flat=True).distinct())
+
+        temporal_active_q = (
+            (Q(effective_from__isnull=True) | Q(effective_from__lte=end_date)) &
+            (Q(effective_to__isnull=True) | Q(effective_to__gte=start_date)) &
+            (Q(is_deleted=False) | Q(deleted_at__date__gte=start_date))
+        )
+
         slots_qs = ClassPeriodSlot.objects.filter(
-            is_deleted=False,
-            is_active=True
+            temporal_active_q | Q(id__in=teacher_conducted_slot_ids)
         ).select_related('student_class', 'department', 'teacher', 'teacher__user')
 
         if tenant_id:
             slots_qs = slots_qs.filter(institution_id=tenant_id)
         if class_id and class_id != 'ALL':
             slots_qs = slots_qs.filter(student_class_id=class_id)
+
+        # Dynamic slot_types filtering
+        slot_types_param = request.query_params.get('slot_types')
+        excluded_slot_types = request.query_params.get('excluded_slot_types')
+        if slot_types_param:
+            types_list = [t.strip() for t in slot_types_param.split(',') if t.strip()]
+            slots_qs = slots_qs.filter(slot_type__in=types_list)
+        elif excluded_slot_types:
+            types_list = [t.strip() for t in excluded_slot_types.split(',') if t.strip()]
+            slots_qs = slots_qs.exclude(slot_type__in=types_list)
+        elif request.query_params.get('include_all_slots') != 'true':
+            slots_qs = slots_qs.exclude(slot_type__in=['BREAK_TIFFIN', 'PRAYER_BREAK'])
 
         teacher_slots_map = {}
         for slot in slots_qs:
@@ -599,7 +698,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         att_qs = StudentAttendance.objects.filter(
             date__gte=start_date,
             date__lte=end_date
-        )
+        ).select_related('taken_by_teacher')
         if tenant_id:
             att_qs = att_qs.filter(student__institution_id=tenant_id)
 
@@ -616,6 +715,10 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                 conducted_general_class_statuses.setdefault((str(att.student.student_class_id), d_str), []).append(att.status)
             if att.taken_by_teacher_id:
                 conducted_teacher_direct_statuses.setdefault((str(att.taken_by_teacher_id), d_str), []).append(att.status)
+                if getattr(att, 'taken_by_teacher', None) and getattr(att.taken_by_teacher, 'user_id', None):
+                    conducted_teacher_direct_statuses.setdefault((str(att.taken_by_teacher.user_id), d_str), []).append(att.status)
+            if att.marked_by_id:
+                conducted_teacher_direct_statuses.setdefault((str(att.marked_by_id), d_str), []).append(att.status)
 
         # 4. Holidays & Weekends
         holidays = []
@@ -664,6 +767,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
             t_name = teacher.user.name if (teacher.user and teacher.user.name) else teacher.employee_id
             t_desig = teacher.designation or 'Faculty Teacher'
             t_dept = teacher.department.name if teacher.department else 'General Academic'
+            t_joining_date = str(teacher.joining_date) if getattr(teacher, 'joining_date', None) else (str(teacher.created_at.date()) if getattr(teacher, 'created_at', None) else None)
 
             for p_idx, slot in enumerate(slots_to_iterate):
                 slot_id_str = str(slot.id) if slot else 'DEFAULT'
@@ -674,6 +778,9 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                 a_count = 0
                 hol_count = 0
 
+                slot_eff_from = str(slot.effective_from) if (slot and slot.effective_from) else None
+                slot_eff_to = str(slot.effective_to) if (slot and slot.effective_to) else None
+
                 for d_info in days_header:
                     d_key = d_info["date"]
 
@@ -682,18 +789,25 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                         daily_statuses[d_key] = 'HOLIDAY_EXCUSED'
                     else:
                         statuses = []
+                        teacher_u_id = str(teacher.user_id) if teacher.user_id else None
+                        teacher_s_id = str(teacher.id)
+
                         if slot and slot_id_str != 'DEFAULT':
                             # 1. Strictly match this teacher's specific assigned period slot
                             if (slot_id_str, d_key) in conducted_period_statuses:
                                 statuses = conducted_period_statuses[(slot_id_str, d_key)]
-                            elif (str(teacher.id), d_key) in conducted_teacher_direct_statuses:
-                                statuses = conducted_teacher_direct_statuses[(str(teacher.id), d_key)]
+                            elif (teacher_s_id, d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(teacher_s_id, d_key)]
+                            elif teacher_u_id and (teacher_u_id, d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(teacher_u_id, d_key)]
                             elif slot.student_class_id and (str(slot.student_class_id), d_key) in conducted_general_class_statuses:
                                 statuses = conducted_general_class_statuses[(str(slot.student_class_id), d_key)]
                         else:
                             # 2. General teaching staff without dedicated period slots
-                            if (str(teacher.id), d_key) in conducted_teacher_direct_statuses:
-                                statuses = conducted_teacher_direct_statuses[(str(teacher.id), d_key)]
+                            if (teacher_s_id, d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(teacher_s_id, d_key)]
+                            elif teacher_u_id and (teacher_u_id, d_key) in conducted_teacher_direct_statuses:
+                                statuses = conducted_teacher_direct_statuses[(teacher_u_id, d_key)]
                             elif slot and slot.student_class_id and (str(slot.student_class_id), d_key) in conducted_general_class_statuses:
                                 statuses = conducted_general_class_statuses[(str(slot.student_class_id), d_key)]
                             elif (None, d_key) in conducted_general_class_statuses:
@@ -716,13 +830,27 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                                 p_count += 1
                                 daily_statuses[d_key] = 'PRESENT'
                         else:
-                            # If date is in the past (< today) and period was unconducted: auto-resolve to ABSENT
-                            today_iso = timezone.localdate().isoformat()
-                            if d_key < today_iso and not d_info["is_holiday"]:
-                                a_count += 1
-                                daily_statuses[d_key] = 'ABSENT'
+                            # Day-level validity check:
+                            # 1. Date is before teacher joining date
+                            is_before_joining = bool(t_joining_date and d_key < t_joining_date)
+
+                            # 2. Slot did not exist or was ended on this day
+                            is_inactive_day = False
+                            if slot:
+                                if slot_eff_from and d_key < slot_eff_from:
+                                    is_inactive_day = True
+                                elif slot_eff_to and d_key > slot_eff_to:
+                                    is_inactive_day = True
+
+                            if is_before_joining or is_inactive_day:
+                                daily_statuses[d_key] = 'NOT_APPLICABLE'
                             else:
-                                daily_statuses[d_key] = ''
+                                today_iso = timezone.localdate().isoformat()
+                                if d_key < today_iso and not d_info["is_holiday"]:
+                                    a_count += 1
+                                    daily_statuses[d_key] = 'ABSENT'
+                                else:
+                                    daily_statuses[d_key] = ''
 
                 total_recorded = p_count + l_count + a_count
                 conduction_rate = round((p_count + l_count) / total_recorded * 100, 1) if total_recorded > 0 else 100.0
@@ -743,6 +871,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     "id": str(teacher.id),
                     "roll_number": str(t_idx + 1),
                     "name": t_name,
+                    "joining_date": t_joining_date,
                     "sub_title": t_desig,
                     "department_name": desc_str,
                     "class_name": slot.student_class.name if (slot and slot.student_class) else '',
@@ -751,6 +880,12 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                     "period_order": slot.period_order if slot else (p_idx + 1),
                     "start_time": str(slot.start_time)[:5] if (slot and slot.start_time) else None,
                     "end_time": str(slot.end_time)[:5] if (slot and slot.end_time) else None,
+                    "effective_from": str(slot.effective_from) if (slot and slot.effective_from) else None,
+                    "effective_to": str(slot.effective_to) if (slot and slot.effective_to) else None,
+                    "is_active": slot.is_active if slot else True,
+                    "is_deleted": slot.is_deleted if slot else False,
+                    "history_log": slot.history_log if slot else [],
+                    "has_history": bool(slot and slot.history_log and len(slot.history_log) > 0),
                     "period_count": len(slots_to_iterate),
                     "period_index": p_idx,
                     "daily_statuses": daily_statuses,
@@ -758,8 +893,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                         "present": p_count,
                         "late": l_count,
                         "absent": a_count,
-                        "half_day": 0,
-                        "leave": 0,
+                        "holiday_excused": hol_count,
                         "total_recorded": total_recorded,
                         "conduction_rate": conduction_rate,
                         "attendance_rate": conduction_rate,

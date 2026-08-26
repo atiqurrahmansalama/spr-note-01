@@ -81,7 +81,22 @@ export function TaxonomyDetailDrawer({
             extraFields.map((field) => {
               const val = item[field.name];
               let displayContent = null;
-              if (Array.isArray(val)) {
+              if (field.renderBadge) {
+                displayContent = field.renderBadge(val, item);
+              } else if (field.type === "boolean" || field.type === "switch" || field.type === "toggle") {
+                const isEnabled = val !== undefined ? Boolean(val) : Boolean(field.defaultValue);
+                displayContent = (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${
+                      isEnabled
+                        ? "theme-bg-success-soft theme-success border-[var(--color-success-border)]"
+                        : "theme-bg-sub theme-text-secondary border-transparent"
+                    }`}
+                  >
+                    {isEnabled ? (field.trueLabel || "Enabled") : (field.falseLabel || "Disabled")}
+                  </span>
+                );
+              } else if (Array.isArray(val)) {
                 displayContent = (
                   <div className="flex flex-wrap gap-1 justify-end max-w-[280px]">
                     {val.map((v) => {
@@ -103,7 +118,7 @@ export function TaxonomyDetailDrawer({
                   : null;
                 displayContent = (
                   <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold theme-bg-sub border theme-border theme-text-primary">
-                    {matchedOpt ? matchedOpt.label : val || "—"}
+                    {matchedOpt ? matchedOpt.label : (val !== undefined ? String(val) : "—")}
                   </span>
                 );
               }
@@ -312,22 +327,35 @@ export function TaxonomyDrawerForm({
     if (e) e.preventDefault();
     if (!formData.name.trim()) return;
 
-    const generatedCode = initialData?.code || formData.name
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "_")
-      .replace(/_+/g, "_")
-      .slice(0, 40);
+    // STRICT IMMUTABILITY RULE:
+    // If editing existing item (initialData exists), preserve initialData.id and initialData.code permanently!
+    // If creating new item:
+    // - Clean Latin name to create initial uppercase slug (e.g. "CLASS_TEACHER")
+    // - If name has non-Latin characters (e.g. Bangla) or produces empty slug, use a collision-proof unique ID/Code
+    let itemCode = initialData?.code;
+    if (!itemCode) {
+      const latinOnly = formData.name
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 35);
+      itemCode = latinOnly && latinOnly.length >= 2
+        ? latinOnly
+        : `ITEM_${Date.now()}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    }
 
     setIsSubmitting(true);
     try {
       if (onSave) {
         await onSave({
           ...formData,
+          ...(initialData?.id ? { id: initialData.id } : {}),
           name: formData.name.trim(),
-          code: generatedCode || `ITEM_${Date.now()}`,
+          code: itemCode,
           type: formData.type || undefined,
-          description: formData.description.trim(),
+          description: formData.description ? formData.description.trim() : "",
           order: parseInt(formData.order, 10) || 0,
         });
       }
@@ -533,6 +561,46 @@ export function TaxonomyDrawerForm({
                 );
               }
 
+              if (field.type === "boolean" || field.type === "switch" || field.type === "toggle") {
+                const isChecked = formData[field.name] !== undefined ? Boolean(formData[field.name]) : Boolean(field.defaultValue);
+                return (
+                  <div
+                    key={field.name}
+                    className="p-3.5 rounded-2xl theme-bg-sub border theme-border flex items-start justify-between gap-3 cursor-pointer hover:theme-bg-elevated transition"
+                    onClick={() => setFormData((prev) => ({ ...prev, [field.name]: !isChecked }))}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <label className="text-xs font-bold theme-text-primary block cursor-pointer select-none">
+                        {field.label}
+                      </label>
+                      {field.description && (
+                        <p className="text-[11px] theme-text-secondary mt-0.5 leading-relaxed select-none">
+                          {field.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isChecked}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFormData((prev) => ({ ...prev, [field.name]: !isChecked }));
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isChecked ? "theme-bg-accent" : "bg-gray-300 dark:bg-zinc-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          isChecked ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              }
+
               if (field.type === "select" || field.type === "multiselect" || field.multiple) {
                 return (
                   <CustomSelect
@@ -714,7 +782,12 @@ export default function CompactTaxonomyManager({
               onManageTypes={onManageTypes}
               onSave={async (payload) => {
                 try {
-                  if (updateItem) await updateItem(foundItem?.id, payload);
+                  const safePayload = {
+                    ...payload,
+                    id: foundItem?.id,
+                    code: foundItem?.code || payload.code,
+                  };
+                  if (updateItem) await updateItem(foundItem?.id, safePayload);
                   showToast(`${itemTypeName} updated successfully!`, "success");
                   closeDrawer();
                   loadData();

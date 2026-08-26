@@ -20,18 +20,19 @@ const WEEKDAY_2LETTER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
  */
 export default function DateHeaderCell({
   as: Component = "th",
-  dateStr,
-  dayNum,
-  weekday,
+  dayData,
+  dateStr: propDateStr,
+  dayNum: propDayNum,
+  weekday: propWeekday,
   isHijriEnabled = false,
-  hijriDay,
-  hasEvent = false,
-  eventColors = null,
-  eventTitle = "",
-  isHoliday = false,
-  holidayTitle = "",
+  hijriDay: propHijriDay,
+  hasEvent: propHasEvent,
+  eventColors: propEventColors,
+  eventTitle: propEventTitle,
+  isHoliday: propIsHoliday,
+  holidayTitle: propHolidayTitle,
   isSelected = false,
-  isToday = false,
+  isToday: propIsToday,
   isCurrentMonth = true,
   showEventBackground = false,
   onClick,
@@ -40,6 +41,16 @@ export default function DateHeaderCell({
   children,
   ...restProps
 }) {
+  const dateStr = propDateStr || dayData?.date || '';
+  const dayNum = propDayNum !== undefined && propDayNum !== null ? propDayNum : dayData?.day;
+  const weekday = propWeekday !== undefined && propWeekday !== null ? propWeekday : dayData?.weekday;
+  const isHoliday = propIsHoliday !== undefined ? propIsHoliday : Boolean(dayData?.is_holiday);
+  const holidayTitle = propHolidayTitle || dayData?.holiday_title || '';
+  const hasEvent = propHasEvent !== undefined ? propHasEvent : Boolean(dayData?.has_event);
+  const eventColors = propEventColors || dayData?.event_colors || null;
+  const eventTitle = propEventTitle || dayData?.event_title || '';
+  const isToday = propIsToday !== undefined ? propIsToday : Boolean(dayData?.is_today);
+  const hijriDay = propHijriDay || dayData?.hijri_day || null;
   // Resolve numeric day
   const resolvedDayNum = dayNum !== undefined && dayNum !== null
     ? dayNum

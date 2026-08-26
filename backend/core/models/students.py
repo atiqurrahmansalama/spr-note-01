@@ -267,6 +267,8 @@ class StudentAcademicDetail(models.Model):
     previous_school_address = models.CharField(max_length=255, blank=True, null=True)
     previous_class = models.CharField(max_length=150, blank=True, null=True)
     previous_roll_number = models.CharField(max_length=64, blank=True, null=True)
+    previous_grade = models.CharField(max_length=64, blank=True, null=True)
+    previous_average = models.CharField(max_length=64, blank=True, null=True)
     previous_result = models.CharField(max_length=128, blank=True, null=True)
     previous_passing_year = models.CharField(max_length=32, blank=True, null=True)
     previous_study_details = models.TextField(blank=True, default='')
@@ -276,6 +278,16 @@ class StudentAcademicDetail(models.Model):
         on_delete=models.CASCADE,
         related_name='created_academic_details'
     )
+
+    def save(self, *args, **kwargs):
+        if not self.previous_result:
+            if self.previous_grade and self.previous_average:
+                self.previous_result = f"{self.previous_grade} ({self.previous_average})"
+            elif self.previous_grade:
+                self.previous_result = self.previous_grade
+            elif self.previous_average:
+                self.previous_result = self.previous_average
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Academic Detail for {self.student.name_en or self.student.uniq_id}"
