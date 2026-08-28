@@ -1283,7 +1283,7 @@ export default function FullAdmissionWizard({
                 <CustomSelect
                   label="Academic Session Year"
                   options={sessionOptions}
-                  value={sharedData.session_year || activeAcademicYear?.name || ""}
+                  value={sharedData.session_year || ongoingAdmissionYear?.name || ""}
                   onChange={(val) => {
                     const matchedYear = academicYears.find((ay) => ay.name === val);
                     setSharedData((prev) => {

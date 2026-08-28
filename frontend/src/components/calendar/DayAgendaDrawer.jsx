@@ -235,7 +235,7 @@ export default function DayAgendaDrawer({
 
           <div className="space-y-2.5">
             {sortedEvents.map((evt) => {
-              const style = getEventColors(evt);
+              const style = getEventColors(evt, activeTenantId);
               const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
               const rankVal = evt.priorityRank || evt.rank || 1;
 

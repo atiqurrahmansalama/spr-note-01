@@ -175,7 +175,7 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
         <CustomSelect
           label="Academic Session Year *"
           options={sessionOptions}
-          value={formData.session_year || activeAcademicYear?.name || ''}
+          value={formData.session_year || ongoingAdmissionYear?.name || ''}
           onChange={(val) => handleChange('session_year', val)}
           required
         />

@@ -36,9 +36,10 @@ export default function TeacherSelect({
   placeholder = 'Select Teacher...',
   allowAll = true,
   allLabel = 'All Teachers',
+  allValue = 'ALL',
   required = false,
   disabled = false,
-  searchable = true,
+  searchable = false,
   showBadge = false,
   size = 'md',
   compactMode = false,
@@ -53,8 +54,9 @@ export default function TeacherSelect({
 
   // Fetch staff/teachers if propTeachers is not supplied
   useEffect(() => {
-    if (propTeachers && Array.isArray(propTeachers)) {
+    if (propTeachers && Array.isArray(propTeachers) && propTeachers.length > 0) {
       setInternalTeachers(propTeachers);
+      setLoading(false);
       return;
     }
 
@@ -84,23 +86,23 @@ export default function TeacherSelect({
     };
   }, [propTeachers, activeTenantId]);
 
-  const allTeachers = propTeachers && Array.isArray(propTeachers) ? propTeachers : internalTeachers;
+  const rawTeachers = propTeachers && Array.isArray(propTeachers) && propTeachers.length > 0 ? propTeachers : internalTeachers;
 
   // Filter only teaching staff if requested
   const filteredTeachers = useMemo(() => {
-    if (!onlyTeachers) return allTeachers;
-    return allTeachers.filter((t) => {
+    if (!onlyTeachers) return rawTeachers;
+    return rawTeachers.filter((t) => {
       const type = t.staff_type || t.type;
       return !type || type === 'TEACHING';
     });
-  }, [allTeachers, onlyTeachers]);
+  }, [rawTeachers, onlyTeachers]);
 
   // Format options for CustomSelect
   const options = useMemo(() => {
     const list = [];
     if (allowAll) {
       list.push({
-        value: '',
+        value: allValue !== undefined ? allValue : 'ALL',
         label: allLabel,
         raw: null,
       });
@@ -126,22 +128,31 @@ export default function TeacherSelect({
     });
 
     return list;
-  }, [filteredTeachers, allowAll, allLabel, showBadge]);
+  }, [filteredTeachers, allowAll, allLabel, allValue, showBadge]);
 
   const handleChange = (selectedVal) => {
     const foundObj = filteredTeachers.find((t) => String(t.id) === String(selectedVal)) || null;
     onChange(selectedVal, foundObj);
   };
 
+  const normalizedValue = useMemo(() => {
+    if (value === undefined || value === null) return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
+    const strVal = String(value);
+    if (strVal === '' || strVal === 'ALL') {
+      return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
+    }
+    return strVal;
+  }, [value, allowAll, allValue]);
+
   return (
     <CustomSelect
-      value={value !== undefined && value !== null ? String(value) : ''}
+      value={normalizedValue}
       onChange={handleChange}
       options={options}
       label={label}
-      placeholder={loading ? 'Loading teachers...' : placeholder}
+      placeholder={loading && options.length === 0 ? 'Loading teachers...' : placeholder}
       required={required}
-      disabled={disabled || loading}
+      disabled={disabled}
       searchable={searchable && options.length > 5}
       showBadge={showBadge}
       size={size}

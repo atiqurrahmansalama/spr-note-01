@@ -30,7 +30,8 @@ from core.models import (
     AttendancePolicySetting, DocumentTemplateConfig, NotificationGatewayConfig,
     NotificationTemplate, NotificationTriggerRule, InAppNotification,
     NotificationDispatchLog, UserSession, UserDevice, UserLoginLog, UserActivityLog,
-    ActivityLog, TeacherProfile, GuardianProfile
+    ActivityLog, TeacherProfile, GuardianProfile,
+    ResidentialBuilding, DormitoryRoom, BedAllocation
 )
 from core.services import get_scoped_tenant_id
 
@@ -46,6 +47,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
     class_teacher_avatar = serializers.CharField(source='class_teacher.user.avatar_url', read_only=True, default='')
     enrolled_students = serializers.SerializerMethodField()
     capacity_percentage = serializers.SerializerMethodField()
+    group_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassSection
@@ -54,8 +56,8 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             'branch', 'branch_name', 'branch_code',
             'section_name', 'section_type', 'room_number', 'max_capacity',
             'class_teacher', 'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
-            'is_active', 'is_deleted',
-            'enrolled_students', 'capacity_percentage',
+            'has_groups', 'is_active', 'is_deleted',
+            'enrolled_students', 'capacity_percentage', 'group_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -63,8 +65,24 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             'student_class_name', 'student_class_code',
             'branch_name', 'branch_code',
             'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
-            'enrolled_students', 'capacity_percentage'
+            'enrolled_students', 'capacity_percentage', 'group_count'
         ]
+
+    def validate(self, attrs):
+        if self.instance and attrs.get('has_groups') is False:
+            active_groups_count = self.instance.groups.filter(is_deleted=False).count()
+            if active_groups_count > 0:
+                raise serializers.ValidationError({
+                    "has_groups": f"Cannot disable group divisions because this section has {active_groups_count} active group(s). Please delete or migrate all groups under this section first."
+                })
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        active_grp_count = instance.groups.filter(is_deleted=False).count()
+        if active_grp_count > 0:
+            data['has_groups'] = True
+        return data
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_enrolled_students(self, obj):
@@ -77,6 +95,10 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             return 0.0
         enrolled = self.get_enrolled_students(obj)
         return round(min(100.0, (enrolled / obj.max_capacity) * 100), 1)
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_group_count(self, obj):
+        return obj.groups.filter(is_deleted=False).count()
 
 
 class ClassPeriodSlotSerializer(serializers.ModelSerializer):
@@ -150,6 +172,7 @@ class StudentClassSerializer(serializers.ModelSerializer):
     class_teacher_name = serializers.CharField(source='class_teacher.name', read_only=True, default='')
     class_teacher_phone = serializers.CharField(source='class_teacher.phone_number', read_only=True, default='')
     student_count = serializers.SerializerMethodField()
+    section_count = serializers.SerializerMethodField()
     group_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -158,12 +181,12 @@ class StudentClassSerializer(serializers.ModelSerializer):
             'id', 'institution', 'institution_name', 'department', 'department_name', 'department_code', 'has_quran_tracker',
             'name', 'code', 'department_type',
             'class_teacher', 'class_teacher_name', 'class_teacher_phone',
-            'order_rank', 'is_active', 'is_deleted',
-            'student_count', 'group_count',
+            'order_rank', 'has_sections', 'has_groups', 'is_active', 'is_deleted',
+            'student_count', 'section_count', 'group_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'student_count', 'group_count',
+            'id', 'created_at', 'updated_at', 'student_count', 'section_count', 'group_count',
             'institution_name', 'department_name', 'department_code', 'has_quran_tracker'
         ]
 
@@ -176,7 +199,36 @@ class StudentClassSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "department": f"Selected department '{dept.name}' does not belong to institution '{inst.name}'."
             })
+        
+        # Enforce data integrity: Cannot disable sections if class already contains active sections
+        if self.instance and attrs.get('has_sections') is False:
+            active_sections_count = self.instance.sections.filter(is_deleted=False).count()
+            if active_sections_count > 0:
+                raise serializers.ValidationError({
+                    "has_sections": f"Cannot disable section divisions because this class has {active_sections_count} active section(s). Please delete or migrate all sections under this class first."
+                })
+
+        # Enforce data integrity: Cannot disable groups if class already contains active groups
+        if self.instance and attrs.get('has_groups') is False:
+            active_groups_count = self.instance.groups.filter(is_deleted=False).count()
+            if active_groups_count > 0:
+                raise serializers.ValidationError({
+                    "has_groups": f"Cannot disable group divisions because this class has {active_groups_count} active group(s). Please delete or migrate all groups under this class first."
+                })
         return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Ensure has_sections is always dynamically true if active sections exist
+        active_sec_count = instance.sections.filter(is_deleted=False).count()
+        if active_sec_count > 0:
+            data['has_sections'] = True
+        
+        # Ensure has_groups is always dynamically true if active groups exist
+        active_grp_count = instance.groups.filter(is_deleted=False).count()
+        if active_grp_count > 0:
+            data['has_groups'] = True
+        return data
 
     def create(self, validated_data):
         dept = validated_data.get('department')
@@ -189,6 +241,10 @@ class StudentClassSerializer(serializers.ModelSerializer):
         return obj.students.filter(is_deleted=False).count()
 
     @extend_schema_field(OpenApiTypes.INT)
+    def get_section_count(self, obj):
+        return obj.sections.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
     def get_group_count(self, obj):
         return obj.groups.filter(is_deleted=False).count()
 
@@ -199,6 +255,9 @@ class StudentGroupSerializer(serializers.ModelSerializer):
     student_class = serializers.PrimaryKeyRelatedField(queryset=StudentClass.objects.all(), required=True, allow_null=False)
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_class_code = serializers.CharField(source='student_class.code', read_only=True, default='')
+    section = serializers.PrimaryKeyRelatedField(queryset=ClassSection.objects.all(), required=False, allow_null=True)
+    section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    section_type = serializers.CharField(source='section.section_type', read_only=True, default='')
     department_type = serializers.CharField(source='student_class.department_type', read_only=True, default='HIFZ')
     mentor_teacher_name = serializers.CharField(source='mentor_teacher.name', read_only=True, default='')
     mentor_teacher_phone = serializers.CharField(source='mentor_teacher.phone_number', read_only=True, default='')
@@ -209,12 +268,19 @@ class StudentGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentGroup
         fields = [
-            'id', 'institution', 'institution_name', 'name', 'student_class', 'student_class_name', 'student_class_code',
+            'id', 'institution', 'institution_name', 'name',
+            'student_class', 'student_class_name', 'student_class_code',
+            'section', 'section_name', 'section_type',
             'department_type', 'mentor_teacher', 'mentor_teacher_name', 'mentor_teacher_phone',
             'capacity', 'is_active', 'is_deleted', 'student_count', 'available_seats',
             'capacity_percentage', 'created_by', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'institution_name', 'student_count', 'available_seats', 'capacity_percentage']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'institution_name',
+            'student_class_name', 'student_class_code',
+            'section_name', 'section_type',
+            'student_count', 'available_seats', 'capacity_percentage'
+        ]
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
@@ -223,9 +289,20 @@ class StudentGroupSerializer(serializers.ModelSerializer):
         return super().to_internal_value(mutable_data)
 
     def validate(self, attrs):
+        sec = attrs.get('section') or getattr(self.instance, 'section', None)
         s_class = attrs.get('student_class') or getattr(self.instance, 'student_class', None)
+
+        if sec and not s_class:
+            attrs['student_class'] = sec.student_class
+            s_class = sec.student_class
+        elif sec and s_class and sec.student_class_id != s_class.id:
+            raise serializers.ValidationError({
+                "section": f"Selected section '{sec.section_name}' belongs to '{sec.student_class.name}', not '{s_class.name}'."
+            })
+
         if not s_class:
             raise serializers.ValidationError({"student_class": "A Parent Academic Class is strictly required for every group."})
+
         inst = attrs.get('institution') or getattr(self.instance, 'institution', None)
         if inst and s_class.institution_id and inst.id != s_class.institution_id:
             raise serializers.ValidationError({
@@ -235,6 +312,10 @@ class StudentGroupSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         s_class = validated_data.get('student_class')
+        sec = validated_data.get('section')
+        if sec and sec.student_class and not s_class:
+            validated_data['student_class'] = sec.student_class
+            s_class = sec.student_class
         if s_class and s_class.institution and not validated_data.get('institution'):
             validated_data['institution'] = s_class.institution
         return super().create(validated_data)
@@ -483,4 +564,111 @@ class TeacherMatrixBulkUpdateItemSerializer(serializers.Serializer):
 
 class TeacherMatrixBulkUpdateSerializer(serializers.Serializer):
     records = TeacherMatrixBulkUpdateItemSerializer(many=True)
+
+
+class BedAllocationSerializer(serializers.ModelSerializer):
+    room_number = serializers.CharField(source='room.room_number', read_only=True, default='')
+    room_name = serializers.CharField(source='room.room_name', read_only=True, default='')
+    building_name = serializers.CharField(source='room.building.name', read_only=True, default='')
+    student_name = serializers.CharField(source='student.name_en', read_only=True, default='')
+    student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True, default='')
+    student_class_name = serializers.CharField(source='student.student_class.name', read_only=True, default='')
+    staff_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BedAllocation
+        fields = [
+            'id', 'room', 'room_number', 'room_name', 'building_name',
+            'bed_number', 'student', 'student_name', 'student_uniq_id',
+            'student_class_name', 'staff', 'staff_name', 'status',
+            'assigned_date', 'remarks', 'is_active', 'created_at', 'updated_at'
+        ]
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_staff_name(self, obj):
+        if not obj.staff or not obj.staff.user:
+            return ""
+        return obj.staff.user.get_full_name() or obj.staff.user.username or f"Staff #{obj.staff.id}"
+
+
+class DormitoryRoomSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
+    building_name = serializers.CharField(source='building.name', read_only=True, default='')
+    building_code = serializers.CharField(source='building.code', read_only=True, default='')
+    supervisor_name = serializers.SerializerMethodField()
+    prefect_name = serializers.CharField(source='prefect.name_en', read_only=True, default='')
+    occupied_seats_count = serializers.SerializerMethodField()
+    vacant_seats_count = serializers.SerializerMethodField()
+    beds = BedAllocationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DormitoryRoom
+        fields = [
+            'id', 'institution', 'branch', 'branch_name',
+            'building', 'building_name', 'building_code',
+            'floor_number', 'room_number', 'room_name', 'room_type',
+            'max_capacity', 'occupied_seats_count', 'vacant_seats_count',
+            'supervisor', 'supervisor_name', 'prefect', 'prefect_name',
+            'amenities', 'beds', 'is_active', 'is_deleted',
+            'created_at', 'updated_at'
+        ]
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_supervisor_name(self, obj):
+        if not obj.supervisor or not obj.supervisor.user:
+            return ""
+        return obj.supervisor.user.get_full_name() or obj.supervisor.user.username or f"Staff #{obj.supervisor.id}"
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_occupied_seats_count(self, obj):
+        return obj.beds.filter(status='OCCUPIED', is_active=True).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_vacant_seats_count(self, obj):
+        occ = obj.beds.filter(status='OCCUPIED', is_active=True).count()
+        return max(0, obj.max_capacity - occ)
+
+
+class ResidentialBuildingSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
+    warden_name = serializers.SerializerMethodField()
+    total_rooms_count = serializers.SerializerMethodField()
+    total_capacity = serializers.SerializerMethodField()
+    occupied_seats_count = serializers.SerializerMethodField()
+    vacant_seats_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ResidentialBuilding
+        fields = [
+            'id', 'institution', 'branch', 'branch_name',
+            'name', 'code', 'total_floors', 'warden', 'warden_name',
+            'description', 'total_rooms_count', 'total_capacity',
+            'occupied_seats_count', 'vacant_seats_count',
+            'is_active', 'is_deleted', 'created_at', 'updated_at'
+        ]
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_warden_name(self, obj):
+        if not obj.warden or not obj.warden.user:
+            return ""
+        return obj.warden.user.get_full_name() or obj.warden.user.username or f"Staff #{obj.warden.id}"
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_rooms_count(self, obj):
+        return obj.rooms.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_capacity(self, obj):
+        return obj.rooms.filter(is_deleted=False).aggregate(total=Sum('max_capacity'))['total'] or 0
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_occupied_seats_count(self, obj):
+        return BedAllocation.objects.filter(room__building=obj, status='OCCUPIED', is_active=True).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_vacant_seats_count(self, obj):
+        cap = self.get_total_capacity(obj)
+        occ = self.get_occupied_seats_count(obj)
+        return max(0, cap - occ)
+
 

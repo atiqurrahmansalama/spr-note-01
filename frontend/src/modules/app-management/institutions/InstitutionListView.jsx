@@ -1,20 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import {
   DepartmentIcon,
-  SearchIcon,
   PlusIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
   TrashIcon,
   EditIcon,
   UsersIcon,
-  CloseIcon,
   BuildingOfficeIcon,
-  PhoneIcon,
-  ClassIcon,
-  MoreVerticalIcon,
 } from '../../../components/ui/Icons';
 import DataTable from '../../../components/ui/DataTable';
 import DataCardGrid from '../../../components/ui/DataCardGrid';
@@ -42,10 +36,10 @@ export default function InstitutionListView({
   hideHeader = false,
   hideMetrics = false,
   isEmbedded = false,
+  showStructureQuotas = false,
 }) {
-  const navigate = useNavigate();
   const { showToast } = useToast();
-  const { requestSwitchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions, currentInstitution } = useTenant();
+  const { requestSwitchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
@@ -173,6 +167,7 @@ export default function InstitutionListView({
           content: (
             <InstitutionEditForm
               institution={foundInst}
+              showStructureQuotas={showStructureQuotas}
               onSuccess={() => {
                 loadData();
                 refreshInstitutions();
@@ -190,6 +185,7 @@ export default function InstitutionListView({
         size: 'md',
         content: (
           <InstitutionOnboardingForm
+            showStructureQuotas={showStructureQuotas}
             onSuccess={() => {
               loadData();
               refreshInstitutions();
@@ -200,7 +196,7 @@ export default function InstitutionListView({
         ),
       };
     },
-    [institutions, loadData, refreshInstitutions, closeDrawer]
+    [institutions, loadData, refreshInstitutions, closeDrawer, showStructureQuotas]
   );
 
   const handleOpenOnboarding = () => {
@@ -559,21 +555,25 @@ export default function InstitutionListView({
 
       {/* 3. Search & View Mode Switcher Toolbar */}
       <DataViewToolbar
+        searchLabel="Search Academies"
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search academies by name, slug, phone..."
         filterElement={
-          <CustomSelect
-            size="sm"
-            searchable={false}
-            value={typeFilter}
-            onChange={(val) => setTypeFilter(val)}
-            options={[
-              { value: 'ALL', label: 'All Academy Types' },
-              ...categories.map((c) => ({ value: c.code, label: c.name })),
-            ]}
-            placeholder="All Academy Types"
-          />
+          <div className="w-36 sm:w-48 shrink-0">
+            <CustomSelect
+              label="Academy Type"
+              size="md"
+              searchable={false}
+              value={typeFilter}
+              onChange={(val) => setTypeFilter(val)}
+              options={[
+                { value: 'ALL', label: 'All Academy Types' },
+                ...categories.map((c) => ({ value: c.code, label: c.name })),
+              ]}
+              placeholder="All Academy Types"
+            />
+          </div>
         }
         viewMode={viewMode}
         onToggleViewMode={handleToggleViewMode}

@@ -716,6 +716,68 @@ def delete_group_with_migration(source_group_id, target_group_id, performed_by=N
     }
 
 
+def delete_section_with_migration(source_section_id, target_section_id=None, performed_by=None):
+    """
+    Safely decommissions a ClassSection by atomically migrating all its active students
+    and associated groups to a target destination section (or unassigning section if target_section_id is empty),
+    and soft-deleting the source section.
+    
+    Guardrail 1: Enforces strict self-target prevention (target_section_id != source_section_id).
+    """
+    from django.db import transaction
+    from rest_framework.exceptions import ValidationError, NotFound
+    from core.models import ClassSection, StudentGroup, Student, StudentAcademicHistory
+
+    if target_section_id and str(source_section_id) == str(target_section_id):
+        raise ValidationError({"target_section_id": "Destination section cannot be the same as the section being deleted (Self-Migration Prohibited)."})
+
+    try:
+        source_section = ClassSection.objects.get(id=source_section_id)
+    except ClassSection.DoesNotExist:
+        raise NotFound("Source section not found.")
+
+    target_section = None
+    if target_section_id:
+        try:
+            target_section = ClassSection.objects.get(id=target_section_id, is_deleted=False)
+        except ClassSection.DoesNotExist:
+            raise ValidationError({"target_section_id": "Target destination section does not exist or has been deleted."})
+
+    with transaction.atomic():
+        affected_students = Student.objects.filter(section=source_section, is_deleted=False)
+        student_count = affected_students.count()
+
+        for student in affected_students:
+            student.section = target_section
+            if target_section and target_section.student_class:
+                student.student_class = target_section.student_class
+            student.save(update_fields=['section', 'student_class', 'updated_at'])
+
+        # Migrate or unassign linked student groups
+        affected_groups = StudentGroup.objects.filter(section=source_section, is_deleted=False)
+        group_count = affected_groups.count()
+        for grp in affected_groups:
+            grp.section = target_section
+            if target_section and target_section.student_class:
+                grp.student_class = target_section.student_class
+            grp.save(update_fields=['section', 'student_class', 'updated_at'])
+
+        # Soft-delete the source section
+        source_section.is_deleted = True
+        source_section.is_active = False
+        source_section.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
+
+    target_name = target_section.section_name if target_section else "General Class Pool (No Section)"
+    return {
+        "status": "success",
+        "message": f"Section '{source_section.section_name}' successfully decommissioned. Migrated {student_count} students and {group_count} groups to '{target_name}'.",
+        "migrated_students": student_count,
+        "migrated_groups": group_count,
+        "source_section": source_section.section_name,
+        "target_section": target_name
+    }
+
+
 def transfer_student_academic(student_id, target_class_id=None, target_group_id=None, transition_date=None, transition_reason="", performed_by=None):
     """
     Transfers a single student between classes and groups with custom transition date

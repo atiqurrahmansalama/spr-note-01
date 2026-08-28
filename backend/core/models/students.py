@@ -97,10 +97,12 @@ class Student(models.Model):
             elif self.created_by and self.created_by.institution:
                 self.institution = self.created_by.institution
 
-        # ── Guardrail 2 & 3: Group & Class Auto-Sync and Backward Compatibility ──
+        # ── Guardrail 2 & 3: Group, Section & Class Auto-Sync and Backward Compatibility ──
         if self.student_group:
             self.group_name = self.student_group.name
-            if self.student_group.student_class and not self.student_class:
+            if self.student_group.section_id and not self.section_id:
+                self.section = self.student_group.section
+            if self.student_group.student_class_id and not self.student_class_id:
                 self.student_class = self.student_group.student_class
         elif self.group_name and str(self.group_name).strip():
             from django.apps import apps
@@ -110,10 +112,15 @@ class Student(models.Model):
                 defaults={'created_by': self.created_by}
             )
             self.student_group = grp
-            if grp.student_class and not self.student_class:
+            if grp.section_id and not self.section_id:
+                self.section = grp.section
+            if grp.student_class_id and not self.student_class_id:
                 self.student_class = grp.student_class
         else:
             self.group_name = "General Group"
+
+        if self.section and self.section.student_class_id and not self.student_class_id:
+            self.student_class = self.section.student_class
 
         if not self.name_en or not str(self.name_en).strip():
             self.name_en = "Unnamed Student"

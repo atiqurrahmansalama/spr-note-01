@@ -117,8 +117,8 @@ class AcademyModelsAndAPITestCase(APITestCase):
         section_payload = {
             "student_class": str(self.student_class.id),
             "branch": str(branch.id),
-            "section_name": "Halqa A - Tajweed",
-            "section_type": "HIFZ_HALQA",
+            "section_name": "Section A - Tajweed",
+            "section_type": "HIFZ_SECTION",
             "room_number": "Room 302",
             "max_capacity": 30,
             "class_teacher": str(self.staff_profile.id),

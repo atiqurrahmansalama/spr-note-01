@@ -45,6 +45,8 @@ User = get_user_model()
 class AcademicInstitutionSerializer(serializers.ModelSerializer):
     total_students_count = serializers.SerializerMethodField()
     total_classes_count = serializers.SerializerMethodField()
+    total_branches_count = serializers.SerializerMethodField()
+    total_departments_count = serializers.SerializerMethodField()
     total_staff_count = serializers.SerializerMethodField()
     logo_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
@@ -58,11 +60,12 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
             'eiin_or_reg_no', 'logo_url', 'logo_data', 'phone', 'email', 'address',
             'division', 'district', 'upazila_thana', 'post_code', 'postal_code', 'street_address',
             'latitude', 'longitude', 'map_place_id',
+            'max_institutions', 'max_branches', 'max_departments',
             'is_verified', 'is_active', 'is_deleted',
-            'total_students_count', 'total_classes_count', 'total_staff_count',
+            'total_students_count', 'total_classes_count', 'total_branches_count', 'total_departments_count', 'total_staff_count',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students_count', 'total_classes_count', 'total_staff_count']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students_count', 'total_classes_count', 'total_branches_count', 'total_departments_count', 'total_staff_count']
 
     def validate(self, attrs):
         logo_url = attrs.get('logo_url')
@@ -103,6 +106,16 @@ class AcademicInstitutionSerializer(serializers.ModelSerializer):
         return StudentClass.objects.filter(institution=obj, is_deleted=False).count()
 
     @extend_schema_field(OpenApiTypes.INT)
+    def get_total_branches_count(self, obj):
+        from core.models import AcademicBranch
+        return AcademicBranch.objects.filter(institution=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_departments_count(self, obj):
+        from core.models import AcademicDepartment
+        return AcademicDepartment.objects.filter(institution=obj, is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
     def get_total_staff_count(self, obj):
         from core.models import User
         return User.objects.filter(institution=obj, is_active=True).count()
@@ -121,7 +134,7 @@ class InstitutionCategorySerializer(serializers.ModelSerializer):
 
 
 class InstitutionOnboardingSerializer(serializers.Serializer):
-    # Step 1: Basic Details
+    # Step 1: Basic Details & Quota Limits
     name = serializers.CharField(max_length=200, required=True)
     bangla_name = serializers.CharField(max_length=250, required=False, allow_blank=True, default='')
     institution_type = serializers.ChoiceField(
@@ -130,6 +143,9 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
     )
     eiin_or_reg_no = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=30, required=True)
+    max_institutions = serializers.IntegerField(required=False, default=1, min_value=1)
+    max_branches = serializers.IntegerField(required=False, default=1, min_value=1)
+    max_departments = serializers.IntegerField(required=False, default=1, min_value=1)
 
     # Step 2: Branding & Address
     slug = serializers.SlugField(max_length=100, required=True)
@@ -207,7 +223,9 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
         admin_phone = validated_data['admin_phone']
         admin_email = validated_data.get('admin_email', '')
         admin_password = validated_data['admin_password']
-        preset_type = validated_data.get('preset_type', 'HIFZ')
+        max_institutions = validated_data.get('max_institutions', 1)
+        max_branches = validated_data.get('max_branches', 1)
+        max_departments = validated_data.get('max_departments', 1)
 
         with transaction.atomic():
             # 1. Create Institution
@@ -231,6 +249,9 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                 map_place_id=map_place_id,
                 logo_url=logo_url,
                 logo_data=logo_data,
+                max_institutions=max_institutions,
+                max_branches=max_branches,
+                max_departments=max_departments,
                 is_verified=True,
                 is_active=True,
             )

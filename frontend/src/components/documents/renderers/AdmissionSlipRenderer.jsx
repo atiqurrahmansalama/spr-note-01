@@ -71,7 +71,7 @@ export default function AdmissionSlipRenderer({
             <span className="font-semibold text-zinc-900">{student.department_name || student.department || 'Hifzul Quran Division'}</span>
           </div>
           <div className="flex justify-between border-b border-zinc-200/80 pb-1">
-            <span className="text-zinc-500 font-medium">Class & Halqa:</span>
+            <span className="text-zinc-500 font-medium">Class & Group:</span>
             <span className="font-semibold text-zinc-900">
               {student.student_class_name || student.student_class || 'Standard Hifz'} {student.student_group_name ? `— ${student.student_group_name}` : ''}
             </span>

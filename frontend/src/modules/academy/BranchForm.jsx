@@ -99,13 +99,25 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
     }
   };
 
+  // Selected parent institution & branch quota calculation
+  const selectedInst = useMemo(() => {
+    if (formData.institution) {
+      return institutions.find((i) => String(i.id) === String(formData.institution)) || currentInstitution;
+    }
+    return currentInstitution;
+  }, [formData.institution, institutions, currentInstitution]);
+
+  const branchQuotaLimit = selectedInst?.max_branches || 1;
+  const currentBranchCount = selectedInst?.total_branches_count || 0;
+  const isQuotaReached = !isEdit && currentBranchCount >= branchQuotaLimit && !isMultiTenantAdmin;
+
   // Determine if form has been modified by the user
   const isDirty = useMemo(() => {
     return Object.keys(initialValues).some((key) => formData[key] !== initialValues[key]);
   }, [formData, initialValues]);
 
   const isFormValid = formData.branch_name.trim().length > 0 && Boolean(formData.institution || activeTenantId !== 'ALL');
-  const canSave = isDirty && isFormValid && !submitting;
+  const canSave = isDirty && isFormValid && !submitting && !isQuotaReached;
 
   const handleDivisionChange = (div) => {
     setFormData((prev) => ({
@@ -121,6 +133,10 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isQuotaReached) {
+      showToast(`Branch quota limit of ${branchQuotaLimit} reached for this academy.`, 'error');
+      return;
+    }
     if (!formData.branch_name.trim()) {
       showToast('Branch Name is required.', 'warning');
       return;
@@ -170,6 +186,19 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
   return (
     <DrawerContainer padding="normal" spacing="normal">
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Quota Limit Notice */}
+        {isQuotaReached && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-start gap-2.5 animate-fade-in">
+            <BuildingOfficeIcon className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Branch Quota Limit Reached ({currentBranchCount}/{branchQuotaLimit})</p>
+              <p className="opacity-90 text-[11px] mt-0.5">
+                This academy has allocated all {branchQuotaLimit} allowed branch campuses. To create additional branches, update the academy's branch quota limit.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Section 1: Basic Campus Profile */}
         <DrawerSection title="Campus Information" icon={BuildingOfficeIcon}>
 
@@ -177,7 +206,7 @@ export default function BranchForm({ branch = null, onSaved, onCancel }) {
             {(institutions.length > 1 || activeTenantId === 'ALL' || isMultiTenantAdmin) && (
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                  Parent Academy / Institution <span className="text-rose-400">*</span>
+                  Parent Academy / Institution <span className="theme-accent">*</span>
                 </label>
                 <CustomSelect
                   options={institutions.map((i) => ({ label: i.name, value: String(i.id) }))}

@@ -14,6 +14,7 @@ import { useRightSidebar } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
+import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 
 // Route details mapping for titles and path lookup

@@ -1,23 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  SleekCheckIcon,
   BuildingOfficeIcon,
-  LocationIcon,
-  CompassIcon,
+  SleekCheckIcon,
 } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
-import FileUploadZone from '../../../components/ui/FileUploadZone';
-import AddressMapModal from '../../../components/common/AddressMapModal';
+import DocumentFilePicker from '../../../components/ui/DocumentFilePicker';
+import { CampusStructureQuotaGroup } from './InstitutionOnboardingForm';
 import AddressPickerInput from '../../../components/ui/AddressPickerInput';
 import { updateInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useToast } from '../../../context/ToastContext';
-import {
-  BANGLADESH_DIVISIONS,
-  BANGLADESH_DISTRICTS_BY_DIVISION,
-  BD_GEO_DATA,
-} from '../../../utils/bangladeshGeoData';
 
 const FALLBACK_INSTITUTION_TYPES = [
   { value: 'MADRASA', label: 'Madrasa / Maktab' },
@@ -27,10 +20,9 @@ const FALLBACK_INSTITUTION_TYPES = [
   { value: 'OTHER', label: 'Other Educational Institution' },
 ];
 
-export default function InstitutionEditForm({ institution, onSuccess, onCancel }) {
+export default function InstitutionEditForm({ institution, onSuccess, onCancel, showStructureQuotas = false }) {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [errors, setErrors] = useState({});
 
@@ -49,6 +41,9 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
     post_code: '',
     street_address: '',
     address: '',
+    max_institutions: 1,
+    max_branches: 1,
+    max_departments: 1,
   });
 
   const [initialData, setInitialData] = useState(null);
@@ -84,6 +79,9 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
         post_code: institution.post_code || '',
         street_address: institution.street_address || '',
         address: institution.address || '',
+        max_institutions: institution.max_institutions ?? 1,
+        max_branches: institution.max_branches ?? 1,
+        max_departments: institution.max_departments ?? 1,
       };
       setFormData(snap);
       setInitialData(snap);
@@ -107,67 +105,33 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
       formData.upazila_thana !== initialData.upazila_thana ||
       formData.post_code !== initialData.post_code ||
       formData.street_address !== initialData.street_address ||
-      formData.address !== initialData.address
+      formData.max_institutions !== initialData.max_institutions ||
+      formData.max_branches !== initialData.max_branches ||
+      formData.max_departments !== initialData.max_departments
     );
   }, [formData, initialData]);
 
-  if (!institution) return null;
-
-  const handleDivisionChange = (newDivision) => {
-    const districtsForDiv = BANGLADESH_DISTRICTS_BY_DIVISION[newDivision] || [];
-    const firstDistrict = districtsForDiv[0] || '';
-    const thanasForDist = (BD_GEO_DATA[newDivision] && BD_GEO_DATA[newDivision][firstDistrict]) || [];
-    setFormData((prev) => ({
-      ...prev,
-      division: newDivision,
-      district: firstDistrict,
-      upazila_thana: thanasForDist[0] || '',
-    }));
-  };
-
-  const handleDistrictChange = (newDistrict) => {
-    const thanasForDist = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][newDistrict]) || [];
-    setFormData((prev) => ({
-      ...prev,
-      district: newDistrict,
-      upazila_thana: thanasForDist[0] || '',
-    }));
-  };
-
-  // Google Maps / GPS Address Auto-fill Callback
-  const handleMapLocationConfirm = (mapData) => {
-    if (!mapData) return;
-    setFormData((prev) => ({
-      ...prev,
-      division: mapData.division || prev.division,
-      district: mapData.district || prev.district,
-      upazila_thana: mapData.upazila_thana || prev.upazila_thana,
-      post_code: mapData.postal_code || mapData.post_code || prev.post_code,
-      street_address: mapData.street_address || mapData.address || prev.street_address,
-      address: mapData.address || prev.address,
-    }));
-    showToast('Campus address coordinates applied from map!', 'success');
-  };
-
-  const validateForm = () => {
+  const validate = () => {
     const errs = {};
-    if (!formData.name.trim()) errs.name = 'Academy name in English is required.';
+    if (!formData.name?.trim()) errs.name = 'Academy name in English is required.';
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errs.email = 'Please provide a valid email address.';
     }
-    if (!formData.division) errs.division = 'Division is required.';
-    if (!formData.district) errs.district = 'District is required.';
+    if (!formData.division) errs.division = 'Division selection is required.';
+    if (!formData.district) errs.district = 'District selection is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!validateForm()) return;
+    if (!validate()) return;
 
-    setIsUpdating(true);
     try {
-      // Re-compose address for full backward compatibility
+      setIsUpdating(true);
+      setErrors({});
+
+      // Format combined address
       const fullAddressParts = [
         formData.street_address,
         formData.upazila_thana,
@@ -178,60 +142,70 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
 
       const payload = {
         ...formData,
-        address: combinedAddress,
+        address: combinedAddress || formData.address,
       };
 
-      await updateInstitution(institution.id, payload);
+      const res = await updateInstitution(institution.id, payload);
       showToast('Academy profile updated successfully!', 'success');
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(res);
     } catch (err) {
-      console.error('[Edit Institution Error]:', err);
-      showToast(err.response?.data?.error || err.message || 'Failed to update academy', 'error');
+      console.error('[Update Academy Error]:', err);
+      const serverErrors = err.response?.data || (typeof err.data === 'object' ? err.data : {});
+      if (typeof serverErrors === 'object' && Object.keys(serverErrors).length > 0) {
+        const mappedErrors = {};
+        Object.entries(serverErrors).forEach(([key, val]) => {
+          mappedErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
+        });
+        setErrors(mappedErrors);
+        const firstKey = Object.keys(mappedErrors)[0];
+        const readableMsg = mappedErrors.non_field_errors || mappedErrors.error || mappedErrors.detail || `${firstKey ? firstKey.replace(/_/g, ' ') + ': ' : ''}${mappedErrors[firstKey]}`;
+        showToast(readableMsg, 'error');
+      } else {
+        showToast(err.message || 'Failed to update academy details. Please try again.', 'error');
+      }
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const availableDistricts = BANGLADESH_DISTRICTS_BY_DIVISION[formData.division] || [];
-  const availableThanas = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][formData.district]) || [];
-  const isSaveDisabled = isUpdating || !isDirty || !formData.name.trim();
+  const isSaveDisabled = !isDirty || isUpdating;
 
   return (
-    <div className="flex flex-col h-full w-full theme-text-primary select-none font-sans min-h-[660px] text-left">
-      <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 pb-36 w-full">
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
-          {/* Identity Names */}
-          <div className="space-y-4">
-            <div>
-              <CustomInput
-                label="Academy Name (English)"
-                required
-                value={formData.name}
-                onChange={(val) => {
-                  setFormData({ ...formData, name: val });
-                  if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
-                }}
-                placeholder="e.g. Darul Ulum Islamic Academy"
-                error={errors.name}
-              />
-            </div>
-
-            <div>
-              <CustomInput
-                label="Native / Regional Name"
-                optional
-                value={formData.bangla_name}
-                onChange={(val) => setFormData({ ...formData, bangla_name: val })}
-                placeholder="e.g. Darul Uloom Academy"
-              />
-            </div>
+    <div className="flex flex-col h-full theme-bg-app select-none">
+      {/* Scrollable Form Body */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl mx-auto">
+          {/* Academy English Title */}
+          <div>
+            <CustomInput
+              label="Academy Name (English)"
+              required
+              value={formData.name}
+              onChange={(val) => {
+                setFormData({ ...formData, name: val });
+                if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+              }}
+              placeholder="e.g. Darul Ulum Islamic Academy"
+              error={errors.name}
+            />
           </div>
 
-          {/* Academy Type & EIIN */}
+          {/* Regional Native Title */}
+          <div>
+            <CustomInput
+              label="Regional Name"
+              optional
+              value={formData.bangla_name}
+              onChange={(val) => setFormData({ ...formData, bangla_name: val })}
+              placeholder="e.g. Darul Uloom Academy"
+            />
+          </div>
+
+          {/* Type & EIIN */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <CustomSelect
-                label="Academy Type"
+                label="Academy Category / Type"
                 value={formData.institution_type}
                 onChange={(val) => setFormData({ ...formData, institution_type: val })}
                 options={categories.length > 0 ? categories : FALLBACK_INSTITUTION_TYPES}
@@ -275,6 +249,16 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
             />
           </div>
 
+          {/* Institutional Quota & Multi-Campus Access Allocation (Super Admin Only) */}
+          {showStructureQuotas && (
+            <CampusStructureQuotaGroup
+              values={formData}
+              onChange={(key, val) => setFormData((prev) => ({ ...prev, [key]: val }))}
+              title="Campus Structure & Quotas"
+              subtitle="Control allowed academies, branch campuses, and department allocations"
+            />
+          )}
+
           {/* Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -303,12 +287,33 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           </div>
 
           {/* Logo File Upload */}
-          <div>
-            <FileUploadZone
-              label="Academy Logo / Emblem"
-              value={formData.logo_data}
-              onChange={(dataUrl) => setFormData({ ...formData, logo_data: dataUrl })}
-              onRemove={() => setFormData({ ...formData, logo_data: '' })}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+              Academy Logo / Emblem
+            </label>
+            <DocumentFilePicker
+              label="Click to Upload Academy Logo"
+              subLabel="SVG, PNG, JPG, WebP (Max 5MB)"
+              accept="image/*,.svg"
+              fileUrl={formData.logo_data || formData.logo_url}
+              fileName={formData.logo_name || (formData.logo_data ? "Academy Logo" : "")}
+              fileSize={formData.logo_size}
+              onChange={(fileData) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  logo_data: fileData.url,
+                  logo_name: fileData.name,
+                  logo_size: fileData.size,
+                }))
+              }
+              onRemove={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  logo_data: '',
+                  logo_name: '',
+                  logo_size: '',
+                }))
+              }
             />
           </div>
 
@@ -380,22 +385,6 @@ export default function InstitutionEditForm({ institution, onSuccess, onCancel }
           </button>
         </div>
       </div>
-
-      {/* Google Maps / GPS Picker Modal */}
-      {isMapModalOpen && (
-        <AddressMapModal
-          isOpen={isMapModalOpen}
-          onClose={() => setIsMapModalOpen(false)}
-          initialLocation={{
-            address: formData.street_address || formData.address,
-            division: formData.division,
-            district: formData.district,
-            upazila_thana: formData.upazila_thana,
-            postal_code: formData.post_code,
-          }}
-          onConfirm={handleMapLocationConfirm}
-        />
-      )}
     </div>
   );
 }

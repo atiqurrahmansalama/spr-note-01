@@ -32,7 +32,8 @@ from core.models import (
     AttendancePolicySetting, DocumentTemplateConfig, NotificationGatewayConfig,
     NotificationTemplate, NotificationTriggerRule, InAppNotification,
     NotificationDispatchLog, UserSession, UserDevice, UserLoginLog, UserActivityLog,
-    ActivityLog, TeacherProfile, GuardianProfile
+    ActivityLog, TeacherProfile, GuardianProfile,
+    AcademicGoal, DailyLessonPlan, LessonEvaluation, HomeworkAssignment, HomeworkSubmission
 )
 from core.services import get_scoped_tenant_id
 
@@ -515,4 +516,181 @@ class DocumentTemplateConfigSerializer(serializers.ModelSerializer):
         if not value or not str(value).strip():
             raise serializers.ValidationError("Template name cannot be empty.")
         return str(value).strip()
+
+
+class AcademicGoalSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.name_en', read_only=True)
+    student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True)
+
+    class Meta:
+        model = AcademicGoal
+        fields = [
+            'id',
+            'institution',
+            'branch',
+            'student',
+            'student_name',
+            'student_uniq_id',
+            'subject_name',
+            'target_title',
+            'target_type',
+            'start_point',
+            'target_point',
+            'current_progress',
+            'progress_percentage',
+            'target_daily_pace',
+            'start_date',
+            'target_end_date',
+            'actual_completion_date',
+            'status',
+            'notes',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class LessonEvaluationSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.name_en', read_only=True)
+    student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True)
+    student_class_name = serializers.CharField(source='student.student_class.name', read_only=True)
+
+    class Meta:
+        model = LessonEvaluation
+        fields = [
+            'id',
+            'lesson_plan',
+            'student',
+            'student_name',
+            'student_uniq_id',
+            'student_class_name',
+            'evaluation_date',
+            'evaluation_status',
+            'score',
+            'max_score',
+            'total_mistakes',
+            'total_stucks',
+            'fluency_rating',
+            'teacher_remarks',
+            'is_synced_to_parent',
+            'parent_viewed_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class DailyLessonPlanSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source='academic_class.name', read_only=True)
+    section_name = serializers.CharField(source='section.section_name', read_only=True)
+    group_name = serializers.CharField(source='student_group.group_name', read_only=True)
+    evaluations = LessonEvaluationSerializer(many=True, read_only=True)
+    total_evaluations = serializers.IntegerField(source='evaluations.count', read_only=True)
+    period_order = serializers.IntegerField(source='period_slot.period_order', read_only=True)
+    start_time = serializers.TimeField(source='period_slot.start_time', read_only=True)
+    end_time = serializers.TimeField(source='period_slot.end_time', read_only=True)
+
+    class Meta:
+        model = DailyLessonPlan
+        fields = [
+            'id',
+            'institution',
+            'branch',
+            'academic_class',
+            'class_name',
+            'section',
+            'section_name',
+            'student_group',
+            'group_name',
+            'subject_name',
+            'curriculum_book_id',
+            'curriculum_book_name',
+            'period_slot',
+            'period_name',
+            'period_order',
+            'start_time',
+            'end_time',
+            'teacher',
+            'teacher_name',
+            'lesson_date',
+            'lesson_title',
+            'lesson_topic',
+            'start_unit',
+            'end_unit',
+            'lesson_instructions',
+            'assigned_scope',
+            'targeted_students',
+            'attachment_url',
+            'is_active',
+            'evaluations',
+            'total_evaluations',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class HomeworkSubmissionSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.name_en', read_only=True)
+    student_uniq_id = serializers.CharField(source='student.uniq_id', read_only=True)
+    homework_title = serializers.CharField(source='homework.title', read_only=True)
+
+    class Meta:
+        model = HomeworkSubmission
+        fields = [
+            'id',
+            'homework',
+            'homework_title',
+            'student',
+            'student_name',
+            'student_uniq_id',
+            'submitted_at',
+            'submission_content',
+            'attachment_url',
+            'status',
+            'obtained_marks',
+            'teacher_feedback',
+            'evaluated_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class HomeworkAssignmentSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source='academic_class.name', read_only=True)
+    section_name = serializers.CharField(source='section.section_name', read_only=True)
+    submissions = HomeworkSubmissionSerializer(many=True, read_only=True)
+    submission_count = serializers.IntegerField(source='submissions.count', read_only=True)
+
+    class Meta:
+        model = HomeworkAssignment
+        fields = [
+            'id',
+            'institution',
+            'branch',
+            'lesson_plan',
+            'academic_class',
+            'class_name',
+            'section',
+            'section_name',
+            'subject_name',
+            'teacher',
+            'teacher_name',
+            'title',
+            'description',
+            'assigned_date',
+            'due_date',
+            'due_time',
+            'max_marks',
+            'submission_type',
+            'attachment_url',
+            'is_active',
+            'submissions',
+            'submission_count',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
 

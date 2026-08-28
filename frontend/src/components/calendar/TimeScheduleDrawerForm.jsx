@@ -519,6 +519,32 @@ export function EventColorPickerDropdown({ value, onChange }) {
   );
 }
 
+export function resolveEventFormColor(evt, targetCategory, kinds = [], types = []) {
+  if (evt?.color && EVENT_COLORS.some((c) => c.id === evt.color)) {
+    return evt.color;
+  }
+  // Lookup type in eventTypes
+  const matchedType = (types || []).find(
+    (t) => t.id === evt?.eventTypeId || t.name === evt?.title || t.code === evt?.code
+  );
+  const rawType = matchedType?.type || evt?.type || evt?.event_type || evt?.kind || evt?.category || targetCategory;
+  if (rawType) {
+    const matchedKind = (kinds || []).find(
+      (k) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
+    );
+    if (matchedKind?.color && EVENT_COLORS.some((c) => c.id === matchedKind.color)) {
+      return matchedKind.color;
+    }
+  }
+  if (rawType === "WORKING_HOURS" || targetCategory === "WORKING_HOURS") return "indigo";
+  if (rawType === "HOLIDAY") return "rose";
+  if (rawType === "EXAM") return "amber";
+  if (rawType === "MEETING") return "blue";
+  if (rawType === "ACTIVITY") return "purple";
+  if (rawType === "GENERAL") return "slate";
+  return "emerald";
+}
+
 export default function TimeScheduleDrawerForm({
   event,
   initialDate,
@@ -679,6 +705,7 @@ export default function TimeScheduleDrawerForm({
       }
 
       const initialImpacts = normalizeImpacts(rawImpacts, impactScopes);
+      const initialColor = resolveEventFormColor(event, event.category || defaultCategory, eventKinds, eventTypes);
 
       return {
         title: event.title || "",
@@ -700,12 +727,17 @@ export default function TimeScheduleDrawerForm({
         untilDate: event.untilDate || event.endDate || "",
         isFullDay: Boolean(event.isFullDay || (!event.startTime && !event.endTime)),
         description: event.description || "",
-        color: event.color || (defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald"),
+        color: initialColor,
       };
     }
     const initialEventsList = masterCalendarStore.getEvents(activeTenantId) || [];
+    const initialTitle = defaultCategory === "WORKING_HOURS" 
+      ? (workingSchedules?.[0]?.name || "Morning Working Session") 
+      : (eventTypes?.[0]?.name || "Mid-Term Examination");
+    const initialColor = resolveEventFormColor({ title: initialTitle }, defaultCategory, eventKinds, eventTypes);
+
     return {
-      title: defaultCategory === "WORKING_HOURS" ? "Morning Working Session" : "Mid-Term Examination",
+      title: initialTitle,
       category: defaultCategory,
       audience: ["ALL"],
       impacts: ["ALL"],
@@ -722,7 +754,7 @@ export default function TimeScheduleDrawerForm({
       untilDate: "",
       isFullDay: false,
       description: "",
-      color: defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald",
+      color: initialColor,
     };
   });
 
@@ -757,6 +789,7 @@ export default function TimeScheduleDrawerForm({
         }
 
         const initialImpacts = normalizeImpacts(rawImpacts, impactScopes);
+        const initialColor = resolveEventFormColor(event, event.category || defaultCategory, eventKinds, eventTypes);
 
         setFormData({
           title: event.title || "",
@@ -778,7 +811,7 @@ export default function TimeScheduleDrawerForm({
           untilDate: event.untilDate || event.endDate || "",
           isFullDay: Boolean(event.isFullDay || (!event.startTime && !event.endTime)),
           description: event.description || "",
-          color: event.color || (defaultCategory === "WORKING_HOURS" ? "indigo" : "emerald"),
+          color: initialColor,
         });
       }
     } else {
@@ -791,7 +824,7 @@ export default function TimeScheduleDrawerForm({
         }));
       }
     }
-  }, [event, initialDate, defaultCategory, impactScopes]);
+  }, [event, initialDate, defaultCategory, impactScopes, eventKinds, eventTypes]);
 
   const eventTitleOptions = useMemo(() => {
     const isWorkingHoursCategory = formData.category === "WORKING_HOURS";
@@ -885,17 +918,20 @@ export default function TimeScheduleDrawerForm({
     });
 
     if (formData.title && !opts.some((o) => o.value === formData.title)) {
+      const currentKind = (eventKinds || []).find(
+        (k) => k.value === formData.type || k.id === formData.type || k.value === formData.category || k.id === formData.category
+      );
       opts.unshift({
         value: formData.title,
         label: formData.title,
-        typeLabel: "Academic Event",
-        category: "ACADEMIC_EVENT",
-        type: "ACADEMIC",
-        color: "emerald",
+        typeLabel: currentKind?.label || (formData.category === "WORKING_HOURS" ? "Working Hours" : "Academic Event"),
+        category: formData.category,
+        type: formData.type || (formData.category === "WORKING_HOURS" ? "WORKING_HOURS" : "ACADEMIC"),
+        color: formData.color || currentKind?.color || "emerald",
       });
     }
     return opts;
-  }, [workingSchedules, eventTypes, eventKinds, formData.title, formData.category]);
+  }, [workingSchedules, eventTypes, eventKinds, formData.title, formData.category, formData.type, formData.color]);
 
   const isRecurringOrMultiDay = Boolean(
     event && (event.repeats || (event.endDate && event.endDate !== event.startDate))
@@ -953,6 +989,7 @@ export default function TimeScheduleDrawerForm({
     if (onSave) {
       onSave({
         ...formData,
+        color: formData.color || resolveEventFormColor(formData, formData.category, eventKinds, eventTypes),
         priorityRank: Number(formData.priorityRank) || 1,
         audience: audienceString,
         impacts: Array.isArray(formData.impacts) ? formData.impacts : (formData.impacts ? [formData.impacts] : ["ALL"]),
@@ -980,11 +1017,14 @@ export default function TimeScheduleDrawerForm({
                   const defaultTitle = isWH
                     ? (workingSchedules?.[0]?.name || "Morning Working Session")
                     : (eventTypes?.[0]?.name || "Mid-Term Examination");
+                  const newColor = isWH 
+                    ? "indigo" 
+                    : resolveEventFormColor({ title: defaultTitle }, "ACADEMIC_EVENT", eventKinds, eventTypes);
                   setFormData((prev) => ({ 
                     ...prev, 
                     category: val,
                     title: defaultTitle,
-                    color: isWH ? "indigo" : "emerald",
+                    color: newColor,
                     repeats: isWH ? true : prev.repeats,
                   }));
                 }}

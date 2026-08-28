@@ -906,8 +906,11 @@ export default function ResidentialAttendanceView({
   const computeStudentTotals = useCallback((studentId) => {
     let p = 0, l = 0, a = 0, lv = 0;
     if (!enrichedMatrixData?.days_header || !studentId) {
-      return { present: 0, late: 0, absent: 0, on_leave: 0, total_recorded: 0, attendance_rate: 100 };
+      return { present: 0, late: 0, absent: 0, on_leave: 0, total_recorded: 0, attendance_rate: 0 };
     }
+
+    const stObj = uniqueStudents.find((s) => String(s.student_id || s.id) === String(studentId));
+    const effectiveStartDate = stObj?.admission_date || null;
 
     enrichedMatrixData.days_header.forEach((d) => {
       const dateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
@@ -921,7 +924,8 @@ export default function ResidentialAttendanceView({
           startTime: chk.time,
           policy: timingPolicy,
           isAdmin,
-          currentStatus: rawStatus,
+          currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
+          effectiveStartDate,
         });
 
         const st = rawStatus || timingState.displayStatus || '';
@@ -929,15 +933,15 @@ export default function ResidentialAttendanceView({
         if (st === 'PRESENT') p += 1;
         else if (st === 'LATE') l += 1;
         else if (st === 'ABSENT') a += 1;
-        else if (st === 'ON_LEAVE') lv += 1;
+        else if (st === 'ON_LEAVE' || st === 'LEAVE') lv += 1;
       });
     });
 
     const total = p + l + a + lv;
     const effective = p + l;
-    const rate = total > 0 ? Math.round((effective / total) * 100) : 100;
+    const rate = total > 0 ? Math.round((effective / total) * 100) : 0;
     return { present: p, late: l, absent: a, on_leave: lv, total_recorded: total, attendance_rate: rate };
-  }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords, timingPolicy, isAdmin]);
+  }, [enrichedMatrixData, activeCheckpoints, selectedYear, selectedMonth, residentialRecords, timingPolicy, isAdmin, uniqueStudents]);
 
   // Export CSV
   const handleExportCSV = () => {
@@ -967,7 +971,19 @@ export default function ResidentialAttendanceView({
         const dayStatuses = matrixData.days_header.map((d) => {
           const fullDateStr = d.date || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
           const recordKey = `${studentId}_${chk.id}_${fullDateStr}`;
-          return residentialRecords[recordKey] || '—';
+          const rawRec = residentialRecords[recordKey];
+          const rawStatus = getResidentialStatus(rawRec);
+          const timingState = getAttendanceCellTimingState({
+            moduleType: 'RESIDENTIAL',
+            targetDate: fullDateStr,
+            startTime: chk.time,
+            policy: timingPolicy,
+            isAdmin,
+            currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
+            effectiveStartDate: student.admission_date || null,
+          });
+          const effectiveStatus = rawStatus || timingState.displayStatus || '—';
+          return effectiveStatus;
         });
 
         const totals = computeStudentTotals(studentId);
@@ -1060,6 +1076,9 @@ export default function ResidentialAttendanceView({
       label: `${c.name} (${c.time || '--:--'})`,
     })),
   ], [checkpoints]);
+
+  const selectedClassName = classes.find((c) => String(c.id) === selectedClassId)?.name || 'All Classes';
+  const selectedGroupName = groups.find((g) => String(g.id) === selectedGroupId)?.name || '';
 
   const innerContent = (
     <>
@@ -1247,28 +1266,39 @@ export default function ResidentialAttendanceView({
                 const timingState = getAttendanceCellTimingState({
                   moduleType: 'RESIDENTIAL',
                   targetDate: dateStr,
+                  startTime: chk.time,
                   policy: timingPolicy,
-                  slotType: 'RESIDENTIAL',
                   isAdmin,
+                  currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
+                  effectiveStartDate: student.admission_date || null,
                 });
 
-                if (rawStatus === 'PRESENT') chkP += 1;
-                else if (rawStatus === 'LATE') chkL += 1;
-                else if (rawStatus === 'ABSENT') chkA += 1;
-                else if (rawStatus === 'ON_LEAVE' || rawStatus === 'LEAVE') chkLv += 1;
+                let effectiveStatus = '';
+                if (rawStatus === 'NOT_APPLICABLE') {
+                  effectiveStatus = 'NOT_APPLICABLE';
+                } else if (rawStatus) {
+                  effectiveStatus = rawStatus;
+                } else {
+                  effectiveStatus = timingState.displayStatus || '';
+                }
+
+                if (effectiveStatus === 'PRESENT') chkP += 1;
+                else if (effectiveStatus === 'LATE') chkL += 1;
+                else if (effectiveStatus === 'ABSENT') chkA += 1;
+                else if (effectiveStatus === 'ON_LEAVE' || effectiveStatus === 'LEAVE') chkLv += 1;
 
                 dailyStatuses[dateStr] = {
-                  status: rawStatus,
+                  status: effectiveStatus,
                   time_in: rawRec?.time_in,
-                  late_minutes: rawRec?.late_minutes || 0,
+                  late_minutes: rawRec?.late_minutes || timingState.lateMinutes || 0,
                   verified_by: rawRec?.verified_by_name,
-                  locked: timingState.isLocked,
+                  locked: !timingState.isEditable,
                   notes: rawRec?.notes,
                 };
               });
 
               const totalUnits = chkP + chkL + chkA + chkLv;
-              const ratePct = totalUnits > 0 ? Math.round(((chkP + chkL) / totalUnits) * 100) : 100;
+              const ratePct = totalUnits > 0 ? Math.round(((chkP + chkL) / totalUnits) * 100) : 0;
 
               return {
                 ...chk,

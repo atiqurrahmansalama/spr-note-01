@@ -1,27 +1,207 @@
 import React, { useState, useEffect } from 'react';
 import {
-  CheckCircleIcon,
-  AcademicCapIcon,
-  BookOpenIcon,
   BuildingOfficeIcon,
+  AcademicCapIcon,
+  DepartmentIcon,
+  PlusIcon,
+  MinusIcon,
   UsersIcon,
-  LocationIcon,
-  CompassIcon,
+  CheckCircleIcon,
 } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import Stepper from '../../../components/ui/Stepper';
-import FileUploadZone from '../../../components/ui/FileUploadZone';
-import AddressMapModal from '../../../components/common/AddressMapModal';
+import DocumentFilePicker from '../../../components/ui/DocumentFilePicker';
 import AddressPickerInput from '../../../components/ui/AddressPickerInput';
 import { registerInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useToast } from '../../../context/ToastContext';
 import { DrawerContainer } from '../../../components/layout';
-import {
-  BANGLADESH_DIVISIONS,
-  BANGLADESH_DISTRICTS_BY_DIVISION,
-  BD_GEO_DATA,
-} from '../../../utils/bangladeshGeoData';
+
+export const CAMPUS_STRUCTURE_QUOTA_FIELDS = [
+  {
+    key: 'max_institutions',
+    icon: AcademicCapIcon,
+    label: 'Academy Structure',
+    singularName: 'Academy',
+    inputLabel: 'Total Allowed Academies',
+    inputPlaceholder: 'e.g. 5',
+    singleDescription: 'Single academy mode',
+    multiDescription: (count) => `Total ${count} campuses permitted`,
+  },
+  {
+    key: 'max_branches',
+    icon: BuildingOfficeIcon,
+    label: 'Branch Structure',
+    singularName: 'Branch',
+    inputLabel: 'Total Allowed Branches',
+    inputPlaceholder: 'e.g. 3',
+    singleDescription: 'Single branch mode',
+    multiDescription: (count) => `Total ${count} branches permitted`,
+  },
+  {
+    key: 'max_departments',
+    icon: DepartmentIcon,
+    label: 'Department Structure',
+    singularName: 'Department',
+    inputLabel: 'Total Allowed Departments',
+    inputPlaceholder: 'e.g. 4',
+    singleDescription: 'Single department mode',
+    multiDescription: (count) => `Total ${count} departments permitted`,
+  },
+];
+
+/**
+ * CampusStructureQuotaGroup
+ * Enterprise responsive module component for configuring single vs. multi-capacity limits
+ * for Academies, Branches, and Departments in Super Admin Onboarding and Institution Edit drawers.
+ */
+export function CampusStructureQuotaGroup({
+  values = {},
+  onChange,
+  title = 'Campus Structure & Quota Capacity',
+  subtitle = 'Configure single vs. multi-capacity limits for academies, branches, and departments',
+}) {
+  const handleSingleSelect = (key) => {
+    onChange?.(key, 1);
+  };
+
+  const handleMultiSelect = (key) => {
+    const currentVal = Number(values[key]) || 1;
+    const nextVal = currentVal > 1 ? currentVal : 2;
+    onChange?.(key, nextVal);
+  };
+
+  const handleNumberChange = (key, rawVal) => {
+    const parsed = parseInt(rawVal, 10);
+    const validVal = isNaN(parsed) ? 2 : Math.max(2, Math.min(99, parsed));
+    onChange?.(key, validVal);
+  };
+
+  return (
+    <div className="space-y-3 pt-1 w-full">
+      {/* Group Header */}
+      <div className="flex items-center gap-2.5 pb-2 border-b theme-border">
+        <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shrink-0">
+          <BuildingOfficeIcon className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate">{title}</h4>
+          {subtitle && (
+            <p className="text-[11px] theme-text-secondary line-clamp-1">{subtitle}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Structure Rows: Subtle soft card items using theme tokens */}
+      <div className="space-y-2.5 w-full">
+        {CAMPUS_STRUCTURE_QUOTA_FIELDS.map((field) => {
+          const val = Number(values[field.key]) || 1;
+          const isSingle = val <= 1;
+          const Icon = field.icon;
+
+          return (
+            <div
+              key={field.key}
+              className={`p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 ${
+                !isSingle
+                  ? 'theme-bg-sub border-[var(--border-hover)] shadow-2xs'
+                  : 'theme-bg-sub/60 theme-border hover:border-[var(--border-hover)]'
+              }`}
+            >
+              {/* Main Row: Icon, Title/Description on Left + Segmented Toggle on Right */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shrink-0">
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h5
+                      className="text-xs sm:text-sm font-bold theme-text-primary truncate"
+                      title={field.label}
+                    >
+                      {field.label}
+                    </h5>
+                    <p className="text-[11px] theme-text-secondary truncate mt-0.5">
+                      {isSingle ? field.singleDescription : field.multiDescription(val)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Segmented Switcher (Single vs Multi) */}
+                <div className="flex p-0.5 rounded-xl theme-bg-app border theme-border shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSingleSelect(field.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs transition cursor-pointer select-none text-center ${
+                      isSingle
+                        ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
+                        : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/60 font-medium'
+                    }`}
+                  >
+                    Single
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMultiSelect(field.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs transition cursor-pointer select-none text-center ${
+                      !isSingle
+                        ? 'theme-bg-accent theme-accent-text shadow-xs font-bold'
+                        : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/60 font-medium'
+                    }`}
+                  >
+                    Multi
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible Stepper Controller (Revealed when Multi is selected) */}
+              {!isSingle && (
+                <div className="mt-3 pt-2.5 border-t theme-border flex items-center justify-between gap-3 animate-fade-in">
+                  <span className="text-xs font-medium theme-text-secondary truncate">
+                    {field.inputLabel}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleNumberChange(field.key, val - 1)}
+                      disabled={val <= 2}
+                      className="w-8 h-8 rounded-xl theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition shrink-0"
+                      title="Decrease limit"
+                    >
+                      <MinusIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-20">
+                      <CustomInput
+                        type="number"
+                        min="2"
+                        max="99"
+                        value={val}
+                        onChange={(newVal) => handleNumberChange(field.key, newVal)}
+                        placeholder={field.inputPlaceholder}
+                        size="sm"
+                        stepper={false}
+                        className="text-center font-mono font-bold text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleNumberChange(field.key, val + 1)}
+                      disabled={val >= 99}
+                      className="w-8 h-8 rounded-xl theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition shrink-0"
+                      title="Increase limit"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const FALLBACK_INSTITUTION_TYPES = [
   { value: 'MADRASA', label: 'Madrasa / Maktab' },
@@ -31,11 +211,10 @@ const FALLBACK_INSTITUTION_TYPES = [
   { value: 'OTHER', label: 'Other Educational Institution' },
 ];
 
-export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
+export default function InstitutionOnboardingForm({ onSuccess, onCancel, showStructureQuotas = false }) {
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [categories, setCategories] = useState([]);
 
@@ -54,13 +233,16 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
   }, []);
 
   const [formData, setFormData] = useState({
-    // Step 1: Basic details
+    // Step 1: Basic details & Quotas
     name: '',
     bangla_name: '',
     institution_type: 'MADRASA',
     eiin_or_reg_no: '',
     phone: '',
     email: '',
+    max_institutions: 1,
+    max_branches: 1,
+    max_departments: 1,
 
     // Step 2: Branding & Structured Address
     slug: '',
@@ -97,42 +279,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
       slug: prev.slug === '' || prev.slug === generateSlug(prev.name) ? generateSlug(val) : prev.slug,
     }));
     if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
-  };
-
-  // Cascading Address Handlers
-  const handleDivisionChange = (newDivision) => {
-    const districtsForDiv = BANGLADESH_DISTRICTS_BY_DIVISION[newDivision] || [];
-    const firstDistrict = districtsForDiv[0] || '';
-    const thanasForDist = (BD_GEO_DATA[newDivision] && BD_GEO_DATA[newDivision][firstDistrict]) || [];
-    setFormData((prev) => ({
-      ...prev,
-      division: newDivision,
-      district: firstDistrict,
-      upazila_thana: thanasForDist[0] || '',
-    }));
-  };
-
-  const handleDistrictChange = (newDistrict) => {
-    const thanasForDist = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][newDistrict]) || [];
-    setFormData((prev) => ({
-      ...prev,
-      district: newDistrict,
-      upazila_thana: thanasForDist[0] || '',
-    }));
-  };
-
-  // Google Maps / GPS Address Auto-fill Callback
-  const handleMapLocationConfirm = (mapData) => {
-    if (!mapData) return;
-    setFormData((prev) => ({
-      ...prev,
-      division: mapData.division || prev.division,
-      district: mapData.district || prev.district,
-      upazila_thana: mapData.upazila_thana || prev.upazila_thana,
-      post_code: mapData.postal_code || mapData.post_code || prev.post_code,
-      street_address: mapData.street_address || mapData.address || prev.street_address,
-    }));
-    showToast('Campus address coordinates applied from map!', 'success');
   };
 
   const validateStep = (currentStep) => {
@@ -223,9 +369,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
     }
   };
 
-  const availableDistricts = BANGLADESH_DISTRICTS_BY_DIVISION[formData.division] || [];
-  const availableThanas = (BD_GEO_DATA[formData.division] && BD_GEO_DATA[formData.division][formData.district]) || [];
-
   return (
     <DrawerContainer padding="normal" spacing="normal">
       {/* Stepper Progress Bar */}
@@ -265,7 +408,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             <div>
               <CustomInput
                 label="Regional Name"
-                optional
                 value={formData.bangla_name}
                 onChange={(val) => setFormData({ ...formData, bangla_name: val })}
                 placeholder="e.g. Darul Uloom Academy"
@@ -288,7 +430,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               <div>
                 <CustomInput
                   label="Govt. Reg. No."
-                  optional
                   value={formData.eiin_or_reg_no}
                   onChange={(val) => setFormData({ ...formData, eiin_or_reg_no: val })}
                   placeholder="e.g. 132456"
@@ -316,14 +457,23 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               <div>
                 <CustomInput
                   type="email"
+                  required
                   label="Official Email"
-                  optional
                   value={formData.email}
                   onChange={(val) => setFormData({ ...formData, email: val })}
-                  placeholder="e.g. info@academy.edu"
+                  placeholder="e.g. info@gmail.com"
+                  error={errors.email}
                 />
               </div>
             </div>
+
+            {/* Multi-Academy, Multi-Branch & Multi-Department Quota Capacity Configuration (Super Admin Only) */}
+            {showStructureQuotas && (
+              <CampusStructureQuotaGroup
+                values={formData}
+                onChange={(key, val) => setFormData((prev) => ({ ...prev, [key]: val }))}
+              />
+            )}
           </div>
         )}
 
@@ -346,13 +496,34 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
               />
             </div>
 
-            {/* Logo File Upload */}
-            <div>
-              <FileUploadZone
-                label="Academy Logo"
-                value={formData.logo_data}
-                onChange={(dataUrl) => setFormData({ ...formData, logo_data: dataUrl })}
-                onRemove={() => setFormData({ ...formData, logo_data: '' })}
+            {/* Academy Logo Document Picker */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                Academy Logo
+              </label>
+              <DocumentFilePicker
+                label="Click to Upload Academy Logo"
+                subLabel="SVG, PNG, JPG, WebP (Max 5MB)"
+                accept="image/*,.svg"
+                fileUrl={formData.logo_data}
+                fileName={formData.logo_name || (formData.logo_data ? "Academy Logo" : "")}
+                fileSize={formData.logo_size}
+                onChange={(fileData) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    logo_data: fileData.url,
+                    logo_name: fileData.name,
+                    logo_size: fileData.size,
+                  }))
+                }
+                onRemove={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    logo_data: '',
+                    logo_name: '',
+                    logo_size: '',
+                  }))
+                }
               />
             </div>
 
@@ -388,7 +559,7 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
         {step === 3 && (
           <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
             <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border text-xs theme-text-primary flex items-start gap-3 shadow-2xs">
-              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
+              <div className="w-9 h-9 rounded-xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shrink-0 mt-0.5">
                 <UsersIcon className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -483,7 +654,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
           >
             <span>Continue</span>
-            <span>&rarr;</span>
           </button>
         ) : (
           <button
@@ -506,22 +676,6 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel }) {
           </button>
         )}
       </div>
-
-      {/* Google Maps / GPS Location Picker Modal */}
-      {isMapModalOpen && (
-        <AddressMapModal
-          isOpen={isMapModalOpen}
-          onClose={() => setIsMapModalOpen(false)}
-          initialLocation={{
-            address: formData.street_address,
-            division: formData.division,
-            district: formData.district,
-            upazila_thana: formData.upazila_thana,
-            postal_code: formData.post_code,
-          }}
-          onConfirm={handleMapLocationConfirm}
-        />
-      )}
     </DrawerContainer>
   );
 }

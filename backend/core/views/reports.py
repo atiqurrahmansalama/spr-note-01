@@ -464,3 +464,288 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
             "institution": sample_inst
         }, status=status.HTTP_200_OK)
 
+
+class AcademicGoalViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing student/curriculum academic goals and milestones."""
+    serializer_class = AcademicGoalSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        qs = AcademicGoal.objects.select_related('student', 'institution').all()
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        
+        student_id = self.request.query_params.get('student') or self.request.query_params.get('student_id')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        
+        goal_status = self.request.query_params.get('status')
+        if goal_status and goal_status != 'ALL':
+            qs = qs.filter(status=goal_status)
+            
+        return qs
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
+        serializer.save(institution=inst or AcademicInstitution.objects.first())
+
+    @action(detail=True, methods=['post'], url_path='update-progress')
+    def update_progress(self, request, pk=None):
+        goal = self.get_object()
+        current_progress = request.data.get('current_progress', goal.current_progress)
+        notes = request.data.get('notes', goal.notes)
+        
+        try:
+            cur = float(current_progress)
+            target = float(goal.target_point)
+            pct = min(100.0, round((cur / target) * 100.0, 1)) if target > 0 else 0.0
+        except (ValueError, TypeError):
+            pct = goal.progress_percentage
+
+        goal.current_progress = str(current_progress)
+        goal.progress_percentage = pct
+        if notes:
+            goal.notes = notes
+        if pct >= 100.0:
+            goal.status = 'COMPLETED'
+            goal.actual_completion_date = timezone.localdate()
+            
+        goal.save()
+        return Response(AcademicGoalSerializer(goal).data, status=status.HTTP_200_OK)
+
+
+class DailyLessonPlanViewSet(viewsets.ModelViewSet):
+    """ViewSet for assigning and managing daily class lessons (পড়া দেওয়া / Sabaq delivery)."""
+    serializer_class = DailyLessonPlanSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        qs = DailyLessonPlan.objects.select_related(
+            'academic_class', 'section', 'student_group', 'teacher', 'period_slot'
+        ).prefetch_related('evaluations').all()
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        
+        class_id = self.request.query_params.get('class_id') or self.request.query_params.get('academic_class')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(academic_class_id=class_id)
+            
+        section_id = self.request.query_params.get('section_id')
+        if section_id and section_id != 'ALL':
+            qs = qs.filter(section_id=section_id)
+            
+        period_slot = self.request.query_params.get('period_slot') or self.request.query_params.get('period_id')
+        if period_slot and period_slot != 'ALL':
+            qs = qs.filter(period_slot_id=period_slot)
+
+        lesson_date = self.request.query_params.get('date') or self.request.query_params.get('lesson_date')
+        if lesson_date:
+            qs = qs.filter(lesson_date=lesson_date)
+            
+        return qs
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
+        serializer.save(institution=inst or AcademicInstitution.objects.first())
+
+    @action(detail=True, methods=['post'], url_path='bulk-evaluate')
+    def bulk_evaluate(self, request, pk=None):
+        """Record recitation evaluations (পড়া আদায়) for multiple students."""
+        lesson_plan = self.get_object()
+        evaluations_data = request.data.get('evaluations', [])
+        
+        created_or_updated = []
+        with transaction.atomic():
+            for item in evaluations_data:
+                student_id = item.get('student_id')
+                if not student_id:
+                    continue
+                
+                student = Student.objects.filter(id=student_id).first()
+                if not student:
+                    continue
+                    
+                eval_obj, _ = LessonEvaluation.objects.update_or_create(
+                    lesson_plan=lesson_plan,
+                    student=student,
+                    defaults={
+                        'student_name': student.name_en or getattr(student, 'name', 'Student'),
+                        'evaluation_date': lesson_plan.lesson_date,
+                        'evaluation_status': item.get('evaluation_status', 'SATISFACTORY'),
+                        'score': float(item.get('score', 10.0)),
+                        'max_score': float(item.get('max_score', 10.0)),
+                        'total_mistakes': int(item.get('total_mistakes', 0)),
+                        'total_stucks': int(item.get('total_stucks', 0)),
+                        'fluency_rating': int(item.get('fluency_rating', 5)),
+                        'teacher_remarks': item.get('teacher_remarks', ''),
+                        'is_synced_to_parent': True,
+                    }
+                )
+                created_or_updated.append(eval_obj)
+
+        return Response({
+            "status": "success",
+            "message": f"Successfully recorded {len(created_or_updated)} evaluations for '{lesson_plan.lesson_title}'",
+            "count": len(created_or_updated)
+        }, status=status.HTTP_200_OK)
+
+
+class LessonEvaluationViewSet(viewsets.ModelViewSet):
+    """ViewSet for individual and bulk lesson evaluations (পড়া আদায়)."""
+    serializer_class = LessonEvaluationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        qs = LessonEvaluation.objects.select_related('lesson_plan', 'student').all()
+        if tenant_id:
+            qs = qs.filter(student__institution_id=tenant_id)
+            
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+            
+        eval_date = self.request.query_params.get('date') or self.request.query_params.get('evaluation_date')
+        if eval_date:
+            qs = qs.filter(evaluation_date=eval_date)
+            
+        status_filter = self.request.query_params.get('status')
+        if status_filter and status_filter != 'ALL':
+            qs = qs.filter(evaluation_status=status_filter)
+            
+        return qs
+
+
+class HomeworkAssignmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for homework creation and distribution."""
+    serializer_class = HomeworkAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        qs = HomeworkAssignment.objects.select_related('academic_class', 'section', 'teacher').prefetch_related('submissions').all()
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+            
+        class_id = self.request.query_params.get('class_id')
+        if class_id and class_id != 'ALL':
+            qs = qs.filter(academic_class_id=class_id)
+            
+        due_date = self.request.query_params.get('due_date')
+        if due_date:
+            qs = qs.filter(due_date=due_date)
+            
+        return qs
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
+        serializer.save(institution=inst or AcademicInstitution.objects.first())
+
+
+class HomeworkSubmissionViewSet(viewsets.ModelViewSet):
+    """ViewSet for student homework submissions and grading."""
+    serializer_class = HomeworkSubmissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = HomeworkSubmission.objects.select_related('homework', 'student').all()
+        homework_id = self.request.query_params.get('homework_id')
+        if homework_id:
+            qs = qs.filter(homework_id=homework_id)
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='evaluate')
+    def evaluate_submission(self, request, pk=None):
+        submission = self.get_object()
+        submission.obtained_marks = float(request.data.get('obtained_marks', 0.0))
+        submission.teacher_feedback = request.data.get('teacher_feedback', '')
+        submission.status = 'EVALUATED'
+        submission.evaluated_at = timezone.now()
+        submission.save()
+        return Response(HomeworkSubmissionSerializer(submission).data, status=status.HTTP_200_OK)
+
+
+class AcademicReportViewSet(viewsets.ViewSet):
+    """Centralized multi-period reporting engine (Daily, Weekly, Monthly, Yearly)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='multi-period-summary')
+    def multi_period_summary(self, request):
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
+        period_type = request.query_params.get('period_type', 'daily').lower()
+        class_id = request.query_params.get('class_id')
+        student_id = request.query_params.get('student_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        # Base filters
+        eval_qs = LessonEvaluation.objects.select_related('student', 'lesson_plan').all()
+        lesson_qs = DailyLessonPlan.objects.all()
+        hw_qs = HomeworkAssignment.objects.all()
+
+        if tenant_id:
+            lesson_qs = lesson_qs.filter(institution_id=tenant_id)
+            hw_qs = hw_qs.filter(institution_id=tenant_id)
+
+        if class_id and class_id != 'ALL':
+            lesson_qs = lesson_qs.filter(academic_class_id=class_id)
+            hw_qs = hw_qs.filter(academic_class_id=class_id)
+            eval_qs = eval_qs.filter(student__student_class_id=class_id)
+
+        if student_id:
+            eval_qs = eval_qs.filter(student_id=student_id)
+
+        if start_date and end_date:
+            eval_qs = eval_qs.filter(evaluation_date__range=[start_date, end_date])
+            lesson_qs = lesson_qs.filter(lesson_date__range=[start_date, end_date])
+            hw_qs = hw_qs.filter(due_date__range=[start_date, end_date])
+
+        total_lessons = lesson_qs.count()
+        total_evaluations = eval_qs.count()
+        total_homeworks = hw_qs.count()
+
+        mastered_count = eval_qs.filter(evaluation_status='MASTERED').count()
+        satisfactory_count = eval_qs.filter(evaluation_status='SATISFACTORY').count()
+        needs_improvement = eval_qs.filter(evaluation_status='NEEDS_IMPROVEMENT').count()
+        unprepared = eval_qs.filter(evaluation_status='UNPREPARED').count()
+        absent_count = eval_qs.filter(evaluation_status='ABSENT').count()
+
+        avg_score = eval_qs.aggregate(Avg('score'))['score__avg'] or 0.0
+        total_mistakes = eval_qs.aggregate(Sum('total_mistakes'))['total_mistakes__sum'] or 0
+        total_stucks = eval_qs.aggregate(Sum('total_stucks'))['total_stucks__sum'] or 0
+
+        mastery_rate = round((mastered_count / total_evaluations * 100.0), 1) if total_evaluations > 0 else 0.0
+
+        return Response({
+            "period_type": period_type,
+            "filters": {
+                "class_id": class_id,
+                "student_id": student_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            "metrics": {
+                "total_lessons": total_lessons,
+                "total_evaluations": total_evaluations,
+                "total_homeworks": total_homeworks,
+                "mastery_rate": mastery_rate,
+                "average_score": round(avg_score, 1),
+                "total_mistakes": total_mistakes,
+                "total_stucks": total_stucks,
+                "mastered_count": mastered_count,
+                "satisfactory_count": satisfactory_count,
+                "needs_improvement_count": needs_improvement,
+                "unprepared_count": unprepared,
+                "absent_count": absent_count,
+            }
+        }, status=status.HTTP_200_OK)
+
+

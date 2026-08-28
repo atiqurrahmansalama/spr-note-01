@@ -4,6 +4,7 @@ import { DotsVerticalIcon } from './Icons';
 
 export default function ActionMenu({
   items = [],
+  actions,
   align = 'right',
   buttonClassName = '',
   menuClassName = '',
@@ -80,7 +81,8 @@ export default function ActionMenu({
     };
   }, [isOpen, updatePosition]);
 
-  const activeItems = items.filter((item) => item && !item.hidden);
+  const rawItems = items && items.length > 0 ? items : actions || [];
+  const activeItems = rawItems.filter((item) => item && !item.hidden);
 
   const renderIcon = (iconInput, className) => {
     if (!iconInput) return null;

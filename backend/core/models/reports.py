@@ -293,3 +293,286 @@ class DocumentTemplateConfig(models.Model):
     def __str__(self):
         return f"{self.template_name} ({self.get_document_type_display()}) - {self.institution.name}"
 
+
+class AcademicGoal(models.Model):
+    """Target/goal planner for a student or class curriculum."""
+    TARGET_TYPE_CHOICES = (
+        ('PAGE_RANGE', 'Page Range'),
+        ('CHAPTER_RANGE', 'Chapter / Unit Range'),
+        ('SURAH_RANGE', 'Surah / Para Range'),
+        ('TOPIC_COUNT', 'Topic Count'),
+    )
+
+    STATUS_CHOICES = (
+        ('ON_TRACK', 'On Track'),
+        ('AHEAD', 'Ahead of Schedule'),
+        ('BEHIND', 'Behind Schedule'),
+        ('COMPLETED', 'Completed'),
+        ('PAUSED', 'Paused'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='academic_goals'
+    )
+    branch = models.CharField(max_length=100, default='MAIN_CAMPUS')
+    student = models.ForeignKey(
+        'core.Student',
+        on_delete=models.CASCADE,
+        related_name='academic_goals'
+    )
+    subject_name = models.CharField(max_length=200, blank=True, default='General Curriculum')
+    target_title = models.CharField(max_length=255)
+    target_type = models.CharField(max_length=30, choices=TARGET_TYPE_CHOICES, default='PAGE_RANGE')
+    start_point = models.CharField(max_length=100, default='1')
+    target_point = models.CharField(max_length=100, default='100')
+    current_progress = models.CharField(max_length=100, default='0')
+    progress_percentage = models.FloatField(default=0.0)
+    target_daily_pace = models.CharField(max_length=100, default='2 Pages/Day')
+    start_date = models.DateField(default=timezone.localdate)
+    target_end_date = models.DateField(null=True, blank=True)
+    actual_completion_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ON_TRACK')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Academic Goal"
+        verbose_name_plural = "Academic Goals"
+
+    def __str__(self):
+        return f"{self.target_title} - {self.student.name_en or 'Student'} ({self.status})"
+
+
+class DailyLessonPlan(models.Model):
+    """Daily lesson assignment (Sabaq delivery) by teacher."""
+    SCOPE_CHOICES = (
+        ('CLASS_WIDE', 'Entire Class / Section'),
+        ('GROUP_WIDE', 'Student Group'),
+        ('INDIVIDUAL_STUDENT', 'Individual Students'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='daily_lessons'
+    )
+    branch = models.CharField(max_length=100, default='MAIN_CAMPUS')
+    academic_class = models.ForeignKey(
+        'core.StudentClass',
+        on_delete=models.CASCADE,
+        related_name='daily_lessons'
+    )
+    section = models.ForeignKey(
+        'core.ClassSection',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_lessons'
+    )
+    student_group = models.ForeignKey(
+        'core.StudentGroup',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_lessons'
+    )
+    subject_name = models.CharField(max_length=200, blank=True, default='General')
+    curriculum_book_id = models.CharField(max_length=100, blank=True)
+    curriculum_book_name = models.CharField(max_length=255, blank=True)
+    period_slot = models.ForeignKey(
+        'core.ClassPeriodSlot',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_lessons'
+    )
+    period_name = models.CharField(max_length=150, blank=True)
+    teacher = models.ForeignKey(
+        'core.StaffProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_lessons'
+    )
+    teacher_name = models.CharField(max_length=255, blank=True)
+    lesson_date = models.DateField(default=timezone.localdate)
+    lesson_title = models.CharField(max_length=255)
+    lesson_topic = models.CharField(max_length=255, blank=True)
+    start_unit = models.CharField(max_length=100, blank=True, help_text="e.g. Page 12 or Ayah 1")
+    end_unit = models.CharField(max_length=100, blank=True, help_text="e.g. Page 15 or Ayah 25")
+    lesson_instructions = models.TextField(blank=True)
+    assigned_scope = models.CharField(max_length=30, choices=SCOPE_CHOICES, default='CLASS_WIDE')
+    targeted_students = models.ManyToManyField('core.Student', blank=True, related_name='assigned_daily_lessons')
+    attachment_url = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-lesson_date', '-created_at']
+        verbose_name = "Daily Lesson Plan"
+        verbose_name_plural = "Daily Lesson Plans"
+
+    def __str__(self):
+        return f"{self.lesson_title} - {self.subject_name} ({self.lesson_date})"
+
+
+class LessonEvaluation(models.Model):
+    """Daily recitation & evaluation record (Sabaq evaluation)."""
+    STATUS_CHOICES = (
+        ('MASTERED', 'Mastered / Excellent'),
+        ('SATISFACTORY', 'Satisfactory / Good'),
+        ('NEEDS_IMPROVEMENT', 'Needs Improvement / Retake'),
+        ('UNPREPARED', 'Unprepared / Incomplete'),
+        ('ABSENT', 'Absent'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lesson_plan = models.ForeignKey(
+        DailyLessonPlan,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='evaluations'
+    )
+    student = models.ForeignKey(
+        'core.Student',
+        on_delete=models.CASCADE,
+        related_name='lesson_evaluations'
+    )
+    student_name = models.CharField(max_length=255, blank=True)
+    evaluation_date = models.DateField(default=timezone.localdate)
+    evaluation_status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='SATISFACTORY')
+    score = models.FloatField(default=10.0, help_text="Evaluation score out of max score")
+    max_score = models.FloatField(default=10.0)
+    total_mistakes = models.IntegerField(default=0)
+    total_stucks = models.IntegerField(default=0, help_text="Lukmah / stuck count")
+    fluency_rating = models.IntegerField(default=5, help_text="Rating 1-5")
+    teacher_remarks = models.TextField(blank=True)
+    is_synced_to_parent = models.BooleanField(default=False)
+    parent_viewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-evaluation_date', '-created_at']
+        unique_together = ('lesson_plan', 'student')
+        verbose_name = "Lesson Evaluation"
+        verbose_name_plural = "Lesson Evaluations"
+
+    def __str__(self):
+        return f"{self.student_name} - {self.evaluation_status} ({self.evaluation_date})"
+
+
+class HomeworkAssignment(models.Model):
+    """Homework & assignment assigned to students."""
+    SUBMISSION_TYPE_CHOICES = (
+        ('WRITTEN_TEXT', 'Written Notes / Text'),
+        ('FILE_UPLOAD', 'File / Photo Upload'),
+        ('VERBAL_RECITATION', 'Verbal Recitation'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='homework_assignments'
+    )
+    branch = models.CharField(max_length=100, default='MAIN_CAMPUS')
+    lesson_plan = models.ForeignKey(
+        DailyLessonPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='homework_assignments'
+    )
+    academic_class = models.ForeignKey(
+        'core.StudentClass',
+        on_delete=models.CASCADE,
+        related_name='homework_assignments'
+    )
+    section = models.ForeignKey(
+        'core.ClassSection',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='homework_assignments'
+    )
+    subject_name = models.CharField(max_length=200, blank=True, default='General')
+    teacher = models.ForeignKey(
+        'core.StaffProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='homework_assignments'
+    )
+    teacher_name = models.CharField(max_length=255, blank=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    assigned_date = models.DateField(default=timezone.localdate)
+    due_date = models.DateField()
+    due_time = models.TimeField(null=True, blank=True)
+    max_marks = models.FloatField(default=10.0)
+    submission_type = models.CharField(max_length=30, choices=SUBMISSION_TYPE_CHOICES, default='WRITTEN_TEXT')
+    attachment_url = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-due_date', '-created_at']
+        verbose_name = "Homework Assignment"
+        verbose_name_plural = "Homework Assignments"
+
+    def __str__(self):
+        return f"{self.title} - Due: {self.due_date}"
+
+
+class HomeworkSubmission(models.Model):
+    """Submission and evaluation of student homework."""
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending Submission'),
+        ('SUBMITTED', 'Submitted / Awaiting Review'),
+        ('EVALUATED', 'Evaluated / Graded'),
+        ('LATE', 'Late Submission'),
+        ('RESUBMIT_REQUESTED', 'Resubmission Requested'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    homework = models.ForeignKey(
+        HomeworkAssignment,
+        on_delete=models.CASCADE,
+        related_name='submissions'
+    )
+    student = models.ForeignKey(
+        'core.Student',
+        on_delete=models.CASCADE,
+        related_name='homework_submissions'
+    )
+    student_name = models.CharField(max_length=255, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    submission_content = models.TextField(blank=True)
+    attachment_url = models.CharField(max_length=500, blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='PENDING')
+    obtained_marks = models.FloatField(null=True, blank=True)
+    teacher_feedback = models.TextField(blank=True)
+    evaluated_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at', '-created_at']
+        unique_together = ('homework', 'student')
+        verbose_name = "Homework Submission"
+        verbose_name_plural = "Homework Submissions"
+
+    def __str__(self):
+        return f"{self.student_name} - {self.homework.title} ({self.status})"
+
+

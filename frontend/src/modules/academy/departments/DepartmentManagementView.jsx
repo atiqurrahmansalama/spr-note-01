@@ -7,20 +7,12 @@ import {
   ClassIcon,
   GroupsIcon,
   PlusIcon,
-  SearchIcon,
   EditIcon,
   TrashIcon,
-  BuildingOfficeIcon,
 } from "../../../components/ui/Icons";
-import DataTable from "../../../components/ui/DataTable";
-import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
-import MetricsGrid from "../../../components/ui/MetricsGrid";
-import PageHeader from "../../../components/ui/PageHeader";
-import { PageContainer } from "../../../components/layout";
-import DataViewToolbar from "../../../components/ui/DataViewToolbar";
-import DataViewFooter from "../../../components/ui/DataViewFooter";
+import UniversalManagementView from "../../../components/common/UniversalManagementView";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import DepartmentForm from "./DepartmentForm";
 
@@ -38,18 +30,13 @@ export default function DepartmentManagementView({
 }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const { openRightSidebar, closeRightSidebar } = useRightSidebar();
-
-  const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem("spr_dept_view_mode") || "table";
-  });
+  const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingDept, setDeletingDept] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedIds, setSelectedIds] = useState([]);
   const [metrics, setMetrics] = useState({
     total_departments: 0,
     total_classes: 0,
@@ -58,26 +45,32 @@ export default function DepartmentManagementView({
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleToggleViewMode = (mode) => {
-    setViewMode(mode);
+  const loadDepartments = useCallback(async () => {
+    setLoading(true);
     try {
-      localStorage.setItem("spr_dept_view_mode", mode);
-    } catch {}
-  };
-
-  const handleSelectRow = useCallback((id) => {
-    setSelectedIds((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
-      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
-    });
-  }, []);
-
-  const handleSelectAll = useCallback((val) => {
-    if (Array.isArray(val)) {
-      setSelectedIds(val);
-    } else {
-      setSelectedIds([]);
+      const res = await fetchWithAuth("/api/v1/departments/");
+      if (res.ok) {
+        const data = await res.json();
+        setDepartments(Array.isArray(data) ? data : data.results || []);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.message || "Failed to load departments.", "error");
+      }
+    } catch (e) {
+      showToast(e.message || "Failed to load departments.", "error");
+    } finally {
+      setLoading(false);
     }
+  }, [showToast]);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth("/api/v1/departments/metrics/");
+      if (res.ok) {
+        const data = await res.json();
+        setMetrics(data);
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -90,42 +83,9 @@ export default function DepartmentManagementView({
     };
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
     return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
-  }, []);
+  }, [loadDepartments, loadMetrics]);
 
-  const loadDepartments = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth("/api/v1/departments/");
-      if (res.ok) {
-        const data = await res.json();
-        setDepartments(Array.isArray(data) ? data : data.results || []);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error("[DepartmentManagementView] HTTP Error:", res.status, err);
-        const errMsg = err.message || err.detail || err.error || `Failed to load departments (Status ${res.status}).`;
-        showToast(errMsg, "error");
-      }
-    } catch (e) {
-      console.error("[DepartmentManagementView] Exception:", e);
-      showToast(e.message || "Failed to load departments.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMetrics = async () => {
-    try {
-      const res = await fetchWithAuth("/api/v1/departments/metrics/");
-      if (res.ok) {
-        const data = await res.json();
-        setMetrics(data);
-      }
-    } catch {}
-  };
-
-  const { openDrawer, closeDrawer } = useRightSidebar();
-
-  // Universal Drawer Registration for Department Form (survives F5 refresh)
+  // Drawer Registration
   useDrawerRegistration(
     "department",
     (params) => {
@@ -139,7 +99,7 @@ export default function DepartmentManagementView({
         size: "md",
         content: (
           <DepartmentForm
-            department={foundDept}
+            editingDepartment={foundDept}
             onSaved={() => {
               loadDepartments();
               loadMetrics();
@@ -150,10 +110,10 @@ export default function DepartmentManagementView({
         ),
       };
     },
-    [departments, closeDrawer]
+    [departments, loadDepartments, loadMetrics, closeDrawer]
   );
 
-  const handleOpenCreate = () => {
+  const handleOpenAdd = () => {
     openDrawer("department", { mode: "add" });
   };
 
@@ -161,14 +121,14 @@ export default function DepartmentManagementView({
     openDrawer("department", { mode: "edit", id: dept.id });
   };
 
-  const handleDeleteDirect = (dept) => {
+  const handleDelete = (dept) => {
     setDeletingDept(dept);
   };
 
-  const handleConfirmDeleteDept = async () => {
+  const confirmDelete = async () => {
     if (!deletingDept) return;
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
       const res = await fetchWithAuth(`/api/v1/departments/${deletingDept.id}/`, {
         method: "DELETE",
       });
@@ -182,113 +142,107 @@ export default function DepartmentManagementView({
         showToast(err.error || "Failed to delete department.", "error");
       }
     } catch {
-      showToast("Network connection error.", "error");
+      showToast("Network error occurred.", "error");
     } finally {
       setIsDeleting(false);
     }
   };
 
   const filteredDepartments = departments.filter((d) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        d.name?.toLowerCase().includes(q) ||
+        d.code?.toLowerCase().includes(q) ||
+        d.dean_name?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+
     if (statusFilter === "ACTIVE" && !d.is_active) return false;
     if (statusFilter === "INACTIVE" && d.is_active) return false;
     if (statusFilter === "QURAN_TRACKER" && !d.has_quran_tracker) return false;
 
-    if (!searchQuery) return true;
-    const name = (d.name || "").toLowerCase();
-    const code = (d.code || "").toLowerCase();
-    const head = (d.department_head_name || "").toLowerCase();
-    const query = searchQuery.toLowerCase();
-
-    return name.includes(query) || code.includes(query) || head.includes(query);
+    return true;
   });
 
-  const getActionMenuItems = (d) => [
-    {
-      label: "Manage Classes",
-      icon: ClassIcon,
-      onClick: () => navigate(`/student-management/classes?department=${d.id}`),
-    },
+  const getActionMenuItems = (dept) => [
     {
       label: "Edit Department",
       icon: EditIcon,
-      onClick: () => handleOpenEdit(d),
+      onClick: () => handleOpenEdit(dept),
     },
     {
-      divider: true,
+      label: "View Classes",
+      icon: ClassIcon,
+      onClick: () => navigate(`/academy/classes-groups?tab=classes&department=${dept.id}`),
     },
+    { divider: true },
     {
-      label: "Decommission",
+      label: "Delete Department",
       icon: TrashIcon,
       danger: true,
-      onClick: () => handleDeleteDirect(d),
+      onClick: () => handleDelete(dept),
     },
   ];
 
-  // Define Reusable DataTable Columns
-  const columns = [
+  const tableColumns = [
     {
       key: "name",
-      header: "Department & Code",
-      headerClassName: "min-w-[220px]",
-      render: (d) => (
-        <div>
-          <span className="font-bold theme-text-primary block text-xs sm:text-sm">{d.name}</span>
-          <span className="text-[10px] font-mono theme-text-secondary mt-0.5 block">
-            {d.code ? `Code: ${d.code} • ` : ""}Order: {d.order_rank ?? 1}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "department_head_name",
-      header: "Head / Dean",
-      headerClassName: "min-w-[240px] sm:w-1/3",
-      render: (d) => (
-        <div>
-          <span className="theme-text-primary font-semibold block text-xs">
-            {d.department_head_name || "Unassigned"}
-          </span>
-          {d.department_head_phone && (
-            <span className="text-[10px] font-mono theme-text-secondary block mt-0.5">
-              {d.department_head_phone}
+      header: "Department Name & Code",
+      render: (dept) => (
+        <div className="space-y-0.5">
+          <span className="font-bold text-sm theme-text-primary block">{dept.name}</span>
+          {dept.code && (
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-block">
+              {dept.code}
             </span>
           )}
         </div>
       ),
     },
     {
-      key: "classes_count",
-      header: "Classes",
-      align: "center",
-      headerClassName: "w-24 text-center",
-      render: (d) => (
-        <span className="font-bold theme-text-primary">{d.classes_count ?? 0}</span>
+      key: "dean_name",
+      header: "Dean / Head",
+      render: (dept) => (
+        <span className="text-xs font-semibold theme-text-primary">
+          {dept.dean_name || "Unassigned"}
+        </span>
       ),
     },
     {
-      key: "students_count",
+      key: "classes",
+      header: "Classes",
+      align: "center",
+      render: (dept) => (
+        <span className="text-xs font-bold font-mono theme-text-primary">
+          {dept.class_count || 0}
+        </span>
+      ),
+    },
+    {
+      key: "students",
       header: "Students",
       align: "center",
-      headerClassName: "w-24 text-center",
-      render: (d) => (
-        <span className="font-bold theme-accent">{d.students_count ?? 0}</span>
+      render: (dept) => (
+        <span className="text-xs font-bold font-mono theme-text-primary">
+          {dept.student_count || 0}
+        </span>
       ),
     },
     {
       key: "is_active",
       header: "Status",
       align: "center",
-      headerClassName: "w-28 text-center",
-      render: (d) => (
+      render: (dept) => (
         <span
           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-            d.is_active
-              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+            dept.is_active
+              ? "theme-bg-accent-soft theme-accent border theme-border"
               : "theme-bg-sub theme-text-secondary border theme-border"
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
-          {d.is_active ? "Active" : "Inactive"}
+          <span className={`w-1.5 h-1.5 rounded-full ${dept.is_active ? "theme-bg-accent" : "theme-bg-elevated"}`}></span>
+          {dept.is_active ? "Active" : "Inactive"}
         </span>
       ),
     },
@@ -297,274 +251,160 @@ export default function DepartmentManagementView({
       header: "Actions",
       align: "right",
       headerClassName: "w-16 text-right",
-      render: (d) => (
+      render: (dept) => (
         <div className="flex items-center justify-end">
-          <ActionMenu items={getActionMenuItems(d)} />
+          <ActionMenu items={getActionMenuItems(dept)} align="right" />
         </div>
       ),
     },
   ];
 
-  // Reusable Card Renderer for DataCardGrid
-  const renderDepartmentCard = (d) => (
+  const renderDepartmentCard = (dept) => (
     <div
-      key={d.id}
-      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between group hover:theme-bg-sub/30 transition-all"
+      key={dept.id}
+      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group"
     >
-      <div className="space-y-4">
-        {/* Header with Title, Code, Status */}
-        <div className="flex items-start justify-between gap-3">
+      <div className="space-y-3.5">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold theme-text-primary text-sm leading-tight break-words">
-              {d.name}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              {d.code && (
-                <span className="px-2 py-0.5 rounded-md theme-bg-sub border theme-border font-mono text-[10px] theme-accent font-bold">
-                  {d.code}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+                {dept.name}
+              </h3>
+              {dept.code && (
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub theme-text-secondary border theme-border">
+                  {dept.code}
                 </span>
               )}
-              <span className="text-[10px] font-mono theme-text-secondary">
-                Order: {d.order_rank ?? 1}
-              </span>
             </div>
+            <p className="text-xs theme-text-secondary mt-1">
+              Head: <span className="font-semibold theme-text-primary">{dept.dean_name || "Unassigned"}</span>
+            </p>
           </div>
-
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${
-              d.is_active
-                ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
-                : "theme-bg-sub theme-text-secondary border theme-border"
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${d.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
-            {d.is_active ? "Active" : "Inactive"}
-          </span>
+          <ActionMenu items={getActionMenuItems(dept)} align="right" />
         </div>
 
-        {/* Head / Dean details */}
-        <div className="text-xs space-y-1 theme-text-secondary pt-2.5 border-t theme-border">
-          <div className="flex items-center justify-between text-[11px]">
-            <span>Head / Dean:</span>
-            <span className="theme-text-primary font-medium">{d.department_head_name || "Unassigned"}</span>
-          </div>
-          {d.department_head_phone && (
-            <div className="flex items-center justify-between text-[11px]">
-              <span>Phone Contact:</span>
-              <span className="theme-text-primary font-mono">{d.department_head_phone}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Stats Strip */}
-        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
+        <div className="grid grid-cols-2 gap-1.5 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
           <div>
-            <span className="block text-sm font-bold theme-text-primary">{d.classes_count ?? 0}</span>
-            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Classes</span>
+            <span className="block text-sm font-bold theme-accent font-mono">{dept.class_count || 0}</span>
+            <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">Classes</span>
           </div>
           <div className="border-l theme-border">
-            <span className="block text-sm font-bold theme-accent">{d.students_count ?? 0}</span>
-            <span className="text-[10px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
+            <span className="block text-sm font-bold theme-text-primary font-mono">{dept.student_count || 0}</span>
+            <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
           </div>
         </div>
-      </div>
-
-      {/* Card Footer Actions */}
-      <div className="pt-3.5 mt-2 border-t theme-border flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(`/student-management/classes?department=${d.id}`)}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 theme-bg-sub hover:theme-bg-elevated theme-text-primary border theme-border"
-        >
-          <ClassIcon className="w-3.5 h-3.5 theme-accent" />
-          <span>Classes</span>
-        </button>
-
-        <ActionMenu items={getActionMenuItems(d)} />
       </div>
     </div>
   );
 
-  const totalDeptsCount = metrics?.total_departments ?? departments.length;
-  const totalClassesCount = metrics?.total_classes ?? departments.reduce((acc, d) => acc + (d.classes_count || 0), 0);
-  const totalStudentsCount = metrics?.total_enrolled_students ?? departments.reduce((acc, d) => acc + (d.students_count || 0), 0);
+  const totalDeptsCount = metrics?.total_departments || departments.length;
+  const totalClassesCount = metrics?.total_classes || 0;
+  const totalStudentsCount = metrics?.total_enrolled_students || 0;
 
   return (
-    <PageContainer isEmbedded={isEmbedded}>
-      {/* 1. Standard Module Header with Reusable PageHeader */}
-      {!hideHeader && (
-        <PageHeader
-          icon={DepartmentIcon}
-          title="Academic Departments"
-          subtitle="Configure institutional academic divisions, branches, and department leadership"
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => navigate("/student-management/classes")}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub cursor-pointer transition-all flex items-center gap-2"
-              >
-                <ClassIcon className="w-4 h-4 theme-accent" />
-                <span>Manage Classes &rarr;</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenCreate}
-                className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-              >
-                <PlusIcon className="w-3.5 h-3.5" />
-                <span>Add Department</span>
-              </button>
-            </>
-          }
-        />
-      )}
-
-      {/* 2. Metrics Header Cards */}
-      {!hideMetrics && (
-        <MetricsGrid
-          items={[
-            {
-              label: "Academic Departments",
-              value: totalDeptsCount,
-              icon: DepartmentIcon,
-              color: "accent",
-            },
-            {
-              label: "Assigned Classes",
-              value: totalClassesCount,
-              icon: ClassIcon,
-              color: "default",
-            },
-            {
-              label: "Enrolled Students",
-              value: totalStudentsCount,
-              icon: GroupsIcon,
-              color: "default",
-            },
-          ]}
-        />
-      )}
-
-      {/* 3. Search & View Mode Switcher Toolbar */}
-      <DataViewToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Search department, code, dean..."
-        filterElement={
+    <UniversalManagementView
+      title="Academic Departments"
+      subtitle="Configure faculties, Quranic study divisions, and curriculum streams"
+      icon={DepartmentIcon}
+      hideHeader={hideHeader}
+      hideMetrics={hideMetrics}
+      isEmbedded={isEmbedded}
+      storageKey="spr_dept_view_mode"
+      defaultViewMode="table"
+      headerActions={
+        <button
+          type="button"
+          onClick={handleOpenAdd}
+          className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+        >
+          <PlusIcon className="w-3.5 h-3.5" />
+          <span>Add Department</span>
+        </button>
+      }
+      metrics={[
+        {
+          label: "Total Departments",
+          value: totalDeptsCount,
+          icon: DepartmentIcon,
+          color: "accent",
+        },
+        {
+          label: "Active Classes",
+          value: totalClassesCount,
+          icon: ClassIcon,
+          color: "default",
+        },
+        {
+          label: "Enrolled Students",
+          value: totalStudentsCount,
+          icon: GroupsIcon,
+          color: "default",
+        },
+      ]}
+      searchLabel="Search Departments"
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search department, code, dean..."
+      filters={
+        <div className="w-36 sm:w-44 shrink-0">
           <CustomSelect
+            label="Department Status"
             options={DEPARTMENT_STATUS_OPTIONS}
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}
-            placeholder="Filter by Status"
+            placeholder="All Status"
+            size="md"
           />
-        }
-        viewMode={viewMode}
-        onToggleViewMode={handleToggleViewMode}
-      />
-
-      {/* --- DISPLAY: DATA CARD GRID OR DATA TABLE --- */}
-      <div className="space-y-4">
-        {selectedIds.length > 0 && (
-          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
-            <span className="text-xs font-bold theme-text-primary">
-              {selectedIds.length} {selectedIds.length === 1 ? 'department' : 'departments'} selected
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
-            >
-              Deselect All
-            </button>
-          </div>
-        )}
-
-        {viewMode === "grid" ? (
-          <DataCardGrid
-            data={filteredDepartments}
-            renderCard={renderDepartmentCard}
-            isLoading={loading}
-            loadingMessage="Loading academic departments..."
-            emptyIcon={DepartmentIcon}
-            emptyTitle="No Departments Found"
-            emptySubMessage={
-              searchQuery
-                ? "No departments matched your search query. Try clearing the search box."
-                : "Get started by adding your first academic division."
-            }
-          />
-        ) : (
-          <DataTable
-            columns={columns}
-            data={filteredDepartments}
-            selectable={true}
-            selectedIds={selectedIds}
-            onSelectRow={handleSelectRow}
-            onSelectAll={handleSelectAll}
-            idField="id"
-            isLoading={loading}
-            loadingMessage="Loading academic departments..."
-            emptyIcon={DepartmentIcon}
-            emptyTitle="No Departments Found"
-            emptySubMessage={
-              searchQuery
-                ? "No departments matched your search query. Try clearing the search box."
-                : "Get started by adding your first academic division."
-            }
-          />
-        )}
-
-        {/* Reusable DataViewFooter */}
-        {!loading && departments.length > 0 && (
-          <DataViewFooter
-            filteredCount={filteredDepartments.length}
-            totalCount={departments.length}
-            itemLabel="departments"
-          />
-        )}
-      </div>
-
-      {/* --- DELETE CONFIRMATION MODAL --- */}
-      {deletingDept && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-sm theme-bg-surface border theme-border rounded-3xl p-6 shadow-2xl space-y-4 animate-scale-in text-left">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
-                <TrashIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold theme-text-primary">Delete Department</h3>
-                <p className="text-xs theme-text-secondary">This action cannot be undone.</p>
-              </div>
-            </div>
-
-            <p className="text-xs theme-text-secondary">
-              Are you sure you want to permanently delete department{" "}
-              <strong className="theme-text-primary">"{deletingDept.name}"</strong>?
-            </p>
-
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t theme-border">
-              <button
-                type="button"
-                onClick={() => setDeletingDept(null)}
-                disabled={isDeleting}
-                className="px-4 py-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteDept}
-                disabled={isDeleting}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50"
-              >
-                {isDeleting ? "Deleting..." : "Delete Department"}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-    </PageContainer>
+      }
+      hasActiveFilters={searchQuery.trim() !== "" || statusFilter !== "ALL"}
+      loading={loading}
+      loadingMessage="Loading academic departments..."
+      data={filteredDepartments}
+      totalCount={departments.length}
+      itemLabel="departments"
+      columns={tableColumns}
+      renderCard={renderDepartmentCard}
+      onRowClick={(dept) => handleOpenEdit(dept)}
+      selectable={true}
+      emptyIcon={DepartmentIcon}
+      emptyTitle="No Departments Found"
+      emptySubMessage={
+        searchQuery || statusFilter !== "ALL"
+          ? "No departments match your active search criteria."
+          : "Get started by adding your first academic faculty or department."
+      }
+      modals={
+        deletingDept && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
+              <h3 className="text-base font-bold theme-text-primary">Delete Department</h3>
+              <p className="text-xs theme-text-secondary">
+                Are you sure you want to delete <span className="font-semibold theme-text-primary">"{deletingDept.name}"</span>? This action cannot be undone.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t theme-border">
+                <button
+                  type="button"
+                  onClick={() => setDeletingDept(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold theme-bg-accent theme-accent-text hover:opacity-90 transition disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    />
   );
 }

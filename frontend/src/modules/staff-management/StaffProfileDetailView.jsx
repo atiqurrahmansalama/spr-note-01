@@ -480,7 +480,7 @@ export default function StaffProfileDetailView() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold theme-text-primary">Active Academic Classes & Groups</h3>
             <button
-              onClick={() => setIsAssignOpen(true)}
+              onClick={handleOpenAssignDrawer}
               className="flex items-center gap-1.5 px-3 py-1.5 theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold rounded-xl cursor-pointer"
             >
               <PlusIcon className="w-3.5 h-3.5" />
@@ -521,7 +521,7 @@ export default function StaffProfileDetailView() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold theme-text-primary">Assigned Operational Tasks</h3>
             <button
-              onClick={() => setIsDutyOpen(true)}
+              onClick={handleOpenDutyDrawer}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
             >
               <PlusIcon className="w-3.5 h-3.5" />

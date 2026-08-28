@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomInput from '../ui/CustomInput';
 import CustomSelect from '../ui/CustomSelect';
+import CustomTimePicker from '../ui/CustomTimePicker';
 import { DrawerContainer } from '../layout';
 import { calculateLateDelayMinutes, minutesToTimeString, timeStringToMinutes } from '../../utils/attendanceTimingEngine';
 import { ATTENDANCE_STATUSES } from '../../constants/attendanceConstants';
@@ -118,11 +119,10 @@ export default function AdminAttendanceDrawer({
               )}
             </div>
 
-            <CustomInput
-              type="time"
+            <CustomTimePicker
               value={inTime}
               onChange={(val) => setInTime(val)}
-              placeholder="HH:MM"
+              placeholder="Select Time..."
             />
           </div>
         )}

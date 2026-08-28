@@ -640,7 +640,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               classId={classFilter === "ALL" ? "" : classFilter}
               groups={groups}
               allowAll={true}
-              allLabel="All Groups / Halqas"
+              allLabel="All Groups"
               placeholder="All Groups"
               icon={GroupIcon}
               label={null}
@@ -766,7 +766,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
               onChange={(val) => setBulkActionType(val)}
               options={[
                 { value: "change_status", label: "Change Status" },
-                { value: "assign_group", label: "Assign Group / Halqa" },
+                { value: "assign_group", label: "Assign Group" },
                 { value: "bulk_delete", label: "Bulk Delete Students" },
               ]}
               placeholder="Select Action..."
@@ -776,7 +776,7 @@ export default function StudentDirectoryView({ viewMode = "all" }) {
           {bulkActionType === "assign_group" && (
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
-                Group / Halqa Name
+                Group Name
               </label>
               <input
                 type="text"

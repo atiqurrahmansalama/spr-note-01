@@ -38,16 +38,27 @@ const AdHocHeadcountView = lazy(() => import("./modules/attendance/AdHocHeadcoun
 
 // ─── Protected Academy & Campus Structure Views (Lazy Loaded) ───────────────
 const DepartmentManagementView = lazy(() => import("./modules/academy/departments/DepartmentManagementView"));
-const ClassManagementView = lazy(() => import("./modules/academy/classes/ClassManagementView"));
-const GroupManagementView = lazy(() => import("./modules/academy/groups/GroupManagementView"));
+const ClassManagementView = lazy(() => import("./modules/academy/classes-sections/classes/ClassManagementView"));
+const GroupManagementView = lazy(() => import("./modules/academy/classes-sections/groups/GroupManagementView"));
 const BranchManagementView = lazy(() => import("./modules/academy/BranchManagementView"));
-const ClassSectionManagerView = lazy(() => import("./modules/academy/ClassSectionManagerView"));
-const ClassPeriodScheduleView = lazy(() => import("./modules/academy/ClassPeriodScheduleView"));
+const SectionManagementView = lazy(() => import("./modules/academy/classes-sections/sections/SectionManagementView"));
+const RoutineCurriculumHubView = lazy(() => import("./modules/academy/routine-curriculum/RoutineCurriculumHubView"));
 const BranchSectionHubView = lazy(() => import("./modules/academy/BranchSectionHubView"));
 const CampusProfileHubView = lazy(() => import("./modules/academy/CampusProfileHubView"));
-const ClassesGroupsHubView = lazy(() => import("./modules/academy/ClassesGroupsHubView"));
+const ClassesGroupsHubView = lazy(() => import("./modules/academy/classes-sections/ClassesSectionsHubView"));
 const TimeCalendarManagerView = lazy(() => import("./modules/academy/TimeCalendarManagerView"));
+const ResidentialHubView = lazy(() => import("./modules/academy/residential/ResidentialHubView"));
 const AcademyProfileView = lazy(() => import("./modules/settings/components/AcademyProfileView"));
+
+// ─── Protected Academic Learning & Lesson Management Views (Lazy Loaded) ─────
+const DailyClassroomHubView = lazy(() => import("./modules/learning/DailyClassroomHubView"));
+const SyllabusMilestoneHubView = lazy(() => import("./modules/learning/SyllabusMilestoneHubView"));
+const AcademicAnalyticsHubView = lazy(() => import("./modules/learning/AcademicAnalyticsHubView"));
+
+
+
+
+
 
 // ─── Protected Admin & Role Views (Lazy Loaded) ─────────────────────────────
 const UserManagementModule = lazy(() => import("./modules/admin/UserManagementModule"));
@@ -166,13 +177,41 @@ export default function App() {
             <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
             <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
             <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches" fallback={<Navigate to="/dashboard" replace />}><BranchManagementView /></FeatureGuard>} />
-            <Route path="/academy/sections" element={<FeatureGuard sectionKey="class_sections" fallback={<Navigate to="/dashboard" replace />}><ClassSectionManagerView /></FeatureGuard>} />
+            <Route path="/academy/sections" element={<FeatureGuard sectionKey="class_sections" fallback={<Navigate to="/dashboard" replace />}><SectionManagementView /></FeatureGuard>} />
             <Route path="/academy/branches-sections" element={<BranchSectionHubView />} />
-            <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><ClassPeriodScheduleView /></FeatureGuard>} />
+            <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><RoutineCurriculumHubView /></FeatureGuard>} />
             <Route path="/academy/calendar-events" element={<TimeCalendarManagerView />} />
             <Route path="/academy/calendar-schedule" element={<TimeCalendarManagerView />} />
             <Route path="/academy/working-hours" element={<TimeCalendarManagerView />} />
+            <Route path="/academy/residential-quarters" element={<ResidentialHubView />} />
+            <Route path="/academy/residential" element={<ResidentialHubView />} />
+            <Route path="/academy/dormitory" element={<ResidentialHubView />} />
+            <Route path="/residential-quarters" element={<ResidentialHubView />} />
+
+            {/* Academic Learning, Daily Lessons & Reporting Hub Routes */}
+            <Route path="/studies" element={<DailyClassroomHubView />} />
+            <Route path="/studies/daily-classroom" element={<DailyClassroomHubView />} />
+            <Route path="/studies/syllabus-milestone" element={<SyllabusMilestoneHubView />} />
+            <Route path="/studies/academic-analytics" element={<AcademicAnalyticsHubView />} />
+
+            {/* Sub-item Direct Routes & Aliases */}
+            <Route path="/studies/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
+            <Route path="/studies/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
+            <Route path="/studies/homework" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
+            <Route path="/studies/goals" element={<SyllabusMilestoneHubView defaultTab="PACING_GOALS" />} />
+            <Route path="/studies/reports" element={<AcademicAnalyticsHubView defaultTab="LEDGER" />} />
+            
+            <Route path="/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
+            <Route path="/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
+            <Route path="/homework-tasks" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
+            <Route path="/academic-goals" element={<SyllabusMilestoneHubView defaultTab="PACING_GOALS" />} />
+            <Route path="/academic-reports" element={<AcademicAnalyticsHubView defaultTab="LEDGER" />} />
+
+
+
+
             <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
+
             <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
             <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
             <Route path="/academy/profile" element={<AcademyProfileView />} />

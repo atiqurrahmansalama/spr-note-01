@@ -8,6 +8,7 @@ import {
 import CustomSelect from "../ui/CustomSelect";
 import { getEventColors, getEventDisplayType } from "./MasterTimeCalendar";
 import { calendarImpactScopesStore } from "../../utils/localStore";
+import { useTenant } from "../../context/TenantContext";
 import { DrawerContainer } from "../layout";
 
 function formatTime12(timeStr) {
@@ -33,6 +34,7 @@ export default function TimeScheduleDetailDrawer({
   onClose,
   readOnly = false,
 }) {
+  const { activeTenantId } = useTenant();
   const effectiveDate = currentDate || initialDate || event?.startDate || new Date().toISOString().split("T")[0];
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -57,12 +59,12 @@ export default function TimeScheduleDetailDrawer({
   ], [effectiveDate]);
 
   const allScopes = useMemo(() => {
-    return calendarImpactScopesStore.getScopes();
-  }, []);
+    return calendarImpactScopesStore.getScopes(activeTenantId);
+  }, [activeTenantId]);
 
   if (!event) return null;
 
-  const style = getEventColors(event);
+  const style = getEventColors(event, activeTenantId);
   const isWorkingHours = event.category === "WORKING_HOURS";
   const isAllDay = event.isFullDay || !event.startTime || !event.endTime;
   const isRecurringOrMultiDay = Boolean(
@@ -88,7 +90,7 @@ export default function TimeScheduleDetailDrawer({
               </h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border ${style.border}`}>
-                  {getEventDisplayType(event)}
+                  {getEventDisplayType(event, activeTenantId)}
                 </span>
                 <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border theme-border theme-text-secondary">
                   Audience: {event.audience || "ALL"}

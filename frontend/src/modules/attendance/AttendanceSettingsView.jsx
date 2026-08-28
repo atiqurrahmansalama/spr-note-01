@@ -7,11 +7,8 @@ import {
   SettingsIcon,
   ChevronIcon,
   ClockIcon,
-  TimerIcon,
-  CheckIcon,
   SaveIcon,
   RefreshIcon,
-  AlertTriangleIcon,
   EditIcon,
   UndoIcon,
 } from "../../components/ui/Icons";
@@ -28,6 +25,7 @@ import { EVENT_COLOR_MAP } from "../../components/calendar";
 import DataTable from "../../components/ui/DataTable";
 import CustomInput from "../../components/ui/CustomInput";
 import CustomCheckbox from "../../components/ui/CustomCheckbox";
+import CustomTimePicker from "../../components/ui/CustomTimePicker";
 
 const SECTIONS = [
   {
@@ -308,12 +306,20 @@ export default function AttendanceSettingsView() {
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border uppercase tracking-wider">
-                        View Only
+                        View Mode
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono theme-bg-sub theme-text-secondary border theme-border">
+                      Effective: {timingPolicy.effective_from || '2026-01-01'}
+                    </span>
+                    {Array.isArray(timingPolicy.history_log) && timingPolicy.history_log.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-warning-badge">
+                        {timingPolicy.history_log.length} Archived {timingPolicy.history_log.length === 1 ? 'Version' : 'Versions'}
                       </span>
                     )}
                   </div>
                   <p className="text-xs theme-text-secondary mt-0.5">
-                    Controls active time windows, late arrival limits, auto-absent triggers, and teacher/admin permissions.
+                    Configure active time windows, late arrival limits, auto-absent triggers, and temporal policy versioning.
                   </p>
                 </div>
               </div>
@@ -343,7 +349,7 @@ export default function AttendanceSettingsView() {
                       type="button"
                       onClick={handleCancelTimingEdit}
                       className="px-3.5 py-2 rounded-xl border theme-border text-xs font-bold theme-text-secondary hover:theme-text-primary hover:theme-bg-sub cursor-pointer transition-all flex items-center gap-1.5"
-                      title="Cancel changes and lock"
+                      title="Cancel changes"
                     >
                       <UndoIcon className="w-3.5 h-3.5" />
                       <span>Cancel</span>
@@ -524,32 +530,28 @@ export default function AttendanceSettingsView() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <CustomInput
-                  type="time"
+                <CustomTimePicker
                   label="Check In Start Time"
                   readOnly={!isEditingTiming}
                   value={timingPolicy.staff_start_time || "07:30"}
                   onChange={(val) => setTimingPolicy((prev) => ({ ...prev, staff_start_time: val }))}
                 />
 
-                <CustomInput
-                  type="time"
+                <CustomTimePicker
                   label="Late Time Start"
                   readOnly={!isEditingTiming}
                   value={timingPolicy.staff_late_start_time || "08:15"}
                   onChange={(val) => setTimingPolicy((prev) => ({ ...prev, staff_late_start_time: val }))}
                 />
 
-                <CustomInput
-                  type="time"
+                <CustomTimePicker
                   label="Late Time End"
                   readOnly={!isEditingTiming}
                   value={timingPolicy.staff_late_end_time || "09:00"}
                   onChange={(val) => setTimingPolicy((prev) => ({ ...prev, staff_late_end_time: val }))}
                 />
 
-                <CustomInput
-                  type="time"
+                <CustomTimePicker
                   label="Check In End Time"
                   readOnly={!isEditingTiming}
                   value={timingPolicy.staff_end_time || "10:00"}
@@ -685,15 +687,14 @@ export default function AttendanceSettingsView() {
                         {/* Right Status Badge & Switch */}
                         <div className="flex items-center gap-3 shrink-0">
                           <span
-                            className={`inline-flex items-center gap-1.5 font-semibold px-2.5 py-1 rounded-md border text-[10px] sm:text-xs leading-none ${
+                            className={`inline-flex items-center gap-1.5 font-semibold px-2.5 py-1 rounded-md text-[10px] sm:text-xs leading-none ${
                               isKindOff
-                                ? "bg-[var(--danger-soft)] text-[var(--danger-text)] border-[var(--danger-main)]/20"
+                                ? "theme-danger-badge"
                                 : "theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
                             }`}
                           >
                             <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: isKindOff ? "var(--danger-main)" : "var(--accent-main)" }}
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${isKindOff ? "theme-bg-danger" : "theme-bg-accent"}`}
                             />
                             <span>{isKindOff ? "Class Attendance OFF" : "Class Attendance Active"}</span>
                           </span>
@@ -702,7 +703,7 @@ export default function AttendanceSettingsView() {
                             type="button"
                             onClick={(e) => handleToggleKindDisabled(kind, e)}
                             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
-                              isKindOff ? "bg-[var(--danger-main)] border-transparent" : "theme-bg-sub theme-border"
+                              isKindOff ? "theme-bg-danger border-transparent" : "theme-bg-elevated theme-border"
                             }`}
                             role="switch"
                             aria-checked={isKindOff}
@@ -710,8 +711,8 @@ export default function AttendanceSettingsView() {
                           >
                             <span
                               aria-hidden="true"
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                isKindOff ? "translate-x-5" : "translate-x-0.5 bg-slate-300 dark:bg-slate-500"
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full theme-bg-surface shadow-md ring-0 transition duration-200 ease-in-out border theme-border ${
+                                isKindOff ? "translate-x-5" : "translate-x-0.5"
                               }`}
                             />
                           </button>
@@ -754,9 +755,9 @@ export default function AttendanceSettingsView() {
                                   return (
                                     <div className="flex items-center gap-2.5 justify-end shrink-0">
                                       <span
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                                           isChildOff
-                                            ? "bg-[var(--danger-soft)] text-[var(--danger-text)] border-[var(--danger-main)]/20"
+                                            ? "theme-danger-badge"
                                             : "theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
                                         }`}
                                       >
@@ -768,8 +769,8 @@ export default function AttendanceSettingsView() {
                                         onClick={(e) => handleToggleChildEventDisabled(et, kind, e)}
                                         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
                                           isChildOff
-                                            ? "bg-[var(--danger-main)] border-transparent"
-                                            : "theme-bg-sub theme-border"
+                                            ? "theme-bg-danger border-transparent"
+                                            : "theme-bg-elevated theme-border"
                                         }`}
                                         role="switch"
                                         aria-checked={isChildOff}
@@ -777,8 +778,8 @@ export default function AttendanceSettingsView() {
                                       >
                                         <span
                                           aria-hidden="true"
-                                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                            isChildOff ? "translate-x-4" : "translate-x-0.5 bg-slate-300 dark:bg-slate-500"
+                                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full theme-bg-surface shadow-md ring-0 transition duration-200 ease-in-out border theme-border ${
+                                            isChildOff ? "translate-x-4" : "translate-x-0.5"
                                           }`}
                                         />
                                       </button>

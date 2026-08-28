@@ -795,13 +795,6 @@ export function useReportForm() {
     }
   };
 
-
-  const handleMakeReport = () => {
-    if (!validateReportForm()) return;
-    showToast(`Generating report preview for "${studentName}"...`, "info");
-    setIsReportModalOpen(true);
-  };
-
   const handleSaveSession = async (sessionName) => {
     const trimmed = typeof sessionName === "string" ? sessionName.trim() : (sessionName?.label || "");
     if (!trimmed) return;
@@ -881,6 +874,7 @@ export function useReportForm() {
     availableGroups,
     sessionList,
     isLoading,
+    isSaving,
     isOffline,
     draftInfo,
     recoverDraft,
@@ -890,7 +884,6 @@ export function useReportForm() {
     handleSaveResult,
     handleSaveSession,
     handleSaveRecord,
-    handleMakeReport,
     handleJuzPageRefresh,
     handleMistakeRefresh,
     handleStuckRefresh,

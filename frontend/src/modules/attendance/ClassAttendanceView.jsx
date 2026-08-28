@@ -36,7 +36,7 @@ import {
   periodCategoriesStore,
 } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
-import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm, TimeScheduleDetailDrawer } from '../../components/calendar';
 import {
   getAttendanceCellTimingState,
   cycleStatusWithinAllowed,
@@ -645,6 +645,7 @@ export default function ClassAttendanceView({
             policy: timingPolicy,
             isAdmin,
             currentStatus: rawStatus && rawStatus !== 'NOT_APPLICABLE' ? rawStatus : '',
+            effectiveStartDate: row.admission_date || null,
           });
 
           let effectiveStatus = '';

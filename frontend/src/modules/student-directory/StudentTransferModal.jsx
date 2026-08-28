@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
-import { TransferIcon, ClassIcon, GroupIcon, CalendarIcon } from "../../components/ui/Icons";
+import { TransferIcon, ClassIcon, SectionIcon, GroupIcon, CalendarIcon } from "../../components/ui/Icons";
 import Modal from "../../components/ui/Modal";
 import CustomSelect from "../../components/ui/CustomSelect";
 import CustomInput from "../../components/ui/CustomInput";
-import { ClassSelect, GroupSelect } from "../../components/selectors";
+import { ClassSelect, SectionSelect, GroupSelect, DormitoryRoomSelect } from "../../components/selectors";
 
 export default function StudentTransferModal({
   isOpen,
@@ -17,9 +17,10 @@ export default function StudentTransferModal({
   const { showToast } = useToast();
 
   const [classes, setClasses] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [targetClassId, setTargetClassId] = useState("");
+  const [targetSectionId, setTargetSectionId] = useState("");
   const [targetGroupId, setTargetGroupId] = useState("");
+  const [targetRoomId, setTargetRoomId] = useState("");
   const [transitionDate, setTransitionDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -32,56 +33,46 @@ export default function StudentTransferModal({
 
   useEffect(() => {
     if (isOpen) {
-      loadClassesAndGroups();
+      loadClasses();
       setTransitionDate(new Date().toISOString().split("T")[0]);
       setTransitionReason("Annual Promotion & Advancement");
       setCustomReason("");
-      setTargetClassId(student?.student_class || "");
-      setTargetGroupId(student?.student_group || "");
+      setTargetClassId(student?.student_class ? String(student.student_class) : "");
+      setTargetSectionId(student?.section ? String(student.section) : "");
+      setTargetGroupId(student?.student_group ? String(student.student_group) : "");
     }
   }, [isOpen, student]);
 
-  const loadClassesAndGroups = async () => {
+  const loadClasses = async () => {
     try {
-      const [classRes, groupRes] = await Promise.all([
-        fetchWithAuth("/api/v1/classes/"),
-        fetchWithAuth("/api/v1/groups/"),
-      ]);
-
-      if (classRes.ok) {
-        const cData = await classRes.json();
+      const res = await fetchWithAuth("/api/v1/classes/");
+      if (res.ok) {
+        const cData = await res.json();
         setClasses(Array.isArray(cData) ? cData : cData.results || []);
-      }
-
-      if (groupRes.ok) {
-        const gData = await groupRes.json();
-        setGroups(Array.isArray(gData) ? gData : gData.results || []);
       }
     } catch {}
   };
 
   if (!isOpen) return null;
 
-  // Filter groups by selected class if class selected, otherwise all groups
-  const eligibleGroups = targetClassId
-    ? groups.filter((g) => g.student_class === targetClassId || !g.student_class)
-    : groups;
+  const handleClassChange = (cid) => {
+    setTargetClassId(cid);
+    // Reset section and group if class changes
+    setTargetSectionId("");
+    setTargetGroupId("");
+  };
 
-  const handleGroupChange = (gid) => {
-    setTargetGroupId(gid);
-    if (gid) {
-      const selectedGrp = groups.find((g) => String(g.id) === String(gid));
-      if (selectedGrp && selectedGrp.student_class && !targetClassId) {
-        setTargetClassId(selectedGrp.student_class);
-      }
-    }
+  const handleSectionChange = (sid) => {
+    setTargetSectionId(sid);
+    // Reset group if section changes
+    setTargetGroupId("");
   };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
 
-    if (!targetClassId && !targetGroupId) {
-      showToast("Please select at least one destination (Class or Group).", "warning");
+    if (!targetClassId && !targetSectionId && !targetGroupId) {
+      showToast("Please select at least one destination (Class, Section, or Group).", "warning");
       return;
     }
 
@@ -99,6 +90,7 @@ export default function StudentTransferModal({
           action: "transfer",
           student_ids: studentIds,
           target_class_id: targetClassId || null,
+          target_section_id: targetSectionId ? parseInt(targetSectionId, 10) : null,
           target_group_id: targetGroupId ? parseInt(targetGroupId, 10) : null,
           transition_date: transitionDate,
           transition_reason: finalReason,
@@ -125,6 +117,7 @@ export default function StudentTransferModal({
         // Single Student Transfer
         const payload = {
           target_class_id: targetClassId || null,
+          target_section_id: targetSectionId ? parseInt(targetSectionId, 10) : null,
           target_group_id: targetGroupId ? parseInt(targetGroupId, 10) : null,
           transition_date: transitionDate,
           transition_reason: finalReason,
@@ -163,7 +156,7 @@ export default function StudentTransferModal({
   const reasonOptions = [
     { value: "Annual Promotion & Advancement", label: "Annual Promotion & Advancement" },
     { value: "Mid-Term Performance Elevation", label: "Mid-Term Performance Elevation" },
-    { value: "Halqa Capacity Rebalancing", label: "Halqa Capacity Rebalancing" },
+    { value: "Group / Section Capacity Rebalancing", label: "Group / Section Capacity Rebalancing" },
     { value: "Guardian Request / Relocation", label: "Guardian Request / Relocation" },
     { value: "Academic Level Adjustment", label: "Academic Level Adjustment" },
     { value: "OTHER", label: "Custom Reason (Specify Below)" },
@@ -176,11 +169,11 @@ export default function StudentTransferModal({
       title={
         isBulk
           ? `Bulk Transfer Students (${activeStudentCount} Selected)`
-          : `Transfer Student Class & Group`
+          : `Transfer Student Academic Placement`
       }
       subtitle={
         isBulk
-          ? "Reassign academic class and group for selected students"
+          ? "Reassign academic class, section, and group for selected students"
           : `For ${student?.name_en || student?.name || "Student"} (ID: ${student?.uniq_id || student?.id})`
       }
       icon={TransferIcon}
@@ -197,7 +190,7 @@ export default function StudentTransferModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || (!targetClassId && !targetGroupId)}
+            disabled={submitting || (!targetClassId && !targetSectionId && !targetGroupId)}
             className="px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
           >
             <TransferIcon className="w-3.5 h-3.5" />
@@ -218,14 +211,15 @@ export default function StudentTransferModal({
           <div className="p-3 rounded-xl theme-bg-sub border theme-border flex items-center justify-between text-xs">
             <div className="space-y-0.5">
               <span className="text-[10px] uppercase font-bold tracking-wider theme-text-secondary block">
-                Current Class &amp; Group
+                Current Academic Placement
               </span>
               <span className="font-bold theme-text-primary">
-                {student.student_class_name || student.class_name || "No Class"} /{" "}
-                {student.student_group_name || student.group_name || "General Group"}
+                {student.student_class_name || student.class_name || "No Class"}
+                {student.section_name ? ` • Section: ${student.section_name}` : ""}
+                {student.student_group_name ? ` • Group: ${student.student_group_name}` : ""}
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border theme-border">
               Active
             </span>
           </div>
@@ -234,9 +228,9 @@ export default function StudentTransferModal({
         {/* Destination Class */}
         <div>
           <ClassSelect
-            label="Destination Class / Grade Level"
+            label="Destination Academic Class"
             value={targetClassId}
-            onChange={(val) => setTargetClassId(val)}
+            onChange={handleClassChange}
             classes={classes}
             allowAll={true}
             allLabel="-- Keep Current / No Class Change --"
@@ -245,18 +239,46 @@ export default function StudentTransferModal({
           />
         </div>
 
+        {/* Destination Section */}
+        <div>
+          <SectionSelect
+            label="Destination Section"
+            value={targetSectionId}
+            onChange={handleSectionChange}
+            classId={targetClassId}
+            allowAll={true}
+            allLabel="-- Keep Current / No Section Change --"
+            optional={true}
+            optionalLabel="Clear Section (Direct Class Level)"
+            placeholder="Select Destination Section..."
+            icon={SectionIcon}
+          />
+        </div>
+
         {/* Destination Group */}
         <div>
           <GroupSelect
-            label="Destination Group / Halqa"
+            label="Destination Group"
             value={targetGroupId}
-            onChange={handleGroupChange}
+            onChange={(gid) => setTargetGroupId(gid)}
             classId={targetClassId}
-            groups={groups}
+            sectionId={targetSectionId}
             allowAll={true}
             allLabel="-- Keep Current / No Group Change --"
             placeholder="Select Destination Group..."
             icon={GroupIcon}
+          />
+        </div>
+
+        {/* Destination Dormitory Room (Optional) */}
+        <div>
+          <DormitoryRoomSelect
+            label="Residential Dormitory Room (Optional)"
+            value={targetRoomId}
+            onChange={(rid) => setTargetRoomId(rid)}
+            allowAll={true}
+            allLabel="-- Keep Current / No Room Change --"
+            placeholder="Select Dormitory Room..."
           />
         </div>
 

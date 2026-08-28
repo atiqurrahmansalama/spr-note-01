@@ -94,6 +94,10 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.none()
 
+        dept_id = self.request.query_params.get('department')
+        if dept_id and dept_id != 'ALL':
+            qs = qs.filter(student_class__department_id=dept_id)
+
         class_id = self.request.query_params.get('class') or self.request.query_params.get('student_class')
         if class_id and class_id != 'ALL':
             qs = qs.filter(student_class_id=class_id)
@@ -139,8 +143,24 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
             "occupancy_rate": occupancy_rate
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='delete-with-migration')
+    def delete_with_migration(self, request, pk=None):
+        from core.services import delete_section_with_migration
+        target_section_id = request.data.get('target_section_id')
+        result = delete_section_with_migration(
+            source_section_id=pk,
+            target_section_id=target_section_id,
+            performed_by=request.user
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        has_students = Student.objects.filter(section=instance, is_deleted=False).exists()
+        if has_students:
+            return Response({
+                "error": f"Section '{instance.section_name}' has active students assigned. Please use 'delete-with-migration' to safely migrate them."
+            }, status=status.HTTP_400_BAD_REQUEST)
         instance.is_deleted = True
         instance.is_active = False
         instance.save(update_fields=['is_deleted', 'is_active', 'updated_at'])
@@ -328,7 +348,7 @@ class StudentClassViewSet(viewsets.ModelViewSet):
 
 
 class StudentGroupViewSet(viewsets.ModelViewSet):
-    queryset = StudentGroup.objects.filter(is_deleted=False).select_related('student_class', 'mentor_teacher', 'institution').order_by('name')
+    queryset = StudentGroup.objects.filter(is_deleted=False).select_related('student_class', 'section', 'mentor_teacher', 'institution').order_by('name')
     serializer_class = StudentGroupSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
     required_section_key = 'student_groups'
@@ -350,15 +370,23 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.none()
 
-        class_id = self.request.query_params.get('student_class')
+        class_id = self.request.query_params.get('student_class') or self.request.query_params.get('class')
         if class_id and class_id != 'ALL':
             qs = qs.filter(student_class_id=class_id)
 
+        section_id = self.request.query_params.get('section') or self.request.query_params.get('section_id')
+        if section_id and section_id != 'ALL':
+            qs = qs.filter(section_id=section_id)
+
         search = self.request.query_params.get('search')
         if search:
-            qs = qs.filter(Q(name__icontains=search) | Q(student_class__name__icontains=search))
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(student_class__name__icontains=search) |
+                Q(section__section_name__icontains=search)
+            )
 
-        return qs.select_related('student_class', 'mentor_teacher', 'institution').order_by('name')
+        return qs.select_related('student_class', 'section', 'mentor_teacher', 'institution').order_by('name')
 
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request)
@@ -671,4 +699,189 @@ class TeacherRoutineScheduleViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
         serializer.save(institution_id=tenant_id)
+
+
+class ResidentialBuildingViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ResidentialBuildingSerializer
+    queryset = ResidentialBuilding.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = ResidentialBuilding.objects.filter(is_deleted=show_trash).select_related('institution', 'branch', 'warden__user')
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                return qs.none()
+
+        branch_id = self.request.query_params.get('branch_id')
+        if branch_id and branch_id != 'ALL':
+            qs = qs.filter(branch_id=branch_id)
+        return qs.order_by('name')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise serializers.ValidationError({"institution": "Active institution scope is required."})
+        serializer.save(institution_id=tenant_id)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response({"status": "Residential building deleted."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        instance = self.get_object()
+        instance.is_deleted = False
+        instance.save()
+        return Response({"status": "Residential building restored."}, status=status.HTTP_200_OK)
+
+
+class DormitoryRoomViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DormitoryRoomSerializer
+    queryset = DormitoryRoom.objects.filter(is_deleted=False)
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        show_trash = self.request.query_params.get('trash') == 'true'
+        qs = DormitoryRoom.objects.filter(is_deleted=show_trash).select_related(
+            'institution', 'branch', 'building', 'supervisor__user', 'prefect'
+        ).prefetch_related('beds')
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                return qs.none()
+
+        branch_id = self.request.query_params.get('branch_id')
+        if branch_id and branch_id != 'ALL':
+            qs = qs.filter(branch_id=branch_id)
+
+        building_id = self.request.query_params.get('building_id')
+        if building_id and building_id != 'ALL':
+            qs = qs.filter(building_id=building_id)
+
+        floor_number = self.request.query_params.get('floor_number')
+        if floor_number and floor_number != 'ALL':
+            try:
+                qs = qs.filter(floor_number=int(floor_number))
+            except ValueError:
+                pass
+
+        room_type = self.request.query_params.get('room_type')
+        if room_type and room_type != 'ALL':
+            qs = qs.filter(room_type=room_type)
+
+        return qs.order_by('building__name', 'floor_number', 'room_number')
+
+    def perform_create(self, serializer):
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
+        if not tenant_id:
+            raise serializers.ValidationError({"institution": "Active institution scope is required."})
+        room = serializer.save(institution_id=tenant_id)
+        for i in range(1, room.max_capacity + 1):
+            BedAllocation.objects.create(
+                room=room,
+                bed_number=f"Bed-{str(i).zfill(2)}",
+                status='VACANT'
+            )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response({"status": "Dormitory room deleted."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        instance = self.get_object()
+        instance.is_deleted = False
+        instance.save()
+        return Response({"status": "Dormitory room restored."}, status=status.HTTP_200_OK)
+
+
+class BedAllocationViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = BedAllocationSerializer
+    queryset = BedAllocation.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return self.queryset.none()
+        qs = BedAllocation.objects.select_related(
+            'room', 'room__building', 'student', 'student__student_class', 'staff__user'
+        )
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            qs = qs.filter(room__institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(room__institution_id=user.institution_id)
+            else:
+                return qs.none()
+
+        room_id = self.request.query_params.get('room_id')
+        if room_id and room_id != 'ALL':
+            qs = qs.filter(room_id=room_id)
+
+        status_param = self.request.query_params.get('status')
+        if status_param and status_param != 'ALL':
+            qs = qs.filter(status=status_param.upper())
+
+        return qs.order_by('room__room_number', 'bed_number')
+
+    @action(detail=True, methods=['post'], url_path='assign')
+    def assign_student(self, request, pk=None):
+        bed = self.get_object()
+        student_id = request.data.get('student_id')
+        staff_id = request.data.get('staff_id')
+        remarks = request.data.get('remarks', '')
+
+        if not student_id and not staff_id:
+            return Response({"error": "Either student_id or staff_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if student_id:
+            BedAllocation.objects.filter(student_id=student_id, is_active=True).update(
+                student=None, status='VACANT'
+            )
+            bed.student_id = student_id
+            bed.staff = None
+        elif staff_id:
+            bed.staff_id = staff_id
+            bed.student = None
+
+        bed.status = 'OCCUPIED'
+        bed.assigned_date = timezone.localdate()
+        bed.remarks = remarks
+        bed.save()
+
+        return Response(BedAllocationSerializer(bed).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='unassign')
+    def unassign_student(self, request, pk=None):
+        bed = self.get_object()
+        bed.student = None
+        bed.staff = None
+        bed.status = 'VACANT'
+        bed.remarks = request.data.get('remarks', '')
+        bed.save()
+
+        return Response(BedAllocationSerializer(bed).data, status=status.HTTP_200_OK)
+
 

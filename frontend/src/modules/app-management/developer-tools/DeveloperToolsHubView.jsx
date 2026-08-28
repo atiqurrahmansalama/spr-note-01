@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import SettingsSplitLayout from "../../../components/common/SettingsSplitLayout";
 import CompactTaxonomyManager from "../../../components/common/CompactTaxonomyManager";
@@ -16,11 +16,14 @@ import {
   CopyIcon,
   HealthActivityIcon,
   ServerStackIcon,
+  BookOpenIcon,
+  TimerIcon,
 } from "../../../components/ui/Icons";
 import SessionManager from "../../student-directory/SessionManager";
 import ReportSettingsView from "../../settings/ReportSettingsView";
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import AdmissionSettingsPanel from "./AdmissionSettingsPanel";
+import WeeklyHolidaySettingsPanel from "./WeeklyHolidaySettingsPanel";
 import {
   getInstitutionCategories,
   createInstitutionCategory,
@@ -40,7 +43,10 @@ import {
   classAdmissionRequirementsStore,
   staffRecruitmentRequirementsStore,
   periodCategoriesStore,
+  periodSequencesStore,
   admissionSettingsStore,
+  academicSubjectsStore,
+  ACADEMIC_SUBJECT_CATEGORIES,
 } from "../../../utils/localStore";
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../../constants/version";
 import { useToast } from "../../../context/ToastContext";
@@ -57,6 +63,13 @@ const SECTIONS = [
     icon: BuildingOfficeIcon,
   },
   {
+    id: "period-sequences",
+    group: "Academic Structure",
+    title: "Period Sequences & Numbers",
+    description: "Manage configurable daily timetable period sequences, ordinal names (1st Period, 2nd Period, etc.), and slot rank orders",
+    icon: TimerIcon,
+  },
+  {
     id: "period-categories",
     group: "Academic Structure",
     title: "Period Categories",
@@ -70,6 +83,13 @@ const SECTIONS = [
     description: "Institutional hierarchy, designations, and faculty rank priorities (Principal, Professor, Senior Faculty, etc.)",
     icon: TeacherIcon,
   },
+  {
+    id: "academic-subjects",
+    group: "Academic Structure",
+    title: "Curriculum Subjects",
+    description: "Manage textbook subjects, Islamic sciences (Fiqh, Hadith, Tafsir, Nahw), and academic disciplines across syllabus tracking",
+    icon: BookOpenIcon,
+  },
 
   // Group 2: Event & Calendar Schedules
   {
@@ -78,6 +98,13 @@ const SECTIONS = [
     title: "Working Hours & Shifts",
     description: "Manage pre-configured operational shifts, duty hours, and faculty sessions",
     icon: ClockIcon,
+  },
+  {
+    id: "weekly-holidays",
+    group: "Calendar & Schedules",
+    title: "Weekly Holidays & Weekends",
+    description: "Configure official weekly institutional holiday(s), non-academic recess days, and attendance excuse rules",
+    icon: CalendarIcon,
   },
   {
     id: "event-types",
@@ -303,6 +330,20 @@ export default function DeveloperToolsHubView() {
           />
         )}
 
+        {/* Section: Period Sequences & Numbers */}
+        {activeSection === "period-sequences" && (
+          <CompactTaxonomyManager
+            title="Period Sequences & Number Ordering"
+            description="Configure daily timetable period sequences, ordinal labels (1st Period, 2nd Period, etc.), and slot rank orders used across Daily Period Slots and Lesson Delivery."
+            fetchItems={async () => periodSequencesStore.getSequences(activeTenantId)}
+            createItem={async (payload) => periodSequencesStore.addSequence(activeTenantId, payload)}
+            updateItem={async (id, payload) => periodSequencesStore.updateSequence(activeTenantId, id, payload)}
+            deleteItem={async (id) => periodSequencesStore.deleteSequence(activeTenantId, id)}
+            itemTypeName="Period Sequence"
+            icon={TimerIcon}
+          />
+        )}
+
         {/* Section: Period Categories */}
         {activeSection === "period-categories" && (
           <CompactTaxonomyManager
@@ -359,6 +400,21 @@ export default function DeveloperToolsHubView() {
           />
         )}
 
+        {/* Section: Academic Subjects & Curriculum Taxonomy */}
+        {activeSection === "academic-subjects" && (
+          <CompactTaxonomyManager
+            title="Curriculum Subjects"
+            description="Manage institutional subject taxonomy, Islamic sciences (Fiqh, Hadith, Tafsir, Nahw, Sarf, Balaghah, Mantiq), and academic disciplines available in curriculum and syllabus creation."
+            fetchItems={async () => academicSubjectsStore.getSubjects(activeTenantId)}
+            createItem={async (payload) => academicSubjectsStore.addSubject(activeTenantId, payload)}
+            updateItem={async (id, payload) => academicSubjectsStore.updateSubject(activeTenantId, id, payload)}
+            deleteItem={async (id) => academicSubjectsStore.deleteSubject(activeTenantId, id)}
+            itemTypeName="Academic Subject"
+            hideStatus={true}
+            icon={BookOpenIcon}
+          />
+        )}
+
         {/* Section 2: Working Hours & Shifts */}
         {activeSection === "working-schedules" && (
           <CompactTaxonomyManager
@@ -372,6 +428,13 @@ export default function DeveloperToolsHubView() {
             hideStatus={true}
             icon={ClockIcon}
           />
+        )}
+
+        {/* Section 2.5: Weekly Holidays & Weekend Schedule */}
+        {activeSection === "weekly-holidays" && (
+          <div className="w-full animate-fade-in">
+            <WeeklyHolidaySettingsPanel activeTenantId={activeTenantId} />
+          </div>
         )}
 
         {/* Section 3: Schedule & Event Types */}

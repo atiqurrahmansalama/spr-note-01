@@ -44,6 +44,20 @@ const HARD_DEFAULTS = {
   student_admission: true,
   quran_hifz_tracker: true,
 
+  // Academic Studies Features
+  nav_academic_studies: true,
+  academic_studies: true,
+  daily_classroom: true,
+  syllabus_milestone: true,
+  academic_analytics: true,
+  daily_lessons: true,
+  recitation_adai: true,
+  homework_tasks: true,
+  academic_goals: true,
+  academic_reports: true,
+
+
+
   nav_staff_management: true,
   staff_roster: true,
   staff_onboarding: true,

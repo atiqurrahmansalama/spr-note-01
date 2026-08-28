@@ -3,27 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
   PlusIcon,
-  SearchIcon,
   EditIcon,
   TrashIcon,
-  PhoneIcon,
-  MailIcon,
   LocationIcon,
   TeacherIcon,
   ClassIcon,
   StudentIcon,
-  SparklesIcon,
 } from '../../components/ui/Icons';
-import PageHeader from '../../components/ui/PageHeader';
-import MetricsGrid from '../../components/ui/MetricsGrid';
-import { PageContainer } from '../../components/layout';
-import DataTable from '../../components/ui/DataTable';
-import DataCardGrid from '../../components/ui/DataCardGrid';
 import ActionMenu from '../../components/ui/ActionMenu';
 import CustomSelect from '../../components/ui/CustomSelect';
-import StatusBadge from '../../components/ui/StatusBadge';
-import DataViewToolbar from '../../components/ui/DataViewToolbar';
-import DataViewFooter from '../../components/ui/DataViewFooter';
+import UniversalManagementView from '../../components/common/UniversalManagementView';
 import BranchForm from './BranchForm';
 import { getBranches, getBranchMetrics, deleteBranch } from '../../api/academy';
 import { useToast } from '../../context/ToastContext';
@@ -41,10 +30,10 @@ export default function BranchManagementView({
   hideHeader = false,
   hideMetrics = false,
   isEmbedded = false,
-  onMetricsLoaded = null,
 }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [branches, setBranches] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -55,56 +44,12 @@ export default function BranchManagementView({
     active_in_charges: 0,
   });
   const [loading, setLoading] = useState(true);
-
-  // View mode
-  const [viewMode, setViewMode] = useState(() => {
-    try {
-      return localStorage.getItem('spr_branches_view_mode') || 'grid';
-    } catch {
-      return 'grid';
-    }
-  });
-
-  // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [selectedIds, setSelectedIds] = useState([]);
-
+  const [deletingBranch, setDeletingBranch] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleToggleViewMode = (mode) => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('spr_branches_view_mode', mode);
-    } catch {}
-  };
-
-  const handleSelectRow = useCallback((id) => {
-    setSelectedIds((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
-      return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
-    });
-  }, []);
-
-  const handleSelectAll = useCallback((val) => {
-    if (Array.isArray(val)) {
-      setSelectedIds(val);
-    } else {
-      setSelectedIds([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-
-    const handleTenantChanged = () => {
-      loadData();
-    };
-    window.addEventListener('spr_tenant_changed', handleTenantChanged);
-    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
-  }, [typeFilter]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [branchData, metricData] = await Promise.allSettled([
@@ -126,11 +71,19 @@ export default function BranchManagementView({
     } finally {
       setLoading(false);
     }
-  };
+  }, [typeFilter, showToast]);
 
-  const { openDrawer, closeDrawer } = useRightSidebar();
+  useEffect(() => {
+    loadData();
 
-  // Universal Drawer Registration for Branch Form (survives F5 refresh)
+    const handleTenantChanged = () => {
+      loadData();
+    };
+    window.addEventListener('spr_tenant_changed', handleTenantChanged);
+    return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+  }, [loadData]);
+
+  // Universal Drawer Registration for Branch Form
   useDrawerRegistration(
     'branch',
     (params) => {
@@ -139,59 +92,76 @@ export default function BranchManagementView({
       const foundBranch = branchId ? branches.find((b) => String(b.id) === String(branchId)) : null;
 
       return {
-        title: mode === 'add' ? 'Register Academic Branch' : `Edit: ${foundBranch?.branch_name || 'Branch'}`,
-        category: 'Academy & Branches',
-        size: 'md',
+        title: mode === 'add' ? 'Create Campus Branch' : `Edit: ${foundBranch?.name || 'Branch'}`,
+        category: 'Campus Management',
+        size: 'lg',
         content: (
           <BranchForm
-            branch={foundBranch}
+            editingBranch={foundBranch}
             onSaved={() => {
               loadData();
               closeDrawer();
-              showToast(mode === 'add' ? 'Branch registered successfully.' : 'Branch updated successfully.', 'success');
             }}
             onCancel={closeDrawer}
           />
         ),
       };
     },
-    [branches, loadData, closeDrawer, showToast]
+    [branches, loadData, closeDrawer]
   );
 
-  const handleCreateNew = () => {
+  const handleOpenAdd = () => {
     openDrawer('branch', { mode: 'add' });
   };
 
-  const handleEdit = (branch) => {
+  const handleOpenEdit = (branch) => {
     openDrawer('branch', { mode: 'edit', id: branch.id });
   };
 
-  const handleDelete = async (branch) => {
-    if (!window.confirm(`Are you sure you want to delete branch "${branch.branch_name}"?`)) {
-      return;
-    }
+  const handleDelete = (branch) => {
+    setDeletingBranch(branch);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingBranch) return;
     setIsDeleting(true);
     try {
-      await deleteBranch(branch.id);
-      showToast(`Branch "${branch.branch_name}" deleted successfully.`, 'success');
+      await deleteBranch(deletingBranch.id);
+      showToast(`Branch "${deletingBranch.name}" removed successfully.`, 'success');
+      setDeletingBranch(null);
       loadData();
     } catch (err) {
-      showToast(err.message || 'Failed to delete branch.', 'error');
+      showToast(err?.response?.data?.error || 'Failed to remove branch.', 'error');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Reusable 3-Dots Action Items Menu
+  const filteredBranches = branches.filter((b) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        b.name?.toLowerCase().includes(q) ||
+        b.code?.toLowerCase().includes(q) ||
+        b.district?.toLowerCase().includes(q) ||
+        b.in_charge_name?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
   const getActionMenuItems = (branch) => [
     {
       label: 'Edit Branch',
       icon: EditIcon,
-      onClick: () => handleEdit(branch),
+      onClick: () => handleOpenEdit(branch),
     },
     {
-      divider: true,
+      label: 'View Sections',
+      icon: ClassIcon,
+      onClick: () => navigate(`/academy/classes-groups?tab=sections&branch=${branch.id}`),
     },
+    { divider: true },
     {
       label: 'Delete Branch',
       icon: TrashIcon,
@@ -200,313 +170,237 @@ export default function BranchManagementView({
     },
   ];
 
-  // Filter branches locally by search query
-  const filteredBranches = branches.filter((b) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (b.branch_name && b.branch_name.toLowerCase().includes(q)) ||
-      (b.branch_code && b.branch_code.toLowerCase().includes(q)) ||
-      (b.district && b.district.toLowerCase().includes(q)) ||
-      (b.division && b.division.toLowerCase().includes(q)) ||
-      (b.in_charge_name && b.in_charge_name.toLowerCase().includes(q))
-    );
-  });
-
-  const metricCards = [
-    {
-      title: 'Total Campuses',
-      value: metrics.total_branches || branches.length,
-      icon: BuildingOfficeIcon,
-      accentColor: 'accent',
-      trend: `${metrics.main_campuses || 0} Main`,
-    },
-    {
-      title: 'Main Campuses',
-      value: metrics.main_campuses || 0,
-      icon: BuildingOfficeIcon,
-      accentColor: 'default',
-      trend: 'Central hubs',
-    },
-    {
-      title: 'Total Capacity',
-      value: metrics.total_capacity || 0,
-      icon: StudentIcon,
-      accentColor: 'default',
-      trend: 'Across sections',
-    },
-    {
-      title: 'Campus In-Charges',
-      value: metrics.active_in_charges || 0,
-      icon: TeacherIcon,
-      accentColor: 'default',
-      trend: 'Designated heads',
-    },
-  ];
-
-  // Reusable Table Columns Definition for DataTable (Campus Type, Profile Icon, Sections removed)
   const tableColumns = [
     {
-      header: 'Branch Name',
-      key: 'branch_name',
-      headerClassName: 'min-w-[200px]',
-      render: (row) => (
-        <div>
-          <div className="font-semibold theme-text-primary text-xs sm:text-sm">{row.branch_name}</div>
-          {row.branch_code && (
-            <div className="text-xs theme-text-secondary font-mono mt-0.5">{row.branch_code}</div>
-          )}
+      key: 'name',
+      header: 'Branch Name & Code',
+      render: (branch) => (
+        <div className="space-y-0.5">
+          <span className="font-bold text-sm theme-text-primary block">{branch.name}</span>
+          <div className="flex items-center gap-1.5">
+            {branch.code && (
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-block">
+                {branch.code}
+              </span>
+            )}
+            <span className="text-[10px] theme-text-secondary">
+              {branch.branch_type ? branch.branch_type.replace('_', ' ') : 'Main'}
+            </span>
+          </div>
         </div>
       ),
     },
     {
-      header: 'In-Charge Staff',
-      key: 'in_charge_name',
-      headerClassName: 'min-w-[180px]',
-      render: (row) => (
-        <div>
-          {row.in_charge_name ? (
-            <div>
-              <div className="text-xs font-medium theme-text-primary">{row.in_charge_name}</div>
-              {row.in_charge_phone && (
-                <div className="text-[10px] theme-text-secondary font-mono mt-0.5">{row.in_charge_phone}</div>
-              )}
-            </div>
-          ) : (
-            <span className="text-xs theme-text-secondary italic">Unassigned</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Location',
-      key: 'district',
-      headerClassName: 'min-w-[180px]',
-      render: (row) => (
-        <div className="text-xs theme-text-secondary">
-          {row.district && row.division ? (
-            <span>{row.district}, {row.division}</span>
-          ) : row.address ? (
-            <span className="truncate max-w-xs block">{row.address}</span>
-          ) : (
-            <span className="italic">--</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Status',
-      key: 'is_active',
-      headerClassName: 'w-24 text-center',
-      align: 'center',
-      render: (row) => (
-        <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-            row.is_active
-              ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
-              : "theme-bg-sub theme-text-secondary border theme-border"
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${row.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
-          {row.is_active ? "Active" : "Inactive"}
+      key: 'in_charge',
+      header: 'Branch In-Charge',
+      render: (branch) => (
+        <span className="text-xs font-semibold theme-text-primary">
+          {branch.in_charge_name || 'Unassigned'}
         </span>
       ),
     },
     {
-      header: 'Actions',
+      key: 'location',
+      header: 'Location / City',
+      render: (branch) => (
+        <div className="flex items-center gap-1.5 text-xs theme-text-secondary">
+          <LocationIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+          <span>{branch.district || branch.city || branch.address || '—'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'capacity',
+      header: 'Capacity',
+      align: 'center',
+      render: (branch) => (
+        <span className="text-xs font-mono font-bold theme-text-primary">
+          {branch.capacity || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      align: 'center',
+      render: (branch) => (
+        <span
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+            branch.is_active
+              ? 'theme-bg-accent-soft theme-accent border theme-border'
+              : 'theme-bg-sub theme-text-secondary border theme-border'
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${branch.is_active ? 'theme-bg-accent' : 'theme-bg-elevated'}`}></span>
+          {branch.is_active ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
       key: 'actions',
+      header: 'Actions',
       align: 'right',
       headerClassName: 'w-16 text-right',
-      render: (row) => (
+      render: (branch) => (
         <div className="flex items-center justify-end">
-          <ActionMenu items={getActionMenuItems(row)} />
+          <ActionMenu items={getActionMenuItems(branch)} align="right" />
         </div>
       ),
     },
   ];
 
-  // Reusable Card Renderer for DataCardGrid (Campus Type, Profile Icon, Sections removed, ActionMenu integrated)
-  const renderBranchCard = (branch) => {
-    return (
-      <div
-        key={branch.id}
-        className="theme-bg-surface border theme-border hover:border-current rounded-2xl p-5 shadow-xs transition-all flex flex-col justify-between"
-      >
-        <div>
-          {/* Top Header */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0 flex-1">
-              <h4 className="font-bold theme-text-primary text-sm leading-snug break-words">
-                {branch.branch_name}
-              </h4>
-              {branch.branch_code && (
-                <div className="text-[11px] font-mono theme-text-secondary mt-0.5">
-                  Code: {branch.branch_code}
-                </div>
+  const renderBranchCard = (branch) => (
+    <div
+      key={branch.id}
+      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group"
+    >
+      <div className="space-y-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+                {branch.name}
+              </h3>
+              {branch.code && (
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub theme-text-secondary border theme-border">
+                  {branch.code}
+                </span>
               )}
             </div>
-
-            <div className="shrink-0">
-              <ActionMenu items={getActionMenuItems(branch)} />
-            </div>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              {branch.branch_type ? branch.branch_type.replace('_', ' ') : 'Main Campus'}
+            </p>
           </div>
-
-          {/* Location & Contact Info */}
-          <div className="space-y-2 py-3 border-y theme-border my-3 text-xs theme-text-secondary">
-            {branch.address && (
-              <div className="flex items-center gap-2 truncate">
-                <LocationIcon className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                <span className="truncate">{branch.address}</span>
-              </div>
-            )}
-            {branch.district && (
-              <div className="flex items-center gap-2">
-                <span className="w-3.5 text-center opacity-60 font-mono text-[10px]">GEO</span>
-                <span>{branch.district}, {branch.division}</span>
-              </div>
-            )}
-            {branch.contact_phone && (
-              <div className="flex items-center gap-2">
-                <PhoneIcon className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                <span>{branch.contact_phone}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Campus In-Charge */}
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <div className="theme-text-secondary">In-Charge:</div>
-            {branch.in_charge_name ? (
-              <div className="font-medium theme-text-primary text-right truncate">
-                <span>{branch.in_charge_name}</span>
-              </div>
-            ) : (
-              <span className="theme-text-secondary italic">Not assigned</span>
-            )}
-          </div>
+          <ActionMenu items={getActionMenuItems(branch)} align="right" />
         </div>
 
-        {/* Footer Status */}
-        <div className="mt-4 pt-3 border-t theme-border flex items-center justify-between text-xs">
-          <span className="text-xs theme-text-secondary">Operational Status:</span>
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-              branch.is_active
-                ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
-                : "theme-bg-sub theme-text-secondary border theme-border"
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${branch.is_active ? "bg-[var(--accent-main)]" : "theme-bg-elevated"}`}></span>
-            {branch.is_active ? "Active" : "Inactive"}
-          </span>
+        <div className="text-xs space-y-1.5 theme-text-secondary border-t theme-border pt-2.5">
+          <div className="flex items-center justify-between">
+            <span>In-Charge:</span>
+            <span className="font-medium theme-text-primary">{branch.in_charge_name || 'Unassigned'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Location:</span>
+            <span className="font-medium theme-text-primary">{branch.district || branch.city || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Capacity:</span>
+            <span className="font-mono font-bold theme-text-primary">{branch.capacity || '—'}</span>
+          </div>
         </div>
       </div>
-    );
-  };
-
-  const emptySubMessage = searchQuery
-    ? `No branch matched "${searchQuery}". Try clearing search filter.`
-    : 'Register campuses, main branches, and residential buildings to start organizing class sections.';
+    </div>
+  );
 
   return (
-    <PageContainer isEmbedded={isEmbedded}>
-      {/* Page Header */}
-      {!hideHeader && (
-        <PageHeader
-          title="Academy Multi-Branch Management"
-          subtitle="Manage multi-campus institutions, sub-branches, residential facilities, and campus leadership."
-          icon={BuildingOfficeIcon}
-          breadcrumbs={[
-            { label: 'Academy', path: '/academy-profile' },
-            { label: 'Branches & Sections', path: '/academy/branches' },
-          ]}
-          actions={
-            <button
-              type="button"
-              onClick={handleCreateNew}
-              className="px-4 py-2 text-xs font-bold theme-bg-accent theme-accent-text rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <PlusIcon className="w-4 h-4" />
-              <span>Add Academic Branch</span>
-            </button>
-          }
-        />
-      )}
-
-      {/* Metrics Grid */}
-      {!hideMetrics && <MetricsGrid metrics={metricCards} />}
-
-      {/* Controls Bar */}
-      <DataViewToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Search branches, code, district..."
-        filterElement={
+    <UniversalManagementView
+      title="Campus Branches"
+      subtitle="Manage physical branches, campus locations, and regional administrative zones"
+      icon={BuildingOfficeIcon}
+      hideHeader={hideHeader}
+      hideMetrics={hideMetrics}
+      isEmbedded={isEmbedded}
+      storageKey="spr_branches_view_mode"
+      defaultViewMode="grid"
+      headerActions={
+        <button
+          type="button"
+          onClick={handleOpenAdd}
+          className="px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+        >
+          <PlusIcon className="w-3.5 h-3.5" />
+          <span>Add Branch</span>
+        </button>
+      }
+      metrics={[
+        {
+          label: 'Total Branches',
+          value: metrics.total_branches || branches.length,
+          icon: BuildingOfficeIcon,
+          color: 'accent',
+        },
+        {
+          label: 'Main Campuses',
+          value: metrics.main_campuses || 0,
+          icon: ClassIcon,
+          color: 'default',
+        },
+        {
+          label: 'Total Capacity',
+          value: metrics.total_capacity || 0,
+          icon: StudentIcon,
+          color: 'default',
+        },
+        {
+          label: 'Active In-Charges',
+          value: metrics.active_in_charges || 0,
+          icon: TeacherIcon,
+          color: 'default',
+        },
+      ]}
+      searchLabel="Search Branches"
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search branches, code, district..."
+      filters={
+        <div className="w-36 sm:w-44 shrink-0">
           <CustomSelect
+            label="Branch Type"
             options={BRANCH_TYPE_OPTIONS}
             value={typeFilter}
             onChange={(val) => setTypeFilter(val)}
-            placeholder="Filter by Type"
+            placeholder="All Types"
+            size="md"
           />
-        }
-        viewMode={viewMode}
-        onToggleViewMode={handleToggleViewMode}
-      />
-
-      {/* Main Content Area: Reusable DataCardGrid or DataTable */}
-      <div className="space-y-4">
-        {selectedIds.length > 0 && (
-          <div className="p-3 rounded-2xl theme-bg-accent-soft/30 border theme-border flex items-center justify-between animate-fade-in">
-            <span className="text-xs font-bold theme-text-primary">
-              {selectedIds.length} {selectedIds.length === 1 ? 'branch' : 'branches'} selected
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="text-xs font-bold theme-text-secondary hover:theme-text-primary px-3 py-1 rounded-lg theme-bg-sub border theme-border transition cursor-pointer"
-            >
-              Deselect All
-            </button>
+        </div>
+      }
+      hasActiveFilters={searchQuery.trim() !== '' || typeFilter !== 'ALL'}
+      loading={loading}
+      loadingMessage="Loading academic branches..."
+      data={filteredBranches}
+      totalCount={branches.length}
+      itemLabel="branches"
+      columns={tableColumns}
+      renderCard={renderBranchCard}
+      onRowClick={(branch) => handleOpenEdit(branch)}
+      selectable={true}
+      emptyIcon={BuildingOfficeIcon}
+      emptyTitle="No Branches Found"
+      emptySubMessage={
+        searchQuery || typeFilter !== 'ALL'
+          ? 'No campus branches match your active filter criteria.'
+          : 'Get started by creating your first campus branch or facility.'
+      }
+      modals={
+        deletingBranch && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
+              <h3 className="text-base font-bold theme-text-primary">Delete Branch</h3>
+              <p className="text-xs theme-text-secondary">
+                Are you sure you want to remove <span className="font-semibold theme-text-primary">"{deletingBranch.name}"</span>?
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t theme-border">
+                <button
+                  type="button"
+                  onClick={() => setDeletingBranch(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold theme-bg-accent theme-accent-text hover:opacity-90 transition disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-
-        {viewMode === 'grid' ? (
-          <DataCardGrid
-            data={filteredBranches}
-            renderCard={renderBranchCard}
-            isLoading={loading}
-            loadingMessage="Loading academy branches..."
-            emptyTitle="No Academic Branches Found"
-            emptySubMessage={emptySubMessage}
-            emptyIcon={BuildingOfficeIcon}
-            gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
-          />
-        ) : (
-          <DataTable
-            columns={tableColumns}
-            data={filteredBranches}
-            selectable={true}
-            selectedIds={selectedIds}
-            onSelectRow={handleSelectRow}
-            onSelectAll={handleSelectAll}
-            idField="id"
-            isLoading={loading}
-            loadingMessage="Loading academy branches..."
-            emptyTitle="No Academic Branches Found"
-            emptySubMessage={emptySubMessage}
-            emptyIcon={BuildingOfficeIcon}
-          />
-        )}
-
-        {/* Reusable DataViewFooter */}
-        {!loading && branches.length > 0 && (
-          <DataViewFooter
-            filteredCount={filteredBranches.length}
-            totalCount={branches.length}
-            itemLabel="branches & campuses"
-          />
-        )}
-      </div>
-    </PageContainer>
+        )
+      }
+    />
   );
 }

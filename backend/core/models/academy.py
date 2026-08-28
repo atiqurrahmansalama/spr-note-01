@@ -36,6 +36,16 @@ class StudentClass(models.Model):
         related_name='assigned_classes'
     )
     order_rank = models.PositiveIntegerField(default=1)
+    has_sections = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this class supports and manages section divisions"
+    )
+    has_groups = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this class supports and manages group divisions"
+    )
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -63,8 +73,8 @@ class StudentClass(models.Model):
 class ClassSection(models.Model):
     SECTION_TYPE_CHOICES = (
         ('GENERAL_SECTION', 'General Section'),
-        ('HIFZ_HALQA', 'Hifz Halqa'),
-        ('RESIDENTIAL_DORM', 'Residential Dorm / Boarding'),
+        ('HIFZ_SECTION', 'Quran / Hifz Section'),
+        ('RESIDENTIAL_DORM', 'Residential Dormitory'),
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -92,6 +102,11 @@ class ClassSection(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='managed_sections'
+    )
+    has_groups = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this section supports and manages group divisions"
     )
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
@@ -214,6 +229,12 @@ class StudentGroup(models.Model):
         blank=True,
         related_name='groups'
     )
+    section = models.ForeignKey('core.ClassSection',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='groups'
+    )
     name = models.CharField(max_length=150)
     mentor_teacher = models.ForeignKey(
         'User',
@@ -241,6 +262,11 @@ class StudentGroup(models.Model):
         verbose_name_plural = "Student Groups"
 
     def save(self, *args, **kwargs):
+        if self.section:
+            if not self.student_class_id and self.section.student_class_id:
+                self.student_class = self.section.student_class
+            if not self.institution_id and self.section.student_class and self.section.student_class.institution_id:
+                self.institution = self.section.student_class.institution
         if not self.institution:
             if self.student_class and self.student_class.institution:
                 self.institution = self.student_class.institution
@@ -250,7 +276,8 @@ class StudentGroup(models.Model):
 
     def __str__(self):
         class_name = self.student_class.name if self.student_class else "No Class"
-        return f"{self.name} [{class_name}]"
+        section_info = f", Section: {self.section.section_name}" if self.section else ""
+        return f"{self.name} [{class_name}{section_info}]"
 
 
 class Session(models.Model):
@@ -552,4 +579,155 @@ class TeacherPeriodAttendanceRecord(models.Model):
     def __str__(self):
         t_name = self.teacher.name_en or str(self.teacher.id)
         return f"{t_name} - {self.schedule.subject_or_kitab_name} on {self.date}: {self.status}"
+
+
+class ResidentialBuilding(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey('core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='residential_buildings'
+    )
+    branch = models.ForeignKey('core.AcademicBranch',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='residential_buildings'
+    )
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=50, blank=True, default='')
+    total_floors = models.PositiveIntegerField(default=1)
+    warden = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='managed_buildings'
+    )
+    description = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Residential Building"
+        verbose_name_plural = "Residential Buildings"
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.code else self.name
+
+
+class DormitoryRoom(models.Model):
+    ROOM_TYPE_CHOICES = (
+        ('STUDENT_DORM', 'Student Dormitory'),
+        ('FACULTY_QUARTER', 'Faculty Quarter'),
+        ('GUEST_ROOM', 'Guest Room'),
+        ('STUDY_HALL', 'Study Hall'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey('core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='dormitory_rooms'
+    )
+    branch = models.ForeignKey('core.AcademicBranch',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dormitory_rooms'
+    )
+    building = models.ForeignKey(
+        ResidentialBuilding,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='rooms'
+    )
+    floor_number = models.IntegerField(default=1)
+    room_number = models.CharField(max_length=50)
+    room_name = models.CharField(max_length=150, blank=True, default='')
+    room_type = models.CharField(
+        max_length=50,
+        choices=ROOM_TYPE_CHOICES,
+        default='STUDENT_DORM'
+    )
+    max_capacity = models.PositiveIntegerField(default=10)
+    supervisor = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='supervised_rooms'
+    )
+    prefect = models.ForeignKey(
+        'core.Student',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='prefect_rooms'
+    )
+    amenities = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['building__name', 'floor_number', 'room_number']
+        verbose_name = "Dormitory Room"
+        verbose_name_plural = "Dormitory Rooms"
+
+    def __str__(self):
+        b_name = f"{self.building.name} - " if self.building else ""
+        return f"{b_name}Room {self.room_number} ({self.room_name})" if self.room_name else f"{b_name}Room {self.room_number}"
+
+
+class BedAllocation(models.Model):
+    STATUS_CHOICES = (
+        ('OCCUPIED', 'Occupied'),
+        ('VACANT', 'Vacant'),
+        ('RESERVED', 'Reserved'),
+        ('MAINTENANCE', 'Under Maintenance'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room = models.ForeignKey(
+        DormitoryRoom,
+        on_delete=models.CASCADE,
+        related_name='beds'
+    )
+    bed_number = models.CharField(max_length=50)
+    student = models.ForeignKey(
+        'core.Student',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='bed_allocations'
+    )
+    staff = models.ForeignKey(
+        'StaffProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='bed_allocations'
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='VACANT'
+    )
+    assigned_date = models.DateField(default=timezone.localdate, null=True, blank=True)
+    remarks = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['room', 'bed_number']
+        verbose_name = "Bed Allocation"
+        verbose_name_plural = "Bed Allocations"
+
+    def __str__(self):
+        return f"{self.room.room_number} - {self.bed_number} [{self.status}]"
 

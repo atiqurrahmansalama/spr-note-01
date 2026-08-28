@@ -7,7 +7,7 @@ import {
   academicYearsStore,
 } from '../../../utils/localStore';
 import { getHijriDateString } from '../../../utils/hijriUtils';
-import { EVENT_COLOR_MAP } from '../../../components/calendar/MasterTimeCalendar';
+import { getEventColors, EVENT_COLOR_MAP } from '../../../components/calendar/MasterTimeCalendar';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -223,12 +223,6 @@ export function useAttendanceDateManager({
   const enrichedDaysHeader = useMemo(() => {
     const calendarEvents = masterCalendarStore.getEvents(activeTenantId) || [];
 
-    const getEventColors = (evt) => {
-      if (!evt) return EVENT_COLOR_MAP.DEFAULT;
-      if (evt.color && EVENT_COLOR_MAP[evt.color]) return EVENT_COLOR_MAP[evt.color];
-      return EVENT_COLOR_MAP.DEFAULT;
-    };
-
     return daysInPeriod.map((d) => {
       const dateStr = d.date;
       const dObj = new Date(dateStr);
@@ -262,7 +256,7 @@ export function useAttendanceDateManager({
       const isCalHoliday = Boolean(
         matched && (matched.category === 'HOLIDAY' || matched.is_holiday || isAttendanceDisabled)
       );
-      const eventColors = matched ? getEventColors(matched) : null;
+      const eventColors = matched ? getEventColors(matched, activeTenantId) : null;
 
       return {
         ...d,

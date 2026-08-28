@@ -121,7 +121,7 @@ export default function DataTable({
                       key={col.key || idx}
                       className={`${defaultHeaderPad} ${alignClass} ${col.headerClassName || ''}`}
                     >
-                      {col.header}
+                      {col.header ?? col.label ?? col.title ?? ''}
                     </th>
                   );
                 })}
@@ -186,11 +186,22 @@ export default function DataTable({
                         ? col.cellClassName(item, rowIdx)
                         : col.cellClassName || '';
 
-                    const content = col.render
-                      ? col.render(item, rowIdx)
-                      : col.key
-                      ? item[col.key] ?? '--'
-                      : null;
+                    const keyName = col.key || col.accessor || col.id;
+                    let content = null;
+                    if (typeof col.render === 'function') {
+                      content = col.render(item, rowIdx);
+                    } else if (keyName) {
+                      const val = item[keyName];
+                      if (val !== undefined && val !== null) {
+                        if (typeof val === 'object' && !React.isValidElement(val)) {
+                          content = val.name || val.label || val.title || '--';
+                        } else {
+                          content = val;
+                        }
+                      } else {
+                        content = '--';
+                      }
+                    }
 
                     return (
                       <td

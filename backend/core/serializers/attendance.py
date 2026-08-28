@@ -165,6 +165,8 @@ class AttendancePolicySettingSerializer(serializers.ModelSerializer):
             'staff_teacher_edit_window_hours',
             'staff_auto_absent_on_expiry',
             'admin_edit_window_days',
+            'effective_from',
+            'history_log',
             'created_at',
             'updated_at',
         ]

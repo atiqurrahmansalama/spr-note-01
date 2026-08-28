@@ -36,6 +36,10 @@ import {
   ChecklistIcon,
   TimerIcon,
   BellIcon,
+  HomeIcon,
+  BookOpenIcon,
+  TargetIcon,
+  ClipboardDocumentCheckIcon,
 } from "../ui/Icons";
 
 export default function SidebarContainer({ 
@@ -55,6 +59,7 @@ export default function SidebarContainer({
   const [openSubMenus, setOpenSubMenus] = useState({
     "Academy": true,
     "Academic Institution": true,
+    "Academic Studies": true,
     "Student": true,
     "Staff Management": false,
     "Settings & Devices": false,
@@ -81,11 +86,24 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_institution",
       subItems: [
-        { id: "Profile", name: "Profile", path: "/academy-profile", Icon: BuildingOfficeIcon, key: "settings_institution" },
-        { id: "Academies & Departments", name: "Academies & Departments", path: "/academy/campus-profile", Icon: BuildingOfficeIcon, key: "campus_profile" },
-        { id: "Classes & Groups", name: "Classes & Groups", path: "/academy/classes-groups", Icon: ClassIcon, key: "student_classes" },
-        { id: "Period Schedules", name: "Period Schedules", path: "/academy/periods", Icon: TimerIcon, key: "class_period_slots" },
+        { id: "Profile", name: "Profile & Branding", path: "/academy-profile", Icon: BuildingOfficeIcon, key: "settings_institution" },
+        { id: "Academies & Departments", name: "Campus Structure", path: "/academy/campus-profile", Icon: BuildingOfficeIcon, key: "campus_profile" },
+        { id: "Classes & Groups", name: "Classes & Sections", path: "/academy/classes-groups", Icon: ClassIcon, key: "student_classes" },
+        { id: "Period Schedules", name: "Routine & Curriculum", path: "/academy/periods", Icon: TimerIcon, key: "class_period_slots" },
         { id: "Calendar & Events", name: "Calendar & Events", path: "/academy/calendar-events", Icon: CalendarIcon, key: "academy_calendar_events" },
+        { id: "Residential Quarters", name: "Residential & Quarters", path: "/academy/residential-quarters", Icon: HomeIcon, key: "residential_quarters" },
+      ]
+    },
+    {
+      id: "Academic Studies",
+      name: "Academic Studies",
+      Icon: BookOpenIcon,
+      hasSub: true,
+      key: "nav_academic_studies",
+      subItems: [
+        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Syllabus Milestone", name: "Syllabus Milestone", path: "/studies/syllabus-milestone", Icon: TargetIcon, key: "syllabus_milestone" },
+        { id: "Academic Analytics", name: "Academic Analytics", path: "/studies/academic-analytics", Icon: SavedMessagesIcon, key: "academic_analytics" },
       ]
     },
     {
@@ -122,7 +140,8 @@ export default function SidebarContainer({
       key: "nav_report_generator",
       subItems: [
         { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon, key: "report_builder" },
-        { id: "Student Reports", name: "Student Reports", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
+        { id: "Academic Reports", name: "Multi-Period Reports", path: "/academy/academic-reports", Icon: SavedMessagesIcon, key: "academic_reports" },
+        { id: "Student Reports", name: "Student Recitation Log", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
       ]
     },
     {

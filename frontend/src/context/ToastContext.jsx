@@ -81,6 +81,16 @@ export function ToastProvider({ children }) {
     }
   }, []);
 
+  useEffect(() => {
+    const handleGlobalToast = (e) => {
+      if (e?.detail?.message) {
+        showToast(e.detail.message, e.detail.type || 'info');
+      }
+    };
+    window.addEventListener('spr_toast', handleGlobalToast);
+    return () => window.removeEventListener('spr_toast', handleGlobalToast);
+  }, [showToast]);
+
   // Toast Container element always rendered on top via Portal
   const toastContainer = (
     <aside
@@ -163,7 +173,17 @@ export function ToastProvider({ children }) {
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
+    return {
+      showToast: (message, type = 'info') => {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('spr_toast', {
+              detail: { message: formatErrorMessage(message), type },
+            })
+          );
+        }
+      },
+    };
   }
   return context;
 };

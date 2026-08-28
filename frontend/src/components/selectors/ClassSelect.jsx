@@ -75,8 +75,9 @@ export default function ClassSelect({
 
   // Fetch classes if propClasses is not supplied
   useEffect(() => {
-    if (propClasses && Array.isArray(propClasses)) {
+    if (propClasses && Array.isArray(propClasses) && propClasses.length > 0) {
       setInternalClasses(propClasses);
+      setLoading(false);
       return;
     }
 
@@ -106,7 +107,7 @@ export default function ClassSelect({
     };
   }, [propClasses, activeTenantId]);
 
-  const rawClasses = propClasses && Array.isArray(propClasses) ? propClasses : internalClasses;
+  const rawClasses = propClasses && Array.isArray(propClasses) && propClasses.length > 0 ? propClasses : internalClasses;
 
   // Filter classes according to admission rules if admissionFilter is true or allowedClassIds provided
   const activeClasses = useMemo(() => {
@@ -132,7 +133,7 @@ export default function ClassSelect({
     const list = [];
     if (allowAll) {
       list.push({
-        value: allValue || 'ALL',
+        value: allValue !== undefined ? allValue : 'ALL',
         label: allLabel,
         raw: null,
       });
@@ -157,10 +158,10 @@ export default function ClassSelect({
   };
 
   const normalizedValue = useMemo(() => {
-    if (value === undefined || value === null) return allowAll ? (allValue || 'ALL') : '';
+    if (value === undefined || value === null) return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
     const strVal = String(value);
     if (strVal === '' || strVal === 'ALL') {
-      return allowAll ? (allValue || 'ALL') : '';
+      return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
     }
     return strVal;
   }, [value, allowAll, allValue]);
@@ -171,9 +172,9 @@ export default function ClassSelect({
       onChange={handleChange}
       options={options}
       label={label}
-      placeholder={loading ? 'Loading classes...' : placeholder}
+      placeholder={loading && options.length === 0 ? 'Loading classes...' : placeholder}
       required={required}
-      disabled={disabled || loading}
+      disabled={disabled}
       searchable={searchable && options.length > 5}
       showBadge={showBadge}
       size={size}

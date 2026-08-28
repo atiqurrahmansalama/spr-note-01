@@ -367,6 +367,10 @@ class AttendancePolicySetting(models.Model):
     # Universal Admin Override Policy
     admin_edit_window_days = models.IntegerField(default=30, help_text="Days after attendance date that an Admin can edit any record")
 
+    # Temporal Policy Versioning & Evolution
+    effective_from = models.DateField(default=timezone.localdate, null=True, blank=True, help_text="Date this policy version took active effect")
+    history_log = models.JSONField(default=list, blank=True, help_text="Historical policy snapshots archived over time")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

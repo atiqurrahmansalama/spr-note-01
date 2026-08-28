@@ -16,7 +16,7 @@
  * 6. Precise Delay Minutes Calculation.
  */
 
-import { DEFAULT_ATTENDANCE_TIMING_POLICY } from './localStore';
+import { DEFAULT_ATTENDANCE_TIMING_POLICY } from './localStore.js';
 
 /**
  * Parses "HH:MM" or "HH:MM:SS" string and returns minutes from midnight.
@@ -53,6 +53,54 @@ export function calculateLateDelayMinutes(scheduledTimeStr, actualTimeStr) {
 }
 
 /**
+ * Resolves the historical or active policy in effect for a given target date.
+ * Ensures changing policies today does not retroactively alter the evaluation
+ * of historical dates.
+ * 
+ * @param {string} targetDate - 'YYYY-MM-DD'
+ * @param {Object} basePolicy - The currently loaded Attendance Policy Object
+ * @returns {Object} Policy configuration active on targetDate
+ */
+export function resolvePolicyForDate(targetDate, basePolicy) {
+  if (!basePolicy) return DEFAULT_ATTENDANCE_TIMING_POLICY;
+  if (!targetDate || typeof targetDate !== 'string') {
+    return { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...basePolicy };
+  }
+
+  const effectiveFrom = basePolicy.effective_from || '1970-01-01';
+
+  if (targetDate < effectiveFrom && Array.isArray(basePolicy.history_log) && basePolicy.history_log.length > 0) {
+    // Search history log for matching snapshot
+    for (let i = basePolicy.history_log.length - 1; i >= 0; i--) {
+      const hist = basePolicy.history_log[i];
+      if (hist && hist.policy) {
+        const fromDate = hist.effective_from || '1970-01-01';
+        const toDate = hist.effective_to || '9999-12-31';
+        if (targetDate >= fromDate && targetDate <= toDate) {
+          return {
+            ...DEFAULT_ATTENDANCE_TIMING_POLICY,
+            ...hist.policy,
+            is_historical_version: true,
+            historical_period: `${fromDate} to ${toDate}`,
+          };
+        }
+      }
+    }
+
+    const oldestHist = basePolicy.history_log[0];
+    if (oldestHist && oldestHist.policy) {
+      return {
+        ...DEFAULT_ATTENDANCE_TIMING_POLICY,
+        ...oldestHist.policy,
+        is_historical_version: true,
+      };
+    }
+  }
+
+  return { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...basePolicy };
+}
+
+/**
  * Resolves cell lifecycle state, editability, allowed statuses, and display fallback.
  * 
  * @param {Object} params
@@ -77,7 +125,8 @@ export function getAttendanceCellTimingState({
   effectiveStartDate = null,
   nowDate = new Date(),
 }) {
-  const safePolicy = { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...(policy || {}) };
+  const activePolicyForDate = resolvePolicyForDate(targetDate, policy);
+  const safePolicy = { ...DEFAULT_ATTENDANCE_TIMING_POLICY, ...(activePolicyForDate || {}) };
 
   const nowYear = nowDate.getFullYear();
   const nowMonth = String(nowDate.getMonth() + 1).padStart(2, '0');
@@ -274,7 +323,7 @@ export function getAttendanceCellTimingState({
       state: 'OPEN_LATE',
       isEditable: true,
       allowedStatuses: isAdmin ? ADMIN_STATUS_OPTIONS : LATE_STATUS_OPTIONS,
-      displayStatus: normalizedCurrentStatus || 'LATE',
+      displayStatus: normalizedCurrentStatus,
       lateMinutes: delay,
       tooltip: `Late Grace Period Active (${delay} mins delay). Only Late and Absent allowed.`,
       canEditArrivalTime: isAdmin,
@@ -282,14 +331,14 @@ export function getAttendanceCellTimingState({
     };
   }
 
-  // D. Post Late Window but within Teacher Edit Window
+  // D. Post Late Window but within Teacher Edit Window (Active edit window - unrecorded remains pending)
   if (nowMinutes >= lateEndMin && nowMinutes < teacherEditLimitMin) {
     const delay = nowMinutes - slotStartMin;
     return {
       state: 'TEACHER_EDIT_WINDOW',
       isEditable: true,
       allowedStatuses: isAdmin ? ADMIN_STATUS_OPTIONS : LATE_STATUS_OPTIONS,
-      displayStatus: normalizedCurrentStatus || (isAutoAbsentEnabled ? 'ABSENT' : ''),
+      displayStatus: normalizedCurrentStatus,
       lateMinutes: delay,
       tooltip: `Teacher edit window active until ${minutesToTimeString(teacherEditLimitMin)}.`,
       canEditArrivalTime: isAdmin,

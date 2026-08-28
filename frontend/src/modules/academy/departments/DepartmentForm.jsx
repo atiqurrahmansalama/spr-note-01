@@ -94,8 +94,23 @@ export default function DepartmentForm({ department = null, onSaved, onCancel })
     }
   };
 
+  const selectedInst = useMemo(() => {
+    if (formData.institution) {
+      return institutions.find((i) => String(i.id) === String(formData.institution)) || currentInstitution;
+    }
+    return currentInstitution;
+  }, [formData.institution, institutions, currentInstitution]);
+
+  const deptQuotaLimit = selectedInst?.max_departments || 1;
+  const currentDeptCount = selectedInst?.total_departments_count || 0;
+  const isQuotaReached = !isEdit && currentDeptCount >= deptQuotaLimit && !isMultiTenantAdmin;
+
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isQuotaReached) {
+      showToast(`Department quota limit of ${deptQuotaLimit} reached for this academy.`, "error");
+      return;
+    }
     if (!formData.name.trim()) {
       showToast("Department name is required.", "warning");
       return;
@@ -132,7 +147,7 @@ export default function DepartmentForm({ department = null, onSaved, onCancel })
         onSaved?.();
       } else {
         const err = await res.json();
-        showToast(err.name?.[0] || err.branch?.[0] || err.error || "Failed to save department.", "error");
+        showToast(err.non_field_errors?.[0] || err.name?.[0] || err.branch?.[0] || err.error || "Failed to save department.", "error");
       }
     } catch {
       showToast("Network connection error.", "error");
@@ -149,29 +164,28 @@ export default function DepartmentForm({ department = null, onSaved, onCancel })
     })),
   ];
 
-  const teacherOptions = [
-    { label: "-- No Department Head Assigned --", value: "" },
-    ...teachers.map((t) => ({
-      label: `${t.name || "Unnamed"} (${t.phone_number || "No Phone"}) ${t.role ? `• ${t.role}` : ""}`,
-      value: String(t.id),
-    })),
-  ];
-
-  const statusOptions = [
-    { label: "Active (Operational & Available)", value: "ACTIVE" },
-    { label: "Inactive (Archived)", value: "INACTIVE" },
-  ];
-
   return (
     <DrawerContainer padding="normal" spacing="normal">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Quota Limit Notice */}
+        {isQuotaReached && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-start gap-2.5 animate-fade-in">
+            <DepartmentIcon className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Department Quota Limit Reached ({currentDeptCount}/{deptQuotaLimit})</p>
+              <p className="opacity-90 text-[11px] mt-0.5">
+                This academy has reached its allowed limit of {deptQuotaLimit} departments. Update the institution's department quota to add more.
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Parent Academy & Campus Selector */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           {(institutions.length > 1 || activeTenantId === 'ALL' || isMultiTenantAdmin) ? (
             <div>
               <label className="block text-xs font-semibold theme-text-secondary uppercase tracking-wider mb-1.5">
-                Parent Academy <span className="text-rose-400">*</span>
+                Parent Academy <span className="theme-accent">*</span>
               </label>
               <CustomSelect
                 options={institutions.map((i) => ({ label: i.name, value: String(i.id) }))}
@@ -282,6 +296,7 @@ export default function DepartmentForm({ department = null, onSaved, onCancel })
         <DrawerFooter
           onCancel={onCancel}
           isSubmitting={submitting}
+          isSaveDisabled={isQuotaReached}
           saveLabel={isEdit ? "Save Changes" : "Create Department"}
           onSubmit={true}
         />

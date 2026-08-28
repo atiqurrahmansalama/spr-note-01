@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
@@ -28,29 +28,77 @@ import { getBranchMetrics } from '../../api/academy';
 import { getInstitutionMetrics } from '../../api/institutions';
 import { fetchWithAuth } from '../../utils/authService';
 import { academicYearsStore } from '../../utils/localStore';
+import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import { useToast } from '../../context/ToastContext';
 
-const TABS = [
-  { id: 'academies', label: 'Academies', icon: BuildingOfficeIcon },
-  { id: 'branches', label: 'Branches', icon: BuildingOfficeIcon },
-  { id: 'departments', label: 'Departments', icon: DepartmentIcon },
-  { id: 'academic_years', label: 'Academic Years', icon: SessionsIcon },
-];
-
 export default function CampusProfileHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTabParam = searchParams.get('tab') || 'academies';
+  const activeTabParam = searchParams.get('tab') || '';
   
-  // Valid active tabs: academies -> branches -> departments -> academic_years
-  const activeTab = ['academies', 'branches', 'departments', 'academic_years'].includes(activeTabParam)
-    ? activeTabParam
-    : 'academies';
-
-  const { refreshInstitutions, activeTenantId } = useTenant();
+  const { user } = useAuth();
+  const { refreshInstitutions, activeTenantId, currentInstitution, isMultiTenantAdmin } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { showToast } = useToast();
+
+  const isSuperAdmin = Boolean(
+    isMultiTenantAdmin ||
+    user?.is_superuser ||
+    (user?.user_type && user.user_type.toUpperCase() === 'SUPER_ADMIN')
+  );
+
+  // Dynamic Tabs Resolution based on institutional capacity quotas
+  const visibleTabs = useMemo(() => {
+    // Super Admin has 100% full visibility into all tabs unconditionally
+    if (isSuperAdmin) {
+      return [
+        { id: 'academies', label: 'Academies', icon: BuildingOfficeIcon },
+        { id: 'branches', label: 'Branches', icon: BuildingOfficeIcon },
+        { id: 'departments', label: 'Departments', icon: DepartmentIcon },
+        { id: 'academic_years', label: 'Academic Years', icon: SessionsIcon },
+      ];
+    }
+
+    const maxInst = currentInstitution?.max_institutions ?? 1;
+    const maxBranch = currentInstitution?.max_branches ?? 1;
+    const maxDept = currentInstitution?.max_departments ?? 1;
+
+    const tabs = [];
+
+    // Academies tab is only visible for institutional users if Multi-Academy (>1)
+    if (maxInst > 1) {
+      tabs.push({ id: 'academies', label: 'Academies', icon: BuildingOfficeIcon });
+    }
+
+    // Branches tab is only visible for institutional users if Multi-Branch (>1)
+    if (maxBranch > 1) {
+      tabs.push({ id: 'branches', label: 'Branches', icon: BuildingOfficeIcon });
+    }
+
+    // Departments tab is only visible for institutional users if Multi-Department (>1)
+    if (maxDept > 1) {
+      tabs.push({ id: 'departments', label: 'Departments', icon: DepartmentIcon });
+    }
+
+    // Academic Years tab is always visible
+    tabs.push({ id: 'academic_years', label: 'Academic Years', icon: SessionsIcon });
+
+    return tabs;
+  }, [currentInstitution, isSuperAdmin]);
+
+  const defaultTab = visibleTabs[0]?.id || 'academic_years';
+
+  // Valid active tab: must be one of visibleTabs IDs
+  const activeTab = visibleTabs.some((t) => t.id === activeTabParam)
+    ? activeTabParam
+    : defaultTab;
+
+  useEffect(() => {
+    if (activeTabParam !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
+    }
+  }, [activeTabParam, activeTab, setSearchParams]);
 
   // Metrics cache per tab
   const [branchMetrics, setBranchMetrics] = useState({
@@ -230,6 +278,7 @@ export default function CampusProfileHubView() {
         size: 'md',
         content: (
           <InstitutionOnboardingForm
+            showStructureQuotas={false}
             onSuccess={() => {
               loadAllMetrics();
               refreshInstitutions();
@@ -424,7 +473,7 @@ export default function CampusProfileHubView() {
 
       {/* 2. Top Toolbar Row: Theme-Aware TabSwitcher on Left + Dynamic Action Button on Far Right */}
       <TabSwitcher
-        tabs={TABS}
+        tabs={visibleTabs}
         activeTab={activeTab}
         onChange={handleTabChange}
         rightContent={
@@ -447,7 +496,7 @@ export default function CampusProfileHubView() {
       {/* 4. Tab Body Content (Persistent display switching to eliminate any layout jumping) */}
       <div className="w-full min-h-[460px]">
         <div className={activeTab === 'academies' ? 'block' : 'hidden'}>
-          <InstitutionListView hideHeader hideMetrics isEmbedded />
+          <InstitutionListView hideHeader hideMetrics isEmbedded showStructureQuotas={false} />
         </div>
         <div className={activeTab === 'branches' ? 'block' : 'hidden'}>
           <BranchManagementView hideHeader hideMetrics isEmbedded />

@@ -8,6 +8,7 @@ import { getStaffDuties, assignGeneralDuty, deleteGeneralDuty } from '../../api/
 import { useToast } from '../../context/ToastContext';
 import CustomSelect from '../../components/ui/CustomSelect';
 import CustomInput from '../../components/ui/CustomInput';
+import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { DrawerContainer, DrawerBanner, DrawerSection, DrawerFooter } from '../../components/layout';
 
 export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
@@ -179,8 +180,7 @@ export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <CustomInput
-              type="time"
+            <CustomTimePicker
               label="Start Time"
               value={form.start_time}
               onChange={(val) => setForm({ ...form, start_time: val })}
@@ -188,8 +188,7 @@ export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
           </div>
 
           <div>
-            <CustomInput
-              type="time"
+            <CustomTimePicker
               label="End Time"
               value={form.end_time}
               onChange={(val) => setForm({ ...form, end_time: val })}

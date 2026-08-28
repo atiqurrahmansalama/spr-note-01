@@ -4,15 +4,16 @@ import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 
 /**
- * Enterprise Reusable Group / Halqa Selector Component
+ * Enterprise Reusable Group Selector Component
  * 
- * Automatically loads groups if not provided via props, supports optional class filtering (via classId),
+ * Automatically loads groups if not provided via props, supports optional class & section filtering,
  * tenant isolation, custom formatting, "All Groups" mode, search, and design token integration.
  * 
  * @param {Object} props
  * @param {string|number} props.value - Selected group ID
  * @param {Function} props.onChange - Callback `(selectedVal, selectedGroupObj) => void`
  * @param {string|number} [props.classId] - Optional class ID to filter groups
+ * @param {string|number} [props.sectionId] - Optional section ID to filter groups
  * @param {Array} [props.groups] - Optional pre-loaded groups array
  * @param {string} [props.label='Select Group'] - Label text
  * @param {string} [props.placeholder='Select Group...'] - Placeholder text
@@ -31,6 +32,7 @@ export default function GroupSelect({
   value,
   onChange,
   classId,
+  sectionId,
   groups: propGroups,
   label = 'Select Group',
   placeholder = 'Select Group...',
@@ -63,8 +65,11 @@ export default function GroupSelect({
       setLoading(true);
       try {
         const queryParams = new URLSearchParams({ page_size: '500' });
-        if (classId) {
-          queryParams.set('student_class', classId);
+        if (classId && classId !== 'ALL') {
+          queryParams.set('student_class', String(classId));
+        }
+        if (sectionId && sectionId !== 'ALL') {
+          queryParams.set('section', String(sectionId));
         }
         const res = await fetchWithAuth(`/api/v1/groups/?${queryParams.toString()}`);
         if (res.ok && isMounted) {
@@ -86,18 +91,27 @@ export default function GroupSelect({
     return () => {
       isMounted = false;
     };
-  }, [propGroups, classId, activeTenantId]);
+  }, [propGroups, classId, sectionId, activeTenantId]);
 
   const allGroups = propGroups && Array.isArray(propGroups) ? propGroups : internalGroups;
 
-  // Filter by classId if supplied (and not already filtered by API)
+  // Filter by classId / sectionId if supplied (and not already filtered by API)
   const filteredGroups = useMemo(() => {
-    if (!classId) return allGroups;
-    return allGroups.filter((g) => {
-      const gClassId = g.student_class_id || g.student_class || g.class_id || (typeof g.class === 'object' ? g.class?.id : g.class);
-      return !gClassId || String(gClassId) === String(classId);
-    });
-  }, [allGroups, classId]);
+    let list = allGroups;
+    if (classId && classId !== 'ALL') {
+      list = list.filter((g) => {
+        const gClassId = g.student_class_id || g.student_class || g.class_id || (typeof g.class === 'object' ? g.class?.id : g.class);
+        return !gClassId || String(gClassId) === String(classId);
+      });
+    }
+    if (sectionId && sectionId !== 'ALL') {
+      list = list.filter((g) => {
+        const gSecId = g.section_id || g.section;
+        return !gSecId || String(gSecId) === String(sectionId);
+      });
+    }
+    return list;
+  }, [allGroups, classId, sectionId]);
 
   // Format options for CustomSelect
   const options = useMemo(() => {

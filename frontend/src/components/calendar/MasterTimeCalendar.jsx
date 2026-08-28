@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import ActionMenu from "../ui/ActionMenu";
+import CustomInput from "../ui/CustomInput";
 import {
   CalendarIcon,
   SearchIcon,
@@ -15,7 +16,8 @@ import {
 import DateHeaderCell from "../common/DateHeaderCell";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 import { EVENT_COLORS } from "./TimeScheduleDrawerForm";
-import { calendarEventTypesStore, calendarSettings } from "../../utils/localStore";
+import { calendarEventTypesStore, calendarEventKindsStore, calendarSettings } from "../../utils/localStore";
+import { useTenant } from "../../context/TenantContext";
 import { getHijriDateString, getHijriDetails } from "../../utils/hijriUtils";
 
 const MONTH_NAMES = [
@@ -115,6 +117,7 @@ export function getEventDisplayType(evt, tenantId) {
 export function getEventColors(evt, tenantId) {
   const isWorkingHours = evt?.category === "WORKING_HOURS" || evt?.type === "WORKING_HOURS";
 
+  // 1. Direct explicit color on event
   if (evt?.color && EVENT_COLOR_MAP[evt.color]) {
     const base = EVENT_COLOR_MAP[evt.color];
     if (isWorkingHours) {
@@ -125,6 +128,28 @@ export function getEventColors(evt, tenantId) {
     }
     return base;
   }
+
+  // 2. Dynamic lookup from Developer Tools Event Types & Kinds
+  if (typeof window !== "undefined") {
+    try {
+      const types = calendarEventTypesStore.getEventTypes(tenantId);
+      const matchedType = types.find(
+        (t) => t.id === evt?.eventTypeId || t.name === evt?.title || t.code === evt?.code
+      );
+      const rawType = matchedType?.type || evt?.type || evt?.event_type || evt?.kind || evt?.category;
+      if (rawType) {
+        const kinds = calendarEventKindsStore.getKinds(tenantId);
+        const matchedKind = kinds.find(
+          (k) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
+        );
+        if (matchedKind?.color && EVENT_COLOR_MAP[matchedKind.color]) {
+          const base = EVENT_COLOR_MAP[matchedKind.color];
+          return isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+        }
+      }
+    } catch {}
+  }
+
   if (isWorkingHours) {
     return {
       bg: "theme-bg-accent-soft",
@@ -135,7 +160,7 @@ export function getEventColors(evt, tenantId) {
     };
   }
 
-  // Auto-detect based on dynamic event type
+  // 3. Fallback based on display type
   const displayType = getEventDisplayType(evt, tenantId);
   if (displayType === "Holiday") return EVENT_COLOR_MAP.rose;
   if (displayType === "Exam") return EVENT_COLOR_MAP.amber;
@@ -181,6 +206,7 @@ export default function MasterTimeCalendar({
   className = "",
 }) {
   const { openDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
@@ -189,13 +215,26 @@ export default function MasterTimeCalendar({
     return localStorage.getItem("spr_calendar_display_mode") || "grid";
   });
   const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
+  const [, setTaxonomyVersion] = useState(0);
 
   useEffect(() => {
     const handleSettingsUpdate = () => {
       setIsHijriEnabled(calendarSettings.getHijriEnabled());
     };
+    const handleTaxonomyUpdate = () => {
+      setTaxonomyVersion((v) => v + 1);
+    };
+
     window.addEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
-    return () => window.removeEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+    window.addEventListener("spr_calendar_event_kinds_updated", handleTaxonomyUpdate);
+    window.addEventListener("spr_calendar_event_types_updated", handleTaxonomyUpdate);
+    window.addEventListener("spr_calendar_events_updated", handleTaxonomyUpdate);
+    return () => {
+      window.removeEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+      window.removeEventListener("spr_calendar_event_kinds_updated", handleTaxonomyUpdate);
+      window.removeEventListener("spr_calendar_event_types_updated", handleTaxonomyUpdate);
+      window.removeEventListener("spr_calendar_events_updated", handleTaxonomyUpdate);
+    };
   }, []);
 
   const monthStripRef = useRef(null);
@@ -561,33 +600,33 @@ export default function MasterTimeCalendar({
   return (
     <div className={`flex flex-col w-full min-w-0 @container ${className}`}>
       
-      {/* ─── Single Unified Calendar Control Bar ──────────────────── */}
-      <div className="py-2 flex flex-col @lg:flex-row items-stretch @lg:items-center justify-between gap-2.5 @lg:gap-3 mb-3 w-full min-w-0">
+      {/* ─── Single Unified Calendar Control Bar Card ──────────────────── */}
+      <div className="p-3 sm:p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col @lg:flex-row items-stretch @lg:items-center justify-between gap-3 mb-4 w-full min-w-0">
         
-        {/* Month Navigator with Precision Arrow SVGs (in month mode) or Agenda Title */}
+        {/* Left Side: Month Navigator with Arrow Buttons & Hijri Date or Agenda Header */}
         {viewMode === "month" ? (
-          <div className="flex items-center gap-1.5 @sm:gap-3 shrink-0 flex-wrap">
-            <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-2 @sm:gap-3 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="p-0.5 @sm:p-1 theme-text-secondary hover:theme-text-primary transition cursor-pointer flex items-center justify-center bg-transparent border-0 shadow-none hover:bg-transparent active:scale-90"
+                className="p-1.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer shadow-2xs shrink-0"
                 title="Previous Month"
               >
-                <ChevronLeftIcon className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" />
+                <ChevronLeftIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-0.5 @sm:p-1 theme-text-secondary hover:theme-text-primary transition cursor-pointer flex items-center justify-center bg-transparent border-0 shadow-none hover:bg-transparent active:scale-90"
+                className="p-1.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer shadow-2xs shrink-0"
                 title="Next Month"
               >
-                <ChevronRightIcon className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" />
+                <ChevronRightIcon className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <div className="flex flex-col">
-              <h3 className="text-sm @sm:text-lg font-bold theme-text-primary tracking-tight leading-tight">
+              <h3 className="text-sm @sm:text-base font-bold theme-text-primary tracking-tight leading-tight">
                 {MONTH_NAMES[viewMonth]} {viewYear}
               </h3>
               {isHijriEnabled && hijriMonthHeader && (
@@ -600,16 +639,16 @@ export default function MasterTimeCalendar({
             <button
               type="button"
               onClick={handleJumpToday}
-              className="p-1 @sm:px-2.5 @sm:py-1 rounded-lg border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary text-xs font-semibold transition cursor-pointer shadow-xs flex items-center justify-center gap-1 shrink-0"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
               title="Jump to Today"
             >
-              <CalendarIcon className="w-3.5 h-3.5 @sm:hidden" />
-              <span className="hidden @sm:inline">Today</span>
+              <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Today</span>
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 shrink-0">
-            <h3 className="text-base @sm:text-lg font-bold theme-text-primary tracking-tight">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <h3 className="text-sm @sm:text-base font-bold theme-text-primary tracking-tight">
               Upcoming Agenda & Schedules
             </h3>
             <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
@@ -618,40 +657,40 @@ export default function MasterTimeCalendar({
           </div>
         )}
 
-        {/* Right Tools: Single Toggle View Switcher, Search Box & ActionMenu */}
-        <div className="flex items-center gap-2 justify-between @lg:justify-end flex-1 @lg:flex-none min-w-0 flex-nowrap">
+        {/* Right Side Tools: Single Toggle View Switcher, Custom Search & ActionMenu */}
+        <div className="flex items-center gap-2 justify-between @lg:justify-end flex-1 @lg:flex-none min-w-0">
           
-          {/* Single View Mode Toggle Button: Click to switch between Grid and Timeline */}
+          {/* Single View Mode Toggle Button */}
           {viewMode === "month" && (
             <button
               type="button"
               onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
-              className="flex items-center gap-1.5 px-2 @sm:px-2.5 py-1.5 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub text-xs font-semibold theme-text-primary transition-all cursor-pointer shadow-xs shrink-0"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
               title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
             >
               {displayMode === "grid" ? (
                 <>
-                  <TimelineIcon className="w-3.5 h-3.5 theme-text-secondary" />
-                  <span className="hidden @sm:inline">Timeline</span>
+                  <TimelineIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Timeline</span>
                 </>
               ) : (
                 <>
-                  <GridIcon className="w-3.5 h-3.5 theme-text-secondary" />
-                  <span className="hidden @sm:inline">Grid</span>
+                  <GridIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Grid</span>
                 </>
               )}
             </button>
           )}
 
-          {/* Search Box - Compact on small screens */}
-          <div className="relative flex-1 @sm:w-48 @lg:w-60 min-w-[32px] @sm:min-w-0">
-            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 theme-text-secondary pointer-events-none" />
-            <input
-              type="text"
+          {/* Reusable Search Box with CustomInput */}
+          <div className="flex-1 @sm:w-48 @lg:w-60 min-w-0">
+            <CustomInput
+              type="search"
+              size="md"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(val) => setSearchQuery(val)}
               placeholder="Search..."
-              className="w-full text-xs pl-7 pr-2 py-1.5 rounded-xl border theme-border theme-bg-surface theme-text-primary placeholder:opacity-0 @sm:placeholder:opacity-100 placeholder:theme-text-secondary focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)] focus:placeholder:opacity-100"
+              clearable={true}
             />
           </div>
 
@@ -745,7 +784,7 @@ export default function MasterTimeCalendar({
                     {/* Compact View (< @xl): Colored Dots Indicator centered directly below day number in the square box */}
                     <div className="flex @xl:hidden items-center justify-center gap-1 mt-0.5 max-w-full">
                       {dayEvents.slice(0, 3).map((evt) => {
-                        const style = getEventColors(evt);
+                        const style = getEventColors(evt, activeTenantId);
                         return (
                           <span
                             key={evt.id}
@@ -767,7 +806,7 @@ export default function MasterTimeCalendar({
                     {/* Wide Container View (>= @xl): Full Event Pills */}
                     <div className="hidden @xl:block flex-1 space-y-1 overflow-y-auto max-h-[84px] scrollbar-none mt-1">
                       {dayEvents.map((evt) => {
-                        const style = getEventColors(evt);
+                        const style = getEventColors(evt, activeTenantId);
                         const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
 
                         return (
@@ -818,7 +857,7 @@ export default function MasterTimeCalendar({
                 const dEvents = getEventsForDate(item.dateStr, item.weekday);
                 const isToday = item.dateStr === todayStr;
                 const topEvent = dEvents.length > 0 ? dEvents[0] : null;
-                const topColor = topEvent ? getEventColors(topEvent) : null;
+                const topColor = topEvent ? getEventColors(topEvent, activeTenantId) : null;
 
                 return (
                   <DateHeaderCell
@@ -892,7 +931,7 @@ export default function MasterTimeCalendar({
               ) : (
                 <div className="space-y-2 @sm:space-y-3 pt-0.5 min-w-0">
                   {selectedDayEvents.map((evt, idx) => {
-                    const style = getEventColors(evt);
+                    const style = getEventColors(evt, activeTenantId);
                     const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
                     const timeText = isAllDay ? "All Day" : formatTime12(evt.startTime);
 
@@ -932,7 +971,7 @@ export default function MasterTimeCalendar({
                             <div className="flex items-center gap-1 flex-wrap">
                               <span className="text-[8px] @sm:text-[10px] uppercase font-mono tracking-wider theme-text-secondary">Type:</span>
                               <span className={`text-[9px] @sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
-                                {getEventDisplayType(evt)}
+                                {getEventDisplayType(evt, activeTenantId)}
                               </span>
                             </div>
 
@@ -978,7 +1017,7 @@ export default function MasterTimeCalendar({
               </div>
             ) : (
               filteredEvents.map((evt) => {
-                const style = getEventColors(evt);
+                const style = getEventColors(evt, activeTenantId);
                 const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
 
                 return (
@@ -993,7 +1032,7 @@ export default function MasterTimeCalendar({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-xs @sm:text-sm font-bold theme-text-primary truncate">{evt.title}</h4>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
-                            {getEventDisplayType(evt)}
+                            {getEventDisplayType(evt, activeTenantId)}
                           </span>
                         </div>
                         <p className="text-[11px] @sm:text-xs theme-text-secondary mt-0.5 truncate">

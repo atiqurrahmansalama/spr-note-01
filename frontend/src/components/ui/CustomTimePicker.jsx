@@ -60,9 +60,11 @@ export default function CustomTimePicker({
   value,
   onChange,
   label,
+  rightElement,
   placeholder = 'Select Time...',
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   size = 'md', // 'sm' | 'md' | 'lg'
   direction = 'auto', // 'auto' | 'up' | 'down'
@@ -303,7 +305,7 @@ export default function CustomTimePicker({
                 </div>
                 <div className="h-36 overflow-y-auto scrollbar-thin p-1 rounded-xl theme-bg-sub border theme-border space-y-0.5">
                   {MINUTES.map((m) => {
-                    const isSelected = Math.abs(draftMinute - m) < 3 || draftMinute === m;
+                    const isSelected = draftMinute === m;
                     return (
                       <button
                         key={m}
@@ -324,16 +326,15 @@ export default function CustomTimePicker({
               </div>
             </div>
 
-            {/* Compact Footer */}
-            <div className="pt-1.5 border-t theme-border flex items-center justify-between gap-1.5">
+            {/* Footer Quick Actions */}
+            <div className="flex items-center justify-between pt-1 border-t theme-border">
               <button
                 type="button"
                 onClick={handleSetNow}
-                className="px-2 py-1 rounded-lg theme-bg-sub border theme-border text-[10px] font-bold theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
+                className="px-2 py-1 rounded-lg text-[10px] font-bold theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer"
               >
-                Now
+                Current Time
               </button>
-
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
@@ -355,6 +356,7 @@ export default function CustomTimePicker({
           <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
             {label} {required && <span className="theme-danger">*</span>}
           </label>
+          {rightElement}
         </div>
       )}
 
@@ -363,15 +365,17 @@ export default function CustomTimePicker({
         id={id}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        className={`w-full ${sizeClasses} rounded-xl border transition-all duration-150 flex items-center justify-between font-mono cursor-pointer select-none ${
+        onClick={() => !disabled && !readOnly && setIsOpen((prev) => !prev)}
+        className={`w-full ${sizeClasses} rounded-xl border transition-all duration-150 flex items-center justify-between font-mono select-none ${
           disabled
             ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
+            : readOnly
+            ? 'cursor-default theme-bg-sub theme-border theme-text-primary'
             : isOpen
-            ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
+            ? 'cursor-pointer theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
             : error
-            ? 'border-[var(--accent-main)] theme-bg-sub theme-text-primary'
-            : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--accent-main)]/40 theme-text-primary'
+            ? 'cursor-pointer border-[var(--accent-main)] theme-bg-sub theme-text-primary'
+            : 'cursor-pointer theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--accent-main)]/40 theme-text-primary'
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
@@ -387,19 +391,16 @@ export default function CustomTimePicker({
           )}
         </div>
 
-        <div className="shrink-0 ml-1.5 flex items-center gap-1.5">
-          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md theme-bg-elevated theme-text-secondary border theme-border">
-            {parsed.period}
-          </span>
+        <div className="shrink-0 ml-1.5 flex items-center">
           <svg
-            className={`w-3.5 h-3.5 theme-text-secondary transition-transform duration-200 ${
+            className={`w-4 h-4 theme-text-secondary transition-transform duration-200 ${
               isOpen ? (coords.openUpward ? 'rotate-0' : 'rotate-180') : 'rotate-0'
             }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
       </button>

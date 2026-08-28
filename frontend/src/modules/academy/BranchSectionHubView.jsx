@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
-  ClassIcon,
+  SectionIcon,
   TimerIcon,
 } from '../../components/ui/Icons';
 import BranchManagementView from './BranchManagementView';
-import ClassSectionManagerView from './ClassSectionManagerView';
-import ClassPeriodScheduleView from './ClassPeriodScheduleView';
+import { SectionManagementView } from './classes-sections';
+import RoutineCurriculumHubView from './routine-curriculum/RoutineCurriculumHubView';
 
 export default function BranchSectionHubView({ defaultTab = 'branches' }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,8 +47,8 @@ export default function BranchSectionHubView({ defaultTab = 'branches' }) {
                 : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/60'
             }`}
           >
-            <ClassIcon className="w-4 h-4 shrink-0" />
-            <span className="whitespace-nowrap">Class Sections & Halqas</span>
+            <SectionIcon className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">Class Sections</span>
           </button>
 
           <button
@@ -68,9 +68,10 @@ export default function BranchSectionHubView({ defaultTab = 'branches' }) {
       {/* Render Active View */}
       <div>
         {activeTab === 'branches' && <BranchManagementView isEmbedded={true} />}
-        {activeTab === 'sections' && <ClassSectionManagerView isEmbedded={true} />}
-        {activeTab === 'periods' && <ClassPeriodScheduleView isEmbedded={true} />}
+        {activeTab === 'sections' && <SectionManagementView hideHeader isEmbedded={true} />}
+        {activeTab === 'periods' && <RoutineCurriculumHubView isEmbedded={true} />}
       </div>
     </div>
   );
 }
+

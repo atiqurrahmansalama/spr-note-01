@@ -13,6 +13,9 @@ from .views import (
     InstitutionCategoryViewSet,
     TenantTaxonomySettingViewSet,
     AcademicBranchViewSet,
+    ResidentialBuildingViewSet,
+    DormitoryRoomViewSet,
+    BedAllocationViewSet,
     ClassSectionViewSet,
     ClassPeriodSlotViewSet,
     StudentViewSet, 
@@ -22,6 +25,12 @@ from .views import (
     SessionViewSet,
     SavedMessageViewSet,
     StudentDailyReportViewSet, 
+    AcademicGoalViewSet,
+    DailyLessonPlanViewSet,
+    LessonEvaluationViewSet,
+    HomeworkAssignmentViewSet,
+    HomeworkSubmissionViewSet,
+    AcademicReportViewSet,
     AdmissionInviteTokenViewSet,
     PublicAdmissionVerifyView,
     AuthenticatedOnlineAdmissionApplyView, 
@@ -137,6 +146,14 @@ router.register(r'tenant-taxonomies', TenantTaxonomySettingViewSet, basename='te
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
 router.register(r'admissions/tokens', AdmissionInviteTokenViewSet, basename='admission-tokens')
 
+# Enterprise Residential & Dormitory Management Routers
+router.register(r'academy/residential-buildings', ResidentialBuildingViewSet, basename='residential-buildings')
+router.register(r'residential-buildings', ResidentialBuildingViewSet, basename='residential-buildings-alias')
+router.register(r'academy/dormitory-rooms', DormitoryRoomViewSet, basename='dormitory-rooms')
+router.register(r'dormitory-rooms', DormitoryRoomViewSet, basename='dormitory-rooms-alias')
+router.register(r'academy/bed-allocations', BedAllocationViewSet, basename='bed-allocations')
+router.register(r'bed-allocations', BedAllocationViewSet, basename='bed-allocations-alias')
+
 # Enterprise Teacher & Staff Management Routers
 router.register(r'staff/teachers', TeacherAssignmentViewSet, basename='staff-teachers')
 router.register(r'staff/general/duties', GeneralStaffDutyViewSet, basename='staff-general-duties')
@@ -168,6 +185,15 @@ router.register(r'notifications/templates', NotificationTemplateViewSet, basenam
 router.register(r'notifications/triggers', NotificationTriggerRuleViewSet, basename='notifications-triggers')
 router.register(r'notifications/logs', NotificationDispatchLogViewSet, basename='notifications-logs')
 router.register(r'notifications/broadcast', ManualBroadcastViewSet, basename='notifications-broadcast')
+
+# Enterprise Academic Learning, Daily Lessons & Multi-Period Reporting Routers
+router.register(r'academic/goals', AcademicGoalViewSet, basename='academic-goals')
+router.register(r'learning/daily-lessons', DailyLessonPlanViewSet, basename='learning-daily-lessons')
+router.register(r'learning/evaluations', LessonEvaluationViewSet, basename='learning-evaluations')
+router.register(r'learning/homeworks', HomeworkAssignmentViewSet, basename='learning-homeworks')
+router.register(r'learning/homework-submissions', HomeworkSubmissionViewSet, basename='learning-homework-submissions')
+router.register(r'learning/reports', AcademicReportViewSet, basename='learning-reports')
+
 
 from django.http import JsonResponse
 

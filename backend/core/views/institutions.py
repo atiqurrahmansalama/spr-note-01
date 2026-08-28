@@ -85,20 +85,31 @@ class InstitutionViewSet(viewsets.ModelViewSet):
         qs = AcademicInstitution.objects.filter(is_deleted=True) if show_trash else AcademicInstitution.objects.filter(is_deleted=False)
 
         is_super = user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'
+        tenant_id = get_scoped_tenant_id(self.request)
+
         if not is_super:
-            if user.institution_id:
+            if tenant_id:
+                qs = qs.filter(id=tenant_id)
+            elif user.institution_id:
                 qs = qs.filter(id=user.institution_id)
+            # If neither tenant_id nor user.institution_id, allow institutional access for admins/staff
+            elif getattr(user, 'user_type', '').upper() in ['ADMIN', 'HEADMASTER', 'DIRECTOR']:
+                pass
             else:
                 qs = qs.none()
-        else:
-            search = self.request.query_params.get('search')
-            if search:
-                qs = qs.filter(
-                    Q(name__icontains=search) | 
-                    Q(bangla_name__icontains=search) | 
-                    Q(slug__icontains=search) | 
-                    Q(district__icontains=search)
-                )
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) | 
+                Q(bangla_name__icontains=search) | 
+                Q(slug__icontains=search) | 
+                Q(district__icontains=search)
+            )
+
+        inst_type = self.request.query_params.get('type')
+        if inst_type and inst_type != 'ALL':
+            qs = qs.filter(institution_type=inst_type)
 
         return qs.order_by('name')
 
@@ -259,15 +270,27 @@ class AcademicBranchViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         req_inst = self.request.data.get('institution')
         tenant_id = req_inst or get_scoped_tenant_id(self.request)
+        target_inst = None
         if tenant_id and tenant_id != 'ALL':
-            serializer.save(institution_id=tenant_id)
+            target_inst = AcademicInstitution.objects.filter(id=tenant_id, is_deleted=False).first()
         elif self.request.user.institution_id:
-            serializer.save(institution_id=self.request.user.institution_id)
+            target_inst = AcademicInstitution.objects.filter(id=self.request.user.institution_id, is_deleted=False).first()
         else:
-            first_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
-            if not first_inst:
-                raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a branch."})
-            serializer.save(institution=first_inst)
+            target_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+
+        if not target_inst:
+            raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a branch."})
+
+        # Enforce maximum branches limit
+        current_branches_count = AcademicBranch.objects.filter(institution=target_inst, is_deleted=False).count()
+        if current_branches_count >= target_inst.max_branches:
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    f"Branch quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_branches} branch(es)."
+                ]
+            })
+
+        serializer.save(institution=target_inst)
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
@@ -359,15 +382,27 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         req_inst = self.request.data.get('institution')
         tenant_id = req_inst or get_scoped_tenant_id(self.request)
+        target_inst = None
         if tenant_id and tenant_id != 'ALL':
-            serializer.save(institution_id=tenant_id)
+            target_inst = AcademicInstitution.objects.filter(id=tenant_id, is_deleted=False).first()
         elif self.request.user.institution_id:
-            serializer.save(institution_id=self.request.user.institution_id)
+            target_inst = AcademicInstitution.objects.filter(id=self.request.user.institution_id, is_deleted=False).first()
         else:
-            first_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
-            if not first_inst:
-                raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a department."})
-            serializer.save(institution=first_inst)
+            target_inst = AcademicInstitution.objects.filter(is_deleted=False).first()
+
+        if not target_inst:
+            raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a department."})
+
+        # Enforce maximum departments quota limit
+        current_departments_count = AcademicDepartment.objects.filter(institution=target_inst, is_deleted=False).count()
+        if current_departments_count >= target_inst.max_departments:
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    f"Department quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_departments} department(s)."
+                ]
+            })
+
+        serializer.save(institution=target_inst)
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):

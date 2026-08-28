@@ -60,7 +60,6 @@ export default function IdCardRenderer({
     show_blood_group: layoutConfig.show_blood_group !== false,
     show_guardian_contact: layoutConfig.show_guardian_contact !== false,
     show_dob: layoutConfig.show_dob !== false,
-    show_halqa: layoutConfig.show_halqa !== false,
     show_district: layoutConfig.show_district !== false,
     show_student_id: layoutConfig.show_student_id !== false,
     show_department: layoutConfig.show_department !== false,
@@ -335,9 +334,9 @@ export default function IdCardRenderer({
                 <span className="font-semibold truncate max-w-[150px]">{student.student_class_name || student.student_class || 'Standard Hifz'}</span>
               </div>
             )}
-            {cfg.show_halqa && (student.student_group_name || student.student_group) && (
+            {cfg.show_group && (student.student_group_name || student.student_group) && (
               <div className="flex justify-between">
-                <span className="opacity-65 text-[8.5px]">Halqa:</span>
+                <span className="opacity-65 text-[8.5px]">Group:</span>
                 <span className="font-semibold truncate max-w-[150px]">{student.student_group_name || student.student_group}</span>
               </div>
             )}

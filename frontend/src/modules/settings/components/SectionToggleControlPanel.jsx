@@ -144,7 +144,7 @@ export default function SectionToggleControlPanel() {
     }
   }, []);
 
-  // 1. Fetch available Halqa Groups & Dynamic Roles for Scope Selectors
+  // 1. Fetch available Student Groups & Dynamic Roles for Scope Selectors
   useEffect(() => {
     const fetchGroups = async () => {
       try {

@@ -82,7 +82,6 @@ export default function DocumentStudioEngine({
     show_blood_group: true,
     show_guardian_contact: true,
     show_dob: true,
-    show_halqa: true,
     show_district: true,
     show_student_id: true,
     show_department: true,
@@ -166,7 +165,7 @@ export default function DocumentStudioEngine({
       guardian_phone: '01812-345678',
       department_name: 'Hifzul Quran Division',
       student_class_name: 'Standard Hifz',
-      student_group_name: 'Halqa A',
+      student_group_name: 'Group Alpha',
       admission_date: '2026-01-10',
     };
   }, [selectedStudentMode, realStudents, samplePayload]);
@@ -723,7 +722,7 @@ export default function DocumentStudioEngine({
                       { key: 'show_guardian_contact', label: 'Guardian Emergency Contact' },
                       { key: 'show_department', label: 'Department / Division Name' },
                       { key: 'show_class', label: 'Class & Standard Grade' },
-                      { key: 'show_halqa', label: 'Halqa / Section Group' },
+                      { key: 'show_group', label: 'Section & Group' },
                       { key: 'show_qr_code', label: 'Dynamic Verification QR Code' },
                       { key: 'show_barcode', label: 'Vector Scannable Barcode' },
                     ].map((item) => (
