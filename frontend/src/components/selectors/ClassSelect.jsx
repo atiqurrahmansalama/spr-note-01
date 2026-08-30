@@ -37,7 +37,7 @@ export default function ClassSelect({
   value,
   onChange,
   classes: propClasses,
-  label = 'Select Class',
+  label = 'Class',
   placeholder = 'Select Class...',
   allowAll = true,
   allLabel = 'All Classes',

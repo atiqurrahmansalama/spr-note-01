@@ -1,74 +1,93 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
-import { GroupIcon, ClassIcon, SectionIcon, SaveIcon } from "../../../../components/ui/Icons";
-import CustomSelect from "../../../../components/ui/CustomSelect";
+import {
+  GroupIcon,
+  ClassIcon,
+  SectionIcon,
+  TeacherIcon,
+} from "../../../../components/ui/Icons";
 import CustomInput from "../../../../components/ui/CustomInput";
 import { ClassSelect, SectionSelect, TeacherSelect } from "../../../../components/selectors";
-import CustomCheckbox from "../../../../components/ui/CustomCheckbox";
 import { DrawerContainer, DrawerFooter } from "../../../../components/layout";
 
+/**
+ * GroupForm Component
+ * Enterprise right sidebar drawer form for creating and editing Study Groups / Circles.
+ * Adheres to zero hardcoded styling, container query responsiveness, and streamlined section layouts.
+ */
 export default function GroupForm({
-  editingGroup,
+  editingGroup = null,
   classes = [],
+  teachers = [],
   defaultClassId = "",
   defaultSectionId = "",
   onSaved,
   onCancel,
 }) {
   const { showToast } = useToast();
+  const isEdit = Boolean(editingGroup?.id);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    student_class: "",
-    section: "",
-    mentor_teacher: "",
-    order_rank: 1,
-    is_active: true,
-  });
-
-  const [teachers, setTeachers] = useState([]);
-  const [loadingTeachers, setLoadingTeachers] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    loadTeachers();
+  const initialValues = useMemo(() => {
     if (editingGroup) {
-      setFormData({
+      return {
         name: editingGroup.name || "",
         student_class: editingGroup.student_class ? String(editingGroup.student_class) : "",
         section: editingGroup.section ? String(editingGroup.section) : "",
         mentor_teacher: editingGroup.mentor_teacher ? String(editingGroup.mentor_teacher) : "",
         order_rank: editingGroup.order_rank ?? 1,
         is_active: editingGroup.is_active ?? true,
-      });
-    } else {
-      setFormData({
-        name: "",
-        student_class: defaultClassId ? String(defaultClassId) : "",
-        section: defaultSectionId ? String(defaultSectionId) : "",
-        mentor_teacher: "",
-        order_rank: 1,
-        is_active: true,
-      });
+      };
     }
-  }, [editingGroup, defaultClassId, defaultSectionId]);
+    return {
+      name: "",
+      student_class: defaultClassId ? String(defaultClassId) : (classes[0]?.id ? String(classes[0].id) : ""),
+      section: defaultSectionId ? String(defaultSectionId) : "",
+      mentor_teacher: "",
+      order_rank: 1,
+      is_active: true,
+    };
+  }, [editingGroup, defaultClassId, defaultSectionId, classes]);
 
-  const loadTeachers = async () => {
-    setLoadingTeachers(true);
-    try {
-      const res = await fetchWithAuth("/api/v1/users/");
-      if (res.ok) {
-        const data = await res.json();
-        const userList = Array.isArray(data) ? data : data.results || [];
-        setTeachers(userList.filter((u) => u.user_type === "TEACHER" || u.user_type === "ADMIN"));
+  const [formData, setFormData] = useState(initialValues);
+  const [classList, setClassList] = useState(classes);
+  const [teacherList, setTeacherList] = useState(teachers);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setFormData(initialValues);
+  }, [initialValues]);
+
+  // Load lookups if not passed via props
+  useEffect(() => {
+    async function loadData() {
+      if (classes.length > 0 && teachers.length > 0) return;
+      setLoadingLookups(true);
+      try {
+        const [cRes, tRes] = await Promise.allSettled([
+          classes.length === 0 ? fetchWithAuth("/api/v1/classes/?page_size=500&all=true") : Promise.resolve(null),
+          teachers.length === 0 ? fetchWithAuth("/api/v1/users/") : Promise.resolve(null),
+        ]);
+
+        if (cRes.status === "fulfilled" && cRes.value && cRes.value.ok) {
+          const d = await cRes.value.json();
+          const list = Array.isArray(d) ? d : d.results || [];
+          setClassList(list.filter((c) => !c.is_deleted));
+        }
+        if (tRes.status === "fulfilled" && tRes.value && tRes.value.ok) {
+          const d = await tRes.value.json();
+          const list = Array.isArray(d) ? d : d.results || [];
+          setTeacherList(list.filter((u) => u.is_active && !u.is_deactivated));
+        }
+      } catch {
+        // Fallback gracefully
+      } finally {
+        setLoadingLookups(false);
       }
-    } catch {
-      showToast("Failed to load mentor teachers", "error");
-    } finally {
-      setLoadingTeachers(false);
     }
-  };
+    loadData();
+  }, [classes.length, teachers.length]);
 
   const handleClassChange = (newClassId) => {
     setFormData((prev) => ({
@@ -79,14 +98,21 @@ export default function GroupForm({
     }));
   };
 
+  const isDirty = useMemo(() => {
+    return Object.keys(initialValues).some((key) => formData[key] !== initialValues[key]);
+  }, [formData, initialValues]);
+
+  const isValid = Boolean(formData.name.trim() && formData.student_class);
+  const canSave = isDirty && isValid && !submitting;
+
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!formData.name.trim()) {
-      showToast("Group Name is required.", "error");
+    if (!formData.student_class) {
+      showToast("Please select a target Academic Class.", "warning");
       return;
     }
-    if (!formData.student_class) {
-      showToast("Parent Academic Class is required.", "error");
+    if (!formData.name.trim()) {
+      showToast("Group Name is required.", "warning");
       return;
     }
 
@@ -101,8 +127,8 @@ export default function GroupForm({
         is_active: formData.is_active,
       };
 
-      const url = editingGroup ? `/api/v1/groups/${editingGroup.id}/` : "/api/v1/groups/";
-      const method = editingGroup ? "PATCH" : "POST";
+      const url = isEdit ? `/api/v1/groups/${editingGroup.id}/` : "/api/v1/groups/";
+      const method = isEdit ? "PATCH" : "POST";
 
       const res = await fetchWithAuth(url, {
         method,
@@ -111,7 +137,7 @@ export default function GroupForm({
 
       if (res.ok) {
         showToast(
-          editingGroup ? "Group updated successfully!" : "New group created successfully!",
+          isEdit ? "Group updated successfully!" : "New group created successfully!",
           "success"
         );
         window.dispatchEvent(new CustomEvent("spr_group_updated"));
@@ -127,99 +153,81 @@ export default function GroupForm({
     }
   };
 
-  const isDirty = Boolean(
-    !editingGroup
-      ? formData.name.trim() || formData.student_class
-      : formData.name !== (editingGroup.name || "") ||
-        formData.student_class !== (editingGroup.student_class ? String(editingGroup.student_class) : "") ||
-        formData.section !== (editingGroup.section ? String(editingGroup.section) : "") ||
-        formData.mentor_teacher !== (editingGroup.mentor_teacher ? String(editingGroup.mentor_teacher) : "") ||
-        formData.order_rank !== (editingGroup.order_rank ?? 1) ||
-        formData.is_active !== (editingGroup.is_active ?? true)
-  );
-
-  const isFormValid = Boolean(formData.name.trim() && formData.student_class);
-  const canSave = isDirty && isFormValid && !submitting;
-
   return (
-    <DrawerContainer padding="normal" spacing="normal">
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 text-left">
-        {/* Parent Class Selector */}
-        <div>
-          <ClassSelect
-            label="Parent Academic Class"
-            value={formData.student_class}
-            onChange={handleClassChange}
-            classes={classes}
-            allowAll={false}
-            placeholder="Select Academic Class (Required)..."
-            icon={ClassIcon}
-            required={true}
-          />
-        </div>
+    <DrawerContainer padding="none" spacing="normal">
+      <form onSubmit={handleSubmit} className="@container space-y-6 pt-2 text-left">
+        {/* ─── 1. Group Information ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <GroupIcon className="w-4 h-4 theme-accent" />
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              Group Information
+            </h4>
+          </div>
 
-        {/* Optional Section Selector */}
-        <div>
-          <SectionSelect
-            label="Class Section / Wing"
-            value={formData.section}
-            onChange={(val) => setFormData({ ...formData, section: val })}
-            classId={formData.student_class}
-            allowAll={false}
-            placeholder="Select Section / Wing (Optional)..."
-            icon={SectionIcon}
-            optional={true}
-          />
-        </div>
+          {/* Complementary Row: Target Class & Target Section */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5 sm:gap-4">
+            <div>
+              <ClassSelect
+                label="Target Class"
+                value={formData.student_class}
+                onChange={handleClassChange}
+                classes={classList}
+                allowAll={false}
+                placeholder="Select Class (Required)..."
+                icon={ClassIcon}
+                required={true}
+              />
+            </div>
 
-        {/* Group Name & Rank */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+            <div>
+              <SectionSelect
+                label="Target Section"
+                value={formData.section}
+                onChange={(val) => setFormData({ ...formData, section: val })}
+                classId={formData.student_class}
+                allowAll={false}
+                placeholder="All Sections (Optional)..."
+                icon={SectionIcon}
+                optional={true}
+              />
+            </div>
+          </div>
+
+          {/* Group Name */}
           <div>
             <CustomInput
-              label="Group / Circle Name"
+              label="Group Name"
               required
-              placeholder="e.g. Circle Alpha, Squad 1, Nazera Group"
+              placeholder="e.g. Group A, Circle Alpha, Nazera Group"
               value={formData.name}
               onChange={(val) => setFormData({ ...formData, name: val })}
             />
           </div>
+        </div>
+
+        {/* ─── 2. Mentorship & Supervision ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <TeacherIcon className="w-4 h-4 theme-accent" />
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              Mentorship &amp; Supervision
+            </h4>
+          </div>
 
           <div>
-            <CustomInput
-              type="number"
-              label="Display Order Rank"
-              min={1}
-              max={999}
-              value={formData.order_rank}
-              onChange={(val) => setFormData({ ...formData, order_rank: val })}
+            <TeacherSelect
+              label="Assigned Mentor"
+              value={formData.mentor_teacher}
+              onChange={(val) => setFormData({ ...formData, mentor_teacher: val })}
+              teachers={teacherList}
+              allowAll={true}
+              allLabel="Unassigned"
+              placeholder="Select Mentor Teacher..."
+              searchable={true}
+              disabled={loadingLookups}
             />
           </div>
-        </div>
-
-        {/* Assigned Mentor / Teacher */}
-        <div>
-          <TeacherSelect
-            label="Assigned Group Mentor / Ustadh"
-            value={formData.mentor_teacher}
-            onChange={(val) => setFormData({ ...formData, mentor_teacher: val })}
-            teachers={teachers}
-            allowAll={true}
-            allLabel="Unassigned"
-            placeholder="Select Mentor Teacher..."
-            searchable={true}
-            disabled={loadingTeachers}
-          />
-        </div>
-
-        {/* Operational Status */}
-        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border">
-          <CustomCheckbox
-            id="group_is_active_check"
-            checked={formData.is_active}
-            onChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
-            label="Group Active & Operational"
-            description="Allows students to be enrolled, tracked and assigned to this circle unit."
-          />
         </div>
 
         {/* Bottom Action Buttons */}
@@ -227,10 +235,11 @@ export default function GroupForm({
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
-          saveLabel={editingGroup ? "Save Changes" : "Create Group"}
+          saveLabel={isEdit ? "Save Changes" : "Create Group"}
           onSubmit={true}
         />
       </form>
     </DrawerContainer>
   );
 }
+

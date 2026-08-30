@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../../../components/ui/Modal';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
+import CustomButton from '../../../components/ui/CustomButton';
 import TeacherSelect from '../../../components/selectors/TeacherSelect';
 import { UserIcon, CheckIcon, TrashIcon } from '../../../components/ui/Icons';
 import { residentialStore } from '../../../utils/stores/residentialStore';
@@ -234,36 +235,39 @@ export default function BedAllocationModal({
 
         <div className="pt-4 border-t theme-border flex items-center justify-between gap-2.5">
           {bed.status === 'OCCUPIED' ? (
-            <button
+            <CustomButton
               type="button"
+              variant="danger"
+              size="sm"
+              icon={TrashIcon}
               onClick={handleUnassign}
-              disabled={saving}
-              className="px-3 py-2 text-xs font-bold rounded-xl border theme-border text-rose-500 hover:bg-rose-500/10 transition flex items-center gap-1 cursor-pointer"
+              loading={saving}
             >
-              <TrashIcon className="w-3.5 h-3.5" />
-              <span>Vacate Seat</span>
-            </button>
+              Vacate Seat
+            </CustomButton>
           ) : (
             <div />
           )}
 
           <div className="flex items-center gap-2">
-            <button
+            <CustomButton
               type="button"
+              variant="sub"
+              size="md"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold rounded-xl border theme-border theme-text-secondary hover:theme-bg-sub transition cursor-pointer"
             >
               Cancel
-            </button>
-            <button
+            </CustomButton>
+            <CustomButton
               type="button"
+              variant="primary"
+              size="md"
               onClick={handleAssign}
-              disabled={saving}
-              className="px-4 py-2 text-xs font-bold rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              loading={saving}
+              icon={CheckIcon}
             >
-              <CheckIcon className="w-3.5 h-3.5" />
-              <span>{saving ? 'Assigning...' : 'Confirm Allocation'}</span>
-            </button>
+              Confirm Allocation
+            </CustomButton>
           </div>
         </div>
       </div>

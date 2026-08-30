@@ -1,4 +1,5 @@
 import React from "react";
+import CustomButton from "../ui/CustomButton";
 
 /**
  * Enterprise Reusable Right Sidebar / Drawer Content Container
@@ -25,10 +26,10 @@ export default function DrawerContainer({
   ...rest
 }) {
   const spacingClass = {
-    normal: "space-y-4 sm:space-y-5",
-    compact: "space-y-3 sm:space-y-3.5",
-    relaxed: "space-y-5 sm:space-y-6",
-  }[spacing] || "space-y-4 sm:space-y-5";
+    normal: "space-y-6 sm:space-y-7",
+    compact: "space-y-4 sm:space-y-5",
+    relaxed: "space-y-8 sm:space-y-9",
+  }[spacing] || "space-y-6 sm:space-y-7";
 
   const paddingClass = {
     normal: "p-3.5 sm:p-5",
@@ -108,7 +109,8 @@ export function DrawerBanner({
 }
 
 /**
- * Reusable Card Section for Grouping Form Inputs or Content
+ * Reusable Section for Grouping Form Inputs or Content in Right Sidebar Drawers
+ * Default is streamlined (zero boxed cards) with clean header divider & ample top margin.
  */
 export function DrawerSection({
   title,
@@ -119,24 +121,33 @@ export function DrawerSection({
   children,
   className = "",
   bodyClassName = "",
+  variant = "streamlined", // "streamlined" (default) | "card"
   ...rest
 }) {
+  const isCard = variant === "card";
+
   return (
     <div
-      className={`rounded-2xl theme-bg-surface border theme-border p-4 sm:p-5 shadow-2xs space-y-3.5 ${className}`}
+      className={
+        isCard
+          ? `rounded-2xl theme-bg-surface border theme-border p-4 sm:p-5 shadow-2xs space-y-4 ${className}`
+          : `space-y-4 pt-5 sm:pt-6 first:pt-1 ${className}`
+      }
       {...rest}
     >
       {(title || subtitle || headerRight) && (
-        <div className="flex items-center justify-between gap-2 pb-2.5 border-b theme-border">
+        <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             {Icon && <Icon className="w-4 h-4 theme-accent shrink-0" />}
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h5 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
-                  {title}
-                </h5>
+              <div className="flex items-center gap-2 flex-wrap">
+                {title && (
+                  <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
+                    {title}
+                  </h3>
+                )}
                 {badge && (
-                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded theme-bg-sub theme-text-secondary border theme-border">
+                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-md theme-bg-sub theme-text-secondary border theme-border">
                     {badge}
                   </span>
                 )}
@@ -151,7 +162,7 @@ export function DrawerSection({
           {headerRight && <div className="shrink-0">{headerRight}</div>}
         </div>
       )}
-      <div className={`space-y-3 ${bodyClassName}`}>{children}</div>
+      <div className={bodyClassName || ""}>{children}</div>
     </div>
   );
 }
@@ -182,25 +193,28 @@ export function DrawerFooter({
 
       <div className="flex items-center gap-2 ml-auto">
         {onCancel && (
-          <button
+          <CustomButton
             type="button"
+            variant="sub"
+            size="md"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2.5 rounded-xl border theme-border hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all cursor-pointer disabled:opacity-50"
           >
             {cancelLabel}
-          </button>
+          </CustomButton>
         )}
 
         {(onSubmit || onSave) && (
-          <button
+          <CustomButton
             type={onSubmit ? "submit" : "button"}
+            variant="primary"
+            size="md"
             onClick={onSave}
-            disabled={isSubmitting || isSaveDisabled}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-bold transition-all cursor-pointer shadow-sm disabled:opacity-50 active:scale-95"
+            loading={isSubmitting}
+            disabled={isSaveDisabled}
           >
-            {isSubmitting ? "Saving..." : saveLabel}
-          </button>
+            {saveLabel}
+          </CustomButton>
         )}
       </div>
     </div>

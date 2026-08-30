@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, CloseIcon, InfoIcon, AlertCircleIcon } from '../components/ui/Icons';
 
@@ -31,14 +31,27 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
   const [mounted, setMounted] = useState(false);
+  const lastToastRef = useRef({ message: '', type: '', timestamp: 0 });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const showToast = useCallback((message, type = 'info') => {
-    const id = Date.now() + Math.random();
     const formattedMsg = formatErrorMessage(message);
+    const now = Date.now();
+
+    // Prevent identical toasts firing in rapid succession (< 400ms)
+    if (
+      lastToastRef.current.message === formattedMsg &&
+      lastToastRef.current.type === type &&
+      now - lastToastRef.current.timestamp < 400
+    ) {
+      return;
+    }
+    lastToastRef.current = { message: formattedMsg, type, timestamp: now };
+
+    const id = now + Math.random();
     setToasts((prev) => {
       const next = [...prev, { id, message: formattedMsg, type }];
       return next.slice(-4); // Keep recent toasts

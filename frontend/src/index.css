@@ -425,3 +425,15 @@ html[data-theme="amber"][data-mode="light"] {
     padding-bottom: 0.5rem !important;
   }
 }
+
+/* Cross-browser scrollbar hiding utilities */
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}

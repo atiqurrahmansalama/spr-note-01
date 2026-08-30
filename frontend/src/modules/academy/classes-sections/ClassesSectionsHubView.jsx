@@ -13,6 +13,7 @@ import {
 } from '../../../components/ui/Icons';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
+import CustomButton from '../../../components/ui/CustomButton';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
 import { PageContainer } from '../../../components/layout';
 import { fetchWithAuth } from '../../../utils/authService';
@@ -361,14 +362,16 @@ export default function ClassesSectionsHubView() {
         activeTab={activeTab}
         onChange={handleTabChange}
         rightContent={
-          <button
+          <CustomButton
             type="button"
+            variant="primary"
+            size="sm"
+            icon={PlusIcon}
             onClick={handlePrimaryAction}
-            className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto"
           >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>{getPrimaryActionText()}</span>
-          </button>
+            {getPrimaryActionText()}
+          </CustomButton>
         }
       />
 

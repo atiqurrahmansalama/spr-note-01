@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CustomSelect from '../ui/CustomSelect';
 import { BuildingOfficeIcon } from '../ui/Icons';
 import { getBranches } from '../../api/academy';
+import { getBranchDisplayName } from '../../utils/localStore';
 
 /**
  * Universal Enterprise Branch Selector Component
@@ -48,9 +49,8 @@ export default function BranchSelect({
     const fetchBranches = async () => {
       setLoading(true);
       try {
-        const res = await getBranches();
-        if (res && res.ok && isMounted) {
-          const data = await res.json();
+        const data = await getBranches();
+        if (data && isMounted) {
           const list = Array.isArray(data) ? data : data.results || [];
           setInternalBranches(list);
         }
@@ -77,8 +77,8 @@ export default function BranchSelect({
   branchList.forEach((b) => {
     options.push({
       value: String(b.id),
-      label: b.branch_name || b.name,
-      subLabel: b.branch_code ? `Code: ${b.branch_code}` : undefined,
+      label: getBranchDisplayName(b),
+      badge: b.branch_type === 'MAIN_CAMPUS' ? 'Main' : b.branch_code || undefined,
     });
   });
 

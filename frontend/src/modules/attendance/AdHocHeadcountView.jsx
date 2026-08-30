@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { fetchWithAuth } from "../../utils/authService";
 import { useToast } from "../../context/ToastContext";
+import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { ChecklistIcon, RefreshIcon, SaveIcon, CloseIcon } from "../../components/ui/Icons";
 import { ClassSelect, GroupSelect } from "../../components/selectors";
-import { academicYearsStore } from "../../utils/localStore";
 
 export default function AdHocHeadcountView() {
   const { showToast } = useToast();
+  const { activeYear, activeSemester } = useAcademicSession();
 
   const [sessions, setSessions] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -73,13 +74,15 @@ export default function AdHocHeadcountView() {
     }
 
     const todayStr = new Date().toISOString().split("T")[0];
-    const academicBounds = academicYearsStore.getDateBounds();
+    // Use global session context bounds
+    const minDate = activeSemester?.startDate || activeYear?.startDate || '';
+    const maxDate = activeSemester?.endDate || activeYear?.endDate || '';
     if (
-      (academicBounds.minDate && todayStr < academicBounds.minDate) ||
-      (academicBounds.maxDate && todayStr > academicBounds.maxDate)
+      (minDate && todayStr < minDate) ||
+      (maxDate && todayStr > maxDate)
     ) {
       showToast(
-        `Headcount sessions cannot be initiated outside the active Academic Year (${academicBounds.activeYear?.name || 'Active Year'}).`,
+        `Headcount sessions cannot be initiated outside the active Academic Year (${activeYear?.name || 'Active Year'}).`,
         "warning"
       );
       return;
@@ -203,7 +206,7 @@ export default function AdHocHeadcountView() {
             <div className="flex items-center gap-2 flex-wrap text-xs theme-text-secondary mt-0.5">
               <span>Instant physical presence verification for study hours, dormitories, and surprise inspections.</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium theme-bg-sub border theme-border">
-                Active Year: <strong className="theme-text-primary">{academicYearsStore.getActiveYear()?.name || "Active Session"}</strong>
+                Active Year: <strong className="theme-text-primary">{activeYear?.name || "Active Session"}</strong>
               </span>
             </div>
           </div>

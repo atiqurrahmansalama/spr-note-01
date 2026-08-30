@@ -39,7 +39,5 @@ export { default as BranchSelect } from './BranchSelect';
 export { default as BranchSelector } from './BranchSelect';
 export { default as ResidentialBuildingSelect } from './ResidentialBuildingSelect';
 export { default as DormitoryRoomSelect } from './DormitoryRoomSelect';
-
-
-
-
+export { default as DepartmentSelect } from './DepartmentSelect';
+export { default as DepartmentSelector } from './DepartmentSelect';

@@ -1,13 +1,13 @@
 import React from 'react';
 import { BookOpenIcon } from '../../components/ui/Icons';
 
-export default function StudentDiaryFeedCard({ date, lessons = [], evaluations = [], homeworks = [] }) {
+export default function StudentDiaryFeedCard({ date, lessons = [], evaluations = [] }) {
   const displayDate = date || new Date().toISOString().split('T')[0];
 
   return (
-    <div className="rounded-xl border theme-border theme-bg-primary overflow-hidden shadow-sm">
+    <div className="@container rounded-2xl border theme-border theme-bg-surface overflow-hidden shadow-xs text-left">
       {/* Header */}
-      <div className="p-4 border-b theme-border flex items-center justify-between theme-bg-secondary/40">
+      <div className="p-4 border-b theme-border flex items-center justify-between theme-bg-sub/40">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-md theme-bg-accent/10 theme-text-accent">
             <BookOpenIcon className="w-4 h-4" />
@@ -46,6 +46,11 @@ export default function StudentDiaryFeedCard({ date, lessons = [], evaluations =
                       <span className="text-[11px] font-medium theme-text-secondary">{lesson.subject_name}</span>
                     </div>
                   </div>
+                  {lesson.homework_task && (
+                    <p className="text-xs theme-text-accent font-medium mt-1">
+                      <span className="font-semibold">Homework Task:</span> {lesson.homework_task}
+                    </p>
+                  )}
                   {lesson.lesson_instructions && (
                     <p className="text-xs theme-text-secondary mt-1 line-clamp-2">{lesson.lesson_instructions}</p>
                   )}
@@ -65,13 +70,13 @@ export default function StudentDiaryFeedCard({ date, lessons = [], evaluations =
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider">
-              Recitation Evaluation
+              Daily Assessment
             </span>
             <span className="text-xs font-semibold theme-text-primary">{evaluations.length} Evaluated</span>
           </div>
 
           {evaluations.length === 0 ? (
-            <p className="text-xs theme-text-secondary italic py-1">Recitation pending or not evaluated yet.</p>
+            <p className="text-xs theme-text-secondary italic py-1">Evaluation pending or not evaluated yet.</p>
           ) : (
             <div className="space-y-2">
               {evaluations.map((ev) => {
@@ -107,34 +112,6 @@ export default function StudentDiaryFeedCard({ date, lessons = [], evaluations =
                   </div>
                 );
               })}
-            </div>
-          )}
-        </div>
-
-        {/* 3. Pending Homework Assignments */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider">
-              Homework & Tasks
-            </span>
-            <span className="text-xs font-semibold theme-text-accent">{homeworks.length} Tasks</span>
-          </div>
-
-          {homeworks.length === 0 ? (
-            <p className="text-xs theme-text-secondary italic py-1">No homework assigned for this day.</p>
-          ) : (
-            <div className="space-y-2">
-              {homeworks.map((hw) => (
-                <div key={hw.id} className="p-2.5 rounded-lg border theme-border theme-bg-secondary/20">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold theme-text-primary">{hw.title}</span>
-                    <span className="text-[11px] px-2 py-0.5 rounded border theme-border font-medium theme-text-secondary">
-                      Due: {hw.due_date} {hw.due_time ? `@ ${hw.due_time}` : ''}
-                    </span>
-                  </div>
-                  <p className="text-xs theme-text-secondary mt-1">{hw.description}</p>
-                </div>
-              ))}
             </div>
           )}
         </div>

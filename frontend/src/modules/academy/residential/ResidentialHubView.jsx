@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
+import CustomButton from '../../../components/ui/CustomButton';
 import { PageContainer } from '../../../components/layout';
 import UniversalManagementView from '../../../components/common/UniversalManagementView';
 import CustomSelect from '../../../components/ui/CustomSelect';
@@ -22,6 +23,7 @@ import {
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { residentialStore } from '../../../utils/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
+import { getBranchDisplayName } from '../../../utils/localStore';
 import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import ResidentialBuildingDrawer from './ResidentialBuildingDrawer';
@@ -465,7 +467,7 @@ export default function ResidentialHubView() {
         <div className="text-xs">
           <span className="font-semibold theme-text-primary block">{row.building_name || 'Main Hall'}</span>
           <span className="text-[11px] theme-text-secondary">
-            Floor {row.floor_number} • {row.branch_name || 'Main Campus'}
+            Floor {row.floor_number} • {getBranchDisplayName(row.branch_name || row.branch) || 'Main Campus'}
           </span>
         </div>
       ),
@@ -677,7 +679,7 @@ export default function ResidentialHubView() {
       key: 'branch',
       header: 'Campus / Branch',
       render: (row) => (
-        <span className="text-xs font-semibold theme-text-primary">{row.branch_name || 'Main Campus'}</span>
+        <span className="text-xs font-semibold theme-text-primary">{getBranchDisplayName(row.branch_name || row.branch) || 'Main Campus'}</span>
       ),
     },
     {
@@ -766,7 +768,7 @@ export default function ResidentialHubView() {
               </div>
               <div>
                 <h4 className="text-sm font-bold theme-text-primary leading-tight">{row.name}</h4>
-                <p className="text-xs theme-text-secondary">{row.branch_name || 'Main Campus'}</p>
+                <p className="text-xs theme-text-secondary">{getBranchDisplayName(row.branch_name || row.branch) || 'Main Campus'}</p>
               </div>
             </div>
             <ActionMenu items={actionItems} />
@@ -852,13 +854,14 @@ export default function ResidentialHubView() {
       key: 'actions',
       header: '',
       render: (row) => (
-        <button
+        <CustomButton
           type="button"
+          variant="sub"
+          size="xs"
           onClick={() => setEditingBed(row)}
-          className="px-2.5 py-1 text-xs font-bold rounded-lg border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-primary transition cursor-pointer"
         >
           {row.status === 'OCCUPIED' ? 'Manage' : 'Assign'}
-        </button>
+        </CustomButton>
       ),
     },
   ];
@@ -882,7 +885,7 @@ export default function ResidentialHubView() {
           </div>
           <div>
             <span className="font-bold text-xs theme-text-primary block">{row.name}</span>
-            <span className="text-[11px] theme-text-secondary">{row.branch_name}</span>
+            <span className="text-[11px] theme-text-secondary">{getBranchDisplayName(row.branch_name || row.branch)}</span>
           </div>
         </div>
       ),
@@ -926,8 +929,10 @@ export default function ResidentialHubView() {
       key: 'actions',
       header: '',
       render: (row) => (
-        <button
+        <CustomButton
           type="button"
+          variant="sub"
+          size="xs"
           onClick={() => {
             if (row.raw_type === 'ROOM') {
               handleOpenRoomDetails(row.raw);
@@ -935,10 +940,9 @@ export default function ResidentialHubView() {
               handleOpenBuildingDrawer(row.raw);
             }
           }}
-          className="px-2.5 py-1 text-xs font-bold rounded-lg border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-primary transition cursor-pointer"
         >
           View Details
-        </button>
+        </CustomButton>
       ),
     },
   ];
@@ -973,7 +977,7 @@ export default function ResidentialHubView() {
                 <h4 className="text-sm font-bold theme-text-primary group-hover:theme-accent leading-tight">
                   {row.name}
                 </h4>
-                <p className="text-xs theme-text-secondary">{row.branch_name}</p>
+                <p className="text-xs theme-text-secondary">{getBranchDisplayName(row.branch_name || row.branch)}</p>
               </div>
             </div>
 
@@ -1028,23 +1032,25 @@ export default function ResidentialHubView() {
           onChange={setActiveTab}
           rightContent={
             activeTab === 'ROOMS' ? (
-              <button
+              <CustomButton
                 type="button"
+                variant="primary"
+                size="sm"
+                icon={PlusIcon}
                 onClick={() => handleOpenRoomDrawer()}
-                className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
               >
-                <PlusIcon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Add Room</span>
-              </button>
+              </CustomButton>
             ) : activeTab === 'BUILDINGS' ? (
-              <button
+              <CustomButton
                 type="button"
+                variant="primary"
+                size="sm"
+                icon={PlusIcon}
                 onClick={() => handleOpenBuildingDrawer()}
-                className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
               >
-                <PlusIcon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Add Building</span>
-              </button>
+              </CustomButton>
             ) : null
           }
         />

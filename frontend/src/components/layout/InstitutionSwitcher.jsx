@@ -129,7 +129,7 @@ export default function InstitutionSwitcher() {
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                navigate('/app-management/institutions');
+                navigate('/academy/campus-profile?tab=academies');
               }}
               className="px-2 py-1 rounded-lg theme-bg-accent-soft hover:opacity-90 theme-accent border theme-border text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
             >

@@ -7,6 +7,7 @@ import {
   academicYearsStore,
   admissionSettingsStore,
   getAcademicYearStatus,
+  getBranchDisplayName,
   DEFAULT_PREVIOUS_CLASSES,
 } from "../../../utils/localStore";
 import {
@@ -107,7 +108,7 @@ function BranchSummaryGrid({
             >
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold theme-text-primary truncate">
-                  {b.branch_name || b.name || "Branch"}
+                  {getBranchDisplayName(b)}
                 </div>
                 {subtitle && (
                   <div className="text-[10px] theme-text-secondary font-mono truncate mt-0.5">
@@ -255,7 +256,7 @@ export default function AdmissionSettingsPanel() {
   // All Branches Options (specifically for Section 2: Allowed Branches selector)
   const allBranchOptions = useMemo(() => {
     return branches.map((b) => {
-      const bName = b.branch_name || b.name || "Branch";
+      const bName = getBranchDisplayName(b);
       const bCode = b.branch_code || b.code;
       return {
         label: bName + (bCode ? ` (${bCode})` : ""),
@@ -267,7 +268,7 @@ export default function AdmissionSettingsPanel() {
   // Open Branch Options (specifically for Section 3, 4, 5, 6: Select Branch selector)
   const openBranchOptions = useMemo(() => {
     return openBranches.map((b) => {
-      const bName = b.branch_name || b.name || "Branch";
+      const bName = getBranchDisplayName(b);
       const bCode = b.branch_code || b.code;
       return {
         label: bName + (bCode ? ` (${bCode})` : ""),

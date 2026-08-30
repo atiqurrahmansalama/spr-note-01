@@ -34,6 +34,7 @@ import {
   SparklesIcon,
   CalendarIcon,
 } from "../../components/ui/Icons";
+import { getBranchDisplayName } from "../../utils/localStore";
 import ActionMenu from "../../components/ui/ActionMenu";
 import StatusBadge from "../../components/ui/StatusBadge";
 import Modal from "../../components/ui/Modal";
@@ -766,7 +767,7 @@ export default function StudentProfileHubView() {
                     Campus Branch
                   </span>
                   <p className="font-medium theme-text-primary text-sm sm:text-base">
-                    {student.branch_name || "Main Campus"}
+                    {getBranchDisplayName(student.branch_name || student.branch) || "Main Campus"}
                   </p>
                 </div>
                 <div>
@@ -1409,7 +1410,7 @@ export default function StudentProfileHubView() {
                           </span>
                         )}
                         <span className="theme-text-secondary">
-                          • Campus: {student.branch_name || "Main Campus"}
+                          • Campus: {getBranchDisplayName(student.branch_name || student.branch) || "Main Campus"}
                         </span>
                         {student.roll_number && (
                           <span className="theme-text-secondary font-mono font-medium">
@@ -1496,7 +1497,7 @@ export default function StudentProfileHubView() {
                           • Mode: {student.admission_mode === "FULL" ? "Full Institutional" : "Quick Entry"}
                         </span>
                         <span className="theme-text-secondary">
-                          • Branch: {student.branch_name || "Main Campus"}
+                          • Branch: {getBranchDisplayName(student.branch_name || student.branch) || "Main Campus"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

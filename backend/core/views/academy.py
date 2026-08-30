@@ -168,7 +168,7 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
 
 
 class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
-    queryset = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'branch', 'department', 'student_class').order_by('period_order', 'start_time')
+    queryset = ClassPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'branch', 'department', 'student_class', 'section').order_by('period_order', 'start_time')
     serializer_class = ClassPeriodSlotSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
     required_section_key = 'class_period_slots'
@@ -198,6 +198,10 @@ class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
         if class_id and class_id != 'ALL':
             qs = qs.filter(student_class_id=class_id)
 
+        section_id = self.request.query_params.get('section')
+        if section_id and section_id != 'ALL':
+            qs = qs.filter(section_id=section_id)
+
         branch_id = self.request.query_params.get('branch')
         if branch_id and branch_id != 'ALL':
             qs = qs.filter(branch_id=branch_id)
@@ -216,13 +220,14 @@ class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
                 Q(period_name__icontains=search) |
                 Q(department__name__icontains=search) |
                 Q(student_class__name__icontains=search) |
+                Q(section__section_name__icontains=search) |
                 Q(teacher__user__first_name__icontains=search) |
                 Q(teacher__user__last_name__icontains=search) |
                 Q(teacher__user__name__icontains=search) |
                 Q(teacher__user__name_en__icontains=search)
             )
 
-        return qs.select_related('institution', 'branch', 'department', 'student_class', 'teacher', 'teacher__user').order_by('period_order', 'start_time')
+        return qs.select_related('institution', 'branch', 'department', 'student_class', 'section', 'teacher', 'teacher__user').order_by('period_order', 'start_time')
 
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request)
@@ -655,13 +660,16 @@ class DynamicPeriodSlotViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return self.queryset.none()
-        qs = DynamicPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'department', 'student_class')
+        qs = DynamicPeriodSlot.objects.filter(is_deleted=False).select_related('institution', 'department', 'student_class', 'section')
         tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             qs = qs.filter(institution_id=tenant_id)
         class_id = self.request.query_params.get('class_id')
         if class_id and class_id != 'ALL':
             qs = qs.filter(student_class_id=class_id)
+        section_id = self.request.query_params.get('section_id')
+        if section_id and section_id != 'ALL':
+            qs = qs.filter(section_id=section_id)
         return qs.order_by('period_order', 'start_time')
 
     def perform_create(self, serializer):

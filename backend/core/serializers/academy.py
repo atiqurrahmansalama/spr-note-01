@@ -107,6 +107,8 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
     department_name = serializers.SerializerMethodField()
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    section = serializers.PrimaryKeyRelatedField(queryset=ClassSection.objects.all(), required=False, allow_null=True)
+    section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
     teacher = serializers.PrimaryKeyRelatedField(queryset=StaffProfile.objects.all(), required=False, allow_null=True)
     teacher_name = serializers.SerializerMethodField()
     teacher_designation = serializers.CharField(source='teacher.designation', read_only=True, default='')
@@ -118,6 +120,7 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
             'branch', 'branch_name',
             'department', 'department_name',
             'student_class', 'student_class_name',
+            'section', 'section_name',
             'teacher', 'teacher_name', 'teacher_designation',
             'period_name', 'slot_type', 'period_order',
             'start_time', 'end_time', 'duration_minutes',
@@ -128,6 +131,7 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'deleted_at',
             'institution_name', 'branch_name', 'department_name', 'student_class_name',
+            'section_name',
             'teacher_name', 'teacher_designation'
         ]
 
@@ -146,9 +150,26 @@ class ClassPeriodSlotSerializer(serializers.ModelSerializer):
         return ""
 
     def validate(self, attrs):
-        if attrs.get('student_class') and not attrs.get('department'):
-            if getattr(attrs['student_class'], 'department', None):
-                attrs['department'] = attrs['student_class'].department
+        section = attrs.get('section')
+        student_class = attrs.get('student_class') or (self.instance.student_class if self.instance else None)
+
+        if section:
+            if not student_class:
+                attrs['student_class'] = section.student_class
+                student_class = section.student_class
+            elif section.student_class_id != student_class.id:
+                raise serializers.ValidationError({
+                    "section": f"The selected section '{section.section_name}' does not belong to the class '{student_class.name}'."
+                })
+            if not attrs.get('branch') and section.branch:
+                attrs['branch'] = section.branch
+            if not attrs.get('institution') and getattr(section.student_class, 'institution', None):
+                attrs['institution'] = section.student_class.institution
+
+        if student_class and not attrs.get('department'):
+            if getattr(student_class, 'department', None):
+                attrs['department'] = student_class.department
+
         start_time = attrs.get('start_time') or (self.instance.start_time if self.instance else None)
         end_time = attrs.get('end_time') or (self.instance.end_time if self.instance else None)
         if start_time and end_time:
@@ -433,6 +454,7 @@ class DynamicPeriodSlotSerializer(serializers.ModelSerializer):
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     department_name = serializers.CharField(source='department.name', read_only=True, default='')
     class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
     slot_type_display = serializers.CharField(source='get_slot_type_display', read_only=True)
 
     class Meta:
@@ -445,6 +467,8 @@ class DynamicPeriodSlotSerializer(serializers.ModelSerializer):
             'department_name',
             'student_class',
             'class_name',
+            'section',
+            'section_name',
             'slot_type',
             'slot_type_display',
             'period_name',
@@ -457,7 +481,7 @@ class DynamicPeriodSlotSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'class_name', 'slot_type_display', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'class_name', 'section_name', 'slot_type_display', 'created_at', 'updated_at']
 
 
 class TeacherRoutineScheduleSerializer(serializers.ModelSerializer):

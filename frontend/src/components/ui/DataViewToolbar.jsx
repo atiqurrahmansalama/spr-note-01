@@ -37,7 +37,7 @@ export default function DataViewToolbar({
   searchQuery = '',
   onSearchChange,
   searchPlaceholder = 'Search...',
-  searchSpanClassName = 'lg:col-span-2',
+  searchSpanClassName = 'col-span-6 @[540px]:col-span-3 @[900px]:col-span-2',
   filterGridClassName = null,
   filterElement = null,
   customFilters = null,
@@ -116,10 +116,10 @@ export default function DataViewToolbar({
   if (stackedSwitcher) {
     return (
       <div
-        className={`p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
+        className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
         {/* Top Row: Search Input + All Filters in a Single Responsive Grid Row */}
-        <div className={`grid ${filterGridClassName || 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'} gap-2.5 w-full items-end`}>
+        <div className={`grid ${filterGridClassName || 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 @[900px]:grid-cols-6'} gap-2.5 w-full items-end`}>
           {onSearchChange && (
             <div className={searchSpanClassName}>
               <CustomInput
@@ -181,7 +181,7 @@ export default function DataViewToolbar({
   // 2. Inline Single-Row Mode (Default for standard views with 0-2 filters)
   return (
     <div
-      className={`p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col lg:flex-row lg:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0 ${className}`}
+      className={`@container p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col @[900px]:flex-row @[900px]:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0 ${className}`}
     >
       {/* Left & Middle: Search Bar + Side-by-Side Filters */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-2.5 flex-1 min-w-0">

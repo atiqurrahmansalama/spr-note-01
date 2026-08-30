@@ -153,6 +153,12 @@ class ClassPeriodSlot(models.Model):
         on_delete=models.SET_NULL,
         related_name='class_period_slots'
     )
+    section = models.ForeignKey('core.ClassSection',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='class_period_slots'
+    )
     teacher = models.ForeignKey(
         'StaffProfile',
         null=True,
@@ -201,6 +207,7 @@ class ClassPeriodSlot(models.Model):
                     'institution_id': self.institution_id,
                     'department_id': self.department_id,
                     'student_class_id': self.student_class_id,
+                    'section_id': self.section_id,
                     'period_name': self.period_name,
                     'period_order': self.period_order,
                     'start_time': self.start_time,
@@ -441,6 +448,12 @@ class DynamicPeriodSlot(models.Model):
         related_name='dynamic_period_slots'
     )
     student_class = models.ForeignKey('core.StudentClass',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dynamic_period_slots'
+    )
+    section = models.ForeignKey('core.ClassSection',
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

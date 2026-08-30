@@ -231,3 +231,79 @@ export const reorderPeriodSlots = async (slots) => {
   }
   return await response.json();
 };
+
+// ==========================================
+// 4. ACADEMIC DEPARTMENTS
+// ==========================================
+
+export const getDepartments = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.search) query.append('search', params.search);
+  if (params.institution && params.institution !== 'ALL') query.append('institution', params.institution);
+  if (params.branch && params.branch !== 'ALL') query.append('branch', params.branch);
+  if (params.is_active !== undefined && params.is_active !== 'ALL') query.append('is_active', params.is_active);
+  if (params.has_quran_tracker !== undefined && params.has_quran_tracker !== 'ALL') query.append('has_quran_tracker', params.has_quran_tracker);
+  if (params.page_size) query.append('page_size', params.page_size);
+  if (params.all) query.append('all', 'true');
+
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await fetchWithAuth(`/api/v1/departments/${qs}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch departments (Status: ${response.status})`);
+  }
+  return await response.json();
+};
+
+export const getDepartmentDetails = async (id) => {
+  const response = await fetchWithAuth(`/api/v1/departments/${id}/`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch department details (Status: ${response.status})`);
+  }
+  return await response.json();
+};
+
+export const getDepartmentMetrics = async () => {
+  const response = await fetchWithAuth('/api/v1/departments/metrics/');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch department metrics (Status: ${response.status})`);
+  }
+  return await response.json();
+};
+
+export const createDepartment = async (data) => {
+  const response = await fetchWithAuth('/api/v1/departments/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.non_field_errors?.[0] || err.name?.[0] || err.branch?.[0] || err.error || err.detail || 'Failed to create department');
+  }
+  return await response.json();
+};
+
+export const updateDepartment = async (id, data) => {
+  const response = await fetchWithAuth(`/api/v1/departments/${id}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.non_field_errors?.[0] || err.name?.[0] || err.branch?.[0] || err.error || err.detail || 'Failed to update department');
+  }
+  return await response.json();
+};
+
+export const deleteDepartment = async (id) => {
+  const response = await fetchWithAuth(`/api/v1/departments/${id}/`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || err.detail || 'Failed to delete department');
+  }
+  return await response.json().catch(() => ({ status: 'success' }));
+};
+

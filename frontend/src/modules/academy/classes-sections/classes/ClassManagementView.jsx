@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
@@ -6,16 +6,15 @@ import {
   ClassIcon,
   GroupIcon,
   SectionIcon,
-  StudentIcon,
-  PlusIcon,
-  BuildingOfficeIcon,
+  TeacherIcon,
   EditIcon,
   TrashIcon,
+  TableIcon,
+  Squares2X2Icon,
 } from "../../../../components/ui/Icons";
 import ActionMenu from "../../../../components/ui/ActionMenu";
-import CustomSelect from "../../../../components/ui/CustomSelect";
-import { TeacherSelect } from "../../../../components/selectors";
-import UniversalManagementView from "../../../../components/common/UniversalManagementView";
+import DataTable from "../../../../components/ui/DataTable";
+import DataCardGrid from "../../../../components/ui/DataCardGrid";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
 import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
@@ -29,29 +28,28 @@ export default function ClassManagementView({
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const queryDept = searchParams.get("department") || "ALL";
 
   const [classes, setClasses] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [metrics, setMetrics] = useState({
-    total_classes: 0,
-    total_enrolled_students: 0,
-    avg_students_per_class: 0.0,
+  // View Mode
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem("spr_classes_view_mode") || "table";
+    } catch {
+      return "table";
+    }
   });
 
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState(queryDept);
-  const [teacherFilter, setTeacherFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-
-  // Selection & UI
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [viewMode, setViewMode] = useState("table");
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("spr_classes_view_mode", mode);
+    } catch {}
+  };
 
   // Modals
   const [deletingClass, setDeletingClass] = useState(null);
@@ -59,19 +57,7 @@ export default function ClassManagementView({
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination & Sorting
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sortField, setSortField] = useState("order_rank");
-  const [sortDirection, setSortDirection] = useState("asc");
-
-  useEffect(() => {
-    if (queryDept !== departmentFilter) {
-      setDepartmentFilter(queryDept);
-    }
-  }, [queryDept]);
-
-  const loadClasses = async () => {
+  const loadClasses = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetchWithAuth("/api/v1/classes/?page_size=500&all=true");
@@ -85,47 +71,17 @@ export default function ClassManagementView({
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadDepartments = async () => {
-    try {
-      const res = await fetchWithAuth("/api/v1/departments/");
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.results || [];
-        setDepartments(list.filter((d) => !d.is_deleted && d.is_active));
-      }
-    } catch {}
-  };
-
-  const loadMetrics = async () => {
-    try {
-      const res = await fetchWithAuth("/api/v1/classes/metrics/");
-      if (res.ok) {
-        const d = await res.json();
-        setMetrics({
-          total_classes: d.total_classes || 0,
-          total_enrolled_students: d.total_enrolled_students || 0,
-          avg_students_per_class: d.avg_students_per_class || 0.0,
-        });
-      }
-    } catch {}
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadClasses();
-    loadDepartments();
-    loadMetrics();
 
     const handleTenantChanged = () => {
       loadClasses();
-      loadDepartments();
-      loadMetrics();
     };
 
     const handleClassUpdated = () => {
       loadClasses();
-      loadMetrics();
     };
 
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
@@ -134,7 +90,12 @@ export default function ClassManagementView({
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
       window.removeEventListener("spr_class_updated", handleClassUpdated);
     };
-  }, []);
+  }, [loadClasses]);
+
+  // Filtered dataset (supporting URL department filter if navigated from department view)
+  const displayedClasses = queryDept !== "ALL"
+    ? classes.filter((cls) => String(cls.department) === String(queryDept))
+    : classes;
 
   // Drawer Registration for Add/Edit Class
   useDrawerRegistration(
@@ -153,10 +114,10 @@ export default function ClassManagementView({
         width: "lg",
         content: (
           <ClassForm
+            key={classId ? `edit-class-${classId}` : "add-class"}
             editingClass={foundClass}
             onSaved={() => {
               loadClasses();
-              loadMetrics();
               closeDrawer();
             }}
             onCancel={closeDrawer}
@@ -164,12 +125,8 @@ export default function ClassManagementView({
         ),
       };
     },
-    [classes, loadClasses, loadMetrics, closeDrawer]
+    [classes, loadClasses, closeDrawer]
   );
-
-  const handleOpenCreate = () => {
-    openDrawer("class", { mode: "add" });
-  };
 
   const handleOpenEdit = (cls) => {
     openDrawer("class", { mode: "edit", id: cls.id });
@@ -192,7 +149,6 @@ export default function ClassManagementView({
         setIsDeleteModalOpen(false);
         setDeletingClass(null);
         loadClasses();
-        loadMetrics();
         window.dispatchEvent(new CustomEvent("spr_class_updated"));
       } else {
         const err = await res.json().catch(() => ({}));
@@ -204,73 +160,6 @@ export default function ClassManagementView({
       setIsDeleting(false);
     }
   };
-
-  const handleFilterChange = (setter, key) => (val) => {
-    setter(val);
-    const newParams = new URLSearchParams(searchParams);
-    if (val === "ALL" || !val) {
-      newParams.delete(key);
-    } else {
-      newParams.set(key, val);
-    }
-    setSearchParams(newParams);
-  };
-
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() ||
-    departmentFilter !== "ALL" ||
-    teacherFilter !== "ALL" ||
-    statusFilter !== "ALL"
-  );
-
-  const activeFilterCount = [
-    departmentFilter !== "ALL",
-    teacherFilter !== "ALL",
-    statusFilter !== "ALL",
-  ].filter(Boolean).length;
-
-  const handleResetFilters = () => {
-    setSearchQuery("");
-    setDepartmentFilter("ALL");
-    setTeacherFilter("ALL");
-    setStatusFilter("ALL");
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("department");
-    newParams.delete("teacher");
-    newParams.delete("status");
-    setSearchParams(newParams);
-  };
-
-  // Filtered dataset
-  const filteredClasses = classes.filter((cls) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = cls.name?.toLowerCase().includes(q);
-      const matchCode = cls.code?.toLowerCase().includes(q);
-      const matchDept = cls.department_name?.toLowerCase().includes(q);
-      const matchTeacher = cls.class_teacher_name?.toLowerCase().includes(q);
-      if (!matchName && !matchCode && !matchDept && !matchTeacher) return false;
-    }
-
-    if (departmentFilter !== "ALL" && String(cls.department) !== String(departmentFilter)) {
-      return false;
-    }
-
-    if (teacherFilter !== "ALL") {
-      if (teacherFilter === "UNASSIGNED") {
-        if (cls.class_teacher) return false;
-      } else if (String(cls.class_teacher) !== String(teacherFilter)) {
-        return false;
-      }
-    }
-
-    if (statusFilter !== "ALL") {
-      if (statusFilter === "ACTIVE" && !cls.is_active) return false;
-      if (statusFilter === "INACTIVE" && cls.is_active) return false;
-    }
-
-    return true;
-  });
 
   const getActionMenuItems = (cls) => [
     {
@@ -301,10 +190,24 @@ export default function ClassManagementView({
   // Table Columns
   const tableColumns = [
     {
+      key: "index",
+      header: "No",
+      align: "center",
+      headerClassName: "w-14 text-center font-mono text-xs",
+      cellClassName: "w-14 text-center font-mono text-xs",
+      render: (_, rowIdx) => (
+        <span className="font-mono text-xs font-bold theme-text-secondary">
+          {rowIdx + 1}
+        </span>
+      ),
+    },
+    {
       key: "name",
       header: "Class Name & Code",
+      headerClassName: "min-w-[200px] sm:min-w-[240px]",
+      cellClassName: "min-w-[200px] sm:min-w-[240px]",
       render: (cls) => (
-        <div className="space-y-0.5">
+        <div className="space-y-0.5 py-1">
           <span className="font-bold text-sm theme-text-primary block">{cls.name}</span>
           {cls.code && (
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-block">
@@ -317,6 +220,8 @@ export default function ClassManagementView({
     {
       key: "department",
       header: "Department",
+      headerClassName: "min-w-[140px] sm:min-w-[180px]",
+      cellClassName: "min-w-[140px] sm:min-w-[180px]",
       render: (cls) => (
         <span className="text-xs font-semibold theme-text-primary">
           {cls.department_name || cls.department_type || "General"}
@@ -326,18 +231,25 @@ export default function ClassManagementView({
     {
       key: "class_teacher_name",
       header: "Class Teacher",
+      headerClassName: "min-w-[160px] sm:min-w-[200px]",
+      cellClassName: "min-w-[160px] sm:min-w-[200px]",
       render: (cls) => (
-        <span className="text-xs font-semibold theme-text-primary">
-          {cls.class_teacher_name || "Unassigned"}
-        </span>
+        <div className="flex items-center gap-1.5 text-xs theme-text-secondary py-1">
+          <TeacherIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+          <span className={`font-semibold ${cls.class_teacher_name ? "theme-text-primary" : "theme-text-muted italic"}`}>
+            {cls.class_teacher_name || "Unassigned"}
+          </span>
+        </div>
       ),
     },
     {
       key: "student_count",
       header: "Students",
       align: "center",
+      headerClassName: "w-24 text-center",
+      cellClassName: "w-24 text-center",
       render: (cls) => (
-        <span className="text-xs font-bold font-mono theme-text-primary">
+        <span className="text-xs font-bold font-mono theme-accent px-2.5 py-0.5 rounded-lg theme-bg-accent-soft/40 border theme-border inline-block">
           {cls.student_count || 0}
         </span>
       ),
@@ -346,8 +258,10 @@ export default function ClassManagementView({
       key: "section_count",
       header: "Sections",
       align: "center",
+      headerClassName: "w-24 text-center",
+      cellClassName: "w-24 text-center",
       render: (cls) => (
-        <span className="text-xs font-bold font-mono theme-text-primary">
+        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
           {cls.section_count || 0}
         </span>
       ),
@@ -356,8 +270,10 @@ export default function ClassManagementView({
       key: "group_count",
       header: "Groups",
       align: "center",
+      headerClassName: "w-24 text-center",
+      cellClassName: "w-24 text-center",
       render: (cls) => (
-        <span className="text-xs font-bold font-mono theme-text-primary">
+        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
           {cls.group_count || 0}
         </span>
       ),
@@ -367,9 +283,10 @@ export default function ClassManagementView({
       header: "Actions",
       align: "right",
       headerClassName: "w-16 text-right",
+      cellClassName: "w-16 text-right",
       render: (cls) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <ActionMenu items={getActionMenuItems(cls)} />
+          <ActionMenu items={getActionMenuItems(cls)} align="right" />
         </div>
       ),
     },
@@ -380,17 +297,17 @@ export default function ClassManagementView({
     <div
       key={cls.id}
       onClick={() => handleOpenEdit(cls)}
-      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
+      className="rounded-2xl theme-bg-surface border theme-border p-4 sm:p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
     >
-      <div className="space-y-3.5">
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+              <h3 className="font-bold theme-text-primary text-sm leading-tight truncate group-hover:theme-accent transition-colors">
                 {cls.name}
               </h3>
               {cls.code && (
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub theme-text-secondary border theme-border">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border">
                   {cls.code}
                 </span>
               )}
@@ -401,7 +318,7 @@ export default function ClassManagementView({
           </div>
 
           <div onClick={(e) => e.stopPropagation()}>
-            <ActionMenu items={getActionMenuItems(cls)} />
+            <ActionMenu items={getActionMenuItems(cls)} align="right" />
           </div>
         </div>
 
@@ -428,124 +345,65 @@ export default function ClassManagementView({
     </div>
   );
 
-  const totalClassesCount = metrics?.total_classes || classes.length;
-  const totalEnrolledCount = metrics?.total_enrolled_students ?? classes.reduce((acc, c) => acc + (c.student_count || 0), 0);
-  const avgStudentsCount = metrics?.avg_students_per_class ?? (classes.length ? (totalEnrolledCount / classes.length).toFixed(1) : 0);
-
-  const departmentOptions = [
-    { value: "ALL", label: "All Departments" },
-    ...departments.map((d) => ({ value: d.id, label: d.name })),
-  ];
-
-  const teacherOptions = [
-    { value: "ALL", label: "All Teachers" },
-    { value: "UNASSIGNED", label: "Unassigned Teachers" },
-  ];
-
-  const statusOptions = [
-    { value: "ALL", label: "All Status" },
-    { value: "ACTIVE", label: "Active Classes" },
-    { value: "INACTIVE", label: "Inactive Classes" },
-  ];
-
-  const filterControls = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
-      <CustomSelect
-        label="Department"
-        value={departmentFilter}
-        onChange={handleFilterChange(setDepartmentFilter, "department")}
-        options={departmentOptions}
-        icon={BuildingOfficeIcon}
-      />
-      <CustomSelect
-        label="Class Teacher"
-        value={teacherFilter}
-        onChange={handleFilterChange(setTeacherFilter, "teacher")}
-        options={teacherOptions}
-        icon={ClassIcon}
-      />
-      <CustomSelect
-        label="Class Status"
-        value={statusFilter}
-        onChange={handleFilterChange(setStatusFilter, "status")}
-        options={statusOptions}
-      />
-    </div>
-  );
-
   return (
-    <>
-      <UniversalManagementView
-        title="Class Management"
-        subtitle="Manage academic classes, class teachers, and grade levels across departments."
-        icon={ClassIcon}
-        hideHeader={hideHeader}
-        hideMetrics={hideMetrics}
-        isEmbedded={isEmbedded}
-        primaryAction={{
-          label: "Add Class",
-          icon: PlusIcon,
-          onClick: handleOpenCreate,
-        }}
-        metrics={[
-          {
-            label: "Total Classes",
-            value: totalClassesCount,
-            icon: ClassIcon,
-            color: "accent",
-            subLabel: "Active grades",
-          },
-          {
-            label: "Enrolled Students",
-            value: totalEnrolledCount,
-            icon: StudentIcon,
-            color: "accent",
-            subLabel: "Total enrollment",
-          },
-          {
-            label: "Avg Students / Class",
-            value: avgStudentsCount,
-            icon: GroupIcon,
-            color: "accent",
-            subLabel: "Class density",
-            onClick: () => navigate("/academy/classes-groups?tab=groups"),
-          },
-        ]}
-        searchPlaceholder="Search classes by name, code, teacher, or department..."
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        hasActiveFilters={hasActiveFilters}
-        activeFilterCount={activeFilterCount}
-        onResetFilters={handleResetFilters}
-        filterControls={filterControls}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        data={filteredClasses}
-        columns={tableColumns}
-        loading={loading}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onRowClick={(cls) => handleOpenEdit(cls)}
-        renderCard={renderClassCard}
-        page={page}
-        pageSize={pageSize}
-        totalCount={filteredClasses.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onSort={(f, d) => {
-          setSortField(f);
-          setSortDirection(d);
-        }}
-        emptyState={{
-          icon: ClassIcon,
-          title: "No Classes Found",
-          description: hasActiveFilters
-            ? "No classes match the applied filters. Try resetting search criteria."
-            : "No academic classes have been created yet. Click 'Add Class' to set up your first grade.",
-        }}
-      />
+    <div className="flex flex-col w-full space-y-3.5">
+      {/* ─── Compact Header & Switcher Row (Zero Background Box) ─── */}
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <ClassIcon className="w-4 h-4 theme-accent" />
+          <h5 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+            Academic Classes ({displayedClasses.length})
+          </h5>
+        </div>
+
+        {/* Standard View Switcher Toggle Button */}
+        <button
+          type="button"
+          onClick={() => handleViewModeChange(viewMode === "grid" ? "table" : "grid")}
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+          title={viewMode === "grid" ? "Switch to Table View" : "Switch to Cards View"}
+        >
+          {viewMode === "grid" ? (
+            <>
+              <TableIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Table View</span>
+            </>
+          ) : (
+            <>
+              <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+              <span>Cards View</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Main View Content (Table or Cards Grid) */}
+      {viewMode === "table" ? (
+        <DataTable
+          columns={tableColumns}
+          data={displayedClasses}
+          loading={loading}
+          loadingMessage="Loading academic classes..."
+          keyExtractor={(c, idx) => c.id || `class_${idx}`}
+          cellPaddingClass="py-3.5 px-4 sm:px-5"
+          headerCellClassName="py-3 px-4 sm:px-5 text-xs uppercase tracking-wider font-bold"
+          emptyIcon={ClassIcon}
+          emptyTitle="No Classes Found"
+          emptySubMessage="Get started by creating your first academic class or grade."
+          onRowClick={(cls) => handleOpenEdit(cls)}
+        />
+      ) : (
+        <DataCardGrid
+          data={displayedClasses}
+          renderCard={renderClassCard}
+          isLoading={loading}
+          loadingMessage="Loading academic classes..."
+          emptyIcon={ClassIcon}
+          emptyTitle="No Classes Found"
+          emptySubMessage="Get started by creating your first academic class or grade."
+          gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        />
+      )}
 
       {/* Delete Impact Modal */}
       {deletingClass && (
@@ -584,11 +442,10 @@ export default function ClassManagementView({
           availableClasses={classes}
           onSuccess={() => {
             loadClasses();
-            loadMetrics();
             window.dispatchEvent(new CustomEvent("spr_class_updated"));
           }}
         />
       )}
-    </>
+    </div>
   );
 }

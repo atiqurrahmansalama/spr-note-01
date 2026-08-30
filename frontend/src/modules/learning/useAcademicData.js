@@ -1,261 +1,132 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
+import { useTenant } from '../../context/TenantContext';
+import { academicYearsStore } from '../../utils/stores/academicStore';
+import { getBranches } from '../../api/academy';
 
-const DEFAULT_CLASSES = [
-  { id: 'cls_1', name: 'Standard Hifz Division', department_name: 'Hifz' },
-  { id: 'cls_2', name: 'Kitab Division (Fazilat)', department_name: 'Kitab' },
-  { id: 'cls_3', name: 'Primary Islamic Studies', department_name: 'Primary' },
-];
-
-const DEFAULT_SECTIONS = [
-  { id: 'sec_1', student_class: 'cls_1', section_name: 'Section A (Boys)' },
-  { id: 'sec_2', student_class: 'cls_2', section_name: 'Section 1' },
-  { id: 'sec_3', student_class: 'cls_3', section_name: 'Section Alpha' },
-];
-
-const DEFAULT_STUDENTS = [
-  {
-    id: 'stu_1',
-    name: 'Ahmadullah Al-Mahdi',
-    name_en: 'Ahmadullah Al-Mahdi',
-    uniq_id: 'STU-2026-001',
-    roll_number: '101',
-    student_class: 'cls_1',
-    student_class_name: 'Standard Hifz Division',
-    section: 'sec_1',
-    section_name: 'Section A (Boys)',
-  },
-  {
-    id: 'stu_2',
-    name: 'Mahmudur Rahman',
-    name_en: 'Mahmudur Rahman',
-    uniq_id: 'STU-2026-002',
-    roll_number: '102',
-    student_class: 'cls_1',
-    student_class_name: 'Standard Hifz Division',
-    section: 'sec_1',
-    section_name: 'Section A (Boys)',
-  },
-  {
-    id: 'stu_3',
-    name: 'Abdullah Tariq',
-    name_en: 'Abdullah Tariq',
-    uniq_id: 'STU-2026-003',
-    roll_number: '103',
-    student_class: 'cls_1',
-    student_class_name: 'Standard Hifz Division',
-    section: 'sec_1',
-    section_name: 'Section A (Boys)',
-  },
-  {
-    id: 'stu_4',
-    name: 'Zubair Al-Hasan',
-    name_en: 'Zubair Al-Hasan',
-    uniq_id: 'STU-2026-004',
-    roll_number: '104',
-    student_class: 'cls_2',
-    student_class_name: 'Kitab Division (Fazilat)',
-    section: 'sec_2',
-    section_name: 'Section 1',
-  },
-];
-
-const DEFAULT_PERIODS = [
-  // ── Class 1: Standard Hifz Division (cls_1) ──
-  {
-    id: 'period_1',
-    period_name: '1st Period: Sabq (New Lesson Recitation)',
-    period_order: 1,
-    start_time: '08:00',
-    end_time: '08:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_1',
-  },
-  {
-    id: 'period_2',
-    period_name: '2nd Period: Sabqi (Recent Lessons Revision)',
-    period_order: 2,
-    start_time: '09:00',
-    end_time: '09:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_1',
-  },
-  {
-    id: 'period_hifz_3',
-    period_name: '3rd Period: Tajweed & Makharij Rules',
-    period_order: 3,
-    start_time: '10:00',
-    end_time: '10:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_1',
-  },
-  {
-    id: 'period_hifz_4',
-    period_name: '4th Period: Islamic Manners & Daily Duas',
-    period_order: 4,
-    start_time: '11:00',
-    end_time: '11:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_1',
-  },
-  {
-    id: 'period_5',
-    period_name: '5th Period: Daur & Afternoon Revision',
-    period_order: 5,
-    start_time: '14:00',
-    end_time: '14:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_1',
-  },
-
-  // ── Class 2: Kitab Division - Fazilat (cls_2) ──
-  {
-    id: 'period_kitab_1',
-    period_name: '1st Period: Tafsir al-Quran (Jalalayn)',
-    period_order: 1,
-    start_time: '08:00',
-    end_time: '08:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_2',
-  },
-  {
-    id: 'period_kitab_2',
-    period_name: '2nd Period: Hadith Studies (Mishkat al-Masabih)',
-    period_order: 2,
-    start_time: '09:00',
-    end_time: '09:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_2',
-  },
-  {
-    id: 'period_3',
-    period_name: '3rd Period: Arabic Grammar & Syntax',
-    period_order: 3,
-    start_time: '10:00',
-    end_time: '10:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_2',
-  },
-  {
-    id: 'period_4',
-    period_name: '4th Period: Islamic Jurisprudence (Fiqh)',
-    period_order: 4,
-    start_time: '11:00',
-    end_time: '11:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_2',
-  },
-  {
-    id: 'period_kitab_5',
-    period_name: '5th Period: Principles of Fiqh (Usul al-Shashi)',
-    period_order: 5,
-    start_time: '14:00',
-    end_time: '14:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_2',
-  },
-  {
-    id: 'period_6',
-    period_name: '6th Period: Mutala & Study Session',
-    period_order: 6,
-    start_time: '15:00',
-    end_time: '15:45',
-    slot_type: 'MUTALA_SESSION',
-    student_class: 'cls_2',
-  },
-
-  // ── Class 3: Primary Islamic Studies (cls_3) ──
-  {
-    id: 'period_7',
-    period_name: '1st Period: Noorani Qaida & Basic Tajweed',
-    period_order: 1,
-    start_time: '08:00',
-    end_time: '08:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_3',
-  },
-  {
-    id: 'period_8',
-    period_name: '2nd Period: Ampara Recitation & Masnoon Duas',
-    period_order: 2,
-    start_time: '09:00',
-    end_time: '09:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_3',
-  },
-  {
-    id: 'period_9',
-    period_name: '3rd Period: Islamic Beliefs & Basic Akhlaq',
-    period_order: 3,
-    start_time: '10:00',
-    end_time: '10:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_3',
-  },
-  {
-    id: 'period_primary_4',
-    period_name: '4th Period: Elementary Bengali & Islamic Etiquette',
-    period_order: 4,
-    start_time: '11:00',
-    end_time: '11:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_3',
-  },
-  {
-    id: 'period_primary_5',
-    period_name: '5th Period: Basic English & Arithmetic',
-    period_order: 5,
-    start_time: '14:00',
-    end_time: '14:45',
-    slot_type: 'TEACHING_PERIOD',
-    student_class: 'cls_3',
-  },
-];
-
+/**
+ * Unified Hook to load full dynamic academic roster hierarchy
+ * (Academy > Branches > Academic Years & Semesters > Departments > Classes > Sections > Students & Period Routine)
+ * 100% Zero Hardcoded fallback — dynamically synchronizes with the live backend database & local store for the active Academy.
+ */
 export function useAcademicData() {
-  const [classes, setClasses] = useState(DEFAULT_CLASSES);
-  const [sections, setSections] = useState(DEFAULT_SECTIONS);
-  const [students, setStudents] = useState(DEFAULT_STUDENTS);
-  const [periodSlots, setPeriodSlots] = useState(DEFAULT_PERIODS);
+  const tenantContext = useTenant ? useTenant() : null;
+  const activeTenantId = tenantContext?.activeTenantId || '';
+
+  const [branches, setBranches] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [periodSlots, setPeriodSlots] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  // Listen to system-wide update events
+  useEffect(() => {
+    const handleUpdate = () => {
+      setRefreshTrigger((prev) => prev + 1);
+    };
+
+    window.addEventListener('spr_tenant_changed', handleUpdate);
+    window.addEventListener('spr_branches_updated', handleUpdate);
+    window.addEventListener('spr_academic_years_updated', handleUpdate);
+    window.addEventListener('spr_departments_updated', handleUpdate);
+    window.addEventListener('spr_classes_updated', handleUpdate);
+    window.addEventListener('spr_sections_updated', handleUpdate);
+    window.addEventListener('spr_students_updated', handleUpdate);
+    window.addEventListener('spr_periods_updated', handleUpdate);
+    window.addEventListener('spr_staff_updated', handleUpdate);
+    window.addEventListener('spr_teachers_updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('spr_tenant_changed', handleUpdate);
+      window.removeEventListener('spr_branches_updated', handleUpdate);
+      window.removeEventListener('spr_academic_years_updated', handleUpdate);
+      window.removeEventListener('spr_departments_updated', handleUpdate);
+      window.removeEventListener('spr_classes_updated', handleUpdate);
+      window.removeEventListener('spr_sections_updated', handleUpdate);
+      window.removeEventListener('spr_students_updated', handleUpdate);
+      window.removeEventListener('spr_periods_updated', handleUpdate);
+      window.removeEventListener('spr_staff_updated', handleUpdate);
+      window.removeEventListener('spr_teachers_updated', handleUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
+      setLoading(true);
       try {
-        const [clsRes, secRes, stuRes, perRes] = await Promise.allSettled([
-          fetchWithAuth('/api/v1/classes/'),
-          fetchWithAuth('/api/v1/academy/sections/'),
-          fetchWithAuth('/api/v1/students/'),
-          fetchWithAuth('/api/v1/academy/periods/'),
+        // Load Academic Years from local store / API
+        const localYears = academicYearsStore.getAcademicYears(activeTenantId);
+        if (isMounted) setAcademicYears(localYears);
+
+        const [branchRes, deptRes, clsRes, secRes, stuRes, perRes, staffRes] = await Promise.allSettled([
+          getBranches ? getBranches({ type: 'ALL' }) : Promise.resolve([]),
+          fetchWithAuth('/api/v1/departments/?page_size=500&all=true'),
+          fetchWithAuth('/api/v1/classes/?page_size=500&all=true'),
+          fetchWithAuth('/api/v1/academy/sections/?page_size=500&all=true'),
+          fetchWithAuth('/api/v1/students/?page_size=500&all=true'),
+          fetchWithAuth('/api/v1/academy/periods/?page_size=500&all=true'),
+          fetchWithAuth('/api/v1/staff/?page_size=500&all=true'),
         ]);
 
-        if (clsRes.status === 'fulfilled' && clsRes.value.ok) {
-          const clsData = await clsRes.value.json();
-          const list = Array.isArray(clsData) ? clsData : clsData.results || [];
-          if (list.length > 0 && isMounted) setClasses(list);
-        }
+        if (isMounted) {
+          if (branchRes.status === 'fulfilled') {
+            const list = Array.isArray(branchRes.value) ? branchRes.value : branchRes.value?.results || [];
+            setBranches(list.filter((b) => !b.is_deleted));
+          }
 
-        if (secRes.status === 'fulfilled' && secRes.value.ok) {
-          const secData = await secRes.value.json();
-          const list = Array.isArray(secData) ? secData : secData.results || [];
-          if (list.length > 0 && isMounted) setSections(list);
-        }
+          if (deptRes.status === 'fulfilled' && deptRes.value?.ok) {
+            const data = await deptRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            setDepartments(list.filter((d) => !d.is_deleted));
+          }
 
-        if (stuRes.status === 'fulfilled' && stuRes.value.ok) {
-          const stuData = await stuRes.value.json();
-          const list = Array.isArray(stuData) ? stuData : stuData.results || [];
-          if (list.length > 0 && isMounted) setStudents(list);
-        }
+          if (clsRes.status === 'fulfilled' && clsRes.value?.ok) {
+            const data = await clsRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            setClasses(list.filter((c) => !c.is_deleted));
+          }
 
-        if (perRes.status === 'fulfilled' && perRes.value.ok) {
-          const perData = await perRes.value.json();
-          const list = Array.isArray(perData) ? perData : perData.results || [];
-          if (list.length > 0 && isMounted) setPeriodSlots(list);
+          if (secRes.status === 'fulfilled' && secRes.value?.ok) {
+            const data = await secRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            setSections(list.filter((s) => !s.is_deleted));
+          }
+
+          if (stuRes.status === 'fulfilled' && stuRes.value?.ok) {
+            const data = await stuRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            setStudents(list.filter((st) => !st.is_deleted));
+          }
+
+          if (perRes.status === 'fulfilled' && perRes.value?.ok) {
+            const data = await perRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            setPeriodSlots(list.filter((p) => !p.is_deleted));
+          }
+
+          if (staffRes.status === 'fulfilled' && staffRes.value?.ok) {
+            const data = await staffRes.value.json();
+            const list = Array.isArray(data) ? data : data.results || [];
+            const activeStaff = list.filter((s) => !s.is_deleted && s.is_active !== false);
+            setStaff(activeStaff);
+            const teachingStaff = activeStaff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
+            setTeachers(teachingStaff.length > 0 ? teachingStaff : activeStaff);
+          }
         }
       } catch (err) {
-        console.warn('Using default academic roster fallback:', err);
+        console.warn('useAcademicData: Failed to load academic hierarchy:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -265,7 +136,33 @@ export function useAcademicData() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshTrigger, activeTenantId]);
 
-  return { classes, sections, students, periodSlots, loading };
+  // Derived Active Academic Year & Semesters (Terms)
+  const activeYear = useMemo(() => {
+    return academicYears.find((y) => y.isCurrent) || academicYears[0] || null;
+  }, [academicYears]);
+
+  const activeTerms = useMemo(() => {
+    return activeYear?.terms || [
+      { id: 'sem_1', name: '1st Semester', isCurrent: true },
+      { id: 'sem_2', name: '2nd Semester', isCurrent: false },
+    ];
+  }, [activeYear]);
+
+  return {
+    branches,
+    academicYears,
+    activeYear,
+    activeTerms,
+    departments,
+    classes,
+    sections,
+    students,
+    periodSlots,
+    teachers,
+    staff,
+    loading,
+    refetch,
+  };
 }

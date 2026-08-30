@@ -47,6 +47,7 @@ import {
   admissionSettingsStore,
   academicSubjectsStore,
   ACADEMIC_SUBJECT_CATEGORIES,
+  branchCategoriesStore,
 } from "../../../utils/localStore";
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TIME } from "../../../constants/version";
 import { useToast } from "../../../context/ToastContext";
@@ -316,18 +317,31 @@ export default function DeveloperToolsHubView() {
       onSectionChange={handleSectionChange}
     >
       <div className="w-full">
-        {/* Section 1: Academy Categories */}
+        {/* Section 1: Academy Categories & Branch Categories */}
         {activeSection === "categories" && (
-          <CompactTaxonomyManager
-            title="Academy Categories"
-            description="Manage institution types, curriculum models, and structural taxonomy divisions."
-            fetchItems={getInstitutionCategories}
-            createItem={createInstitutionCategory}
-            updateItem={updateInstitutionCategory}
-            deleteItem={deleteInstitutionCategory}
-            itemTypeName="Category"
-            icon={BuildingOfficeIcon}
-          />
+          <div className="space-y-8">
+            <CompactTaxonomyManager
+              title="Academy Categories"
+              description="Manage institution types, curriculum models, and structural taxonomy divisions."
+              fetchItems={getInstitutionCategories}
+              createItem={createInstitutionCategory}
+              updateItem={updateInstitutionCategory}
+              deleteItem={deleteInstitutionCategory}
+              itemTypeName="Category"
+              icon={BuildingOfficeIcon}
+            />
+
+            <CompactTaxonomyManager
+              title="Branch & Campus Categories"
+              description="Configure campus classifications, branch types (Main Campus, Sub Branch, Female Branch, Residential Complex, etc.), and operational campus scopes."
+              fetchItems={async () => branchCategoriesStore.getCategories(activeTenantId)}
+              createItem={async (payload) => branchCategoriesStore.addCategory(activeTenantId, payload)}
+              updateItem={async (id, payload) => branchCategoriesStore.updateCategory(activeTenantId, id, payload)}
+              deleteItem={async (id) => branchCategoriesStore.deleteCategory(activeTenantId, id)}
+              itemTypeName="Branch Category"
+              icon={BuildingOfficeIcon}
+            />
+          </div>
         )}
 
         {/* Section: Period Sequences & Numbers */}

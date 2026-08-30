@@ -180,7 +180,7 @@ def run_seed():
         # --- A. Academic Branches (4 branches) ---
         branches_data = [
             {
-                "branch_name": f"{inst.name} - Main Campus",
+                "branch_name": "Main Campus",
                 "branch_code": f"MC-{inst.slug[:3].upper()}-01",
                 "branch_type": "MAIN_CAMPUS",
                 "contact_phone": "+8801712001122",
@@ -190,7 +190,7 @@ def run_seed():
                 "division": inst.division,
             },
             {
-                "branch_name": f"{inst.name} - North Noorani & Hifz Branch",
+                "branch_name": "North Noorani & Hifz Branch",
                 "branch_code": f"NB-{inst.slug[:3].upper()}-02",
                 "branch_type": "SUB_BRANCH",
                 "contact_phone": "+8801712003344",
@@ -200,7 +200,7 @@ def run_seed():
                 "division": inst.division,
             },
             {
-                "branch_name": f"{inst.name} - Mahila & Female Campus",
+                "branch_name": "Mahila & Female Campus",
                 "branch_code": f"FC-{inst.slug[:3].upper()}-03",
                 "branch_type": "FEMALE_BRANCH",
                 "contact_phone": "+8801712005566",
@@ -210,7 +210,7 @@ def run_seed():
                 "division": inst.division,
             },
             {
-                "branch_name": f"{inst.name} - Residential Complex & Boarding",
+                "branch_name": "Residential Complex & Boarding",
                 "branch_code": f"RC-{inst.slug[:3].upper()}-04",
                 "branch_type": "RESIDENTIAL_CAMPUS",
                 "contact_phone": "+8801712007788",

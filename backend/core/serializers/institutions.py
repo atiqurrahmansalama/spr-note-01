@@ -226,6 +226,7 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
         max_institutions = validated_data.get('max_institutions', 1)
         max_branches = validated_data.get('max_branches', 1)
         max_departments = validated_data.get('max_departments', 1)
+        preset_type = validated_data.get('preset_type', 'HIFZ')
 
         with transaction.atomic():
             # 1. Create Institution

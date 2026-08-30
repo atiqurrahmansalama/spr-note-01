@@ -37,23 +37,22 @@ const ResidentialAttendanceView = lazy(() => import("./modules/attendance/Reside
 const AdHocHeadcountView = lazy(() => import("./modules/attendance/AdHocHeadcountView"));
 
 // ─── Protected Academy & Campus Structure Views (Lazy Loaded) ───────────────
-const DepartmentManagementView = lazy(() => import("./modules/academy/departments/DepartmentManagementView"));
+const DepartmentManagementView = lazy(() => import("./modules/academy/campus-structure/departments/DepartmentManagementView"));
 const ClassManagementView = lazy(() => import("./modules/academy/classes-sections/classes/ClassManagementView"));
 const GroupManagementView = lazy(() => import("./modules/academy/classes-sections/groups/GroupManagementView"));
-const BranchManagementView = lazy(() => import("./modules/academy/BranchManagementView"));
+const BranchManagementView = lazy(() => import("./modules/academy/campus-structure/branches/BranchManagementView"));
 const SectionManagementView = lazy(() => import("./modules/academy/classes-sections/sections/SectionManagementView"));
 const RoutineCurriculumHubView = lazy(() => import("./modules/academy/routine-curriculum/RoutineCurriculumHubView"));
-const BranchSectionHubView = lazy(() => import("./modules/academy/BranchSectionHubView"));
-const CampusProfileHubView = lazy(() => import("./modules/academy/CampusProfileHubView"));
+const CampusProfileHubView = lazy(() => import("./modules/academy/campus-structure/CampusProfileHubView"));
 const ClassesGroupsHubView = lazy(() => import("./modules/academy/classes-sections/ClassesSectionsHubView"));
-const TimeCalendarManagerView = lazy(() => import("./modules/academy/TimeCalendarManagerView"));
+const CalendarEventsHubView = lazy(() => import("./modules/academy/calendar-events/CalendarEventsHubView"));
 const ResidentialHubView = lazy(() => import("./modules/academy/residential/ResidentialHubView"));
 const AcademyProfileView = lazy(() => import("./modules/settings/components/AcademyProfileView"));
 
 // ─── Protected Academic Learning & Lesson Management Views (Lazy Loaded) ─────
-const DailyClassroomHubView = lazy(() => import("./modules/learning/DailyClassroomHubView"));
-const SyllabusMilestoneHubView = lazy(() => import("./modules/learning/SyllabusMilestoneHubView"));
-const AcademicAnalyticsHubView = lazy(() => import("./modules/learning/AcademicAnalyticsHubView"));
+const DailyClassroomHubView = lazy(() => import("./modules/learning/daily-classroom/DailyClassroomHubView"));
+const SyllabusMilestoneHubView = lazy(() => import("./modules/learning/syllabus-milestone/SyllabusMilestoneHubView"));
+const AcademicAnalyticsHubView = lazy(() => import("./modules/learning/academic-analytics/AcademicAnalyticsHubView"));
 
 
 
@@ -80,7 +79,7 @@ const SectionToggleControlPanel = lazy(() => import("./modules/settings/componen
 // ─── Protected Developer & App Management Views (Lazy Loaded) ───────────────
 const RoleInviteManagerView = lazy(() => import("./modules/app-management/invites/RoleInviteManagerView"));
 const NotificationManagementView = lazy(() => import("./modules/app-management/notifications/NotificationManagementView"));
-const InstitutionListView = lazy(() => import("./modules/app-management/institutions/InstitutionListView"));
+const InstitutionListView = lazy(() => import("./modules/academy/campus-structure/academies/InstitutionListView"));
 const DeveloperToolsHubView = lazy(() => import("./modules/app-management/developer-tools/DeveloperToolsHubView"));
 
 function ProtectedRoute({ children }) {
@@ -177,12 +176,10 @@ export default function App() {
             <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
             <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
             <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches" fallback={<Navigate to="/dashboard" replace />}><BranchManagementView /></FeatureGuard>} />
-            <Route path="/academy/sections" element={<FeatureGuard sectionKey="class_sections" fallback={<Navigate to="/dashboard" replace />}><SectionManagementView /></FeatureGuard>} />
-            <Route path="/academy/branches-sections" element={<BranchSectionHubView />} />
             <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><RoutineCurriculumHubView /></FeatureGuard>} />
-            <Route path="/academy/calendar-events" element={<TimeCalendarManagerView />} />
-            <Route path="/academy/calendar-schedule" element={<TimeCalendarManagerView />} />
-            <Route path="/academy/working-hours" element={<TimeCalendarManagerView />} />
+            <Route path="/academy/calendar-events" element={<CalendarEventsHubView />} />
+            <Route path="/academy/calendar-schedule" element={<CalendarEventsHubView />} />
+            <Route path="/academy/working-hours" element={<CalendarEventsHubView />} />
             <Route path="/academy/residential-quarters" element={<ResidentialHubView />} />
             <Route path="/academy/residential" element={<ResidentialHubView />} />
             <Route path="/academy/dormitory" element={<ResidentialHubView />} />

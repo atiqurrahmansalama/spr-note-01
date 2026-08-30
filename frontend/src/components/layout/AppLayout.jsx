@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { calendarSettings, sidebarSettings, auth as authStore } from "../../utils/localStore";
+import { calendarSettings, sidebarSettings, auth as authStore, getBranchDisplayName } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
 import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
 import SaveStatusBadge from "../common/SaveStatusBadge";
@@ -16,6 +16,8 @@ import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
+import { useAcademicSession } from "../../context/AcademicSessionContext";
+import { UndoIcon, RedoIcon } from "../ui/Icons";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
@@ -290,30 +292,48 @@ export default function AppLayout() {
   }, [showToast]);
 
   const { currentInstitution, activeTenantId } = useTenant();
+  const { activeBranch, activeYear } = useAcademicSession();
   const isRightDock = location.pathname === "/report-builder" && panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
-  // 📱 Mobile Touch Swipe Right gesture to open sidebar (and swipe left to close)
+  // 📱 Mobile Touch Edge-Swipe gesture to open sidebar (and swipe left to close)
   useEffect(() => {
     let touchStartX = 0;
     let touchStartY = 0;
+    let isIgnoredTarget = false;
 
     const handleTouchStart = (e) => {
       if (e.touches && e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
+
+        // Ignore swipe if the touch started on a horizontally scrollable container, interactive input, table, calendar or button
+        const target = e.target;
+        if (target && target.closest) {
+          isIgnoredTarget = Boolean(
+            target.closest(
+              '.overflow-x-auto, .no-scrollbar, .scrollbar-none, [data-no-swipe], input, select, textarea, button, table, [role="tablist"], [role="slider"]'
+            )
+          );
+        } else {
+          isIgnoredTarget = false;
+        }
       }
     };
 
     const handleTouchEnd = (e) => {
       if (!e.changedTouches || e.changedTouches.length !== 1) return;
+      if (isIgnoredTarget) return;
+
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
 
       const deltaX = touchEndX - touchStartX;
       const deltaY = touchEndY - touchStartY;
 
-      if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
-        if (deltaX > 0 && (touchStartX < 60 || !isSidebarOpen)) {
+      // Must be a predominantly horizontal swipe
+      if (Math.abs(deltaX) > 70 && Math.abs(deltaY) < 50) {
+        // Open ONLY if swiped from the very left edge (within 24px of the screen edge)
+        if (deltaX > 0 && !isSidebarOpen && touchStartX <= 24) {
           setIsSidebarOpen(true);
         } else if (deltaX < 0 && isSidebarOpen) {
           setIsSidebarOpen(false);
@@ -564,12 +584,31 @@ export default function AppLayout() {
           </button>
         </div>
 
-        {/* Selected Active Institution Name in Header Middle (Pure Text, No Background) */}
+        {/* Selected Active Institution, Branch & Academic Year in Header Middle */}
         {currentInstitution?.name && (
           <div className="flex-1 flex justify-center items-center px-2 sm:px-4 min-w-0 pointer-events-none select-none text-center">
-            <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
-              {currentInstitution.name}
-            </span>
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
+              <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
+                {currentInstitution.name}
+              </span>
+              {getBranchDisplayName(activeBranch) &&
+                getBranchDisplayName(activeBranch).toLowerCase() !== currentInstitution.name.toLowerCase() && (
+                <>
+                  <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                  <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[240px]">
+                    {getBranchDisplayName(activeBranch)}
+                  </span>
+                </>
+              )}
+              {activeYear?.name && (
+                <>
+                  <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                  <span className="text-xs sm:text-sm font-semibold font-mono theme-accent truncate">
+                    {activeYear.name}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -585,9 +624,7 @@ export default function AppLayout() {
                 className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
                 title="Undo (Ctrl+Z)"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
+                <UndoIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
@@ -595,9 +632,7 @@ export default function AppLayout() {
                 className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
                 title="Redo (Ctrl+Y)"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 10h-10a8 8 0 00-8 8v2m18-12l-6 6m6-6l-6-6" />
-                </svg>
+                <RedoIcon className="w-3.5 h-3.5" />
               </button>
             </div>
           )}

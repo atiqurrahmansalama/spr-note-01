@@ -144,11 +144,11 @@ export default function RightSidebarPanel({
 
           <div className="flex items-center gap-1.5 min-w-0 truncate">
             {category && (
-              <span className="text-[10px] @sm:text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
+              <span className="text-[11px] @sm:text-xs font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
                 {category} /
               </span>
             )}
-            <span className="text-xs @sm:text-sm font-bold theme-text-primary truncate">
+            <span className="text-sm font-bold theme-text-primary truncate">
               {title}
             </span>
           </div>

@@ -34,6 +34,7 @@ import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../c
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
+import { useAcademicSession } from '../../context/AcademicSessionContext';
 import {
   ATTENDANCE_STATUSES,
   getAttendanceRateColor,
@@ -80,6 +81,8 @@ export default function ResidentialAttendanceView({
   const { showToast } = useToast();
   const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { openRightSidebar, closeRightSidebar, openDrawer } = useRightSidebar();
+  // Global Academic Session — bounds from active year/semester selected globally
+  const { activeYear, activeSemester } = useAcademicSession();
 
   const userProfile = useMemo(() => {
     try {
@@ -115,16 +118,17 @@ export default function ResidentialAttendanceView({
     };
   }, [activeTenantId]);
 
-  const [academicYearsVersion, setAcademicYearsVersion] = useState(0);
-  useEffect(() => {
-    const handleAcademicUpdate = () => setAcademicYearsVersion((v) => v + 1);
-    window.addEventListener('spr_academic_years_updated', handleAcademicUpdate);
-    return () => window.removeEventListener('spr_academic_years_updated', handleAcademicUpdate);
-  }, []);
-
+  // Derive academic date bounds from global AcademicSessionContext
   const academicBounds = useMemo(() => {
+    if (activeYear?.startDate && activeYear?.endDate) {
+      return {
+        minDate: activeSemester?.startDate || activeYear.startDate,
+        maxDate: activeSemester?.endDate || activeYear.endDate,
+        activeYear,
+      };
+    }
     return academicYearsStore.getDateBounds(activeTenantId);
-  }, [activeTenantId, academicYearsVersion]);
+  }, [activeYear, activeSemester, activeTenantId]);
 
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
   const todayStr = new Date().toISOString().split('T')[0];

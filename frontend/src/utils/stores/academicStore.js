@@ -6,6 +6,7 @@
  */
 
 import { KEYS, readJSON, writeJSON } from "./coreStore";
+import { weeklyHolidaysStore, WEEKDAY_OPTIONS } from "./calendarStore";
 
 // ─── Students Store ─────────────────────────────────────────────────────────
 
@@ -530,18 +531,23 @@ export const DEFAULT_ACADEMIC_YEARS = [
     endDate: "2026-12-31",
     termSystem: "SEMESTER",
     isCurrent: true,
+    // Branch context: Main Campus is the default scope for this academic year
+    branch_id: "branch_main",
+    branch_name: "Main Campus",
     terms: [
       {
         id: "sem_2026_1",
         name: "1st Semester",
         startDate: "2026-01-01",
         endDate: "2026-06-30",
+        isCurrent: false,
       },
       {
         id: "sem_2026_2",
         name: "2nd Semester",
         startDate: "2026-07-01",
         endDate: "2026-12-31",
+        isCurrent: true,
       },
     ],
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -577,6 +583,186 @@ export function getAcademicYearStatus(startDate, endDate) {
   if (today >= startDate && today <= endDate) return "ACTIVE";
   if (today < startDate) return "UPCOMING";
   return "COMPLETED";
+}
+
+export const DEFAULT_BRANCH_CATEGORIES = [
+  {
+    id: "cat_main_campus",
+    code: "MAIN_CAMPUS",
+    name: "Main Campus",
+    name_bn: "মূল ক্যাম্পাস",
+    order: 1,
+    description: "Central administrative headquarters and primary academic campus",
+    is_active: true,
+  },
+  {
+    id: "cat_sub_branch",
+    code: "SUB_BRANCH",
+    name: "Sub Branch",
+    name_bn: "শাখা ক্যাম্পাস",
+    order: 2,
+    description: "Secondary academic branch or feeder campus under the central institution",
+    is_active: true,
+  },
+  {
+    id: "cat_female_branch",
+    code: "FEMALE_BRANCH",
+    name: "Female Branch / Mahila Branch",
+    name_bn: "মহিলা শাখা",
+    order: 3,
+    description: "Dedicated campus for female students and faculty with separate facilities",
+    is_active: true,
+  },
+  {
+    id: "cat_residential_campus",
+    code: "RESIDENTIAL_CAMPUS",
+    name: "Residential Campus & Boarding",
+    name_bn: "আবাসিক ক্যাম্পাস ও বোর্ডিং",
+    order: 4,
+    description: "Full residential boarding campus with dormitory and residential care facilities",
+    is_active: true,
+  },
+];
+
+export const branchCategoriesStore = {
+  getCategories: (tenantId) => {
+    const key = `spr_branch_categories_${tenantId || 'default'}`;
+    const raw = readJSON(key, null);
+    if (!raw || !Array.isArray(raw) || raw.length === 0) {
+      writeJSON(key, DEFAULT_BRANCH_CATEGORIES);
+      return DEFAULT_BRANCH_CATEGORIES;
+    }
+    return raw.sort((a, b) => (Number(a.order) || 99) - (Number(b.order) || 99));
+  },
+  saveCategories: (tenantId, categories) => {
+    const key = `spr_branch_categories_${tenantId || 'default'}`;
+    const sorted = [...categories].sort((a, b) => (Number(a.order) || 99) - (Number(b.order) || 99));
+    writeJSON(key, sorted);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent("spr_branch_categories_updated", { detail: sorted }));
+    }
+    return sorted;
+  },
+  addCategory: (tenantId, catData) => {
+    const list = branchCategoriesStore.getCategories(tenantId);
+    const code = (catData.code || catData.name || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_").slice(0, 40);
+    const newCat = {
+      ...catData,
+      id: catData.id || `bcat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      code: code || `BCAT_${Date.now()}`,
+      name: catData.name || code,
+      name_bn: catData.name_bn || "",
+      order: catData.order !== undefined ? Number(catData.order) : list.length + 1,
+      description: catData.description || "",
+      is_active: catData.is_active !== undefined ? catData.is_active : true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...list, newCat];
+    branchCategoriesStore.saveCategories(tenantId, updated);
+    return newCat;
+  },
+  updateCategory: (tenantId, id, updatedData) => {
+    const list = branchCategoriesStore.getCategories(tenantId);
+    const updated = list.map((c) =>
+      c.id === id || c.code === id
+        ? {
+            ...c,
+            ...updatedData,
+            id: c.id,
+            code: c.code,
+            order: updatedData.order !== undefined ? Number(updatedData.order) : c.order,
+            updatedAt: new Date().toISOString(),
+          }
+        : c
+    );
+    branchCategoriesStore.saveCategories(tenantId, updated);
+    return updated;
+  },
+  deleteCategory: (tenantId, id) => {
+    const list = branchCategoriesStore.getCategories(tenantId);
+    const updated = list.filter((c) => c.id !== id && c.code !== id);
+    branchCategoriesStore.saveCategories(tenantId, updated);
+    return updated;
+  },
+  resetToDefaults: (tenantId) => {
+    return branchCategoriesStore.saveCategories(tenantId, DEFAULT_BRANCH_CATEGORIES);
+  },
+  getCategoryOptions: (tenantId) => {
+    const list = branchCategoriesStore.getCategories(tenantId);
+    return list
+      .filter((c) => c.is_active !== false)
+      .map((c) => ({
+        label: c.name,
+        value: c.code || c.id,
+        badge: c.code,
+      }));
+  },
+  getCategoryLabel: (type, tenantId) => {
+    if (!type) return 'Main Campus';
+    const list = branchCategoriesStore.getCategories(tenantId);
+    const found = list.find((c) => c.code === type || c.id === type || c.name === type);
+    if (found) return found.name;
+    return BRANCH_TYPE_LABELS[type] || type;
+  },
+};
+
+export const BRANCH_TYPE_LABELS = {
+  MAIN_CAMPUS: 'Main Campus',
+  FEMALE_BRANCH: 'Female Branch',
+  SUB_BRANCH: 'Sub Branch',
+  RESIDENTIAL_CAMPUS: 'Residential Campus',
+};
+
+/**
+ * Returns clean, schema-driven display name for an academic branch
+ * based on its branch_name, branch_code, or branch_type taxonomy.
+ */
+export function getBranchDisplayName(branch, tenantId) {
+  if (!branch) return '';
+  if (typeof branch === 'string') {
+    let s = branch.trim();
+    const dynamicLabel = branchCategoriesStore.getCategoryLabel(s, tenantId);
+    if (dynamicLabel && dynamicLabel !== s) return dynamicLabel;
+    if (BRANCH_TYPE_LABELS[s]) return BRANCH_TYPE_LABELS[s];
+    if (s.includes(' - ')) {
+      const parts = s.split(' - ');
+      if (parts.length >= 2 && parts[parts.length - 1].trim()) {
+        s = parts[parts.length - 1].trim();
+      }
+    }
+    return branchCategoriesStore.getCategoryLabel(s, tenantId) || BRANCH_TYPE_LABELS[s] || s;
+  }
+  let name = '';
+  // 1. Exact branch_name or name from schema
+  if (branch.branch_name && typeof branch.branch_name === 'string' && branch.branch_name.trim()) {
+    name = branch.branch_name.trim();
+  } else if (branch.name && typeof branch.name === 'string' && branch.name.trim()) {
+    name = branch.name.trim();
+  }
+
+  // If name has " - " with institution prefix (e.g. "Academy Name - Branch Name")
+  if (name) {
+    if (branch.institution_name && name.startsWith(branch.institution_name + ' - ')) {
+      name = name.substring((branch.institution_name + ' - ').length).trim();
+    } else if (branch.institution && typeof branch.institution === 'object' && branch.institution.name && name.startsWith(branch.institution.name + ' - ')) {
+      name = name.substring((branch.institution.name + ' - ').length).trim();
+    } else if (name.includes(' - ')) {
+      const parts = name.split(' - ');
+      if (parts.length >= 2 && parts[parts.length - 1].trim()) {
+        name = parts[parts.length - 1].trim();
+      }
+    }
+    if (name) return name;
+  }
+
+  // 2. Canonical branch_type or campus_type taxonomy label
+  const type = branch.branch_type || branch.campus_type;
+  if (type) {
+    const label = branchCategoriesStore.getCategoryLabel(type, tenantId);
+    if (label) return label;
+  }
+  // 3. Fallback to branch_code
+  return branch.branch_code || 'Main Campus';
 }
 
 export const academicYearsStore = {
@@ -1289,6 +1475,86 @@ export const curriculumStore = {
       notStartedItems: notStarted,
       overallProgressPct: avgProgress,
     };
+  },
+
+  /**
+   * Detects routine schedule conflicts for a book / syllabus item.
+   * Checks if another book in the same Class & Section is already scheduled during the same Period Slot on overlapping days.
+   */
+  detectScheduleConflicts: (tenantId, {
+    itemId = null,
+    classId = '',
+    sectionId = '',
+    sectionScope = 'ALL',
+    periodSlotId = '',
+    scheduleType = 'FULL_WEEK',
+    scheduleDays = [],
+  } = {}) => {
+    if (!classId || !periodSlotId) return [];
+
+    const allItems = curriculumStore.getItems(tenantId);
+    const workingDayCodes = weeklyHolidaysStore.getWorkingDayCodes(tenantId, true);
+
+    // Normalize target days
+    const targetDays = scheduleType === 'FULL_WEEK' || !Array.isArray(scheduleDays) || scheduleDays.length === 0
+      ? workingDayCodes
+      : scheduleDays.map((d) => weeklyHolidaysStore.normalizeDayCode(d)).filter(Boolean);
+
+    const conflicts = [];
+
+    allItems.forEach((other) => {
+      // 1. Skip self
+      if (itemId && String(other.id) === String(itemId)) return;
+
+      // 2. Must match the same Class ID
+      if (!other.classId || String(other.classId) !== String(classId)) return;
+
+      // 3. Must match the same Period Slot ID
+      if (!other.periodSlotId || String(other.periodSlotId) !== String(periodSlotId)) return;
+
+      // 4. Section overlap check:
+      const isTargetSpecific = sectionScope === 'SPECIFIC' && Boolean(sectionId);
+      const isOtherSpecific = Boolean(other.sectionId);
+
+      if (isTargetSpecific && isOtherSpecific && String(other.sectionId) !== String(sectionId)) {
+        // Both are specific sections and they are different -> no conflict
+        return;
+      }
+
+      // 5. Day overlap check:
+      const otherDays = other.scheduleType === 'SPLIT_DAYS' && Array.isArray(other.scheduleDays) && other.scheduleDays.length > 0
+        ? other.scheduleDays.map((d) => weeklyHolidaysStore.normalizeDayCode(d)).filter(Boolean)
+        : workingDayCodes;
+
+      const overlappingDayCodes = targetDays.filter((tDay) =>
+        otherDays.some((oDay) => oDay === tDay || oDay.startsWith(tDay) || tDay.startsWith(oDay))
+      );
+
+      if (overlappingDayCodes.length > 0) {
+        const dayNames = overlappingDayCodes.map((code) => {
+          const found = WEEKDAY_OPTIONS.find((w) => w.short.toUpperCase() === code || w.code === code);
+          return found ? found.short : code;
+        });
+
+        conflicts.push({
+          id: other.id,
+          bookName: other.name,
+          subject: other.subject || '',
+          periodSlotId: other.periodSlotId,
+          periodName: other.periodName || 'Selected Period',
+          className: other.className || '',
+          classId: other.classId,
+          sectionName: other.sectionName || (other.sectionId ? 'Specific Section' : 'All Sections'),
+          sectionId: other.sectionId || '',
+          teacherName: other.teacherName || '',
+          conflictingDays: overlappingDayCodes,
+          conflictingDaysLabel: dayNames.join(', '),
+          isFullWeekOverlap: overlappingDayCodes.length === workingDayCodes.length,
+        });
+      }
+    });
+
+    return conflicts;
   },
 };
 

@@ -30,6 +30,8 @@ class AcademyModelsAndAPITestCase(APITestCase):
             institution_type="MADRASA",
             phone="01700000001",
             email="central@darululoom.edu",
+            max_departments=10,
+            max_branches=10,
         )
 
         self.admin_user = User.objects.create_user(
@@ -261,3 +263,94 @@ class AcademyModelsAndAPITestCase(APITestCase):
         }, format="json")
         self.assertEqual(res_valid.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_valid.data["student_class_name"], "Hifz Final Year")
+
+    def test_period_slot_section_scope_and_filtering(self):
+        # 1. Create two sections for student_class
+        section_a = ClassSection.objects.create(
+            student_class=self.student_class,
+            section_name="Section A - Boys"
+        )
+        section_b = ClassSection.objects.create(
+            student_class=self.student_class,
+            section_name="Section B - Girls"
+        )
+
+        # 2. Create a Period Slot for "All Sections" (section=None)
+        res_all = self.client.post("/api/v1/academy/periods/", {
+            "period_name": "Morning Assembly",
+            "slot_type": "TEACHING_PERIOD",
+            "period_order": 1,
+            "start_time": "07:30:00",
+            "end_time": "08:00:00",
+            "department": str(self.department.id),
+            "student_class": str(self.student_class.id),
+            "section": None,
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_all.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(res_all.data["section"])
+        self.assertEqual(res_all.data["section_name"], "")
+
+        # 3. Create a Period Slot for "Specific Section" (section_a)
+        res_sec_a = self.client.post("/api/v1/academy/periods/", {
+            "period_name": "1st Period: Hifz Revision",
+            "slot_type": "TEACHING_PERIOD",
+            "period_order": 2,
+            "start_time": "08:00:00",
+            "end_time": "08:45:00",
+            "department": str(self.department.id),
+            "student_class": str(self.student_class.id),
+            "section": str(section_a.id),
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_sec_a.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(res_sec_a.data["section"]), str(section_a.id))
+        self.assertEqual(res_sec_a.data["section_name"], "Section A - Boys")
+
+        # 4. Create a Period Slot for "Specific Section" (section_b)
+        res_sec_b = self.client.post("/api/v1/academy/periods/", {
+            "period_name": "1st Period: Tajweed Practice",
+            "slot_type": "TEACHING_PERIOD",
+            "period_order": 2,
+            "start_time": "08:00:00",
+            "end_time": "08:45:00",
+            "department": str(self.department.id),
+            "student_class": str(self.student_class.id),
+            "section": str(section_b.id),
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_sec_b.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(res_sec_b.data["section"]), str(section_b.id))
+        self.assertEqual(res_sec_b.data["section_name"], "Section B - Girls")
+
+        # 5. Test filtering by section
+        res_filter_a = self.client.get(f"/api/v1/academy/periods/?section={section_a.id}")
+        self.assertEqual(res_filter_a.status_code, status.HTTP_200_OK)
+        results_a = res_filter_a.data if isinstance(res_filter_a.data, list) else res_filter_a.data.get("results", [])
+        self.assertTrue(any(str(s["id"]) == str(res_sec_a.data["id"]) for s in results_a))
+        self.assertFalse(any(str(s["id"]) == str(res_sec_b.data["id"]) for s in results_a))
+
+        # 6. Test section validation mismatch (section belonging to another class)
+        other_class = StudentClass.objects.create(
+            institution=self.institution,
+            department=self.department,
+            name="Class 9",
+            code="CLS-9"
+        )
+        other_section = ClassSection.objects.create(
+            student_class=other_class,
+            section_name="Class 9 Section X"
+        )
+        res_mismatch = self.client.post("/api/v1/academy/periods/", {
+            "period_name": "Mismatch Period",
+            "slot_type": "TEACHING_PERIOD",
+            "period_order": 3,
+            "start_time": "09:00:00",
+            "end_time": "09:45:00",
+            "department": str(self.department.id),
+            "student_class": str(self.student_class.id),
+            "section": str(other_section.id),
+            "is_active": True
+        }, format="json")
+        self.assertEqual(res_mismatch.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("section", str(res_mismatch.data))

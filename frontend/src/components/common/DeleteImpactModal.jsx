@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangleIcon,
@@ -6,6 +6,7 @@ import {
   CloseIcon,
   DepartmentIcon,
   ClassIcon,
+  SectionIcon,
   GroupsIcon,
   StudentIcon,
   UsersIcon,
@@ -19,11 +20,15 @@ export default function DeleteImpactModal({
   isOpen,
   onClose,
   onConfirm,
+  onDirectDelete,
   title = 'Confirm Deletion',
   subtitle,
   entityName,
+  itemName,
   entityType = 'Item',
+  itemType,
   impactItems = [],
+  impactData,
   warningMessage,
   requireAck = true,
   requireNameMatch = false,
@@ -31,8 +36,42 @@ export default function DeleteImpactModal({
   confirmButtonText = 'Permanently Delete',
   isDeleting = false,
   onMigrate,
+  onMigrateOpen,
   migrateButtonText = 'Migrate Data Instead',
 }) {
+  const resolvedEntityName = entityName || itemName || '';
+  const resolvedEntityType = entityType || itemType || 'Item';
+  const resolvedOnConfirm = onConfirm || onDirectDelete;
+  const resolvedOnMigrate = onMigrate || onMigrateOpen;
+
+  const resolvedImpactItems = useMemo(() => {
+    if (Array.isArray(impactItems) && impactItems.length > 0) {
+      return impactItems;
+    }
+    if (impactData && typeof impactData === 'object') {
+      const items = [];
+      if (impactData.direct_students !== undefined) {
+        items.push({ count: impactData.direct_students, label: 'Enrolled Students', icon: StudentIcon });
+      } else if (impactData.students !== undefined) {
+        items.push({ count: impactData.students, label: 'Enrolled Students', icon: StudentIcon });
+      }
+      if (impactData.sections !== undefined) {
+        items.push({ count: impactData.sections, label: 'Class Sections', icon: SectionIcon });
+      }
+      if (impactData.groups !== undefined) {
+        items.push({ count: impactData.groups, label: 'Study Groups', icon: GroupsIcon });
+      }
+      if (impactData.classes !== undefined) {
+        items.push({ count: impactData.classes, label: 'Classes', icon: ClassIcon });
+      }
+      if (impactData.teachers !== undefined || impactData.staff !== undefined) {
+        items.push({ count: impactData.teachers || impactData.staff, label: 'Teachers / Staff', icon: UsersIcon });
+      }
+      return items;
+    }
+    return [];
+  }, [impactItems, impactData]);
+
   const [acknowledged, setAcknowledged] = useState(false);
   const [typedName, setTypedName] = useState('');
   const [password, setPassword] = useState('');
@@ -58,21 +97,22 @@ export default function DeleteImpactModal({
 
   if (!isOpen || typeof document === 'undefined') return null;
 
-  const isNameMatchValid = !requireNameMatch || (typedName.trim() === entityName?.trim());
+  const isNameMatchValid = !requireNameMatch || (typedName.trim() === resolvedEntityName?.trim());
   const isPasswordValid = !requirePassword || (password.trim().length > 0);
   const isAckValid = !requireAck || acknowledged;
   const canConfirm = isAckValid && isNameMatchValid && isPasswordValid && !isDeleting;
 
   const handleConfirmSubmit = (e) => {
     e.preventDefault();
-    if (!canConfirm) return;
-    onConfirm({ password, entityName });
+    if (!canConfirm || !resolvedOnConfirm) return;
+    resolvedOnConfirm({ password, entityName: resolvedEntityName });
   };
 
   const getImpactIcon = (label = '') => {
     const lower = label.toLowerCase();
     if (lower.includes('department')) return DepartmentIcon;
     if (lower.includes('class')) return ClassIcon;
+    if (lower.includes('section')) return SectionIcon;
     if (lower.includes('group')) return GroupsIcon;
     if (lower.includes('student')) return StudentIcon;
     if (lower.includes('staff') || lower.includes('teacher') || lower.includes('user')) return UsersIcon;
@@ -106,8 +146,8 @@ export default function DeleteImpactModal({
               <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed">
                 {subtitle || (
                   <>
-                    You are about to remove {entityType.toLowerCase()}{' '}
-                    <strong className="theme-text-primary font-semibold">"{entityName}"</strong>.
+                    You are about to remove {resolvedEntityType.toLowerCase()}{' '}
+                    <strong className="theme-text-primary font-semibold">"{resolvedEntityName}"</strong>.
                   </>
                 )}
               </p>
@@ -137,20 +177,20 @@ export default function DeleteImpactModal({
             </div>
 
             {/* Impact Metric Chips / Counts */}
-            {impactItems.length > 0 ? (
+            {resolvedImpactItems.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-                {impactItems.map((item, idx) => {
+                {resolvedImpactItems.map((item, idx) => {
                   const Icon = item.icon || getImpactIcon(item.label);
                   return (
                     <div 
                       key={idx} 
                       className="p-2.5 rounded-xl theme-bg-surface border theme-border flex items-center gap-2.5 shadow-2xs"
                     >
-                      <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
-                        <Icon className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 theme-accent" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold theme-text-primary truncate">
+                        <div className="text-xs font-bold font-mono theme-text-primary truncate">
                           {item.count !== undefined ? item.count : '—'}
                         </div>
                         <div className="text-[10px] theme-text-secondary truncate">
@@ -166,7 +206,7 @@ export default function DeleteImpactModal({
             <p className="text-xs theme-text-secondary leading-relaxed pt-0.5">
               {warningMessage || (
                 <>
-                  Deleting this {entityType.toLowerCase()} will disconnect related records, reports, and class rosters. This action cannot be reversed without administrative database recovery.
+                  Deleting this {resolvedEntityType.toLowerCase()} will disconnect related records, reports, and class rosters. This action cannot be reversed without administrative database recovery.
                 </>
               )}
             </p>
@@ -183,7 +223,7 @@ export default function DeleteImpactModal({
                 className="mt-0.5 w-4 h-4 rounded accent-[var(--accent-main)] theme-bg-surface theme-border cursor-pointer shrink-0"
               />
               <label htmlFor="delete_modal_ack" className="text-xs font-medium theme-text-primary cursor-pointer leading-relaxed">
-                I acknowledge the consequences and confirm that I wish to proceed with deleting this {entityType.toLowerCase()}.
+                I acknowledge the consequences and confirm that I wish to proceed with deleting this {resolvedEntityType.toLowerCase()}.
               </label>
             </div>
           )}
@@ -192,13 +232,13 @@ export default function DeleteImpactModal({
           {requireNameMatch && (
             <div>
               <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-2">
-                Type <span className="theme-text-primary font-mono font-bold select-all theme-bg-elevated px-2 py-0.5 rounded-md border theme-border">{entityName}</span> to confirm:
+                Type <span className="theme-text-primary font-mono font-bold select-all theme-bg-elevated px-2 py-0.5 rounded-md border theme-border">{resolvedEntityName}</span> to confirm:
               </label>
               <input
                 type="text"
                 value={typedName}
                 onChange={(e) => setTypedName(e.target.value)}
-                placeholder={`Type "${entityName}" exactly`}
+                placeholder={`Type "${resolvedEntityName}" exactly`}
                 className="w-full px-4 py-2.5 rounded-xl theme-bg-sub border theme-border text-xs sm:text-sm font-medium theme-text-primary placeholder-[var(--text-secondary)]/50 focus:outline-none focus:border-[var(--accent-main)]/70 focus:ring-2 focus:ring-[var(--accent-main)]/15"
               />
             </div>
@@ -223,13 +263,14 @@ export default function DeleteImpactModal({
           {/* Footer Actions */}
           <div className="pt-3 border-t theme-border flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="w-full sm:w-auto">
-              {onMigrate && (
+              {resolvedOnMigrate && (
                 <button
                   type="button"
-                  onClick={onMigrate}
+                  onClick={resolvedOnMigrate}
                   disabled={isDeleting}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border theme-border theme-bg-accent-soft theme-accent text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 hover:opacity-90"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[var(--accent-main)]/30 theme-bg-accent-soft theme-accent text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 hover:opacity-90 shadow-2xs"
                 >
+                  <TransferIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
                   <span>{migrateButtonText}</span>
                 </button>
               )}
@@ -261,7 +302,7 @@ export default function DeleteImpactModal({
                   </>
                 ) : (
                   <>
-                    <TrashIcon className="w-3.5 h-3.5" />
+                    <TrashIcon className="w-3.5 h-3.5 text-white" />
                     <span>{confirmButtonText}</span>
                   </>
                 )}

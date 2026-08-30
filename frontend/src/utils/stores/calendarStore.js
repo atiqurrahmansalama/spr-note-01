@@ -1051,8 +1051,59 @@ export const weeklyHolidaysStore = {
     const config = weeklyHolidaysStore.getHolidays(tenantId);
     const code = String(dayCodeOrName).toUpperCase().trim();
     return (config.weekendDays || []).some(
-      (d) => d.toUpperCase() === code || code.startsWith(d.toUpperCase().slice(0, 3))
+      (d) => d.toUpperCase() === code || code.startsWith(d.toUpperCase().slice(0, 3)) || d.toUpperCase().startsWith(code.slice(0, 3))
     );
+  },
+  getWorkingDays: (tenantId) => {
+    const config = weeklyHolidaysStore.getHolidays(tenantId);
+    const weekendDays = (config.weekendDays || []).map((d) => String(d).toUpperCase().trim());
+    return WEEKDAY_OPTIONS.filter((w) => {
+      const fullCode = w.code.toUpperCase();
+      const shortCode = w.short.toUpperCase();
+      return !weekendDays.some((wd) => wd === fullCode || wd.startsWith(shortCode) || fullCode.startsWith(wd.slice(0, 3)));
+    });
+  },
+  getWorkingDayCodes: (tenantId, useShort = true) => {
+    const working = weeklyHolidaysStore.getWorkingDays(tenantId);
+    return working.map((w) => (useShort ? w.short.toUpperCase() : w.code));
+  },
+  getOrderedWeekdays: (tenantId) => {
+    const firstDayStr = (calendarSettings.getFirstDay() || "Saturday").toUpperCase().trim();
+    const startIndex = WEEKDAY_OPTIONS.findIndex(
+      (w) =>
+        w.label.toUpperCase() === firstDayStr ||
+        w.code === firstDayStr ||
+        w.short.toUpperCase() === firstDayStr.slice(0, 3)
+    );
+    if (startIndex <= 0) return [...WEEKDAY_OPTIONS];
+    return [...WEEKDAY_OPTIONS.slice(startIndex), ...WEEKDAY_OPTIONS.slice(0, startIndex)];
+  },
+  normalizeDayCode: (dayCodeOrName) => {
+    if (!dayCodeOrName) return "";
+    const str = String(dayCodeOrName).toUpperCase().trim();
+    const found = WEEKDAY_OPTIONS.find(
+      (w) =>
+        w.code === str ||
+        w.short.toUpperCase() === str ||
+        w.label.toUpperCase() === str ||
+        str.startsWith(w.short.toUpperCase())
+    );
+    return found ? found.short.toUpperCase() : str.slice(0, 3);
+  },
+  formatScheduleDaysSummary: (scheduleDays = [], scheduleType = 'FULL_WEEK', tenantId = null) => {
+    if (scheduleType !== 'SPLIT_DAYS') {
+      const workingDays = weeklyHolidaysStore.getWorkingDays(tenantId);
+      return `Full Week (${workingDays.length} Days)`;
+    }
+    if (!Array.isArray(scheduleDays) || scheduleDays.length === 0) {
+      return 'Split Days';
+    }
+    const shortNames = scheduleDays.map((d) => {
+      const normalized = weeklyHolidaysStore.normalizeDayCode(d);
+      const found = WEEKDAY_OPTIONS.find((w) => w.short.toUpperCase() === normalized);
+      return found ? found.short : normalized;
+    });
+    return `Split: ${shortNames.join(', ')}`;
   },
 };
 

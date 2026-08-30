@@ -18,6 +18,7 @@ import {
   SearchIcon,
   BuildingOffice2Icon,
 } from "../../../components/ui/Icons";
+import { getBranchDisplayName } from "../../../utils/localStore";
 import AddressPickerInput from "../../../components/ui/AddressPickerInput";
 import MultiDocumentManager from "../../../components/ui/MultiDocumentManager";
 import DocumentFilePicker from "../../../components/ui/DocumentFilePicker";
@@ -30,6 +31,7 @@ import {
   DEFAULT_PREVIOUS_CLASSES,
 } from "../../../utils/localStore";
 import { useTenant } from "../../../context/TenantContext";
+import { useAcademicSession } from "../../../context/AcademicSessionContext";
 
 const ADMISSION_STEPS = [
   { id: 1, label: "Profile & Photo" },
@@ -159,29 +161,22 @@ export default function FullAdmissionWizard({
   const [classes, setClasses] = useState([]);
 
   const { activeTenantId } = useTenant();
-  const [academicYears, setAcademicYears] = useState(() => academicYearsStore.getAcademicYears(activeTenantId));
+  // Academic years sourced from the global AcademicSessionContext
+  const { academicYears, activeYear: contextActiveYear } = useAcademicSession();
   const [admissionSettings, setAdmissionSettings] = useState(() => admissionSettingsStore.getSettings(activeTenantId));
 
   useEffect(() => {
-    setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
     setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
 
-    const handleAcademicUpdate = () => {
-      setAcademicYears(academicYearsStore.getAcademicYears(activeTenantId));
-    };
     const handleSettingsUpdate = () => {
       setAdmissionSettings(admissionSettingsStore.getSettings(activeTenantId));
     };
 
-    window.addEventListener("spr_academic_years_updated", handleAcademicUpdate);
     window.addEventListener("spr_admission_settings_updated", handleSettingsUpdate);
-    window.addEventListener("spr_tenant_changed", handleAcademicUpdate);
     window.addEventListener("spr_tenant_changed", handleSettingsUpdate);
 
     return () => {
-      window.removeEventListener("spr_academic_years_updated", handleAcademicUpdate);
       window.removeEventListener("spr_admission_settings_updated", handleSettingsUpdate);
-      window.removeEventListener("spr_tenant_changed", handleAcademicUpdate);
       window.removeEventListener("spr_tenant_changed", handleSettingsUpdate);
     };
   }, [activeTenantId]);
@@ -308,7 +303,7 @@ export default function FullAdmissionWizard({
   const branchOptions = useMemo(() => {
     const allowed = admissionSettingsStore.getAllowedAdmissionBranches(activeTenantId, branches);
     return allowed.map((b) => {
-      const bName = b.branch_name || b.name || "Branch";
+      const bName = getBranchDisplayName(b);
       const bCode = b.branch_code || b.code;
       return {
         label: bName + (bCode ? ` (${bCode})` : ""),
@@ -1627,8 +1622,7 @@ export default function FullAdmissionWizard({
                     <div className="flex justify-between py-1 border-b theme-border">
                       <span className="theme-text-secondary">Campus Branch</span>
                       <span className="font-bold theme-text-primary">
-                        {branches.find((b) => b.id === sharedData.branch_id)?.branch_name ||
-                         branches.find((b) => b.id === sharedData.branch_id)?.name || "Main Campus"}
+                        {getBranchDisplayName(branches.find((b) => b.id === sharedData.branch_id)) || "Main Campus"}
                       </span>
                     </div>
                   )}

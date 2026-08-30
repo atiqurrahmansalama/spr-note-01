@@ -3,3 +3,5 @@ export { default as ClassesGroupsHubView } from './ClassesSectionsHubView';
 export * from './classes';
 export * from './sections';
 export * from './groups';
+export { default } from './ClassesSectionsHubView';
+

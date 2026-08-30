@@ -44,10 +44,10 @@ export default function UserProfileCard({ onCloseSidebar }) {
 
         <div className="flex-1 overflow-hidden">
           <div>
-            <p className="text-xs font-semibold theme-text-primary truncate">
+            <p className="text-[13px] font-bold theme-text-primary truncate">
               {user ? (user.first_name ? `${user.first_name} ${user.last_name || ""}` : user.username) : "Profile Settings"}
             </p>
-            <p className="text-[10px] theme-accent font-mono truncate">
+            <p className="text-[11px] theme-accent font-mono truncate">
               {user ? (user.role || "MEMBER") : "Tap to open profile →"}
             </p>
           </div>

@@ -7,7 +7,9 @@ import {
   CalendarIcon,
   CloseIcon,
   CheckIcon,
+  AlertCircleIcon,
 } from "../ui/Icons";
+import CustomInput from "../ui/CustomInput";
 import { getHijriDetails } from "../../utils/hijriUtils";
 
 const MONTH_NAMES = [
@@ -52,6 +54,21 @@ export default function ReusableCalendar({
   isInline = false,
   defaultOpen = false,
   label = "",
+  subLabel = "",
+  required = false,
+  optional = false,
+  badge = null,
+  error = null,
+  helperText = null,
+  disabled = false,
+  clearable = false,
+  size = "md", // 'sm' | 'md' | 'lg'
+  variant = "sub", // 'default' | 'filled' | 'elevated' | 'sub' | 'borderless'
+  icon: CustomIcon = null,
+  id,
+  name,
+  inputClassName = "",
+  wrapperClassName = "",
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [tempStart, setTempStart] = useState(startDate || selectedDate);
@@ -576,22 +593,63 @@ export default function ReusableCalendar({
     </div>
   );
 
+  const IconToRender = CustomIcon || CalendarIcon;
+
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
-      {label && <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider mb-1.5 select-none">{label}</label>}
-
       {!isInline && (
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          className="w-full min-h-[42px] flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-semibold hover:theme-bg-elevated/60 focus:outline-none focus:border-[var(--accent-main)] focus:ring-1 focus:ring-[var(--accent-main)] transition-all duration-200 cursor-pointer select-none shadow-2xs"
+        <div
+          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          className="w-full cursor-pointer select-none"
         >
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
-            <span className="truncate font-medium">{getLabel()}</span>
-          </div>
-          <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
-        </button>
+          <CustomInput
+            id={id}
+            name={name}
+            label={label}
+            subLabel={subLabel}
+            required={required}
+            optional={optional}
+            badge={badge}
+            placeholder={placeholder}
+            value={getLabel() === placeholder ? "" : getLabel()}
+            readOnly={true}
+            disabled={disabled}
+            error={error}
+            helperText={helperText}
+            size={size}
+            variant={variant}
+            icon={IconToRender}
+            className={`cursor-pointer ${inputClassName}`}
+            inputClassName="cursor-pointer select-none"
+            wrapperClassName={wrapperClassName}
+            endAdornment={
+              <div className="flex items-center gap-1 shrink-0">
+                {clearable && (selectedDate || startDate) && !disabled && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isRange) {
+                        onRangeSelect?.("", "");
+                        setTempStart("");
+                        setTempEnd("");
+                      } else {
+                        onSelectDate?.("");
+                        setTempStart("");
+                      }
+                    }}
+                    className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer"
+                    title="Clear date"
+                  >
+                    <CloseIcon className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
+              </div>
+            }
+          />
+        </div>
       )}
 
       {isInline

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import CustomButton from '../../../components/ui/CustomButton';
 import { HomeIcon, UserIcon, EditIcon, PlusIcon, CloseIcon } from '../../../components/ui/Icons';
 import { residentialStore } from '../../../utils/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
+import { getBranchDisplayName } from '../../../utils/localStore';
 import BedAllocationModal from './BedAllocationModal';
 
 export default function RoomDetailsDrawer({
@@ -51,19 +53,19 @@ export default function RoomDetailsDrawer({
               <p className="text-xs font-semibold theme-text-secondary">{room.room_name}</p>
             )}
             <p className="text-[11px] theme-text-secondary">
-              {room.building_name || 'Main Hall'} • Floor {room.floor_number} • {room.branch_name || 'Main Campus'}
+              {room.building_name || 'Main Hall'} • Floor {room.floor_number} • {getBranchDisplayName(room.branch_name || room.branch) || 'Main Campus'}
             </p>
           </div>
 
           {onEditRoom && (
-            <button
+            <CustomButton
               type="button"
+              variant="sub"
+              size="icon-sm"
+              icon={EditIcon}
               onClick={() => onEditRoom(room)}
-              className="p-1.5 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub transition cursor-pointer shadow-2xs"
               title="Edit Room Details"
-            >
-              <EditIcon className="w-4 h-4 theme-text-secondary" />
-            </button>
+            />
           )}
         </div>
 
@@ -152,12 +154,14 @@ export default function RoomDetailsDrawer({
                   </p>
                 </div>
 
-                <button
+                <CustomButton
                   type="button"
-                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-primary transition shrink-0 cursor-pointer"
+                  variant="sub"
+                  size="xs"
+                  onClick={() => setSelectedBedToAssign(bed)}
                 >
                   {isOccupied ? 'Manage' : 'Assign'}
-                </button>
+                </CustomButton>
               </div>
             );
           })}

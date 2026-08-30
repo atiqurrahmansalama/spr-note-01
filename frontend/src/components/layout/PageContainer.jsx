@@ -56,7 +56,7 @@ export default function PageContainer({
   if (isEmbedded) {
     return (
       <div
-        className={`w-full space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 ${
+        className={`w-full space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 @container ${
           animate ? "animate-fade-in" : ""
         } ${className}`}
         {...rest}
@@ -69,7 +69,7 @@ export default function PageContainer({
 
   return (
     <div
-      className={`w-full ${maxWidthClass} mx-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 ${
+      className={`w-full ${maxWidthClass} mx-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 @container ${
         animate ? "animate-fade-in" : ""
       } ${className}`}
       {...rest}

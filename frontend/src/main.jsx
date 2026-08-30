@@ -26,6 +26,7 @@ import { AuthProvider } from './context/AuthContext'
 import { TenantProvider } from './context/TenantContext'
 import { FeatureControlProvider } from './context/FeatureControlContext'
 import { RightSidebarProvider } from './context/RightSidebarContext'
+import { AcademicSessionProvider } from './context/AcademicSessionContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -37,7 +38,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <AuthProvider>
           <TenantProvider>
             <FeatureControlProvider>
-              <ToastProvider>
+              <AcademicSessionProvider>
+                <ToastProvider>
                 <ThemeProvider>
                   <FontProvider>
                     <RightSidebarProvider>
@@ -45,7 +47,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                     </RightSidebarProvider>
                   </FontProvider>
                 </ThemeProvider>
-              </ToastProvider>
+                </ToastProvider>
+              </AcademicSessionProvider>
             </FeatureControlProvider>
           </TenantProvider>
         </AuthProvider>

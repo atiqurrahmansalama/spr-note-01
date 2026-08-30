@@ -5,28 +5,24 @@ import { useToast } from '../../../../context/ToastContext';
 import {
   SectionIcon,
   ClassIcon,
-  BuildingOfficeIcon,
-  StudentIcon,
-  PlusIcon,
+  TeacherIcon,
   EditIcon,
   TrashIcon,
   GroupIcon,
+  TableIcon,
+  Squares2X2Icon,
 } from '../../../../components/ui/Icons';
 import ActionMenu from '../../../../components/ui/ActionMenu';
-import CustomSelect from '../../../../components/ui/CustomSelect';
-import { ClassSelect, BranchSelect, TeacherSelect } from '../../../../components/selectors';
-import UniversalManagementView from '../../../../components/common/UniversalManagementView';
+import CustomInput from '../../../../components/ui/CustomInput';
+import { ClassSelect } from '../../../../components/selectors';
+import DataTable from '../../../../components/ui/DataTable';
+import DataCardGrid from '../../../../components/ui/DataCardGrid';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import SectionForm from './SectionForm';
 import SectionMigrationModal from './SectionMigrationModal';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
-import { getSections, getSectionMetrics, deleteSection, getBranches } from '../../../../api/academy';
-
-const TYPE_CONFIG = {
-  GENERAL_SECTION: 'General Section',
-  HIFZ_SECTION: 'Quran / Hifz Section',
-  RESIDENTIAL_DORM: 'Residential Dormitory',
-};
+import { getSections, deleteSection, getBranches } from '../../../../api/academy';
+import { getBranchDisplayName } from '../../../../utils/localStore';
 
 export default function SectionManagementView({
   hideHeader = false,
@@ -39,7 +35,6 @@ export default function SectionManagementView({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const queryClass = searchParams.get('class') || searchParams.get('student_class') || 'ALL';
-  const queryBranch = searchParams.get('branch') || 'ALL';
 
   const [sections, setSections] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -47,23 +42,23 @@ export default function SectionManagementView({
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [metrics, setMetrics] = useState({
-    total_sections: 0,
-    total_capacity: 0,
-    total_enrolled: 0,
-    occupancy_rate: 0,
-  });
-
-  // Filters
+  // Filters & View Mode
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState(queryClass);
-  const [branchFilter, setBranchFilter] = useState(queryBranch);
-  const [typeFilter, setTypeFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('spr_sections_view_mode') || 'table';
+    } catch {
+      return 'table';
+    }
+  });
 
-  // Selection & UI
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [viewMode, setViewMode] = useState('table');
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('spr_sections_view_mode', mode);
+    } catch {}
+  };
 
   // Modals
   const [deletingSection, setDeletingSection] = useState(null);
@@ -71,30 +66,20 @@ export default function SectionManagementView({
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination & Sorting
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sortField, setSortField] = useState('section_name');
-  const [sortDirection, setSortDirection] = useState('asc');
-
   useEffect(() => {
     if (queryClass !== classFilter) {
       setClassFilter(queryClass);
     }
-    if (queryBranch !== branchFilter) {
-      setBranchFilter(queryBranch);
-    }
-  }, [queryClass, queryBranch]);
+  }, [queryClass]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [secRes, classRes, branchRes, teacherRes, metricRes] = await Promise.allSettled([
+      const [secRes, classRes, branchRes, teacherRes] = await Promise.allSettled([
         getSections({ page_size: 500, all: true }),
         fetchWithAuth('/api/v1/classes/?page_size=500&all=true'),
         getBranches(),
         fetchWithAuth('/api/v1/users/'),
-        getSectionMetrics(),
       ]);
 
       if (secRes.status === 'fulfilled' && secRes.value) {
@@ -118,16 +103,6 @@ export default function SectionManagementView({
         const d = await teacherRes.value.json();
         const list = Array.isArray(d) ? d : d.results || [];
         setTeachers(list.filter((u) => u.is_active && !u.is_deactivated));
-      }
-
-      if (metricRes.status === 'fulfilled' && metricRes.value) {
-        const md = metricRes.value;
-        setMetrics({
-          total_sections: md.total_sections || 0,
-          total_capacity: md.total_capacity || 0,
-          total_enrolled: md.total_enrolled || 0,
-          occupancy_rate: md.occupancy_rate || 0,
-        });
       }
     } catch {
       showToast('Failed to load sections.', 'error');
@@ -172,12 +147,12 @@ export default function SectionManagementView({
         width: 'lg',
         content: (
           <SectionForm
+            key={sectionId ? `edit-sec-${sectionId}` : 'add-sec'}
             section={foundSection}
             classes={classes}
             branches={branches}
             teachers={teachers}
             defaultClassId={classFilter !== 'ALL' ? classFilter : null}
-            defaultBranchId={branchFilter !== 'ALL' ? branchFilter : null}
             onSaved={() => {
               loadData();
               window.dispatchEvent(new CustomEvent('spr_section_updated'));
@@ -188,12 +163,8 @@ export default function SectionManagementView({
         ),
       };
     },
-    [sections, classes, branches, teachers, classFilter, branchFilter, loadData, closeDrawer]
+    [sections, classes, branches, teachers, classFilter, loadData, closeDrawer]
   );
-
-  const handleCreateNew = () => {
-    openDrawer('section', { mode: 'add' });
-  };
 
   const handleEdit = (section) => {
     openDrawer('section', { mode: 'edit', id: section.id });
@@ -221,21 +192,6 @@ export default function SectionManagementView({
     }
   };
 
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setClassFilter('ALL');
-    setBranchFilter('ALL');
-    setTypeFilter('ALL');
-    setStatusFilter('ALL');
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete('class');
-    newParams.delete('student_class');
-    newParams.delete('branch');
-    newParams.delete('type');
-    newParams.delete('status');
-    setSearchParams(newParams);
-  };
-
   const handleFilterChange = (setter, key) => (val) => {
     setter(val);
     const newParams = new URLSearchParams(searchParams);
@@ -248,49 +204,19 @@ export default function SectionManagementView({
     setSearchParams(newParams);
   };
 
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() ||
-    classFilter !== 'ALL' ||
-    branchFilter !== 'ALL' ||
-    typeFilter !== 'ALL' ||
-    statusFilter !== 'ALL'
-  );
-
-  const activeFilterCount = [
-    classFilter !== 'ALL',
-    branchFilter !== 'ALL',
-    typeFilter !== 'ALL',
-    statusFilter !== 'ALL',
-  ].filter(Boolean).length;
-
-  // Filtered dataset
+  // Filtered dataset by search query & class filter
   const filteredSections = sections.filter((sec) => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = (sec.section_name || sec.name)?.toLowerCase().includes(q);
       const matchClass = sec.student_class_name?.toLowerCase().includes(q);
-      const matchBranch = sec.branch_name?.toLowerCase().includes(q);
       const matchTeacher = sec.class_teacher_name?.toLowerCase().includes(q);
-      if (!matchName && !matchClass && !matchBranch && !matchTeacher) return false;
+      if (!matchName && !matchClass && !matchTeacher) return false;
     }
 
     if (classFilter !== 'ALL' && String(sec.student_class) !== String(classFilter)) {
       return false;
     }
-
-    if (branchFilter !== 'ALL' && String(sec.branch) !== String(branchFilter)) {
-      return false;
-    }
-
-    if (typeFilter !== 'ALL' && sec.section_type !== typeFilter) {
-      return false;
-    }
-
-    if (statusFilter !== 'ALL') {
-      if (statusFilter === 'ACTIVE' && !sec.is_active) return false;
-      if (statusFilter === 'INACTIVE' && sec.is_active) return false;
-    }
-
     return true;
   });
 
@@ -315,57 +241,53 @@ export default function SectionManagementView({
     },
   ];
 
-  // Table Columns
+  // Table Columns (Campus/Branch, Format, Enrolled/Capacity removed per request)
   const tableColumns = [
     {
-      key: 'section_name',
-      header: 'Section Name & Class',
-      render: (sec) => (
-        <div className="space-y-0.5">
-          <span className="font-bold text-sm theme-text-primary block">{sec.section_name || sec.name}</span>
-          <span className="text-xs theme-text-secondary block">
-            {sec.student_class_name || 'Academic Class'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'branch',
-      header: 'Campus / Branch',
-      render: (sec) => (
-        <span className="text-xs font-semibold theme-text-primary">
-          {sec.branch_name || 'Main Campus'}
+      key: 'index',
+      header: 'No',
+      align: 'center',
+      headerClassName: 'w-14 text-center font-mono text-xs',
+      cellClassName: 'w-14 text-center font-mono text-xs',
+      render: (_, rowIdx) => (
+        <span className="font-mono text-xs font-bold theme-text-secondary">
+          {rowIdx + 1}
         </span>
       ),
     },
     {
-      key: 'section_type',
-      header: 'Format',
+      key: 'section_name',
+      header: 'Section Name',
+      headerClassName: 'min-w-[160px] sm:min-w-[200px]',
+      cellClassName: 'min-w-[160px] sm:min-w-[200px]',
       render: (sec) => (
-        <span className="text-xs theme-text-secondary">
-          {TYPE_CONFIG[sec.section_type] || sec.section_type || 'General'}
+        <span className="font-bold text-sm theme-text-primary block py-1">
+          {sec.section_name || sec.name}
+        </span>
+      ),
+    },
+    {
+      key: 'student_class_name',
+      header: 'Class',
+      headerClassName: 'min-w-[140px] sm:min-w-[180px]',
+      cellClassName: 'min-w-[140px] sm:min-w-[180px]',
+      render: (sec) => (
+        <span className="text-xs font-semibold theme-text-primary">
+          {sec.student_class_name || 'Academic Class'}
         </span>
       ),
     },
     {
       key: 'class_teacher_name',
       header: 'In-Charge Teacher',
+      headerClassName: 'min-w-[180px] sm:min-w-[220px]',
+      cellClassName: 'min-w-[180px] sm:min-w-[220px]',
       render: (sec) => (
-        <span className="text-xs font-semibold theme-text-primary">
-          {sec.class_teacher_name || 'Unassigned'}
-        </span>
-      ),
-    },
-    {
-      key: 'enrolled_students',
-      header: 'Enrolled / Capacity',
-      align: 'center',
-      render: (sec) => (
-        <div className="text-center font-mono">
-          <span className="text-xs font-bold theme-text-primary">
-            {sec.enrolled_students || 0}
+        <div className="flex items-center gap-1.5 text-xs theme-text-secondary py-1">
+          <TeacherIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+          <span className={`font-semibold ${sec.class_teacher_name ? 'theme-text-primary' : 'theme-text-muted italic'}`}>
+            {sec.class_teacher_name || 'Unassigned'}
           </span>
-          <span className="text-xs theme-text-secondary"> / {sec.max_capacity || 40}</span>
         </div>
       ),
     },
@@ -373,8 +295,10 @@ export default function SectionManagementView({
       key: 'group_count',
       header: 'Groups',
       align: 'center',
+      headerClassName: 'w-24 text-center',
+      cellClassName: 'w-24 text-center',
       render: (sec) => (
-        <span className="text-xs font-bold font-mono theme-text-primary">
+        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
           {sec.group_count || 0}
         </span>
       ),
@@ -384,9 +308,10 @@ export default function SectionManagementView({
       header: 'Actions',
       align: 'right',
       headerClassName: 'w-16 text-right',
+      cellClassName: 'w-16 text-right',
       render: (sec) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <ActionMenu items={getActionMenuItems(sec)} />
+          <ActionMenu items={getActionMenuItems(sec)} align="right" />
         </div>
       ),
     },
@@ -397,21 +322,21 @@ export default function SectionManagementView({
     <div
       key={sec.id}
       onClick={() => handleEdit(sec)}
-      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
+      className="rounded-2xl theme-bg-surface border theme-border p-4 sm:p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
     >
-      <div className="space-y-3.5">
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+            <h3 className="font-bold theme-text-primary text-sm leading-tight truncate group-hover:theme-accent transition-colors">
               {sec.section_name || sec.name}
             </h3>
             <p className="text-xs font-medium theme-text-secondary mt-1 truncate">
-              {sec.student_class_name || 'Class'} &bull; {sec.branch_name || 'Main Campus'}
+              {sec.student_class_name || 'Class'} &bull; {getBranchDisplayName(sec.branch_name || sec.branch) || 'Main Campus'}
             </p>
           </div>
 
           <div onClick={(e) => e.stopPropagation()}>
-            <ActionMenu items={getActionMenuItems(sec)} />
+            <ActionMenu items={getActionMenuItems(sec)} align="right" />
           </div>
         </div>
 
@@ -423,10 +348,10 @@ export default function SectionManagementView({
         <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
           <div>
             <span className="block text-sm font-bold theme-accent font-mono">
-              {sec.enrolled_students || 0} / {sec.max_capacity || 40}
+              {sec.enrolled_students || 0}
             </span>
             <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">
-              Enrolled / Capacity
+              Enrolled Students
             </span>
           </div>
           <div className="border-l theme-border">
@@ -440,125 +365,97 @@ export default function SectionManagementView({
     </div>
   );
 
-  const filterControls = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
-      <ClassSelect
-        label="Class"
-        classes={classes}
-        value={classFilter}
-        onChange={handleFilterChange(setClassFilter, 'class')}
-        allowAll={true}
-      />
-      <BranchSelect
-        label="Branch"
-        branches={branches}
-        value={branchFilter}
-        onChange={handleFilterChange(setBranchFilter, 'branch')}
-        allowAll={true}
-      />
-      <CustomSelect
-        label="Format"
-        value={typeFilter}
-        onChange={handleFilterChange(setTypeFilter, 'type')}
-        options={[
-          { value: 'ALL', label: 'All Formats' },
-          { value: 'GENERAL_SECTION', label: 'General Section' },
-          { value: 'HIFZ_SECTION', label: 'Quranic / Hifz Section' },
-          { value: 'RESIDENTIAL_DORM', label: 'Residential Dorm' },
-        ]}
-      />
-      <CustomSelect
-        label="Status"
-        value={statusFilter}
-        onChange={handleFilterChange(setStatusFilter, 'status')}
-        options={[
-          { value: 'ALL', label: 'All Status' },
-          { value: 'ACTIVE', label: 'Active' },
-          { value: 'INACTIVE', label: 'Inactive' },
-        ]}
-      />
-    </div>
-  );
-
   return (
-    <>
-      <UniversalManagementView
-        title="Class Sections"
-        subtitle="Manage academic section divisions, seat capacities, and in-charge mentors."
-        icon={SectionIcon}
-        hideHeader={hideHeader}
-        hideMetrics={hideMetrics}
-        isEmbedded={isEmbedded}
-        primaryAction={{
-          label: 'Add Section',
-          icon: PlusIcon,
-          onClick: handleCreateNew,
-        }}
-        metrics={[
-          {
-            label: 'Total Sections',
-            value: metrics.total_sections || sections.length,
-            icon: SectionIcon,
-            color: 'accent',
-            subLabel: 'Active sections',
-          },
-          {
-            label: 'Total Capacity',
-            value: metrics.total_capacity || 0,
-            icon: StudentIcon,
-            color: 'accent',
-            subLabel: 'Allocated seats',
-          },
-          {
-            label: 'Enrolled Students',
-            value: metrics.total_enrolled || 0,
-            icon: StudentIcon,
-            color: 'accent',
-            subLabel: 'Active enrollment',
-          },
-          {
-            label: 'Occupancy Rate',
-            value: `${metrics.occupancy_rate || 0}%`,
-            icon: BuildingOfficeIcon,
-            color: 'accent',
-            subLabel: 'Seat utilization',
-          },
-        ]}
-        searchPlaceholder="Search sections by name, class, branch, or teacher..."
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        hasActiveFilters={hasActiveFilters}
-        activeFilterCount={activeFilterCount}
-        onResetFilters={handleResetFilters}
-        filterControls={filterControls}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        data={filteredSections}
-        columns={tableColumns}
-        loading={loading}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onRowClick={(sec) => handleEdit(sec)}
-        renderCard={renderSectionCard}
-        page={page}
-        pageSize={pageSize}
-        totalCount={filteredSections.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onSort={(f, d) => {
-          setSortField(f);
-          setSortDirection(d);
-        }}
-        emptyState={{
-          icon: SectionIcon,
-          title: 'No Sections Found',
-          description: hasActiveFilters
-            ? 'No sections match the selected filter criteria. Try clearing some filters.'
-            : 'No class sections have been created yet. Click "Add Section" to configure your first section.',
-        }}
-      />
+    <div className="flex flex-col w-full space-y-3.5">
+      {/* ─── Top Filter & View Toolbar Card ─── */}
+      <div className="p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0">
+        {/* Left Side: Search Bar + Class Filter */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-2.5 flex-1 min-w-0">
+          <div className="w-full sm:w-56 md:w-64 lg:w-72 shrink-0">
+            <CustomInput
+              label="Search Sections"
+              type="search"
+              size="md"
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+              placeholder="Search sections, teacher..."
+              clearable={true}
+            />
+          </div>
+
+          <div className="w-full sm:w-52 md:w-56 shrink-0">
+            <ClassSelect
+              label="Filter by Class"
+              placeholder="All Classes"
+              classes={classes}
+              value={classFilter}
+              onChange={handleFilterChange(setClassFilter, 'class')}
+              allowAll={true}
+              allLabel="All Classes"
+              size="md"
+              icon={ClassIcon}
+            />
+          </div>
+        </div>
+
+        {/* Right Side: View Switcher Button */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 theme-border sm:border-transparent pb-0.5">
+          <button
+            type="button"
+            onClick={() => handleViewModeChange(viewMode === 'grid' ? 'table' : 'grid')}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+            title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Cards View'}
+          >
+            {viewMode === 'grid' ? (
+              <>
+                <TableIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>Table View</span>
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+                <span>Cards View</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main View Content (Table or Cards Grid) */}
+      {viewMode === 'table' ? (
+        <DataTable
+          columns={tableColumns}
+          data={filteredSections}
+          loading={loading}
+          loadingMessage="Loading class sections..."
+          keyExtractor={(s, idx) => s.id || `sec_${idx}`}
+          cellPaddingClass="py-3.5 px-4 sm:px-5"
+          headerCellClassName="py-3 px-4 sm:px-5 text-xs uppercase tracking-wider font-bold"
+          emptyIcon={SectionIcon}
+          emptyTitle="No Sections Found"
+          emptySubMessage={
+            searchQuery || classFilter !== 'ALL'
+              ? 'No sections match the applied search or filter criteria.'
+              : 'Get started by creating your first class section division.'
+          }
+          onRowClick={(sec) => handleEdit(sec)}
+        />
+      ) : (
+        <DataCardGrid
+          data={filteredSections}
+          renderCard={renderSectionCard}
+          isLoading={loading}
+          loadingMessage="Loading class sections..."
+          emptyIcon={SectionIcon}
+          emptyTitle="No Sections Found"
+          emptySubMessage={
+            searchQuery || classFilter !== 'ALL'
+              ? 'No sections match the applied search or filter criteria.'
+              : 'Get started by creating your first class section division.'
+          }
+          gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        />
+      )}
 
       {/* Delete Impact Modal */}
       {deletingSection && (
@@ -600,6 +497,7 @@ export default function SectionManagementView({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
+

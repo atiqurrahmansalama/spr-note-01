@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
 import {
   GroupIcon,
   ClassIcon,
   SectionIcon,
-  StudentIcon,
-  PlusIcon,
+  TeacherIcon,
   EditIcon,
   TrashIcon,
+  TableIcon,
+  Squares2X2Icon,
 } from "../../../../components/ui/Icons";
 import ActionMenu from "../../../../components/ui/ActionMenu";
-import CustomSelect from "../../../../components/ui/CustomSelect";
-import { ClassSelect, SectionSelect, TeacherSelect } from "../../../../components/selectors";
-import UniversalManagementView from "../../../../components/common/UniversalManagementView";
+import CustomInput from "../../../../components/ui/CustomInput";
+import { ClassSelect, SectionSelect } from "../../../../components/selectors";
+import DataTable from "../../../../components/ui/DataTable";
+import DataCardGrid from "../../../../components/ui/DataCardGrid";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
 import GroupForm from "./GroupForm";
 import GroupMigrationModal from "./GroupMigrationModal";
@@ -26,7 +28,6 @@ export default function GroupManagementView({
   isEmbedded = false,
 }) {
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -39,35 +40,30 @@ export default function GroupManagementView({
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [metrics, setMetrics] = useState({
-    total_groups: 0,
-    total_assigned_students: 0,
-    total_classes: 0,
-    available_seats: 0,
-  });
-
-  // Filters
+  // Filters & View Mode
   const [searchQuery, setSearchQuery] = useState("");
   const [classFilter, setClassFilter] = useState(initialClassFilter);
   const [sectionFilter, setSectionFilter] = useState(initialSectionFilter);
-  const [mentorFilter, setMentorFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem("spr_groups_view_mode") || "table";
+    } catch {
+      return "table";
+    }
+  });
 
-  // Selection & UI
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [viewMode, setViewMode] = useState("table");
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("spr_groups_view_mode", mode);
+    } catch {}
+  };
 
   // Modals
   const [deletingGroup, setDeletingGroup] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Pagination & Sorting
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sortField, setSortField] = useState("order_rank");
-  const [sortDirection, setSortDirection] = useState("asc");
 
   useEffect(() => {
     if (initialClassFilter !== classFilter) {
@@ -122,35 +118,17 @@ export default function GroupManagementView({
     } catch {}
   }, []);
 
-  const loadMetrics = useCallback(async () => {
-    try {
-      const res = await fetchWithAuth("/api/v1/groups/metrics/");
-      if (res.ok) {
-        const d = await res.json();
-        setMetrics({
-          total_groups: d.total_groups || 0,
-          total_assigned_students: d.total_assigned_students || 0,
-          total_classes: d.total_classes || 0,
-          available_seats: d.available_seats || 0,
-        });
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     loadGroups();
     loadLookups();
-    loadMetrics();
 
     const handleTenantChanged = () => {
       loadGroups();
       loadLookups();
-      loadMetrics();
     };
 
     const handleGroupUpdated = () => {
       loadGroups();
-      loadMetrics();
     };
 
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
@@ -159,51 +137,9 @@ export default function GroupManagementView({
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
       window.removeEventListener("spr_group_updated", handleGroupUpdated);
     };
-  }, [loadGroups, loadLookups, loadMetrics]);
+  }, [loadGroups, loadLookups]);
 
-  const handleFilterChange = (setter, key) => (val) => {
-    setter(val);
-    const newParams = new URLSearchParams(searchParams);
-    if (val === "ALL" || !val) {
-      newParams.delete(key);
-      if (key === "class") newParams.delete("student_class");
-    } else {
-      newParams.set(key, val);
-    }
-    setSearchParams(newParams);
-  };
-
-  const handleResetFilters = () => {
-    setSearchQuery("");
-    setClassFilter("ALL");
-    setSectionFilter("ALL");
-    setMentorFilter("ALL");
-    setStatusFilter("ALL");
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("class");
-    newParams.delete("student_class");
-    newParams.delete("section");
-    newParams.delete("mentor");
-    newParams.delete("status");
-    setSearchParams(newParams);
-  };
-
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() ||
-    classFilter !== "ALL" ||
-    sectionFilter !== "ALL" ||
-    mentorFilter !== "ALL" ||
-    statusFilter !== "ALL"
-  );
-
-  const activeFilterCount = [
-    classFilter !== "ALL",
-    sectionFilter !== "ALL",
-    mentorFilter !== "ALL",
-    statusFilter !== "ALL",
-  ].filter(Boolean).length;
-
-  // Drawer Registration for Group Form
+  // Drawer Registration for Add/Edit Group
   useDrawerRegistration(
     "group",
     (params) => {
@@ -216,18 +152,17 @@ export default function GroupManagementView({
         subtitle:
           mode === "edit"
             ? `Update settings for ${foundGroup?.name || "Group"}`
-            : "Define a new study group or halqa unit",
+            : "Configure a new study circle, batch, or student squad",
         width: "lg",
         content: (
           <GroupForm
+            key={groupId ? `edit-grp-${groupId}` : "add-grp"}
             editingGroup={foundGroup}
             classes={classes}
             defaultClassId={classFilter !== "ALL" ? classFilter : ""}
             defaultSectionId={sectionFilter !== "ALL" ? sectionFilter : ""}
             onSaved={() => {
               loadGroups();
-              loadMetrics();
-              window.dispatchEvent(new CustomEvent("spr_group_updated"));
               closeDrawer();
             }}
             onCancel={closeDrawer}
@@ -235,15 +170,11 @@ export default function GroupManagementView({
         ),
       };
     },
-    [groups, classes, classFilter, sectionFilter, loadGroups, loadMetrics, closeDrawer]
+    [groups, classes, classFilter, sectionFilter, loadGroups, closeDrawer]
   );
 
-  const handleOpenCreate = () => {
-    openDrawer("group", { mode: "add" });
-  };
-
-  const handleOpenEdit = (group) => {
-    openDrawer("group", { mode: "edit", id: group.id });
+  const handleOpenEdit = (grp) => {
+    openDrawer("group", { mode: "edit", id: grp.id });
   };
 
   const handleDeletePrompt = (group) => {
@@ -264,7 +195,6 @@ export default function GroupManagementView({
         setIsDeleteModalOpen(false);
         setDeletingGroup(null);
         loadGroups();
-        loadMetrics();
       } else {
         const err = await res.json().catch(() => ({}));
         showToast(err.error || "Failed to delete group.", "error");
@@ -274,6 +204,18 @@ export default function GroupManagementView({
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleFilterChange = (setter, key) => (val) => {
+    setter(val);
+    const newParams = new URLSearchParams(searchParams);
+    if (val === "ALL" || !val) {
+      newParams.delete(key);
+      if (key === "class") newParams.delete("student_class");
+    } else {
+      newParams.set(key, val);
+    }
+    setSearchParams(newParams);
   };
 
   // Filtered dataset
@@ -295,19 +237,6 @@ export default function GroupManagementView({
       return false;
     }
 
-    if (mentorFilter !== "ALL") {
-      if (mentorFilter === "UNASSIGNED") {
-        if (grp.mentor_teacher) return false;
-      } else if (String(grp.mentor_teacher) !== String(mentorFilter)) {
-        return false;
-      }
-    }
-
-    if (statusFilter !== "ALL") {
-      if (statusFilter === "ACTIVE" && !grp.is_active) return false;
-      if (statusFilter === "INACTIVE" && grp.is_active) return false;
-    }
-
     return true;
   });
 
@@ -326,46 +255,77 @@ export default function GroupManagementView({
     },
   ];
 
-  // Table Columns
+  // Table Columns (Rank column removed)
   const tableColumns = [
     {
+      key: "index",
+      header: "No",
+      align: "center",
+      headerClassName: "w-14 text-center font-mono text-xs",
+      cellClassName: "w-14 text-center font-mono text-xs",
+      render: (_, rowIdx) => (
+        <span className="font-mono text-xs font-bold theme-text-secondary">
+          {rowIdx + 1}
+        </span>
+      ),
+    },
+    {
       key: "name",
-      header: "Group & Academic Unit",
+      header: "Group Name",
+      headerClassName: "min-w-[160px] sm:min-w-[200px]",
+      cellClassName: "min-w-[160px] sm:min-w-[200px]",
       render: (grp) => (
-        <div className="space-y-0.5">
-          <span className="font-bold text-sm theme-text-primary block">{grp.name}</span>
-          <span className="text-xs theme-text-secondary block">
-            {grp.student_class_name || "Academic Class"}
-            {grp.section_name ? ` • ${grp.section_name}` : ""}
-          </span>
-        </div>
+        <span className="font-bold text-sm theme-text-primary block py-1">
+          {grp.name}
+        </span>
+      ),
+    },
+    {
+      key: "student_class_name",
+      header: "Class",
+      headerClassName: "min-w-[140px] sm:min-w-[180px]",
+      cellClassName: "min-w-[140px] sm:min-w-[180px]",
+      render: (grp) => (
+        <span className="text-xs font-semibold theme-text-primary">
+          {grp.student_class_name || "Academic Class"}
+        </span>
+      ),
+    },
+    {
+      key: "section_name",
+      header: "Section",
+      headerClassName: "min-w-[140px] sm:min-w-[180px]",
+      cellClassName: "min-w-[140px] sm:min-w-[180px]",
+      render: (grp) => (
+        <span className="text-xs font-semibold theme-text-secondary">
+          {grp.section_name || "Direct Class Level"}
+        </span>
       ),
     },
     {
       key: "mentor_teacher_name",
       header: "Assigned Mentor",
+      headerClassName: "min-w-[160px] sm:min-w-[200px]",
+      cellClassName: "min-w-[160px] sm:min-w-[200px]",
       render: (grp) => (
-        <span className="text-xs font-semibold theme-text-primary">
-          {grp.mentor_teacher_name || "Unassigned"}
-        </span>
+        <div className="flex items-center gap-1.5 text-xs theme-text-secondary py-1">
+          <TeacherIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+          <span className={`font-semibold ${grp.mentor_teacher_name ? "theme-text-primary" : "theme-text-muted italic"}`}>
+            {grp.mentor_teacher_name || "Unassigned"}
+          </span>
+        </div>
       ),
     },
     {
       key: "student_count",
-      header: "Assigned Students",
+      header: "Students",
       align: "center",
+      headerClassName: "w-24 text-center",
+      cellClassName: "w-24 text-center",
       render: (grp) => (
-        <span className="text-xs font-bold font-mono theme-text-primary">
+        <span className="text-xs font-bold font-mono theme-accent px-2.5 py-0.5 rounded-lg theme-bg-accent-soft/40 border theme-border inline-block">
           {grp.student_count || 0}
         </span>
-      ),
-    },
-    {
-      key: "order_rank",
-      header: "Rank",
-      align: "center",
-      render: (grp) => (
-        <span className="text-xs font-mono theme-text-secondary">{grp.order_rank ?? 1}</span>
       ),
     },
     {
@@ -373,9 +333,10 @@ export default function GroupManagementView({
       header: "Actions",
       align: "right",
       headerClassName: "w-16 text-right",
+      cellClassName: "w-16 text-right",
       render: (grp) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <ActionMenu items={getActionMenuItems(grp)} />
+          <ActionMenu items={getActionMenuItems(grp)} align="right" />
         </div>
       ),
     },
@@ -386,12 +347,12 @@ export default function GroupManagementView({
     <div
       key={grp.id}
       onClick={() => handleOpenEdit(grp)}
-      className="rounded-2xl theme-bg-surface border theme-border p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
+      className="rounded-2xl theme-bg-surface border theme-border p-4 sm:p-5 shadow-xs flex flex-col justify-between hover:theme-bg-sub/20 transition-all space-y-4 group cursor-pointer"
     >
-      <div className="space-y-3.5">
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold theme-text-primary text-sm leading-tight truncate">
+            <h3 className="font-bold theme-text-primary text-sm leading-tight truncate group-hover:theme-accent transition-colors">
               {grp.name}
             </h3>
             <p className="text-xs font-medium theme-text-secondary mt-1 truncate">
@@ -401,7 +362,7 @@ export default function GroupManagementView({
           </div>
 
           <div onClick={(e) => e.stopPropagation()}>
-            <ActionMenu items={getActionMenuItems(grp)} />
+            <ActionMenu items={getActionMenuItems(grp)} align="right" />
           </div>
         </div>
 
@@ -409,141 +370,116 @@ export default function GroupManagementView({
           <span>Mentor:</span>
           <span className="font-semibold theme-text-primary">{grp.mentor_teacher_name || "Unassigned"}</span>
         </div>
-
-        <div className="p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
-          <span className="block text-sm font-bold theme-accent font-mono">{grp.student_count || 0}</span>
-          <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">
-            Assigned Students
-          </span>
-        </div>
       </div>
     </div>
   );
 
-  const teacherOptions = [
-    { value: "ALL", label: "All Mentors" },
-    { value: "UNASSIGNED", label: "Unassigned Mentors" },
-    ...teachers.map((t) => ({ value: t.id, label: t.name })),
-  ];
-
-  const statusOptions = [
-    { value: "ALL", label: "All Status" },
-    { value: "ACTIVE", label: "Active Groups" },
-    { value: "INACTIVE", label: "Inactive Groups" },
-  ];
-
-  const filterControls = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
-      <ClassSelect
-        label="Class"
-        classes={classes}
-        value={classFilter}
-        onChange={handleFilterChange(setClassFilter, "class")}
-        allowAll={true}
-      />
-      <SectionSelect
-        label="Section"
-        sections={sections}
-        classId={classFilter !== "ALL" ? classFilter : null}
-        value={sectionFilter}
-        onChange={handleFilterChange(setSectionFilter, "section")}
-        allowAll={true}
-      />
-      <CustomSelect
-        label="Mentor Teacher"
-        value={mentorFilter}
-        onChange={handleFilterChange(setMentorFilter, "mentor")}
-        options={teacherOptions}
-        icon={TeacherSelect}
-      />
-      <CustomSelect
-        label="Group Status"
-        value={statusFilter}
-        onChange={handleFilterChange(setStatusFilter, "status")}
-        options={statusOptions}
-      />
-    </div>
-  );
-
   return (
-    <>
-      <UniversalManagementView
-        title="Study Groups & Circles"
-        subtitle="Manage peer learning circles, halqas, and assigned mentors."
-        icon={GroupIcon}
-        hideHeader={hideHeader}
-        hideMetrics={hideMetrics}
-        isEmbedded={isEmbedded}
-        primaryAction={{
-          label: "Add Group",
-          icon: PlusIcon,
-          onClick: handleOpenCreate,
-        }}
-        metrics={[
-          {
-            label: "Total Groups",
-            value: metrics.total_groups || groups.length,
-            icon: GroupIcon,
-            color: "accent",
-            subLabel: "Active study units",
-          },
-          {
-            label: "Assigned Students",
-            value: metrics.total_assigned_students || 0,
-            icon: StudentIcon,
-            color: "accent",
-            subLabel: "Total enrolled",
-          },
-          {
-            label: "Parent Classes",
-            value: metrics.total_classes || 0,
-            icon: ClassIcon,
-            color: "accent",
-            subLabel: "Active classes",
-          },
-          {
-            label: "Available Seats",
-            value: metrics.available_seats || 0,
-            icon: SectionIcon,
-            color: "accent",
-            subLabel: "Capacity available",
-          },
-        ]}
-        searchPlaceholder="Search groups by name, class, section, or mentor..."
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        hasActiveFilters={hasActiveFilters}
-        activeFilterCount={activeFilterCount}
-        onResetFilters={handleResetFilters}
-        filterControls={filterControls}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        data={filteredGroups}
-        columns={tableColumns}
-        loading={loading}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onRowClick={(grp) => handleOpenEdit(grp)}
-        renderCard={renderGroupCard}
-        page={page}
-        pageSize={pageSize}
-        totalCount={filteredGroups.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onSort={(f, d) => {
-          setSortField(f);
-          setSortDirection(d);
-        }}
-        emptyState={{
-          icon: GroupIcon,
-          title: "No Groups Found",
-          description: hasActiveFilters
-            ? "No study groups match the selected filter criteria."
-            : "No study groups or circles have been created yet. Click 'Add Group' to set up your first circle.",
-        }}
-      />
+    <div className="flex flex-col w-full space-y-3.5">
+      {/* ─── Top Filter & View Toolbar Card ─── */}
+      <div className="p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0">
+        {/* Left Side: Search Bar + Class Filter + Section Filter */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-2.5 flex-1 min-w-0 flex-wrap">
+          <div className="w-full sm:w-52 md:w-60 shrink-0">
+            <CustomInput
+              label="Search Groups"
+              type="search"
+              size="md"
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+              placeholder="Search groups, mentor..."
+              clearable={true}
+            />
+          </div>
+
+          <div className="w-full sm:w-48 md:w-52 shrink-0">
+            <ClassSelect
+              label="Filter by Class"
+              placeholder="All Classes"
+              classes={classes}
+              value={classFilter}
+              onChange={handleFilterChange(setClassFilter, "class")}
+              allowAll={true}
+              allLabel="All Classes"
+              size="md"
+              icon={ClassIcon}
+            />
+          </div>
+
+          <div className="w-full sm:w-48 md:w-52 shrink-0">
+            <SectionSelect
+              label="Filter by Section"
+              placeholder="All Sections"
+              sections={sections}
+              classId={classFilter !== "ALL" ? classFilter : null}
+              value={sectionFilter}
+              onChange={handleFilterChange(setSectionFilter, "section")}
+              allowAll={true}
+              allLabel="All Sections"
+              size="md"
+              icon={SectionIcon}
+            />
+          </div>
+        </div>
+
+        {/* Right Side: View Switcher Button */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 theme-border sm:border-transparent pb-0.5">
+          <button
+            type="button"
+            onClick={() => handleViewModeChange(viewMode === "grid" ? "table" : "grid")}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+            title={viewMode === "grid" ? "Switch to Table View" : "Switch to Cards View"}
+          >
+            {viewMode === "grid" ? (
+              <>
+                <TableIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>Table View</span>
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+                <span>Cards View</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main View Content (Table or Cards Grid) */}
+      {viewMode === "table" ? (
+        <DataTable
+          columns={tableColumns}
+          data={filteredGroups}
+          loading={loading}
+          loadingMessage="Loading study groups..."
+          keyExtractor={(g, idx) => g.id || `grp_${idx}`}
+          cellPaddingClass="py-3.5 px-4 sm:px-5"
+          headerCellClassName="py-3 px-4 sm:px-5 text-xs uppercase tracking-wider font-bold"
+          emptyIcon={GroupIcon}
+          emptyTitle="No Groups Found"
+          emptySubMessage={
+            searchQuery || classFilter !== "ALL" || sectionFilter !== "ALL"
+              ? "No groups match the applied search or filter criteria."
+              : "Get started by creating your first study group or circle."
+          }
+          onRowClick={(grp) => handleOpenEdit(grp)}
+        />
+      ) : (
+        <DataCardGrid
+          data={filteredGroups}
+          renderCard={renderGroupCard}
+          isLoading={loading}
+          loadingMessage="Loading study groups..."
+          emptyIcon={GroupIcon}
+          emptyTitle="No Groups Found"
+          emptySubMessage={
+            searchQuery || classFilter !== "ALL" || sectionFilter !== "ALL"
+              ? "No groups match the applied search or filter criteria."
+              : "Get started by creating your first study group or circle."
+          }
+          gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        />
+      )}
 
       {/* Delete Impact Modal */}
       {deletingGroup && (
@@ -568,7 +504,7 @@ export default function GroupManagementView({
         />
       )}
 
-      {/* Group Migration Modal */}
+      {/* Migration Modal */}
       {deletingGroup && (
         <GroupMigrationModal
           isOpen={isMigrationModalOpen}
@@ -580,11 +516,10 @@ export default function GroupManagementView({
           availableGroups={groups}
           onSuccess={() => {
             loadGroups();
-            loadMetrics();
             window.dispatchEvent(new CustomEvent("spr_group_updated"));
           }}
         />
       )}
-    </>
+    </div>
   );
 }

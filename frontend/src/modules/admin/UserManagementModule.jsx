@@ -39,7 +39,7 @@ import {
 // Drawer Forms
 import UserDrawerForm from "./UserDrawerForm";
 import UserResetPasswordDrawerForm from "./UserResetPasswordDrawerForm";
-import InstitutionOnboardingForm from "../app-management/institutions/InstitutionOnboardingForm";
+import InstitutionOnboardingForm from "../academy/campus-structure/academies/InstitutionOnboardingForm";
 
 export default function UserManagementModule() {
   const { showToast } = useToast();
