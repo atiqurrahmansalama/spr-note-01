@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import UniversalManagementView from '../../../../components/common/UniversalManagementView';
 import CustomSelect from '../../../../components/ui/CustomSelect';
 import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import ActionMenu from '../../../../components/ui/ActionMenu';
 import ClassPeriodSwitcherBar from '../ClassPeriodSwitcherBar';
+import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import {
   renderAssessmentCurriculumLessonCell,
   renderMistakesStucksCell,
@@ -13,7 +14,11 @@ import {
 import {
   ChecklistIcon,
   EditIcon,
+  DeleteIcon,
 } from '../../../../components/ui/Icons';
+import { learningStore } from '../../../../utils/stores/learningStore';
+import { deleteLessonEvaluation as deleteEvaluationAPI } from '../../../../api/learning';
+import { useToast } from '../../../../context/ToastContext';
 
 export default function StudentAssessmentManagementView({
   assessmentRows = [],
@@ -40,43 +45,79 @@ export default function StudentAssessmentManagementView({
   getSlotAssessmentCount,
   getPeriodTimeForSlot,
   onOpenAssessmentDrawer,
+  tenantId,
+  loadData,
 }) {
+  const { showToast } = useToast();
+  const [deletingEvaluation, setDeletingEvaluation] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDeleteEvaluation = async () => {
+    if (!deletingEvaluation) return;
+    setIsDeleting(true);
+    try {
+      if (deletingEvaluation.id) {
+        learningStore.deleteEvaluation(tenantId, deletingEvaluation.id);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(deletingEvaluation.id));
+        if (isUUID) {
+          try {
+            await deleteEvaluationAPI(deletingEvaluation.id);
+          } catch (apiErr) {
+            console.warn('Backend evaluation delete error:', apiErr);
+          }
+        }
+      }
+      showToast('Assessment evaluation record deleted.', 'success');
+      setDeletingEvaluation(null);
+      loadData?.();
+    } catch (err) {
+      showToast('Failed to delete assessment.', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Clean Columns for Daily Student Assessment (Unified 3-line Curriculum & Lesson column)
   const assessmentColumns = [
     {
       header: 'Student Name',
-      headerClassName: 'w-[180px]',
+      headerClassName: 'w-[20%] min-w-[170px]',
+      cellClassName: 'w-[20%] min-w-[170px]',
       render: (row) => (
-        <div className="cursor-pointer group text-left">
-          <span className="font-bold theme-text-primary group-hover:theme-text-accent transition-colors block">
+        <div className="cursor-pointer group text-left min-w-0">
+          <span className="font-bold theme-text-primary group-hover:theme-text-accent transition-colors block truncate">
             {row.student_name}
           </span>
-          <span className="text-xs theme-text-secondary">{row.student_uniq_id}</span>
+          <span className="text-xs theme-text-secondary block truncate">{row.student_uniq_id}</span>
         </div>
       ),
     },
     {
-      header: 'Curriculum & Lesson',
-      headerClassName: 'w-[250px]',
+      header: 'Book & Lesson',
+      headerClassName: 'w-[28%] min-w-[220px]',
+      cellClassName: 'w-[28%] min-w-[220px]',
       render: renderAssessmentCurriculumLessonCell,
     },
     {
-      header: 'Mistakes & Stucks',
+      header: 'Mistake & Stuck',
       align: 'center',
-      headerClassName: 'w-[130px] text-center',
+      headerClassName: 'w-[130px] min-w-[130px] text-center',
+      cellClassName: 'w-[130px] min-w-[130px] text-center',
       render: renderMistakesStucksCell,
     },
     {
-      header: 'Scores',
+      header: 'Lesson & Homework',
       align: 'center',
-      headerClassName: 'w-[160px] text-center',
+      headerClassName: 'w-[150px] min-w-[150px] text-center',
+      cellClassName: 'w-[150px] min-w-[150px] text-center',
       render: renderAssessmentScoresCell,
     },
     {
       header: 'Teacher Remarks',
-      headerClassName: 'min-w-[170px]',
+      headerClassName: 'min-w-[160px]',
+      cellClassName: 'min-w-[160px]',
       render: (row) => (
-        <span className="text-xs theme-text-secondary line-clamp-1 text-left">
+        <span className="text-xs theme-text-secondary line-clamp-2 text-left block">
           {row.teacher_remarks !== '—' && row.teacher_remarks ? row.teacher_remarks : <span className="opacity-40">—</span>}
         </span>
       ),
@@ -84,15 +125,26 @@ export default function StudentAssessmentManagementView({
     {
       header: 'Actions',
       align: 'right',
-      headerClassName: 'w-16 text-right',
+      headerClassName: 'w-[64px] min-w-[64px] text-right',
+      cellClassName: 'w-[64px] min-w-[64px] text-right',
       render: (row) => {
         const actionItems = [
           {
             label: row.is_evaluated ? 'Edit Assessment' : 'Evaluate Student',
             icon: EditIcon,
-            onClick: () => onOpenAssessmentDrawer?.(row.student),
+            onClick: () => onOpenAssessmentDrawer?.(row.student, row),
           },
         ];
+
+        if (row.is_evaluated) {
+          actionItems.push({
+            label: 'Delete Assessment',
+            icon: DeleteIcon,
+            variant: 'danger',
+            onClick: () => setDeletingEvaluation(row),
+          });
+        }
+
         return <ActionMenu items={actionItems} align="right" />;
       },
     },
@@ -102,7 +154,7 @@ export default function StudentAssessmentManagementView({
   const renderAssessmentCard = (row) => (
     <div
       key={row.id}
-      onClick={() => onOpenAssessmentDrawer?.(row.student)}
+      onClick={() => onOpenAssessmentDrawer?.(row.student, row)}
       className="p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs hover:theme-bg-sub/20 transition-all flex flex-col justify-between space-y-3 cursor-pointer group text-left"
     >
       <div>
@@ -242,7 +294,7 @@ export default function StudentAssessmentManagementView({
               allPeriodFilterOptions={allPeriodFilterOptions}
               activePeriodId={activePeriodId}
               onPeriodChange={onPeriodChange}
-              getSlotCount={getSlotLessonsCount || getSlotAssessmentCount}
+              getSlotCount={getSlotAssessmentCount || getSlotLessonsCount}
               getPeriodSubtitle={getPeriodTimeForSlot}
             />
           </>
@@ -250,11 +302,30 @@ export default function StudentAssessmentManagementView({
         data={assessmentRows}
         columns={assessmentColumns}
         renderCard={renderAssessmentCard}
+        onRowClick={(row) => onOpenAssessmentDrawer?.(row.student || row.id)}
         totalCount={assessmentRows.length}
         emptyIcon={ChecklistIcon}
         emptyTitle="No students found"
         emptySubMessage="Select a class and section to evaluate student daily learning and performance."
       />
+
+      {/* Delete Impact Confirmation Modal */}
+      {deletingEvaluation && (
+        <DeleteImpactModal
+          isOpen={Boolean(deletingEvaluation)}
+          onClose={() => setDeletingEvaluation(null)}
+          onConfirm={handleConfirmDeleteEvaluation}
+          title="Delete Assessment Evaluation"
+          subtitle={`You are about to delete the evaluation record for ${deletingEvaluation?.student_name}.`}
+          entityName={deletingEvaluation?.student_name || 'Student Evaluation'}
+          entityType="Assessment Record"
+          requireAck={false}
+          requireNameMatch={false}
+          isDeleting={isDeleting}
+          confirmButtonText="Delete Evaluation"
+          warningMessage="Deleting this student assessment will remove the scores, mistakes, and recitation remarks from their academic diary."
+        />
+      )}
     </div>
   );
 }

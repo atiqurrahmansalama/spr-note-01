@@ -75,7 +75,7 @@ export default function ClassPeriodSwitcherBar({
         onMouseLeave={handleMouseLeaveOrUp}
         onMouseUp={handleMouseLeaveOrUp}
         onMouseMove={handleMouseMove}
-        className={`flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar flex-nowrap cursor-grab active:cursor-grabbing select-none ${
+        className={`flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar flex-nowrap cursor-grab active:cursor-grabbing select-none ${
           isDragging ? 'cursor-grabbing select-none' : ''
         }`}
       >
@@ -93,19 +93,19 @@ export default function ClassPeriodSwitcherBar({
                   onPeriodChange(opt.value);
                 }
               }}
-              className={`px-2.5 py-2 rounded-xl border transition-all text-left cursor-pointer w-[136px] min-w-[136px] max-w-[136px] shrink-0 select-none ${
+              className={`px-2.5 py-1.5 rounded-xl border transition-all text-left cursor-pointer w-[115px] min-w-[115px] max-w-[115px] shrink-0 select-none ${
                 isSelected
                   ? 'theme-bg-accent text-white border-transparent shadow-sm'
                   : 'theme-bg-surface theme-border theme-text-primary hover:theme-bg-sub/60 shadow-2xs'
               }`}
             >
               {/* Row 1: Period Label & Count Badge */}
-              <div className="flex items-center justify-between gap-1.5 min-w-0">
+              <div className="flex items-center justify-between gap-1 min-w-0">
                 <span className={`font-bold text-xs truncate min-w-0 shrink ${isSelected ? 'text-white' : 'theme-text-primary'}`}>
                   {opt.label}
                 </span>
                 <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 min-w-[18px] text-center leading-none ${
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 min-w-[17px] text-center leading-none ${
                     isSelected
                       ? 'bg-white/25 text-white'
                       : 'theme-bg-sub border theme-border theme-text-secondary'
@@ -115,9 +115,9 @@ export default function ClassPeriodSwitcherBar({
                 </span>
               </div>
 
-              {/* Row 2: Period Time (Isolated full-width text) */}
+              {/* Row 2: Period Time / Details */}
               <span
-                className={`text-[10.5px] font-medium truncate block mt-1 w-full leading-tight ${
+                className={`text-[10px] font-medium truncate block mt-0.5 w-full leading-tight ${
                   isSelected ? 'text-white/80' : 'theme-text-secondary'
                 }`}
                 title={subtitleText}

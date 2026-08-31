@@ -112,6 +112,14 @@ export async function saveLessonEvaluation(data) {
   return res.json();
 }
 
+export async function deleteLessonEvaluation(id) {
+  const res = await fetchWithAuth(`/api/v1/learning/evaluations/${id}/`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to delete evaluation');
+  return true;
+}
+
 // ─── Homework Assignments API ────────────────────────────────────────────────
 export async function getHomeworkAssignments(params = {}) {
   const query = new URLSearchParams(params).toString();

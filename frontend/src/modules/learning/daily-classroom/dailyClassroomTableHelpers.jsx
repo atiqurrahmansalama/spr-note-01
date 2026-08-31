@@ -1,5 +1,8 @@
 import React from 'react';
 
+// Shared label constants for consistent copy across cell renderers
+const NO_ASSIGNMENT_LABEL = 'No lesson assigned';
+
 /**
  * Format range units cleanly without repeating prefix words like "Page", "Pages", "Ayah", "Para"
  * E.g. "Page 12" and "Page 14" => "Page 12 → 14"
@@ -38,16 +41,16 @@ export function renderCurriculumBookCell(row) {
   const subjectName = row.subject_name;
 
   return (
-    <div className="space-y-0.5 min-w-[170px] max-w-[230px] text-left">
+    <div className="space-y-0.5 min-w-0 w-full text-left">
       <span
-        className="text-xs font-bold theme-text-primary block truncate max-w-[220px]"
+        className="text-xs font-bold theme-text-primary block truncate"
         title={bookName || subjectName || 'General Curriculum'}
       >
         {bookName || subjectName || 'General Curriculum'}
       </span>
       {subjectName && bookName && subjectName !== bookName && (
         <span
-          className="text-[11px] font-medium theme-text-secondary block truncate max-w-[220px]"
+          className="text-[11px] font-medium theme-text-secondary block truncate"
           title={subjectName}
         >
           {subjectName}
@@ -66,15 +69,15 @@ export function renderLessonRangeCell(row) {
   const rangeText = formatRangeText(row.start_unit, row.end_unit);
 
   return (
-    <div className="space-y-0.5 min-w-[180px] max-w-[240px] text-left">
+    <div className="space-y-0.5 min-w-0 w-full text-left">
       <span
-        className="text-xs font-bold theme-text-primary block truncate max-w-[230px]"
+        className="text-xs font-bold theme-text-primary block truncate"
         title={title}
       >
         {title}
       </span>
       {rangeText && (
-        <span className="text-[11px] font-bold theme-text-accent block">
+        <span className="text-[11px] font-bold theme-text-accent block truncate">
           {rangeText}
         </span>
       )}
@@ -102,25 +105,25 @@ export function renderAssessmentCurriculumLessonCell(row) {
 
   if (!hasAssignment) {
     return (
-      <div className="space-y-0.5 min-w-[190px] max-w-[250px] text-left">
+      <div className="space-y-0.5 min-w-0 w-full text-left">
         <span
-          className="text-xs font-bold theme-text-primary block truncate max-w-[240px]"
+          className="text-xs font-bold theme-text-primary block truncate"
           title={row.student_class_name || 'Class Curriculum'}
         >
           {row.student_class_name || 'Class Curriculum'}
         </span>
-        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate max-w-[240px]">
-          No assignment assigned
+        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate">
+          {NO_ASSIGNMENT_LABEL}
         </span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-0.5 min-w-[190px] max-w-[250px] text-left">
+    <div className="space-y-0.5 min-w-0 w-full text-left">
       {/* Line 1: Book Name */}
       <span
-        className="text-xs font-bold theme-text-primary block truncate max-w-[240px]"
+        className="text-xs font-bold theme-text-primary block truncate"
         title={bookName || row.student_class_name || 'Curriculum Subject'}
       >
         {bookName || row.student_class_name || 'Curriculum Subject'}
@@ -129,7 +132,7 @@ export function renderAssessmentCurriculumLessonCell(row) {
       {/* Line 2: Lesson Title */}
       {title && (
         <span
-          className="text-[11px] font-semibold theme-text-secondary block truncate max-w-[240px]"
+          className="text-[11px] font-semibold theme-text-secondary block truncate"
           title={title}
         >
           {title}
@@ -138,12 +141,12 @@ export function renderAssessmentCurriculumLessonCell(row) {
 
       {/* Line 3: Page Range or Assignment Note */}
       {rangeText ? (
-        <span className="text-[11px] font-bold theme-text-accent block">
+        <span className="text-[11px] font-bold theme-text-accent block truncate">
           {rangeText}
         </span>
       ) : (
-        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate max-w-[240px]">
-          No assignment assigned
+        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate">
+          {NO_ASSIGNMENT_LABEL}
         </span>
       )}
     </div>

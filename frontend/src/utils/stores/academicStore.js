@@ -1075,6 +1075,69 @@ export const DEFAULT_CURRICULUM_ITEMS = [
     notes: "Full revision cycle: half to one Para per session.",
     updatedAt: "2026-08-27T14:00:00.000Z",
   },
+  {
+    id: "syllabus_hifz_6",
+    name: "Hadith Studies & Islamic Ethics (Riyadus Saliheen)",
+    subject: "Hadith & Islamic Adab",
+    className: "Standard Hifz Division",
+    classId: "cls_1",
+    periodSlotId: "period_6",
+    period_order: 6,
+    periodName: "6th Period: Hadith Studies & Islamic Ethics",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 150,
+    currentPage: 45,
+    totalPages: 150,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Basic Hadith memorization with Bangla meaning and practice.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
+  {
+    id: "syllabus_hifz_7",
+    name: "General Science & Academic Studies",
+    subject: "General Studies & Science",
+    className: "Standard Hifz Division",
+    classId: "cls_1",
+    periodSlotId: "period_7",
+    period_order: 7,
+    periodName: "7th Period: General Science & Academic Studies",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 120,
+    currentPage: 30,
+    totalPages: 120,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Daily academic science and general knowledge curriculum.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
+  {
+    id: "syllabus_hifz_8",
+    name: "Night Daur & Evening Mutala",
+    subject: "Evening Mutala & Daur",
+    className: "Standard Hifz Division",
+    classId: "cls_1",
+    periodSlotId: "period_8",
+    period_order: 8,
+    periodName: "8th Period: Evening Mutala & Night Daur",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 604,
+    currentPage: 250,
+    totalPages: 604,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Supervised evening revision and self-study recitation session.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
 
   // ── Class 2: Kitab Division - Fazilat (cls_2) ────────────────────────
   {
@@ -1203,6 +1266,48 @@ export const DEFAULT_CURRICULUM_ITEMS = [
     notes: "Chapters on Sincerity, Repentance, and Patience.",
     updatedAt: "2026-08-26T16:00:00.000Z",
   },
+  {
+    id: "syllabus_kitab_7",
+    name: "Al-Balaghatul Wadhihah",
+    subject: "Arabic Rhetoric (Balaghat)",
+    className: "Kitab Division (Fazilat)",
+    classId: "cls_2",
+    periodSlotId: "period_7",
+    period_order: 7,
+    periodName: "7th Period: Arabic Rhetoric & Eloquence",
+    semester: "1st Semester",
+    teacherName: "Shaykhul Hadith Maulana Zakariya",
+    teacherId: "teacher_2",
+    startPage: 1,
+    endPage: 180,
+    currentPage: 60,
+    totalPages: 180,
+    targetDate: "2026-08-31",
+    status: "IN_PROGRESS",
+    notes: "Ilm al-Ma'ani, Ilm al-Bayan, and Ilm al-Badi'.",
+    updatedAt: "2026-08-26T16:00:00.000Z",
+  },
+  {
+    id: "syllabus_kitab_8",
+    name: "Night Mutala & Research Session",
+    subject: "Night Mutala & Research",
+    className: "Kitab Division (Fazilat)",
+    classId: "cls_2",
+    periodSlotId: "period_8",
+    period_order: 8,
+    periodName: "8th Period: Evening Mutala & Research",
+    semester: "1st Semester",
+    teacherName: "Maulana Mufti Abdullah",
+    teacherId: "teacher_1",
+    startPage: 1,
+    endPage: 300,
+    currentPage: 120,
+    totalPages: 300,
+    targetDate: "2026-08-31",
+    status: "IN_PROGRESS",
+    notes: "Independent study, Fatawa research, and Mutala verification.",
+    updatedAt: "2026-08-26T16:00:00.000Z",
+  },
 
   // ── Class 3: Primary Islamic Studies (cls_3) ────────────────────────
   {
@@ -1308,6 +1413,69 @@ export const DEFAULT_CURRICULUM_ITEMS = [
     targetDate: "2026-06-30",
     status: "IN_PROGRESS",
     notes: "Alphabet recognition, numbers, and basic additions.",
+    updatedAt: "2026-08-25T11:00:00.000Z",
+  },
+  {
+    id: "syllabus_primary_6",
+    name: "Islamic Manners & Story of Prophets",
+    subject: "Islamic Stories & Akhlaq",
+    className: "Primary Islamic Studies",
+    classId: "cls_3",
+    periodSlotId: "period_6",
+    period_order: 6,
+    periodName: "6th Period: Islamic Stories & Akhlaq",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 80,
+    currentPage: 25,
+    totalPages: 80,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Qasas al-Anbiya stories and daily moral lessons.",
+    updatedAt: "2026-08-25T11:00:00.000Z",
+  },
+  {
+    id: "syllabus_primary_7",
+    name: "Quran Nazira Practice & Tajweed Recitation",
+    subject: "Tajweed Recitation",
+    className: "Primary Islamic Studies",
+    classId: "cls_3",
+    periodSlotId: "period_7",
+    period_order: 7,
+    periodName: "7th Period: Quran Nazira Practice",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 120,
+    currentPage: 40,
+    totalPages: 120,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Supervised Tajweed oral practice.",
+    updatedAt: "2026-08-25T11:00:00.000Z",
+  },
+  {
+    id: "syllabus_primary_8",
+    name: "Evening Dua & Homework Recitation",
+    subject: "Dua & Adab",
+    className: "Primary Islamic Studies",
+    classId: "cls_3",
+    periodSlotId: "period_8",
+    period_order: 8,
+    periodName: "8th Period: Evening Dua & Daily Review",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 50,
+    currentPage: 20,
+    totalPages: 50,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Daily review and bedtime Sunnah Duas.",
     updatedAt: "2026-08-25T11:00:00.000Z",
   },
 ];
@@ -1726,8 +1894,37 @@ export const periodCategoriesStore = {
 
 // ─── Configurable Period Sequences Store ─────────────────────────────────────
 
-export function getOrdinalPeriodLabel(num) {
-  const n = parseInt(num, 10) || 1;
+export function getOrdinalPeriodLabel(numOrStr) {
+  if (!numOrStr) return '1st Period';
+  if (typeof numOrStr === 'string') {
+    const trimmed = numOrStr.trim();
+    if (/^\d+(st|nd|rd|th)\s+period$/i.test(trimmed)) {
+      return trimmed;
+    }
+    // UUID / Hash protection: do NOT parse UUIDs as numbers!
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(trimmed) || trimmed.length > 20) {
+      return '1st Period';
+    }
+    const match = trimmed.match(/^(?:period[_\-\s]*|slot[_\-\s]*|p)?(\d+)(?:st|nd|rd|th)?(?:\s*period)?$/i);
+    if (match && match[1]) {
+      const n = parseInt(match[1], 10);
+      const s = ['th', 'st', 'nd', 'rd'];
+      const v = n % 100;
+      const suffix = s[(v - 20) % 10] || s[v] || s[0];
+      return `${n}${suffix} Period`;
+    }
+    const anyMatch = trimmed.match(/\b(\d+)(?:st|nd|rd|th)?\b/);
+    if (anyMatch && anyMatch[1]) {
+      const n = parseInt(anyMatch[1], 10);
+      if (n > 0 && n <= 50) {
+        const s = ['th', 'st', 'nd', 'rd'];
+        const v = n % 100;
+        const suffix = s[(v - 20) % 10] || s[v] || s[0];
+        return `${n}${suffix} Period`;
+      }
+    }
+  }
+  const n = typeof numOrStr === 'number' ? numOrStr : (parseInt(numOrStr, 10) || 1);
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
   const suffix = s[(v - 20) % 10] || s[v] || s[0];

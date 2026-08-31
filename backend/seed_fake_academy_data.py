@@ -21,6 +21,9 @@ from core.models import (
     ClassPeriodSlot,
     User,
     StaffProfile,
+    Student,
+    DailyLessonPlan,
+    LessonEvaluation,
 )
 
 def run_seed():
@@ -646,22 +649,196 @@ def run_seed():
 
         created_periods = []
         for p_info in period_slots_data:
-            slot, _ = ClassPeriodSlot.objects.get_or_create(
-                institution=inst,
-                period_order=p_info['period_order'],
-                defaults={
-                    "period_name": p_info['period_name'],
-                    "slot_type": p_info['slot_type'],
-                    "start_time": p_info['start_time'],
-                    "end_time": p_info['end_time'],
-                    "department": p_info['dept'],
-                    "student_class": p_info['s_class'],
-                    "branch": p_info['branch'],
-                    "is_active": True,
-                }
-            )
+            slot = ClassPeriodSlot.objects.filter(institution=inst, period_order=p_info['period_order']).first()
+            if not slot:
+                slot = ClassPeriodSlot.objects.create(
+                    institution=inst,
+                    period_order=p_info['period_order'],
+                    period_name=p_info['period_name'],
+                    slot_type=p_info['slot_type'],
+                    start_time=p_info['start_time'],
+                    end_time=p_info['end_time'],
+                    department=p_info['dept'],
+                    student_class=p_info['s_class'],
+                    branch=p_info['branch'],
+                    is_active=True,
+                )
             created_periods.append(slot)
-        print(f"  [OK] Created {len(created_periods)} Period Slots for {inst.name}")
+        # --- G. Daily Lesson Plans & Lesson Evaluations (2026-08-30 & 2026-08-31) ---
+        seed_dates = [datetime.date(2026, 8, 30), datetime.date(2026, 8, 31)]
+        hifz_class = created_classes[0] if created_classes else None
+        kitab_class = created_classes[1] if len(created_classes) > 1 else hifz_class
+        primary_class = created_classes[2] if len(created_classes) > 2 else hifz_class
+
+        lesson_templates = [
+            {
+                "period_order": 1,
+                "s_class": hifz_class,
+                "subject": "Quran Memorization (Hifz)",
+                "book": "Quran Daily Sabaq (Para 1-10)",
+                "title": "Surah Al-Kahf (Ayah 1 to 20)",
+                "topic": "Recitation with Proper Tajweed and Waqf",
+                "start_unit": "Page 293",
+                "end_unit": "Page 294",
+                "instructions": "Memorize with accurate Makharij. Minimum 5 repetitions before Adai.",
+            },
+            {
+                "period_order": 2,
+                "s_class": hifz_class,
+                "subject": "Sabqi Revision",
+                "book": "Quran Sabqi (Para 1-5 Recent Revision)",
+                "title": "Surah Al-Isra (Ayah 80 to 111)",
+                "topic": "Recent Sabaq Fluent Recall and Tajweed Precision",
+                "start_unit": "Page 290",
+                "end_unit": "Page 292",
+                "instructions": "Review with partner. Ensure zero Lukmah in recitation.",
+            },
+            {
+                "period_order": 4,
+                "s_class": hifz_class,
+                "subject": "Manzil Revision",
+                "book": "Quran Manzil (Long-Term Retention Routine)",
+                "title": "Para 4: Al-Imran (Ayah 92-200)",
+                "topic": "Continuous fluent recitation of full half-para",
+                "start_unit": "Page 62",
+                "end_unit": "Page 76",
+                "instructions": "Listen carefully in groups of three. Mark any hesitations.",
+            },
+            {
+                "period_order": 5,
+                "s_class": kitab_class,
+                "subject": "Tajweed & Qirat Rules",
+                "book": "Al-Jazariyyah in Tajweed Science",
+                "title": "Bab al-Makharij wa Sifat: Letter Attributes",
+                "topic": "Hams, Jahr, and Shiddah classification with examples",
+                "start_unit": "Page 14",
+                "end_unit": "Page 18",
+                "instructions": "Articulate each letter with exact vocal cord vibration checks.",
+            },
+            {
+                "period_order": 6,
+                "s_class": kitab_class,
+                "subject": "Arabic Syntax (Nahw & Sarf)",
+                "book": "Sharh Mi'ata Amil",
+                "title": "Hidayat al-Nahw: Marfuat Rules",
+                "topic": "Fail and Naib Fail Syntactic Analysis & I'rab",
+                "start_unit": "Chapter 3, Page 45",
+                "end_unit": "Chapter 3, Page 52",
+                "instructions": "Analyze practical I'rab examples from Quranic verses 1-10.",
+            },
+            {
+                "period_order": 7,
+                "s_class": primary_class,
+                "subject": "General Science & Mathematics",
+                "book": "Primary Mathematics & Geometry",
+                "title": "Unit 4: Geometry & Angle Measurements",
+                "topic": "Right Angles, Acute Angles & Protractor Usage",
+                "start_unit": "Page 52",
+                "end_unit": "Page 58",
+                "instructions": "Hands-on practice measuring triangle internal angles.",
+            },
+            {
+                "period_order": 9,
+                "s_class": kitab_class,
+                "subject": "Hadith Studies & Islamic Ethics",
+                "book": "Mishkat al-Masabih",
+                "title": "Kitab al-Salah: Sunan & Adab",
+                "topic": "Hadith 540-555 Commentary and Fiqh derivations",
+                "start_unit": "Page 88",
+                "end_unit": "Page 94",
+                "instructions": "Analyze linguistic nuances and Matn variations across Sunan collections.",
+            },
+            {
+                "period_order": 10,
+                "s_class": primary_class,
+                "subject": "English & Mother Tongue Bangla",
+                "book": "English Grammar & Composition",
+                "title": "Tenses & Dialogue Practice",
+                "topic": "Present Continuous and Past Simple in Conversation",
+                "start_unit": "Page 40",
+                "end_unit": "Page 46",
+                "instructions": "Pair speaking practice followed by written paragraph review.",
+            },
+            {
+                "period_order": 11,
+                "s_class": hifz_class,
+                "subject": "Afternoon Mutala & Self-Study",
+                "book": "Quran Daily Sabaq (Para 1-10)",
+                "title": "Guided Self-Revision & Homework Completion",
+                "topic": "Deep concentration memorization circle",
+                "start_unit": "Unit Notes",
+                "end_unit": "Review",
+                "instructions": "Maintain silence. Focus on weaker verses.",
+            },
+            {
+                "period_order": 12,
+                "s_class": hifz_class,
+                "subject": "Night Daur Recitation",
+                "book": "Quran Manzil (Long-Term Retention Routine)",
+                "title": "Nightly Daur: Juz 1 to 5",
+                "topic": "Continuous fluent recitation with lead Qari",
+                "start_unit": "Para 1",
+                "end_unit": "Para 5",
+                "instructions": "Speed recitation with clear articulation and Waqf compliance.",
+            },
+        ]
+
+        inst_students = list(Student.objects.filter(institution=inst))
+        created_lessons_count = 0
+        for l_date in seed_dates:
+            for l_tmpl in lesson_templates:
+                p_slot = next((p for p in created_periods if p.period_order == l_tmpl['period_order']), created_periods[0] if created_periods else None)
+                target_cls = l_tmpl['s_class'] or created_classes[0]
+                sec = next((s for s in created_sections if s.student_class == target_cls), None)
+                assigned_teacher_user = teachers[0] if teachers else None
+                staff_prof = StaffProfile.objects.filter(institution=inst).first() or (StaffProfile.objects.filter(user=assigned_teacher_user).first() if assigned_teacher_user else None)
+                teacher_full_name = staff_prof.full_name if (staff_prof and hasattr(staff_prof, 'full_name') and staff_prof.full_name) else (assigned_teacher_user.get_full_name() if (assigned_teacher_user and assigned_teacher_user.get_full_name()) else "Assigned Instructor")
+
+                dlp, _ = DailyLessonPlan.objects.get_or_create(
+                    institution=inst,
+                    lesson_date=l_date,
+                    period_name=p_slot.period_name if p_slot else f"Period {l_tmpl['period_order']}",
+                    academic_class=target_cls,
+                    defaults={
+                        "branch": "MAIN_CAMPUS",
+                        "section": sec,
+                        "subject_name": l_tmpl['subject'],
+                        "curriculum_book_name": l_tmpl['book'],
+                        "period_slot": p_slot,
+                        "teacher": staff_prof,
+                        "teacher_name": teacher_full_name,
+                        "lesson_title": l_tmpl['title'],
+                        "lesson_topic": l_tmpl['topic'],
+                        "start_unit": l_tmpl['start_unit'],
+                        "end_unit": l_tmpl['end_unit'],
+                        "lesson_instructions": l_tmpl['instructions'],
+                        "assigned_scope": "CLASS_WIDE",
+                        "is_active": True,
+                    }
+                )
+                created_lessons_count += 1
+
+                # Seed LessonEvaluations for students
+                if inst_students:
+                    for idx, st in enumerate(inst_students[:3]):
+                        LessonEvaluation.objects.get_or_create(
+                            lesson_plan=dlp,
+                            student=st,
+                            defaults={
+                                "student_name": st.name_en or getattr(st, 'name', 'Student'),
+                                "evaluation_date": l_date,
+                                "evaluation_status": "MASTERED" if idx == 0 else "SATISFACTORY",
+                                "score": 10.0 if idx == 0 else 8.5,
+                                "max_score": 10.0,
+                                "total_mistakes": 0 if idx == 0 else 1,
+                                "total_stucks": 0 if idx == 0 else 1,
+                                "fluency_rating": 5 if idx == 0 else 4,
+                                "teacher_remarks": "Excellent recitation and fluent memorization." if idx == 0 else "Good progress. Minor hesitation.",
+                                "is_synced_to_parent": True,
+                            }
+                        )
+
+        print(f"  [OK] Created {created_lessons_count} Daily Lesson Plans & Evaluations for {inst.name}")
 
     print("\n[SUCCESS] Comprehensive Fake Data Seeding Completed Successfully!")
     print(f"Total Institutions: {AcademicInstitution.objects.count()}")
@@ -671,6 +848,8 @@ def run_seed():
     print(f"Total Sections:     {ClassSection.objects.count()}")
     print(f"Total Groups:       {StudentGroup.objects.count()}")
     print(f"Total Periods:      {ClassPeriodSlot.objects.count()}")
+    print(f"Total Lesson Plans: {DailyLessonPlan.objects.count()}")
+    print(f"Total Evaluations:  {LessonEvaluation.objects.count()}")
     print(f"Total Staff/Users:  {User.objects.count()}")
 
 if __name__ == '__main__':

@@ -582,6 +582,8 @@ class LessonEvaluationSerializer(serializers.ModelSerializer):
 
 class DailyLessonPlanSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source='academic_class.name', read_only=True)
+    department_id = serializers.CharField(source='academic_class.department.id', read_only=True, default=None)
+    department_name = serializers.CharField(source='academic_class.department.name', read_only=True, default='')
     section_name = serializers.CharField(source='section.section_name', read_only=True)
     group_name = serializers.CharField(source='student_group.group_name', read_only=True)
     evaluations = LessonEvaluationSerializer(many=True, read_only=True)
@@ -596,6 +598,8 @@ class DailyLessonPlanSerializer(serializers.ModelSerializer):
             'id',
             'institution',
             'branch',
+            'department_id',
+            'department_name',
             'academic_class',
             'class_name',
             'section',

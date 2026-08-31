@@ -149,6 +149,10 @@ export function RightSidebarProvider({ children }) {
     const drawerKey = drawerKeyOrConfig;
 
     updateUrlParams((params) => {
+      // Clear previous drawer-specific params
+      const drawerParamKeys = ['id', 'mode', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
+      drawerParamKeys.forEach((k) => params.delete(k));
+
       params.set('drawer', drawerKey);
       Object.entries(queryParams).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') {

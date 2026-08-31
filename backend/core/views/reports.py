@@ -526,7 +526,7 @@ class DailyLessonPlanViewSet(viewsets.ModelViewSet):
         qs = DailyLessonPlan.objects.select_related(
             'academic_class', 'section', 'student_group', 'teacher', 'period_slot'
         ).prefetch_related('evaluations').all()
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(institution_id=tenant_id)
         
         class_id = self.request.query_params.get('class_id') or self.request.query_params.get('academic_class')
@@ -549,7 +549,7 @@ class DailyLessonPlanViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
-        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
+        inst = AcademicInstitution.objects.filter(id=tenant_id).first() if (tenant_id and str(tenant_id).upper() != 'ALL') else None
         serializer.save(institution=inst or AcademicInstitution.objects.first())
 
     @action(detail=True, methods=['post'], url_path='bulk-evaluate')
@@ -602,7 +602,7 @@ class LessonEvaluationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
         qs = LessonEvaluation.objects.select_related('lesson_plan', 'student').all()
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(student__institution_id=tenant_id)
             
         student_id = self.request.query_params.get('student_id')

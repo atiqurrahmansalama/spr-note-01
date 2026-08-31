@@ -15,6 +15,7 @@ import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import { learningStore } from '../../../../utils/stores/learningStore';
 import { useToast } from '../../../../context/ToastContext';
 import { useTenant } from '../../../../context/TenantContext';
+import { doesLessonMatchClass } from '../dailyClassroomUtils';
 
 /**
  * Enterprise-grade Lesson Clone & Carry-Forward Modal
@@ -105,17 +106,20 @@ export default function CarryForwardLessonModal({
     if (!isOpen || mode !== 'bulk' || !sourceDate) return [];
     try {
       const allLessons = learningStore.getDailyLessons(tenantId) || [];
+      const targetSource = String(sourceDate).split('T')[0];
+
       return allLessons.filter((l) => {
-        if (l.lesson_date !== sourceDate) return false;
+        const lDate = String(l.lesson_date || '').split('T')[0];
+        if (lDate !== targetSource) return false;
         if (selectedClassId && selectedClassId !== 'ALL') {
-          return String(l.academic_class) === String(selectedClassId);
+          return doesLessonMatchClass(l, selectedClassId, classes);
         }
         return true;
       });
     } catch {
       return [];
     }
-  }, [isOpen, mode, sourceDate, selectedClassId, tenantId]);
+  }, [isOpen, mode, sourceDate, selectedClassId, classes, tenantId]);
 
   // Auto-select all source lessons when list loads
   useEffect(() => {

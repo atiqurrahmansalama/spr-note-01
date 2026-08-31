@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangleIcon,
@@ -10,6 +10,7 @@ import {
   GroupsIcon,
   StudentIcon,
   UsersIcon,
+  TransferIcon,
 } from '../ui/Icons';
 
 /**
@@ -44,6 +45,12 @@ export default function DeleteImpactModal({
   const resolvedOnConfirm = onConfirm || onDirectDelete;
   const resolvedOnMigrate = onMigrate || onMigrateOpen;
 
+  const cancelBtnRef = useRef(null);
+  const confirmBtnRef = useRef(null);
+  const migrateBtnRef = useRef(null);
+  const nameInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+
   const resolvedImpactItems = useMemo(() => {
     if (Array.isArray(impactItems) && impactItems.length > 0) {
       return impactItems;
@@ -76,31 +83,90 @@ export default function DeleteImpactModal({
   const [typedName, setTypedName] = useState('');
   const [password, setPassword] = useState('');
 
+  const isNameMatchValid = !requireNameMatch || (typedName.trim() === resolvedEntityName?.trim());
+  const isPasswordValid = !requirePassword || (password.trim().length > 0);
+  const isAckValid = !requireAck || acknowledged;
+  const canConfirm = isAckValid && isNameMatchValid && isPasswordValid && !isDeleting;
+
+  // Auto-focus on modal open
   useEffect(() => {
     if (isOpen) {
       setAcknowledged(!requireAck);
       setTypedName('');
       setPassword('');
-    }
-  }, [isOpen, requireAck]);
 
-  // Handle ESC key press
+      const timer = setTimeout(() => {
+        if (requireNameMatch && nameInputRef.current) {
+          nameInputRef.current.focus();
+        } else if (requirePassword && passwordInputRef.current) {
+          passwordInputRef.current.focus();
+        } else if (confirmBtnRef.current) {
+          confirmBtnRef.current.focus();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, requireAck, requireNameMatch, requirePassword]);
+
+  // Comprehensive keyboard handling (Escape, Enter, Left/Right Arrow navigation)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen && !isDeleting) {
+      if (!isOpen || isDeleting) return;
+
+      // 1. Cancel on Escape key
+      if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
+        return;
+      }
+
+      // Check if text/password inputs are actively focused
+      const activeEl = document.activeElement;
+      const isTextInputActive =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
+        activeEl.type !== 'checkbox';
+
+      // 2. Left / Right Arrow navigation between action buttons
+      if (!isTextInputActive && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        if (e.key === 'ArrowLeft') {
+          if (activeEl === confirmBtnRef.current && cancelBtnRef.current) {
+            cancelBtnRef.current.focus();
+          } else if (activeEl === cancelBtnRef.current && migrateBtnRef.current) {
+            migrateBtnRef.current.focus();
+          } else if (cancelBtnRef.current) {
+            cancelBtnRef.current.focus();
+          }
+        } else if (e.key === 'ArrowRight') {
+          if (activeEl === migrateBtnRef.current && cancelBtnRef.current) {
+            cancelBtnRef.current.focus();
+          } else if (activeEl === cancelBtnRef.current && confirmBtnRef.current) {
+            confirmBtnRef.current.focus();
+          } else if (confirmBtnRef.current) {
+            confirmBtnRef.current.focus();
+          }
+        }
+        return;
+      }
+
+      // 3. Enter key handling
+      if (e.key === 'Enter') {
+        if (activeEl === cancelBtnRef.current) {
+          e.preventDefault();
+          onClose();
+        } else if (canConfirm && resolvedOnConfirm) {
+          e.preventDefault();
+          resolvedOnConfirm({ password, entityName: resolvedEntityName });
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isDeleting, onClose]);
+  }, [isOpen, isDeleting, onClose, canConfirm, resolvedOnConfirm, password, resolvedEntityName]);
 
   if (!isOpen || typeof document === 'undefined') return null;
-
-  const isNameMatchValid = !requireNameMatch || (typedName.trim() === resolvedEntityName?.trim());
-  const isPasswordValid = !requirePassword || (password.trim().length > 0);
-  const isAckValid = !requireAck || acknowledged;
-  const canConfirm = isAckValid && isNameMatchValid && isPasswordValid && !isDeleting;
 
   const handleConfirmSubmit = (e) => {
     e.preventDefault();
@@ -158,8 +224,8 @@ export default function DeleteImpactModal({
             type="button"
             onClick={onClose}
             disabled={isDeleting}
-            className="p-1.5 rounded-xl border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer shrink-0 disabled:opacity-30"
-            title="Close"
+            className="p-1.5 rounded-xl border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer shrink-0 disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-[var(--accent-main)]/50"
+            title="Close (Esc)"
           >
             <CloseIcon className="w-4 h-4" />
           </button>
@@ -220,7 +286,7 @@ export default function DeleteImpactModal({
                 id="delete_modal_ack"
                 checked={acknowledged}
                 onChange={(e) => setAcknowledged(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded accent-[var(--accent-main)] theme-bg-surface theme-border cursor-pointer shrink-0"
+                className="mt-0.5 w-4 h-4 rounded accent-[var(--accent-main)] theme-bg-surface theme-border cursor-pointer shrink-0 focus:ring-2 focus:ring-[var(--accent-main)]/50"
               />
               <label htmlFor="delete_modal_ack" className="text-xs font-medium theme-text-primary cursor-pointer leading-relaxed">
                 I acknowledge the consequences and confirm that I wish to proceed with deleting this {resolvedEntityType.toLowerCase()}.
@@ -235,6 +301,7 @@ export default function DeleteImpactModal({
                 Type <span className="theme-text-primary font-mono font-bold select-all theme-bg-elevated px-2 py-0.5 rounded-md border theme-border">{resolvedEntityName}</span> to confirm:
               </label>
               <input
+                ref={nameInputRef}
                 type="text"
                 value={typedName}
                 onChange={(e) => setTypedName(e.target.value)}
@@ -251,6 +318,7 @@ export default function DeleteImpactModal({
                 Your Admin Password <span className="theme-danger">*</span>
               </label>
               <input
+                ref={passwordInputRef}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -265,10 +333,11 @@ export default function DeleteImpactModal({
             <div className="w-full sm:w-auto">
               {resolvedOnMigrate && (
                 <button
+                  ref={migrateBtnRef}
                   type="button"
                   onClick={resolvedOnMigrate}
                   disabled={isDeleting}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[var(--accent-main)]/30 theme-bg-accent-soft theme-accent text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 hover:opacity-90 shadow-2xs"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[var(--accent-main)]/30 theme-bg-accent-soft theme-accent text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 hover:opacity-90 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[var(--accent-main)]/50"
                 >
                   <TransferIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
                   <span>{migrateButtonText}</span>
@@ -278,32 +347,34 @@ export default function DeleteImpactModal({
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
               <button
+                ref={cancelBtnRef}
                 type="button"
                 onClick={onClose}
                 disabled={isDeleting}
-                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-bold transition cursor-pointer disabled:opacity-40"
+                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary text-xs font-bold transition cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[var(--accent-main)]/50 focus:border-[var(--accent-main)]"
               >
                 Cancel
               </button>
 
               <button
+                ref={confirmBtnRef}
                 type="submit"
                 disabled={!canConfirm}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md ${
+                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]/40 focus:ring-offset-1 ${
                   canConfirm 
-                    ? 'theme-bg-danger text-white hover:opacity-90 active:scale-95' 
+                    ? 'theme-bg-surface border border-[var(--color-danger)]/40 theme-danger hover:theme-bg-danger-soft/50 hover:border-[var(--color-danger)]/60 active:scale-95' 
                     : 'theme-bg-sub border theme-border theme-text-secondary opacity-50 cursor-not-allowed'
                 }`}
               >
                 {isDeleting ? (
                   <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Deleting...</span>
+                    <div className="w-3.5 h-3.5 border-2 border-[var(--color-danger)]/30 border-t-[var(--color-danger)] rounded-full animate-spin" />
+                    <span className="theme-danger">Deleting...</span>
                   </>
                 ) : (
                   <>
-                    <TrashIcon className="w-3.5 h-3.5 text-white" />
-                    <span>{confirmButtonText}</span>
+                    <TrashIcon className="w-3.5 h-3.5 theme-danger" />
+                    <span className="theme-danger">{confirmButtonText}</span>
                   </>
                 )}
               </button>
