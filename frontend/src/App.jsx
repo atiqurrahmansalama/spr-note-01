@@ -51,8 +51,9 @@ const AcademyProfileView = lazy(() => import("./modules/settings/components/Acad
 
 // ─── Protected Academic Learning & Lesson Management Views (Lazy Loaded) ─────
 const DailyClassroomHubView = lazy(() => import("./modules/learning/daily-classroom/DailyClassroomHubView"));
-const SyllabusMilestoneHubView = lazy(() => import("./modules/learning/syllabus-milestone/SyllabusMilestoneHubView"));
-const AcademicAnalyticsHubView = lazy(() => import("./modules/learning/academic-analytics/AcademicAnalyticsHubView"));
+
+// ─── Protected Examination & Result Management Views (Lazy Loaded) ───────────
+const ExaminationsHubView = lazy(() => import("./modules/examinations/ExaminationsHubView"));
 
 
 
@@ -188,21 +189,28 @@ export default function App() {
             {/* Academic Learning, Daily Lessons & Reporting Hub Routes */}
             <Route path="/studies" element={<DailyClassroomHubView />} />
             <Route path="/studies/daily-classroom" element={<DailyClassroomHubView />} />
-            <Route path="/studies/syllabus-milestone" element={<SyllabusMilestoneHubView />} />
-            <Route path="/studies/academic-analytics" element={<AcademicAnalyticsHubView />} />
 
             {/* Sub-item Direct Routes & Aliases */}
             <Route path="/studies/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
             <Route path="/studies/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
             <Route path="/studies/homework" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
-            <Route path="/studies/goals" element={<SyllabusMilestoneHubView defaultTab="PACING_GOALS" />} />
-            <Route path="/studies/reports" element={<AcademicAnalyticsHubView defaultTab="LEDGER" />} />
             
             <Route path="/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
             <Route path="/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
             <Route path="/homework-tasks" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
-            <Route path="/academic-goals" element={<SyllabusMilestoneHubView defaultTab="PACING_GOALS" />} />
-            <Route path="/academic-reports" element={<AcademicAnalyticsHubView defaultTab="LEDGER" />} />
+
+            {/* Examination & Result Management Hub Routes */}
+            <Route path="/examinations" element={<ExaminationsHubView />} />
+            <Route path="/examinations/schedules" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
+            <Route path="/examinations/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
+            <Route path="/examinations/tabulation" element={<ExaminationsHubView defaultTab="TABULATION" />} />
+            <Route path="/examinations/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
+            <Route path="/examinations/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
+            <Route path="/exams" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
+            <Route path="/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
+            <Route path="/tabulation-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
+            <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
+            <Route path="/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
 
 
 

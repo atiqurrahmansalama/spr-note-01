@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
 import TabSwitcher from "../../../components/ui/TabSwitcher";
@@ -13,11 +13,14 @@ import { useAcademicData } from "../useAcademicData";
 import { useTenant } from "../../../context/TenantContext";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import { doesLessonMatchClass } from "./dailyClassroomUtils";
-import { LessonDeliveryManagementView, LessonPlanDrawer, CarryForwardLessonModal } from "./lessons";
-import { StudentAssessmentManagementView, StudentAssessmentDrawer } from "./assessment";
+import { LessonDeliveryManagementView, LessonPlanDrawer } from "./lessons";
+import {
+  StudentAssessmentManagementView,
+  StudentAssessmentDrawer,
+  useDailyClassroomAssessment,
+} from "./assessment";
 import useDailyClassroomData from "./hooks/useDailyClassroomData";
 import useDailyClassroomFilters from "./hooks/useDailyClassroomFilters";
-import useDailyClassroomAssessment from "./hooks/useDailyClassroomAssessment";
 
 const TABS = [
   { id: "LESSON", label: "Daily Lesson Delivery", icon: BookOpenIcon },
@@ -46,7 +49,6 @@ export default function DailyClassroomHubView({
   const [activePeriodId, setActivePeriodId] = useState("ALL");
   const [lessonSearch, setLessonSearch] = useState("");
   const [assessmentSearch, setAssessmentSearch] = useState("");
-  const [isBulkCarryForwardOpen, setIsBulkCarryForwardOpen] = useState(false);
 
   // ── Custom Hooks ─────────────────────────────────────────────────────────────
 
@@ -134,14 +136,44 @@ export default function DailyClassroomHubView({
     "lesson_plan",
     (params) => {
       const mode = params.get("mode") || "add";
-      const lessonId = mode === "edit" ? params.get("id") : null;
-      const foundLesson = mode === "edit" && lessonId ? lessons.find((l) => String(l.id) === String(lessonId)) : null;
+      const lessonId = mode === "edit" || mode === "duplicate" ? params.get("id") : null;
+      const foundLesson = (mode === "edit" || mode === "duplicate") && lessonId
+        ? lessons.find((l) => String(l.id) === String(lessonId))
+        : null;
+
+      let effectiveLesson = foundLesson;
+      if (mode === "duplicate" && foundLesson) {
+        let nextStart = foundLesson.start_unit || "";
+        let nextEnd = foundLesson.end_unit || "";
+        const sNum = parseInt(foundLesson.start_unit, 10);
+        const eNum = parseInt(foundLesson.end_unit, 10);
+        if (!isNaN(sNum) && !isNaN(eNum) && eNum >= sNum) {
+          const span = eNum - sNum + 1;
+          nextStart = String(eNum + 1);
+          nextEnd = String(eNum + span);
+        }
+        effectiveLesson = {
+          ...foundLesson,
+          id: null,
+          isDuplicate: true,
+          lesson_date: selectedDate,
+          start_unit: nextStart,
+          end_unit: nextEnd,
+        };
+      }
 
       return {
-        title: mode === "edit" ? "Edit Lesson Plan & Assignment" : "Assign Daily Sabaq & Lesson",
+        title:
+          mode === "edit"
+            ? "Edit Lesson Plan & Assignment"
+            : mode === "duplicate"
+            ? "Duplicate Daily Sabaq & Lesson"
+            : "Assign Daily Sabaq & Lesson",
         subtitle:
           mode === "edit"
             ? `Update details for ${foundLesson?.lesson_title || "Lesson"}`
+            : mode === "duplicate"
+            ? `Duplicating from ${foundLesson?.curriculum_book_name || "Lesson"}`
             : "Define homework, instruction milestones, and target page span",
         category: "Academic Learning",
         size: "lg",
@@ -149,7 +181,7 @@ export default function DailyClassroomHubView({
         content: (
           <LessonPlanDrawer
             key={`lesson-plan-drawer-${mode}-${lessonId || "new"}-${selectedDepartmentId}-${effectiveClassId}-${selectedSectionId}-${activePeriodId}-${selectedDate}`}
-            lesson={foundLesson}
+            lesson={effectiveLesson}
             defaultDepartmentId={selectedDepartmentId !== "ALL" ? selectedDepartmentId : ""}
             defaultClassId={effectiveClassId !== "ALL" ? effectiveClassId : ""}
             defaultSectionId={selectedSectionId !== "ALL" ? selectedSectionId : ""}
@@ -231,6 +263,8 @@ export default function DailyClassroomHubView({
 
   const handleEditLesson = (lesson) => openDrawer("lesson_plan", { mode: "edit", id: lesson.id });
 
+  const handleDuplicateLesson = (lesson) => openDrawer("lesson_plan", { mode: "duplicate", id: lesson.id });
+
   const handleOpenAssessmentDrawer = (studentId, rowData = null) => {
     const rawStudentId = typeof studentId === "object" ? studentId?.student || studentId?.id : studentId;
     const targetRow =
@@ -272,6 +306,40 @@ export default function DailyClassroomHubView({
     setActivePeriodId("ALL");
   };
 
+  // ── Consolidated Filter Props for Sub-Views ──────────────────────────────────
+  const sharedFilterProps = useMemo(() => ({
+    selectedDate,
+    onDateChange: handleDateChange,
+    hasDepartments,
+    selectedDepartmentId,
+    onDepartmentChange: handleDepartmentChange,
+    departmentSelectOptions,
+    selectedClassId,
+    onClassChange: handleClassChange,
+    classSelectOptions,
+    hasSectionsForClass,
+    selectedSectionId,
+    onSectionChange: handleSectionChange,
+    sectionSelectOptions,
+    allPeriodFilterOptions,
+    activePeriodId,
+    onPeriodChange: setActivePeriodId,
+    getPeriodSubtitle: getPeriodTimeForSlot,
+  }), [
+    selectedDate,
+    hasDepartments,
+    selectedDepartmentId,
+    departmentSelectOptions,
+    selectedClassId,
+    classSelectOptions,
+    hasSectionsForClass,
+    selectedSectionId,
+    sectionSelectOptions,
+    allPeriodFilterOptions,
+    activePeriodId,
+    getPeriodTimeForSlot,
+  ]);
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -302,82 +370,37 @@ export default function DailyClassroomHubView({
       {/* 3. Tab 1: Daily Lesson Delivery */}
       {activeTab === "LESSON" && (
         <LessonDeliveryManagementView
+          filterProps={sharedFilterProps}
           filteredLessons={filteredLessons}
           lessonMetrics={lessonMetrics}
           lessonSearch={lessonSearch}
           onSearchChange={setLessonSearch}
-          selectedDate={selectedDate}
-          onDateChange={handleDateChange}
-          selectedDepartmentId={selectedDepartmentId}
-          onDepartmentChange={handleDepartmentChange}
-          departmentSelectOptions={departmentSelectOptions}
-          hasDepartments={hasDepartments}
-          selectedClassId={selectedClassId}
-          onClassChange={handleClassChange}
-          classSelectOptions={classSelectOptions}
-          selectedSectionId={selectedSectionId}
-          onSectionChange={handleSectionChange}
-          sectionSelectOptions={sectionSelectOptions}
-          hasSectionsForClass={hasSectionsForClass}
-          activePeriodId={activePeriodId}
-          onPeriodChange={setActivePeriodId}
-          allPeriodFilterOptions={allPeriodFilterOptions}
           getSlotLessonsCount={getSlotLessonsCount}
           getBookNamesForPeriod={getBookNamesForPeriod}
-          getPeriodTimeForSlot={getPeriodTimeForSlot}
           selectedClassObj={selectedClassObj}
           classes={classes}
           tenantId={tenantId}
           loadData={loadData}
           onOpenAddLesson={handleOpenAddLesson}
           onEditLesson={handleEditLesson}
-          onOpenBulkCarryForward={() => setIsBulkCarryForwardOpen(true)}
+          onDuplicateLesson={handleDuplicateLesson}
         />
       )}
 
       {/* 4. Tab 2: Daily Student Assessment */}
       {activeTab === "ASSESSMENT" && (
         <StudentAssessmentManagementView
+          filterProps={sharedFilterProps}
           assessmentRows={assessmentRows}
           assessmentMetrics={assessmentMetrics}
           assessmentSearch={assessmentSearch}
           onSearchChange={setAssessmentSearch}
-          selectedDate={selectedDate}
-          onDateChange={handleDateChange}
-          selectedDepartmentId={selectedDepartmentId}
-          onDepartmentChange={handleDepartmentChange}
-          departmentSelectOptions={departmentSelectOptions}
-          hasDepartments={hasDepartments}
-          selectedClassId={selectedClassId}
-          onClassChange={handleClassChange}
-          classSelectOptions={classSelectOptions}
-          selectedSectionId={selectedSectionId}
-          onSectionChange={handleSectionChange}
-          sectionSelectOptions={sectionSelectOptions}
-          hasSectionsForClass={hasSectionsForClass}
-          activePeriodId={activePeriodId}
-          onPeriodChange={setActivePeriodId}
-          allPeriodFilterOptions={allPeriodFilterOptions}
-          getSlotLessonsCount={getSlotLessonsCount}
           getSlotAssessmentCount={getSlotAssessmentCount}
-          getPeriodTimeForSlot={getPeriodTimeForSlot}
           onOpenAssessmentDrawer={handleOpenAssessmentDrawer}
           tenantId={tenantId}
           loadData={loadData}
         />
       )}
-
-      {/* Bulk Carry-Forward Modal */}
-      <CarryForwardLessonModal
-        isOpen={isBulkCarryForwardOpen}
-        onClose={() => setIsBulkCarryForwardOpen(false)}
-        mode="bulk"
-        currentDate={selectedDate}
-        selectedClassId={effectiveClassId}
-        selectedClassObj={selectedClassObj}
-        classes={classes}
-        onSuccess={loadData}
-      />
     </PageContainer>
   );
 }

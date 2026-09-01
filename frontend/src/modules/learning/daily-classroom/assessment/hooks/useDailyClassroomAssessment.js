@@ -1,10 +1,10 @@
-﻿import { useMemo, useCallback } from "react";
-import { doesLessonMatchClass, isLessonInSlot } from "../dailyClassroomUtils";
+import { useMemo, useCallback } from "react";
+import { doesLessonMatchClass, isLessonInSlot } from "../../dailyClassroomUtils";
 
 /**
  * useDailyClassroomAssessment
  * Computes assessment rows (student + evaluation matrix),
- * slot-based assessment counts, and dashboard metrics.
+ * slot-based assessment counts, and dashboard metrics for Daily Student Assessment.
  *
  * @param {Object} params - All required data and filter references
  */

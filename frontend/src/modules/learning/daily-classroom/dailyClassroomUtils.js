@@ -210,18 +210,27 @@ export function isLessonInSlot(lesson, slotValue, periodSlots = []) {
  */
 export function resolveBookTeacher(book, teachers = [], staff = []) {
   if (!book) return '';
-  const raw = book.teacherName || book.teacher_name || book.instructor || book.teacher || book.assignedTeacher || '';
+  const raw = book.teacherName || book.teacher_name || book.instructor || book.assignedTeacher || '';
   let name = typeof raw === 'object'
     ? (raw?.name_en || raw?.user_name || raw?.name || raw?.full_name || '')
     : String(raw || '');
 
-  if (!name && (book.teacherId || book.teacher_id)) {
-    const targetId = String(book.teacherId || book.teacher_id);
+  if (!name && book.teacher) {
+    if (typeof book.teacher === 'object') {
+      name = book.teacher?.name_en || book.teacher?.user_name || book.teacher?.name || book.teacher?.full_name || '';
+    } else if (typeof book.teacher === 'string' && isNaN(Number(book.teacher)) && book.teacher.length > 1) {
+      name = book.teacher;
+    }
+  }
+
+  const teacherId = book.teacherId || book.teacher_id || (typeof book.teacher !== 'object' && book.teacher ? String(book.teacher) : '');
+  if (!name && teacherId) {
+    const targetId = String(teacherId);
     const matched =
-      teachers.find((t) => String(t.id) === targetId || String(t.teacher_id) === targetId || String(t.user) === targetId) ||
-      staff.find((s) => String(s.id) === targetId || String(s.employee_id) === targetId);
+      teachers.find((t) => String(t.id) === targetId || String(t.teacher_id) === targetId || String(t.user) === targetId || String(t.user_id) === targetId) ||
+      staff.find((s) => String(s.id) === targetId || String(s.employee_id) === targetId || String(s.user) === targetId);
     if (matched) {
-      name = matched.name_en || matched.user_name || matched.name || matched.full_name || '';
+      name = matched.name_en || matched.user_name || matched.name || (matched.first_name ? `${matched.first_name} ${matched.last_name || ''}`.trim() : '') || matched.full_name || '';
     }
   }
   return name;
@@ -256,3 +265,30 @@ export function filterCurriculumBooks(curriculumBooks = [], classId, classes = [
 
   return filtered.length > 0 ? filtered : curriculumBooks;
 }
+
+/**
+ * Calculates yesterday's date formatted as YYYY-MM-DD.
+ */
+export function getYesterdayDate(baseDate) {
+  try {
+    const d = baseDate ? new Date(baseDate) : new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Calculates tomorrow's date formatted as YYYY-MM-DD.
+ */
+export function getTomorrowDate(baseDate) {
+  try {
+    const d = baseDate ? new Date(baseDate) : new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+}
+

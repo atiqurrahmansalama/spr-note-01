@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomButton from '../../../../components/ui/CustomButton';
+import CustomCheckbox from '../../../../components/ui/CustomCheckbox';
 import ReusableCalendar from '../../../../components/common/ReusableCalendar';
-import { CopyIcon, CloseIcon } from '../../../../components/ui/Icons';
+import {
+  CopyIcon,
+  CloseIcon,
+  BookOpenIcon,
+  TimerIcon,
+  CheckIcon,
+} from '../../../../components/ui/Icons';
 import { learningStore } from '../../../../utils/stores/learningStore';
 import { getOrdinalPeriodLabel } from '../../../../utils/localStore';
-import { doesLessonMatchClass } from '../dailyClassroomUtils';
+import { doesLessonMatchClass, getYesterdayDate } from '../dailyClassroomUtils';
 
 /**
  * Reusable In-Drawer Carry Forward Panel
@@ -19,20 +26,10 @@ export default function CarryForwardLessonPanel({
   tenantId = 'default',
   onApplyLesson,
 }) {
-  const getYesterdayDate = (baseDate) => {
-    try {
-      const d = baseDate ? new Date(baseDate) : new Date();
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
-
   const [carrySourceDate, setCarrySourceDate] = useState(() => getYesterdayDate(currentDate));
   const [autoAdvancePages, setAutoAdvancePages] = useState(true);
 
-  // Find all distinct previous dates that have lessons for auto-detection and quick selection pills
+  // Auto-detect previous dates with lessons
   const availablePreviousDates = useMemo(() => {
     if (!isOpen) return [];
     try {
@@ -58,7 +55,7 @@ export default function CarryForwardLessonPanel({
     }
   }, [isOpen, currentDate, classId, classes, tenantId]);
 
-  // Auto-sync carrySourceDate to the most recent date with lessons if current date has 0 lessons
+  // Auto-sync carrySourceDate to the most recent date with lessons if current source date has 0 lessons
   useEffect(() => {
     if (isOpen && availablePreviousDates.length > 0) {
       const currentSourceClean = String(carrySourceDate || '').split('T')[0];
@@ -107,22 +104,30 @@ export default function CarryForwardLessonPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-[var(--accent-main)]/40 theme-bg-sub/70 p-4 space-y-3.5 shadow-sm animate-fade-in text-left">
-      <div className="flex items-center justify-between gap-2 border-b theme-border pb-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 rounded-xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0">
+    <div className="rounded-2xl border theme-border theme-bg-sub/40 p-4 sm:p-5 space-y-4 shadow-xs animate-fade-in text-left">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 pb-3 border-b theme-border">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 rounded-xl theme-bg-accent/10 theme-accent shrink-0">
             <CopyIcon className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-xs font-bold theme-text-primary truncate">Carry Forward Previous Sabaq</h4>
-            <p className="text-[11px] theme-text-secondary truncate">Select previous day's Sabaq to auto-fill current form</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-sm font-bold theme-text-primary truncate">Carry Forward Previous Sabaq</h4>
+              <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent/10 theme-text-accent">
+                {sourceLessons.length} Available
+              </span>
+            </div>
+            <p className="text-xs theme-text-secondary truncate mt-0.5">
+              Select a previous lesson to auto-populate the form with smart page advancement
+            </p>
           </div>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
             title="Close Carry Forward Panel"
           >
             <CloseIcon className="w-4 h-4" />
@@ -130,65 +135,50 @@ export default function CarryForwardLessonPanel({
         )}
       </div>
 
-      {/* Source Date & Auto-Advance Toggle */}
-      <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
+      {/* Controls Row: Date Picker & Auto-Advance Toggle */}
+      <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 items-end">
         <ReusableCalendar
-          label="Source Lesson Date (Yesterday)"
+          label="Source Routine Date"
           selectedDate={carrySourceDate}
           onSelectDate={setCarrySourceDate}
           placeholder="Select Date"
         />
-        <div className="flex items-end">
-          <label className="flex items-center gap-2 text-xs font-semibold theme-text-primary cursor-pointer p-2.5 rounded-xl border theme-border theme-bg-surface w-full">
-            <input
-              type="checkbox"
-              checked={autoAdvancePages}
-              onChange={(e) => setAutoAdvancePages(e.target.checked)}
-              className="rounded theme-border theme-accent cursor-pointer"
-            />
-            <span>Auto-advance pages (+1 span)</span>
-          </label>
+        <div className="p-3 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub/60 transition-colors flex items-center min-h-[46px]">
+          <CustomCheckbox
+            checked={autoAdvancePages}
+            onChange={setAutoAdvancePages}
+            label="Auto-advance Range"
+            subLabel="Increment bounds (+1 span)"
+            size="md"
+          />
         </div>
       </div>
 
-      {/* Quick Available Dates Badges */}
-      {availablePreviousDates.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap pt-1">
-          <span className="text-[11px] font-semibold theme-text-secondary">Recent Dates with Sabaq:</span>
-          {availablePreviousDates.slice(0, 5).map((item) => (
-            <button
-              key={item.date}
-              type="button"
-              onClick={() => setCarrySourceDate(item.date)}
-              className={`text-[11px] px-2 py-0.5 rounded-lg border font-semibold transition-all cursor-pointer ${
-                String(carrySourceDate).split('T')[0] === item.date
-                  ? 'theme-bg-accent text-white border-[var(--accent-main)] shadow-xs'
-                  : 'theme-bg-surface theme-border theme-text-primary hover:theme-bg-sub'
-              }`}
-            >
-              {item.date} ({item.count} sabaq)
-            </button>
-          ))}
+      {/* Source Lessons Section */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
+            Lessons on {carrySourceDate || 'Selected Date'}
+          </span>
+          {sourceLessons.length > 0 && (
+            <span className="text-[11px] theme-text-secondary">
+              Click &quot;Apply&quot; to import
+            </span>
+          )}
         </div>
-      )}
-
-      {/* Source Lessons List */}
-      <div className="space-y-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
-          Found Lessons on {carrySourceDate || 'Selected Date'} ({sourceLessons.length})
-        </span>
 
         {sourceLessons.length === 0 ? (
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface text-center space-y-1">
-            <p className="text-xs font-semibold theme-text-primary">No previous lessons found on {carrySourceDate}</p>
+          <div className="p-5 rounded-xl border theme-border theme-bg-surface text-center space-y-1.5">
+            <div className="w-9 h-9 mx-auto rounded-xl theme-bg-sub flex items-center justify-center theme-text-secondary">
+              <BookOpenIcon className="w-4 h-4 opacity-70" />
+            </div>
+            <p className="text-xs font-bold theme-text-primary">No previous lessons found on {carrySourceDate}</p>
             <p className="text-[11px] theme-text-secondary">
-              {availablePreviousDates.length > 0
-                ? 'Click one of the recent dates above with available Sabaqs.'
-                : 'Try selecting a different date in the calendar above.'}
+              Select another source date from the calendar above to inspect lessons.
             </p>
           </div>
         ) : (
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1 no-scrollbar">
             {sourceLessons.map((src) => {
               const sNum = parseInt(src.start_unit, 10);
               const eNum = parseInt(src.end_unit, 10);
@@ -203,38 +193,52 @@ export default function CarryForwardLessonPanel({
               return (
                 <div
                   key={src.id}
-                  className="p-3 rounded-xl border theme-border theme-bg-surface flex items-center justify-between gap-2.5 flex-wrap"
+                  className="p-3.5 rounded-xl border theme-border theme-bg-surface hover:border-[var(--accent-main)]/40 transition-all flex items-center justify-between gap-3 shadow-2xs group"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs font-bold theme-text-primary">
                         {src.curriculum_book_name || src.subject_name || 'Curriculum Book'}
                       </span>
                       {src.period_order && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded theme-bg-sub theme-text-secondary border theme-border">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-flex items-center gap-1">
+                          <TimerIcon className="w-3 h-3 theme-accent shrink-0" />
                           {getOrdinalPeriodLabel(src.period_order)}
                         </span>
                       )}
+                      {src.teacher_name && (
+                        <span className="text-[11px] theme-text-secondary truncate">
+                          • {src.teacher_name}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-[11px] theme-text-secondary truncate mt-0.5">
-                      {src.lesson_title || 'Untitled Sabaq'} • Page {src.start_unit || 1} - {src.end_unit || 1}
+
+                    <div className="text-xs font-medium theme-text-primary truncate">
+                      {src.lesson_title || 'Untitled Sabaq'}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs flex-wrap pt-0.5">
+                      <span className="text-[11px] theme-text-secondary">
+                        Source: <span className="font-semibold theme-text-primary">Page {src.start_unit || 1} – {src.end_unit || 1}</span>
+                      </span>
                       {autoAdvancePages && nextStart && (
-                        <span className="theme-text-accent font-semibold ml-1.5">
-                          ➔ Suggests Page {nextStart} – {nextEnd}
+                        <span className="text-[11px] font-bold theme-text-accent px-1.5 py-0.5 rounded theme-bg-accent/10 inline-flex items-center gap-1">
+                          <span>➔</span> Next: Page {nextStart} – {nextEnd}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="shrink-0">
                     <CustomButton
                       type="button"
-                      variant="primary"
+                      variant="secondary"
                       size="sm"
+                      icon={CheckIcon}
                       onClick={() => handleApply(src)}
-                      title="Auto-fill form with this lesson details"
+                      title="Apply lesson details to form"
                     >
-                      Apply to Form
+                      Apply
                     </CustomButton>
                   </div>
                 </div>

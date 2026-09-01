@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import CustomInput from "../../../../components/ui/CustomInput";
 import CustomSelect from "../../../../components/ui/CustomSelect";
 import CustomButton from "../../../../components/ui/CustomButton";
@@ -77,7 +77,6 @@ export default function LessonPlanDrawer({
   // ── Dropdown Options (reactive to current form state) ────────────────────────
   const {
     filteredStudents,
-    availableBooks,
     departmentOptions,
     classOptions,
     sectionOptions,
@@ -94,18 +93,18 @@ export default function LessonPlanDrawer({
     teachers,
     staff,
     curriculumBooks,
+    availableBooks: form.availableBooks,
     departmentId: form.departmentId,
     classId: form.classId,
     sectionId: form.sectionId,
+    periodSlotId: form.periodSlotId,
+    curriculumBookId: form.curriculumBookId,
     teacherName: form.teacherName,
   });
 
-  // Sync reactive availableBooks into form hook for book auto-match logic
-  const formWithBooks = { ...form, availableBooks };
-
   return (
     <DrawerContainer padding="none">
-      <form onSubmit={form.handleSubmit} className="@container p-4 sm:p-6 space-y-6 text-left">
+      <form onSubmit={form.handleSubmit} className="@container p-4 @[480px]:p-6 space-y-6 text-left">
         {/* In-Drawer Carry Forward Panel */}
         {!lesson && form.isCarryForwardOpen && (
           <CarryForwardLessonPanel
@@ -122,8 +121,8 @@ export default function LessonPlanDrawer({
         {/* 1. Context Summary Card (pre-selected context) */}
         {form.hasFixedContext && (
           <ClassroomContextCard
-            title={lesson ? "Lesson Assignment Context" : "Delivery Context & Schedule"}
-            badgeLabel={lesson ? "Editing Lesson" : "Pre-selected Context"}
+            title={lesson && !lesson?.isDuplicate ? "Lesson Assignment Context" : "Delivery Context & Schedule"}
+            badgeLabel={lesson?.isDuplicate ? "Duplicating Lesson" : (lesson ? "Editing Lesson" : "Pre-selected")}
             date={form.lessonDate}
             periodName={form.displayPeriodName}
             periodTime={form.resolvedPeriodTime}
@@ -150,19 +149,6 @@ export default function LessonPlanDrawer({
           <DrawerSection
             title="Academic Target & Delivery Schedule"
             icon={CalendarIcon}
-            headerRight={
-              !lesson ? (
-                <button
-                  type="button"
-                  onClick={() => form.setIsCarryForwardOpen(true)}
-                  className="text-[11px] font-semibold flex items-center gap-1.5 px-2.5 py-1 rounded-lg border theme-bg-sub theme-border theme-text-primary hover:theme-bg-sub/80 transition-all cursor-pointer shadow-2xs"
-                  title="Carry forward lessons from yesterday"
-                >
-                  <CopyIcon className="w-3 h-3 theme-accent" />
-                  <span>Carry Forward</span>
-                </button>
-              ) : null
-            }
           >
             <div className="space-y-4">
               {/* Row 1: Delivery Date & Period Slot */}
@@ -247,7 +233,7 @@ export default function LessonPlanDrawer({
         )}
 
         {/* 3. Lesson Content & Assignments */}
-        <DrawerSection title="Daily Sabaq & Instruction Details" icon={BookOpenIcon}>
+        <DrawerSection title="Daily Sabaq Details" icon={BookOpenIcon}>
           <div className="space-y-4">
             {/* Assignment Scope */}
             <div className="space-y-2">
@@ -265,7 +251,7 @@ export default function LessonPlanDrawer({
               {form.assignedScope === "SPECIFIC_STUDENTS" && (
                 <div className="space-y-1.5 animate-fade-in">
                   <CustomSelect
-                    label="Select Target Students"
+                    label="Select Students"
                     options={studentSelectOptions}
                     value={form.targetStudentIds}
                     onChange={(val) => {
@@ -295,22 +281,24 @@ export default function LessonPlanDrawer({
               required
             />
 
-            {/* Page Range Row */}
-            <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
+            {/* Page Range Row (Always 2 columns even on small screens) */}
+            <div className="grid grid-cols-2 gap-3">
               <CustomInput
-                label="Start Page / Unit"
+                label="Start Page"
                 type="number"
                 min={form.bookMinPage}
                 max={form.bookMaxPage || undefined}
+                allowDecimals={false}
                 placeholder={form.selectedBook ? `e.g. ${form.bookMinPage}` : "e.g. 1"}
                 value={form.startUnit}
                 onChange={form.handleStartPageChange}
               />
               <CustomInput
-                label="End Page / Unit"
+                label="End Page"
                 type="number"
                 min={form.startUnit ? Math.max(form.bookMinPage, parseInt(form.startUnit, 10) || form.bookMinPage) : form.bookMinPage}
                 max={form.bookMaxPage || undefined}
+                allowDecimals={false}
                 placeholder={form.selectedBook ? `e.g. ${form.bookMaxPage}` : "e.g. 20"}
                 value={form.endUnit}
                 onChange={form.handleEndPageChange}
@@ -348,7 +336,7 @@ export default function LessonPlanDrawer({
             Cancel
           </CustomButton>
           <CustomButton type="submit" variant="primary" size="md" loading={form.saving} icon={CheckIcon}>
-            {lesson ? "Update Lesson" : "Assign Sabaq"}
+            {lesson && !lesson?.isDuplicate ? "Update Lesson" : "Assign Sabaq"}
           </CustomButton>
         </DrawerFooter>
       </form>

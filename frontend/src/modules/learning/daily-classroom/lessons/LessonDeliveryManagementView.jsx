@@ -1,11 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import UniversalManagementView from '../../../../components/common/UniversalManagementView';
-import CustomSelect from '../../../../components/ui/CustomSelect';
-import CustomButton from '../../../../components/ui/CustomButton';
-import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import ActionMenu from '../../../../components/ui/ActionMenu';
-import CarryForwardLessonModal from './CarryForwardLessonModal';
-import ClassPeriodSwitcherBar from '../ClassPeriodSwitcherBar';
+import DailyClassroomFilterControls from '../DailyClassroomFilterControls';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import {
   renderCurriculumBookCell,
@@ -24,65 +20,24 @@ import { deleteDailyLesson as deleteDailyLessonAPI } from '../../../../api/learn
 import { useToast } from '../../../../context/ToastContext';
 
 export default function LessonDeliveryManagementView({
+  filterProps = null,
   filteredLessons = [],
   lessonMetrics = [],
   lessonSearch = '',
   onSearchChange,
-  selectedDate,
-  onDateChange,
-  selectedDepartmentId,
-  onDepartmentChange,
-  departmentSelectOptions = [],
-  hasDepartments = false,
-  selectedClassId,
-  onClassChange,
-  classSelectOptions = [],
-  selectedSectionId,
-  onSectionChange,
-  sectionSelectOptions = [],
-  hasSectionsForClass = false,
-  activePeriodId,
-  onPeriodChange,
-  allPeriodFilterOptions = [],
   getSlotLessonsCount,
-  getBookNamesForPeriod,
-  getPeriodTimeForSlot,
   selectedClassObj,
   classes = [],
   tenantId,
   loadData,
   onOpenAddLesson,
   onEditLesson,
-  onOpenBulkCarryForward,
+  onDuplicateLesson,
+  ...restFilterProps
 }) {
   const { showToast } = useToast();
-  const [carryForwardModal, setCarryForwardModal] = useState({
-    isOpen: false,
-    mode: 'bulk',
-    sourceLesson: null,
-  });
   const [deletingLesson, setDeletingLesson] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleOpenSingleCarryForward = (lesson) => {
-    setCarryForwardModal({
-      isOpen: true,
-      mode: 'single',
-      sourceLesson: lesson,
-    });
-  };
-
-  const handleCloseCarryForwardModal = () => {
-    setCarryForwardModal({
-      isOpen: false,
-      mode: 'bulk',
-      sourceLesson: null,
-    });
-  };
-
-  const handleCarryForwardSuccess = () => {
-    loadData?.();
-  };
 
   const handleConfirmDelete = async () => {
     if (!deletingLesson) return;
@@ -175,7 +130,7 @@ export default function LessonDeliveryManagementView({
           {
             label: 'Carry Forward / Duplicate',
             icon: CopyIcon,
-            onClick: () => handleOpenSingleCarryForward(row),
+            onClick: () => onDuplicateLesson?.(row),
           },
           {
             label: 'Edit Lesson',
@@ -200,7 +155,7 @@ export default function LessonDeliveryManagementView({
       {
         label: 'Carry Forward / Duplicate',
         icon: CopyIcon,
-        onClick: () => handleOpenSingleCarryForward(row),
+        onClick: () => onDuplicateLesson?.(row),
       },
       {
         label: 'Edit Lesson',
@@ -223,56 +178,33 @@ export default function LessonDeliveryManagementView({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {row.curriculum_book_name && (
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg theme-bg-accent/10 theme-text-accent inline-flex items-center gap-1.5">
-                  <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
-                  {row.curriculum_book_name}
-                </span>
-              )}
-              {row.period_name && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border theme-border theme-bg-secondary/40 theme-text-primary inline-flex items-center gap-1">
-                  <TimerIcon className="w-3 h-3 theme-accent shrink-0" />
-                  {row.period_name}
-                </span>
-              )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                {row.curriculum_book_name || row.subject_name || 'Academic Course'}
+              </span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-flex items-center gap-1">
+                <TimerIcon className="w-3 h-3 theme-accent shrink-0" />
+                {row.period_name || 'Assigned Slot'}
+              </span>
             </div>
-            <h4 className="text-sm font-bold theme-text-primary mt-1 truncate">{row.lesson_title}</h4>
+            <h4 className="text-sm font-bold theme-text-primary group-hover:theme-accent transition-colors pt-1">
+              {row.lesson_title || 'Untitled Sabaq Plan'}
+            </h4>
           </div>
-          <ActionMenu items={actionItems} align="right" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl border theme-border theme-bg-secondary/20 text-xs">
-          <div>
-            <span className="text-[10px] uppercase font-bold theme-text-secondary block">Assigned Range</span>
-            <span className="font-bold theme-text-accent">
-              {formatRangeText(row.start_unit, row.end_unit) || '—'}
-            </span>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold theme-text-secondary block">Target Class</span>
-            <span className="font-medium theme-text-primary truncate block">
-              {row.class_name} ({row.section_name || 'All'})
-            </span>
+          <div onClick={(e) => e.stopPropagation()}>
+            <ActionMenu items={actionItems} align="right" />
           </div>
         </div>
 
-        {row.homework_task && (
-          <div className="text-xs p-2 rounded-lg theme-bg-secondary/40 border theme-border/60 flex items-start gap-1.5">
-            <span className="font-semibold theme-accent shrink-0">HW:</span>
-            <span className="theme-text-primary line-clamp-2">{row.homework_task}</span>
+        <div className="pt-2 border-t theme-border grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider theme-text-secondary block">Page Bounds</span>
+            <span className="font-semibold theme-text-primary">{formatRangeText(row.start_unit, row.end_unit)}</span>
           </div>
-        )}
-
-        {row.lesson_instructions && (
-          <p className="text-xs theme-text-secondary italic line-clamp-2 p-2 rounded-lg theme-bg-secondary/30 border theme-border/40">
-            "{row.lesson_instructions}"
-          </p>
-        )}
-
-        <div className="pt-2 border-t theme-border flex items-center justify-between text-xs theme-text-secondary">
-          <span className="font-medium">{row.teacher_name || 'Assigned Instructor'}</span>
-          {row.period_time && <span className="font-semibold theme-text-primary">{row.period_time}</span>}
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider theme-text-secondary block">Instructor</span>
+            <span className="font-medium theme-text-primary truncate block">{row.teacher_name || 'Unassigned'}</span>
+          </div>
         </div>
       </div>
     );
@@ -294,59 +226,12 @@ export default function LessonDeliveryManagementView({
         filterGridClassName="grid-cols-6 gap-2.5"
         searchSpanClassName="col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"
         filters={
-          <>
-            <div className={hasDepartments && hasSectionsForClass ? "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"}>
-              <ReusableCalendar
-                label="Delivery Date"
-                selectedDate={selectedDate}
-                onSelectDate={onDateChange}
-                placeholder="Select Date"
-              />
-            </div>
-
-            {hasDepartments && (
-              <div className={hasSectionsForClass ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1"}>
-                <CustomSelect
-                  label="Department"
-                  options={departmentSelectOptions}
-                  value={selectedDepartmentId}
-                  onChange={onDepartmentChange}
-                  size="md"
-                />
-              </div>
-            )}
-
-            <div className={hasDepartments && hasSectionsForClass ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : (hasDepartments || hasSectionsForClass ? "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-6 @[900px]:col-span-2")}>
-              <CustomSelect
-                label="Class"
-                options={classSelectOptions}
-                value={selectedClassId}
-                onChange={onClassChange}
-                size="md"
-              />
-            </div>
-
-            {hasSectionsForClass && (
-              <div className={hasDepartments ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1"}>
-                <CustomSelect
-                  label="Section"
-                  options={sectionSelectOptions}
-                  value={selectedSectionId}
-                  onChange={onSectionChange}
-                  size="md"
-                />
-              </div>
-            )}
-
-            {/* Routine Period Fast Selector Bar (Reusable Component) */}
-            <ClassPeriodSwitcherBar
-              allPeriodFilterOptions={allPeriodFilterOptions}
-              activePeriodId={activePeriodId}
-              onPeriodChange={onPeriodChange}
-              getSlotCount={getSlotLessonsCount}
-              getPeriodSubtitle={getPeriodTimeForSlot}
-            />
-          </>
+          <DailyClassroomFilterControls
+            dateLabel="Delivery Date"
+            filterProps={filterProps}
+            getSlotCount={getSlotLessonsCount || filterProps?.getSlotCount}
+            {...restFilterProps}
+          />
         }
         data={filteredLessons}
         columns={lessonColumns}
@@ -356,19 +241,6 @@ export default function LessonDeliveryManagementView({
         emptyIcon={BookOpenIcon}
         emptyTitle="No lesson deliveries found"
         emptySubMessage="Assign a daily Sabaq or select another date/period to inspect records."
-      />
-
-      {/* Carry-Forward Modal */}
-      <CarryForwardLessonModal
-        isOpen={carryForwardModal.isOpen}
-        onClose={handleCloseCarryForwardModal}
-        mode={carryForwardModal.mode}
-        sourceLesson={carryForwardModal.sourceLesson}
-        currentDate={selectedDate}
-        selectedClassId={selectedClassId}
-        selectedClassObj={selectedClassObj}
-        classes={classes}
-        onSuccess={handleCarryForwardSuccess}
       />
 
       {/* Delete Impact Confirmation Modal */}

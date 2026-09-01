@@ -77,6 +77,19 @@ export const ROUTE_TITLE_MAP = {
 
   "/shortcuts": { title: "Shortcuts", category: "Shortcuts" },
   "/guide": { title: "App Guide", category: "App Guide" },
+  // Examination & Result Management
+  "/examinations": { title: "Examination & Results", category: "Examination & Results" },
+  "/examinations/schedules": { title: "Exam Schedules", category: "Examination & Results" },
+  "/examinations/mark-entry": { title: "Mark Entry Desk", category: "Examination & Results" },
+  "/examinations/tabulation": { title: "Tabulation Ledger", category: "Examination & Results" },
+  "/examinations/transcripts": { title: "Marksheet Studio", category: "Examination & Results" },
+  "/examinations/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
+  "/exams": { title: "Exam Schedules", category: "Examination & Results" },
+  "/mark-entry": { title: "Mark Entry Desk", category: "Examination & Results" },
+  "/tabulation-sheet": { title: "Tabulation Ledger", category: "Examination & Results" },
+  "/transcripts": { title: "Marksheet Studio", category: "Examination & Results" },
+  "/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
+
   "/about": { title: "About", category: "About" },
   "/trash-restoration": { title: "Trash & Restoration", category: "Admin Tools" },
 };

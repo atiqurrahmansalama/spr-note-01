@@ -40,6 +40,10 @@ import {
   BookOpenIcon,
   TargetIcon,
   ClipboardDocumentCheckIcon,
+  AcademicCapIcon,
+  ChartBarIcon,
+  DocumentIcon,
+  EditIcon,
 } from "../ui/Icons";
 
 export default function SidebarContainer({ 
@@ -60,6 +64,7 @@ export default function SidebarContainer({
     "Academy": true,
     "Academic Institution": true,
     "Academic Studies": true,
+    "Examination & Results": true,
     "Student": true,
     "Staff Management": false,
     "Settings & Devices": false,
@@ -102,8 +107,20 @@ export default function SidebarContainer({
       key: "nav_academic_studies",
       subItems: [
         { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", Icon: BookOpenIcon, key: "daily_classroom" },
-        { id: "Syllabus Milestone", name: "Syllabus Milestone", path: "/studies/syllabus-milestone", Icon: TargetIcon, key: "syllabus_milestone" },
-        { id: "Academic Analytics", name: "Academic Analytics", path: "/studies/academic-analytics", Icon: SavedMessagesIcon, key: "academic_analytics" },
+      ]
+    },
+    {
+      id: "Examination & Results",
+      name: "Examination & Results",
+      Icon: AcademicCapIcon,
+      hasSub: true,
+      key: "nav_examinations",
+      subItems: [
+        { id: "Exam Schedules", name: "Exam Schedules", path: "/examinations/schedules", Icon: CalendarIcon, key: "exam_schedules" },
+        { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", Icon: EditIcon, key: "exam_mark_entry" },
+        { id: "Tabulation Sheet", name: "Tabulation Ledger", path: "/examinations/tabulation", Icon: ChartBarIcon, key: "exam_tabulation" },
+        { id: "Transcript Studio", name: "Marksheet Studio", path: "/examinations/transcripts", Icon: DocumentIcon, key: "exam_transcripts" },
+        { id: "Grading Policies", name: "Grading Policies", path: "/examinations/grading-rules", Icon: SettingsIcon, key: "exam_grading_rules" },
       ]
     },
     {

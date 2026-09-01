@@ -1,6 +1,10 @@
-﻿import { useMemo } from "react";
+import { useMemo } from "react";
 import { getOrdinalPeriodLabel } from "../../../../../utils/localStore";
-import { filterCurriculumBooks } from "../../dailyClassroomUtils";
+import {
+  filterCurriculumBooks,
+  findMatchingPeriodSlot,
+  resolveBookTeacher,
+} from "../../dailyClassroomUtils";
 
 /**
  * useLessonOptions
@@ -16,9 +20,12 @@ export default function useLessonOptions({
   teachers,
   staff,
   curriculumBooks,
+  availableBooks: propAvailableBooks,
   departmentId,
   classId,
   sectionId,
+  periodSlotId,
+  curriculumBookId,
   teacherName,
 }) {
   // ── Filtered Lists ──────────────────────────────────────────────────────────
@@ -57,8 +64,8 @@ export default function useLessonOptions({
   }, [students, classId, sectionId]);
 
   const availableBooks = useMemo(
-    () => filterCurriculumBooks(curriculumBooks, classId, classes, departmentId),
-    [curriculumBooks, classId, classes, departmentId]
+    () => propAvailableBooks || filterCurriculumBooks(curriculumBooks, classId, classes, departmentId),
+    [propAvailableBooks, curriculumBooks, classId, classes, departmentId]
   );
 
   // ── Select Options ──────────────────────────────────────────────────────────
@@ -97,18 +104,77 @@ export default function useLessonOptions({
     return list;
   }, [periodSlots]);
 
-  const bookOptions = useMemo(() => [
-    { value: "", label: "None (Direct Entry)" },
-    ...availableBooks.map((b) => ({
-      value: String(b.id),
-      label: `${b.name}${b.subject ? ` (${b.subject})` : ""}`,
-    })),
-  ], [availableBooks]);
+  const bookOptions = useMemo(() => {
+    const list = [{ value: "", label: "None (Direct Entry)" }];
+
+    if (periodSlotId && periodSlotId !== "ALL") {
+      const matchedSlot = findMatchingPeriodSlot(periodSlotId, periodSlots);
+      const targetOrder = matchedSlot?.period_order ?? matchedSlot?.order ?? (Number(periodSlotId) || null);
+
+      const periodMatched = [];
+      const others = [];
+
+      availableBooks.forEach((b) => {
+        const isMatch =
+          (b.periodSlotId && (String(b.periodSlotId) === String(periodSlotId) || (matchedSlot && String(b.periodSlotId) === String(matchedSlot.id)))) ||
+          (targetOrder !== null && (b.period_order !== undefined ? Number(b.period_order) : (b.order !== undefined ? Number(b.order) : null)) === targetOrder);
+
+        if (isMatch) {
+          periodMatched.push(b);
+        } else {
+          others.push(b);
+        }
+      });
+
+      periodMatched.forEach((b) => {
+        list.push({
+          value: String(b.id),
+          label: `${b.name}${b.subject ? ` (${b.subject})` : ""} • [Period Match]`,
+        });
+      });
+
+      others.forEach((b) => {
+        list.push({
+          value: String(b.id),
+          label: `${b.name}${b.subject ? ` (${b.subject})` : ""}`,
+        });
+      });
+    } else {
+      availableBooks.forEach((b) => {
+        list.push({
+          value: String(b.id),
+          label: `${b.name}${b.subject ? ` (${b.subject})` : ""}`,
+        });
+      });
+    }
+
+    return list;
+  }, [availableBooks, periodSlotId, periodSlots]);
 
   const teacherOptions = useMemo(() => {
     const list = [{ value: "", label: "None (Unassigned)" }];
     const seen = new Set();
 
+    // 1. Primary assigned teacher for active book or period slot
+    const currentBook =
+      availableBooks.find((b) => String(b.id) === String(curriculumBookId)) ||
+      curriculumBooks.find((b) => String(b.id) === String(curriculumBookId));
+    const assignedBookTeacher = resolveBookTeacher(currentBook, teachers, staff);
+
+    const matchedSlot = findMatchingPeriodSlot(periodSlotId, periodSlots);
+    const assignedSlotTeacher = matchedSlot?.teacher_name || matchedSlot?.teacher || "";
+
+    const primaryTeacher = assignedBookTeacher || assignedSlotTeacher || teacherName || "";
+
+    if (primaryTeacher) {
+      seen.add(primaryTeacher);
+      list.push({
+        value: primaryTeacher,
+        label: `${primaryTeacher} (Assigned Routine Teacher)`,
+      });
+    }
+
+    // 2. Add all teachers and staff
     [...teachers, ...staff].forEach((t) => {
       const name =
         t.name_en ||
@@ -125,6 +191,7 @@ export default function useLessonOptions({
       }
     });
 
+    // 3. Add any book instructors
     curriculumBooks.forEach((b) => {
       const tName = b.teacherName || b.teacher_name || b.instructor || "";
       if (tName && !seen.has(tName)) {
@@ -133,13 +200,8 @@ export default function useLessonOptions({
       }
     });
 
-    if (teacherName && !seen.has(teacherName)) {
-      seen.add(teacherName);
-      list.push({ value: teacherName, label: teacherName });
-    }
-
     return list;
-  }, [teachers, staff, curriculumBooks, teacherName]);
+  }, [teachers, staff, curriculumBooks, availableBooks, curriculumBookId, periodSlotId, periodSlots, teacherName]);
 
   return {
     filteredClasses,

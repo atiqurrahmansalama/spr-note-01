@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import UniversalManagementView from '../../../../components/common/UniversalManagementView';
-import CustomSelect from '../../../../components/ui/CustomSelect';
-import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import ActionMenu from '../../../../components/ui/ActionMenu';
-import ClassPeriodSwitcherBar from '../ClassPeriodSwitcherBar';
+import DailyClassroomFilterControls from '../DailyClassroomFilterControls';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import {
   renderAssessmentCurriculumLessonCell,
@@ -21,32 +19,16 @@ import { deleteLessonEvaluation as deleteEvaluationAPI } from '../../../../api/l
 import { useToast } from '../../../../context/ToastContext';
 
 export default function StudentAssessmentManagementView({
+  filterProps = null,
   assessmentRows = [],
   assessmentMetrics = [],
   assessmentSearch = '',
   onSearchChange,
-  selectedDate,
-  onDateChange,
-  selectedDepartmentId,
-  onDepartmentChange,
-  departmentSelectOptions = [],
-  hasDepartments = false,
-  selectedClassId,
-  onClassChange,
-  classSelectOptions = [],
-  selectedSectionId,
-  onSectionChange,
-  sectionSelectOptions = [],
-  hasSectionsForClass = false,
-  activePeriodId = 'ALL',
-  onPeriodChange,
-  allPeriodFilterOptions = [],
-  getSlotLessonsCount,
   getSlotAssessmentCount,
-  getPeriodTimeForSlot,
   onOpenAssessmentDrawer,
   tenantId,
   loadData,
+  ...restFilterProps
 }) {
   const { showToast } = useToast();
   const [deletingEvaluation, setDeletingEvaluation] = useState(null);
@@ -239,65 +221,12 @@ export default function StudentAssessmentManagementView({
         filterGridClassName="grid-cols-6 gap-2.5"
         searchSpanClassName="col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"
         filters={
-          <>
-            <div className={hasDepartments && hasSectionsForClass ? "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"}>
-              <ReusableCalendar
-                label="Evaluation Date"
-                selectedDate={selectedDate}
-                onSelectDate={onDateChange}
-                placeholder="Select Date"
-              />
-            </div>
-
-            {hasDepartments && (
-              <div className={hasSectionsForClass ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1"}>
-                <CustomSelect
-                  label="Department"
-                  options={departmentSelectOptions}
-                  value={selectedDepartmentId}
-                  onChange={(val) => {
-                    onDepartmentChange(val);
-                    onSectionChange('ALL');
-                  }}
-                  size="md"
-                />
-              </div>
-            )}
-
-            <div className={hasDepartments && hasSectionsForClass ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : (hasDepartments || hasSectionsForClass ? "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-6 @[900px]:col-span-2")}>
-              <CustomSelect
-                label="Class"
-                options={classSelectOptions}
-                value={selectedClassId}
-                onChange={(val) => {
-                  onClassChange(val);
-                  onSectionChange('ALL');
-                }}
-                size="md"
-              />
-            </div>
-
-            {hasSectionsForClass && (
-              <div className={hasDepartments ? "col-span-6 @[540px]:col-span-2 @[900px]:col-span-1" : "col-span-6 @[540px]:col-span-3 @[900px]:col-span-1"}>
-                <CustomSelect
-                  label="Section"
-                  options={sectionSelectOptions}
-                  value={selectedSectionId}
-                  onChange={onSectionChange}
-                  size="md"
-                />
-              </div>
-            )}
-
-            {/* Routine Period Fast Selector Bar (Reusable Component) */}
-            <ClassPeriodSwitcherBar
-              allPeriodFilterOptions={allPeriodFilterOptions}
-              activePeriodId={activePeriodId}
-              onPeriodChange={onPeriodChange}
-              getSlotCount={getSlotAssessmentCount || getSlotLessonsCount}
-              getPeriodSubtitle={getPeriodTimeForSlot}
-            />
-          </>
+          <DailyClassroomFilterControls
+            dateLabel="Evaluation Date"
+            filterProps={filterProps}
+            getSlotCount={getSlotAssessmentCount || filterProps?.getSlotCount}
+            {...restFilterProps}
+          />
         }
         data={assessmentRows}
         columns={assessmentColumns}

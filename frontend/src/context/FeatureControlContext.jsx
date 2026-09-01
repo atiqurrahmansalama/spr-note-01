@@ -48,13 +48,18 @@ const HARD_DEFAULTS = {
   nav_academic_studies: true,
   academic_studies: true,
   daily_classroom: true,
-  syllabus_milestone: true,
-  academic_analytics: true,
   daily_lessons: true,
   recitation_adai: true,
   homework_tasks: true,
-  academic_goals: true,
-  academic_reports: true,
+
+  // Examination & Result Management Features
+  nav_examinations: true,
+  examinations: true,
+  exam_schedules: true,
+  exam_mark_entry: true,
+  exam_tabulation: true,
+  exam_transcripts: true,
+  exam_grading_rules: true,
 
 
 

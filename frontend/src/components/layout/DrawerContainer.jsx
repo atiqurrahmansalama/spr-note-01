@@ -136,10 +136,10 @@ export function DrawerSection({
       {...rest}
     >
       {(title || subtitle || headerRight) && (
-        <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {Icon && <Icon className="w-4 h-4 theme-accent shrink-0" />}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 {title && (
                   <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
@@ -147,7 +147,7 @@ export function DrawerSection({
                   </h3>
                 )}
                 {badge && (
-                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-md theme-bg-sub theme-text-secondary border theme-border">
+                  <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-md theme-bg-sub theme-text-secondary border theme-border shrink-0">
                     {badge}
                   </span>
                 )}
@@ -159,7 +159,7 @@ export function DrawerSection({
               )}
             </div>
           </div>
-          {headerRight && <div className="shrink-0">{headerRight}</div>}
+          {headerRight && <div className="shrink-0 ml-auto flex items-center">{headerRight}</div>}
         </div>
       )}
       <div className={bodyClassName || ""}>{children}</div>

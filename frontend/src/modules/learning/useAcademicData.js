@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 import { academicYearsStore } from '../../utils/stores/academicStore';
-import { getBranches } from '../../api/academy';
+import { getBranches, getDepartments } from '../../api/academy';
 
 /**
  * Unified Hook to load full dynamic academic roster hierarchy
@@ -29,7 +29,7 @@ export function useAcademicData() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  // Listen to system-wide update events
+  // Listen to system-wide update events (both singular and plural)
   useEffect(() => {
     const handleUpdate = () => {
       setRefreshTrigger((prev) => prev + 1);
@@ -37,26 +37,40 @@ export function useAcademicData() {
 
     window.addEventListener('spr_tenant_changed', handleUpdate);
     window.addEventListener('spr_branches_updated', handleUpdate);
+    window.addEventListener('spr_branch_updated', handleUpdate);
     window.addEventListener('spr_academic_years_updated', handleUpdate);
     window.addEventListener('spr_departments_updated', handleUpdate);
+    window.addEventListener('spr_department_updated', handleUpdate);
     window.addEventListener('spr_classes_updated', handleUpdate);
+    window.addEventListener('spr_class_updated', handleUpdate);
     window.addEventListener('spr_sections_updated', handleUpdate);
+    window.addEventListener('spr_section_updated', handleUpdate);
     window.addEventListener('spr_students_updated', handleUpdate);
+    window.addEventListener('spr_student_updated', handleUpdate);
     window.addEventListener('spr_periods_updated', handleUpdate);
+    window.addEventListener('spr_period_updated', handleUpdate);
     window.addEventListener('spr_staff_updated', handleUpdate);
     window.addEventListener('spr_teachers_updated', handleUpdate);
+    window.addEventListener('spr_curriculum_updated', handleUpdate);
 
     return () => {
       window.removeEventListener('spr_tenant_changed', handleUpdate);
       window.removeEventListener('spr_branches_updated', handleUpdate);
+      window.removeEventListener('spr_branch_updated', handleUpdate);
       window.removeEventListener('spr_academic_years_updated', handleUpdate);
       window.removeEventListener('spr_departments_updated', handleUpdate);
+      window.removeEventListener('spr_department_updated', handleUpdate);
       window.removeEventListener('spr_classes_updated', handleUpdate);
+      window.removeEventListener('spr_class_updated', handleUpdate);
       window.removeEventListener('spr_sections_updated', handleUpdate);
+      window.removeEventListener('spr_section_updated', handleUpdate);
       window.removeEventListener('spr_students_updated', handleUpdate);
+      window.removeEventListener('spr_student_updated', handleUpdate);
       window.removeEventListener('spr_periods_updated', handleUpdate);
+      window.removeEventListener('spr_period_updated', handleUpdate);
       window.removeEventListener('spr_staff_updated', handleUpdate);
       window.removeEventListener('spr_teachers_updated', handleUpdate);
+      window.removeEventListener('spr_curriculum_updated', handleUpdate);
     };
   }, []);
 
@@ -72,7 +86,7 @@ export function useAcademicData() {
 
         const [branchRes, deptRes, clsRes, secRes, stuRes, perRes, staffRes] = await Promise.allSettled([
           getBranches ? getBranches({ type: 'ALL' }) : Promise.resolve([]),
-          fetchWithAuth('/api/v1/departments/?page_size=500&all=true'),
+          getDepartments ? getDepartments({ page_size: 500, all: true }) : fetchWithAuth('/api/v1/departments/?page_size=500&all=true'),
           fetchWithAuth('/api/v1/classes/?page_size=500&all=true'),
           fetchWithAuth('/api/v1/academy/sections/?page_size=500&all=true'),
           fetchWithAuth('/api/v1/students/?page_size=500&all=true'),
@@ -81,44 +95,76 @@ export function useAcademicData() {
         ]);
 
         if (isMounted) {
+          // 1. Branches
           if (branchRes.status === 'fulfilled') {
-            const list = Array.isArray(branchRes.value) ? branchRes.value : branchRes.value?.results || [];
+            const val = branchRes.value;
+            const list = Array.isArray(val) ? val : val?.results || [];
             setBranches(list.filter((b) => !b.is_deleted));
           }
 
-          if (deptRes.status === 'fulfilled' && deptRes.value?.ok) {
-            const data = await deptRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 2. Departments
+          if (deptRes.status === 'fulfilled') {
+            let data = deptRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             setDepartments(list.filter((d) => !d.is_deleted));
           }
 
-          if (clsRes.status === 'fulfilled' && clsRes.value?.ok) {
-            const data = await clsRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 3. Classes
+          if (clsRes.status === 'fulfilled') {
+            let data = clsRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             setClasses(list.filter((c) => !c.is_deleted));
           }
 
-          if (secRes.status === 'fulfilled' && secRes.value?.ok) {
-            const data = await secRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 4. Sections
+          if (secRes.status === 'fulfilled') {
+            let data = secRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             setSections(list.filter((s) => !s.is_deleted));
           }
 
-          if (stuRes.status === 'fulfilled' && stuRes.value?.ok) {
-            const data = await stuRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 5. Students
+          if (stuRes.status === 'fulfilled') {
+            let data = stuRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             setStudents(list.filter((st) => !st.is_deleted));
           }
 
-          if (perRes.status === 'fulfilled' && perRes.value?.ok) {
-            const data = await perRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 6. Periods
+          if (perRes.status === 'fulfilled') {
+            let data = perRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             setPeriodSlots(list.filter((p) => !p.is_deleted));
           }
 
-          if (staffRes.status === 'fulfilled' && staffRes.value?.ok) {
-            const data = await staffRes.value.json();
-            const list = Array.isArray(data) ? data : data.results || [];
+          // 7. Staff & Teachers
+          if (staffRes.status === 'fulfilled') {
+            let data = staffRes.value;
+            if (data && typeof data.json === 'function') {
+              if (data.ok) data = await data.json();
+              else data = [];
+            }
+            const list = Array.isArray(data) ? data : data?.results || [];
             const activeStaff = list.filter((s) => !s.is_deleted && s.is_active !== false);
             setStaff(activeStaff);
             const teachingStaff = activeStaff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);

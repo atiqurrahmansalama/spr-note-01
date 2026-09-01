@@ -37,6 +37,7 @@ export default function ClassSelect({
   value,
   onChange,
   classes: propClasses,
+  departmentId = null,
   label = 'Class',
   placeholder = 'Select Class...',
   allowAll = true,
@@ -109,16 +110,28 @@ export default function ClassSelect({
 
   const rawClasses = propClasses && Array.isArray(propClasses) && propClasses.length > 0 ? propClasses : internalClasses;
 
-  // Filter classes according to admission rules if admissionFilter is true or allowedClassIds provided
+  // Filter classes according to department, admission rules if admissionFilter is true or allowedClassIds provided
   const activeClasses = useMemo(() => {
+    let list = rawClasses;
+    if (departmentId && departmentId !== 'ALL') {
+      const deptFiltered = list.filter((c) => {
+        const dId = c.department !== undefined && c.department !== null
+          ? (typeof c.department === 'object' ? c.department.id : c.department)
+          : (c.department_id || (c.department_details?.id ?? null));
+        return dId !== null && dId !== undefined && String(dId) === String(departmentId);
+      });
+      if (deptFiltered.length > 0) {
+        list = deptFiltered;
+      }
+    }
     if (Array.isArray(allowedClassIds) && allowedClassIds.length > 0) {
-      return rawClasses.filter((c) => allowedClassIds.map(String).includes(String(c.id)));
+      list = list.filter((c) => allowedClassIds.map(String).includes(String(c.id)));
     }
     if (admissionFilter) {
-      return admissionSettingsStore.getAllowedAdmissionClasses(activeTenantId, branchId, rawClasses);
+      return admissionSettingsStore.getAllowedAdmissionClasses(activeTenantId, branchId, list);
     }
-    return rawClasses;
-  }, [rawClasses, allowedClassIds, admissionFilter, activeTenantId, branchId, admissionSettingsVersion]);
+    return list;
+  }, [rawClasses, departmentId, allowedClassIds, admissionFilter, activeTenantId, branchId, admissionSettingsVersion]);
 
   // Auto-select first class if requested
   useEffect(() => {

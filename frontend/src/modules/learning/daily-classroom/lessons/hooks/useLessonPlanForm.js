@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "../../../../../context/ToastContext";
 import { learningStore } from "../../../../../utils/stores/learningStore";
-import { getOrdinalPeriodLabel } from "../../../../../utils/localStore";
+import { getOrdinalPeriodLabel, curriculumStore } from "../../../../../utils/localStore";
 import {
   findMatchingPeriodSlot,
   resolvePeriodTime,
@@ -113,6 +113,13 @@ export default function useLessonPlanForm({
     }
   }, [defaultPeriodId, lesson, periodSlots, periodSlotId]);
 
+  // ── Available books filtered by class & department ──────────────────────────
+
+  const availableBooks = useMemo(
+    () => filterCurriculumBooks(curriculumBooks, classId, classes, departmentId),
+    [curriculumBooks, classId, classes, departmentId]
+  );
+
   // ── Selected book ───────────────────────────────────────────────────────────
 
   const selectedBook = useMemo(() =>
@@ -128,23 +135,27 @@ export default function useLessonPlanForm({
     const matchedSlot = findMatchingPeriodSlot(targetSlotId, periodSlots);
     const targetOrder = matchedSlot?.period_order ?? matchedSlot?.order ?? (Number(targetSlotId) || null);
 
-    if (targetOrder !== null && !isNaN(targetOrder)) {
-      const matchedBook = availableBooks.find((b) => {
-        if (b.periodSlotId && (String(b.periodSlotId) === String(targetSlotId) || (matchedSlot && String(b.periodSlotId) === String(matchedSlot.id)))) return true;
-        const bOrder = b.period_order !== undefined ? Number(b.period_order) : (b.order !== undefined ? Number(b.order) : null);
-        return bOrder !== null && bOrder === targetOrder;
-      });
-
-      const bookToApply = matchedBook || (availableBooks.length > 0 ? availableBooks[0] : null);
-      if (bookToApply) {
-        setCurriculumBookId(String(bookToApply.id));
-        setCurriculumBookName(bookToApply.name || "");
-        if (bookToApply.subject) setSubjectName(bookToApply.subject);
-        const autoTeacher = resolveBookTeacher(bookToApply, teachers, staff);
-        if (autoTeacher) setTeacherName(autoTeacher);
-        if (bookToApply.startPage) setStartUnit(String(bookToApply.startPage));
-        if (bookToApply.endPage) setEndUnit(String(bookToApply.endPage));
+    // 1. Check for a book explicitly linked to this period slot
+    const matchedBook = availableBooks.find((b) => {
+      if (b.periodSlotId && (String(b.periodSlotId) === String(targetSlotId) || (matchedSlot && String(b.periodSlotId) === String(matchedSlot.id)))) {
+        return true;
       }
+      const bOrder = b.period_order !== undefined ? Number(b.period_order) : (b.order !== undefined ? Number(b.order) : null);
+      return targetOrder !== null && bOrder !== null && bOrder === targetOrder;
+    });
+
+    const bookToApply = matchedBook || (availableBooks.length > 0 ? availableBooks[0] : null);
+    if (bookToApply) {
+      setCurriculumBookId(String(bookToApply.id));
+      setCurriculumBookName(bookToApply.name || "");
+      if (bookToApply.subject) setSubjectName(bookToApply.subject);
+      const autoTeacher = resolveBookTeacher(bookToApply, teachers, staff) || matchedSlot?.teacher_name || matchedSlot?.teacher || "";
+      if (autoTeacher) setTeacherName(autoTeacher);
+      if (bookToApply.startPage) setStartUnit(String(bookToApply.startPage));
+      if (bookToApply.endPage) setEndUnit(String(bookToApply.endPage));
+    } else {
+      const slotTeacher = matchedSlot?.teacher_name || matchedSlot?.teacher || "";
+      if (slotTeacher) setTeacherName(slotTeacher);
     }
   }, [availableBooks, periodSlots, teachers, staff]);
 
@@ -213,9 +224,6 @@ export default function useLessonPlanForm({
   const matchedSection = sections.find((s) => String(s.id) === String(sectionId));
   const resolvedDeptId = departmentId ||
     (typeof matchedClass?.department === "object" ? matchedClass.department?.id : (matchedClass?.department || matchedClass?.department_id));
-  const matchedDept = classes
-    ? null // resolved from classes in component if needed
-    : null;
   const displaySectionLabel = matchedSection
     ? (matchedSection.section_name || matchedSection.name || "Section")
     : (sectionId ? "Section" : "Class Wide (All Sections)");
@@ -373,7 +381,18 @@ export default function useLessonPlanForm({
       };
 
       learningStore.saveDailyLesson(tenantId, payload);
-      showToast(lesson ? "Daily lesson plan updated." : "Daily lesson assigned successfully.", "success");
+
+      // Sync progress with main Curriculum Store
+      if (curriculumBookId && endUnit) {
+        const pageNum = parseInt(endUnit, 10);
+        if (!isNaN(pageNum) && pageNum > 0) {
+          try {
+            curriculumStore.updateProgress(tenantId, curriculumBookId, pageNum, lessonTitle.trim() || undefined);
+          } catch {}
+        }
+      }
+
+      showToast(lesson && !lesson?.isDuplicate ? "Daily lesson plan updated." : "Daily lesson assigned successfully.", "success");
       if (onSaveSuccess) onSaveSuccess();
     } catch {
       showToast("Failed to save daily lesson.", "error");
@@ -403,6 +422,7 @@ export default function useLessonPlanForm({
     isCarryForwardOpen, setIsCarryForwardOpen,
     isEditingContext, setIsEditingContext,
     // Derived
+    availableBooks,
     selectedBook,
     matchedPeriod,
     displayPeriodName,
