@@ -88,7 +88,7 @@ export default function DataTable({
       <div className="overflow-x-auto">
         <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
           {!hideHeader && (
-            <thead className="border-b theme-border theme-bg-sub/60 theme-text-secondary uppercase text-[10px] tracking-wider font-bold">
+            <thead className="border-b theme-border theme-bg-sub theme-text-secondary uppercase text-[10px] tracking-wider font-bold">
               <tr>
                 {selectable && (
                   <th
@@ -116,10 +116,28 @@ export default function DataTable({
                       ? 'text-right'
                       : 'text-left';
 
+                  const isStickyRight =
+                    col.sticky === 'right' ||
+                    col.sticky === true ||
+                    (col.key === 'actions' && col.sticky !== false) ||
+                    (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
+                    (typeof col.className === 'string' && col.className.includes('sticky right'));
+
+                  const isStickyLeft =
+                    col.sticky === 'left' ||
+                    (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
+                    (typeof col.className === 'string' && col.className.includes('sticky left'));
+
+                  const stickyHeaderClass = isStickyRight
+                    ? 'sticky right-0 z-20 theme-bg-sub'
+                    : isStickyLeft
+                    ? 'sticky left-0 z-20 theme-bg-sub'
+                    : '';
+
                   return (
                     <th
                       key={col.key || idx}
-                      className={`${defaultHeaderPad} ${alignClass} ${col.headerClassName || ''}`}
+                      className={`${defaultHeaderPad} ${alignClass} ${stickyHeaderClass} ${col.headerClassName || ''}`}
                     >
                       {col.header ?? col.label ?? col.title ?? ''}
                     </th>
@@ -152,7 +170,7 @@ export default function DataTable({
                     }
                     onRowClick?.(item);
                   }}
-                  className={`hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors ${
+                  className={`group/row hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors ${
                     itemSelected ? 'theme-bg-accent-soft/20' : ''
                   } ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
                 >
@@ -181,10 +199,38 @@ export default function DataTable({
                         ? 'text-right'
                         : 'text-left';
 
+                    const isStickyRight =
+                      col.sticky === 'right' ||
+                      col.sticky === true ||
+                      (col.key === 'actions' && col.sticky !== false) ||
+                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
+                      (typeof col.className === 'string' && col.className.includes('sticky right')) ||
+                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky right'));
+
+                    const isStickyLeft =
+                      col.sticky === 'left' ||
+                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
+                      (typeof col.className === 'string' && col.className.includes('sticky left')) ||
+                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky left'));
+
+                    const stickyCellClass = isStickyRight
+                      ? `sticky right-0 z-10 ${
+                          itemSelected
+                            ? 'theme-bg-sub'
+                            : 'theme-bg-surface group-hover/row:theme-bg-surface'
+                        }`
+                      : isStickyLeft
+                      ? `sticky left-0 z-10 ${
+                          itemSelected
+                            ? 'theme-bg-sub'
+                            : 'theme-bg-surface group-hover/row:theme-bg-surface'
+                        }`
+                      : '';
+
                     const customCellClass =
                       typeof col.cellClassName === 'function'
                         ? col.cellClassName(item, rowIdx)
-                        : col.cellClassName || '';
+                        : (col.cellClassName || col.className || '');
 
                     const keyName = col.key || col.accessor || col.id;
                     let content = null;
@@ -206,7 +252,7 @@ export default function DataTable({
                     return (
                       <td
                         key={col.key || colIdx}
-                        className={`${defaultCellPad} ${alignClass} ${customCellClass}`}
+                        className={`${defaultCellPad} ${alignClass} ${stickyCellClass} ${customCellClass}`}
                       >
                         {content}
                       </td>

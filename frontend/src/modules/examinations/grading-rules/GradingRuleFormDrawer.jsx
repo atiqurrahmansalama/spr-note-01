@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CustomButton from '../../../components/ui/CustomButton';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
@@ -9,9 +9,11 @@ import {
   TrashIcon,
   CheckIcon,
   SparklesIcon,
+  HistoryIcon,
 } from '../../../components/ui/Icons';
 import { useToast } from '../../../context/ToastContext';
 import { examStore, DEFAULT_GRADING_SYSTEMS } from '../../../utils/stores/examStore';
+import { readJSON, writeJSON } from '../../../utils/stores/coreStore';
 
 export default function GradingRuleFormDrawer({
   system = null,
@@ -21,21 +23,74 @@ export default function GradingRuleFormDrawer({
 }) {
   const { showToast } = useToast();
 
-  const [name, setName] = useState(system?.name || '');
-  const [code, setCode] = useState(system?.code || `SCALE_${Date.now().toString(36).toUpperCase()}`);
-  const [description, setDescription] = useState(system?.description || '');
-  const [rules, setRules] = useState(
-    system?.rules && system.rules.length > 0
-      ? system.rules
-      : [
-          { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
-          { grade: 'A', title: 'Excellent', minMark: 70, maxMark: 79, gradePoint: 4.0, division: '1st Division', isPass: true, color: 'teal' },
-          { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
-          { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
-          { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
-        ]
-  );
+  const draftKey = `spr_grading_rule_draft_${tenantId}_${system?.id || 'new'}`;
+  const savedDraft = useMemo(() => {
+    return readJSON(draftKey, null);
+  }, [draftKey]);
+
+  const [isDraftRestored, setIsDraftRestored] = useState(() => Boolean(savedDraft));
+
+  const [name, setName] = useState(savedDraft?.name ?? system?.name ?? '');
+  const [code, setCode] = useState(savedDraft?.code ?? system?.code ?? `SCALE_${Date.now().toString(36).toUpperCase()}`);
+  const [description, setDescription] = useState(savedDraft?.description ?? system?.description ?? '');
+  const [rules, setRules] = useState(() => {
+    if (Array.isArray(savedDraft?.rules) && savedDraft.rules.length > 0) {
+      return savedDraft.rules;
+    }
+    if (system?.rules && system.rules.length > 0) {
+      return system.rules;
+    }
+    return [
+      { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
+      { grade: 'A', title: 'Excellent', minMark: 70, maxMark: 79, gradePoint: 4.0, division: '1st Division', isPass: true, color: 'teal' },
+      { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
+      { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
+      { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
+    ];
+  });
   const [saving, setSaving] = useState(false);
+
+  // Auto-save form draft with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const hasContent = Boolean(name.trim() || description.trim() || rules.length > 5);
+      if (hasContent) {
+        writeJSON(draftKey, {
+          name,
+          code,
+          description,
+          rules,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [draftKey, name, code, description, rules]);
+
+  const handleDiscardDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {}
+    setIsDraftRestored(false);
+
+    setName(system?.name || '');
+    setCode(system?.code || `SCALE_${Date.now().toString(36).toUpperCase()}`);
+    setDescription(system?.description || '');
+    setRules(
+      system?.rules && system.rules.length > 0
+        ? system.rules
+        : [
+            { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
+            { grade: 'A', title: 'Excellent', minMark: 70, maxMark: 79, gradePoint: 4.0, division: '1st Division', isPass: true, color: 'teal' },
+            { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
+            { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
+            { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
+          ]
+    );
+
+    showToast('Draft discarded and form reset.', 'info');
+  };
 
   const handleLoadPreset = (presetId) => {
     const preset = DEFAULT_GRADING_SYSTEMS.find((p) => p.id === presetId);
@@ -109,6 +164,11 @@ export default function GradingRuleFormDrawer({
         showToast('New grading scale policy created.', 'success');
       }
 
+      // Clean up saved draft upon successful save
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {}
+
       onSaveSuccess?.();
     } catch {
       showToast('Failed to save grading scale policy.', 'error');
@@ -120,6 +180,26 @@ export default function GradingRuleFormDrawer({
   return (
     <DrawerContainer padding="none">
       <form onSubmit={handleSaveSystem} className="@container p-4 @[480px]:p-6 space-y-6 text-left">
+        {/* Restored Draft Notice Banner */}
+        {isDraftRestored && (
+          <div className="flex items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-subtle text-xs animate-fade-in">
+            <div className="flex items-center gap-2 theme-text-primary font-medium">
+              <HistoryIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Unsaved draft restored from your previous session.</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <CustomButton
+                type="button"
+                variant="sub"
+                size="xs"
+                onClick={handleDiscardDraft}
+                icon={TrashIcon}
+              >
+                Discard Draft
+              </CustomButton>
+            </div>
+          </div>
+        )}
         {/* Template Presets Toolbar */}
         <div className="p-3.5 rounded-xl border theme-border theme-bg-sub/40 space-y-2">
           <span className="text-xs font-bold theme-text-primary block">

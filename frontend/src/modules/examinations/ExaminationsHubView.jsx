@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../components/layout';
 import PageHeader from '../../components/ui/PageHeader';
 import TabSwitcher from '../../components/ui/TabSwitcher';
 import CustomButton from '../../components/ui/CustomButton';
-import ExamSchedulesView from './schedules/ExamSchedulesView';
-import SubjectRoutineMatrixView from './schedules/SubjectRoutineMatrixView';
+import ExamSchedulesView from './exam-schedules/schedules/ExamSchedulesView';
+import SubjectRoutineMatrixView from './exam-schedules/routine-matrix/SubjectRoutineMatrixView';
 import MarkEntryDeskView from './mark-entry/MarkEntryDeskView';
 import TabulationLedgerView from './tabulation/TabulationLedgerView';
 import TranscriptStudioView from './transcripts/TranscriptStudioView';
@@ -24,24 +25,61 @@ import { useRightSidebar } from '../../context/RightSidebarContext';
  */
 export default function ExaminationsHubView({ defaultTab = 'SCHEDULES' }) {
   const { openDrawer } = useRightSidebar();
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Resolve active tab from pathname, searchParams, or defaultTab
+  const resolveActiveTab = () => {
+    const path = location.pathname.toLowerCase();
+    const tabParam = searchParams.get('tab')?.toLowerCase();
+    if (path.includes('routine-matrix') || path.includes('matrix') || tabParam === 'routine-matrix' || tabParam === 'matrix' || tabParam === 'subject_matrix') {
+      return 'SUBJECT_MATRIX';
+    }
+    if (path.includes('mark-entry') || tabParam === 'mark-entry') {
+      return 'MARK_ENTRY';
+    }
+    if (path.includes('tabulation') || tabParam === 'tabulation') {
+      return 'TABULATION';
+    }
+    if (path.includes('transcripts') || tabParam === 'transcripts') {
+      return 'TRANSCRIPTS';
+    }
+    if (path.includes('grading-rules') || tabParam === 'grading-rules') {
+      return 'GRADING_RULES';
+    }
+    if (path.includes('schedules') || path.includes('exams') || tabParam === 'schedules') {
+      return 'SCHEDULES';
+    }
+    return defaultTab || 'SCHEDULES';
+  };
+
+  const [activeTab, setActiveTab] = useState(resolveActiveTab);
   const [selectedExamContext, setSelectedExamContext] = useState(null);
   const [selectedStudentContext, setSelectedStudentContext] = useState(null);
 
   useEffect(() => {
-    if (defaultTab) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab]);
+    setActiveTab(resolveActiveTab());
+  }, [location.pathname, searchParams, defaultTab]);
 
   const tabs = [
     { id: 'SCHEDULES', label: 'Exam Schedules', icon: CalendarIcon },
     { id: 'SUBJECT_MATRIX', label: 'Subject Routine Matrix', icon: BookOpenIcon },
   ];
 
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === 'SCHEDULES') {
+      navigate('/examinations/schedules');
+    } else if (newTab === 'SUBJECT_MATRIX') {
+      navigate('/examinations/routine-matrix');
+    }
+  };
+
   const handleNavigateToMatrix = (examId) => {
     setSelectedExamContext(examId);
     setActiveTab('SUBJECT_MATRIX');
+    navigate('/examinations/routine-matrix');
   };
 
   const handleNavigateToMarkEntry = (examId) => {
@@ -92,7 +130,7 @@ export default function ExaminationsHubView({ defaultTab = 'SCHEDULES' }) {
       <TabSwitcher
         tabs={tabs}
         activeTab={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         rightContent={renderTabAction()}
       />
 
@@ -111,7 +149,7 @@ export default function ExaminationsHubView({ defaultTab = 'SCHEDULES' }) {
         {activeTab === 'SUBJECT_MATRIX' && (
           <SubjectRoutineMatrixView
             initialExamId={selectedExamContext}
-            onNavigateToExamSessions={() => setActiveTab('SCHEDULES')}
+            onNavigateToExamSessions={() => handleTabChange('SCHEDULES')}
           />
         )}
 

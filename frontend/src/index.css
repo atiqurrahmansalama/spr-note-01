@@ -437,3 +437,25 @@ html[data-theme="amber"][data-mode="light"] {
 .scrollbar-none::-webkit-scrollbar {
   display: none; /* Chrome, Safari, and Opera */
 }
+
+/* ==========================================================================
+   DEVELOPMENT TEXT SELECTION & COPY SUPPORT
+   Enables seamless selection and copying of text across all drawers, modals,
+   forms, tables, labels, cards, and page views during development.
+   ========================================================================== */
+*, *::before, *::after {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Ensure text inside all standard tags and containers is selectable */
+input, textarea, select, button, label, p, span, h1, h2, h3, h4, h5, h6, td, th, li, a, code, pre, div {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Override select-none utility during development so text can be copied anywhere */
+.select-none {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}

@@ -13,4 +13,5 @@ export { default as PageHeader } from './PageHeader';
 export { default as FilterBar } from './FilterBar';
 export { default as FullscreenButton } from './FullscreenButton';
 export { default as RightSidebarPanel } from './RightSidebarPanel';
+export { default as CollapsibleCard } from './CollapsibleCard';
 export * from './Icons';

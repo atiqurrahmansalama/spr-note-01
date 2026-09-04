@@ -131,7 +131,7 @@ export default function useExamData() {
 
   // Options for Departments - 100% Dynamic from Academy
   const departmentOptions = useMemo(() => {
-    const list = departments.map((d) => ({
+    const list = (departments || []).map((d) => ({
       value: String(d.id),
       label: d.name || d.department_name || 'Department',
       code: d.code || d.department_code || '',
@@ -142,7 +142,7 @@ export default function useExamData() {
 
   // Options for Classes - 100% Dynamic from Academy with robust department link
   const classOptions = useMemo(() => {
-    return classes.map((c) => {
+    return (classes || []).map((c) => {
       let deptId = null;
       if (c.department !== undefined && c.department !== null) {
         deptId = typeof c.department === 'object' ? c.department.id : c.department;
@@ -150,13 +150,17 @@ export default function useExamData() {
         deptId = c.department_id;
       } else if (c.department_details && typeof c.department_details === 'object') {
         deptId = c.department_details.id;
+      } else if (c.dept_id !== undefined && c.dept_id !== null) {
+        deptId = c.dept_id;
+      } else if (c.dept !== undefined && c.dept !== null) {
+        deptId = typeof c.dept === 'object' ? c.dept.id : c.dept;
       }
 
       return {
         value: String(c.id),
         label: c.name || c.class_name || 'Class',
         departmentId: deptId !== null && deptId !== undefined ? String(deptId) : null,
-        departmentName: c.department_name || '',
+        departmentName: c.department_name || (typeof c.department === 'object' ? c.department.name : '') || '',
         code: c.code || '',
         classObj: c,
       };

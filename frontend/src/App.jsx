@@ -202,11 +202,13 @@ export default function App() {
             {/* Examination & Result Management Hub Routes */}
             <Route path="/examinations" element={<ExaminationsHubView />} />
             <Route path="/examinations/schedules" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
+            <Route path="/examinations/routine-matrix" element={<ExaminationsHubView defaultTab="SUBJECT_MATRIX" />} />
             <Route path="/examinations/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
             <Route path="/examinations/tabulation" element={<ExaminationsHubView defaultTab="TABULATION" />} />
             <Route path="/examinations/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
             <Route path="/examinations/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
             <Route path="/exams" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
+            <Route path="/routine-matrix" element={<ExaminationsHubView defaultTab="SUBJECT_MATRIX" />} />
             <Route path="/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
             <Route path="/tabulation-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
             <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />

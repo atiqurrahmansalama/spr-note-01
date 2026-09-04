@@ -29,6 +29,7 @@ export default function DrawerContainer({
     normal: "space-y-6 sm:space-y-7",
     compact: "space-y-4 sm:space-y-5",
     relaxed: "space-y-8 sm:space-y-9",
+    none: "space-y-0",
   }[spacing] || "space-y-6 sm:space-y-7";
 
   const paddingClass = {
@@ -39,7 +40,7 @@ export default function DrawerContainer({
 
   return (
     <div
-      className={`w-full ${paddingClass} ${spacingClass} font-sans text-left theme-text-primary select-none min-w-0 flex flex-col justify-between ${
+      className={`w-full ${paddingClass} ${spacingClass} font-sans text-left theme-text-primary min-w-0 flex flex-col justify-between ${
         animate ? "animate-fade-in" : ""
       } ${className}`}
       {...rest}
@@ -136,10 +137,10 @@ export function DrawerSection({
       {...rest}
     >
       {(title || subtitle || headerRight) && (
-        <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 min-w-0">
             {Icon && <Icon className="w-4 h-4 theme-accent shrink-0" />}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 {title && (
                   <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
@@ -162,7 +163,7 @@ export function DrawerSection({
           {headerRight && <div className="shrink-0 ml-auto flex items-center">{headerRight}</div>}
         </div>
       )}
-      <div className={bodyClassName || ""}>{children}</div>
+      <div className={bodyClassName || "space-y-3.5"}>{children}</div>
     </div>
   );
 }
@@ -182,16 +183,26 @@ export function DrawerFooter({
   className = "",
   children,
 }) {
+  const hasStandardActions = Boolean(onCancel || onSubmit || onSave);
+
+  if (!hasStandardActions && children) {
+    return (
+      <div className={`pt-4 border-t theme-border w-full ${className}`}>
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border select-none ${className}`}
+      className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border w-full ${className}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         {extraButtons}
         {children}
       </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2 ml-auto shrink-0">
         {onCancel && (
           <CustomButton
             type="button"

@@ -30,7 +30,7 @@ export default function PageContainer({
   if (isFullscreen) {
     const fullscreenContent = (
       <div
-        className={`fixed inset-0 z-[9999] theme-bg-app p-3 sm:p-4 md:p-5 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in select-none w-screen h-screen min-w-0 ${className}`}
+        className={`fixed inset-0 z-[9999] theme-bg-app p-3 sm:p-4 md:p-5 flex flex-col justify-between overflow-hidden shadow-2xl animate-fade-in w-screen h-screen min-w-0 ${className}`}
         {...rest}
       >
         {header && <div className="w-full shrink-0">{header}</div>}
@@ -56,7 +56,7 @@ export default function PageContainer({
   if (isEmbedded) {
     return (
       <div
-        className={`w-full space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 @container ${
+        className={`w-full space-y-4 sm:space-y-6 font-sans text-left theme-text-primary min-w-0 @container ${
           animate ? "animate-fade-in" : ""
         } ${className}`}
         {...rest}
@@ -69,7 +69,7 @@ export default function PageContainer({
 
   return (
     <div
-      className={`w-full ${maxWidthClass} mx-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 font-sans text-left theme-text-primary select-none min-w-0 @container ${
+      className={`w-full ${maxWidthClass} mx-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 font-sans text-left theme-text-primary min-w-0 @container ${
         animate ? "animate-fade-in" : ""
       } ${className}`}
       {...rest}

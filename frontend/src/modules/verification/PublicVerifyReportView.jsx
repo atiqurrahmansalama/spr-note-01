@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { verifyReport } from "../../api/reports";
-import { examStore } from "../../utils/stores/examStore";
 import QrCodeBadge from "../../components/common/QrCodeBadge";
 
 export default function PublicVerifyReportView({ reportIdParam }) {
@@ -24,8 +23,7 @@ export default function PublicVerifyReportView({ reportIdParam }) {
     if (idToVerify.startsWith("EXAM_")) {
       // Offline/Local Examination Verification
       const parts = idToVerify.split("_");
-      const examId = parts[1] || "";
-      const studentId = parts[2] || "";
+      const studentId = parts[2] || parts[1] || "";
 
       setTimeout(() => {
         setResult({

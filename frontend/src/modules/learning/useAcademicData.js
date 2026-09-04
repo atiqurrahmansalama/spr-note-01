@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 import { academicYearsStore } from '../../utils/stores/academicStore';
+import { readJSON, writeJSON } from '../../utils/stores/coreStore';
 import { getBranches, getDepartments } from '../../api/academy';
 
 /**
@@ -11,18 +12,39 @@ import { getBranches, getDepartments } from '../../api/academy';
  */
 export function useAcademicData() {
   const tenantContext = useTenant ? useTenant() : null;
-  const activeTenantId = tenantContext?.activeTenantId || '';
+  const activeTenantId = tenantContext?.activeTenantId || 'default';
 
-  const [branches, setBranches] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [periodSlots, setPeriodSlots] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Synchronous hydration from local cache prevents empty flash / loss of state on refresh
+  const [branches, setBranches] = useState(() =>
+    readJSON(`spr_branches_cache_${activeTenantId}`, [])
+  );
+  const [academicYears, setAcademicYears] = useState(() =>
+    academicYearsStore.getAcademicYears(activeTenantId)
+  );
+  const [departments, setDepartments] = useState(() =>
+    readJSON(`spr_departments_cache_${activeTenantId}`, [])
+  );
+  const [classes, setClasses] = useState(() =>
+    readJSON(`spr_classes_cache_${activeTenantId}`, [])
+  );
+  const [sections, setSections] = useState(() =>
+    readJSON(`spr_sections_cache_${activeTenantId}`, [])
+  );
+  const [students, setStudents] = useState(() =>
+    readJSON(`spr_students_cache_${activeTenantId}`, [])
+  );
+  const [periodSlots, setPeriodSlots] = useState(() =>
+    readJSON(`spr_period_slots_cache_${activeTenantId}`, [])
+  );
+  const [teachers, setTeachers] = useState(() => {
+    const cachedStaff = readJSON(`spr_staff_cache_${activeTenantId}`, []);
+    const teaching = cachedStaff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
+    return teaching.length > 0 ? teaching : cachedStaff;
+  });
+  const [staff, setStaff] = useState(() =>
+    readJSON(`spr_staff_cache_${activeTenantId}`, [])
+  );
+  const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const refetch = useCallback(() => {
@@ -98,8 +120,9 @@ export function useAcademicData() {
           // 1. Branches
           if (branchRes.status === 'fulfilled') {
             const val = branchRes.value;
-            const list = Array.isArray(val) ? val : val?.results || [];
-            setBranches(list.filter((b) => !b.is_deleted));
+            const list = (Array.isArray(val) ? val : val?.results || []).filter((b) => !b.is_deleted);
+            setBranches(list);
+            writeJSON(`spr_branches_cache_${activeTenantId}`, list);
           }
 
           // 2. Departments
@@ -109,8 +132,9 @@ export function useAcademicData() {
               if (data.ok) data = await data.json();
               else data = [];
             }
-            const list = Array.isArray(data) ? data : data?.results || [];
-            setDepartments(list.filter((d) => !d.is_deleted));
+            const list = (Array.isArray(data) ? data : data?.results || []).filter((d) => !d.is_deleted);
+            setDepartments(list);
+            writeJSON(`spr_departments_cache_${activeTenantId}`, list);
           }
 
           // 3. Classes
@@ -120,8 +144,9 @@ export function useAcademicData() {
               if (data.ok) data = await data.json();
               else data = [];
             }
-            const list = Array.isArray(data) ? data : data?.results || [];
-            setClasses(list.filter((c) => !c.is_deleted));
+            const list = (Array.isArray(data) ? data : data?.results || []).filter((c) => !c.is_deleted);
+            setClasses(list);
+            writeJSON(`spr_classes_cache_${activeTenantId}`, list);
           }
 
           // 4. Sections
@@ -131,8 +156,9 @@ export function useAcademicData() {
               if (data.ok) data = await data.json();
               else data = [];
             }
-            const list = Array.isArray(data) ? data : data?.results || [];
-            setSections(list.filter((s) => !s.is_deleted));
+            const list = (Array.isArray(data) ? data : data?.results || []).filter((s) => !s.is_deleted);
+            setSections(list);
+            writeJSON(`spr_sections_cache_${activeTenantId}`, list);
           }
 
           // 5. Students
@@ -142,8 +168,9 @@ export function useAcademicData() {
               if (data.ok) data = await data.json();
               else data = [];
             }
-            const list = Array.isArray(data) ? data : data?.results || [];
-            setStudents(list.filter((st) => !st.is_deleted));
+            const list = (Array.isArray(data) ? data : data?.results || []).filter((st) => !st.is_deleted);
+            setStudents(list);
+            writeJSON(`spr_students_cache_${activeTenantId}`, list);
           }
 
           // 6. Periods
@@ -153,8 +180,9 @@ export function useAcademicData() {
               if (data.ok) data = await data.json();
               else data = [];
             }
-            const list = Array.isArray(data) ? data : data?.results || [];
-            setPeriodSlots(list.filter((p) => !p.is_deleted));
+            const list = (Array.isArray(data) ? data : data?.results || []).filter((p) => !p.is_deleted);
+            setPeriodSlots(list);
+            writeJSON(`spr_period_slots_cache_${activeTenantId}`, list);
           }
 
           // 7. Staff & Teachers
@@ -167,6 +195,7 @@ export function useAcademicData() {
             const list = Array.isArray(data) ? data : data?.results || [];
             const activeStaff = list.filter((s) => !s.is_deleted && s.is_active !== false);
             setStaff(activeStaff);
+            writeJSON(`spr_staff_cache_${activeTenantId}`, activeStaff);
             const teachingStaff = activeStaff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
             setTeachers(teachingStaff.length > 0 ? teachingStaff : activeStaff);
           }

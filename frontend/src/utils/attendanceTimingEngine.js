@@ -226,11 +226,11 @@ export function getAttendanceCellTimingState({
   }
 
   // ─── 3. Target Date is Today (Live Day Time-Window Evaluation) ─────────────
-  let slotStartMin = 0;
-  let lateStartMin = 0;
-  let lateEndMin = 0;
-  let slotEndMin = 0;
-  let teacherEditLimitMin = 0;
+  let slotStartMin;
+  let lateStartMin;
+  let lateEndMin;
+  let slotEndMin;
+  let teacherEditLimitMin;
 
   if (moduleType === 'CLASS' || moduleType === 'TEACHER_CLASS' || moduleType === 'TEACHER') {
     const defaultStart = startTime || '08:00';

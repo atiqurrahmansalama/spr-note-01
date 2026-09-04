@@ -306,7 +306,7 @@ export default function CustomSelect({
     >
       {label && (
         <div className="flex items-center justify-between gap-2 mb-2">
-          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
+          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
             {label} {required && <span className="theme-danger">*</span>}
           </label>
         </div>
@@ -318,13 +318,13 @@ export default function CustomSelect({
           type="button"
           disabled={disabled}
           onClick={() => !disabled && setIsOpen((prev) => !prev)}
-          className={`w-full h-full theme-bg-sub rounded-lg border overflow-hidden relative flex items-center justify-center cursor-pointer shadow-xs transition-all hover:theme-bg-elevated select-none focus:outline-none ${
+          className={`w-full h-full theme-bg-sub rounded-lg border overflow-hidden relative flex items-center justify-center cursor-pointer shadow-xs transition-all hover:theme-bg-elevated focus:outline-none ${
             isOpen
               ? 'border-[var(--accent-main)]/60 ring-1 ring-[var(--accent-main)]/20 shadow-xs'
               : 'theme-border hover:border-[var(--accent-main)]/40'
           }`}
         >
-          <span className="w-full text-center text-[12px] sm:text-[14px] font-mono font-semibold theme-text-primary select-none pointer-events-none">
+          <span className="w-full text-center text-[12px] sm:text-[14px] font-mono font-semibold theme-text-primary pointer-events-none">
             {selectedLabel || placeholder}
           </span>
           <span className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">

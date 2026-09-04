@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { PageContainer } from '../../../components/layout';
-import PageHeader from '../../../components/ui/PageHeader';
-import MetricsGrid from '../../../components/ui/MetricsGrid';
-import CustomButton from '../../../components/ui/CustomButton';
-import CustomSelect from '../../../components/ui/CustomSelect';
-import CustomInput from '../../../components/ui/CustomInput';
-import ActionMenu from '../../../components/ui/ActionMenu';
+import { PageContainer } from '../../../../components/layout';
+import PageHeader from '../../../../components/ui/PageHeader';
+import MetricsGrid from '../../../../components/ui/MetricsGrid';
+import CustomButton from '../../../../components/ui/CustomButton';
+import CustomSelect from '../../../../components/ui/CustomSelect';
+import CustomInput from '../../../../components/ui/CustomInput';
+import ActionMenu from '../../../../components/ui/ActionMenu';
 import ExamFormDrawer from './ExamFormDrawer';
-import ExamSubjectConfigDrawer from './ExamSubjectConfigDrawer';
 import {
   CalendarIcon,
   PlusIcon,
@@ -15,20 +14,19 @@ import {
   TrashIcon,
   BookOpenIcon,
   CheckIcon,
-  LockClosedIcon,
-  BuildingOfficeIcon,
   ClockIcon,
   SearchIcon,
+  ChevronIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
   ChartBarIcon,
   AcademicCapIcon,
-  ChevronIcon,
-  SparklesIcon,
-  ShieldCheckIcon,
-} from '../../../components/ui/Icons';
-import { useToast } from '../../../context/ToastContext';
-import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
-import { examStore } from '../../../utils/stores/examStore';
-import useExamData from '../hooks/useExamData';
+  LockClosedIcon,
+} from '../../../../components/ui/Icons';
+import { useToast } from '../../../../context/ToastContext';
+import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
+import { examStore } from '../../../../utils/stores/examStore';
+import useExamData from '../../hooks/useExamData';
 
 /**
  * ExamSchedulesView
@@ -50,15 +48,10 @@ export default function ExamSchedulesView({
     gradingSystems,
     gradingSystemOptions,
     examSubjects,
-    branchOptions,
     academicYears,
     academicYearOptions,
     departmentOptions,
     classOptions,
-    sectionOptions,
-    curriculumBooks,
-    teachers,
-    staff,
     refreshExamData,
   } = useExamData();
 
@@ -72,7 +65,7 @@ export default function ExamSchedulesView({
 
   // ── Global Drawer Registrations ───────────────────────────────────────────────
 
-  // 1. Examination Session Drawer
+  // Examination Session Drawer
   useDrawerRegistration(
     'exam_session',
     (params) => {
@@ -106,47 +99,6 @@ export default function ExamSchedulesView({
       };
     },
     [exams, tenantId, academicYears, academicYearOptions, departmentOptions, gradingSystemOptions, classOptions, refreshExamData, closeDrawer]
-  );
-
-  // 2. Exam Subject Routine Drawer
-  useDrawerRegistration(
-    'exam_subject',
-    (params) => {
-      const mode = params.get('mode') || 'add';
-      const examId = params.get('examId');
-      const subjectId = params.get('id');
-      const foundSubject = subjectId ? examSubjects.find((s) => String(s.id) === String(subjectId)) : null;
-      const foundExam = examId ? exams.find((e) => String(e.id) === String(examId)) : null;
-
-      return {
-        title: mode === 'edit' ? 'Edit Subject Schedule' : 'Add Subject to Exam Routine',
-        subtitle: mode === 'edit' ? `Update routine for ${foundSubject?.subjectName || 'Subject'}` : 'Assign exam date, time slot, full/pass marks, and examiner',
-        category: 'Examination & Results',
-        size: 'lg',
-        width: 'lg',
-        content: (
-          <ExamSubjectConfigDrawer
-            key={`exam-sub-drawer-${mode}-${subjectId || 'new'}-${examId}`}
-            subjectConfig={foundSubject}
-            exam={foundExam}
-            examId={examId}
-            tenantId={tenantId}
-            departmentOptions={departmentOptions}
-            classOptions={classOptions}
-            sectionOptions={sectionOptions}
-            curriculumBooks={curriculumBooks}
-            teachers={teachers}
-            staff={staff}
-            onSaveSuccess={() => {
-              refreshExamData();
-              closeDrawer();
-            }}
-            onCancel={closeDrawer}
-          />
-        ),
-      };
-    },
-    [exams, examSubjects, tenantId, departmentOptions, classOptions, sectionOptions, curriculumBooks, teachers, staff, refreshExamData, closeDrawer]
   );
 
   // Status Filter Options
@@ -245,11 +197,9 @@ export default function ExamSchedulesView({
     showToast(`Exam status updated to ${newStatus.replace(/_/g, ' ')}.`, 'success');
   };
 
-  const handleOpenSubjectDrawer = (examId, subject = null) => {
-    if (subject) {
-      openDrawer('exam_subject', { mode: 'edit', examId, id: subject.id });
-    } else {
-      openDrawer('exam_subject', { mode: 'add', examId });
+  const handleNavigateToMatrix = (examId) => {
+    if (onNavigateToMatrix) {
+      onNavigateToMatrix(examId);
     }
   };
 
@@ -453,14 +403,9 @@ export default function ExamSchedulesView({
                             onClick: () => handleEditExam(exam),
                           },
                           {
-                            label: 'Subject Routine Matrix (Table)',
+                            label: 'Subject Routine Matrix',
                             icon: BookOpenIcon,
-                            onClick: () => onNavigateToMatrix ? onNavigateToMatrix(exam.id) : handleOpenSubjectDrawer(exam.id),
-                          },
-                          {
-                            label: 'Schedule Subject (Drawer)',
-                            icon: PlusIcon,
-                            onClick: () => handleOpenSubjectDrawer(exam.id),
+                            onClick: () => handleNavigateToMatrix(exam.id),
                           },
                           ...(onNavigateToMarkEntry
                             ? [
@@ -630,9 +575,9 @@ export default function ExamSchedulesView({
                             variant="sub"
                             size="xs"
                             icon={PlusIcon}
-                            onClick={() => handleOpenSubjectDrawer(exam.id)}
+                            onClick={() => handleNavigateToMatrix(exam.id)}
                           >
-                            Schedule First Subject
+                            Open Routine Matrix
                           </CustomButton>
                         </div>
                       ) : (
@@ -652,9 +597,9 @@ export default function ExamSchedulesView({
                                       buttonClassName="p-1 rounded-lg border-0 shadow-none hover:theme-bg-sub"
                                       actions={[
                                         {
-                                          label: 'Edit Subject Routine',
+                                          label: 'Manage in Routine Matrix',
                                           icon: EditIcon,
-                                          onClick: () => handleOpenSubjectDrawer(exam.id, sub),
+                                          onClick: () => handleNavigateToMatrix(exam.id),
                                         },
                                         {
                                           label: 'Remove Subject Routine',

@@ -576,7 +576,7 @@ export default function AppLayout() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden theme-bg-app theme-text-primary">
       {/* Global Top Navigation Bar */}
-      <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 select-none">
+      <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0">
         <div className="flex items-center gap-3">
           <button 
             type="button"
@@ -599,7 +599,7 @@ export default function AppLayout() {
 
         {/* Selected Active Institution, Branch & Academic Year in Header Middle */}
         {currentInstitution?.name && (
-          <div className="flex-1 flex justify-center items-center px-2 sm:px-4 min-w-0 pointer-events-none select-none text-center">
+          <div className="flex-1 flex justify-center items-center px-2 sm:px-4 min-w-0 pointer-events-none text-center">
             <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
               <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
                 {currentInstitution.name}
@@ -727,7 +727,7 @@ export default function AppLayout() {
           <div 
             className={
               isRightDock
-                ? "h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex select-none max-w-full theme-bg-app min-w-0"
+                ? "h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex max-w-full theme-bg-app min-w-0"
                 : "flex-1 h-full overflow-hidden relative min-w-0"
             }
             style={
@@ -813,7 +813,7 @@ export default function AppLayout() {
           ) : (
             /* Desktop Docked Sidebar (>= 768px) */
             <div 
-              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex select-none theme-bg-app animate-fade-in min-w-0"
+              className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex theme-bg-app animate-fade-in min-w-0"
               style={{
                 width: `${drawerWidth || 580}px`,
                 maxWidth: 'min(980px, 85vw)',
@@ -868,7 +868,7 @@ export default function AppLayout() {
 
 function DashboardComingSoon() {
   return (
-    <div className="flex flex-col items-center justify-center text-center font-sans space-y-5 select-none p-6 py-12 theme-bg-surface border theme-border rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in">
+    <div className="flex flex-col items-center justify-center text-center font-sans space-y-5 p-6 py-12 theme-bg-surface border theme-border rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in">
       <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-md">
         <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

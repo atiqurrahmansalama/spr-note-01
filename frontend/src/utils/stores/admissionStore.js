@@ -365,7 +365,7 @@ export const admissionSettingsStore = {
     return candidateDepts;
   },
 
-  getAllowedAdmissionClasses: (tenantId, branchId = null, allClasses = [], allDepartments = []) => {
+  getAllowedAdmissionClasses: (tenantId, branchId = null, allClasses = [], _allDepartments = []) => {
     const settings = admissionSettingsStore.getSettings(tenantId);
 
     let filteredClasses = [...allClasses];

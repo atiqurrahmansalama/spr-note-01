@@ -1067,7 +1067,7 @@ export const weeklyHolidaysStore = {
     const working = weeklyHolidaysStore.getWorkingDays(tenantId);
     return working.map((w) => (useShort ? w.short.toUpperCase() : w.code));
   },
-  getOrderedWeekdays: (tenantId) => {
+  getOrderedWeekdays: (_tenantId) => {
     const firstDayStr = (calendarSettings.getFirstDay() || "Saturday").toUpperCase().trim();
     const startIndex = WEEKDAY_OPTIONS.findIndex(
       (w) =>

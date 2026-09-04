@@ -112,12 +112,12 @@ export default function RightSidebarPanel({
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`w-full h-full flex flex-col theme-bg-app text-left select-none overflow-hidden relative @container ${className}`}
+      className={`w-full h-full flex flex-col theme-bg-app text-left overflow-hidden relative @container ${className}`}
       role="region"
       aria-label={typeof title === "string" ? title : "Right Sidebar Panel"}
     >
       {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
-      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md select-none gap-2 h-[48px] @sm:h-[52px]">
+      <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
         
         {/* Left: Clean Icon Back Button + Icon + Title + Breadcrumbs */}
         <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">

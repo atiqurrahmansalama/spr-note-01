@@ -24,7 +24,7 @@ export default function PageHeader({
 
   return (
     <div
-      className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-3 @md:pb-4 border-b theme-border select-none w-full min-w-0 ${className}`}
+      className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-3 @md:pb-4 border-b theme-border w-full min-w-0 ${className}`}
     >
       {/* Left: Icon & Title Metadata */}
       <div className="flex items-center gap-3 @sm:gap-3.5 min-w-0 flex-1">

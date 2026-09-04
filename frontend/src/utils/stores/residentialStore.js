@@ -284,12 +284,10 @@ export const residentialStore = {
     const key = `spr_dormitory_rooms_${tenantId || "default"}`;
     const list = residentialStore.getRooms(tenantId);
     let updated;
-    let targetRoomId = roomData.id;
-
     if (roomData.id) {
       updated = list.map((r) => (r.id === roomData.id ? { ...r, ...roomData, updated_at: new Date().toISOString() } : r));
     } else {
-      targetRoomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const targetRoomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
       const newRoom = {
         id: targetRoomId,
         created_at: new Date().toISOString(),

@@ -489,7 +489,7 @@ const CustomInput = forwardRef(function CustomInput(
   } else if (disabled) {
     stateClasses = "opacity-50 cursor-not-allowed theme-bg-sub theme-border";
   } else if (readOnly) {
-    stateClasses = "cursor-default select-none theme-bg-sub/70 theme-border";
+    stateClasses = "cursor-default theme-bg-sub/70 theme-border";
   } else if (isInvalid) {
     stateClasses =
       "border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 shadow-xs";
@@ -606,7 +606,7 @@ const CustomInput = forwardRef(function CustomInput(
             {label && (
               <label
                 htmlFor={inputId}
-                className={`block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none ${
+                className={`block text-xs font-bold theme-text-secondary uppercase tracking-wider ${
                   disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
                 } ${labelClassName}`}
               >
@@ -645,11 +645,11 @@ const CustomInput = forwardRef(function CustomInput(
         {startAdornment ? (
           <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
         ) : prefix ? (
-          <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary select-none font-mono">
+          <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
             {prefix}
           </div>
         ) : normalizedType === "currency" ? (
-          <div className="mr-2 shrink-0 text-sm font-bold theme-accent select-none font-mono">
+          <div className="mr-2 shrink-0 text-sm font-bold theme-accent font-mono">
             {currencySymbol}
           </div>
         ) : (

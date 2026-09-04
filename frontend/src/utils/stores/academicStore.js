@@ -1593,7 +1593,7 @@ export const curriculumStore = {
     const updated = list.map((item) => {
       if (item.id === id) {
         const cur = Number(newPage);
-        let status = item.status;
+        let status;
         if (cur >= item.endPage && item.endPage > 0) status = "COMPLETED";
         else if (cur >= item.startPage || cur > 0) status = "IN_PROGRESS";
         else status = "NOT_STARTED";

@@ -30,8 +30,6 @@ function setStorageData(key, val) {
 
 // Default Seed Data Generator
 function generateDefaultData(tenantId = 'default') {
-  const today = new Date().toISOString().split('T')[0];
-
   const goals = [
     {
       id: `goal_1_${tenantId}`,
@@ -737,11 +735,9 @@ export const learningStore = {
 
   deleteDailyLesson(tenantId = 'default', lessonId) {
     const all = getStorageData(STORAGE_KEYS.LESSONS);
-    Object.keys(all).forEach((tKey) => {
-      if (Array.isArray(all[tKey])) {
-        all[tKey] = all[tKey].filter((l) => String(l.id) !== String(lessonId));
-      }
-    });
+    if (Array.isArray(all[tenantId])) {
+      all[tenantId] = all[tenantId].filter((l) => String(l.id) !== String(lessonId));
+    }
     setStorageData(STORAGE_KEYS.LESSONS, all);
   },
 
@@ -900,11 +896,9 @@ export const learningStore = {
 
   deleteEvaluation(tenantId = 'default', evalId) {
     const all = getStorageData(STORAGE_KEYS.EVALUATIONS);
-    Object.keys(all).forEach((tKey) => {
-      if (Array.isArray(all[tKey])) {
-        all[tKey] = all[tKey].filter((e) => String(e.id) !== String(evalId));
-      }
-    });
+    if (Array.isArray(all[tenantId])) {
+      all[tenantId] = all[tenantId].filter((e) => String(e.id) !== String(evalId));
+    }
     setStorageData(STORAGE_KEYS.EVALUATIONS, all);
   },
 

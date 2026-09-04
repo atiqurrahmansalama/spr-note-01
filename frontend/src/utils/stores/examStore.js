@@ -1,6 +1,12 @@
 import { readJSON, writeJSON } from './coreStore';
-import { learningStore } from './learningStore';
-import { academicYearsStore } from './academicStore';
+
+/**
+ * Universal Tenant ID Sanitizer
+ */
+export const getSafeTenantId = (t) => {
+  if (!t || t === 'default' || t === 'ALL' || t === 'null' || t === 'undefined') return 'default';
+  return String(t);
+};
 
 /**
  * Universal Default Grading Presets (100% English taxonomy)
@@ -53,13 +59,244 @@ export const DEFAULT_GRADING_SYSTEMS = [
 ];
 
 /**
+ * Universal Default Examination Sessions
+ */
+export const DEFAULT_EXAM_SESSIONS = [
+  {
+    id: 'exam_term_1_2026',
+    name: 'First Term Examination 2026',
+    code: 'EXAM_TERM_1_2026',
+    description: 'First comprehensive term assessment across all academic departments.',
+    academicYearId: 'academic_year_2026',
+    academicYearName: 'Academic Year 2026',
+    semesterId: '1st_term',
+    semesterName: 'First Term',
+    departmentId: 'ALL',
+    departmentName: 'All Departments',
+    startDate: '2026-10-10',
+    endDate: '2026-10-20',
+    publishDate: '2026-10-25',
+    gradingSystemId: 'dars_e_nizami_standard',
+    status: 'DRAFT',
+    isLocked: false,
+    defaultStartTime: '09:00 AM',
+    defaultEndTime: '11:00 AM',
+    hasSecondShift: true,
+    secondStartTime: '02:00 PM',
+    secondEndTime: '04:00 PM',
+    defaultFullMarks: 100,
+    targetClassIds: ['cls_1', 'cls_2', 'cls_3', 'cls_4'],
+    shifts: [
+      { id: 'shift_1', name: 'Shift 1 (Morning)', startTime: '09:00 AM', endTime: '11:00 AM' },
+      { id: 'shift_2', name: 'Shift 2 (Afternoon)', startTime: '02:00 PM', endTime: '04:00 PM' },
+    ],
+    scheduleDays: [
+      { date: '2026-10-10', dayNumber: 1, type: 'DUAL_EXAM', shiftCount: 2, label: 'Exam Day 1' },
+      { date: '2026-10-11', dayNumber: 2, type: 'DUAL_EXAM', shiftCount: 2, label: 'Exam Day 2' },
+      { date: '2026-10-12', dayNumber: 3, type: 'SINGLE_EXAM', shiftCount: 1, label: 'Exam Day 3' },
+      { date: '2026-10-13', dayNumber: 4, type: 'PREPARATION_GAP', shiftCount: 0, label: 'Study Gap' },
+      { date: '2026-10-14', dayNumber: 5, type: 'DUAL_EXAM', shiftCount: 2, label: 'Exam Day 4' },
+      { date: '2026-10-15', dayNumber: 6, type: 'DUAL_EXAM', shiftCount: 2, label: 'Exam Day 5' },
+    ],
+    defaultComponents: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+      { id: 'comp_2', name: 'Oral / Nazera', maxMarks: 30 },
+    ],
+    caWeightage: {
+      enabled: false,
+      dailyClassroomPct: 10,
+      attendancePct: 10,
+      examPct: 80,
+    },
+    rankingConfig: {
+      scope: 'CLASS_AND_SECTION',
+      failSubjectRule: 'EXCLUDE_FROM_MERIT',
+    },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'exam_annual_2026',
+    name: 'Annual Final Examination 2026',
+    code: 'EXAM_ANNUAL_2026',
+    description: 'Final academic year cumulative assessment and promotion evaluations.',
+    academicYearId: 'academic_year_2026',
+    academicYearName: 'Academic Year 2026',
+    semesterId: 'annual_term',
+    semesterName: 'Annual Term',
+    departmentId: 'ALL',
+    departmentName: 'All Departments',
+    startDate: '2026-11-15',
+    endDate: '2026-11-28',
+    publishDate: '2026-12-05',
+    gradingSystemId: 'dars_e_nizami_standard',
+    status: 'DRAFT',
+    isLocked: false,
+    defaultStartTime: '09:00 AM',
+    defaultEndTime: '11:00 AM',
+    hasSecondShift: false,
+    defaultFullMarks: 100,
+    targetClassIds: ['cls_1', 'cls_2', 'cls_3', 'cls_4'],
+    shifts: [
+      { id: 'shift_1', name: 'Shift 1 (Morning)', startTime: '09:00 AM', endTime: '11:00 AM' },
+    ],
+    scheduleDays: [
+      { date: '2026-11-15', dayNumber: 1, type: 'SINGLE_EXAM', shiftCount: 1, label: 'Exam Day 1' },
+      { date: '2026-11-16', dayNumber: 2, type: 'SINGLE_EXAM', shiftCount: 1, label: 'Exam Day 2' },
+      { date: '2026-11-17', dayNumber: 3, type: 'SINGLE_EXAM', shiftCount: 1, label: 'Exam Day 3' },
+      { date: '2026-11-18', dayNumber: 4, type: 'PREPARATION_GAP', shiftCount: 0, label: 'Study Gap' },
+      { date: '2026-11-19', dayNumber: 5, type: 'SINGLE_EXAM', shiftCount: 1, label: 'Exam Day 4' },
+    ],
+    defaultComponents: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 80 },
+      { id: 'comp_2', name: 'Oral / Viva', maxMarks: 20 },
+    ],
+    caWeightage: {
+      enabled: true,
+      dailyClassroomPct: 10,
+      attendancePct: 10,
+      examPct: 80,
+    },
+    rankingConfig: {
+      scope: 'CLASS_AND_SECTION',
+      failSubjectRule: 'EXCLUDE_FROM_MERIT',
+    },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+];
+
+/**
+ * Universal Default Examination Subjects (Matching Default Sessions)
+ */
+export const DEFAULT_EXAM_SUBJECTS = [
+  {
+    id: 'exam_sub_1',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_hifz',
+    departmentName: 'Hifz Department',
+    classId: 'cls_1',
+    className: 'Standard Hifz Division',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Quran Hifz Recitation & Daur',
+    curriculumBookId: 'syllabus_hifz_1',
+    curriculumBookName: 'Para 1-5 Memorization & Revision',
+    teacherId: 'teacher_1',
+    teacherName: 'Hafiz Qari Zubair',
+    examDate: '2026-10-10',
+    shiftId: 'shift_1',
+    shiftName: 'Shift 1 (Morning)',
+    startTime: '09:00 AM',
+    endTime: '11:00 AM',
+    fullMarks: 100,
+    passMarks: 33,
+    components: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+      { id: 'comp_2', name: 'Oral / Nazera', maxMarks: 30 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'exam_sub_2',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_hifz',
+    departmentName: 'Hifz Department',
+    classId: 'cls_1',
+    className: 'Standard Hifz Division',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Tajweed Rules & Pronunciation',
+    curriculumBookId: 'syllabus_hifz_2',
+    curriculumBookName: 'Ahkamut Tajweed Foundation',
+    teacherId: 'teacher_2',
+    teacherName: 'Qari Abdullah',
+    examDate: '2026-10-10',
+    shiftId: 'shift_2',
+    shiftName: 'Shift 2 (Afternoon)',
+    startTime: '02:00 PM',
+    endTime: '04:00 PM',
+    fullMarks: 100,
+    passMarks: 33,
+    components: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+      { id: 'comp_2', name: 'Oral / Nazera', maxMarks: 30 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'exam_sub_3',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_kitab',
+    departmentName: 'Kitab Department',
+    classId: 'cls_2',
+    className: 'Mizan Class (Level 1)',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Mizan wa Munshaib (Arabic Grammar)',
+    curriculumBookId: 'syllabus_kitab_1',
+    curriculumBookName: 'Mizan wa Munshaib',
+    teacherId: 'teacher_3',
+    teacherName: 'Maulana Mahmudul Hasan',
+    examDate: '2026-10-11',
+    shiftId: 'shift_1',
+    shiftName: 'Shift 1 (Morning)',
+    startTime: '09:00 AM',
+    endTime: '11:00 AM',
+    fullMarks: 100,
+    passMarks: 33,
+    components: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+      { id: 'comp_2', name: 'Oral / Nazera', maxMarks: 30 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'exam_sub_4',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_kitab',
+    departmentName: 'Kitab Department',
+    classId: 'cls_2',
+    className: 'Mizan Class (Level 1)',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Nahw-e-Mir (Arabic Syntax)',
+    curriculumBookId: 'syllabus_kitab_2',
+    curriculumBookName: 'Nahw-e-Mir',
+    teacherId: 'teacher_3',
+    teacherName: 'Maulana Mahmudul Hasan',
+    examDate: '2026-10-11',
+    shiftId: 'shift_2',
+    shiftName: 'Shift 2 (Afternoon)',
+    startTime: '02:00 PM',
+    endTime: '04:00 PM',
+    fullMarks: 100,
+    passMarks: 33,
+    components: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+      { id: 'comp_2', name: 'Oral / Nazera', maxMarks: 30 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+];
+
+/**
  * Enterprise Examination Store
  */
 export const examStore = {
   // ── 1. GRADING SYSTEMS ───────────────────────────────────────────────────────
   getGradingSystems: (tenantId = 'default') => {
-    const key = `spr_grading_systems_${tenantId}`;
-    const stored = readJSON(key, null);
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_systems_${safeTenant}`;
+    const legacyKey = 'spr_grading_systems_default';
+    let stored = readJSON(key, null);
+    if (!stored && safeTenant !== 'default') {
+      stored = readJSON(legacyKey, null);
+    }
     if (!stored || !Array.isArray(stored) || stored.length === 0) {
       writeJSON(key, DEFAULT_GRADING_SYSTEMS);
       return DEFAULT_GRADING_SYSTEMS;
@@ -68,9 +305,14 @@ export const examStore = {
   },
 
   saveGradingSystems: (tenantId = 'default', systems = []) => {
-    const key = `spr_grading_systems_${tenantId}`;
-    writeJSON(key, systems);
-    return systems;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_systems_${safeTenant}`;
+    const safe = Array.isArray(systems) ? systems : [];
+    writeJSON(key, safe);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('spr_grading_systems_updated', { detail: safe }));
+    }
+    return safe;
   },
 
   addGradingSystem: (tenantId = 'default', systemData) => {
@@ -113,18 +355,29 @@ export const examStore = {
 
   // ── 2. EXAMINATIONS & TERMS ─────────────────────────────────────────────────
   getExams: (tenantId = 'default') => {
-    const key = `spr_exams_${tenantId}`;
-    const stored = readJSON(key, []);
-    if (!stored || !Array.isArray(stored)) {
-      return [];
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exams_${safeTenant}`;
+    const legacyKey = 'spr_exams_default';
+    let stored = readJSON(key, null);
+    if (!stored && safeTenant !== 'default') {
+      stored = readJSON(legacyKey, null);
+    }
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      writeJSON(key, DEFAULT_EXAM_SESSIONS);
+      return DEFAULT_EXAM_SESSIONS;
     }
     return stored;
   },
 
   saveExams: (tenantId = 'default', exams = []) => {
-    const key = `spr_exams_${tenantId}`;
-    writeJSON(key, exams);
-    return exams;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exams_${safeTenant}`;
+    const safe = Array.isArray(exams) ? exams : [];
+    writeJSON(key, safe);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('spr_exams_updated', { detail: safe }));
+    }
+    return safe;
   },
 
   getExamById: (tenantId = 'default', examId) => {
@@ -133,16 +386,19 @@ export const examStore = {
   },
 
   addExam: (tenantId = 'default', examData) => {
-    const list = examStore.getExams(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExams(safeTenant);
     const newExam = {
       id: examData.id || `exam_${Date.now()}`,
-      tenantId,
+      tenantId: safeTenant,
       branchId: examData.branchId || null,
       branchName: examData.branchName || '',
       academicYearId: examData.academicYearId || '',
       academicYearName: examData.academicYearName || '',
       semesterId: examData.semesterId || '1st_term',
       semesterName: examData.semesterName || 'First Term',
+      departmentId: examData.departmentId || 'ALL',
+      departmentName: examData.departmentName || 'All Departments',
       name: examData.name || 'Term Examination',
       code: examData.code || `EXAM_${Date.now().toString(36).toUpperCase()}`,
       description: examData.description || '',
@@ -150,7 +406,7 @@ export const examStore = {
       endDate: examData.endDate || new Date().toISOString().split('T')[0],
       publishDate: examData.publishDate || '',
       gradingSystemId: examData.gradingSystemId || 'dars_e_nizami_standard',
-      targetClassIds: examData.targetClassIds || [],
+      targetClassIds: Array.isArray(examData.targetClassIds) ? examData.targetClassIds.map(String) : [],
       
       // Continuous Assessment & Mark Weightage Configuration
       caWeightage: {
@@ -162,41 +418,54 @@ export const examStore = {
 
       // Multi-Level Ranking Configuration
       rankingConfig: {
-        scope: examData.rankingConfig?.scope || 'CLASS_AND_SECTION', // 'CLASS_AND_SECTION' | 'CLASS_ONLY'
-        failSubjectRule: examData.rankingConfig?.failSubjectRule || 'EXCLUDE_FROM_MERIT', // 'EXCLUDE_FROM_MERIT' | 'NORMAL'
+        scope: examData.rankingConfig?.scope || 'CLASS_AND_SECTION',
+        failSubjectRule: examData.rankingConfig?.failSubjectRule || 'EXCLUDE_FROM_MERIT',
       },
 
-      // Multi-stage Lifecycle: DRAFT -> MARK_ENTRY -> FIRST_PUBLISHED -> UNDER_REVIEW -> FINAL_PUBLISHED -> LOCKED
+      // Multi-stage Lifecycle
       status: examData.status || 'DRAFT',
       isLocked: examData.status === 'LOCKED',
       reviewWindowClosesAt: examData.reviewWindowClosesAt || '',
+
+      // Spread all extra properties (shifts, scheduleDays, timings, breakdown, etc.)
+      ...examData,
 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const updated = [newExam, ...list];
-    examStore.saveExams(tenantId, updated);
+    examStore.saveExams(safeTenant, updated);
     return newExam;
   },
 
   updateExam: (tenantId = 'default', examId, examData) => {
-    const list = examStore.getExams(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExams(safeTenant);
+    let updatedRecord = null;
     const updated = list.map((e) => {
       if (String(e.id) === String(examId)) {
-        return {
+        updatedRecord = {
           ...e,
           ...examData,
+          departmentId: examData.departmentId !== undefined ? examData.departmentId : (e.departmentId || 'ALL'),
+          departmentName: examData.departmentName !== undefined ? examData.departmentName : (e.departmentName || 'All Departments'),
+          targetClassIds: Array.isArray(examData.targetClassIds)
+            ? examData.targetClassIds.map(String)
+            : (e.targetClassIds ? e.targetClassIds.map(String) : []),
           updatedAt: new Date().toISOString(),
         };
+        return updatedRecord;
       }
       return e;
     });
-    examStore.saveExams(tenantId, updated);
+    examStore.saveExams(safeTenant, updated);
+    return updatedRecord;
   },
 
   updateExamStatus: (tenantId = 'default', examId, newStatus) => {
-    const list = examStore.getExams(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExams(safeTenant);
     const updated = list.map((e) => {
       if (String(e.id) === String(examId)) {
         const isLocked = newStatus === 'LOCKED' || newStatus === 'FINAL_PUBLISHED';
@@ -210,23 +479,33 @@ export const examStore = {
       }
       return e;
     });
-    examStore.saveExams(tenantId, updated);
+    examStore.saveExams(safeTenant, updated);
   },
 
   deleteExam: (tenantId = 'default', examId) => {
-    const list = examStore.getExams(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExams(safeTenant);
     const updated = list.filter((e) => String(e.id) !== String(examId));
-    examStore.saveExams(tenantId, updated);
+    examStore.saveExams(safeTenant, updated);
 
     // Also remove associated exam subjects and marks
-    examStore.deleteExamSubjectsByExamId(tenantId, examId);
-    examStore.deleteExamMarksByExamId(tenantId, examId);
+    examStore.deleteExamSubjectsByExamId(safeTenant, examId);
+    examStore.deleteExamMarksByExamId(safeTenant, examId);
   },
 
   // ── 3. EXAM SUBJECTS & SCHEDULES ────────────────────────────────────────────
   getExamSubjects: (tenantId = 'default', examId = null) => {
-    const key = `spr_exam_subjects_${tenantId}`;
-    const stored = readJSON(key, []);
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_subjects_${safeTenant}`;
+    const legacyKey = 'spr_exam_subjects_default';
+    let stored = readJSON(key, null);
+    if (stored === null && safeTenant !== 'default') {
+      stored = readJSON(legacyKey, null);
+    }
+    if (stored === null || stored === undefined) {
+      writeJSON(key, DEFAULT_EXAM_SUBJECTS);
+      stored = DEFAULT_EXAM_SUBJECTS;
+    }
     if (examId) {
       return stored.filter((s) => String(s.examId) === String(examId));
     }
@@ -234,83 +513,96 @@ export const examStore = {
   },
 
   saveExamSubjects: (tenantId = 'default', subjects = []) => {
-    const key = `spr_exam_subjects_${tenantId}`;
-    writeJSON(key, subjects);
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_subjects_${safeTenant}`;
+    const safe = Array.isArray(subjects) ? subjects : [];
+    writeJSON(key, safe);
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('spr_exam_subjects_updated', { detail: subjects }));
+      window.dispatchEvent(new CustomEvent('spr_exam_subjects_updated', { detail: safe }));
     }
-    return subjects;
+    return safe;
   },
 
   bulkUpsertExamSubjects: (tenantId = 'default', examId, examSubjectsList = []) => {
-    const list = examStore.getExamSubjects(tenantId);
-    // Remove old records for this exam and replace with updated list
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamSubjects(safeTenant);
     const otherExamSubjects = list.filter((s) => String(s.examId) !== String(examId));
-    const normalized = examSubjectsList.map((s, idx) => ({
-      id: s.id || `exam_sub_${Date.now()}_${idx}`,
+    const normalized = (Array.isArray(examSubjectsList) ? examSubjectsList : []).map((s, idx) => ({
+      id: String(s.id || `exam_sub_${Date.now()}_${idx}`),
       examId: String(examId),
-      departmentId: s.departmentId || 'ALL',
+      departmentId: String(s.departmentId || 'ALL'),
       departmentName: s.departmentName || '',
       classId: String(s.classId || ''),
       className: s.className || '',
-      sectionId: s.sectionId || 'ALL',
+      sectionId: String(s.sectionId || 'ALL'),
       sectionName: s.sectionName || 'All Sections',
-      subjectName: (s.subjectName || '').trim(),
-      curriculumBookId: s.curriculumBookId || null,
+      subjectName: (s.subjectName || '').trim() || (s.className ? `${s.className} Subject` : 'Exam Subject'),
+      subjectCode: s.subjectCode || '',
+      evaluationType: s.evaluationType || 'COMPOSITE',
+      roomNo: s.roomNo || '',
+      curriculumBookId: s.curriculumBookId ? String(s.curriculumBookId) : null,
       curriculumBookName: s.curriculumBookName || '',
+      teacherId: s.teacherId ? String(s.teacherId) : '',
       teacherName: (s.teacherName || '').trim(),
+      notes: s.notes || '',
       examDate: s.examDate || '',
+      shiftId: s.shiftId || 'shift_1',
+      shiftName: s.shiftName || 'Shift 1 (Morning)',
       startTime: s.startTime || '09:00 AM',
       endTime: s.endTime || '11:00 AM',
       fullMarks: Number(s.fullMarks) || 100,
       passMarks: Number(s.passMarks) || 33,
       components: Array.isArray(s.components) && s.components.length > 0
         ? s.components
-        : [{ name: 'Written', maxMarks: Number(s.fullMarks) || 100 }],
+        : [{ id: 'comp_1', name: 'Written Exam', maxMarks: Number(s.fullMarks) || 100 }],
       createdAt: s.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
 
     const combined = [...otherExamSubjects, ...normalized];
-    examStore.saveExamSubjects(tenantId, combined);
+    examStore.saveExamSubjects(safeTenant, combined);
     return normalized;
   },
 
   addExamSubject: (tenantId = 'default', subjectData) => {
-    const list = examStore.getExamSubjects(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamSubjects(safeTenant);
     const newSubject = {
       id: subjectData.id || `exam_sub_${Date.now()}`,
-      examId: subjectData.examId,
-      classId: subjectData.classId,
+      examId: String(subjectData.examId),
+      departmentId: subjectData.departmentId || 'ALL',
+      departmentName: subjectData.departmentName || '',
+      classId: String(subjectData.classId || ''),
       className: subjectData.className || '',
       sectionId: subjectData.sectionId || 'ALL',
       sectionName: subjectData.sectionName || 'All Sections',
-      subjectName: subjectData.subjectName || 'Subject',
+      subjectName: (subjectData.subjectName || '').trim() || 'Exam Subject',
       curriculumBookId: subjectData.curriculumBookId || null,
       curriculumBookName: subjectData.curriculumBookName || '',
-      teacherName: subjectData.teacherName || '',
+      teacherId: subjectData.teacherId || '',
+      teacherName: (subjectData.teacherName || '').trim(),
       examDate: subjectData.examDate || '',
-      startTime: subjectData.startTime || '',
-      endTime: subjectData.endTime || '',
+      shiftId: subjectData.shiftId || 'shift_1',
+      shiftName: subjectData.shiftName || 'Shift 1',
+      startTime: subjectData.startTime || '09:00 AM',
+      endTime: subjectData.endTime || '11:00 AM',
       fullMarks: Number(subjectData.fullMarks) || 100,
       passMarks: Number(subjectData.passMarks) || 33,
-      
-      // Sub-component mark breakdowns (e.g. Written: 70, Oral/Nazera: 20, Attendance: 10)
       components: Array.isArray(subjectData.components) && subjectData.components.length > 0
         ? subjectData.components
-        : [{ name: 'Written', maxMarks: Number(subjectData.fullMarks) || 100 }],
-
+        : [{ id: 'comp_1', name: 'Written Exam', maxMarks: Number(subjectData.fullMarks) || 100 }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const updated = [newSubject, ...list];
-    examStore.saveExamSubjects(tenantId, updated);
+    examStore.saveExamSubjects(safeTenant, updated);
     return newSubject;
   },
 
   updateExamSubject: (tenantId = 'default', subjectId, subjectData) => {
-    const list = examStore.getExamSubjects(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamSubjects(safeTenant);
     const updated = list.map((s) => {
       if (String(s.id) === String(subjectId)) {
         return {
@@ -321,24 +613,27 @@ export const examStore = {
       }
       return s;
     });
-    examStore.saveExamSubjects(tenantId, updated);
+    examStore.saveExamSubjects(safeTenant, updated);
   },
 
   deleteExamSubject: (tenantId = 'default', subjectId) => {
-    const list = examStore.getExamSubjects(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamSubjects(safeTenant);
     const updated = list.filter((s) => String(s.id) !== String(subjectId));
-    examStore.saveExamSubjects(tenantId, updated);
+    examStore.saveExamSubjects(safeTenant, updated);
   },
 
   deleteExamSubjectsByExamId: (tenantId = 'default', examId) => {
-    const list = examStore.getExamSubjects(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamSubjects(safeTenant);
     const updated = list.filter((s) => String(s.examId) !== String(examId));
-    examStore.saveExamSubjects(tenantId, updated);
+    examStore.saveExamSubjects(safeTenant, updated);
   },
 
   // ── 4. EXAM MARKS ENTRY & SUBMISSION LIFECYCLE ──────────────────────────────
   getExamMarks: (tenantId = 'default', examId = null, examSubjectId = null) => {
-    const key = `spr_exam_marks_${tenantId}`;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_marks_${safeTenant}`;
     const stored = readJSON(key, []);
     let filtered = stored;
     if (examId) {
@@ -351,13 +646,16 @@ export const examStore = {
   },
 
   saveExamMarks: (tenantId = 'default', marksList = []) => {
-    const key = `spr_exam_marks_${tenantId}`;
-    writeJSON(key, marksList);
-    return marksList;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_marks_${safeTenant}`;
+    const safe = Array.isArray(marksList) ? marksList : [];
+    writeJSON(key, safe);
+    return safe;
   },
 
   saveBatchMarks: (tenantId = 'default', { examId, examSubjectId, marksEntries, status = 'DRAFT' }) => {
-    const allMarks = examStore.getExamMarks(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const allMarks = examStore.getExamMarks(safeTenant);
     const otherMarks = allMarks.filter(
       (m) => !(String(m.examId) === String(examId) && String(m.examSubjectId) === String(examSubjectId))
     );
@@ -365,8 +663,8 @@ export const examStore = {
     const now = new Date().toISOString();
     const formattedEntries = marksEntries.map((entry) => ({
       id: entry.id || `mark_${examId}_${examSubjectId}_${entry.studentId}`,
-      examId,
-      examSubjectId,
+      examId: String(examId),
+      examSubjectId: String(examSubjectId),
       studentId: String(entry.studentId),
       studentName: entry.studentName || '',
       studentRoll: entry.studentRoll || '',
@@ -378,24 +676,26 @@ export const examStore = {
       passMarks: Number(entry.passMarks) || 33,
       isAbsent: Boolean(entry.isAbsent),
       teacherRemarks: entry.teacherRemarks || '',
-      status, // 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'LOCKED'
+      status,
       updatedAt: now,
     }));
 
     const updated = [...otherMarks, ...formattedEntries];
-    examStore.saveExamMarks(tenantId, updated);
+    examStore.saveExamMarks(safeTenant, updated);
     return formattedEntries;
   },
 
   deleteExamMarksByExamId: (tenantId = 'default', examId) => {
-    const list = examStore.getExamMarks(tenantId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const list = examStore.getExamMarks(safeTenant);
     const updated = list.filter((m) => String(m.examId) !== String(examId));
-    examStore.saveExamMarks(tenantId, updated);
+    examStore.saveExamMarks(safeTenant, updated);
   },
 
   // ── 5. STUDENT MARK REVIEW / RECHECK REQUESTS ───────────────────────────────
   getExamReviews: (tenantId = 'default', examId = null) => {
-    const key = `spr_exam_reviews_${tenantId}`;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_reviews_${safeTenant}`;
     const stored = readJSON(key, []);
     if (examId) {
       return stored.filter((r) => String(r.examId) === String(examId));
@@ -404,19 +704,20 @@ export const examStore = {
   },
 
   submitReviewRequest: (tenantId = 'default', reviewData) => {
-    const key = `spr_exam_reviews_${tenantId}`;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_reviews_${safeTenant}`;
     const list = readJSON(key, []);
     const newReview = {
       id: reviewData.id || `rev_${Date.now()}`,
-      examId: reviewData.examId,
-      examSubjectId: reviewData.examSubjectId,
+      examId: String(reviewData.examId),
+      examSubjectId: String(reviewData.examSubjectId),
       studentId: String(reviewData.studentId),
       studentName: reviewData.studentName || '',
       subjectName: reviewData.subjectName || '',
       currentMarks: Number(reviewData.currentMarks) || 0,
       requestedMarks: reviewData.requestedMarks !== undefined ? Number(reviewData.requestedMarks) : null,
       studentReason: reviewData.studentReason || '',
-      status: 'PENDING', // 'PENDING' | 'APPROVED' | 'REJECTED'
+      status: 'PENDING',
       reviewerRemarks: '',
       resolvedAt: null,
       createdAt: new Date().toISOString(),
@@ -427,7 +728,8 @@ export const examStore = {
   },
 
   resolveReviewRequest: (tenantId = 'default', reviewId, { status, updatedMarks, reviewerRemarks }) => {
-    const key = `spr_exam_reviews_${tenantId}`;
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_exam_reviews_${safeTenant}`;
     const list = readJSON(key, []);
     const target = list.find((r) => String(r.id) === String(reviewId));
     if (!target) return null;
@@ -448,7 +750,7 @@ export const examStore = {
 
     // If approved, update the actual mark entry
     if (status === 'APPROVED' && updatedMarks !== undefined) {
-      const allMarks = examStore.getExamMarks(tenantId);
+      const allMarks = examStore.getExamMarks(safeTenant);
       const updatedMarksList = allMarks.map((m) => {
         if (String(m.examId) === String(target.examId) &&
             String(m.examSubjectId) === String(target.examSubjectId) &&
@@ -461,7 +763,7 @@ export const examStore = {
         }
         return m;
       });
-      examStore.saveExamMarks(tenantId, updatedMarksList);
+      examStore.saveExamMarks(safeTenant, updatedMarksList);
     }
   },
 
@@ -481,15 +783,16 @@ export const examStore = {
   },
 
   calculateTabulationMatrix: (tenantId = 'default', { examId, classId, sectionId = 'ALL', students = [] }) => {
-    const exam = examStore.getExamById(tenantId, examId);
+    const safeTenant = getSafeTenantId(tenantId);
+    const exam = examStore.getExamById(safeTenant, examId);
     if (!exam) return { studentsData: [], subjects: [], gradingSystem: null };
 
-    const gradingSystems = examStore.getGradingSystems(tenantId);
+    const gradingSystems = examStore.getGradingSystems(safeTenant);
     const gradingSystem = gradingSystems.find((g) => g.id === exam.gradingSystemId) || gradingSystems[0] || DEFAULT_GRADING_SYSTEMS[0];
     const rules = gradingSystem.rules || [];
 
     // Filter subjects for class & section
-    let subjects = examStore.getExamSubjects(tenantId, examId).filter(
+    let subjects = examStore.getExamSubjects(safeTenant, examId).filter(
       (s) => String(s.classId) === String(classId)
     );
     if (sectionId && sectionId !== 'ALL') {
@@ -509,7 +812,7 @@ export const examStore = {
     }
 
     // Load marks
-    const allMarks = examStore.getExamMarks(tenantId, examId);
+    const allMarks = examStore.getExamMarks(safeTenant, examId);
     const marksByStudentAndSub = new Map();
     allMarks.forEach((m) => {
       marksByStudentAndSub.set(`${m.studentId}_${m.examSubjectId}`, m);
@@ -589,7 +892,6 @@ export const examStore = {
 
     // Sort for Class Ranking (Highest Total Marks, then GPA)
     studentsData.sort((a, b) => {
-      // Prioritize passed students if failSubjectRule is active
       if (exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT') {
         if (a.isOverallPass && !b.isOverallPass) return -1;
         if (!a.isOverallPass && b.isOverallPass) return 1;

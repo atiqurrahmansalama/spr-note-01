@@ -353,7 +353,7 @@ export default function CustomTimePicker({
     <div className={`relative w-full text-left font-sans ${className}`} ref={containerRef}>
       {label && (
         <div className="flex items-center justify-between gap-2 mb-2">
-          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider select-none">
+          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
             {label} {required && <span className="theme-danger">*</span>}
           </label>
           {rightElement}
@@ -366,7 +366,7 @@ export default function CustomTimePicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && !readOnly && setIsOpen((prev) => !prev)}
-        className={`w-full ${sizeClasses} rounded-xl border transition-all duration-150 flex items-center justify-between font-mono select-none ${
+        className={`w-full ${sizeClasses} rounded-xl border transition-all duration-150 flex items-center justify-between font-mono ${
           disabled
             ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
             : readOnly
