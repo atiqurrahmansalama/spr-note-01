@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { PageContainer } from '../../../../components/layout';
 import PageHeader from '../../../../components/ui/PageHeader';
-import MetricsGrid from '../../../../components/ui/MetricsGrid';
 import CustomButton from '../../../../components/ui/CustomButton';
 import CustomSelect from '../../../../components/ui/CustomSelect';
-import CustomInput from '../../../../components/ui/CustomInput';
+import DataViewToolbar from '../../../../components/ui/DataViewToolbar';
+import SubjectMatrixTable from '../components/SubjectMatrixTable';
+import ExamStatTile from '../components/ExamStatTile';
 import ActionMenu from '../../../../components/ui/ActionMenu';
+import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import ExamFormDrawer from './ExamFormDrawer';
 import {
   CalendarIcon,
@@ -15,23 +17,58 @@ import {
   BookOpenIcon,
   CheckIcon,
   ClockIcon,
-  SearchIcon,
   ChevronIcon,
   ShieldCheckIcon,
   SparklesIcon,
   ChartBarIcon,
   AcademicCapIcon,
   LockClosedIcon,
+  DepartmentIcon,
+  CheckCircleIcon,
+  HistoryIcon,
 } from '../../../../components/ui/Icons';
 import { useToast } from '../../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import { examStore } from '../../../../utils/stores/examStore';
 import useExamData from '../../hooks/useExamData';
 
+const STATUS_OPTIONS = [
+  { value: 'ALL', label: 'All Statuses' },
+  { value: 'DRAFT', label: 'Draft Setup' },
+  { value: 'MARK_ENTRY', label: 'Mark Entry Open' },
+  { value: 'FIRST_PUBLISHED', label: '1st Published (Review Window)' },
+  { value: 'UNDER_REVIEW', label: 'Under Review' },
+  { value: 'FINAL_PUBLISHED', label: 'Final Published & Certified' },
+];
+
+const LIFECYCLE_STAGES = [
+  { key: 'DRAFT', label: 'Draft' },
+  { key: 'MARK_ENTRY', label: 'Mark Entry' },
+  { key: 'REVIEW', label: 'Review Window' },
+  { key: 'FINAL', label: 'Certified' },
+];
+
+const getLifecycleStageIndex = (status) => {
+  switch (status) {
+    case 'DRAFT':
+      return 0;
+    case 'MARK_ENTRY':
+      return 1;
+    case 'FIRST_PUBLISHED':
+    case 'UNDER_REVIEW':
+      return 2;
+    case 'FINAL_PUBLISHED':
+    case 'LOCKED':
+      return 3;
+    default:
+      return 0;
+  }
+};
+
 /**
  * ExamSchedulesView
- * Standard project container & header compliant management view for examination schedules,
- * subject routines, and multi-tier lifecycle statuses.
+ * Enterprise management workspace for examination sessions,
+ * scheduled subject routines, and multi-tier lifecycle statuses.
  */
 export default function ExamSchedulesView({
   isEmbedded = false,
@@ -59,13 +96,15 @@ export default function ExamSchedulesView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYearFilter, setSelectedYearFilter] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
-  
+
   // Expanded Routine Cards State (Map of examId -> boolean)
   const [expandedExams, setExpandedExams] = useState({});
 
-  // ── Global Drawer Registrations ───────────────────────────────────────────────
+  // Delete Impact Modal States
+  const [examToDelete, setExamToDelete] = useState(null);
+  const [subjectToDelete, setSubjectToDelete] = useState(null);
 
-  // Examination Session Drawer
+  // ── Global Drawer Registrations ───────────────────────────────────────────────
   useDrawerRegistration(
     'exam_session',
     (params) => {
@@ -75,7 +114,10 @@ export default function ExamSchedulesView({
 
       return {
         title: mode === 'edit' ? 'Edit Examination Session' : 'Create Examination Session',
-        subtitle: mode === 'edit' ? `Update details for ${foundExam?.name || 'Examination'}` : 'Configure institutional scope, grading scale, and CA weightage',
+        subtitle:
+          mode === 'edit'
+            ? `Update details for ${foundExam?.name || 'Examination'}`
+            : 'Configure institutional scope, grading scale, and CA weightage',
         category: 'Examination & Results',
         size: 'lg',
         width: 'lg',
@@ -98,18 +140,37 @@ export default function ExamSchedulesView({
         ),
       };
     },
-    [exams, tenantId, academicYears, academicYearOptions, departmentOptions, gradingSystemOptions, classOptions, refreshExamData, closeDrawer]
+    [
+      exams,
+      tenantId,
+      academicYears,
+      academicYearOptions,
+      departmentOptions,
+      gradingSystemOptions,
+      classOptions,
+      refreshExamData,
+      closeDrawer,
+    ]
   );
 
-  // Status Filter Options
-  const statusOptions = [
-    { value: 'ALL', label: 'All Statuses' },
-    { value: 'DRAFT', label: 'Draft Setup' },
-    { value: 'MARK_ENTRY', label: 'Mark Entry Open' },
-    { value: 'FIRST_PUBLISHED', label: '1st Published (Review Window)' },
-    { value: 'UNDER_REVIEW', label: 'Under Review' },
-    { value: 'FINAL_PUBLISHED', label: 'Final Published & Certified' },
-  ];
+  // Filter Active Check
+  const isFilterActive = Boolean(
+    (searchQuery && searchQuery.trim()) ||
+    (selectedYearFilter && selectedYearFilter !== '') ||
+    (selectedStatusFilter && selectedStatusFilter !== 'ALL')
+  );
+
+  const activeFilterCount = [
+    Boolean(searchQuery && searchQuery.trim()),
+    Boolean(selectedYearFilter && selectedYearFilter !== ''),
+    Boolean(selectedStatusFilter && selectedStatusFilter !== 'ALL'),
+  ].filter(Boolean).length;
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedYearFilter('');
+    setSelectedStatusFilter('ALL');
+  };
 
   // Filtered Examinations
   const filteredExams = useMemo(() => {
@@ -122,57 +183,23 @@ export default function ExamSchedulesView({
         const matchCode = e.code?.toLowerCase().includes(q);
         const matchYear = e.academicYearName?.toLowerCase().includes(q);
         const matchBranch = e.branchName?.toLowerCase().includes(q);
-        if (!matchName && !matchCode && !matchYear && !matchBranch) return false;
+        const matchDept = e.departmentName?.toLowerCase().includes(q);
+        if (!matchName && !matchCode && !matchYear && !matchBranch && !matchDept) return false;
       }
       return true;
     });
   }, [exams, selectedYearFilter, selectedStatusFilter, searchQuery]);
 
-  // Overall KPI Metrics for MetricsGrid
-  const metricCards = useMemo(() => {
-    const total = exams.length;
-    const markEntryActive = exams.filter((e) => e.status === 'MARK_ENTRY').length;
-    const published = exams.filter((e) => e.status === 'FIRST_PUBLISHED' || e.status === 'FINAL_PUBLISHED').length;
-    const totalSubjects = examSubjects.length;
-
-    return [
-      {
-        label: 'Total Exam Sessions',
-        value: total,
-        icon: CalendarIcon,
-        color: 'accent',
-        subLabel: 'Academic terms',
-      },
-      {
-        label: 'Mark Entry Open',
-        value: markEntryActive,
-        icon: EditIcon,
-        color: 'accent',
-        subLabel: 'Active entry sessions',
-      },
-      {
-        label: 'Results Published',
-        value: published,
-        icon: ShieldCheckIcon,
-        color: 'accent',
-        subLabel: 'Official & certified',
-      },
-      {
-        label: 'Scheduled Subjects',
-        value: totalSubjects,
-        icon: BookOpenIcon,
-        color: 'accent',
-        subLabel: 'Exam routines',
-      },
-    ];
-  }, [exams, examSubjects]);
-
   // Toggle Subject Routines Accordion
   const toggleExpand = (examId) => {
-    setExpandedExams((prev) => ({
-      ...prev,
-      [examId]: !prev[examId],
-    }));
+    const key = String(examId);
+    setExpandedExams((prev) => {
+      const isCurrentlyOpen = prev[key] !== undefined ? prev[key] : true;
+      return {
+        ...prev,
+        [key]: !isCurrentlyOpen,
+      };
+    });
   };
 
   const handleOpenNewExam = () => {
@@ -183,12 +210,20 @@ export default function ExamSchedulesView({
     openDrawer('exam_session', { mode: 'edit', id: exam.id });
   };
 
-  const handleDeleteExam = (examId) => {
-    if (window.confirm('Are you sure you want to delete this examination? All scheduled subjects and recorded marks will be permanently removed.')) {
-      examStore.deleteExam(tenantId, examId);
-      refreshExamData();
-      showToast('Examination session deleted.', 'success');
-    }
+  const handleConfirmDeleteExam = () => {
+    if (!examToDelete) return;
+    examStore.deleteExam(tenantId, examToDelete.id);
+    refreshExamData();
+    showToast(`Examination session "${examToDelete.name}" deleted.`, 'success');
+    setExamToDelete(null);
+  };
+
+  const handleConfirmDeleteSubject = () => {
+    if (!subjectToDelete) return;
+    examStore.deleteExamSubject(tenantId, subjectToDelete.id);
+    refreshExamData();
+    showToast(`Subject schedule "${subjectToDelete.subjectName}" removed.`, 'success');
+    setSubjectToDelete(null);
   };
 
   const handleStatusChange = (examId, newStatus) => {
@@ -203,64 +238,9 @@ export default function ExamSchedulesView({
     }
   };
 
-  const handleDeleteSubject = (subjectId) => {
-    if (window.confirm('Remove this subject routine schedule from the examination?')) {
-      examStore.deleteExamSubject(tenantId, subjectId);
-      refreshExamData();
-      showToast('Subject schedule removed.', 'success');
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'DRAFT':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-sub theme-text-secondary border theme-border">
-            Draft Setup
-          </span>
-        );
-      case 'MARK_ENTRY':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 animate-pulse">
-            Mark Entry Open
-          </span>
-        );
-      case 'FIRST_PUBLISHED':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-surface theme-text-primary border theme-border">
-            1st Published (Review Window)
-          </span>
-        );
-      case 'UNDER_REVIEW':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-sub theme-text-primary border theme-border">
-            Under Review / Recheck
-          </span>
-        );
-      case 'FINAL_PUBLISHED':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-accent text-white border border-[var(--accent-main)]">
-            Final Published & Certified
-          </span>
-        );
-      case 'LOCKED':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-sub theme-text-secondary border theme-border opacity-70">
-            Archived / Locked
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold theme-bg-sub theme-text-secondary border theme-border">
-            {status}
-          </span>
-        );
-    }
-  };
-
   return (
     <PageContainer isEmbedded={isEmbedded} maxWidth="7xl">
-      {/* 1. Optional Standard PageHeader (When viewed standalone) */}
+      {/* ── 1. Optional Standard PageHeader (When viewed standalone) ── */}
       {!hideHeader && (
         <PageHeader
           title="Exam Schedules & Sessions"
@@ -279,242 +259,361 @@ export default function ExamSchedulesView({
         />
       )}
 
-      {/* 2. Top Metric KPI Grid using project MetricsGrid component */}
-      <div className="w-full">
-        <MetricsGrid items={metricCards} />
-      </div>
+      {/* ── 2. Enterprise Data View Toolbar (Search, Academic Year & Status Filters, Live Counters & Reset) ── */}
+      <DataViewToolbar
+        searchLabel="Search"
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search by exam name, code, session or department..."
+        searchSpanClassName="col-span-1 sm:col-span-2 lg:col-span-2"
+        filterGridClassName="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        stackedSwitcher={true}
+        filteredCount={filteredExams.length}
+        totalCount={exams.length}
+        itemLabel={filteredExams.length === 1 ? 'exam session' : 'exam sessions'}
+        hasActiveFilters={isFilterActive}
+        onResetFilters={handleResetFilters}
+        activeFilterCount={activeFilterCount}
+        customFilters={
+          <>
+            <div>
+              <CustomSelect
+                label="Academic Year"
+                options={[{ value: '', label: 'All Academic Years' }, ...academicYearOptions]}
+                value={selectedYearFilter}
+                onChange={(val) => setSelectedYearFilter(val || '')}
+                size="md"
+              />
+            </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-        <div className="sm:col-span-6">
-          <CustomInput
-            placeholder="Search by exam name, code, session or branch..."
-            prefix={SearchIcon}
-            value={searchQuery}
-            onChange={setSearchQuery}
-          />
-        </div>
+            <div>
+              <CustomSelect
+                label="Lifecycle Status"
+                options={STATUS_OPTIONS}
+                value={selectedStatusFilter}
+                onChange={(val) => setSelectedStatusFilter(val || 'ALL')}
+                size="md"
+              />
+            </div>
+          </>
+        }
+      />
 
-        <div className="sm:col-span-3">
-          <CustomSelect
-            options={[{ value: '', label: 'All Academic Years' }, ...academicYearOptions]}
-            value={selectedYearFilter}
-            onChange={setSelectedYearFilter}
-          />
-        </div>
-
-        <div className="sm:col-span-3">
-          <CustomSelect
-            options={statusOptions}
-            value={selectedStatusFilter}
-            onChange={setSelectedStatusFilter}
-          />
-        </div>
-      </div>
-
-      {/* 4. Examination Cards List */}
+      {/* ── 4. Examination Cards List ── */}
       {filteredExams.length === 0 ? (
-        <div className="p-16 text-center border-2 border-dashed theme-border rounded-3xl theme-bg-surface/50 space-y-4">
-          <div className="w-14 h-14 rounded-full theme-bg-sub flex items-center justify-center mx-auto text-slate-400">
+        <div className="p-12 sm:p-16 text-center border-2 border-dashed theme-border rounded-3xl theme-bg-surface/50 space-y-4 animate-fade-in">
+          <div className="w-14 h-14 rounded-full theme-bg-sub flex items-center justify-center mx-auto theme-text-secondary opacity-70">
             <CalendarIcon className="w-7 h-7" />
           </div>
           <div className="max-w-md mx-auto space-y-1">
             <h3 className="text-base font-bold theme-text-primary">No Examination Sessions Found</h3>
             <p className="text-xs theme-text-secondary">
-              {searchQuery || selectedYearFilter || selectedStatusFilter !== 'ALL'
-                ? 'No examination sessions match your active filters. Try clearing or changing filters.'
+              {isFilterActive
+                ? 'No examination sessions match your active filters. Try resetting your search filters.'
                 : 'Create your first term examination session to configure subjects and start recording marks.'}
             </p>
           </div>
           <div>
-            <CustomButton variant="primary" size="sm" icon={PlusIcon} onClick={handleOpenNewExam}>
-              Create First Examination
+            <CustomButton
+              variant={isFilterActive ? 'sub' : 'primary'}
+              size="sm"
+              icon={isFilterActive ? null : PlusIcon}
+              onClick={isFilterActive ? handleResetFilters : handleOpenNewExam}
+            >
+              {isFilterActive ? 'Reset Active Filters' : 'Create First Examination'}
             </CustomButton>
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {filteredExams.map((exam) => {
             const currentSubjects = examSubjects.filter((s) => String(s.examId) === String(exam.id));
             const grading = gradingSystems.find((g) => g.id === exam.gradingSystemId);
             const isExpanded = expandedExams[exam.id] ?? true;
+            const examDaysList = exam.scheduleDays || [];
+            const currentStageIdx = getLifecycleStageIndex(exam.status);
 
             return (
-              <div
-                key={exam.id}
-                className="rounded-2xl border theme-border theme-bg-surface shadow-xs transition-all hover:border-[var(--accent-main)]/40 overflow-hidden"
-              >
-                {/* Exam Header Row */}
-                <div className="p-4 sm:p-5 border-b theme-border space-y-3.5 bg-slate-50/30 dark:bg-slate-900/20">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl theme-bg-accent-soft border border-[var(--accent-main)]/20 theme-accent flex items-center justify-center font-bold shrink-0 mt-0.5">
-                        <AcademicCapIcon className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight truncate">
-                            {exam.name}
-                          </h2>
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold theme-bg-sub theme-text-secondary border theme-border">
-                            {exam.code}
-                          </span>
-                          {getStatusBadge(exam.status)}
+              <div key={exam.id} className="space-y-3.5 text-left animate-fade-in">
+                {/* ── 4.1 Standalone Exam Session Card ── */}
+                <div className="rounded-2xl border theme-border theme-bg-surface shadow-xs transition-all duration-200 hover:shadow-md hover:border-[var(--accent-main)]/35 overflow-hidden">
+                  {/* Card Main Body */}
+                  <div className="p-4 sm:p-5 lg:p-6 space-y-4">
+                    {/* Header Row: Identity, Code, Status & Top Actions */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+                      <div className="flex items-start gap-3.5 min-w-0">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl theme-bg-accent-soft border border-[var(--accent-main)]/25 theme-accent flex items-center justify-center font-bold shrink-0 mt-0.5 shadow-xs">
+                          <AcademicCapIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
 
-                        <div className="flex items-center gap-2.5 text-xs theme-text-secondary flex-wrap">
-                          <span className="inline-flex items-center gap-1 font-medium">
-                            <AcademicCapIcon className="w-3.5 h-3.5 text-slate-400" />
-                            {exam.departmentName || 'All Departments'}
-                          </span>
-                          <span>•</span>
-                          <span className="font-semibold theme-text-primary">{exam.academicYearName}</span>
-                          <span>•</span>
-                          <span>{exam.semesterName}</span>
-                          <span>•</span>
-                          <span className="inline-flex items-center gap-1 font-mono">
-                            <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
-                            {exam.startDate} — {exam.endDate}
-                          </span>
-                          {exam.scheduleDays && exam.scheduleDays.length > 0 && (
-                            <>
-                              <span>•</span>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
-                                {exam.scheduleDays.filter((d) => d.type === 'EXAM_DAY').length} Exam Days
-                              </span>
-                              {exam.scheduleDays.some((d) => d.type === 'PREPARATION_GAP') && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold theme-bg-surface theme-text-primary border theme-border">
-                                  {exam.scheduleDays.filter((d) => d.type === 'PREPARATION_GAP').length} Study Gaps
+                        <div className="space-y-1 min-w-0 flex-1">
+                          {/* 1st Line: Title, Code, Academic Year & Semester */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight truncate">
+                              {exam.name}
+                            </h2>
+                            <span className="text-xs font-mono font-medium theme-text-secondary opacity-75">
+                              #{exam.code}
+                            </span>
+                            <span className="text-xs theme-text-secondary opacity-30">/</span>
+                            <span className="text-xs font-semibold theme-text-secondary">
+                              {exam.academicYearName}
+                              {exam.semesterName ? ` · ${exam.semesterName}` : ''}
+                            </span>
+                          </div>
+
+                          {/* 2nd Line: Scope, Schedule Dates & Multi-Dept Status */}
+                          <div className="flex items-center gap-2.5 text-xs theme-text-secondary flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 font-medium">
+                              <DepartmentIcon className="w-3.5 h-3.5 opacity-70 shrink-0" />
+                              <span>{exam.departmentName || 'All Departments'}</span>
+                            </span>
+
+                            {(exam.startDate || exam.endDate) && (
+                              <>
+                                <span className="inline-flex items-center gap-1.5 font-mono font-medium theme-text-primary">
+                                  <ClockIcon className="w-3.5 h-3.5 theme-accent opacity-85 shrink-0" />
+                                  <span>{exam.startDate} — {exam.endDate}</span>
                                 </span>
-                              )}
-                            </>
-                          )}
+                              </>
+                            )}
+
+                            {exam.isMultiDepartmentSchedule && (
+                              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-2xs">
+                                Multi-Dept Windows
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </div>
+
+                      {/* Top Right Actions: Toggle Table Accordion & ActionMenu */}
+                      <div className="flex items-center gap-2 shrink-0 self-start lg:self-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(exam.id)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-sub/80 theme-text-secondary hover:theme-text-primary flex items-center gap-2 cursor-pointer transition-all shadow-2xs active:scale-95"
+                          title={isExpanded ? 'Hide Subject Routines' : 'Show Subject Routines'}
+                        >
+                          <span>{isExpanded ? 'Hide Routines' : 'View Routines'}</span>
+                          <span className="px-1.5 py-0.2 rounded-full font-mono text-[10px] theme-bg-surface border theme-border font-bold">
+                            {currentSubjects.length}
+                          </span>
+                          <ChevronIcon isOpen={isExpanded} className="w-3.5 h-3.5 transition-transform duration-200" />
+                        </button>
+
+                        <ActionMenu
+                          actions={[
+                            {
+                              label: 'Edit Examination',
+                              icon: EditIcon,
+                              onClick: () => handleEditExam(exam),
+                            },
+                            {
+                              label: 'Subject Routine Matrix',
+                              icon: BookOpenIcon,
+                              onClick: () => handleNavigateToMatrix(exam.id),
+                            },
+                            ...(onNavigateToMarkEntry
+                              ? [
+                                  {
+                                    label: 'Mark Entry',
+                                    icon: EditIcon,
+                                    onClick: () => onNavigateToMarkEntry(exam.id),
+                                  },
+                                ]
+                              : []),
+                            ...(onNavigateToTabulation
+                              ? [
+                                  {
+                                    label: 'Tabulation Ledger',
+                                    icon: ChartBarIcon,
+                                    onClick: () => onNavigateToTabulation(exam.id),
+                                  },
+                                ]
+                              : []),
+                            { divider: true },
+                            {
+                              label: 'Delete Examination',
+                              icon: TrashIcon,
+                              danger: true,
+                              onClick: () => setExamToDelete(exam),
+                            },
+                          ]}
+                          align="right"
+                          ariaLabel={`Actions for ${exam.name}`}
+                        />
                       </div>
                     </div>
 
-                    {/* Actions Toolbar — Three-Dots Reusable ActionMenu */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <ActionMenu
-                        actions={[
-                          {
-                            label: 'Edit Examination',
-                            icon: EditIcon,
-                            onClick: () => handleEditExam(exam),
-                          },
-                          {
-                            label: 'Subject Routine Matrix',
-                            icon: BookOpenIcon,
-                            onClick: () => handleNavigateToMatrix(exam.id),
-                          },
-                          ...(onNavigateToMarkEntry
-                            ? [
-                                {
-                                  label: 'Mark Entry',
-                                  icon: EditIcon,
-                                  onClick: () => onNavigateToMarkEntry(exam.id),
-                                },
-                              ]
-                            : []),
-                          ...(onNavigateToTabulation
-                            ? [
-                                {
-                                  label: 'Tabulation Ledger',
-                                  icon: ChartBarIcon,
-                                  onClick: () => onNavigateToTabulation(exam.id),
-                                },
-                              ]
-                            : []),
-                          { divider: true },
-                          {
-                            label: 'Delete Examination',
-                            icon: TrashIcon,
-                            danger: true,
-                            onClick: () => handleDeleteExam(exam.id),
-                          },
-                        ]}
-                        align="right"
-                        ariaLabel={`Actions for ${exam.name}`}
+                    {/* Policy & Key Specifications 4-Tile Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                      {/* Tile 1: Routine Coverage */}
+                      <ExamStatTile
+                        icon={BookOpenIcon}
+                        label="Routine Coverage"
+                        value={`${currentSubjects.length} ${currentSubjects.length === 1 ? 'Subject Routine' : 'Subject Routines'}`}
+                      />
+
+                      {/* Tile 2: Full Marks */}
+                      <ExamStatTile
+                        icon={AcademicCapIcon}
+                        label="Full Marks"
+                        value={`${exam.defaultFullMarks || exam.targetFullMarks || 100} pts`}
+                        title={`Baseline Examination Marks Scale: ${exam.defaultFullMarks || exam.targetFullMarks || 100} Points`}
+                      />
+
+                      {/* Tile 3: Breakdown */}
+                      <ExamStatTile
+                        icon={ChartBarIcon}
+                        label="Breakdown"
+                        value={
+                          Array.isArray(exam.components) && exam.components.length > 0
+                            ? exam.components.map((c) => `${c.name || 'Comp'}: ${c.maxMarks || 0}`).join(' · ')
+                            : (exam.breakdownConfig?.enabled === false ? 'No Breakdown (Single Total)' : 'Direct 100% Written')
+                        }
+                        title={
+                          Array.isArray(exam.components) && exam.components.length > 0
+                            ? exam.components.map((c) => `${c.name || 'Component'}: ${c.maxMarks || 0} pts`).join(', ')
+                            : 'Direct Full Marks'
+                        }
+                      />
+
+                      {/* Tile 4: Assessment Policy */}
+                      <ExamStatTile
+                        icon={SparklesIcon}
+                        label="Assessment Policy"
+                        value={
+                          exam.caWeightage?.enabled
+                            ? `CA: ${exam.caWeightage.dailyClassroomPct}%D · ${exam.caWeightage.attendancePct}%A · ${exam.caWeightage.examPct}%E`
+                            : 'Direct Written (100%)'
+                        }
+                        title={
+                          exam.caWeightage?.enabled
+                            ? `Continuous Assessment: Daily ${exam.caWeightage.dailyClassroomPct}% + Attendance ${exam.caWeightage.attendancePct}% + Exam ${exam.caWeightage.examPct}%`
+                            : 'Direct 100% Examination Evaluation'
+                        }
                       />
                     </div>
-                  </div>
 
-                  {/* Summary Badges Row */}
-                  <div className="flex items-center gap-2 text-xs flex-wrap pt-0.5">
-                    <div className="px-2.5 py-1 rounded-lg theme-bg-surface border theme-border text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5 shadow-2xs">
-                      <span className="text-slate-400 text-[11px]">Grading Policy:</span>
-                      <strong className="theme-text-primary font-bold text-xs">{grading?.name || 'Default Scale'}</strong>
-                    </div>
-
-                    {exam.caWeightage?.enabled && (
-                      <div className="px-2.5 py-1 rounded-lg theme-bg-accent-soft border border-[var(--accent-main)]/20 theme-accent font-medium flex items-center gap-1.5 shadow-2xs text-[11px]">
-                        <SparklesIcon className="w-3.5 h-3.5" />
-                        <span>CA:</span>
-                        <strong className="font-bold">
-                          Daily {exam.caWeightage.dailyClassroomPct}% + Attendance {exam.caWeightage.attendancePct}% + Exam {exam.caWeightage.examPct}%
-                        </strong>
-                      </div>
-                    )}
-
-                    <div className="px-2.5 py-1 rounded-lg theme-bg-surface border theme-border text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5 shadow-2xs text-[11px]">
-                      <span className="text-slate-400">Scheduled Subjects:</span>
-                      <strong className="theme-text-primary font-bold">{currentSubjects.length}</strong>
-                    </div>
-
-                    {exam.rankingConfig && (
-                      <div className="px-2.5 py-1 rounded-lg theme-bg-surface border theme-border text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5 shadow-2xs text-[11px]">
-                        <span className="text-slate-400">Ranking:</span>
-                        <strong className="theme-text-primary font-bold">
-                          {exam.rankingConfig.scope === 'CLASS_ONLY' ? 'Class Only' : 'Class & Section'}
-                        </strong>
+                    {/* Department Specific Date Windows Row (If Multi-Department Dates Enabled) */}
+                    {exam.isMultiDepartmentSchedule && Array.isArray(exam.departmentSchedules) && exam.departmentSchedules.length > 0 && (
+                      <div className="pt-2.5 border-t theme-border/60">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider theme-text-secondary shrink-0">
+                            <DepartmentIcon className="w-3.5 h-3.5 theme-accent opacity-85" />
+                            <span>Department Windows:</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {exam.departmentSchedules.map((dept) => (
+                              <div
+                                key={dept.departmentId}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs theme-bg-sub/60 theme-text-primary border theme-border shadow-2xs"
+                              >
+                                <span className="font-semibold">{dept.departmentName || dept.departmentCode}:</span>
+                                <span className="font-mono text-[11px] theme-text-secondary font-medium">
+                                  {dept.startDate} — {dept.endDate}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Lifecycle Management Stepper Bar */}
-                <div className="px-4 sm:px-5 py-2.5 border-b theme-border theme-bg-sub/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold theme-text-secondary uppercase tracking-wider text-[10px]">
-                      Lifecycle Stage:
-                    </span>
-                    <span className="font-bold theme-text-primary text-xs">
-                      {exam.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
+                  {/* Lifecycle Management Stepper Bar */}
+                  <div className="px-4 sm:px-5 lg:px-6 py-3 border-t theme-border theme-bg-sub/20 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                    {/* Visual Lifecycle Pipeline */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                      <span className="font-bold theme-text-secondary uppercase tracking-wider text-[10px] mr-1 shrink-0">
+                        Lifecycle:
+                      </span>
+                      {LIFECYCLE_STAGES.map((st, idx) => {
+                        const isCurrent = currentStageIdx === idx;
+                        const isPast = currentStageIdx > idx;
+                        return (
+                          <React.Fragment key={st.key}>
+                            {idx > 0 && (
+                              <span
+                                className={`text-[10px] ${
+                                  isPast ? 'theme-accent font-bold' : 'theme-text-secondary opacity-30'
+                                }`}
+                              >
+                                →
+                              </span>
+                            )}
+                            <div
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all ${
+                                isCurrent
+                                  ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 font-bold shadow-2xs'
+                                  : isPast
+                                  ? 'theme-text-primary font-medium'
+                                  : 'theme-text-secondary opacity-50'
+                              }`}
+                            >
+                              {isPast ? (
+                                <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
+                              ) : (
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    isCurrent ? 'bg-[var(--accent-main)]' : 'theme-bg-subtle'
+                                  }`}
+                                />
+                              )}
+                              <span>{st.label}</span>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {exam.status === 'DRAFT' && (
-                      <CustomButton
-                        size="xs"
-                        variant="soft"
-                        icon={EditIcon}
-                        onClick={() => handleStatusChange(exam.id, 'MARK_ENTRY')}
-                      >
-                        Open for Mark Entry
-                      </CustomButton>
-                    )}
-
-                    {exam.status === 'MARK_ENTRY' && (
-                      <CustomButton
-                        size="xs"
-                        variant="primary"
-                        icon={CheckIcon}
-                        onClick={() => handleStatusChange(exam.id, 'FIRST_PUBLISHED')}
-                      >
-                        Publish 1st Result (Open Review Window)
-                      </CustomButton>
-                    )}
-
-                    {exam.status === 'FIRST_PUBLISHED' && (
-                      <>
+                    {/* Transition Action Buttons */}
+                    <div className="flex items-center gap-2 flex-wrap shrink-0">
+                      {exam.status === 'DRAFT' && (
                         <CustomButton
                           size="xs"
-                          variant="soft"
-                          onClick={() => handleStatusChange(exam.id, 'UNDER_REVIEW')}
+                          variant="primary"
+                          icon={EditIcon}
+                          onClick={() => handleStatusChange(exam.id, 'MARK_ENTRY')}
                         >
-                          Mark as Under Review
+                          Open for Mark Entry
                         </CustomButton>
+                      )}
+
+                      {exam.status === 'MARK_ENTRY' && (
+                        <CustomButton
+                          size="xs"
+                          variant="primary"
+                          icon={CheckIcon}
+                          onClick={() => handleStatusChange(exam.id, 'FIRST_PUBLISHED')}
+                        >
+                          Publish 1st Result (Open Review Window)
+                        </CustomButton>
+                      )}
+
+                      {exam.status === 'FIRST_PUBLISHED' && (
+                        <>
+                          <CustomButton
+                            size="xs"
+                            variant="sub"
+                            icon={ClockIcon}
+                            onClick={() => handleStatusChange(exam.id, 'UNDER_REVIEW')}
+                          >
+                            Mark as Under Review
+                          </CustomButton>
+                          <CustomButton
+                            size="xs"
+                            variant="primary"
+                            icon={LockClosedIcon}
+                            onClick={() => handleStatusChange(exam.id, 'FINAL_PUBLISHED')}
+                          >
+                            Publish Final Result & Lock
+                          </CustomButton>
+                        </>
+                      )}
+
+                      {exam.status === 'UNDER_REVIEW' && (
                         <CustomButton
                           size="xs"
                           variant="primary"
@@ -523,53 +622,56 @@ export default function ExamSchedulesView({
                         >
                           Publish Final Result & Lock
                         </CustomButton>
-                      </>
-                    )}
+                      )}
 
-                    {exam.status === 'UNDER_REVIEW' && (
-                      <CustomButton
-                        size="xs"
-                        variant="primary"
-                        icon={LockClosedIcon}
-                        onClick={() => handleStatusChange(exam.id, 'FINAL_PUBLISHED')}
-                      >
-                        Publish Final Result & Lock
-                      </CustomButton>
-                    )}
-
-                    {exam.status === 'FINAL_PUBLISHED' && (
-                      <span className="inline-flex items-center gap-1.5 font-bold theme-accent theme-bg-accent-soft px-2.5 py-0.5 rounded-full border border-[var(--accent-main)]/20 text-xs">
-                        <LockClosedIcon className="w-3.5 h-3.5" />
-                        Final Official Result Certified & Immutable
-                      </span>
-                    )}
+                      {(exam.status === 'FINAL_PUBLISHED' || exam.status === 'LOCKED') && (
+                        <span className="inline-flex items-center gap-1.5 font-bold theme-accent theme-bg-accent-soft px-2.5 py-1 rounded-full border border-[var(--accent-main)]/20 text-xs shadow-2xs">
+                          <LockClosedIcon className="w-3.5 h-3.5" />
+                          Official Certified & Immutable
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Subject Routine Cards Section */}
-                <div className="p-4 sm:p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-                      Scheduled Subject Routines & Components ({currentSubjects.length})
-                    </span>
+                {/* ── 4.2 Scheduled Subject Routines Table (Smooth Accordion Grid) ── */}
+                <div
+                  className={`grid transition-all duration-300 ease-in-out ${
+                    isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-2.5 pt-1 pb-1">
+                      {/* Clean minimal sub-header without boxed background */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <BookOpenIcon className="w-4 h-4 theme-accent shrink-0" />
+                          <h4 className="text-xs sm:text-sm font-bold theme-text-primary tracking-tight">
+                            Scheduled Subject Routines & Components
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full font-mono text-[10px] theme-bg-sub theme-text-secondary border theme-border font-bold shadow-2xs shrink-0">
+                            {currentSubjects.length} {currentSubjects.length === 1 ? 'subject' : 'subjects'}
+                          </span>
+                        </div>
 
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(exam.id)}
-                      className="text-xs font-bold theme-text-secondary hover:theme-text-primary flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
-                      <ChevronIcon isOpen={isExpanded} className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                        <div className="flex items-center gap-2">
+                          <CustomButton
+                            variant="sub"
+                            size="xs"
+                            icon={EditIcon}
+                            onClick={() => handleNavigateToMatrix(exam.id)}
+                          >
+                            Open in Routine Matrix
+                          </CustomButton>
+                        </div>
+                      </div>
 
-                  {isExpanded && (
-                    <>
+                      {/* Table Body with Generous Row Height (Reusing SubjectMatrixTable) */}
                       {currentSubjects.length === 0 ? (
-                        <div className="p-6 text-center border border-dashed theme-border rounded-xl theme-bg-sub/10 space-y-2">
-                          <BookOpenIcon className="w-7 h-7 mx-auto text-slate-400" />
+                        <div className="p-8 text-center border border-dashed theme-border rounded-2xl theme-bg-sub/10 space-y-2">
+                          <BookOpenIcon className="w-7 h-7 mx-auto theme-text-secondary opacity-60" />
                           <p className="text-xs font-medium theme-text-secondary">
-                            No subjects scheduled yet for this examination.
+                            No subjects scheduled yet for this examination session.
                           </p>
                           <CustomButton
                             variant="sub"
@@ -577,97 +679,55 @@ export default function ExamSchedulesView({
                             icon={PlusIcon}
                             onClick={() => handleNavigateToMatrix(exam.id)}
                           >
-                            Open Routine Matrix
+                            Configure Routine Matrix
                           </CustomButton>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                          {currentSubjects.map((sub) => (
-                            <div
-                              key={sub.id}
-                              className="p-3.5 rounded-xl border theme-border theme-bg-surface hover:border-[var(--accent-main)]/30 transition-all space-y-2 shadow-2xs flex flex-col justify-between"
-                            >
-                              <div className="space-y-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <span className="font-bold text-xs sm:text-sm theme-text-primary block truncate">
-                                    {sub.subjectName}
-                                  </span>
-                                  <div className="flex items-center shrink-0">
-                                    <ActionMenu
-                                      buttonClassName="p-1 rounded-lg border-0 shadow-none hover:theme-bg-sub"
-                                      actions={[
-                                        {
-                                          label: 'Manage in Routine Matrix',
-                                          icon: EditIcon,
-                                          onClick: () => handleNavigateToMatrix(exam.id),
-                                        },
-                                        {
-                                          label: 'Remove Subject Routine',
-                                          icon: TrashIcon,
-                                          danger: true,
-                                          onClick: () => handleDeleteSubject(sub.id),
-                                        },
-                                      ]}
-                                      align="right"
-                                      ariaLabel={`Actions for ${sub.subjectName}`}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1 text-[11px]">
-                                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                                    <span>Class:</span>
-                                    <strong className="theme-text-primary">
-                                      {sub.className} ({sub.sectionName})
-                                    </strong>
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                                    <span>Exam Date:</span>
-                                    <span className="font-mono theme-text-primary">
-                                      {sub.examDate || 'TBD'}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                                    <span>Timing:</span>
-                                    <span className="font-mono theme-text-primary">
-                                      {sub.startTime || '—'} to {sub.endTime || '—'}
-                                    </span>
-                                  </div>
-
-                                  {sub.teacherName && (
-                                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                                      <span>Invigilator:</span>
-                                      <span className="theme-text-primary truncate max-w-[130px]">
-                                        {sub.teacherName}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Marks & Components Pills */}
-                              <div className="pt-2 border-t theme-border flex items-center justify-between text-[11px]">
-                                <span className="font-bold theme-text-primary theme-bg-surface px-2 py-0.5 rounded-md border theme-border">
-                                  Full: {sub.fullMarks} | Pass: {sub.passMarks}
-                                </span>
-                                <span className="text-[10px] theme-text-secondary truncate max-w-[110px]" title={sub.components?.map((c) => `${c.name}: ${c.maxMarks}`).join(', ')}>
-                                  {sub.components?.map((c) => `${c.name}:${c.maxMarks}`).join(', ')}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <SubjectMatrixTable
+                          activeExam={exam}
+                          filteredRows={currentSubjects}
+                          showActions={false}
+                          onOpenComponentModal={() => handleNavigateToMatrix(exam.id)}
+                        />
                       )}
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* ── 5. Standard DeleteImpactModal for Examination Session Deletion ── */}
+      <DeleteImpactModal
+        isOpen={Boolean(examToDelete)}
+        onClose={() => setExamToDelete(null)}
+        onConfirm={handleConfirmDeleteExam}
+        title="Delete Examination Session?"
+        subtitle={`You are about to permanently delete "${examToDelete?.name}".`}
+        entityName={examToDelete?.name || 'Examination Session'}
+        entityType="Examination Session"
+        requireAck={false}
+        requireNameMatch={false}
+        confirmButtonText="Delete Examination"
+        warningMessage="Permanently deleting this examination session will remove all associated subject routine schedules, invigilator assignments, recorded marks, and tabulation entries."
+      />
+
+      {/* ── 6. Standard DeleteImpactModal for Subject Routine Removal ── */}
+      <DeleteImpactModal
+        isOpen={Boolean(subjectToDelete)}
+        onClose={() => setSubjectToDelete(null)}
+        onConfirm={handleConfirmDeleteSubject}
+        title="Remove Subject Routine Schedule?"
+        subtitle={`You are about to remove "${subjectToDelete?.subjectName}" from the exam routine.`}
+        entityName={subjectToDelete?.subjectName || 'Subject Routine'}
+        entityType="Subject Schedule"
+        requireAck={false}
+        requireNameMatch={false}
+        confirmButtonText="Remove Schedule"
+        warningMessage="Removing this subject schedule will delete its scheduled date, shift timings, invigilator assignments, and mark components."
+      />
     </PageContainer>
   );
 }

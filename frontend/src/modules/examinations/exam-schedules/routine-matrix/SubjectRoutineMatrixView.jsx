@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import useSubjectMatrixState from './hooks/useSubjectMatrixState';
 import SubjectMatrixHeader from './components/SubjectMatrixHeader';
-import SubjectMatrixTable from './components/SubjectMatrixTable';
-import SubjectRoutineDrawerForm from './components/SubjectRoutineDrawerForm';
+import SubjectMatrixTable from '../components/SubjectMatrixTable';
+import SubjectRoutineDrawerForm from './SubjectRoutineDrawerForm';
+import { UniversalAutoPopulateDrawer } from '../../../../components/ui/auto-populate';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import { examStore } from '../../../../utils/stores/examStore';
@@ -11,10 +12,10 @@ import { examStore } from '../../../../utils/stores/examStore';
  * SubjectRoutineMatrixView
  * Enterprise-grade Subject Routine Matrix workspace.
  * Manages class exam dates, shifts, invigilators, and mark breakdown distributions.
- * Form creation and edits are performed seamlessly via the dedicated Right Sidebar Drawer.
+ * Form creation, edits, and auto-population are performed seamlessly via the dedicated Right Sidebar Drawer.
  */
 export default function SubjectRoutineMatrixView({ initialExamId = null, onNavigateToExamSessions = null }) {
-  const { openDrawer, closeDrawer, openRightSidebar, closeRightSidebar } = useRightSidebar();
+  const { openDrawer, closeDrawer } = useRightSidebar();
 
   const {
     tenantId,
@@ -28,6 +29,7 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     participatingClasses,
     allAvailableClasses,
     availableCurriculumBooks,
+    teachers,
     examOptions,
     searchQuery,
     setSearchQuery,
@@ -42,35 +44,29 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     dateFilterOptions,
     selectedRowIds,
     setSelectedRowIds,
-    showAutoPopulateConfirm,
-    setShowAutoPopulateConfirm,
-    executeAutoPopulate,
-    handleSelectRow,
-    handleAutoPopulateFromCurriculum,
+    loadStoredRows,
     handleUpsertRow,
     handleDeleteRow,
     handleDuplicateRow,
-    handleBulkDelete,
-  } = useSubjectMatrixState({ initialExamId });
+    executeBulkDelete,
+  } = useSubjectMatrixState({ initialExamId, onNavigateToExamSessions });
 
-  // ─── Right Sidebar Drawer Registration for Subject Routine Form ───────────────
+  // Delete Impact Modal States
+  const [rowToDelete, setRowToDelete] = useState(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // ─── Right Sidebar Drawer Registration for Single Subject Routine Form ────────
   useDrawerRegistration(
     'subject_routine',
     (params) => {
       const mode = params.get('mode') || 'add';
       const rowId = params.get('id');
-      let foundRow = null;
-      if (mode === 'edit' && rowId) {
-        foundRow =
-          rows.find((r) => String(r.id) === String(rowId)) ||
-          (examStore.getExamSubjects(tenantId, selectedExamId) || []).find(
-            (r) => String(r.id) === String(rowId)
-          ) ||
-          (examStore.getExamSubjects(tenantId) || []).find(
-            (r) => String(r.id) === String(rowId)
-          ) ||
-          null;
-      }
+      const foundRow =
+        mode === 'edit' && rowId
+          ? rows.find((r) => String(r.id) === String(rowId)) ||
+            (examStore.getExamSubjects(tenantId, selectedExamId) || []).find((r) => String(r.id) === String(rowId)) ||
+            null
+          : null;
 
       return {
         title: mode === 'edit' ? 'Edit Subject Routine' : 'Add Subject Routine',
@@ -115,13 +111,76 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     ]
   );
 
+  // ─── Right Sidebar Drawer Registration for Universal Auto-Populate Routine ──────────────
+  useDrawerRegistration(
+    'auto_populate_routine',
+    () => {
+      return {
+        title: 'Auto-Populate Exam Routine',
+        subtitle: `Configure curriculum mapping and examiner rules for ${activeExam?.name || 'Active Session'}`,
+        category: 'Routine Matrix',
+        size: 'lg',
+        width: 'lg',
+        content: (
+          <UniversalAutoPopulateDrawer
+            key={`auto-populate-drawer-${selectedExamId}`}
+            domainKey="exam_routine_matrix"
+            context={{
+              tenantId,
+              activeExam,
+              participatingClasses,
+              allAvailableClasses,
+              availableCurriculumBooks,
+              teachers,
+              examShifts,
+              existingRowsCount: rows.length,
+            }}
+            onSuccess={() => {
+              loadStoredRows();
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [
+      tenantId,
+      activeExam,
+      participatingClasses,
+      allAvailableClasses,
+      availableCurriculumBooks,
+      teachers,
+      examShifts,
+      rows.length,
+      selectedExamId,
+      loadStoredRows,
+      closeDrawer,
+    ]
+  );
+
   const handleOpenAddDrawer = () => {
     openDrawer('subject_routine', { mode: 'add' });
+  };
+
+  const handleOpenAutoPopulateDrawer = () => {
+    openDrawer('auto_populate_routine');
   };
 
   const handleOpenEditDrawer = (row) => {
     if (!row) return;
     openDrawer('subject_routine', { mode: 'edit', id: row.id });
+  };
+
+  const handleConfirmSingleDelete = () => {
+    if (!rowToDelete) return;
+    handleDeleteRow(rowToDelete.id);
+    setRowToDelete(null);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    executeBulkDelete();
+    setShowBulkDeleteConfirm(false);
   };
 
   return (
@@ -134,7 +193,7 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
           setSelectedExamId(val);
           setSelectedRowIds(new Set());
         }}
-        onAutoPopulate={handleAutoPopulateFromCurriculum}
+        onAutoPopulate={handleOpenAutoPopulateDrawer}
         onAddRow={handleOpenAddDrawer}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -151,31 +210,50 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
         totalCount={rows.length}
         filteredCount={filteredRows.length}
         selectedCount={selectedRowIds.size}
-        onBulkDelete={handleBulkDelete}
+        onBulkDelete={() => setShowBulkDeleteConfirm(true)}
       />
 
       {/* ── 2. Subject Routine Matrix Read-Only Presentation Table ── */}
       <SubjectMatrixTable
+        activeExam={activeExam}
         filteredRows={filteredRows}
         onEditRow={handleOpenEditDrawer}
         onOpenComponentModal={handleOpenEditDrawer}
         onDuplicateRow={handleDuplicateRow}
-        onDeleteRow={handleDeleteRow}
+        onDeleteRow={(rowId) => {
+          const found = rows.find((r) => String(r.id) === String(rowId));
+          setRowToDelete(found || { id: rowId, subjectName: 'Subject' });
+        }}
       />
 
-      {/* ── 3. Confirm Overwrite Re-population Modal (Standard DeleteImpactModal) ── */}
+      {/* ── 4. Single Row Delete Confirmation Modal ── */}
       <DeleteImpactModal
-        isOpen={showAutoPopulateConfirm}
-        onClose={() => setShowAutoPopulateConfirm(false)}
-        onConfirm={executeAutoPopulate}
-        title="Overwrite Existing Routine Schedules?"
-        subtitle={`You are about to re-populate the routine schedule for "${activeExam?.name || 'Active Examination Session'}".`}
-        entityName={activeExam?.name || 'Exam Routine'}
-        entityType="Exam Session"
+        isOpen={Boolean(rowToDelete)}
+        onClose={() => setRowToDelete(null)}
+        onConfirm={handleConfirmSingleDelete}
+        title="Delete Subject Routine Row?"
+        subtitle={`You are about to delete the routine schedule for "${rowToDelete?.subjectName || 'Subject'}".`}
+        entityName={rowToDelete?.subjectName || 'Subject Routine'}
+        entityType="Subject Routine"
         requireAck={false}
         requireNameMatch={false}
-        confirmButtonText="Overwrite & Auto-Populate"
-        warningMessage={`This examination session currently contains ${rows.length} scheduled subject ${rows.length === 1 ? 'entry' : 'entries'}. Re-populating from the curriculum will permanently overwrite and replace all current routines, custom date/shift timing adjustments, invigilator assignments, and mark breakdowns.`}
+        confirmButtonText="Delete Row"
+        warningMessage="Deleting this subject routine row will remove its scheduled date, assigned examiner, and component marks distribution for this exam session."
+      />
+
+      {/* ── 5. Bulk Delete Confirmation Modal ── */}
+      <DeleteImpactModal
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Delete Selected Subject Routines?"
+        subtitle={`You are about to delete ${selectedRowIds.size} selected subject routine entries.`}
+        entityName={`${selectedRowIds.size} Subject Routines`}
+        entityType="Routine Entries"
+        requireAck={false}
+        requireNameMatch={false}
+        confirmButtonText={`Delete ${selectedRowIds.size} Selected`}
+        warningMessage="Permanently deleting these selected subject routines will remove their examination schedules and mark breakdown configs from this exam session."
       />
     </div>
   );

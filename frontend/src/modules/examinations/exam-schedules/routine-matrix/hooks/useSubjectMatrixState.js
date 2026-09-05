@@ -4,37 +4,15 @@ import { fetchWithAuth } from '../../../../../utils/authService';
 import { examStore } from '../../../../../utils/stores/examStore';
 import { curriculumStore } from '../../../../../utils/stores/academicStore';
 import useExamData from '../../../hooks/useExamData';
+import {
+  generateDateRange,
+  formatShortDateLabel,
+  formatDateLabel,
+  DAY_NAMES,
+  MONTH_NAMES,
+} from '../../utils/examScheduleUtils';
 
-/**
- * Helper to generate an array of YYYY-MM-DD strings between two dates
- */
-const generateDateRange = (startDateStr, endDateStr) => {
-  if (!startDateStr || !endDateStr) return [];
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
-
-  const dates = [];
-  const current = new Date(start);
-  while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-};
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-export const formatShortDateLabel = (dateStr) => {
-  if (!dateStr) return 'TBD';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const dayName = DAY_NAMES[d.getDay()];
-  const monthName = MONTH_NAMES[d.getMonth()];
-  const dayNum = d.getDate();
-  return `${dayName}, ${dayNum} ${monthName}`;
-};
+export { formatShortDateLabel, formatDateLabel, generateDateRange };
 
 /**
  * useSubjectMatrixState
@@ -284,14 +262,25 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
   }, [designatedExamDays, activeExam]);
 
   // State for confirm overwrite modal
+  // State for confirm overwrite modal
   const [showAutoPopulateConfirm, setShowAutoPopulateConfirm] = useState(false);
 
-  // ✨ Execute Auto-Populate Routine from Curriculum Books
-  const executeAutoPopulate = useCallback(() => {
+  // ✨ Execute Auto-Populate Routine from Curriculum Books with Custom Invigilator & Examiner Strategies
+  const executeAutoPopulate = useCallback((config = {}) => {
     if (!activeExam) {
       showToast('Please select an active examination session first.', 'warning');
       return;
     }
+
+    const {
+      invigilatorStrategy = 'BALANCED_ROTATION',
+      invigilatorTeacherId = '',
+      invigilatorTeacherName = '',
+      examinerStrategy = 'SUBJECT_TEACHER',
+      examinerTeacherId = '',
+      examinerTeacherName = '',
+      overwriteMode = 'REPLACE',
+    } = config;
 
     const targetClasses = participatingClasses.length > 0 ? participatingClasses : allAvailableClasses;
     if (targetClasses.length === 0) {
@@ -363,7 +352,46 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       });
     }
 
+    // ─── 1. Map Invigilator Roster by Date & Shift Slot (Hall Guard Duty Roster) ───
+    const slotInvigilatorMap = {};
+    let slotTeacherIndex = 0;
+    examSlots.forEach((slot) => {
+      const slotKey = `${slot.date}___${slot.shiftId}`;
+      if (!slotInvigilatorMap[slotKey]) {
+        if (invigilatorStrategy === 'BALANCED_ROTATION') {
+          const teach = teacherPool[slotTeacherIndex % teacherPool.length];
+          slotInvigilatorMap[slotKey] = {
+            id: teach.id,
+            name: teach.name,
+          };
+          slotTeacherIndex++;
+        } else if (invigilatorStrategy === 'SPECIFIC_TEACHER') {
+          const matchedTeach = teacherPool.find((t) => String(t.id) === String(invigilatorTeacherId));
+          slotInvigilatorMap[slotKey] = {
+            id: String(invigilatorTeacherId || ''),
+            name: invigilatorTeacherName || matchedTeach?.name || '',
+          };
+        } else if (invigilatorStrategy === 'UNASSIGNED') {
+          slotInvigilatorMap[slotKey] = {
+            id: '',
+            name: '',
+          };
+        }
+      }
+    });
+
+    // ─── 2. Map Examiner by Unique Subject / Book (Subject Specialist Roster) ────
+    const subjectExaminerMap = {};
+    let subjectTeacherCounter = 0;
+
     const newRows = [];
+
+    // Helper map for append mode check
+    const existingMap = new Set(
+      (overwriteMode === 'APPEND' && Array.isArray(rows) ? rows : []).map(
+        (r) => `${String(r.classId || '')}___${String(r.curriculumBookId || r.subjectName || '').toLowerCase()}`
+      )
+    );
 
     targetClasses.forEach((cls) => {
       const clsIdStr = String(cls.id);
@@ -385,25 +413,73 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
         let slotIndex = 0;
         classBooks.forEach((book) => {
           const autoSubject = book.subject || book.subject_name || book.name || book.title || 'Subject';
-          
-          // Initial teacher allocation: respect existing teacher or randomly pick from teacherPool
-          let autoTeacherId = book.teacherId || book.teacher_id || '';
-          let autoTeacher = book.teacherName || book.teacher_name || book.teacher || '';
-          if (!autoTeacherId || !autoTeacher) {
-            const randomTeacher = teacherPool[Math.floor(Math.random() * teacherPool.length)];
-            autoTeacherId = randomTeacher.id;
-            autoTeacher = randomTeacher.name;
+          const bookKey = `${clsIdStr}___${String(book.id || autoSubject).toLowerCase()}`;
+
+          // Skip if append mode and already exists
+          if (overwriteMode === 'APPEND' && existingMap.has(bookKey)) {
+            return;
           }
 
-          const autoFullMarks = Number(book.fullMarks || book.full_marks || book.total_marks || defaultFullMarks);
-          const autoPassMarks = Number(book.passMarks || book.pass_marks || Math.round(autoFullMarks * 0.33));
-          
+          const bookTeacherId = String(book.teacherId || book.teacher_id || '');
+          const bookTeacherName = book.teacherName || book.teacher_name || book.teacher || '';
+
           const currentSlot = examSlots[slotIndex % examSlots.length];
           const assignedDate = currentSlot.date;
           const assignedShiftId = currentSlot.shiftId;
           const assignedShiftName = currentSlot.shiftName;
           const assignedStart = currentSlot.startTime;
           const assignedEnd = currentSlot.endTime;
+
+          // ── A. Resolve Paper Setter & Examiner (Subject-Specific) ──────────
+          let assignedExaminerId = '';
+          let assignedExaminerName = '';
+
+          if (examinerStrategy === 'SUBJECT_TEACHER') {
+            if (bookTeacherId && bookTeacherName) {
+              assignedExaminerId = bookTeacherId;
+              assignedExaminerName = bookTeacherName;
+            } else {
+              // Map distinct specialized teachers across different subject titles
+              const subjKey = String(book.name || book.title || autoSubject).trim().toLowerCase();
+              if (!subjectExaminerMap[subjKey]) {
+                const teach = teacherPool[subjectTeacherCounter % teacherPool.length];
+                subjectExaminerMap[subjKey] = teach;
+                subjectTeacherCounter++;
+              }
+              assignedExaminerId = subjectExaminerMap[subjKey].id;
+              assignedExaminerName = subjectExaminerMap[subjKey].name;
+            }
+          } else if (examinerStrategy === 'SPECIFIC_TEACHER') {
+            const matchedChief = teacherPool.find((t) => String(t.id) === String(examinerTeacherId));
+            assignedExaminerId = String(examinerTeacherId || '');
+            assignedExaminerName = examinerTeacherName || matchedChief?.name || '';
+          } else if (examinerStrategy === 'UNASSIGNED') {
+            assignedExaminerId = '';
+            assignedExaminerName = '';
+          }
+
+          // ── B. Resolve Hall Invigilator (Slot/Date-Specific) ───────────────
+          let assignedInvigilatorId = '';
+          let assignedInvigilatorName = '';
+
+          if (invigilatorStrategy === 'SUBJECT_TEACHER') {
+            assignedInvigilatorId = bookTeacherId || assignedExaminerId;
+            assignedInvigilatorName = bookTeacherName || assignedExaminerName;
+          } else {
+            const slotKey = `${assignedDate}___${assignedShiftId}`;
+            const slotGuard = slotInvigilatorMap[slotKey];
+            assignedInvigilatorId = slotGuard ? slotGuard.id : '';
+            assignedInvigilatorName = slotGuard ? slotGuard.name : '';
+          }
+
+          // If Examiner strategy is SAME_AS_INVIGILATOR, mirror the slot invigilator
+          if (examinerStrategy === 'SAME_AS_INVIGILATOR') {
+            assignedExaminerId = assignedInvigilatorId;
+            assignedExaminerName = assignedInvigilatorName;
+          }
+
+          const autoFullMarks = Number(book.fullMarks || book.full_marks || book.total_marks || defaultFullMarks);
+          const autoPassMarks = Number(book.passMarks || book.pass_marks || Math.round(autoFullMarks * 0.33));
 
           const subjectComponents = getExamDefaultComponents(autoFullMarks);
 
@@ -419,8 +495,14 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
             curriculumBookId: String(book.id),
             curriculumBookName: book.name || book.title || '',
             subjectName: autoSubject,
-            teacherId: autoTeacherId,
-            teacherName: autoTeacher,
+            teacherId: assignedInvigilatorId,
+            teacherName: assignedInvigilatorName,
+            invigilatorId: assignedInvigilatorId,
+            invigilatorName: assignedInvigilatorName,
+            examinerId: assignedExaminerId,
+            examinerName: assignedExaminerName,
+            evaluatorId: assignedExaminerId,
+            evaluatorName: assignedExaminerName,
             examDate: assignedDate,
             shiftId: assignedShiftId,
             shiftName: assignedShiftName,
@@ -443,7 +525,27 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
         };
 
         const fallbackComponents = getExamDefaultComponents(defaultFullMarks);
-        const randomTeacher = teacherPool[Math.floor(Math.random() * teacherPool.length)];
+        const fallbackSlotKey = `${currentSlot.date}___${currentSlot.shiftId}`;
+        const slotGuard = slotInvigilatorMap[fallbackSlotKey];
+
+        const assignedInvigilatorId = invigilatorStrategy === 'UNASSIGNED' ? '' : (slotGuard ? slotGuard.id : (teacherPool[0]?.id || ''));
+        const assignedInvigilatorName = invigilatorStrategy === 'UNASSIGNED' ? '' : (slotGuard ? slotGuard.name : (teacherPool[0]?.name || ''));
+
+        let assignedExaminerId = '';
+        let assignedExaminerName = '';
+        if (examinerStrategy === 'SUBJECT_TEACHER') {
+          const teach = teacherPool[subjectTeacherCounter % teacherPool.length];
+          assignedExaminerId = teach.id;
+          assignedExaminerName = teach.name;
+          subjectTeacherCounter++;
+        } else if (examinerStrategy === 'SAME_AS_INVIGILATOR') {
+          assignedExaminerId = assignedInvigilatorId;
+          assignedExaminerName = assignedInvigilatorName;
+        } else if (examinerStrategy === 'SPECIFIC_TEACHER') {
+          const matchedChief = teacherPool.find((t) => String(t.id) === String(examinerTeacherId));
+          assignedExaminerId = String(examinerTeacherId || '');
+          assignedExaminerName = examinerTeacherName || matchedChief?.name || '';
+        }
 
         newRows.push({
           id: `row_auto_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -457,8 +559,14 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
           curriculumBookId: null,
           curriculumBookName: '',
           subjectName: `${clsName} Subject`,
-          teacherId: randomTeacher.id,
-          teacherName: randomTeacher.name,
+          teacherId: assignedInvigilatorId,
+          teacherName: assignedInvigilatorName,
+          invigilatorId: assignedInvigilatorId,
+          invigilatorName: assignedInvigilatorName,
+          examinerId: assignedExaminerId,
+          examinerName: assignedExaminerName,
+          evaluatorId: assignedExaminerId,
+          evaluatorName: assignedExaminerName,
           examDate: currentSlot.date,
           shiftId: currentSlot.shiftId,
           shiftName: currentSlot.shiftName,
@@ -471,17 +579,24 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       }
     });
 
+    const finalRows = overwriteMode === 'APPEND' ? [...rows, ...newRows] : newRows;
+
     try {
-      examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, newRows);
+      examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, finalRows);
     } catch (e) {
       console.error('Failed to auto-save curriculum routine:', e);
     }
 
-    setRows(newRows);
+    setRows(finalRows);
     setIsDirty(false);
     setShowAutoPopulateConfirm(false);
     refreshExamData();
-    showToast(`Generated and saved ${newRows.length} subject routine entries from curriculum with invigilators assigned.`, 'success');
+    showToast(
+      overwriteMode === 'APPEND'
+        ? `Appended ${newRows.length} new subject routine entries from curriculum.`
+        : `Generated and saved ${newRows.length} subject routine entries with customized invigilators and examiners.`,
+      'success'
+    );
   }, [
     activeExam,
     participatingClasses,
@@ -493,6 +608,7 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     getExamDefaultComponents,
     tenantId,
     selectedExamId,
+    rows,
     refreshExamData,
     showToast,
   ]);
@@ -823,24 +939,23 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
   };
 
   // Bulk: Delete Selected (Instantly auto-saved)
-  const handleBulkDelete = () => {
+  const executeBulkDelete = useCallback(() => {
     if (selectedRowIds.size === 0) return;
-    if (window.confirm(`Delete ${selectedRowIds.size} selected subject routine entries?`)) {
-      setRows((prev) => {
-        const nextRows = prev.filter((r) => !selectedRowIds.has(r.id));
-        try {
-          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextRows);
-        } catch (e) {
-          console.error(e);
-        }
-        return nextRows;
-      });
-      setSelectedRowIds(new Set());
-      setIsDirty(false);
-      refreshExamData();
-      showToast('Selected entries removed and saved.', 'info');
-    }
-  };
+    const count = selectedRowIds.size;
+    setRows((prev) => {
+      const nextRows = prev.filter((r) => !selectedRowIds.has(r.id));
+      try {
+        examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextRows);
+      } catch (e) {
+        console.error('Failed to save bulk delete:', e);
+      }
+      return nextRows;
+    });
+    setSelectedRowIds(new Set());
+    setIsDirty(false);
+    refreshExamData();
+    showToast(`Removed ${count} selected subject routine entries.`, 'info');
+  }, [selectedRowIds, tenantId, selectedExamId, refreshExamData, showToast]);
 
   // ─── Core Persistent Save Routine ──────────────────────────────────────────
   const handleSaveAll = () => {
@@ -982,6 +1097,7 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     participatingClasses,
     allAvailableClasses,
     availableCurriculumBooks,
+    teachers,
     baseDateOptions,
     shiftOptions,
     examOptions,
@@ -1011,7 +1127,8 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     handleDeleteRow,
     handleDuplicateRow,
     handleUpsertRow,
-    handleBulkDelete,
+    executeBulkDelete,
+    handleBulkDelete: executeBulkDelete,
     handleSaveAll,
   };
 }

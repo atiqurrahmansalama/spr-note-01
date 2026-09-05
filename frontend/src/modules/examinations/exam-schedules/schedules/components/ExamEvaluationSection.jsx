@@ -218,7 +218,7 @@ export default function ExamEvaluationSection({
                           type="button"
                           onClick={() => onRemoveComponent(idx)}
                           title="Remove component"
-                          className="text-[11px] font-semibold theme-text-secondary hover:text-rose-500 cursor-pointer flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md hover:theme-bg-danger-soft active:scale-95"
+                          className="text-[11px] font-semibold theme-text-secondary hover:theme-danger cursor-pointer flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md hover:theme-bg-danger-soft active:scale-95"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
                           <span className="hidden @[480px]:inline">Remove</span>
@@ -499,7 +499,7 @@ export default function ExamEvaluationSection({
                         type="button"
                         onClick={() => onRemovePreviousExam(idx)}
                         title="Remove linked exam"
-                        className="text-[11px] font-semibold theme-text-secondary hover:text-rose-500 cursor-pointer flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md hover:theme-bg-danger-soft active:scale-95 shrink-0"
+                        className="text-[11px] font-semibold theme-text-secondary hover:theme-danger cursor-pointer flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md hover:theme-bg-danger-soft active:scale-95 shrink-0"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
                         <span className="hidden @[480px]:inline">Remove</span>

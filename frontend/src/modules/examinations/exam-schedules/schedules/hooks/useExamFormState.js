@@ -1,17 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useToast } from '../../../../../context/ToastContext';
 import { examStore } from '../../../../../utils/stores/examStore';
 import { masterCalendarStore } from '../../../../../utils/stores/calendarStore';
 import { readJSON, writeJSON } from '../../../../../utils/stores/coreStore';
+import { DEFAULT_SHIFT_PRESETS } from '../../utils/examScheduleUtils';
 
-export const DEFAULT_SHIFT_PRESETS = [
-  { name: 'Shift 1', startTime: '09:00 AM', endTime: '11:00 AM' },
-  { name: 'Shift 2', startTime: '11:30 AM', endTime: '01:30 PM' },
-  { name: 'Shift 3', startTime: '02:00 PM', endTime: '04:00 PM' },
-  { name: 'Shift 4', startTime: '04:30 PM', endTime: '06:30 PM' },
-  { name: 'Shift 5', startTime: '07:00 PM', endTime: '09:00 PM' },
-  { name: 'Shift 6', startTime: '09:30 PM', endTime: '11:30 PM' },
-];
+export { DEFAULT_SHIFT_PRESETS };
 
 /**
  * useExamFormState
@@ -36,6 +30,7 @@ export default function useExamFormState({
   const { showToast } = useToast();
 
   const draftKey = `spr_exam_form_draft_${tenantId}_${exam?.id || 'new'}`;
+  const isSavedRef = useRef(false);
   const savedDraft = useMemo(() => {
     return readJSON(draftKey, null);
   }, [draftKey]);
@@ -201,18 +196,113 @@ export default function useExamFormState({
 
   // ── Step 2: Departments & Classes ─────────────────────────────────────────
   const [departmentId, setDepartmentId] = useState(() => {
+    if (Array.isArray(savedDraft?.departmentId)) {
+      return savedDraft.departmentId.map(String);
+    }
+    if (Array.isArray(savedDraft?.departmentIds)) {
+      return savedDraft.departmentIds.map(String);
+    }
     if (savedDraft?.departmentId !== undefined && savedDraft?.departmentId !== null) {
-      return String(savedDraft.departmentId);
+      const val = String(savedDraft.departmentId);
+      return val.includes(',') ? val.split(',').map((s) => s.trim()) : [val];
+    }
+    if (Array.isArray(exam?.departmentId)) {
+      return exam.departmentId.map(String);
+    }
+    if (Array.isArray(exam?.departmentIds)) {
+      return exam.departmentIds.map(String);
     }
     if (exam?.departmentId !== undefined && exam?.departmentId !== null) {
-      return String(exam.departmentId);
+      const val = String(exam.departmentId);
+      return val.includes(',') ? val.split(',').map((s) => s.trim()) : [val];
     }
-    return 'ALL';
+    return ['ALL'];
   });
+
+  const [isMultiDepartmentSchedule, setIsMultiDepartmentSchedule] = useState(
+    savedDraft?.isMultiDepartmentSchedule ?? exam?.isMultiDepartmentSchedule ?? false
+  );
+
+  const [departmentSchedules, setDepartmentSchedules] = useState(() => {
+    if (Array.isArray(savedDraft?.departmentSchedules) && savedDraft.departmentSchedules.length > 0) {
+      return savedDraft.departmentSchedules;
+    }
+    if (Array.isArray(exam?.departmentSchedules) && exam.departmentSchedules.length > 0) {
+      return exam.departmentSchedules;
+    }
+    return [];
+  });
+
+  // Extract all participating departments based on departmentOptions and selected departmentId
+  const activeDepartments = useMemo(() => {
+    const deptsMap = new Map();
+    const cleanDepts = (departmentOptions || []).filter((d) => d.value && d.value !== 'ALL');
+
+    const currentDeptList = Array.isArray(departmentId)
+      ? departmentId.map(String)
+      : typeof departmentId === 'string' && departmentId.trim()
+      ? (departmentId.includes(',') ? departmentId.split(',').map((s) => s.trim()) : [departmentId.trim()])
+      : ['ALL'];
+
+    const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
+
+    if (!hasAll) {
+      cleanDepts.forEach((d) => {
+        if (currentDeptList.includes(String(d.value))) {
+          deptsMap.set(String(d.value), { label: d.label, code: d.code || '' });
+        }
+      });
+    } else {
+      cleanDepts.forEach((d) => {
+        deptsMap.set(String(d.value), { label: d.label, code: d.code || '' });
+      });
+    }
+
+    return Array.from(deptsMap.entries()).map(([value, info]) => ({
+      value,
+      label: info.label,
+      code: info.code,
+    }));
+  }, [departmentOptions, departmentId]);
+
+  // Synchronize departmentSchedules when active departments or exam dates change
+  useEffect(() => {
+    if (!isMultiDepartmentSchedule) return;
+
+    setDepartmentSchedules((prev) => {
+      return activeDepartments.map((dept) => {
+        const existing = prev.find((p) => String(p.departmentId) === String(dept.value));
+        return {
+          departmentId: String(dept.value),
+          departmentName: dept.label || 'Department',
+          departmentCode: dept.code || '',
+          startDate: existing?.startDate || startDate,
+          endDate: existing?.endDate || endDate,
+          prepStartDate: existing?.prepStartDate || prepStartDate || '',
+          prepEndDate: existing?.prepEndDate || prepEndDate || '',
+        };
+      });
+    });
+  }, [isMultiDepartmentSchedule, activeDepartments, startDate, endDate, prepStartDate, prepEndDate]);
+
+  const handleUpdateDepartmentSchedule = (deptId, fieldOrObject, value) => {
+    setDepartmentSchedules((prev) =>
+      prev.map((ds) => {
+        if (String(ds.departmentId) === String(deptId)) {
+          if (typeof fieldOrObject === 'object' && fieldOrObject !== null) {
+            return { ...ds, ...fieldOrObject };
+          }
+          return { ...ds, [fieldOrObject]: value };
+        }
+        return ds;
+      })
+    );
+  };
 
   useEffect(() => {
     if (exam?.departmentId !== undefined && exam?.departmentId !== null && !savedDraft) {
-      setDepartmentId(String(exam.departmentId));
+      const val = exam.departmentId;
+      setDepartmentId(Array.isArray(val) ? val.map(String) : [String(val)]);
     }
   }, [exam?.departmentId, savedDraft]);
 
@@ -233,21 +323,37 @@ export default function useExamFormState({
   }, [exam?.targetClassIds, savedDraft]);
 
   const visibleClasses = useMemo(() => {
-    if (!departmentId || departmentId === 'ALL') {
+    const currentDeptList = Array.isArray(departmentId)
+      ? departmentId.map(String)
+      : typeof departmentId === 'string' && departmentId.trim()
+      ? (departmentId.includes(',') ? departmentId.split(',').map((s) => s.trim()) : [departmentId.trim()])
+      : ['ALL'];
+
+    const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
+
+    if (hasAll) {
       return classOptions;
     }
     return classOptions.filter(
-      (c) => c.departmentId && String(c.departmentId) === String(departmentId)
+      (c) => c.departmentId && currentDeptList.includes(String(c.departmentId))
     );
   }, [classOptions, departmentId]);
 
   useEffect(() => {
     if (!exam?.id && !savedDraft && classOptions.length > 0 && targetClassIds.length === 0) {
-      if (!departmentId || departmentId === 'ALL') {
+      const currentDeptList = Array.isArray(departmentId)
+        ? departmentId.map(String)
+        : typeof departmentId === 'string' && departmentId.trim()
+        ? (departmentId.includes(',') ? departmentId.split(',').map((s) => s.trim()) : [departmentId.trim()])
+        : ['ALL'];
+
+      const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
+
+      if (hasAll) {
         setTargetClassIds(classOptions.map((c) => String(c.value)));
       } else {
         const matching = classOptions.filter(
-          (c) => c.departmentId && String(c.departmentId) === String(departmentId)
+          (c) => c.departmentId && currentDeptList.includes(String(c.departmentId))
         );
         setTargetClassIds(
           matching.length > 0
@@ -258,21 +364,35 @@ export default function useExamFormState({
     }
   }, [classOptions, departmentId, exam?.id, savedDraft, targetClassIds.length]);
 
-  const handleDepartmentChange = (newDeptId) => {
-    const strDeptId = String(newDeptId || 'ALL');
-    setDepartmentId(strDeptId);
-
-    if (!strDeptId || strDeptId === 'ALL') {
-      setTargetClassIds(classOptions.map((c) => String(c.value)));
+  const handleDepartmentChange = (newDeptVal) => {
+    let nextList = [];
+    if (Array.isArray(newDeptVal)) {
+      nextList = newDeptVal.map(String);
+    } else if (typeof newDeptVal === 'string' && newDeptVal.trim()) {
+      nextList = newDeptVal.includes(',')
+        ? newDeptVal.split(',').map((s) => s.trim())
+        : [newDeptVal.trim()];
     } else {
-      const matchingClasses = classOptions.filter(
-        (c) => c.departmentId && String(c.departmentId) === strDeptId
-      );
-      if (matchingClasses.length > 0) {
-        setTargetClassIds(matchingClasses.map((c) => String(c.value)));
-      } else {
-        setTargetClassIds([]);
-      }
+      nextList = ['ALL'];
+    }
+
+    if (nextList.length === 0) {
+      nextList = ['ALL'];
+    }
+
+    setDepartmentId(nextList);
+
+    const hasAll = nextList.includes('ALL');
+    const matchedClasses = hasAll
+      ? classOptions
+      : classOptions.filter(
+          (c) => c.departmentId && nextList.includes(String(c.departmentId))
+        );
+
+    if (matchedClasses.length > 0) {
+      setTargetClassIds(matchedClasses.map((c) => String(c.value)));
+    } else {
+      setTargetClassIds([]);
     }
   };
 
@@ -479,9 +599,12 @@ export default function useExamFormState({
   const [rankingScope, setRankingScope] = useState(savedDraft?.rankingScope ?? exam?.rankingConfig?.scope ?? 'CLASS_AND_SECTION');
   const [failSubjectRule, setFailSubjectRule] = useState(savedDraft?.failSubjectRule ?? exam?.rankingConfig?.failSubjectRule ?? 'EXCLUDE_FROM_MERIT');
 
-  // ── Auto-Save Draft ───────────────────────────────────────────────────────
+  // ── Auto-Save Draft to Local Storage (Debounced 300ms) ──────────────────────
   useEffect(() => {
+    if (isSavedRef.current) return;
+
     const timer = setTimeout(() => {
+      if (isSavedRef.current) return;
       const hasContent = Boolean(
         name.trim() ||
         code.trim() ||
@@ -505,6 +628,8 @@ export default function useExamFormState({
           semesterId,
           gradingSystemId,
           departmentId,
+          isMultiDepartmentSchedule,
+          departmentSchedules,
           targetClassIds,
           startDate,
           endDate,
@@ -541,6 +666,8 @@ export default function useExamFormState({
     semesterId,
     gradingSystemId,
     departmentId,
+    isMultiDepartmentSchedule,
+    departmentSchedules,
     targetClassIds,
     startDate,
     endDate,
@@ -582,7 +709,12 @@ export default function useExamFormState({
     setAcademicYearId(defYear);
     setSemesterId(exam?.semesterId ? String(exam.semesterId) : (semesterOptions[0]?.value || 'annual_term'));
     setGradingSystemId(exam?.gradingSystemId || gradingSystemOptions[0]?.value || 'dars_e_nizami_standard');
-    setDepartmentId(exam?.departmentId !== undefined && exam?.departmentId !== null ? String(exam.departmentId) : 'ALL');
+    const initDept = exam?.departmentIds
+      ? (Array.isArray(exam.departmentIds) ? exam.departmentIds.map(String) : [String(exam.departmentIds)])
+      : exam?.departmentId !== undefined && exam?.departmentId !== null
+      ? (Array.isArray(exam.departmentId) ? exam.departmentId.map(String) : [String(exam.departmentId)])
+      : ['ALL'];
+    setDepartmentId(initDept);
     setTargetClassIds(Array.isArray(exam?.targetClassIds) ? exam.targetClassIds.map(String) : []);
     setStartDate(exam?.startDate || new Date().toISOString().split('T')[0]);
     setEndDate(exam?.endDate || new Date().toISOString().split('T')[0]);
@@ -650,7 +782,26 @@ export default function useExamFormState({
         academicYears.find((y) => String(y.id || y.academic_year || y.year_code) === String(academicYearId)) ||
         selectedYear;
       const selectedSemObj = semesterOptions.find((s) => String(s.value) === String(semesterId));
-      const selectedDeptObj = departmentOptions.find((d) => String(d.value) === String(departmentId));
+      
+      const currentDeptList = Array.isArray(departmentId)
+        ? departmentId.map(String)
+        : typeof departmentId === 'string' && departmentId.trim()
+        ? (departmentId.includes(',') ? departmentId.split(',').map((s) => s.trim()) : [departmentId.trim()])
+        : ['ALL'];
+
+      const hasAllDepts = currentDeptList.includes('ALL') || currentDeptList.length === 0;
+
+      let resolvedDeptName = 'All Departments';
+      if (!hasAllDepts) {
+        const selectedDeptNames = departmentOptions
+          .filter((d) => currentDeptList.includes(String(d.value)))
+          .map((d) => d.label);
+        resolvedDeptName = selectedDeptNames.join(', ') || 'Selected Departments';
+      }
+
+      const finalDeptId = hasAllDepts
+        ? 'ALL'
+        : (currentDeptList.length === 1 ? currentDeptList[0] : currentDeptList);
 
       const finalTargetClassIds =
         targetClassIds.length > 0
@@ -664,14 +815,17 @@ export default function useExamFormState({
         academicYearName: selectedYearObj?.name || selectedYearObj?.academic_year || 'Academic Year',
         semesterId: String(semesterId || (semesterOptions[0]?.value || 'annual_term')),
         semesterName: selectedSemObj?.term?.name || selectedSemObj?.label || 'Semester',
-        departmentId: departmentId || 'ALL',
-        departmentName: selectedDeptObj?.label || (departmentId === 'ALL' ? 'All Departments' : 'Department'),
+        departmentId: finalDeptId,
+        departmentIds: hasAllDepts ? ['ALL'] : currentDeptList,
+        departmentName: resolvedDeptName,
         gradingSystemId,
         targetClassIds: finalTargetClassIds,
         startDate,
         endDate,
         prepStartDate: prepStartDate || null,
         prepEndDate: prepEndDate || null,
+        isMultiDepartmentSchedule: Boolean(isMultiDepartmentSchedule),
+        departmentSchedules: isMultiDepartmentSchedule ? departmentSchedules : [],
         scheduleDays,
         description: description.trim(),
         shifts: shifts.map((s, idx) => ({
@@ -783,7 +937,8 @@ export default function useExamFormState({
         console.warn('Event Calendar Sync Notice:', syncErr);
       }
 
-      // Clean up draft
+      // Clean up draft and lock from re-saving
+      isSavedRef.current = true;
       try {
         localStorage.removeItem(draftKey);
       } catch {}
@@ -836,6 +991,12 @@ export default function useExamFormState({
     // Step 2: Classes & Faculty
     departmentId,
     handleDepartmentChange,
+    isMultiDepartmentSchedule,
+    setIsMultiDepartmentSchedule,
+    departmentSchedules,
+    setDepartmentSchedules,
+    activeDepartments,
+    handleUpdateDepartmentSchedule,
     visibleClasses,
     targetClassIds,
     handleClassToggle,

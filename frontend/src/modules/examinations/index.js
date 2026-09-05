@@ -1,7 +1,9 @@
 export { default as ExaminationsHubView } from './ExaminationsHubView';
+export { default as ExamSchedulesHubView } from './exam-schedules/ExamSchedulesHubView';
 export { default as ExamSchedulesView } from './exam-schedules/schedules/ExamSchedulesView';
 export { default as ExamFormDrawer } from './exam-schedules/schedules/ExamFormDrawer';
 export { default as SubjectRoutineMatrixView } from './exam-schedules/routine-matrix/SubjectRoutineMatrixView';
+export { default as InvigilationScheduleView } from './exam-schedules/invigilation/InvigilationScheduleView';
 export { default as MarkEntryDeskView } from './mark-entry/MarkEntryDeskView';
 export { default as TabulationLedgerView } from './tabulation/TabulationLedgerView';
 export { default as ResultGazetteModal } from './tabulation/ResultGazetteModal';

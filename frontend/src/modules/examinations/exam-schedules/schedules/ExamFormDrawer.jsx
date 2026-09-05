@@ -6,8 +6,6 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  HistoryIcon,
-  TrashIcon,
 } from '../../../../components/ui/Icons';
 import useExamFormState from './hooks/useExamFormState';
 
@@ -72,27 +70,6 @@ export default function ExamFormDrawer({
           />
         </div>
 
-        {/* Restored Draft Notice Banner */}
-        {form.isDraftRestored && (
-          <div className="flex items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-subtle text-xs animate-fade-in">
-            <div className="flex items-center gap-2 theme-text-primary font-medium">
-              <HistoryIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Unsaved draft restored from your previous session.</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <CustomButton
-                type="button"
-                variant="sub"
-                size="xs"
-                onClick={form.handleDiscardDraft}
-                icon={TrashIcon}
-              >
-                Discard Draft
-              </CustomButton>
-            </div>
-          </div>
-        )}
-
         {/* STEP 1: Examination Information & Schedule */}
         {form.step === 1 && (
           <ExamGeneralScheduleSection
@@ -130,7 +107,7 @@ export default function ExamFormDrawer({
           />
         )}
 
-        {/* STEP 2: Target Faculty & Classes */}
+        {/* STEP 2: Target Faculty, Classes & Department Date Windows */}
         {form.step === 2 && (
           <ExamClassesSection
             departmentOptions={departmentOptions}
@@ -140,6 +117,14 @@ export default function ExamFormDrawer({
             targetClassIds={form.targetClassIds}
             onClassToggle={form.handleClassToggle}
             onSelectAllClasses={form.handleSelectAllClasses}
+            isMultiDepartmentSchedule={form.isMultiDepartmentSchedule}
+            onMultiDepartmentScheduleToggle={form.setIsMultiDepartmentSchedule}
+            departmentSchedules={form.departmentSchedules}
+            onDepartmentScheduleChange={form.handleUpdateDepartmentSchedule}
+            globalStartDate={form.startDate}
+            globalEndDate={form.endDate}
+            globalPrepStartDate={form.prepStartDate}
+            globalPrepEndDate={form.prepEndDate}
           />
         )}
 

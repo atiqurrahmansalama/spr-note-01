@@ -1,17 +1,27 @@
 import React from 'react';
 import CustomSelect from '../../../../../components/ui/CustomSelect';
+import CustomCheckbox from '../../../../../components/ui/CustomCheckbox';
+import ReusableCalendar from '../../../../../components/common/ReusableCalendar';
 import { DrawerSection } from '../../../../../components/layout';
-import { AcademicCapIcon, BuildingLibraryIcon, CheckIcon } from '../../../../../components/ui/Icons';
+import {
+  AcademicCapIcon,
+  BuildingLibraryIcon,
+  CheckIcon,
+  CalendarIcon,
+  DepartmentIcon,
+  RefreshIcon,
+} from '../../../../../components/ui/Icons';
 
 /**
  * ExamClassesSection
- * Wizard Step 2: Target Department & Participating Classes Selection.
+ * Wizard Step 2: Target Department, Participating Classes & Multi-Department Date Windows.
  * 
  * Follows SPR Note Enterprise Engineering Guidelines:
  * - 100% Theme Tokens & Zero Hardcoded Colors
  * - Container Queries (@container, @[480px]:grid-cols-2)
  * - Reusable DrawerSection components
  * - Highly aesthetic interactive class selection cards
+ * - Multi-Department Custom Date Windows mapping with ReusableCalendar
  */
 export default function ExamClassesSection({
   departmentOptions = [],
@@ -21,6 +31,14 @@ export default function ExamClassesSection({
   targetClassIds = [],
   onClassToggle,
   onSelectAllClasses,
+  isMultiDepartmentSchedule = false,
+  onMultiDepartmentScheduleToggle,
+  departmentSchedules = [],
+  onDepartmentScheduleChange,
+  globalStartDate = '',
+  globalEndDate = '',
+  globalPrepStartDate = '',
+  globalPrepEndDate = '',
 }) {
   const visibleSelectedCount = visibleClasses.filter((c) =>
     targetClassIds.some((id) => String(id) === String(c.value))
@@ -30,15 +48,17 @@ export default function ExamClassesSection({
     <div className="space-y-6 animate-fade-in">
       {/* ── Sub-Section 1: Target Department & Faculty Scope ── */}
       <DrawerSection
-        title="Target Faculty & Department Scope"
+        title="Target Department Scope"
         icon={BuildingLibraryIcon}
         className="!pt-0"
       >
         <CustomSelect
-          label="Target Academic Department / Faculty"
+          label={false}
           options={departmentOptions}
           value={departmentId}
           onChange={onDepartmentChange}
+          multiple={true}
+          placeholder="Select Department..."
         />
       </DrawerSection>
 
@@ -119,6 +139,119 @@ export default function ExamClassesSection({
             })}
           </div>
         )}
+      </DrawerSection>
+
+      {/* ── Sub-Section 3: Multi-Department Date Windows ── */}
+      <DrawerSection
+        title="Department Exam Date Windows"
+        subtitle="Configure independent date spans for each participating department"
+        icon={CalendarIcon}
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl border theme-border theme-bg-sub/20 flex items-start gap-3">
+            <CustomCheckbox
+              checked={isMultiDepartmentSchedule}
+              onChange={onMultiDepartmentScheduleToggle}
+            />
+            <div className="space-y-0.5 min-w-0 flex-1 cursor-pointer" onClick={() => onMultiDepartmentScheduleToggle(!isMultiDepartmentSchedule)}>
+              <div className="text-xs font-bold theme-text-primary">
+                Enable Department-Specific Date Windows
+              </div>
+              <div className="text-[11px] theme-text-secondary">
+                Assign separate examination start and end dates to each department under this term session.
+              </div>
+            </div>
+          </div>
+
+          {isMultiDepartmentSchedule && (
+            <div className="space-y-3 pt-1 animate-fade-in">
+              {departmentSchedules.length === 0 ? (
+                <div className="p-4 text-center border border-dashed theme-border rounded-xl theme-bg-sub/10 text-xs theme-text-secondary">
+                  No departments selected. Select departments or participating classes above.
+                </div>
+              ) : (
+                departmentSchedules.map((ds) => {
+                  const isModified = Boolean(
+                    (ds.startDate && ds.startDate !== globalStartDate) ||
+                    (ds.endDate && ds.endDate !== globalEndDate) ||
+                    ((ds.prepStartDate || '') !== (globalPrepStartDate || '')) ||
+                    ((ds.prepEndDate || '') !== (globalPrepEndDate || ''))
+                  );
+
+                  return (
+                    <div
+                      key={ds.departmentId}
+                      className="p-3.5 rounded-2xl border theme-border theme-bg-surface space-y-3 shadow-2xs transition-all hover:border-[var(--accent-main)]/40"
+                    >
+                      {/* Header: Dept Name & Code */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 border border-[var(--accent-main)]/20">
+                            <DepartmentIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold theme-text-primary truncate">
+                            {ds.departmentName}
+                          </span>
+                        </div>
+
+                        {isModified && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDepartmentScheduleChange(ds.departmentId, {
+                                startDate: globalStartDate,
+                                endDate: globalEndDate,
+                                prepStartDate: globalPrepStartDate,
+                                prepEndDate: globalPrepEndDate,
+                              });
+                            }}
+                            className="text-[11px] font-semibold theme-accent hover:underline inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95 animate-fade-in"
+                            title="Reset to main examination dates"
+                          >
+                            <RefreshIcon className="w-3 h-3 theme-accent" />
+                            <span>Reset to Term Dates</span>
+                          </button>
+                        )}
+                      </div>
+
+                    {/* Date Ranges Grid Reusing ReusableCalendar */}
+                    <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
+                      <ReusableCalendar
+                        label="Preparation Date Range"
+                        placeholder="Select Preparation Dates"
+                        isRange={true}
+                        startDate={ds.prepStartDate || ''}
+                        endDate={ds.prepEndDate || ''}
+                        onRangeSelect={(start, end) =>
+                          onDepartmentScheduleChange(ds.departmentId, {
+                            prepStartDate: start,
+                            prepEndDate: end,
+                          })
+                        }
+                        clearable
+                      />
+                      <ReusableCalendar
+                        label="Exam Date Range"
+                        placeholder="Select Exam Dates"
+                        isRange={true}
+                        startDate={ds.startDate || globalStartDate}
+                        endDate={ds.endDate || globalEndDate}
+                        onRangeSelect={(start, end) =>
+                          onDepartmentScheduleChange(ds.departmentId, {
+                            startDate: start,
+                            endDate: end,
+                          })
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            </div>
+          )}
+        </div>
       </DrawerSection>
     </div>
   );
