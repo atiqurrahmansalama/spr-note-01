@@ -123,29 +123,42 @@ function parseErrorDetails(error, errorInfo) {
 }
 
 /**
- * Formats a clean Markdown diagnostic report ready for copying and bug tracking.
+ * Formats a clean, highly concise Markdown diagnostic report ready for copying and instant debugging.
+ * Strips away massive node_modules/internal bundler noise while keeping exact source locations.
  */
 function buildMarkdownReport(diagnostics) {
-  return [
+  // Extract only clean application frames (non-internal)
+  const appFrames = (diagnostics.parsedFrames || []).filter((f) => !f.isInternal && f.file);
+  const formattedAppStack = appFrames.length > 0
+    ? appFrames.map((f, i) => `  ${i + 1}. at <${f.fnName}> (${f.file}${f.line ? `:${f.line}:${f.column}` : ''})`).join('\n')
+    : null;
+
+  // Extract top relevant component hierarchy from React Component Stack (up to 4 levels)
+  const compHierarchy = (diagnostics.componentStack || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('at ') && !l.includes('node_modules') && !l.includes('div') && !l.includes('Suspense'))
+    .slice(0, 5)
+    .map((l) => `  - ${l}`)
+    .join('\n');
+
+  const reportSections = [
     `# Bug Report: ${diagnostics.name}`,
     `**Message:** ${diagnostics.message}`,
     `**File Location:** \`${diagnostics.locationString}\``,
-    `**Component / Function:** \`<${diagnostics.culpritFunction} />\``,
-    `**Timestamp:** ${diagnostics.timestamp}`,
+    `**Component Scope:** \`<${diagnostics.culpritFunction} />\``,
     `**Route:** \`${diagnostics.routePath || '/'}\``,
-    `**URL:** ${diagnostics.currentUrl}`,
-    `**User Agent:** ${diagnostics.userAgent}`,
-    '',
-    '## Call Stack Trace',
-    '```text',
-    diagnostics.rawStack || 'No stack trace captured',
-    '```',
-    '',
-    '## React Component Stack',
-    '```text',
-    diagnostics.componentStack || 'No component stack captured',
-    '```',
-  ].join('\n');
+  ];
+
+  if (formattedAppStack) {
+    reportSections.push('', '## Application Call Stack', '```text', formattedAppStack, '```');
+  }
+
+  if (compHierarchy) {
+    reportSections.push('', '## Component Hierarchy', '```text', compHierarchy, '```');
+  }
+
+  return reportSections.join('\n');
 }
 
 export class ErrorBoundary extends React.Component {
@@ -238,36 +251,63 @@ export class ErrorBoundary extends React.Component {
                 </div>
               </div>
 
-              {/* Quick Copy Report Button */}
-              <button
-                type="button"
-                onClick={() => this.handleCopy('full', markdownReport)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 self-stretch sm:self-auto justify-center ${
-                  this.state.copyStatus === 'full'
-                    ? 'theme-bg-accent theme-accent-text'
-                    : 'theme-bg-sub border theme-border theme-text-primary hover:theme-bg-elevated'
-                }`}
-                title="Copy full diagnostic report formatted in Markdown"
-              >
-                {this.state.copyStatus === 'full' ? (
-                  <>
-                    <CheckIcon className="w-3.5 h-3.5" />
-                    <span>Report Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5 theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>Copy Full Report</span>
-                  </>
-                )}
-              </button>
+              {/* Quick Copy Report Buttons */}
+              <div className="flex items-center gap-2 flex-wrap shrink-0 self-stretch sm:self-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    this.handleCopy(
+                      'summary',
+                      `**${diagnostics.name}:** ${diagnostics.message}\n**Location:** \`${diagnostics.locationString}\``
+                    )
+                  }
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    this.state.copyStatus === 'summary'
+                      ? 'theme-bg-accent theme-accent-text'
+                      : 'theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
+                  }`}
+                  title="Copy short 2-line summary for quick sharing"
+                >
+                  {this.state.copyStatus === 'summary' ? (
+                    <>
+                      <CheckIcon className="w-3.5 h-3.5" />
+                      <span>Summary Copied!</span>
+                    </>
+                  ) : (
+                    <span>Copy Summary</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => this.handleCopy('full', markdownReport)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    this.state.copyStatus === 'full'
+                      ? 'theme-bg-accent theme-accent-text'
+                      : 'theme-bg-accent theme-accent-text hover:opacity-90'
+                  }`}
+                  title="Copy structured diagnostic report (concise, noise-free)"
+                >
+                  {this.state.copyStatus === 'full' ? (
+                    <>
+                      <CheckIcon className="w-3.5 h-3.5" />
+                      <span>Report Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Copy Clean Report</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Culprit File Origin Banner */}

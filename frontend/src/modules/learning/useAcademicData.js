@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
-import { academicYearsStore } from '../../utils/stores/academicStore';
-import { readJSON, writeJSON } from '../../utils/stores/coreStore';
+import { academicYearsStore } from '@/stores/academicStore';
+import { readJSON, writeJSON } from '@/stores/coreStore';
 import { getBranches, getDepartments } from '../../api/academy';
 
 /**

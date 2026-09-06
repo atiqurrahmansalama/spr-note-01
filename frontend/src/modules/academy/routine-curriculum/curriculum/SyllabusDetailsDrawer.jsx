@@ -11,7 +11,7 @@ import {
   ChartBarIcon,
   TimerIcon,
 } from '../../../../components/ui/Icons';
-import { weeklyHolidaysStore } from '../../../../utils/stores/calendarStore';
+import { weeklyHolidaysStore } from '@/stores/calendarStore';
 
 export default function SyllabusDetailsDrawer({
   item,

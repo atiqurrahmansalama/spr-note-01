@@ -161,7 +161,8 @@ export function TenantProvider({ children }) {
   const value = {
     institutions,
     currentInstitution,
-    activeTenantId,
+    activeTenant: currentInstitution,
+    activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
     isMultiTenantAdmin,
     isLoadingInstitutions,
     switchInstitution,

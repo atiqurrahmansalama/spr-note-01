@@ -1478,6 +1478,176 @@ export const DEFAULT_CURRICULUM_ITEMS = [
     notes: "Daily review and bedtime Sunnah Duas.",
     updatedAt: "2026-08-25T11:00:00.000Z",
   },
+
+  // ── Class 4: Nazera Division (cls_4) ────────────────────────────────
+  {
+    id: "syllabus_nazera_1",
+    name: "Noorani Qaida & Basic Tajweed",
+    subject: "Noorani Qaida & Phonetics",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_1",
+    period_order: 1,
+    periodName: "1st Period: Noorani Qaida & Phonetics",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 32,
+    currentPage: 20,
+    totalPages: 32,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Basic Arabic letters, pronunciation, and Makharij.",
+    updatedAt: "2026-08-25T09:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_2",
+    name: "Quran Nazira (Para 1-5)",
+    subject: "Quran Nazira Recitation",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_2",
+    period_order: 2,
+    periodName: "2nd Period: Quran Nazira Recitation",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 100,
+    currentPage: 65,
+    totalPages: 100,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Supervised fluent reading practice with Tajweed.",
+    updatedAt: "2026-08-26T10:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_3",
+    name: "Tajweed Rules & Makharij Practice",
+    subject: "Tajweed & Pronunciation",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_3",
+    period_order: 3,
+    periodName: "3rd Period: Tajweed & Makharij Rules",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 40,
+    currentPage: 25,
+    totalPages: 40,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Rules of Gunnah, Ikhfa, Idgham, and Iqlab.",
+    updatedAt: "2026-08-25T11:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_4",
+    name: "Masnoon Duas & Daily Adab",
+    subject: "Daily Duas & Akhlaq",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_4",
+    period_order: 4,
+    periodName: "4th Period: Masnoon Duas & Daily Adab",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 50,
+    currentPage: 30,
+    totalPages: 50,
+    targetDate: "2026-06-30",
+    status: "IN_PROGRESS",
+    notes: "Essential daily Sunnah duas and Islamic etiquette.",
+    updatedAt: "2026-08-24T12:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_5",
+    name: "Short Surahs Memorization (Surah An-Nas to Al-Fil)",
+    subject: "Surah Memorization",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_5",
+    period_order: 5,
+    periodName: "5th Period: Surah Memorization & Revision",
+    semester: "1st Semester",
+    teacherName: "Hafiz Qari Osman",
+    teacherId: "teacher_4",
+    startPage: 1,
+    endPage: 20,
+    currentPage: 14,
+    totalPages: 20,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Memorization of last 10 Surahs with correct Tajweed.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_6",
+    name: "Elementary Bengali (Bangla Bornomala & Sahitya)",
+    subject: "Elementary Bengali",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_6",
+    period_order: 6,
+    periodName: "6th Period: Elementary Bengali Reading & Writing",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 60,
+    currentPage: 35,
+    totalPages: 60,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Bengali reading, writing, and word forming.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_7",
+    name: "Basic English & Numerals",
+    subject: "Basic English & Math",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_7",
+    period_order: 7,
+    periodName: "7th Period: Basic English & Arithmetic",
+    semester: "1st Semester",
+    teacherName: "Maulana Mahmudul Hasan",
+    teacherId: "teacher_3",
+    startPage: 1,
+    endPage: 50,
+    currentPage: 25,
+    totalPages: 50,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "English alphabet, simple vocabulary, and basic counting.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
+  {
+    id: "syllabus_nazera_8",
+    name: "Islamic Tarbiyah & Evening Mutala",
+    subject: "Islamic Tarbiyah & Mutala",
+    className: "Nazera Division",
+    classId: "cls_4",
+    periodSlotId: "period_nazera_8",
+    period_order: 8,
+    periodName: "8th Period: Islamic Tarbiyah & Evening Review",
+    semester: "1st Semester",
+    teacherName: "Maulana Mufti Abdullah",
+    teacherId: "teacher_1",
+    startPage: 1,
+    endPage: 40,
+    currentPage: 20,
+    totalPages: 40,
+    targetDate: "2026-07-31",
+    status: "IN_PROGRESS",
+    notes: "Moral upbringing, character building, and evening study review.",
+    updatedAt: "2026-08-27T14:00:00.000Z",
+  },
 ];
 
 export const curriculumStore = {
@@ -1489,39 +1659,23 @@ export const curriculumStore = {
       raw = readJSON(legacyKey, null);
     }
     if (!raw || !Array.isArray(raw) || raw.length === 0) {
-      writeJSON(key, DEFAULT_CURRICULUM_ITEMS);
       return DEFAULT_CURRICULUM_ITEMS;
     }
 
-    // Merge missing defaults and sync periodSlotId
-    let hasChanges = false;
-    const existingIds = new Set(raw.map((it) => it.id));
-    const missingDefaults = DEFAULT_CURRICULUM_ITEMS.filter((it) => !existingIds.has(it.id));
+    // Deduplicate purely by unique item ID
+    const seenIds = new Set();
+    const cleanList = [];
 
-    let combined = raw.map((item) => {
-      const def = DEFAULT_CURRICULUM_ITEMS.find((d) => d.id === item.id);
-      if (def && (!item.periodSlotId || !item.period_order)) {
-        hasChanges = true;
-        return {
-          ...item,
-          periodSlotId: item.periodSlotId || def.periodSlotId,
-          period_order: item.period_order || def.period_order,
-          periodName: item.periodName || def.periodName,
-        };
+    raw.forEach((item) => {
+      if (!item || !item.id) return;
+      const idStr = String(item.id);
+      if (!seenIds.has(idStr)) {
+        seenIds.add(idStr);
+        cleanList.push(item);
       }
-      return item;
     });
 
-    if (missingDefaults.length > 0) {
-      combined = [...combined, ...missingDefaults];
-      hasChanges = true;
-    }
-
-    if (hasChanges) {
-      writeJSON(key, combined);
-    }
-
-    return combined;
+    return cleanList.length > 0 ? cleanList : DEFAULT_CURRICULUM_ITEMS;
   },
 
   saveItems: (tenantId, items) => {

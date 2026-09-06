@@ -1,5 +1,4 @@
 import React from 'react';
-import { DrawerSection } from '../../../../../components/layout';
 import CustomInput from '../../../../../components/ui/CustomInput';
 import CustomSelect from '../../../../../components/ui/CustomSelect';
 import { BookOpenIcon } from '../../../../../components/ui/Icons';
@@ -7,6 +6,7 @@ import { BookOpenIcon } from '../../../../../components/ui/Icons';
 /**
  * SubjectCurriculumSection
  * Handles Curriculum Book selection and Subject Examination Title.
+ * Streamlined Enterprise Section Headers (Zero Boxed Cards).
  */
 export default function SubjectCurriculumSection({
   formData,
@@ -16,11 +16,15 @@ export default function SubjectCurriculumSection({
   handleBookChange,
 }) {
   return (
-    <DrawerSection
-      title="Subject & Curriculum Book"
-      icon={BookOpenIcon}
-    >
-      <div className="space-y-3.5">
+    <div className="space-y-3.5 text-left">
+      <div className="flex items-center gap-2 pb-2 border-b theme-border">
+        <BookOpenIcon className="w-4 h-4 theme-accent shrink-0" />
+        <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+          Subject & Curriculum Book
+        </h3>
+      </div>
+
+      <div className="space-y-3.5 pt-1">
         <CustomSelect
           label="Curriculum Textbook"
           value={formData.curriculumBookId || (formData.subjectName ? 'CUSTOM' : '')}
@@ -49,6 +53,6 @@ export default function SubjectCurriculumSection({
           </div>
         </div>
       </div>
-    </DrawerSection>
+    </div>
   );
 }

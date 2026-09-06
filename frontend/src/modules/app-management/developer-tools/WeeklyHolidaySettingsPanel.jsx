@@ -5,7 +5,7 @@ import {
   weeklyHolidaysStore,
   WEEKDAY_OPTIONS,
   DEFAULT_WEEKLY_HOLIDAYS_CONFIG,
-} from "../../../utils/stores/calendarStore";
+} from "@/stores/calendarStore";
 import {
   CalendarIcon,
   RefreshIcon,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useTenant } from './TenantContext';
-import { academicYearsStore, getAcademicYearStatus } from '../utils/stores/academicStore';
+import { academicYearsStore, getAcademicYearStatus } from '@/stores/academicStore';
 import { getBranches } from '../api/academy';
 
 /**

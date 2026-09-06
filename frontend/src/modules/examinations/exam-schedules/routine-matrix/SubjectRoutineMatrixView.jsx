@@ -1,22 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useSubjectMatrixState from './hooks/useSubjectMatrixState';
 import SubjectMatrixHeader from './components/SubjectMatrixHeader';
 import SubjectMatrixTable from '../components/SubjectMatrixTable';
 import SubjectRoutineDrawerForm from './SubjectRoutineDrawerForm';
+import SubjectRoutineStudioView from './SubjectRoutineStudioView';
 import { UniversalAutoPopulateDrawer } from '../../../../components/ui/auto-populate';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
-import { examStore } from '../../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 
 /**
  * SubjectRoutineMatrixView
  * Enterprise-grade Subject Routine Matrix workspace.
  * Manages class exam dates, shifts, invigilators, and mark breakdown distributions.
- * Form creation, edits, and auto-population are performed seamlessly via the dedicated Right Sidebar Drawer.
+ * Seamlessly toggles between Tabular Matrix View and 2D Routine Studio generator.
  */
-export default function SubjectRoutineMatrixView({ initialExamId = null, onNavigateToExamSessions = null }) {
+export default function SubjectRoutineMatrixView({
+  initialExamId = null,
+  initialViewMode = 'table',
+  onNavigateToExamSessions = null,
+}) {
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const [viewMode, setViewMode] = useState(initialViewMode || 'table');
 
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
+
+  const matrixState = useSubjectMatrixState({ initialExamId, onNavigateToExamSessions });
   const {
     tenantId,
     selectedExamId,
@@ -29,6 +42,7 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     participatingClasses,
     allAvailableClasses,
     availableCurriculumBooks,
+    periodSlots,
     teachers,
     examOptions,
     searchQuery,
@@ -46,10 +60,11 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     setSelectedRowIds,
     loadStoredRows,
     handleUpsertRow,
+    handleBulkUpsertRows,
     handleDeleteRow,
     handleDuplicateRow,
     executeBulkDelete,
-  } = useSubjectMatrixState({ initialExamId, onNavigateToExamSessions });
+  } = matrixState;
 
   // Delete Impact Modal States
   const [rowToDelete, setRowToDelete] = useState(null);
@@ -131,11 +146,15 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
               participatingClasses,
               allAvailableClasses,
               availableCurriculumBooks,
+              periodSlots,
               teachers,
               examShifts,
               existingRowsCount: rows.length,
             }}
-            onSuccess={() => {
+            onSuccess={(data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                handleBulkUpsertRows(data);
+              }
               loadStoredRows();
               closeDrawer();
             }}
@@ -150,10 +169,12 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
       participatingClasses,
       allAvailableClasses,
       availableCurriculumBooks,
+      periodSlots,
       teachers,
       examShifts,
       rows.length,
       selectedExamId,
+      handleBulkUpsertRows,
       loadStoredRows,
       closeDrawer,
     ]
@@ -161,10 +182,6 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
 
   const handleOpenAddDrawer = () => {
     openDrawer('subject_routine', { mode: 'add' });
-  };
-
-  const handleOpenAutoPopulateDrawer = () => {
-    openDrawer('auto_populate_routine');
   };
 
   const handleOpenEditDrawer = (row) => {
@@ -183,6 +200,21 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
     setShowBulkDeleteConfirm(false);
   };
 
+  if (viewMode === 'studio') {
+    return (
+      <div className="space-y-4 animate-fade-in text-left">
+        <SubjectRoutineStudioView
+          matrixState={matrixState}
+          onToggleViewMode={() => {
+            closeDrawer();
+            setViewMode('table');
+          }}
+          onNavigateToExamSessions={onNavigateToExamSessions}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 animate-fade-in text-left">
       {/* ── 1. Unified Control Header: Session Selector, Actions, Search, Filters & Counters ── */}
@@ -193,7 +225,11 @@ export default function SubjectRoutineMatrixView({ initialExamId = null, onNavig
           setSelectedExamId(val);
           setSelectedRowIds(new Set());
         }}
-        onAutoPopulate={handleOpenAutoPopulateDrawer}
+        viewMode={viewMode}
+        onToggleViewMode={() => {
+          closeDrawer();
+          setViewMode('studio');
+        }}
         onAddRow={handleOpenAddDrawer}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}

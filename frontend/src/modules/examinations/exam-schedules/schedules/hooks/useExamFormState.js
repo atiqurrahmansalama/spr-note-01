@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useToast } from '../../../../../context/ToastContext';
-import { examStore } from '../../../../../utils/stores/examStore';
-import { masterCalendarStore } from '../../../../../utils/stores/calendarStore';
-import { readJSON, writeJSON } from '../../../../../utils/stores/coreStore';
+import { examStore } from '@/stores/examStore';
+import { masterCalendarStore } from '@/stores/calendarStore';
+import { readJSON, writeJSON } from '@/stores/coreStore';
 import { DEFAULT_SHIFT_PRESETS } from '../../utils/examScheduleUtils';
 
 export { DEFAULT_SHIFT_PRESETS };

@@ -1,5 +1,4 @@
 import React from 'react';
-import { DrawerSection } from '../../../../../components/layout';
 import CustomInput from '../../../../../components/ui/CustomInput';
 import CustomCheckbox from '../../../../../components/ui/CustomCheckbox';
 import {
@@ -13,6 +12,7 @@ import {
  * SubjectEvaluationSection
  * Handles Full Marks baseline, Marks Breakdown Components (with auto-balance),
  * and Previous Exams Marks Merger configuration.
+ * Streamlined Enterprise Section Headers (Zero Boxed Cards).
  */
 export default function SubjectEvaluationSection({
   formData,
@@ -36,18 +36,17 @@ export default function SubjectEvaluationSection({
     : defaultPreviousExamsList;
 
   return (
-    <>
+    <div className="space-y-6 text-left">
       {/* ─── SECTION 1: Marks & Assessment Components Breakdown ───────────── */}
-      <DrawerSection
-        title="Marks & Assessment Evaluation"
-        subtitle={
-          isBreakdownEnabledOnExam
-            ? "Configure baseline evaluation marks scale and component distribution"
-            : "Configure baseline examination full marks and passing threshold"
-        }
-        icon={SparklesIcon}
-      >
-        <div className="space-y-3.5">
+      <div className="space-y-3.5">
+        <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
+          <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+            Marks & Assessment Evaluation
+          </h3>
+        </div>
+
+        <div className="space-y-3.5 pt-1">
           {/* Dynamic Full Marks Baseline Setting Card */}
           <div className="p-3.5 rounded-xl border theme-border theme-bg-surface flex items-center justify-between gap-4 shadow-2xs">
             <div className="space-y-0.5">
@@ -201,18 +200,19 @@ export default function SubjectEvaluationSection({
             </>
           )}
         </div>
-      </DrawerSection>
+      </div>
 
       {/* ─── SECTION 2: Previous Exams Marks Merger (If enabled on active exam) ─── */}
       {isPreviousExamsEnabledOnExam && (
-        <DrawerSection
-          title="Previous Exams Marks Merger"
-          subtitle={`${previousExamsList.length} linked prior ${
-            previousExamsList.length === 1 ? 'exam term' : 'exam terms'
-          } configured for session`}
-          icon={HistoryIcon}
-        >
-          <div className="space-y-3.5">
+        <div className="space-y-3.5">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <HistoryIcon className="w-4 h-4 theme-accent shrink-0" />
+            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              Previous Exams Marks Merger ({previousExamsList.length} linked)
+            </h3>
+          </div>
+
+          <div className="space-y-3.5 pt-1">
             {/* Include Toggle Card */}
             <div className="p-3.5 rounded-xl border theme-border theme-bg-surface flex items-center justify-between gap-3 shadow-2xs">
               <div className="space-y-0.5 pr-2 min-w-0">
@@ -281,8 +281,8 @@ export default function SubjectEvaluationSection({
               </div>
             )}
           </div>
-        </DrawerSection>
+        </div>
       )}
-    </>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import CustomButton from '../../../components/ui/CustomButton';
 import CustomInput from '../../../components/ui/CustomInput';
@@ -12,6 +12,9 @@ import {
   UserIcon,
   DocumentIcon,
   TrophyIcon,
+  SortIcon,
+  SortAscIcon,
+  SortDescIcon,
 } from '../../../components/ui/Icons';
 import useExamData from '../hooks/useExamData';
 import useTabulationData from '../hooks/useTabulationData';
@@ -35,6 +38,9 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
   const [selectedSectionId, setSelectedSectionId] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isGazetteOpen, setIsGazetteOpen] = useState(false);
+
+  // Column Sort State
+  const [sortConfig, setSortConfig] = useState({ key: 'classRank', direction: 'asc' });
 
   // Exam Options
   const examOptions = useMemo(() => {
@@ -63,19 +69,84 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
     students,
   });
 
-  // Filter students by name or roll search
+  const handleSortToggle = useCallback((colKey) => {
+    setSortConfig((prev) => {
+      if (prev.key === colKey) {
+        if (prev.direction === 'asc') return { key: colKey, direction: 'desc' };
+        if (prev.direction === 'desc') return { key: 'classRank', direction: 'asc' };
+      }
+      return { key: colKey, direction: 'asc' };
+    });
+  }, []);
+
+  // Filter & sort students by name or roll search and active sort column
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return studentsData;
-    const q = searchQuery.toLowerCase();
-    return studentsData.filter(
-      (st) =>
-        st.studentName.toLowerCase().includes(q) ||
-        String(st.rollNumber).toLowerCase().includes(q)
-    );
-  }, [studentsData, searchQuery]);
+    let list = studentsData;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (st) =>
+          st.studentName.toLowerCase().includes(q) ||
+          String(st.rollNumber).toLowerCase().includes(q)
+      );
+    }
+
+    if (!sortConfig.key || !sortConfig.direction) return list;
+
+    const { key, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    return [...list].sort((a, b) => {
+      let valA;
+      let valB;
+
+      if (key.startsWith('subject_')) {
+        const subId = key.replace('subject_', '');
+        const smA = a.subjectMarks.find((s) => String(s.subjectId) === String(subId));
+        const smB = b.subjectMarks.find((s) => String(s.subjectId) === String(subId));
+        valA = smA ? (smA.isAbsent ? -1 : Number(smA.obtained) || 0) : 0;
+        valB = smB ? (smB.isAbsent ? -1 : Number(smB.obtained) || 0) : 0;
+      } else {
+        valA = a[key];
+        valB = b[key];
+      }
+
+      if (valA === null || valA === undefined) return 1;
+      if (valB === null || valB === undefined) return -1;
+
+      if (typeof valA === 'number' || (!isNaN(Number(valA)) && typeof valA !== 'string')) {
+        return isAsc ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
+      }
+
+      return isAsc
+        ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
+        : String(valB).localeCompare(String(valA), undefined, { numeric: true });
+    });
+  }, [studentsData, searchQuery, sortConfig]);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const renderSortIndicator = (colKey) => {
+    const isCurrent = sortConfig.key === colKey;
+    return (
+      <span
+        className={`inline-flex items-center shrink-0 transition-colors ${
+          isCurrent ? 'theme-text-accent' : 'theme-text-muted/40 group-hover:theme-text-secondary opacity-60 group-hover:opacity-100'
+        }`}
+      >
+        {isCurrent ? (
+          sortConfig.direction === 'asc' ? (
+            <SortAscIcon className="w-3.5 h-3.5" />
+          ) : (
+            <SortDescIcon className="w-3.5 h-3.5" />
+          )
+        ) : (
+          <SortIcon className="w-3.5 h-3.5" />
+        )}
+      </span>
+    );
   };
 
   return (
@@ -227,26 +298,107 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b theme-border theme-bg-sub/60 font-bold theme-text-primary">
-                    <th className="py-3 px-3 w-14 text-center">Rank</th>
-                    <th className="py-3 px-3 w-16">Roll</th>
-                    <th className="py-3 px-4 min-w-[160px]">Student Name</th>
-                    <th className="py-3 px-3 w-20 text-center">Section</th>
+                  <tr className="border-b theme-border theme-bg-sub/60 font-bold theme-text-primary select-none">
+                    <th
+                      onClick={() => handleSortToggle('classRank')}
+                      className="py-3 px-3 w-14 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>Rank</span>
+                        {renderSortIndicator('classRank')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('rollNumber')}
+                      className="py-3 px-3 w-16 cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <span>Roll</span>
+                        {renderSortIndicator('rollNumber')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('studentName')}
+                      className="py-3 px-4 min-w-[160px] cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <span>Student Name</span>
+                        {renderSortIndicator('studentName')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('studentSection')}
+                      className="py-3 px-3 w-20 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>Section</span>
+                        {renderSortIndicator('studentSection')}
+                      </div>
+                    </th>
                     {subjects.map((sub) => (
-                      <th key={sub.id} className="py-3 px-2 text-center min-w-[90px]">
-                        <span className="block truncate max-w-[120px]" title={sub.subjectName}>
-                          {sub.subjectName}
-                        </span>
-                        <span className="block text-[10px] font-normal theme-text-secondary">
-                          ({sub.fullMarks})
-                        </span>
+                      <th
+                        key={sub.id}
+                        onClick={() => handleSortToggle(`subject_${sub.id}`)}
+                        className="py-3 px-2 text-center min-w-[90px] cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                      >
+                        <div className="flex flex-col items-center">
+                          <div className="inline-flex items-center gap-1 max-w-[120px]">
+                            <span className="block truncate" title={sub.subjectName}>
+                              {sub.subjectName}
+                            </span>
+                            {renderSortIndicator(`subject_${sub.id}`)}
+                          </div>
+                          <span className="block text-[10px] font-normal theme-text-secondary">
+                            ({sub.fullMarks})
+                          </span>
+                        </div>
                       </th>
                     ))}
-                    <th className="py-3 px-3 w-20 text-center">Total</th>
-                    <th className="py-3 px-3 w-16 text-center">%</th>
-                    <th className="py-3 px-3 w-16 text-center">GPA</th>
-                    <th className="py-3 px-4 min-w-[130px] text-center">Grade / Division</th>
-                    <th className="py-3 px-3 w-24 text-center">Status</th>
+                    <th
+                      onClick={() => handleSortToggle('totalObtained')}
+                      className="py-3 px-3 w-20 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>Total</span>
+                        {renderSortIndicator('totalObtained')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('overallPercentage')}
+                      className="py-3 px-3 w-16 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>%</span>
+                        {renderSortIndicator('overallPercentage')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('overallGpa')}
+                      className="py-3 px-3 w-16 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>GPA</span>
+                        {renderSortIndicator('overallGpa')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('grade')}
+                      className="py-3 px-4 min-w-[130px] text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>Grade / Div</span>
+                        {renderSortIndicator('grade')}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortToggle('isOverallPass')}
+                      className="py-3 px-3 w-24 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <span>Status</span>
+                        {renderSortIndicator('isOverallPass')}
+                      </div>
+                    </th>
                     <th className="py-3 px-3 w-20 text-center print:hidden">Action</th>
                   </tr>
                 </thead>

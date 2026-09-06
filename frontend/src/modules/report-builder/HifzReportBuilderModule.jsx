@@ -12,6 +12,7 @@ import SkeletonLoader from "../../components/common/SkeletonLoader";
 import { useReportForm } from "./hooks/useReportForm";
 import { useToast } from "../../context/ToastContext";
 import { useFont } from "../../context/useFont";
+import { useUndoRedo } from "../../context/useUndoRedo";
 import { ClockIcon, CloseIcon, EditIcon } from "../../components/ui/Icons";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 
@@ -79,40 +80,26 @@ export default function HifzReportBuilderModule({ timeZone, dateFormat }) {
     handleJuzPageRefresh,
     handleUndo,
     handleRedo,
+    canUndoDraft,
+    canRedoDraft,
   } = useReportForm();
 
+  const { registerScopeHandler } = useUndoRedo();
   const isEditMode = Boolean(editingReport);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
+  // Register with Global UndoRedoProvider for route-aware synchronization
   useEffect(() => {
-    const handleUndoRedoKeys = (e) => {
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      if (!isCmdOrCtrl) return;
-
-      const key = e.key.toLowerCase();
-      if (key === "z" && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((key === "z" && (e.shiftKey || e.altKey)) || key === "y") {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener("keydown", handleUndoRedoKeys);
-    return () => window.removeEventListener("keydown", handleUndoRedoKeys);
-  }, [handleUndo, handleRedo]);
-  useEffect(() => {
-    const handleGlobalUndo = () => handleUndo();
-    const handleGlobalRedo = () => handleRedo();
-    window.addEventListener("spr_undo", handleGlobalUndo);
-    window.addEventListener("spr_redo", handleGlobalRedo);
-    return () => {
-      window.removeEventListener("spr_undo", handleGlobalUndo);
-      window.removeEventListener("spr_redo", handleGlobalRedo);
-    };
-  }, [handleUndo, handleRedo]);
+    return registerScopeHandler('/report-builder', {
+      undo: handleUndo,
+      redo: handleRedo,
+      canUndo: canUndoDraft,
+      canRedo: canRedoDraft,
+      undoTitle: 'Restore previous draft state',
+      redoTitle: 'Restore next draft state',
+    });
+  }, [registerScopeHandler, handleUndo, handleRedo, canUndoDraft, canRedoDraft]);
   useEffect(() => {
     if (!isLoading && !featureLoading) {
       setTimeout(() => {

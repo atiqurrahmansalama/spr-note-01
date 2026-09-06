@@ -4,8 +4,8 @@
  * Pre-populates student mark entry sheets from active student enrollment rosters.
  */
 
-import BaseGenerator from '../BaseGenerator';
-import { resolveConflicts, CONFLICT_MODES } from '../conflictResolver';
+import BaseGenerator from '@/utils/auto-populate/BaseGenerator';
+import { resolveConflicts, CONFLICT_MODES } from '@/utils/auto-populate/conflictResolver';
 
 export class MarkEntrySheetGenerator extends BaseGenerator {
   constructor() {
@@ -98,19 +98,19 @@ export class MarkEntrySheetGenerator extends BaseGenerator {
         viva: '',
         total: '',
       },
-      grade: '',
-      isPassed: null,
-      remarks: '',
+      isAbsent: defaultStatus === 'ABSENT',
+      comments: '',
     }));
 
     const resolved = resolveConflicts({
       existingItems: existingMarks,
       generatedItems,
-      keyExtractor: (item) => `${item.examId}__${item.subjectId}__${item.studentId}`,
+      keyExtractor: (item) => `${item.studentId}`,
       conflictMode: overwriteMode,
       customMerger: (exist, gen) => ({
         ...gen,
-        ...exist, // preserve already entered marks
+        ...exist,
+        id: exist.id || gen.id,
       }),
     });
 
@@ -119,20 +119,28 @@ export class MarkEntrySheetGenerator extends BaseGenerator {
       items: resolved.finalItems,
       toCreate: resolved.toCreate,
       toUpdate: resolved.toUpdate,
+      toPreserve: resolved.toPreserve,
+      toRemove: resolved.toRemove,
+      conflictsCount: resolved.conflictsCount,
       summary: {
-        totalStudents: resolved.finalItems.length,
-        newStudentsAdded: resolved.toCreate.length,
-        existingMarksPreserved: resolved.toPreserve.length,
+        totalGenerated: generatedItems.length,
+        totalFinal: resolved.finalItems.length,
+        createdCount: resolved.toCreate.length,
+        updatedCount: resolved.toUpdate.length,
+        preservedCount: resolved.toPreserve.length,
+        conflictMode: overwriteMode,
       },
     };
   }
 
   execute(context = {}, options = {}, simulationResult = null) {
     const sim = simulationResult || this.simulate(context, options);
+    const finalItems = sim.items || [];
+
     return {
       success: true,
-      message: `Initialized mark sheets for ${sim.items.length} students.`,
-      data: sim.items,
+      message: `Successfully populated mark entry roster for ${finalItems.length} students.`,
+      data: finalItems,
       summary: sim.summary,
     };
   }

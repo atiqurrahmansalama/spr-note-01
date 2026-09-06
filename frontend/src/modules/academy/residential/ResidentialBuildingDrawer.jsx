@@ -4,7 +4,7 @@ import BranchSelect from '../../../components/selectors/BranchSelect';
 import TeacherSelect from '../../../components/selectors/TeacherSelect';
 import { BuildingOfficeIcon } from '../../../components/ui/Icons';
 import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../components/layout';
-import { residentialStore } from '../../../utils/stores/residentialStore';
+import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
 

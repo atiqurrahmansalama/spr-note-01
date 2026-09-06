@@ -12,8 +12,8 @@ import {
   HistoryIcon,
 } from '../../../components/ui/Icons';
 import { useToast } from '../../../context/ToastContext';
-import { examStore, DEFAULT_GRADING_SYSTEMS } from '../../../utils/stores/examStore';
-import { readJSON, writeJSON } from '../../../utils/stores/coreStore';
+import { examStore, DEFAULT_GRADING_SYSTEMS } from '@/stores/examStore';
+import { readJSON, writeJSON } from '@/stores/coreStore';
 
 export default function GradingRuleFormDrawer({
   system = null,

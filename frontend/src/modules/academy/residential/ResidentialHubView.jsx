@@ -21,7 +21,7 @@ import {
   ChecklistIcon,
 } from '../../../components/ui/Icons';
 import ActionMenu from '../../../components/ui/ActionMenu';
-import { residentialStore } from '../../../utils/stores/residentialStore';
+import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { getBranchDisplayName } from '../../../utils/localStore';
 import { useToast } from '../../../context/ToastContext';

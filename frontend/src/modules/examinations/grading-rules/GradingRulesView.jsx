@@ -12,7 +12,7 @@ import {
 } from '../../../components/ui/Icons';
 import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
-import { examStore } from '../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 import useExamData from '../hooks/useExamData';
 
 /**

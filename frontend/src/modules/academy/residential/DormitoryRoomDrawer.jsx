@@ -6,7 +6,7 @@ import ResidentialBuildingSelect from '../../../components/selectors/Residential
 import TeacherSelect from '../../../components/selectors/TeacherSelect';
 import { HomeIcon, SparklesIcon, TeacherIcon } from '../../../components/ui/Icons';
 import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../components/layout';
-import { residentialStore } from '../../../utils/stores/residentialStore';
+import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
 

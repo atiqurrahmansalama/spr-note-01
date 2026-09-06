@@ -15,7 +15,7 @@ import {
   EditIcon,
   DeleteIcon,
 } from '../../../../components/ui/Icons';
-import { learningStore } from '../../../../utils/stores/learningStore';
+import { learningStore } from '@/stores/learningStore';
 import { deleteDailyLesson as deleteDailyLessonAPI } from '../../../../api/learning';
 import { useToast } from '../../../../context/ToastContext';
 

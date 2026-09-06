@@ -30,16 +30,16 @@ export default function RoutineCurriculumHubView({
   isEmbedded = false,
 }) {
   const { showToast } = useToast();
-  const { activeTenant } = useTenant();
-  const activeTenantId = activeTenant?.id || 'default';
+  const { activeTenantId, activeTenant, currentInstitution } = useTenant();
+  const effectiveTenantId = activeTenantId || (activeTenant?.id ? String(activeTenant.id) : (currentInstitution?.id ? String(currentInstitution.id) : 'default'));
 
   const [activeTab, setActiveTab] = useState('periods');
   const [periodSlots, setPeriodSlots] = useState([]);
   const [periodCategories, setPeriodCategories] = useState(() =>
-    periodCategoriesStore.getCategories(activeTenantId)
+    periodCategoriesStore.getCategories(effectiveTenantId)
   );
   const [periodSequences, setPeriodSequences] = useState(() =>
-    periodSequencesStore.getSequences(activeTenantId)
+    periodSequencesStore.getSequences(effectiveTenantId)
   );
 
   useEffect(() => {
@@ -255,7 +255,7 @@ export default function RoutineCurriculumHubView({
           classes={classes}
           sections={sections}
           periodCategories={periodCategories}
-          activeTenantId={activeTenantId}
+          activeTenantId={effectiveTenantId}
           loading={loading}
           onOpenAddSlot={handleOpenAddSlot}
           onEditSlot={handleEditSlot}
@@ -273,7 +273,7 @@ export default function RoutineCurriculumHubView({
       {activeTab === 'curriculum' && (
         <div className="animate-fade-in">
           <CurriculumTrackerView
-            activeTenantId={activeTenantId}
+            activeTenantId={effectiveTenantId}
             classes={classes}
             sections={sections}
             teachers={teachers}

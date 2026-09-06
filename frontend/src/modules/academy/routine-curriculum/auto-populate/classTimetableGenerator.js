@@ -4,9 +4,9 @@
  * Generates weekly period slots for classes based on curriculum subject requirements and teacher availability.
  */
 
-import BaseGenerator from '../BaseGenerator';
-import { resolveConflicts, CONFLICT_MODES } from '../conflictResolver';
-import { matchSubjectTeacher } from '../workloadBalancer';
+import BaseGenerator from '@/utils/auto-populate/BaseGenerator';
+import { resolveConflicts, CONFLICT_MODES } from '@/utils/auto-populate/conflictResolver';
+import { matchSubjectTeacher } from '@/utils/auto-populate/workloadBalancer';
 
 export class ClassTimetableGenerator extends BaseGenerator {
   constructor() {
@@ -87,23 +87,22 @@ export class ClassTimetableGenerator extends BaseGenerator {
 
     workingDays.forEach((dayName) => {
       for (let pNum = 1; pNum <= periodsPerDay; pNum++) {
-        const book = curriculumBooks[bookIndex % curriculumBooks.length];
+        const book = curriculumBooks[bookIndex % (curriculumBooks.length || 1)];
         bookIndex++;
 
         const matchedTeacher = matchSubjectTeacher(book, teachers);
 
         generatedItems.push({
-          id: `routine_${targetClass.id}_${dayName}_p${pNum}_${Date.now()}`,
-          classId: String(targetClass.id),
-          className: targetClass.name,
+          id: `routine_${targetClass?.id || 'cls'}_${dayName}_p${pNum}_${Date.now()}`,
+          classId: String(targetClass?.id || ''),
+          className: targetClass?.name || 'Class',
           day: dayName,
           periodNumber: pNum,
-          periodName: `Period ${pNum}`,
-          subjectId: String(book?.id || ''),
-          subjectName: book?.name || 'Subject',
-          teacherId: matchedTeacher.id,
-          teacherName: matchedTeacher.name,
-          roomNo: targetClass.roomNo || 'Room 101',
+          bookId: String(book?.id || ''),
+          subjectName: book?.name || book?.title || 'Subject',
+          teacherId: matchedTeacher?.id ? String(matchedTeacher.id) : '',
+          teacherName: matchedTeacher?.name || '',
+          roomNo: 'Classroom',
         });
       }
     });
@@ -111,8 +110,13 @@ export class ClassTimetableGenerator extends BaseGenerator {
     const resolved = resolveConflicts({
       existingItems: existingRoutines,
       generatedItems,
-      keyExtractor: (item) => `${item.classId}__${item.day}__${item.periodNumber}`,
+      keyExtractor: (item) => `${item.classId}____${item.day}____${item.periodNumber}`,
       conflictMode: overwriteMode,
+      customMerger: (exist, gen) => ({
+        ...gen,
+        ...exist,
+        id: exist.id || gen.id,
+      }),
     });
 
     return {
@@ -120,20 +124,28 @@ export class ClassTimetableGenerator extends BaseGenerator {
       items: resolved.finalItems,
       toCreate: resolved.toCreate,
       toUpdate: resolved.toUpdate,
+      toPreserve: resolved.toPreserve,
+      toRemove: resolved.toRemove,
+      conflictsCount: resolved.conflictsCount,
       summary: {
-        totalSlots: resolved.finalItems.length,
+        totalGenerated: generatedItems.length,
+        totalFinal: resolved.finalItems.length,
         createdCount: resolved.toCreate.length,
         updatedCount: resolved.toUpdate.length,
+        preservedCount: resolved.toPreserve.length,
+        conflictMode: overwriteMode,
       },
     };
   }
 
   execute(context = {}, options = {}, simulationResult = null) {
     const sim = simulationResult || this.simulate(context, options);
+    const finalItems = sim.items || [];
+
     return {
       success: true,
-      message: `Generated ${sim.items.length} timetable periods for ${context.targetClass?.name || 'Class'}.`,
-      data: sim.items,
+      message: `Successfully populated weekly timetable with ${finalItems.length} period slots.`,
+      data: finalItems,
       summary: sim.summary,
     };
   }

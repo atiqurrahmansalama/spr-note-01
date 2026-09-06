@@ -1,6 +1,7 @@
 /**
  * auto-populate/index.js
- * Universal Auto-Populate Framework - Central Entrypoint & Registry Initializer.
+ * Universal Auto-Populate Framework — Central Micro-Kernel & Registry Initializer.
+ * Exports core algorithms, base generator contract, and orchestrates domain plugins.
  */
 
 import autoPopulateEngine from './AutoPopulateEngine';
@@ -8,17 +9,16 @@ import BaseGenerator from './BaseGenerator';
 import { resolveConflicts, CONFLICT_MODES } from './conflictResolver';
 import { balanceRoundRobin, balanceDailyGuardByDateShift, matchSubjectTeacher } from './workloadBalancer';
 
-// Domain Generators
-import examRoutineGenerator from './generators/examRoutineGenerator';
-import invigilationRosterGenerator from './generators/invigilationRosterGenerator';
-import classTimetableGenerator from './generators/classTimetableGenerator';
-import markEntrySheetGenerator from './generators/markEntrySheetGenerator';
+// Import domain generator plugins from their colocated feature modules
+import {
+  examRoutineGenerator,
+  invigilationRosterGenerator,
+  markEntrySheetGenerator,
+} from '@/modules/examinations/auto-populate';
 
-// Register standard domain plugins
-autoPopulateEngine.register(examRoutineGenerator);
-autoPopulateEngine.register(invigilationRosterGenerator);
-autoPopulateEngine.register(classTimetableGenerator);
-autoPopulateEngine.register(markEntrySheetGenerator);
+import {
+  classTimetableGenerator,
+} from '@/modules/academy/routine-curriculum/auto-populate';
 
 export {
   autoPopulateEngine,
@@ -28,11 +28,12 @@ export {
   balanceRoundRobin,
   balanceDailyGuardByDateShift,
   matchSubjectTeacher,
-  // Generators
+  // Domain Generators
   examRoutineGenerator,
   invigilationRosterGenerator,
-  classTimetableGenerator,
   markEntrySheetGenerator,
+  classTimetableGenerator,
 };
 
 export default autoPopulateEngine;
+

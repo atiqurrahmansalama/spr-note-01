@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '../../../../../context/ToastContext';
-import { learningStore } from '../../../../../utils/stores/learningStore';
-import { getOrdinalPeriodLabel, curriculumStore } from '../../../../../utils/localStore';
+import { learningStore, getOrdinalPeriodLabel, curriculumStore } from '@/stores';
 import {
   findMatchingPeriodSlot,
   resolvePeriodTime,

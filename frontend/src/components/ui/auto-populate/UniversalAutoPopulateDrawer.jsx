@@ -128,9 +128,14 @@ export default function UniversalAutoPopulateDrawer({
                     <TeacherSelect
                       label="Designated Single Invigilator"
                       value={formData.invigilatorTeacherId}
+                      teachers={context.teachers || []}
+                      allowAll={false}
+                      onlyTeachers={true}
+                      searchable={true}
+                      placeholder="Select designated invigilator..."
                       onChange={(tId, tObj) => {
                         handleFieldChange('invigilatorTeacherId', tId || '');
-                        handleFieldChange('invigilatorTeacherName', tObj?.name || tObj?.full_name || '');
+                        handleFieldChange('invigilatorTeacherName', tObj?.name || tObj?.name_en || tObj?.full_name || '');
                       }}
                       required
                     />
@@ -164,9 +169,14 @@ export default function UniversalAutoPopulateDrawer({
                     <TeacherSelect
                       label="Designated Chief Examiner"
                       value={formData.examinerTeacherId}
+                      teachers={context.teachers || []}
+                      allowAll={false}
+                      onlyTeachers={true}
+                      searchable={true}
+                      placeholder="Select chief examiner..."
                       onChange={(tId, tObj) => {
                         handleFieldChange('examinerTeacherId', tId || '');
-                        handleFieldChange('examinerTeacherName', tObj?.name || tObj?.full_name || '');
+                        handleFieldChange('examinerTeacherName', tObj?.name || tObj?.name_en || tObj?.full_name || '');
                       }}
                       required
                     />

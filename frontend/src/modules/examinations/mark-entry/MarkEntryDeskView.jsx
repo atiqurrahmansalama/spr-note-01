@@ -16,7 +16,7 @@ import {
 } from '../../../components/ui/Icons';
 import useExamData from '../hooks/useExamData';
 import useMarkEntryGrid from '../hooks/useMarkEntryGrid';
-import { examStore } from '../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 
 /**
  * MarkEntryDeskView

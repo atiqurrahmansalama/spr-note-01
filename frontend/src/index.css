@@ -152,7 +152,9 @@ body {
 .theme-bg-elevated {
   background-color: var(--bg-elevated);
 }
-.theme-border {
+.theme-border,
+.divide-theme-border > :not([hidden]) ~ :not([hidden]),
+.divide-theme-border > * + * {
   border-color: var(--border-color);
 }
 .theme-text-primary {

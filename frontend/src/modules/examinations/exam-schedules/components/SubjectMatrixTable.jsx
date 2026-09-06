@@ -11,7 +11,6 @@ import {
   PlusIcon,
   EditIcon,
   TrashIcon,
-  UserIcon,
   UserCheckIcon,
 } from '../../../../components/ui/Icons';
 
@@ -52,8 +51,9 @@ export default function SubjectMatrixTable({
       {
         key: 'classScope',
         title: 'Class & Scope',
-        headerClassName: 'w-[17%] min-w-[120px]',
-        className: 'w-[17%] min-w-[120px] align-middle',
+        sortValue: (row) => `${row.className || ''} ${row.sectionName || ''} ${row.departmentName || ''}`,
+        headerClassName: 'w-[20%] min-w-[130px]',
+        className: 'w-[20%] min-w-[130px] align-middle',
         render: (row) => (
           <div className="space-y-1 py-1">
             <div className="font-bold text-xs sm:text-sm theme-text-primary truncate">
@@ -75,8 +75,9 @@ export default function SubjectMatrixTable({
       {
         key: 'curriculumBook',
         title: 'Curriculum Book & Subject',
-        headerClassName: 'w-[22%] min-w-[140px]',
-        className: 'w-[22%] min-w-[140px] align-middle',
+        sortValue: (row) => row.curriculumBookName || row.subjectName || '',
+        headerClassName: 'w-[26%] min-w-[160px]',
+        className: 'w-[26%] min-w-[160px] align-middle',
         render: (row) => (
           <div className="space-y-1 py-1">
             {/* Top: Book Name */}
@@ -106,8 +107,9 @@ export default function SubjectMatrixTable({
       {
         key: 'scheduleTiming',
         title: 'Date & Timing',
-        headerClassName: 'w-[15%] min-w-[115px]',
-        className: 'w-[15%] min-w-[115px] align-middle',
+        sortValue: (row) => `${row.examDate || ''} ${row.startTime || ''}`,
+        headerClassName: 'w-[18%] min-w-[130px]',
+        className: 'w-[18%] min-w-[130px] align-middle',
         render: (row) => (
           <div className="space-y-1 py-1">
             <div className="flex items-center gap-1.5">
@@ -126,42 +128,13 @@ export default function SubjectMatrixTable({
         ),
       },
 
-      // ─── 4. Hall Invigilator ──────────────────────────────────────────────
-      {
-        key: 'invigilator',
-        title: 'Invigilator',
-        headerClassName: 'w-[14%] min-w-[110px]',
-        className: 'w-[14%] min-w-[110px] align-middle',
-        render: (row) => {
-          const invName = row.invigilatorName || row.teacherName;
-          const invId = row.invigilatorId || row.teacherId;
-          if (!invName && !invId) {
-            return (
-              <span className="text-[11px] px-2 py-0.5 rounded theme-bg-sub theme-text-secondary border theme-border opacity-70 italic">
-                Unassigned
-              </span>
-            );
-          }
-
-          return (
-            <div className="flex items-center gap-1.5 min-w-0 py-1" title={`Hall Invigilator: ${invName || `Teacher #${invId}`}`}>
-              <div className="w-5.5 h-5.5 rounded-full theme-bg-accent-soft theme-accent flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs border border-[var(--accent-main)]/20">
-                <UserIcon className="w-3 h-3" />
-              </div>
-              <span className="text-xs font-semibold theme-text-primary truncate">
-                {invName || `Teacher #${invId}`}
-              </span>
-            </div>
-          );
-        },
-      },
-
-      // ─── 5. Paper Setter & Examiner ───────────────────────────────────────
+      // ─── 4. Paper Setter & Examiner ───────────────────────────────────────
       {
         key: 'examiner',
         title: 'Examiner',
-        headerClassName: 'w-[14%] min-w-[110px]',
-        className: 'w-[14%] min-w-[110px] align-middle',
+        sortValue: (row) => row.examinerName || row.evaluatorName || '',
+        headerClassName: 'w-[18%] min-w-[130px]',
+        className: 'w-[18%] min-w-[130px] align-middle',
         render: (row) => {
           const exName = row.examinerName || row.evaluatorName;
           const exId = row.examinerId || row.evaluatorId;
@@ -186,11 +159,12 @@ export default function SubjectMatrixTable({
         },
       },
 
-      // ─── 6. Full Marks ────────────────────────────────────────────────────
+      // ─── 5. Full Marks ────────────────────────────────────────────────────
       {
         key: 'marks',
         title: 'Full Marks',
         align: 'center',
+        sortValue: (row) => Number(row.fullMarks) || 100,
         headerClassName: 'w-20 min-w-[75px] text-center',
         className: 'w-20 min-w-[75px] text-center align-middle',
         render: (row) => (

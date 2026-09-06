@@ -3,28 +3,37 @@ import CustomSelect from '../../../../../components/ui/CustomSelect';
 import CustomButton from '../../../../../components/ui/CustomButton';
 import DataViewToolbar from '../../../../../components/ui/DataViewToolbar';
 import { DepartmentSelect, ClassSelect, TeacherSelect } from '../../../../../components/selectors';
+import TimetableLensSelector, { LENS_MODES } from '../../../../../components/common/TimetableMatrixGrid/TimetableLensSelector';
 import {
   SparklesIcon,
   CalendarIcon,
-  UserIcon,
+  UserCheckIcon,
+  PlusIcon,
   TrashIcon,
+  Squares2X2Icon,
+  TableIcon,
+  PrinterIcon,
 } from '../../../../../components/ui/Icons';
 
 /**
  * SubjectMatrixHeader
- * Unified Enterprise Control Header for Subject Exam Routine Matrix and Invigilation Schedules.
- * Reuses the standard DataViewToolbar from Academy/Enterprise UI with:
- * - Active Examination Session selector & primary actions (Auto-Populate & Add Row)
- * - Optional inlineSessionSelector mode for single-row compact headers
- * - Search, Department, Class, Exam Date, and Invigilator filters
+ * Unified Enterprise Control Header for Subject Exam Routine Matrix and Routine Studio.
+ * Reuses the standard DataViewToolbar in Table mode, and switches to dedicated Lens & Class filters in Studio mode.
+ * - Active Examination Session selector & primary actions (Routine Studio / Matrix Table view switcher, Auto-Populate, Add, Print)
+ * - Single-line unified filter grid
  * - Dynamic live counts, active filter badges, and one-click Reset
  */
 export default function SubjectMatrixHeader({
   examOptions = [],
   selectedExamId,
   setSelectedExamId,
+  viewMode = 'table',
+  onToggleViewMode,
   onAutoPopulate,
+  autoPopulateLabel = 'Auto-Populate',
+  autoPopulateTitle,
   onAddRow,
+  onPrint,
   rightActions,
   showSearch = true,
   searchQuery = '',
@@ -40,6 +49,7 @@ export default function SubjectMatrixHeader({
   filterExamDate = 'ALL',
   setFilterExamDate,
   showTeacherFilter = true,
+  teacherLabel = 'Examiner',
   filterTeacherId = 'ALL',
   setFilterTeacherId,
   dateFilterOptions = [],
@@ -51,24 +61,34 @@ export default function SubjectMatrixHeader({
   onBulkDelete,
   filterGridClassName,
   inlineSessionSelector = false,
+  activeLens = LENS_MODES.ALL,
+  setActiveLens,
 }) {
-  const isFilterActive = Boolean(
-    (showSearch && searchQuery && searchQuery.trim()) ||
-    (showDepartmentFilter && filterDepartmentId && filterDepartmentId !== 'ALL') ||
-    (showClassFilter && filterClassId && filterClassId !== 'ALL') ||
-    (showExamDateFilter && filterExamDate && filterExamDate !== 'ALL') ||
-    (showTeacherFilter && filterTeacherId && filterTeacherId !== 'ALL')
-  );
+  const isTableMode = viewMode === 'table';
+
+  const isFilterActive = isTableMode
+    ? Boolean(
+        (showSearch && searchQuery && searchQuery.trim()) ||
+        (showDepartmentFilter && filterDepartmentId && filterDepartmentId !== 'ALL') ||
+        (showClassFilter && filterClassId && filterClassId !== 'ALL') ||
+        (showExamDateFilter && filterExamDate && filterExamDate !== 'ALL') ||
+        (showTeacherFilter && filterTeacherId && filterTeacherId !== 'ALL')
+      )
+    : Boolean(
+        (filterDepartmentId && filterDepartmentId !== 'ALL') ||
+        (filterClassId && filterClassId !== 'ALL')
+      );
 
   const activeFilterCount = [
-    Boolean(showSearch && searchQuery && searchQuery.trim()),
+    Boolean(showSearch && searchQuery && searchQuery.trim() && isTableMode),
     Boolean(showDepartmentFilter && filterDepartmentId && filterDepartmentId !== 'ALL'),
     Boolean(showClassFilter && filterClassId && filterClassId !== 'ALL'),
-    Boolean(showExamDateFilter && filterExamDate && filterExamDate !== 'ALL'),
-    Boolean(showTeacherFilter && filterTeacherId && filterTeacherId !== 'ALL'),
+    Boolean(showExamDateFilter && filterExamDate && filterExamDate !== 'ALL' && isTableMode),
+    Boolean(showTeacherFilter && filterTeacherId && filterTeacherId !== 'ALL' && isTableMode),
   ].filter(Boolean).length;
 
   const totalGridItemsCount = [
+    showSearch,
     inlineSessionSelector,
     showDepartmentFilter,
     showClassFilter,
@@ -95,11 +115,11 @@ export default function SubjectMatrixHeader({
   };
 
   return (
-    <div className="p-3.5 sm:p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-3.5 text-left animate-fade-in">
-      {/* ── 1. Top Section: Active Session Selector & Primary Actions (when not inline) ── */}
+    <div className="p-3.5 sm:p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-3.5 text-left animate-fade-in print:hidden">
+      {/* ── 1. Top Section: Active Examination Session & Primary Action Buttons (Line 1) ── */}
       {!inlineSessionSelector && (
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
-          <div className="flex-1 max-w-xl">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div className="w-full sm:w-80 md:w-96">
             <CustomSelect
               label="Active Examination Session"
               options={examOptions}
@@ -108,161 +128,231 @@ export default function SubjectMatrixHeader({
                 setSelectedExamId(val);
               }}
               placeholder="Select Examination Session..."
+              size="md"
               required
             />
           </div>
 
-          {(onAutoPopulate || rightActions) && (
-            <div className="flex items-center gap-2 flex-wrap pb-0.5">
+          {(onToggleViewMode || onAutoPopulate || onAddRow || onPrint || rightActions || selectedCount > 0) && (
+            <div className="flex items-center gap-2 flex-wrap pb-0.5 shrink-0">
+              {selectedCount > 0 && isTableMode && (
+                <div className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl theme-bg-danger-soft border border-[var(--danger-main)]/30 theme-danger animate-fade-in text-xs font-semibold shadow-2xs">
+                  <span className="font-bold font-mono">{selectedCount} selected</span>
+                  <button
+                    type="button"
+                    onClick={onBulkDelete}
+                    className="p-1 rounded-lg hover:theme-bg-danger-soft theme-danger transition-colors cursor-pointer"
+                    title="Delete Selected Subject Routines"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               {onAutoPopulate && (
                 <CustomButton
+                  type="button"
                   variant="sub"
                   size="sm"
                   icon={SparklesIcon}
                   onClick={onAutoPopulate}
-                  title="Automatically generate and save rows for all curriculum books belonging to this exam"
+                  title={autoPopulateTitle || "Automatically generate and populate schedule"}
                 >
-                  Auto-Populate
+                  {autoPopulateLabel || 'Auto-Populate'}
                 </CustomButton>
               )}
+
+              {onPrint && (
+                <CustomButton
+                  type="button"
+                  variant="sub"
+                  size="sm"
+                  icon={PrinterIcon}
+                  onClick={onPrint}
+                  title="Print official institutional examination timetable sheet"
+                >
+                  Print
+                </CustomButton>
+              )}
+
               {rightActions}
+
+              {/* View Switcher Button (Positioned at the far right) */}
+              {onToggleViewMode && (
+                <CustomButton
+                  type="button"
+                  variant="sub"
+                  size="sm"
+                  icon={!isTableMode ? TableIcon : Squares2X2Icon}
+                  onClick={onToggleViewMode}
+                  title={!isTableMode ? "Switch to Subject Routine Table View" : "Open Interactive 2D Routine Studio"}
+                >
+                  {!isTableMode ? 'Matrix Table' : 'Routine Studio'}
+                </CustomButton>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* ── 2. Integrated Data View Toolbar (Search, Filters, Reset, and Live Counters) ── */}
-      <div className={!inlineSessionSelector ? 'border-t theme-border pt-3.5' : ''}>
-        <DataViewToolbar
-          className="!border-0 !shadow-none !p-0 !bg-transparent"
-          searchLabel="Search"
-          searchQuery={searchQuery}
-          onSearchChange={showSearch ? setSearchQuery : null}
-          searchPlaceholder={searchPlaceholder}
-          searchSpanClassName="col-span-1"
-          filterGridClassName={resolvedGridClassName}
-          stackedSwitcher={true}
-          filteredCount={filteredCount}
-          totalCount={totalCount}
-          itemLabel={itemLabel || (filteredCount === 1 ? 'subject' : 'subjects')}
-          hasActiveFilters={isFilterActive}
-          onResetFilters={handleResetFilters}
-          activeFilterCount={activeFilterCount}
-          customFilters={
-            <>
-              {inlineSessionSelector && (
-                <div>
-                  <CustomSelect
-                    label="Active Examination Session"
-                    options={examOptions}
-                    value={selectedExamId}
-                    onChange={(val) => setSelectedExamId(val)}
-                    placeholder="Select Examination Session..."
-                    size="md"
-                    required
-                  />
-                </div>
-              )}
+      {/* ── 2. Integrated Controls & Filters (Line 2) ── */}
+      {isTableMode ? (
+        /* Table Mode: Full Search & Multi-dimension DataViewToolbar */
+        <div className={!inlineSessionSelector ? 'border-t theme-border pt-3.5' : ''}>
+          <DataViewToolbar
+            className="!border-0 !shadow-none !p-0 !bg-transparent"
+            searchLabel="Search"
+            searchQuery={searchQuery}
+            onSearchChange={showSearch ? setSearchQuery : null}
+            searchPlaceholder={searchPlaceholder}
+            searchSpanClassName="col-span-1"
+            filterGridClassName={resolvedGridClassName}
+            stackedSwitcher={true}
+            filteredCount={filteredCount}
+            totalCount={totalCount}
+            itemLabel={itemLabel || (filteredCount === 1 ? 'subject' : 'subjects')}
+            hasActiveFilters={isFilterActive}
+            onResetFilters={handleResetFilters}
+            activeFilterCount={activeFilterCount}
+            customFilters={
+              <>
+                {inlineSessionSelector && (
+                  <div>
+                    <CustomSelect
+                      label="Active Examination Session"
+                      options={examOptions}
+                      value={selectedExamId}
+                      onChange={(val) => setSelectedExamId(val)}
+                      placeholder="Select Examination Session..."
+                      size="md"
+                      required
+                    />
+                  </div>
+                )}
 
-              {showDepartmentFilter && (
-                <div>
-                  <DepartmentSelect
-                    label="Department"
-                    value={filterDepartmentId}
-                    allowAll={true}
-                    allValue="ALL"
-                    allLabel="All Departments"
-                    placeholder="All Departments"
-                    size="md"
-                    onChange={(val) => {
-                      setFilterDepartmentId?.(val || 'ALL');
-                    }}
-                  />
-                </div>
-              )}
+                {showDepartmentFilter && (
+                  <div>
+                    <DepartmentSelect
+                      label="Department"
+                      value={filterDepartmentId}
+                      allowAll={true}
+                      allValue="ALL"
+                      allLabel="All Departments"
+                      placeholder="All Departments"
+                      size="md"
+                      onChange={(val) => {
+                        setFilterDepartmentId?.(val || 'ALL');
+                      }}
+                    />
+                  </div>
+                )}
 
-              {showClassFilter && (
-                <div>
-                  <ClassSelect
-                    label="Class"
-                    value={filterClassId}
-                    departmentId={filterDepartmentId !== 'ALL' ? filterDepartmentId : ''}
-                    classes={allAvailableClasses}
-                    allowAll={true}
-                    allValue="ALL"
-                    allLabel="All Classes"
-                    placeholder="All Classes"
-                    size="md"
-                    onChange={(val) => setFilterClassId?.(val || 'ALL')}
-                  />
-                </div>
-              )}
+                {showClassFilter && (
+                  <div>
+                    <ClassSelect
+                      label="Class"
+                      value={filterClassId}
+                      departmentId={filterDepartmentId !== 'ALL' ? filterDepartmentId : ''}
+                      classes={allAvailableClasses}
+                      allowAll={true}
+                      allValue="ALL"
+                      allLabel="All Classes"
+                      placeholder="All Classes"
+                      size="md"
+                      onChange={(val) => setFilterClassId?.(val || 'ALL')}
+                    />
+                  </div>
+                )}
 
-              {showExamDateFilter && (
-                <div>
-                  <CustomSelect
-                    label="Exam Date"
-                    value={filterExamDate}
-                    options={dateFilterOptions}
-                    icon={CalendarIcon}
-                    placeholder="All Exam Dates"
-                    size="md"
-                    onChange={(val) => setFilterExamDate?.(val || 'ALL')}
-                  />
-                </div>
-              )}
+                {showExamDateFilter && (
+                  <div>
+                    <CustomSelect
+                      label="Exam Date"
+                      value={filterExamDate}
+                      options={dateFilterOptions}
+                      icon={CalendarIcon}
+                      placeholder="All Exam Dates"
+                      size="md"
+                      onChange={(val) => setFilterExamDate?.(val || 'ALL')}
+                    />
+                  </div>
+                )}
 
-              {showTeacherFilter && (
-                <div>
-                  <TeacherSelect
-                    label="Invigilator"
-                    value={filterTeacherId}
-                    allowAll={true}
-                    allValue="ALL"
-                    allLabel="All Invigilators"
-                    placeholder="All Invigilators"
-                    icon={UserIcon}
-                    size="md"
-                    onChange={(val) => setFilterTeacherId?.(val || 'ALL')}
-                  />
-                </div>
-              )}
-            </>
-          }
-          actions={
-            selectedCount > 0 ? (
-              <div className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl theme-bg-danger-soft border border-[var(--danger-main)]/30 theme-danger animate-fade-in text-xs font-semibold shadow-2xs">
-                <span className="font-bold font-mono">{selectedCount} selected</span>
-                <button
-                  type="button"
-                  onClick={onBulkDelete}
-                  className="p-1 rounded-lg hover:theme-bg-danger-soft theme-danger transition-colors cursor-pointer"
-                  title="Delete Selected Subject Routines"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              (inlineSessionSelector && (onAutoPopulate || rightActions)) ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {onAutoPopulate && (
-                    <CustomButton
-                      variant="sub"
-                      size="sm"
-                      icon={SparklesIcon}
-                      onClick={onAutoPopulate}
-                      title="Automatically generate and save rows for all curriculum books belonging to this exam"
-                    >
-                      Auto-Populate
-                    </CustomButton>
-                  )}
-                  {rightActions}
-                </div>
-              ) : null
-            )
-          }
-        />
-      </div>
+                {showTeacherFilter && (
+                  <div>
+                    <TeacherSelect
+                      label={teacherLabel || 'Examiner'}
+                      value={filterTeacherId}
+                      allowAll={true}
+                      allValue="ALL"
+                      allLabel={`All ${teacherLabel ? `${teacherLabel}s` : 'Examiners'}`}
+                      placeholder={`All ${teacherLabel ? `${teacherLabel}s` : 'Examiners'}`}
+                      icon={UserCheckIcon}
+                      size="md"
+                      onChange={(val) => setFilterTeacherId?.(val || 'ALL')}
+                    />
+                  </div>
+                )}
+              </>
+            }
+          />
+        </div>
+      ) : (
+        /* Studio Mode: Department, Class & Lens Switcher Toolbar */
+        <div className="border-t theme-border pt-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Left Side: Dept & Class Filters */}
+          <div className="flex items-center gap-2.5 flex-wrap flex-1">
+            {/* Department Filter */}
+            <div className="w-full sm:w-44">
+              <DepartmentSelect
+                value={filterDepartmentId}
+                allowAll={true}
+                allValue="ALL"
+                allLabel="All Departments"
+                placeholder="All Departments"
+                size="sm"
+                onChange={(val) => setFilterDepartmentId?.(val || 'ALL')}
+              />
+            </div>
+
+            {/* Class Filter */}
+            <div className="w-full sm:w-44">
+              <ClassSelect
+                value={filterClassId}
+                departmentId={filterDepartmentId !== 'ALL' ? filterDepartmentId : ''}
+                classes={allAvailableClasses}
+                allowAll={true}
+                allValue="ALL"
+                allLabel="All Classes"
+                placeholder="All Classes"
+                size="sm"
+                onChange={(val) => setFilterClassId?.(val || 'ALL')}
+              />
+            </div>
+
+            {/* Reset Filters */}
+            {isFilterActive && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-xs font-semibold theme-text-secondary hover:theme-text-primary px-2 py-1 rounded-lg border theme-border hover:theme-bg-sub transition-colors cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+
+          {/* Right Side: Lens Switcher */}
+          {setActiveLens && (
+            <div className="flex items-center gap-2 flex-wrap shrink-0 justify-end">
+              <TimetableLensSelector
+                activeLens={activeLens}
+                onChange={setActiveLens}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

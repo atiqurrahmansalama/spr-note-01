@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CustomSelect from '../ui/CustomSelect';
 import { HomeIcon } from '../ui/Icons';
-import { residentialStore } from '../../utils/stores/residentialStore';
+import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../context/TenantContext';
 
 /**

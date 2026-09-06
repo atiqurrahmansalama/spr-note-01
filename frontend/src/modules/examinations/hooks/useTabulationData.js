@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { examStore } from '../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 import { useToast } from '../../../context/ToastContext';
 
 /**

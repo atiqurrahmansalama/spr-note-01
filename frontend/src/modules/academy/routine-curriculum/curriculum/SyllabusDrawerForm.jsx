@@ -19,7 +19,7 @@ import { fetchWithAuth } from '../../../../utils/authService';
 
 import RoutineScheduleModePicker from '../../../../components/common/RoutineScheduleModePicker';
 import AcademicScopePicker from '../../../../components/common/AcademicScopePicker';
-import { weeklyHolidaysStore } from '../../../../utils/stores/calendarStore';
+import { weeklyHolidaysStore } from '@/stores/calendarStore';
 
 export default function SyllabusDrawerForm({
   item = null,

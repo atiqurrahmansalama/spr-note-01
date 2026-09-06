@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTenant } from '../../../context/TenantContext';
 import { useAcademicData } from '../../learning/useAcademicData';
-import { examStore } from '../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 import {
   academicYearsStore,
   DEFAULT_ACADEMIC_YEARS,
   curriculumStore,
-} from '../../../utils/stores/academicStore';
+} from '@/stores/academicStore';
 
 /**
  * useExamData
@@ -178,19 +178,15 @@ export default function useExamData() {
     return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...list];
   }, [sections]);
 
-  // Curriculum Books - Universal resolution across tenant and default stores
+  // Curriculum Books - Direct resolution from active tenant store
   const resolvedCurriculumBooks = useMemo(() => {
-    const fromTenant = localCurriculumBooks || [];
-    const fromDefault = tenantId !== 'default' ? curriculumStore.getItems('default') || [] : [];
-    const fromAcademic = academicData.curriculumBooks || [];
-    const combined = [...fromTenant, ...fromDefault, ...fromAcademic];
-    const seen = new Set();
-    return combined.filter((item) => {
-      if (!item || !item.id || seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-  }, [localCurriculumBooks, tenantId, academicData.curriculumBooks]);
+    if (Array.isArray(localCurriculumBooks) && localCurriculumBooks.length > 0) {
+      return localCurriculumBooks;
+    }
+    const fromTenant = curriculumStore.getItems(tenantId) || [];
+    if (fromTenant.length > 0) return fromTenant;
+    return curriculumStore.getItems('default') || [];
+  }, [localCurriculumBooks, tenantId]);
 
   // Options for Grading Systems
   const gradingSystemOptions = useMemo(() => {
@@ -210,6 +206,7 @@ export default function useExamData() {
     teachers: teachers.length > 0 ? teachers : staff,
     staff,
     curriculumBooks: resolvedCurriculumBooks,
+    periodSlots: academicData?.periodSlots || [],
     academicYears,
     activeYear,
     academicYearOptions,

@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '../../../../../context/ToastContext';
+import { useUndoRedo } from '../../../../../context/useUndoRedo';
 import { fetchWithAuth } from '../../../../../utils/authService';
-import { examStore } from '../../../../../utils/stores/examStore';
-import { curriculumStore } from '../../../../../utils/stores/academicStore';
+import { examStore } from '@/stores/examStore';
+import { curriculumStore } from '@/stores/academicStore';
+import { readJSON } from '@/stores/coreStore';
 import useExamData from '../../../hooks/useExamData';
+import { findMatchingCurriculumBooks, resolveClassForBook } from '../../../auto-populate/examRoutineGenerator';
 import {
   generateDateRange,
   formatShortDateLabel,
@@ -20,11 +23,16 @@ export { formatShortDateLabel, formatDateLabel, generateDateRange };
  */
 export default function useSubjectMatrixState({ initialExamId = null } = {}) {
   const { showToast } = useToast();
+  const { pushAction } = useUndoRedo();
   const {
     tenantId,
     exams = [],
     classes = [],
+    departments = [],
     curriculumBooks = [],
+    periodSlots = [],
+    teachers: examDataTeachers = [],
+    staff: examDataStaff = [],
     refreshExamData,
   } = useExamData();
 
@@ -72,13 +80,29 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
 
   // Designated Exam Days from Active Exam Session (excluding PREPARATION_GAP)
   const designatedExamDays = useMemo(() => {
-    if (activeExam?.scheduleDays && Array.isArray(activeExam.scheduleDays)) {
-      return activeExam.scheduleDays
+    if (activeExam?.scheduleDays && Array.isArray(activeExam.scheduleDays) && activeExam.scheduleDays.length > 0) {
+      const validDays = activeExam.scheduleDays
         .filter((d) => d.type !== 'PREPARATION_GAP' && d.type !== 'EXAM_BREAK')
-        .map((d) => d.date);
+        .map((d) => d.date)
+        .filter(Boolean);
+      if (validDays.length > 0) return validDays;
     }
     if (activeExam?.startDate && activeExam?.endDate) {
-      return generateDateRange(activeExam.startDate, activeExam.endDate);
+      const range = generateDateRange(activeExam.startDate, activeExam.endDate);
+      if (range.length > 0) return range;
+    }
+    if (activeExam?.startDate) {
+      const s = new Date(activeExam.startDate);
+      if (!isNaN(s.getTime())) {
+        const dates = [];
+        for (let i = 0; i < 10; i++) {
+          const d = new Date(s);
+          d.setDate(d.getDate() + i);
+          dates.push(d.toISOString().split('T')[0]);
+        }
+        return dates;
+      }
+      return [activeExam.startDate];
     }
     return [];
   }, [activeExam]);
@@ -97,8 +121,20 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Load staff / teachers roster for invigilator allocation
-  const [teachers, setTeachers] = useState([]);
+  // Load staff / teachers roster for invigilator & examiner allocation
+  const [teachers, setTeachers] = useState(() => {
+    if (Array.isArray(examDataTeachers) && examDataTeachers.length > 0) return examDataTeachers;
+    if (Array.isArray(examDataStaff) && examDataStaff.length > 0) return examDataStaff;
+    return typeof window !== 'undefined' ? (readJSON(`spr_staff_cache_${tenantId || 'default'}`, [])) : [];
+  });
+
+  useEffect(() => {
+    if (Array.isArray(examDataTeachers) && examDataTeachers.length > 0) {
+      setTeachers(examDataTeachers);
+    } else if (Array.isArray(examDataStaff) && examDataStaff.length > 0) {
+      setTeachers(examDataStaff);
+    }
+  }, [examDataTeachers, examDataStaff]);
 
   useEffect(() => {
     let isMounted = true;
@@ -108,7 +144,9 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
         if (res.ok && isMounted) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.results || [];
-          setTeachers(list);
+          if (list.length > 0) {
+            setTeachers(list);
+          }
         }
       } catch (err) {
         console.warn('[useSubjectMatrixState] Failed to load staff roster:', err);
@@ -186,36 +224,66 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
   const participatingClasses = useMemo(() => {
     if (!activeExam) return classes;
     if (activeExam.targetClassIds && Array.isArray(activeExam.targetClassIds) && activeExam.targetClassIds.length > 0) {
-      return classes.filter((c) => activeExam.targetClassIds.map(String).includes(String(c.id)));
+      const matchSet = new Set(activeExam.targetClassIds.map(String));
+      const matched = classes.filter((c) => {
+        const cId = String(c.id);
+        const cIdClean = cId.replace(/^cls_/, '');
+        return matchSet.has(cId) || matchSet.has(cIdClean) || matchSet.has(`cls_${cId}`);
+      });
+      if (matched.length > 0) return matched;
     }
     return classes;
   }, [activeExam, classes]);
 
-  // All Available Classes (Combined & Deduplicated)
-  const allAvailableClasses = useMemo(() => {
-    const fromParticipating = participatingClasses || [];
-    const fromAll = classes || [];
-    const combined = [...fromParticipating, ...fromAll];
-    const seen = new Set();
-    return combined.filter((c) => {
-      if (!c || !c.id || seen.has(String(c.id))) return false;
-      seen.add(String(c.id));
-      return true;
-    });
-  }, [participatingClasses, classes]);
-
-  // Available Curriculum Books for the Exam
+  // Available Curriculum Books for the Exam (Dynamic from Tenant Store)
   const availableCurriculumBooks = useMemo(() => {
     const fromTenant = curriculumStore.getItems(tenantId) || [];
-    const fromDefault = tenantId !== 'default' ? curriculumStore.getItems('default') || [] : [];
-    const combined = [...fromTenant, ...fromDefault, ...(curriculumBooks || [])];
-    const seen = new Set();
-    return combined.filter((item) => {
-      if (!item || !item.id || seen.has(String(item.id))) return false;
-      seen.add(String(item.id));
-      return true;
-    });
+    if (fromTenant.length > 0) return fromTenant;
+    return Array.isArray(curriculumBooks) ? curriculumBooks : [];
   }, [tenantId, curriculumBooks]);
+
+  // All Available Classes (100% Dynamic from Academy with real Department metadata)
+  const allAvailableClasses = useMemo(() => {
+    const rawList = (Array.isArray(participatingClasses) && participatingClasses.length > 0)
+      ? participatingClasses
+      : (Array.isArray(classes) ? classes : []);
+
+    const deptMap = new Map();
+    (departments || []).forEach((d) => {
+      if (d && d.id) {
+        deptMap.set(String(d.id), d);
+      }
+    });
+
+    const classMap = new Map();
+    rawList.forEach((c) => {
+      if (!c || !c.id) return;
+      const idStr = String(c.id);
+      let deptId = '';
+      if (c.department !== undefined && c.department !== null) {
+        deptId = typeof c.department === 'object' ? String(c.department.id || '') : String(c.department);
+      } else if (c.departmentId || c.department_id) {
+        deptId = String(c.departmentId || c.department_id);
+      }
+
+      const matchedDept = deptMap.get(deptId);
+      const deptName = matchedDept?.name || matchedDept?.department_name || c.departmentName || c.department_name || '';
+
+      if (!classMap.has(idStr)) {
+        classMap.set(idStr, {
+          ...c,
+          id: idStr,
+          name: c.name || c.className || c.class_name || `Class ${idStr}`,
+          className: c.name || c.className || c.class_name || `Class ${idStr}`,
+          departmentId: deptId,
+          departmentName: deptName,
+          departmentCode: matchedDept?.code || matchedDept?.department_code || '',
+        });
+      }
+    });
+
+    return Array.from(classMap.values());
+  }, [participatingClasses, classes, departments]);
 
   // Helper to build default components based on activeExam
   const getExamDefaultComponents = useCallback((fullMarksNum = 100) => {
@@ -282,48 +350,92 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       overwriteMode = 'REPLACE',
     } = config;
 
-    const targetClasses = participatingClasses.length > 0 ? participatingClasses : allAvailableClasses;
-    if (targetClasses.length === 0) {
-      showToast('No participating classes configured for this exam session.', 'warning');
+    const rawBooks = (Array.isArray(availableCurriculumBooks) && availableCurriculumBooks.length > 0)
+      ? availableCurriculumBooks
+      : (curriculumStore.getItems(tenantId) || []);
+
+    if (rawBooks.length === 0) {
+      showToast('No curriculum books found in Curriculum Tracker.', 'warning');
       return;
+    }
+
+    // Filter books based on activeExam target classes and department
+    const normalizeId = (s) => String(s || '').replace(/^cls_/, '').replace(/^dept_/, '').trim().toLowerCase();
+
+    let targetBooks = rawBooks;
+
+    if (Array.isArray(activeExam?.targetClassIds) && activeExam.targetClassIds.length > 0) {
+      const targetIdSet = new Set(activeExam.targetClassIds.map(normalizeId));
+      const targetNameSet = new Set(
+        participatingClasses.map(c => String(c.name || c.className || '').trim().toLowerCase()).filter(Boolean)
+      );
+
+      const classFiltered = targetBooks.filter((b) => {
+        const bClsId = normalizeId(b.classId || b.class_id || (typeof b.class === 'object' ? b.class?.id : b.class) || '');
+        const bClsName = String(b.className || b.class_name || (typeof b.class === 'object' ? b.class?.name : '') || '').trim().toLowerCase();
+
+        if (bClsId && targetIdSet.has(bClsId)) return true;
+        if (bClsName && targetNameSet.has(bClsName)) return true;
+        return false;
+      });
+
+      if (classFiltered.length > 0) {
+        targetBooks = classFiltered;
+      }
+    }
+
+    if (activeExam?.departmentId && activeExam.departmentId !== 'ALL' && activeExam.departmentId !== '') {
+      const examDeptClean = normalizeId(activeExam.departmentId);
+      const deptFiltered = targetBooks.filter((b) => {
+        const bDeptId = normalizeId(b.departmentId || b.department_id || (typeof b.department === 'object' ? b.department?.id : b.department) || '');
+        const bDeptName = String(b.departmentName || b.department_name || (typeof b.department === 'object' ? b.department?.name : '') || '').trim().toLowerCase();
+        return bDeptId === examDeptClean || (bDeptName && (bDeptName.includes(examDeptClean) || examDeptClean.includes(bDeptName)));
+      });
+
+      if (deptFiltered.length > 0) {
+        targetBooks = deptFiltered;
+      }
     }
 
     const defaultFullMarks = Number(activeExam.defaultFullMarks || activeExam.targetFullMarks || 100);
 
-    // Prepare teacher pool for random / balanced invigilator distribution
+    // Build Class and Department resolution map from allAvailableClasses
+    const classLookup = new Map();
+    (allAvailableClasses || []).forEach((c) => {
+      if (!c) return;
+      const idStr = String(c.id || '');
+      const cleanId = normalizeId(idStr);
+      const nameStr = String(c.name || c.className || c.class_name || '').trim().toLowerCase();
+      if (idStr) classLookup.set(idStr, c);
+      if (cleanId) classLookup.set(cleanId, c);
+      if (nameStr) classLookup.set(nameStr, c);
+    });
+
+    // Prepare teacher pool for dynamic staff allocation
     const teachingStaff = teachers.filter((t) => {
       const type = t.staff_type || t.type;
       return !type || type === 'TEACHING';
     });
 
-    const fallbackFaculty = [
-      { id: 'teach_101', name: 'Maulana Abdur Rahman' },
-      { id: 'teach_102', name: 'Mufti Mahmud Hasan' },
-      { id: 'teach_103', name: 'Qari Sirajul Islam' },
-      { id: 'teach_104', name: 'Maulana Ibrahim Khalil' },
-      { id: 'teach_105', name: 'Ustadh Tariqul Islam' },
-      { id: 'teach_106', name: 'Maulana Aminul Islam' },
-      { id: 'teach_107', name: 'Mufti Nurul Huda' },
-      { id: 'teach_108', name: 'Ustadh Anwar Hossain' },
-    ];
-
-    const teacherPool = teachingStaff.length > 0
-      ? teachingStaff.map((t) => ({
-          id: String(t.id),
-          name: t.name_en || t.name || t.full_name || t.user_name || 'Teacher',
-        }))
-      : fallbackFaculty;
+    const teacherPool = teachingStaff.map((t) => ({
+      id: String(t.id),
+      name: t.name_en || t.name || t.full_name || t.user_name || 'Teacher',
+    }));
 
     // Generate ordered schedule slots respecting dynamic shifts per day
+    const resolvedShifts = Array.isArray(examShifts) && examShifts.length > 0 ? examShifts : [
+      { id: 'shift_1', name: 'Shift 1 (Morning)', startTime: '09:00 AM', endTime: '11:00 AM' },
+    ];
+
     const examSlots = [];
-    if (activeExam?.scheduleDays && Array.isArray(activeExam.scheduleDays)) {
+    if (activeExam?.scheduleDays && Array.isArray(activeExam.scheduleDays) && activeExam.scheduleDays.length > 0) {
       activeExam.scheduleDays.forEach((d) => {
         if (d.type !== 'PREPARATION_GAP' && d.type !== 'EXAM_BREAK') {
           const shiftCount = typeof d.shiftCount === 'number'
-            ? Math.max(1, Math.min(d.shiftCount, examShifts.length))
-            : (d.type === 'DUAL_EXAM' ? Math.min(2, examShifts.length) : 1);
+            ? Math.max(1, Math.min(d.shiftCount, resolvedShifts.length))
+            : (d.type === 'DUAL_EXAM' ? Math.min(2, resolvedShifts.length) : 1);
           
-          const applicableShifts = examShifts.slice(0, shiftCount);
+          const applicableShifts = resolvedShifts.slice(0, shiftCount);
           applicableShifts.forEach((shift) => {
             examSlots.push({
               date: d.date,
@@ -338,9 +450,12 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     }
 
     if (examSlots.length === 0) {
-      const fallbackDates = designatedExamDays.length > 0 ? designatedExamDays : [activeExam.startDate || ''];
+      const fallbackDates = designatedExamDays.length > 0
+        ? designatedExamDays
+        : (activeExam.startDate && activeExam.endDate ? generateDateRange(activeExam.startDate, activeExam.endDate) : [activeExam.startDate || '2026-10-10']);
+
       fallbackDates.forEach((dt) => {
-        examShifts.forEach((shift) => {
+        resolvedShifts.forEach((shift) => {
           examSlots.push({
             date: dt,
             shiftId: shift.id,
@@ -352,234 +467,193 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       });
     }
 
-    // ─── 1. Map Invigilator Roster by Date & Shift Slot (Hall Guard Duty Roster) ───
-    const slotInvigilatorMap = {};
-    let slotTeacherIndex = 0;
-    examSlots.forEach((slot) => {
-      const slotKey = `${slot.date}___${slot.shiftId}`;
-      if (!slotInvigilatorMap[slotKey]) {
-        if (invigilatorStrategy === 'BALANCED_ROTATION') {
-          const teach = teacherPool[slotTeacherIndex % teacherPool.length];
-          slotInvigilatorMap[slotKey] = {
-            id: teach.id,
-            name: teach.name,
-          };
-          slotTeacherIndex++;
-        } else if (invigilatorStrategy === 'SPECIFIC_TEACHER') {
-          const matchedTeach = teacherPool.find((t) => String(t.id) === String(invigilatorTeacherId));
-          slotInvigilatorMap[slotKey] = {
-            id: String(invigilatorTeacherId || ''),
-            name: invigilatorTeacherName || matchedTeach?.name || '',
-          };
-        } else if (invigilatorStrategy === 'UNASSIGNED') {
-          slotInvigilatorMap[slotKey] = {
-            id: '',
-            name: '',
-          };
-        }
+    // Group target curriculum books by real Resolved Class to assign collision-free dates & shifts
+    const effectiveClasses = (Array.isArray(participatingClasses) && participatingClasses.length > 0)
+      ? participatingClasses
+      : (Array.isArray(allAvailableClasses) && allAvailableClasses.length > 0 ? allAvailableClasses : []);
+
+    const booksByClass = new Map();
+    targetBooks.forEach((book) => {
+      const resolved = resolveClassForBook(book, effectiveClasses);
+      const clsKey = String(resolved.classId || 'default_class');
+      if (!booksByClass.has(clsKey)) {
+        booksByClass.set(clsKey, {
+          resolvedClass: resolved,
+          books: [],
+        });
       }
+      booksByClass.get(clsKey).books.push({ book, resolved });
     });
 
-    // ─── 2. Map Examiner by Unique Subject / Book (Subject Specialist Roster) ────
-    const subjectExaminerMap = {};
+    const slotInvigilatorsUsed = new Map();
+    let globalTeacherRotationIndex = 0;
     let subjectTeacherCounter = 0;
+    let externalExaminerCounter = 0;
+
+    const getAvailableInvigilatorForSlot = (slotKey, preferredTeacherId = null, preferredTeacherName = null) => {
+      if (invigilatorStrategy === 'UNASSIGNED') {
+        return { id: '', name: '' };
+      }
+
+      if (!slotInvigilatorsUsed.has(slotKey)) {
+        slotInvigilatorsUsed.set(slotKey, new Set());
+      }
+      const usedInSlot = slotInvigilatorsUsed.get(slotKey);
+
+      if (invigilatorStrategy === 'SPECIFIC_TEACHER') {
+        const matched = teacherPool.find((t) => String(t.id) === String(invigilatorTeacherId));
+        return { id: String(invigilatorTeacherId || ''), name: invigilatorTeacherName || matched?.name || '' };
+      }
+
+      if (preferredTeacherId && !usedInSlot.has(String(preferredTeacherId))) {
+        usedInSlot.add(String(preferredTeacherId));
+        return { id: String(preferredTeacherId), name: preferredTeacherName || 'Teacher' };
+      }
+
+      if (teacherPool.length === 0) {
+        return { id: '', name: '' };
+      }
+
+      let pickedTeacher = null;
+      for (let i = 0; i < teacherPool.length; i++) {
+        const candidate = teacherPool[(globalTeacherRotationIndex + i) % teacherPool.length];
+        if (!usedInSlot.has(String(candidate.id))) {
+          pickedTeacher = candidate;
+          globalTeacherRotationIndex = (globalTeacherRotationIndex + i + 1) % teacherPool.length;
+          break;
+        }
+      }
+
+      if (!pickedTeacher && teacherPool.length > 0) {
+        pickedTeacher = teacherPool[globalTeacherRotationIndex % teacherPool.length];
+        globalTeacherRotationIndex++;
+      }
+
+      if (pickedTeacher) {
+        usedInSlot.add(String(pickedTeacher.id));
+        return { id: String(pickedTeacher.id), name: pickedTeacher.name };
+      }
+
+      return { id: '', name: '' };
+    };
 
     const newRows = [];
-
-    // Helper map for append mode check
     const existingMap = new Set(
       (overwriteMode === 'APPEND' && Array.isArray(rows) ? rows : []).map(
         (r) => `${String(r.classId || '')}___${String(r.curriculumBookId || r.subjectName || '').toLowerCase()}`
       )
     );
 
-    targetClasses.forEach((cls) => {
-      const clsIdStr = String(cls.id);
-      const clsName = cls.name || cls.class_name || 'Class';
-      const clsDeptId = cls.department !== undefined ? (typeof cls.department === 'object' ? cls.department.id : cls.department) : (cls.department_id || '');
+    let sequenceCounter = 1;
 
-      // Find matching curriculum books for this class
-      const classBooks = availableCurriculumBooks.filter((b) => {
-        const bClassId = String(b.classId || b.class_id || (typeof b.class === 'object' ? b.class?.id : b.class) || '').trim();
-        const bClassName = String(b.className || b.class_name || '').toLowerCase().trim();
-        const targetNameClean = clsName.toLowerCase().trim();
+    booksByClass.forEach(({ resolvedClass, books }) => {
+      books.forEach(({ book, resolved }, bIdx) => {
+        const bookTitle = book.name || book.title || book.subject || 'Curriculum Book';
+        const resolvedClassId = resolved.classId;
+        const resolvedClassName = resolved.className;
+        const resolvedDeptId = resolved.departmentId;
+        const resolvedDeptName = resolved.departmentName;
 
-        if (bClassId && (bClassId === clsIdStr || clsIdStr.includes(bClassId))) return true;
-        if (targetNameClean && bClassName && (bClassName === targetNameClean || bClassName.includes(targetNameClean) || targetNameClean.includes(bClassName))) return true;
-        return false;
-      });
+        const bookKey = `${resolvedClassId}___${String(book.id || bookTitle).toLowerCase()}`;
+        if (overwriteMode === 'APPEND' && existingMap.has(bookKey)) {
+          return;
+        }
 
-      if (classBooks.length > 0) {
-        let slotIndex = 0;
-        classBooks.forEach((book) => {
-          const autoSubject = book.subject || book.subject_name || book.name || book.title || 'Subject';
-          const bookKey = `${clsIdStr}___${String(book.id || autoSubject).toLowerCase()}`;
+        const slot = examSlots[bIdx % examSlots.length];
+        const assignedDate = slot.date;
+        const assignedShiftId = slot.shiftId;
+        const assignedShiftName = slot.shiftName;
+        const assignedStart = slot.startTime;
+        const assignedEnd = slot.endTime;
+        const slotKey = `${assignedDate}___${assignedShiftId}`;
 
-          // Skip if append mode and already exists
-          if (overwriteMode === 'APPEND' && existingMap.has(bookKey)) {
-            return;
-          }
+        const bookTeacherId = String(book.teacherId || book.teacher_id || '');
+        const bookTeacherName = book.teacherName || book.teacher_name || book.teacher || '';
 
-          const bookTeacherId = String(book.teacherId || book.teacher_id || '');
-          const bookTeacherName = book.teacherName || book.teacher_name || book.teacher || '';
-
-          const currentSlot = examSlots[slotIndex % examSlots.length];
-          const assignedDate = currentSlot.date;
-          const assignedShiftId = currentSlot.shiftId;
-          const assignedShiftName = currentSlot.shiftName;
-          const assignedStart = currentSlot.startTime;
-          const assignedEnd = currentSlot.endTime;
-
-          // ── A. Resolve Paper Setter & Examiner (Subject-Specific) ──────────
-          let assignedExaminerId = '';
-          let assignedExaminerName = '';
-
-          if (examinerStrategy === 'SUBJECT_TEACHER') {
-            if (bookTeacherId && bookTeacherName) {
-              assignedExaminerId = bookTeacherId;
-              assignedExaminerName = bookTeacherName;
-            } else {
-              // Map distinct specialized teachers across different subject titles
-              const subjKey = String(book.name || book.title || autoSubject).trim().toLowerCase();
-              if (!subjectExaminerMap[subjKey]) {
-                const teach = teacherPool[subjectTeacherCounter % teacherPool.length];
-                subjectExaminerMap[subjKey] = teach;
-                subjectTeacherCounter++;
-              }
-              assignedExaminerId = subjectExaminerMap[subjKey].id;
-              assignedExaminerName = subjectExaminerMap[subjKey].name;
-            }
-          } else if (examinerStrategy === 'SPECIFIC_TEACHER') {
-            const matchedChief = teacherPool.find((t) => String(t.id) === String(examinerTeacherId));
-            assignedExaminerId = String(examinerTeacherId || '');
-            assignedExaminerName = examinerTeacherName || matchedChief?.name || '';
-          } else if (examinerStrategy === 'UNASSIGNED') {
-            assignedExaminerId = '';
-            assignedExaminerName = '';
-          }
-
-          // ── B. Resolve Hall Invigilator (Slot/Date-Specific) ───────────────
-          let assignedInvigilatorId = '';
-          let assignedInvigilatorName = '';
-
-          if (invigilatorStrategy === 'SUBJECT_TEACHER') {
-            assignedInvigilatorId = bookTeacherId || assignedExaminerId;
-            assignedInvigilatorName = bookTeacherName || assignedExaminerName;
-          } else {
-            const slotKey = `${assignedDate}___${assignedShiftId}`;
-            const slotGuard = slotInvigilatorMap[slotKey];
-            assignedInvigilatorId = slotGuard ? slotGuard.id : '';
-            assignedInvigilatorName = slotGuard ? slotGuard.name : '';
-          }
-
-          // If Examiner strategy is SAME_AS_INVIGILATOR, mirror the slot invigilator
-          if (examinerStrategy === 'SAME_AS_INVIGILATOR') {
-            assignedExaminerId = assignedInvigilatorId;
-            assignedExaminerName = assignedInvigilatorName;
-          }
-
-          const autoFullMarks = Number(book.fullMarks || book.full_marks || book.total_marks || defaultFullMarks);
-          const autoPassMarks = Number(book.passMarks || book.pass_marks || Math.round(autoFullMarks * 0.33));
-
-          const subjectComponents = getExamDefaultComponents(autoFullMarks);
-
-          newRows.push({
-            id: `row_auto_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-            examId: String(activeExam.id),
-            departmentId: String(clsDeptId || 'ALL'),
-            departmentName: cls.department_name || '',
-            classId: clsIdStr,
-            className: clsName,
-            sectionId: 'ALL',
-            sectionName: 'All Sections',
-            curriculumBookId: String(book.id),
-            curriculumBookName: book.name || book.title || '',
-            subjectName: autoSubject,
-            teacherId: assignedInvigilatorId,
-            teacherName: assignedInvigilatorName,
-            invigilatorId: assignedInvigilatorId,
-            invigilatorName: assignedInvigilatorName,
-            examinerId: assignedExaminerId,
-            examinerName: assignedExaminerName,
-            evaluatorId: assignedExaminerId,
-            evaluatorName: assignedExaminerName,
-            examDate: assignedDate,
-            shiftId: assignedShiftId,
-            shiftName: assignedShiftName,
-            startTime: assignedStart,
-            endTime: assignedEnd,
-            fullMarks: autoFullMarks,
-            passMarks: autoPassMarks,
-            components: subjectComponents,
-          });
-
-          slotIndex++;
-        });
-      } else {
-        const currentSlot = examSlots[0] || {
-          date: activeExam.startDate || '',
-          shiftId: examShifts[0]?.id || 'shift_1',
-          shiftName: examShifts[0]?.name || 'Shift 1 (Morning)',
-          startTime: examShifts[0]?.startTime || '09:00 AM',
-          endTime: examShifts[0]?.endTime || '11:00 AM',
-        };
-
-        const fallbackComponents = getExamDefaultComponents(defaultFullMarks);
-        const fallbackSlotKey = `${currentSlot.date}___${currentSlot.shiftId}`;
-        const slotGuard = slotInvigilatorMap[fallbackSlotKey];
-
-        const assignedInvigilatorId = invigilatorStrategy === 'UNASSIGNED' ? '' : (slotGuard ? slotGuard.id : (teacherPool[0]?.id || ''));
-        const assignedInvigilatorName = invigilatorStrategy === 'UNASSIGNED' ? '' : (slotGuard ? slotGuard.name : (teacherPool[0]?.name || ''));
+        const allocatedInvigilator = getAvailableInvigilatorForSlot(
+          slotKey,
+          invigilatorStrategy === 'SUBJECT_TEACHER' ? bookTeacherId : null,
+          invigilatorStrategy === 'SUBJECT_TEACHER' ? bookTeacherName : null
+        );
+        const assignedInvigilatorId = allocatedInvigilator.id;
+        const assignedInvigilatorName = allocatedInvigilator.name;
 
         let assignedExaminerId = '';
         let assignedExaminerName = '';
-        if (examinerStrategy === 'SUBJECT_TEACHER') {
-          const teach = teacherPool[subjectTeacherCounter % teacherPool.length];
-          assignedExaminerId = teach.id;
-          assignedExaminerName = teach.name;
-          subjectTeacherCounter++;
-        } else if (examinerStrategy === 'SAME_AS_INVIGILATOR') {
+
+        if (examinerStrategy === 'SAME_AS_INVIGILATOR') {
           assignedExaminerId = assignedInvigilatorId;
           assignedExaminerName = assignedInvigilatorName;
+        } else if (examinerStrategy === 'SUBJECT_TEACHER') {
+          if (bookTeacherId && bookTeacherName) {
+            assignedExaminerId = bookTeacherId;
+            assignedExaminerName = bookTeacherName;
+          } else if (teacherPool.length > 0) {
+            const teach = teacherPool[subjectTeacherCounter % teacherPool.length];
+            subjectTeacherCounter++;
+            assignedExaminerId = teach.id;
+            assignedExaminerName = teach.name;
+          }
+        } else if (examinerStrategy === 'EXTERNAL_NON_CLASS_TEACHER') {
+          if (teacherPool.length > 0) {
+            const teach = teacherPool[externalExaminerCounter % teacherPool.length];
+            externalExaminerCounter++;
+            assignedExaminerId = teach.id;
+            assignedExaminerName = teach.name;
+          }
         } else if (examinerStrategy === 'SPECIFIC_TEACHER') {
           const matchedChief = teacherPool.find((t) => String(t.id) === String(examinerTeacherId));
-          assignedExaminerId = String(examinerTeacherId || '');
+          assignedExaminerId = String(examinerTeacherId || (matchedChief ? matchedChief.id : ''));
           assignedExaminerName = examinerTeacherName || matchedChief?.name || '';
         }
 
+        const autoFullMarks = Number(book.fullMarks || book.full_marks || defaultFullMarks);
+        const autoPassMarks = Number(book.passMarks || book.pass_marks || Math.round(defaultFullMarks * 0.4));
+        const subjectComponents = getExamDefaultComponents(autoFullMarks);
+
         newRows.push({
-          id: `row_auto_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          id: `routine_${activeExam.id}_${resolvedClassId}_${book.id}`,
           examId: String(activeExam.id),
-          departmentId: String(clsDeptId || 'ALL'),
-          departmentName: cls.department_name || '',
-          classId: clsIdStr,
-          className: clsName,
+          examName: activeExam.name || 'Exam',
+          departmentId: String(resolvedDeptId || 'ALL'),
+          departmentName: resolvedDeptName,
+          classId: resolvedClassId,
+          className: resolvedClassName,
           sectionId: 'ALL',
           sectionName: 'All Sections',
-          curriculumBookId: null,
-          curriculumBookName: '',
-          subjectName: `${clsName} Subject`,
-          teacherId: assignedInvigilatorId,
-          teacherName: assignedInvigilatorName,
+          subjectId: String(book.id),
+          subjectName: bookTitle,
+          subjectCode: book.code || book.subject_code || '',
+          bookId: String(book.id),
+          bookName: bookTitle,
+          curriculumBookId: String(book.id),
+          curriculumBookName: bookTitle,
+          teacherId: bookTeacherId || assignedInvigilatorId,
+          teacherName: bookTeacherName || assignedInvigilatorName,
           invigilatorId: assignedInvigilatorId,
           invigilatorName: assignedInvigilatorName,
           examinerId: assignedExaminerId,
           examinerName: assignedExaminerName,
           evaluatorId: assignedExaminerId,
           evaluatorName: assignedExaminerName,
-          examDate: currentSlot.date,
-          shiftId: currentSlot.shiftId,
-          shiftName: currentSlot.shiftName,
-          startTime: currentSlot.startTime,
-          endTime: currentSlot.endTime,
-          fullMarks: defaultFullMarks,
-          passMarks: Math.round(defaultFullMarks * 0.33),
-          components: fallbackComponents,
+          examDate: assignedDate,
+          dayOfWeek: new Date(assignedDate).toLocaleDateString('en-US', { weekday: 'short' }),
+          shiftId: assignedShiftId,
+          shiftName: assignedShiftName,
+          startTime: assignedStart,
+          endTime: assignedEnd,
+          roomNo: 'Main Hall',
+          fullMarks: autoFullMarks,
+          passMarks: autoPassMarks,
+          sequence: sequenceCounter++,
+          notes: book.notes || '',
+          components: subjectComponents,
         });
-      }
+      });
     });
 
     const finalRows = overwriteMode === 'APPEND' ? [...rows, ...newRows] : newRows;
+    const prevSnapshot = rows;
 
     try {
       examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, finalRows);
@@ -591,25 +665,44 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     setIsDirty(false);
     setShowAutoPopulateConfirm(false);
     refreshExamData();
-    showToast(
-      overwriteMode === 'APPEND'
-        ? `Appended ${newRows.length} new subject routine entries from curriculum.`
-        : `Generated and saved ${newRows.length} subject routine entries with customized invigilators and examiners.`,
-      'success'
-    );
+
+    pushAction({
+      title: `Auto-Populate Routine (${newRows.length} curriculum books)`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, prevSnapshot);
+        } catch (e) {
+          console.error('Failed to undo auto-populate routine:', e);
+        }
+        setRows(prevSnapshot);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, finalRows);
+        } catch (e) {
+          console.error('Failed to redo auto-populate routine:', e);
+        }
+        setRows(finalRows);
+        refreshExamData();
+      },
+    });
+
+    showToast(`Successfully populated ${newRows.length} subject routine entries from curriculum books.`, 'success');
   }, [
     activeExam,
     participatingClasses,
     allAvailableClasses,
+    availableCurriculumBooks,
+    tenantId,
     teachers,
     examShifts,
     designatedExamDays,
-    availableCurriculumBooks,
-    getExamDefaultComponents,
-    tenantId,
-    selectedExamId,
     rows,
+    selectedExamId,
     refreshExamData,
+    pushAction,
     showToast,
   ]);
 
@@ -852,8 +945,15 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
 
   // Delete a single row
   const handleDeleteRow = useCallback((rowId) => {
+    let previousRows = [];
+    let deletedItem = null;
+    let nextRows = [];
+
     setRows((prevRows) => {
+      previousRows = prevRows;
+      deletedItem = prevRows.find((r) => String(r.id) === String(rowId));
       const updated = prevRows.filter((r) => String(r.id) !== String(rowId));
+      nextRows = updated;
       try {
         examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, updated);
       } catch (e) {
@@ -861,49 +961,105 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       }
       return updated;
     });
+
     setSelectedRowIds((prev) => {
       const next = new Set(prev);
       next.delete(rowId);
       return next;
     });
+
+    pushAction({
+      title: `Delete "${deletedItem?.subjectName || 'Subject'}"`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, previousRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(previousRows);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(nextRows);
+        refreshExamData();
+      },
+    });
+
     setIsDirty(false);
     refreshExamData();
     showToast('Subject routine removed.', 'info');
-  }, [tenantId, selectedExamId, refreshExamData, showToast]);
+  }, [tenantId, selectedExamId, refreshExamData, showToast, pushAction]);
 
   // Upsert (Add / Edit) a subject routine row
-  const handleUpsertRow = useCallback((savedRow) => {
+  const handleUpsertRow = useCallback((savedRow, options = {}) => {
     if (!savedRow || !savedRow.id) return;
+    const { silent = false } = typeof options === 'object' ? options : {};
     const targetIdStr = String(savedRow.id);
     const targetExamId = String(savedRow.examId || selectedExamId);
 
+    let previousRows = [];
+    let nextUpdatedRows = [];
+    let isExisting = false;
+
     setRows((prevRows) => {
-      const isExisting = prevRows.some((r) => String(r.id) === targetIdStr);
+      previousRows = prevRows;
+      isExisting = prevRows.some((r) => String(r.id) === targetIdStr);
       const updatedRows = isExisting
         ? prevRows.map((r) => (String(r.id) === targetIdStr ? { ...r, ...savedRow, id: r.id } : r))
         : [savedRow, ...prevRows];
 
-      // Schedule persistence outside of state updater
-      setTimeout(() => {
-        try {
-          examStore.bulkUpsertExamSubjects(tenantId, targetExamId, updatedRows);
-        } catch (err) {
-          console.error('Failed to auto-persist subject row:', err);
-        }
-      }, 0);
+      nextUpdatedRows = updatedRows;
 
+      try {
+        examStore.bulkUpsertExamSubjects(tenantId, targetExamId, updatedRows);
+      } catch (err) {
+        console.error('Failed to auto-persist subject row:', err);
+      }
+
+      return updatedRows;
+    });
+
+    if (!silent) {
       showToast(
         isExisting
           ? `Updated "${savedRow.subjectName}".`
           : `Created subject routine for "${savedRow.subjectName}".`,
         'success'
       );
+    }
 
-      return updatedRows;
+    pushAction({
+      title: isExisting ? `Update "${savedRow.subjectName}"` : `Add "${savedRow.subjectName}"`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, targetExamId, previousRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(previousRows);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, targetExamId, nextUpdatedRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(nextUpdatedRows);
+        refreshExamData();
+      },
     });
 
     setIsDirty(false);
-  }, [tenantId, selectedExamId, showToast]);
+    refreshExamData();
+  }, [tenantId, selectedExamId, refreshExamData, showToast, pushAction]);
 
   // Duplicate a row
   const handleDuplicateRow = useCallback((row) => {
@@ -913,8 +1069,14 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
       id: `row_clone_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       subjectName: row.subjectName ? `${row.subjectName} (Copy)` : 'Subject (Copy)',
     };
+
+    let previousRows = [];
+    let nextDuplicatedRows = [];
+
     setRows((prevRows) => {
+      previousRows = prevRows;
       const updatedRows = [cloned, ...prevRows];
+      nextDuplicatedRows = updatedRows;
       try {
         const persisted = examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, updatedRows);
         return Array.isArray(persisted) ? persisted : updatedRows;
@@ -923,10 +1085,153 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
         return updatedRows;
       }
     });
+
+    pushAction({
+      title: `Duplicate "${row.subjectName || 'Subject'}"`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, previousRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(previousRows);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextDuplicatedRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(nextDuplicatedRows);
+        refreshExamData();
+      },
+    });
+
     setIsDirty(false);
     refreshExamData();
     showToast('Subject routine duplicated and saved.', 'info');
-  }, [tenantId, selectedExamId, refreshExamData, showToast]);
+  }, [tenantId, selectedExamId, refreshExamData, showToast, pushAction]);
+
+  // Atomically Swap two rows in 2D Timetable Routine Board
+  const handleSwapRows = useCallback((rowA, rowB, options = {}) => {
+    if (!rowA || !rowB || !rowA.id || !rowB.id) return;
+    const { silent = false } = typeof options === 'object' ? options : {};
+    const idA = String(rowA.id);
+    const idB = String(rowB.id);
+
+    let previousRows = [];
+    let nextSwappedRows = [];
+
+    setRows((prevRows) => {
+      previousRows = prevRows;
+      const nextRows = prevRows.map((r) => {
+        if (String(r.id) === idA) return { ...r, ...rowA, id: r.id };
+        if (String(r.id) === idB) return { ...r, ...rowB, id: r.id };
+        return r;
+      });
+
+      nextSwappedRows = nextRows;
+
+      try {
+        examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextRows);
+      } catch (err) {
+        console.error('Failed to persist swapped rows:', err);
+      }
+
+      return nextRows;
+    });
+
+    pushAction({
+      title: `Swap "${rowA.subjectName || 'Slot'}" ↔ "${rowB.subjectName || 'Slot'}"`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, previousRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(previousRows);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, nextSwappedRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(nextSwappedRows);
+        refreshExamData();
+      },
+    });
+
+    setIsDirty(false);
+    refreshExamData();
+    if (!silent) {
+      showToast(`Swapped schedule between "${rowA.subjectName || 'Subject'}" and "${rowB.subjectName || 'Subject'}".`, 'info');
+    }
+  }, [tenantId, selectedExamId, refreshExamData, showToast, pushAction]);
+
+  // Batch Upsert Multiple Rows Atomically
+  const handleBulkUpsertRows = useCallback((updatedRowsArray = []) => {
+    if (!Array.isArray(updatedRowsArray) || updatedRowsArray.length === 0) return;
+
+    try {
+      const persisted = examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, updatedRowsArray);
+      setRows(persisted || updatedRowsArray);
+    } catch (err) {
+      console.error('Failed to bulk persist subject rows:', err);
+      setRows(updatedRowsArray);
+    }
+
+    setIsDirty(false);
+    refreshExamData();
+  }, [tenantId, selectedExamId, refreshExamData]);
+
+  // Clear all routine rows for the active examination session
+  const handleClearAllRows = useCallback(() => {
+    if (!selectedExamId) return;
+    let previousRows = [];
+
+    setRows((prevRows) => {
+      previousRows = prevRows;
+      return [];
+    });
+    setSelectedRowIds(new Set());
+    try {
+      examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, []);
+    } catch (e) {
+      console.error('Failed to clear exam routine:', e);
+    }
+
+    pushAction({
+      title: `Clear Session Routine (${previousRows.length} subjects)`,
+      domain: 'Examinations',
+      undo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, previousRows);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows(previousRows);
+        refreshExamData();
+      },
+      redo: () => {
+        try {
+          examStore.bulkUpsertExamSubjects(tenantId, selectedExamId, []);
+        } catch (e) {
+          console.error(e);
+        }
+        setRows([]);
+        refreshExamData();
+      },
+    });
+
+    setIsDirty(false);
+    refreshExamData();
+    showToast('All subject routine schedules cleared for this session.', 'info');
+  }, [selectedExamId, tenantId, refreshExamData, showToast, pushAction]);
 
   // Multi-Selection Handlers
   const handleSelectRow = (rowId) => {
@@ -1000,19 +1305,35 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
 
   // Dynamic Entity Enrichment: Sync class, department, book, and subject names with live taxonomy
   const enrichedRows = useMemo(() => {
+    const normalizeId = (id) => String(id || '').replace(/^cls_/, '').trim().toLowerCase();
+    const normalizeDeptId = (id) => String(id || '').replace(/^dept_/, '').trim().toLowerCase();
+
     return rows.map((r) => {
+      const rClassClean = normalizeId(r.classId);
       const matchedClass = allAvailableClasses.find(
-        (c) => String(c.id) === String(r.classId)
+        (c) =>
+          String(c.id) === String(r.classId) ||
+          normalizeId(c.id) === rClassClean ||
+          (c.name && r.className && c.name.toLowerCase() === r.className.toLowerCase())
       );
       const clsName =
         r.className && r.className !== 'General Class' && r.className !== 'Class'
           ? r.className
           : (matchedClass?.name || matchedClass?.class_name || r.className || (allAvailableClasses[0]?.name) || 'Class');
-      
+
+      const matchedDept = departments.find(
+        (d) =>
+          String(d.id) === String(r.departmentId) ||
+          normalizeDeptId(d.id) === normalizeDeptId(r.departmentId) ||
+          (d.name && r.departmentName && d.name.toLowerCase() === r.departmentName.toLowerCase()) ||
+          (matchedClass && (String(matchedClass.departmentId || matchedClass.department_id || (typeof matchedClass.department === 'object' ? matchedClass.department.id : matchedClass.department)) === String(d.id)))
+      );
+
+      const resolvedDeptId = String(r.departmentId || matchedDept?.id || matchedClass?.departmentId || matchedClass?.department_id || (typeof matchedClass?.department === 'object' ? matchedClass.department.id : matchedClass?.department) || '');
       const deptName =
         r.departmentName && r.departmentName !== 'General Dept'
           ? r.departmentName
-          : (matchedClass?.department_name || matchedClass?.departmentName || r.departmentName || 'General Dept');
+          : (matchedDept?.name || matchedDept?.department_name || matchedClass?.department_name || matchedClass?.departmentName || r.departmentName || 'General Dept');
 
       const matchedBook = r.curriculumBookId
         ? availableCurriculumBooks.find((b) => String(b.id) === String(r.curriculumBookId))
@@ -1026,60 +1347,215 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
 
       return {
         ...r,
+        departmentId: resolvedDeptId || r.departmentId,
         className: clsName,
         departmentName: deptName,
         curriculumBookName: bookName,
         subjectName: subjName,
       };
     });
-  }, [rows, allAvailableClasses, availableCurriculumBooks]);
+  }, [rows, allAvailableClasses, availableCurriculumBooks, departments]);
 
   // Date Filter Options for top header
   const dateFilterOptions = useMemo(() => {
-    const days = designatedExamDays.length > 0
-      ? designatedExamDays
-      : (activeExam?.startDate && activeExam?.endDate ? generateDateRange(activeExam.startDate, activeExam.endDate) : []);
+    const set = new Set();
+    if (Array.isArray(designatedExamDays)) {
+      designatedExamDays.forEach((d) => d && set.add(d));
+    }
+    if (activeExam?.startDate && activeExam?.endDate) {
+      generateDateRange(activeExam.startDate, activeExam.endDate).forEach((d) => set.add(d));
+    }
+    if (activeExam?.startDate) set.add(activeExam.startDate);
+    if (Array.isArray(rows)) {
+      rows.forEach((r) => {
+        if (r.examDate) set.add(r.examDate);
+      });
+    }
+
+    const sortedDates = Array.from(set).filter(Boolean).sort();
 
     return [
       { value: 'ALL', label: 'All Exam Dates' },
-      ...days.map((d) => ({
+      ...sortedDates.map((d) => ({
         value: d,
         label: `${formatShortDateLabel(d)} (${d})`,
       })),
     ];
-  }, [designatedExamDays, activeExam]);
+  }, [designatedExamDays, activeExam, rows]);
 
   // Filtered Rows for display
   const filteredRows = useMemo(() => {
+    const normalize = (s) => String(s || '').replace(/^dept_|^cls_|^teach_|^staff_/, '').trim().toLowerCase();
+
+    // 1. Resolve Selected Department Metadata
+    const hasDeptFilter = filterDepartmentId && filterDepartmentId !== 'ALL';
+    const cleanFilterDeptId = hasDeptFilter ? normalize(filterDepartmentId) : '';
+    const selectedDept = hasDeptFilter
+      ? departments.find((d) => String(d.id) === String(filterDepartmentId) || normalize(d.id) === cleanFilterDeptId)
+      : null;
+    const selectedDeptName = (selectedDept?.name || selectedDept?.department_name || '').toLowerCase().trim();
+    const selectedDeptWords = selectedDeptName ? selectedDeptName.split(/[\s,()/-]+/).filter((w) => w.length > 2) : [];
+
+    // 2. Resolve Selected Class Metadata
+    const hasClassFilter = filterClassId && filterClassId !== 'ALL';
+    const cleanFilterClassId = hasClassFilter ? normalize(filterClassId) : '';
+    const selectedClass = hasClassFilter
+      ? allAvailableClasses.find((c) => String(c.id) === String(filterClassId) || normalize(c.id) === cleanFilterClassId)
+      : null;
+    const selectedClassName = (selectedClass?.name || selectedClass?.class_name || selectedClass?.className || '').toLowerCase().trim();
+    const selectedClassWords = selectedClassName ? selectedClassName.split(/[\s,()/-]+/).filter((w) => w.length > 2) : [];
+
+    // 3. Resolve Selected Teacher / Examiner Metadata
+    const hasTeacherFilter = filterTeacherId && filterTeacherId !== 'ALL';
+    const cleanFilterTeacherId = hasTeacherFilter && filterTeacherId !== 'UNASSIGNED' ? normalize(filterTeacherId) : '';
+    const selectedTeacher = hasTeacherFilter && filterTeacherId !== 'UNASSIGNED'
+      ? teachers.find((t) => String(t.id) === String(filterTeacherId) || normalize(t.id) === cleanFilterTeacherId)
+      : null;
+    const selectedTeacherName = (
+      selectedTeacher?.name_en ||
+      selectedTeacher?.name ||
+      selectedTeacher?.full_name ||
+      selectedTeacher?.user_name ||
+      ''
+    ).toLowerCase().trim();
+    const selectedTeacherWords = selectedTeacherName ? selectedTeacherName.split(/[\s,()/-]+/).filter((w) => w.length > 2) : [];
+
+    // 4. Resolve Target Exam Date
+    const hasDateFilter = filterExamDate && filterExamDate !== 'ALL';
+    const targetDateStr = hasDateFilter ? String(filterExamDate).split('T')[0].trim() : '';
+
     return enrichedRows.filter((r) => {
-      if (filterDepartmentId !== 'ALL' && String(r.departmentId) !== String(filterDepartmentId)) {
-        return false;
+      // ─── A. Department Filter ──────────────────────────────────────────
+      if (hasDeptFilter) {
+        const rDeptId = String(r.departmentId || '');
+        const rDeptClean = normalize(rDeptId);
+        const rDeptName = String(r.departmentName || '').toLowerCase().trim();
+
+        let matchesDept =
+          rDeptId === String(filterDepartmentId) ||
+          (cleanFilterDeptId && rDeptClean === cleanFilterDeptId) ||
+          (selectedDeptName && rDeptName && (rDeptName === selectedDeptName || rDeptName.includes(selectedDeptName) || selectedDeptName.includes(rDeptName)));
+
+        if (!matchesDept) {
+          // Check class-level department linkage
+          const matchedClass = allAvailableClasses.find((c) => String(c.id) === String(r.classId) || normalize(c.id) === normalize(r.classId));
+          if (matchedClass) {
+            const cDeptId = String(matchedClass.departmentId || matchedClass.department_id || (typeof matchedClass.department === 'object' ? matchedClass.department?.id : matchedClass.department) || '');
+            const cDeptClean = normalize(cDeptId);
+            const cDeptName = String(matchedClass.departmentName || matchedClass.department_name || (typeof matchedClass.department === 'object' ? matchedClass.department?.name : '') || '').toLowerCase().trim();
+            const cName = String(matchedClass.name || matchedClass.className || matchedClass.class_name || '').toLowerCase().trim();
+
+            if (cDeptId === String(filterDepartmentId) || (cleanFilterDeptId && cDeptClean === cleanFilterDeptId)) {
+              matchesDept = true;
+            } else if (selectedDeptName && cDeptName && (cDeptName === selectedDeptName || cDeptName.includes(selectedDeptName) || selectedDeptName.includes(cDeptName))) {
+              matchesDept = true;
+            } else if (selectedDeptName && cName && (cName.includes(selectedDeptName) || selectedDeptName.includes(cName))) {
+              matchesDept = true;
+            } else if (selectedDeptWords.length > 0) {
+              for (const word of selectedDeptWords) {
+                if (word && word !== 'department' && word !== 'general' && (cName.includes(word) || rDeptName.includes(word))) {
+                  matchesDept = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!matchesDept) return false;
       }
-      if (filterClassId !== 'ALL' && String(r.classId) !== String(filterClassId)) {
-        return false;
+
+      // ─── B. Class Filter ───────────────────────────────────────────────
+      if (hasClassFilter) {
+        const rClsId = String(r.classId || '');
+        const rClsClean = normalize(rClsId);
+        const rClsName = String(r.className || '').toLowerCase().trim();
+
+        let matchesClass =
+          rClsId === String(filterClassId) ||
+          (cleanFilterClassId && rClsClean === cleanFilterClassId) ||
+          (cleanFilterClassId && rClsClean && (rClsClean.includes(cleanFilterClassId) || cleanFilterClassId.includes(rClsClean))) ||
+          (selectedClassName && rClsName && (rClsName === selectedClassName || rClsName.includes(selectedClassName) || selectedClassName.includes(rClsName)));
+
+        if (!matchesClass && selectedClassWords.length > 0) {
+          for (const word of selectedClassWords) {
+            if (word && word !== 'class' && word !== 'division' && rClsName.includes(word)) {
+              matchesClass = true;
+              break;
+            }
+          }
+        }
+
+        if (!matchesClass) return false;
       }
-      if (filterExamDate !== 'ALL' && String(r.examDate) !== String(filterExamDate)) {
-        return false;
-      }
-      if (filterTeacherId !== 'ALL') {
-        if (filterTeacherId === 'UNASSIGNED') {
-          if (r.teacherId || r.teacherName) return false;
-        } else if (String(r.teacherId) !== String(filterTeacherId)) {
+
+      // ─── C. Exam Date Filter ───────────────────────────────────────────
+      if (hasDateFilter) {
+        const rowDateStr = String(r.examDate || '').split('T')[0].trim();
+        if (rowDateStr !== targetDateStr) {
           return false;
         }
       }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+
+      // ─── D. Teacher / Examiner Filter ──────────────────────────────────
+      if (hasTeacherFilter) {
+        if (filterTeacherId === 'UNASSIGNED') {
+          const hasAssigned = Boolean(
+            r.examinerId || r.examinerName || r.evaluatorId || r.evaluatorName ||
+            r.teacherId || r.teacherName || r.invigilatorId || r.invigilatorName
+          );
+          if (hasAssigned) return false;
+        } else {
+          const rExmId = String(r.examinerId || r.evaluatorId || '');
+          const rTeachId = String(r.teacherId || r.invigilatorId || '');
+          const rExmClean = normalize(rExmId);
+          const rTeachClean = normalize(rTeachId);
+          const rExmName = String(r.examinerName || r.evaluatorName || '').toLowerCase().trim();
+          const rTeachName = String(r.teacherName || r.invigilatorName || '').toLowerCase().trim();
+
+          let matchesTeacher =
+            rExmId === String(filterTeacherId) ||
+            rTeachId === String(filterTeacherId) ||
+            (cleanFilterTeacherId && (rExmClean === cleanFilterTeacherId || rTeachClean === cleanFilterTeacherId)) ||
+            (selectedTeacherName && (
+              (rExmName && (rExmName === selectedTeacherName || rExmName.includes(selectedTeacherName) || selectedTeacherName.includes(rExmName))) ||
+              (rTeachName && (rTeachName === selectedTeacherName || rTeachName.includes(selectedTeacherName) || selectedTeacherName.includes(rTeachName)))
+            ));
+
+          if (!matchesTeacher && selectedTeacherWords.length > 0) {
+            for (const word of selectedTeacherWords) {
+              if (word && word !== 'maulana' && word !== 'teacher' && word !== 'hafiz' && (rExmName.includes(word) || rTeachName.includes(word))) {
+                matchesTeacher = true;
+                break;
+              }
+            }
+          }
+
+          if (!matchesTeacher) return false;
+        }
+      }
+
+      // ─── E. Global Search Filter ───────────────────────────────────────
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
         const matchSub = r.subjectName?.toLowerCase().includes(q);
         const matchBook = r.curriculumBookName?.toLowerCase().includes(q);
         const matchClass = r.className?.toLowerCase().includes(q);
-        const matchTeacher = r.teacherName?.toLowerCase().includes(q);
+        const matchDept = r.departmentName?.toLowerCase().includes(q);
+        const matchTeacher =
+          r.examinerName?.toLowerCase().includes(q) ||
+          r.evaluatorName?.toLowerCase().includes(q) ||
+          r.teacherName?.toLowerCase().includes(q) ||
+          r.invigilatorName?.toLowerCase().includes(q);
+        const matchDate = r.examDate?.toLowerCase().includes(q);
+        const matchShift = r.shiftName?.toLowerCase().includes(q);
         const matchRoom = r.roomNo?.toLowerCase().includes(q);
-        return matchSub || matchBook || matchClass || matchTeacher || matchRoom;
+        return matchSub || matchBook || matchClass || matchDept || matchTeacher || matchDate || matchShift || matchRoom;
       }
+
       return true;
     });
-  }, [enrichedRows, filterDepartmentId, filterClassId, filterExamDate, filterTeacherId, searchQuery]);
+  }, [enrichedRows, filterDepartmentId, filterClassId, filterExamDate, filterTeacherId, searchQuery, departments, allAvailableClasses, teachers]);
 
   return {
     tenantId,
@@ -1097,6 +1573,7 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     participatingClasses,
     allAvailableClasses,
     availableCurriculumBooks,
+    periodSlots,
     teachers,
     baseDateOptions,
     shiftOptions,
@@ -1114,6 +1591,7 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     setFilterTeacherId,
     selectedRowIds,
     setSelectedRowIds,
+    loadStoredRows: loadExamSubjects,
     showAutoPopulateConfirm,
     setShowAutoPopulateConfirm,
     executeAutoPopulate,
@@ -1127,6 +1605,9 @@ export default function useSubjectMatrixState({ initialExamId = null } = {}) {
     handleDeleteRow,
     handleDuplicateRow,
     handleUpsertRow,
+    handleSwapRows,
+    handleBulkUpsertRows,
+    handleClearAllRows,
     executeBulkDelete,
     handleBulkDelete: executeBulkDelete,
     handleSaveAll,

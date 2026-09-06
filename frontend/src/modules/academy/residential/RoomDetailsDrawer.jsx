@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CustomButton from '../../../components/ui/CustomButton';
 import { HomeIcon, UserIcon, EditIcon, PlusIcon, CloseIcon } from '../../../components/ui/Icons';
-import { residentialStore } from '../../../utils/stores/residentialStore';
+import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { getBranchDisplayName } from '../../../utils/localStore';
 import BedAllocationModal from './BedAllocationModal';

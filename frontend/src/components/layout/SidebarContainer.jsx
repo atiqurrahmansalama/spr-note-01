@@ -91,12 +91,12 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_institution",
       subItems: [
-        { id: "Profile", name: "Profile & Branding", path: "/academy-profile", Icon: BuildingOfficeIcon, key: "settings_institution" },
-        { id: "Academies & Departments", name: "Campus Structure", path: "/academy/campus-profile", Icon: BuildingOfficeIcon, key: "campus_profile" },
-        { id: "Classes & Groups", name: "Classes & Sections", path: "/academy/classes-groups", Icon: ClassIcon, key: "student_classes" },
-        { id: "Period Schedules", name: "Routine & Curriculum", path: "/academy/periods", Icon: TimerIcon, key: "class_period_slots" },
-        { id: "Calendar & Events", name: "Calendar & Events", path: "/academy/calendar-events", Icon: CalendarIcon, key: "academy_calendar_events" },
-        { id: "Residential Quarters", name: "Residential & Quarters", path: "/academy/residential-quarters", Icon: HomeIcon, key: "residential_quarters" },
+        { id: "Profile", name: "Profile & Branding", path: "/academy-profile", matchPaths: ["/academy-profile", "/academy/profile", "/settings/institution", "/institution-profile"], Icon: BuildingOfficeIcon, key: "settings_institution" },
+        { id: "Academies & Departments", name: "Campus Structure", path: "/academy/campus-profile", matchPaths: ["/academy/campus-profile", "/campus-profile", "/academy/branches", "/academy/departments", "/student-management/departments"], Icon: BuildingOfficeIcon, key: "campus_profile" },
+        { id: "Classes & Groups", name: "Classes & Sections", path: "/academy/classes-groups", matchPaths: ["/academy/classes-groups", "/classes-groups", "/academy/classes", "/academy/groups", "/student-management/classes", "/student-management/groups"], Icon: ClassIcon, key: "student_classes" },
+        { id: "Period Schedules", name: "Routine & Curriculum", path: "/academy/periods", matchPaths: ["/academy/periods"], Icon: TimerIcon, key: "class_period_slots" },
+        { id: "Calendar & Events", name: "Calendar & Events", path: "/academy/calendar-events", matchPaths: ["/academy/calendar-events", "/academy/calendar-schedule", "/academy/working-hours"], Icon: CalendarIcon, key: "academy_calendar_events" },
+        { id: "Residential Quarters", name: "Residential & Quarters", path: "/academy/residential-quarters", matchPaths: ["/academy/residential-quarters", "/academy/residential", "/academy/dormitory", "/residential-quarters"], Icon: HomeIcon, key: "residential_quarters" },
       ]
     },
     {
@@ -106,7 +106,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", matchPaths: ["/studies/daily-classroom", "/studies", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
       ]
     },
     {
@@ -116,11 +116,31 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_examinations",
       subItems: [
-        { id: "Exam Schedules", name: "Exam Schedules", path: "/examinations/schedules", Icon: CalendarIcon, key: "exam_schedules" },
-        { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", Icon: EditIcon, key: "exam_mark_entry" },
-        { id: "Tabulation Sheet", name: "Tabulation Ledger", path: "/examinations/tabulation", Icon: ChartBarIcon, key: "exam_tabulation" },
-        { id: "Transcript Studio", name: "Marksheet Studio", path: "/examinations/transcripts", Icon: DocumentIcon, key: "exam_transcripts" },
-        { id: "Grading Policies", name: "Grading Policies", path: "/examinations/grading-rules", Icon: SettingsIcon, key: "exam_grading_rules" },
+        {
+          id: "Exam Schedules",
+          name: "Exam Schedules",
+          path: "/examinations/schedules",
+          matchPaths: [
+            "/examinations/schedules",
+            "/examinations/routine-matrix",
+            "/examinations/routine-board",
+            "/examinations/visual-timetable",
+            "/examinations/invigilation",
+            "/examinations/invigilation-schedule",
+            "/examinations",
+            "/exams",
+            "/routine-matrix",
+            "/routine-board",
+            "/visual-timetable",
+            "/invigilation-schedule"
+          ],
+          Icon: CalendarIcon,
+          key: "exam_schedules"
+        },
+        { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
+        { id: "Tabulation Sheet", name: "Tabulation Ledger", path: "/examinations/tabulation", matchPaths: ["/examinations/tabulation", "/tabulation-sheet"], Icon: ChartBarIcon, key: "exam_tabulation" },
+        { id: "Transcript Studio", name: "Marksheet Studio", path: "/examinations/transcripts", matchPaths: ["/examinations/transcripts", "/transcripts"], Icon: DocumentIcon, key: "exam_transcripts" },
+        { id: "Grading Policies", name: "Grading Policies", path: "/examinations/grading-rules", matchPaths: ["/examinations/grading-rules", "/grading-rules"], Icon: SettingsIcon, key: "exam_grading_rules" },
       ]
     },
     {
@@ -130,10 +150,10 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_student_management",
       subItems: [
-        { id: "Student Roster", name: "Student Roster", path: "/students", Icon: StudentIcon, key: "student_roster" },
-        { id: "Class Attendance", name: "Class Attendance", path: "/attendance/students/monthly-matrix", Icon: MatrixIcon, key: "monthly_attendance_matrix" },
-        { id: "Residential Attendance", name: "Residential Attendance", path: "/attendance/students/residential", Icon: TimerIcon, key: "residential_attendance" },
-        { id: "Admission", name: "Admission", path: "/admission", Icon: AdmissionIcon, key: "student_admission" },
+        { id: "Student Roster", name: "Student Roster", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
+        { id: "Class Attendance", name: "Class Attendance", path: "/attendance/students/monthly-matrix", matchPaths: ["/attendance/students/monthly-matrix", "/attendance/student", "/attendance/monthly-register"], Icon: MatrixIcon, key: "monthly_attendance_matrix" },
+        { id: "Residential Attendance", name: "Residential Attendance", path: "/attendance/students/residential", matchPaths: ["/attendance/students/residential"], Icon: TimerIcon, key: "residential_attendance" },
+        { id: "Admission", name: "Admission", path: "/admission", matchPaths: ["/admission", "/short-admission", "/admission/short"], Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
     {
@@ -143,10 +163,10 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_staff_management",
       subItems: [
-        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", path: "/staff/roster", Icon: TeacherIcon, key: "staff_roster" },
-        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", path: "/staff/teacher-attendance", Icon: ClassIcon, key: "staff_roster" },
-        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", path: "/staff/attendance", Icon: DutyIcon, key: "staff_roster" },
-        { id: "Staff Onboarding", name: "Staff Onboarding", path: "/staff/onboarding", Icon: AdmissionIcon, key: "staff_onboarding" },
+        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", path: "/staff/roster", matchPaths: ["/staff/roster"], Icon: TeacherIcon, key: "staff_roster" },
+        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "staff_roster" },
+        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_roster" },
+        { id: "Staff Onboarding", name: "Staff Onboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },
     {
@@ -156,9 +176,9 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_report_generator",
       subItems: [
-        { id: "Generate Report", name: "Generate Report", path: "/report-builder", Icon: SavedMessagesIcon, key: "report_builder" },
-        { id: "Academic Reports", name: "Multi-Period Reports", path: "/academy/academic-reports", Icon: SavedMessagesIcon, key: "academic_reports" },
-        { id: "Student Reports", name: "Student Recitation Log", path: "/student-reports", Icon: SavedMessagesIcon, key: "report_history" },
+        { id: "Generate Report", name: "Generate Report", path: "/report-builder", matchPaths: ["/report-builder"], Icon: SavedMessagesIcon, key: "report_builder" },
+        { id: "Academic Reports", name: "Multi-Period Reports", path: "/academy/academic-reports", matchPaths: ["/academy/academic-reports"], Icon: SavedMessagesIcon, key: "academic_reports" },
+        { id: "Student Reports", name: "Student Recitation Log", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
       ]
     },
     {
@@ -168,12 +188,12 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_app_management",
       subItems: [
-        { id: "Section Control", name: "Section Control", path: "/section-control", Icon: SectionControlIcon, key: "app_section_control" },
-        { id: "User Management", name: "User Management", path: "/user-management", Icon: SectionControlIcon, key: "app_user_management" },
-        { id: "Role Management", name: "Role Management", path: "/role-management", Icon: SectionControlIcon, key: "app_role_management" },
-        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", Icon: DashboardIcon, key: "app_activity_analytics" },
-        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", Icon: SectionControlIcon, key: "app_role_invites" },
-        { id: "Notification Management", name: "Notification Management", path: "/app-management/notifications", Icon: BellIcon, key: "notification_management" },
+        { id: "Section Control", name: "Section Control", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
+        { id: "User Management", name: "User Management", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
+        { id: "Role Management", name: "Role Management", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
+        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },
+        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", matchPaths: ["/app-management/role-invites"], Icon: SectionControlIcon, key: "app_role_invites" },
+        { id: "Notification Management", name: "Notification Management", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management" },
       ]
     },
     { 
@@ -183,17 +203,17 @@ export default function SidebarContainer({
       hasSub: true, 
       key: "nav_settings",
       subItems: [
-        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", Icon: SettingsIcon, key: "settings_profile" },
-        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", Icon: AttendanceIcon, key: "attendance_policies_slots" },
-        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", Icon: SettingsIcon, key: "settings_security" },
-        { id: "Personalize", name: "Personalize", path: "/personalize", Icon: AppearanceIcon, key: "settings_personalize" },
-        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", Icon: CloudIcon, key: "settings_backup" },
-        { id: "Admin Tools", name: "Admin Tools", path: "/admin-tools", Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
+        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
+        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", matchPaths: ["/attendance/settings"], Icon: AttendanceIcon, key: "attendance_policies_slots" },
+        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", matchPaths: ["/security-sessions"], Icon: SettingsIcon, key: "settings_security" },
+        { id: "Personalize", name: "Personalize", path: "/personalize", matchPaths: ["/personalize", "/appearance", "/date-time", "/language"], Icon: AppearanceIcon, key: "settings_personalize" },
+        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup" },
+        { id: "Admin Tools", name: "Admin Tools", path: "/admin-tools", matchPaths: ["/admin-tools", "/developer-tools", "/sp-management"], Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
       ]
     },
-    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", Icon: ShortcutsIcon, key: "nav_shortcuts" },
-    { id: "App Guide", name: "App Guide", path: "/guide", Icon: AppGuideIcon, key: "nav_app_guide" },
-    { id: "About", name: "About", path: "/about", Icon: AboutIcon, key: "nav_about" },
+    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", matchPaths: ["/shortcuts"], Icon: ShortcutsIcon, key: "nav_shortcuts" },
+    { id: "App Guide", name: "App Guide", path: "/guide", matchPaths: ["/guide"], Icon: AppGuideIcon, key: "nav_app_guide" },
+    { id: "About", name: "About", path: "/about", matchPaths: ["/about"], Icon: AboutIcon, key: "nav_about" },
   ];
 
   const handleNavigate = (path) => {
@@ -233,12 +253,16 @@ export default function SidebarContainer({
       return true;
     });
 
-  const checkIsActive = (path) => {
-    if (!path) return false;
+  const checkIsActive = (path, item = null) => {
+    if (!path && !item) return false;
     if (path === "/") {
       return currentPath === "/" || currentPath === "/dashboard";
     }
-    return currentPath === path;
+    if (currentPath === path) return true;
+    if (item && Array.isArray(item.matchPaths)) {
+      return item.matchPaths.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
+    }
+    return false;
   };
 
   return (
@@ -282,9 +306,9 @@ export default function SidebarContainer({
           style={{ scrollbarGutter: "stable" }}
         >
           {displayMenuItems.map((item) => {
-            const isParentActive = checkIsActive(item.path);
+            const isParentActive = checkIsActive(item.path, item);
             const ItemIcon = item.Icon;
-            const isAnySubActive = item.hasSub ? item.subItems.some((sub) => checkIsActive(sub.path)) : false;
+            const isAnySubActive = item.hasSub ? item.subItems.some((sub) => checkIsActive(sub.path, sub)) : false;
             const isSubOpen = openSubMenus[item.id] || isAnySubActive || false;
 
             if (item.hasSub) {
@@ -320,7 +344,7 @@ export default function SidebarContainer({
                         : "ml-3 sm:ml-3.5 pl-1.5 space-y-1 pt-1"
                     }>
                       {item.subItems.map((sub) => {
-                        const isSubActive = checkIsActive(sub.path);
+                        const isSubActive = checkIsActive(sub.path, sub);
                         const SubIcon = sub.Icon;
                         return (
                           <button
@@ -347,7 +371,7 @@ export default function SidebarContainer({
               );
             }
 
-            const isActive = checkIsActive(item.path);
+            const isActive = checkIsActive(item.path, item);
             return (
               <button
                 key={item.id}

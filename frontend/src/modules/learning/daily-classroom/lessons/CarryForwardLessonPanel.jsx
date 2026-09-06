@@ -9,8 +9,7 @@ import {
   TimerIcon,
   CheckIcon,
 } from '../../../../components/ui/Icons';
-import { learningStore } from '../../../../utils/stores/learningStore';
-import { getOrdinalPeriodLabel } from '../../../../utils/localStore';
+import { learningStore, getOrdinalPeriodLabel } from '@/stores';
 import { doesLessonMatchClass, getYesterdayDate } from '../dailyClassroomUtils';
 
 /**

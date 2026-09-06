@@ -11,7 +11,7 @@ import {
 } from '../../../../components/ui/Icons';
 import { useToast } from '../../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
-import { examStore } from '../../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 import useExamData from '../../hooks/useExamData';
 import { formatShortDateLabel, generateDateRange } from '../utils/examScheduleUtils';
 import InvigilationDutyDrawerForm from './InvigilationDutyDrawerForm';
@@ -534,13 +534,15 @@ export default function InvigilationScheduleView({ initialExamId = null }) {
 
   return (
     <div className="space-y-4 animate-fade-in text-left">
-      {/* ── 1. Unified Control Header: Session, Exam Date, Invigilator on single line ── */}
+      {/* ── 1. Unified Control Header: Session & Auto-Populate (Row 1), Date & Invigilator (Row 2) ── */}
       <SubjectMatrixHeader
         examOptions={examOptions}
         selectedExamId={selectedExamId}
         setSelectedExamId={setSelectedExamId}
-        inlineSessionSelector={true}
+        inlineSessionSelector={false}
         onAutoPopulate={handleOpenAutoPopulateDrawer}
+        autoPopulateLabel="Auto-Populate Roster"
+        autoPopulateTitle="Automatically balance and assign faculty hall invigilation duties across all exam dates and shifts"
         showSearch={false}
         showDepartmentFilter={false}
         showClassFilter={false}
@@ -548,6 +550,7 @@ export default function InvigilationScheduleView({ initialExamId = null }) {
         filterExamDate={filterExamDate}
         setFilterExamDate={setFilterExamDate}
         showTeacherFilter={true}
+        teacherLabel="Invigilator"
         filterTeacherId={filterTeacherId}
         setFilterTeacherId={setFilterTeacherId}
         dateFilterOptions={dateFilterOptions}

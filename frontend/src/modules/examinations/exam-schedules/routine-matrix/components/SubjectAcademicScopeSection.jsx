@@ -1,5 +1,4 @@
 import React from 'react';
-import { DrawerSection } from '../../../../../components/layout';
 import CustomInput from '../../../../../components/ui/CustomInput';
 import {
   DepartmentSelect,
@@ -16,6 +15,7 @@ import {
 /**
  * SubjectAcademicScopeSection
  * Handles Department, Target Class, Section Scope, Room/Hall, Examiner & Invigilation notes.
+ * Streamlined Enterprise Section Headers (Zero Boxed Cards).
  */
 export default function SubjectAcademicScopeSection({
   formData,
@@ -26,13 +26,17 @@ export default function SubjectAcademicScopeSection({
   handleSectionChange,
 }) {
   return (
-    <>
+    <div className="space-y-6 text-left">
       {/* ─── Academic Scope & Location ────────────────────────────────────── */}
-      <DrawerSection
-        title="Academic Scope & Location"
-        icon={BuildingLibraryIcon}
-      >
-        <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
+      <div className="space-y-3.5">
+        <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <BuildingLibraryIcon className="w-4 h-4 theme-accent shrink-0" />
+          <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+            Academic Scope & Location
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5 pt-1">
           <DepartmentSelect
             label="Department Scope"
             value={formData.departmentId}
@@ -72,14 +76,18 @@ export default function SubjectAcademicScopeSection({
             icon={BuildingLibraryIcon}
           />
         </div>
-      </DrawerSection>
+      </div>
 
       {/* ─── Examiner & Invigilation ─────────────────────────────────────── */}
-      <DrawerSection
-        title="Examiner & Invigilation"
-        icon={UserIcon}
-      >
-        <div className="space-y-3.5">
+      <div className="space-y-3.5">
+        <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <UserIcon className="w-4 h-4 theme-accent shrink-0" />
+          <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+            Examiner & Invigilation
+          </h3>
+        </div>
+
+        <div className="space-y-3.5 pt-1">
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
             <TeacherSelect
               label="Hall Invigilator"
@@ -138,7 +146,7 @@ export default function SubjectAcademicScopeSection({
             icon={DocumentTextIcon}
           />
         </div>
-      </DrawerSection>
-    </>
+      </div>
+    </div>
   );
 }

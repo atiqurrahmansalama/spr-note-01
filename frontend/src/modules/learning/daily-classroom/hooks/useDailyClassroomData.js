@@ -1,6 +1,5 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { curriculumStore } from "../../../../utils/localStore";
-import { learningStore } from "../../../../utils/stores/learningStore";
+import { useState, useEffect, useCallback } from "react";
+import { curriculumStore, learningStore } from "@/stores";
 import {
   getDailyLessons as fetchDailyLessonsAPI,
   getLessonEvaluations as fetchLessonEvaluationsAPI,

@@ -79,8 +79,11 @@ export function useReportForm() {
       stack.push(snap);
       if (stack.length > 35) stack.shift();
       redoStackRef.current = [];
+      setHistoryVersion((v) => v + 1);
     }
   }, [captureSnapshot]);
+
+  const [historyVersion, setHistoryVersion] = useState(0);
 
   const handleUndo = useCallback(() => {
     const stack = historyStackRef.current;
@@ -90,6 +93,7 @@ export function useReportForm() {
     }
     const currentSnap = stack.pop();
     redoStackRef.current.push(currentSnap);
+    setHistoryVersion((v) => v + 1);
 
     const prevSnapStr = stack[stack.length - 1];
     if (prevSnapStr) {
@@ -118,6 +122,7 @@ export function useReportForm() {
     }
     const nextSnapStr = rStack.pop();
     historyStackRef.current.push(nextSnapStr);
+    setHistoryVersion((v) => v + 1);
 
     try {
       const data = JSON.parse(nextSnapStr);
@@ -134,6 +139,9 @@ export function useReportForm() {
       console.error("Redo restore failed", err);
     }
   }, [showToast]);
+
+  const canUndoDraft = historyStackRef.current.length > 1;
+  const canRedoDraft = redoStackRef.current.length > 0;
   const [isOffline, setIsOffline] = useState(!isOnline());
 
   const [draftInfo, setDraftInfo] = useState(null);
@@ -889,5 +897,7 @@ export function useReportForm() {
     handleStuckRefresh,
     handleUndo,
     handleRedo,
+    canUndoDraft,
+    canRedoDraft,
   };
 }

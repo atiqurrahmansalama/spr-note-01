@@ -17,6 +17,7 @@ import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
+import { useUndoRedo } from "../../context/useUndoRedo";
 import { UndoIcon, RedoIcon } from "../ui/Icons";
 
 // Route details mapping for titles and path lookup
@@ -80,11 +81,20 @@ export const ROUTE_TITLE_MAP = {
   // Examination & Result Management
   "/examinations": { title: "Examination & Results", category: "Examination & Results" },
   "/examinations/schedules": { title: "Exam Schedules", category: "Examination & Results" },
+  "/examinations/routine-matrix": { title: "Subject Routine Matrix", category: "Examination & Results" },
+  "/examinations/routine-board": { title: "2D Routine Board", category: "Examination & Results" },
+  "/examinations/visual-timetable": { title: "2D Routine Board", category: "Examination & Results" },
+  "/examinations/invigilation": { title: "Invigilation Schedule", category: "Examination & Results" },
+  "/examinations/invigilation-schedule": { title: "Invigilation Schedule", category: "Examination & Results" },
   "/examinations/mark-entry": { title: "Mark Entry Desk", category: "Examination & Results" },
   "/examinations/tabulation": { title: "Tabulation Ledger", category: "Examination & Results" },
   "/examinations/transcripts": { title: "Marksheet Studio", category: "Examination & Results" },
   "/examinations/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
   "/exams": { title: "Exam Schedules", category: "Examination & Results" },
+  "/routine-matrix": { title: "Subject Routine Matrix", category: "Examination & Results" },
+  "/routine-board": { title: "2D Routine Board", category: "Examination & Results" },
+  "/visual-timetable": { title: "2D Routine Board", category: "Examination & Results" },
+  "/invigilation-schedule": { title: "Invigilation Schedule", category: "Examination & Results" },
   "/mark-entry": { title: "Mark Entry Desk", category: "Examination & Results" },
   "/tabulation-sheet": { title: "Tabulation Ledger", category: "Examination & Results" },
   "/transcripts": { title: "Marksheet Studio", category: "Examination & Results" },
@@ -100,6 +110,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const themeContext = useTheme();
+  const { canUndo, canRedo, undoTitle, redoTitle, undo, redo } = useUndoRedo();
   const {
     isRightSidebarOpen,
     rightSidebarConfig,
@@ -628,27 +639,35 @@ export default function AppLayout() {
         <div className="flex items-center gap-3">
           <SaveStatusBadge />
 
-          {/* Undo / Redo Buttons (Only visible on report builder route) */}
-          {isReportBuilderRoute && (
-            <div className="flex items-center gap-1 theme-bg-sub border theme-border rounded-xl p-0.5 shadow-inner">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("spr_undo"))}
-                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
-                title="Undo (Ctrl+Z)"
-              >
-                <UndoIcon className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("spr_redo"))}
-                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer flex items-center justify-center bg-transparent border-0 active:scale-95"
-                title="Redo (Ctrl+Y)"
-              >
-                <RedoIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+          {/* Universal Route-Aware Undo / Redo Widget */}
+          <div className="flex items-center gap-1 theme-bg-sub border theme-border rounded-xl p-0.5 shadow-inner">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              className={`p-1.5 rounded-lg transition flex items-center justify-center bg-transparent border-0 ${
+                canUndo
+                  ? "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer active:scale-95"
+                  : "theme-text-muted opacity-35 cursor-not-allowed"
+              }`}
+              title={canUndo ? `Undo: ${undoTitle || 'Last action'} (Ctrl+Z)` : "Nothing to undo (Ctrl+Z)"}
+            >
+              <UndoIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              className={`p-1.5 rounded-lg transition flex items-center justify-center bg-transparent border-0 ${
+                canRedo
+                  ? "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer active:scale-95"
+                  : "theme-text-muted opacity-35 cursor-not-allowed"
+              }`}
+              title={canRedo ? `Redo: ${redoTitle || 'Last action'} (Ctrl+Y)` : "Nothing to redo (Ctrl+Y)"}
+            >
+              <RedoIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {/* Dark / Light Mode Toggle Button */}
           <button

@@ -6,7 +6,7 @@
  * Online sync: Local cache is updated on successful API responses.
  *
  * Architecture Note:
- * Individual domain stores have been modularized under ./stores/:
+ * Individual domain stores have been modularized under src/stores/:
  * - coreStore.js       (Storage helpers, KEYS, Auth, Multi-Account, Status)
  * - settingsStore.js   (Appearance, Copy Report, Sidebar)
  * - calendarStore.js   (Master Calendar, Working Schedules, Event Types, Impact Scopes, Period Categories, Policies)
@@ -14,8 +14,11 @@
  * - documentStore.js   (Document Types, Allowed Formats)
  * - academicStore.js   (Students, Sessions, Saved Comments, Academic Subjects, Academic Years, Curriculum)
  * - admissionStore.js  (Admission Policies, Previous Classes, Class Document Requirements)
+ * - residentialStore.js(Dormitories, Buildings, Rooms, Bed Allocations)
+ * - learningStore.js   (Daily Classroom Lessons, Assessments, Homework)
+ * - examStore.js       (Exam Schedules, Grading Rules, Mark Entry, Tabulation)
  *
  * This file serves as the unified backward-compatible facade.
  */
 
-export * from "./stores";
+export * from "../stores";

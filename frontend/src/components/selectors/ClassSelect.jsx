@@ -114,11 +114,16 @@ export default function ClassSelect({
   const activeClasses = useMemo(() => {
     let list = rawClasses;
     if (departmentId && departmentId !== 'ALL') {
+      const cleanTargetDeptId = String(departmentId).replace(/^dept_/, '').trim().toLowerCase();
       const deptFiltered = list.filter((c) => {
         const dId = c.department !== undefined && c.department !== null
           ? (typeof c.department === 'object' ? c.department.id : c.department)
-          : (c.department_id || (c.department_details?.id ?? null));
-        return dId !== null && dId !== undefined && String(dId) === String(departmentId);
+          : (c.department_id || c.departmentId || (c.department_details?.id ?? null));
+        const cleanDId = String(dId || '').replace(/^dept_/, '').trim().toLowerCase();
+        return (
+          (dId !== null && dId !== undefined && String(dId) === String(departmentId)) ||
+          (cleanDId && cleanTargetDeptId && cleanDId === cleanTargetDeptId)
+        );
       });
       if (deptFiltered.length > 0) {
         list = deptFiltered;

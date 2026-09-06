@@ -21,7 +21,7 @@ import { useRightSidebar } from '../../../context/RightSidebarContext';
  * Dedicated Enterprise Parent Hub for Examination Schedules & Matrix Workspace.
  * Unites:
  * 1. Exam Schedules & Sessions (`ExamSchedulesView`)
- * 2. Subject Routine Matrix (`SubjectRoutineMatrixView`)
+ * 2. Subject Routine Matrix & Routine Studio (`SubjectRoutineMatrixView`)
  * 3. Invigilation Schedule & Duty Roster (`InvigilationScheduleView`)
  * 
  * Follows SPR Note Enterprise Engineering Guidelines:
@@ -50,7 +50,19 @@ export default function ExamSchedulesHubView({
     if (path.includes('invigilation') || tabParam === 'invigilation' || tabParam === 'invigilation-schedule') {
       return 'INVIGILATION_SCHEDULE';
     }
-    if (path.includes('routine-matrix') || path.includes('matrix') || tabParam === 'routine-matrix' || tabParam === 'matrix' || tabParam === 'subject_matrix') {
+    if (
+      path.includes('routine-matrix') ||
+      path.includes('matrix') ||
+      path.includes('routine-board') ||
+      path.includes('2d-board') ||
+      path.includes('visual-timetable') ||
+      tabParam === 'routine-matrix' ||
+      tabParam === 'matrix' ||
+      tabParam === 'subject_matrix' ||
+      tabParam === 'routine-board' ||
+      tabParam === 'visual-timetable' ||
+      tabParam === 'timetable'
+    ) {
       return 'SUBJECT_MATRIX';
     }
     if (path.includes('schedules') || path.includes('exams') || tabParam === 'schedules') {
@@ -115,7 +127,7 @@ export default function ExamSchedulesHubView({
           onClick={() => openDrawer('subject_routine', { mode: 'add' })}
           className="w-full sm:w-auto"
         >
-          Add Subject Row
+          Add Subject Routine
         </CustomButton>
       );
     }
@@ -128,7 +140,7 @@ export default function ExamSchedulesHubView({
       {!hideHeader && (
         <PageHeader
           title="Examination Schedules & Routine Matrix"
-          subtitle="Configure institutional exam sessions, multi-class routine matrix, marks breakdown, and daily hall invigilation duty rosters."
+          subtitle="Configure institutional exam sessions, multi-class routine matrix, 2D visual timetable board, and daily hall invigilation rosters."
           icon={AcademicCapIcon}
         />
       )}

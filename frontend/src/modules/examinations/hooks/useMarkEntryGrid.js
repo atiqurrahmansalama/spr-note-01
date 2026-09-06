@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '../../../context/ToastContext';
-import { examStore } from '../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 
 /**
  * useMarkEntryGrid

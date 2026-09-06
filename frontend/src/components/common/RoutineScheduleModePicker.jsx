@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TimerIcon } from '../ui/Icons';
-import { weeklyHolidaysStore } from '../../utils/stores/calendarStore';
+import { weeklyHolidaysStore } from '@/stores/calendarStore';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 

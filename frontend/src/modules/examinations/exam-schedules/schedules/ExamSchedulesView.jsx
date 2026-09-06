@@ -4,7 +4,6 @@ import PageHeader from '../../../../components/ui/PageHeader';
 import CustomButton from '../../../../components/ui/CustomButton';
 import CustomSelect from '../../../../components/ui/CustomSelect';
 import DataViewToolbar from '../../../../components/ui/DataViewToolbar';
-import SubjectMatrixTable from '../components/SubjectMatrixTable';
 import ExamStatTile from '../components/ExamStatTile';
 import ActionMenu from '../../../../components/ui/ActionMenu';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
@@ -17,19 +16,16 @@ import {
   BookOpenIcon,
   CheckIcon,
   ClockIcon,
-  ChevronIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   ChartBarIcon,
   AcademicCapIcon,
   LockClosedIcon,
   DepartmentIcon,
   CheckCircleIcon,
-  HistoryIcon,
 } from '../../../../components/ui/Icons';
 import { useToast } from '../../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
-import { examStore } from '../../../../utils/stores/examStore';
+import { examStore } from '@/stores/examStore';
 import useExamData from '../../hooks/useExamData';
 
 const STATUS_OPTIONS = [
@@ -68,7 +64,8 @@ const getLifecycleStageIndex = (status) => {
 /**
  * ExamSchedulesView
  * Enterprise management workspace for examination sessions,
- * scheduled subject routines, and multi-tier lifecycle statuses.
+ * policy parameters, and multi-tier lifecycle statuses.
+ * Directs detailed routine schedule operations to the Subject Routine Matrix workspace.
  */
 export default function ExamSchedulesView({
   isEmbedded = false,
@@ -97,12 +94,8 @@ export default function ExamSchedulesView({
   const [selectedYearFilter, setSelectedYearFilter] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
 
-  // Expanded Routine Cards State (Map of examId -> boolean)
-  const [expandedExams, setExpandedExams] = useState({});
-
   // Delete Impact Modal States
   const [examToDelete, setExamToDelete] = useState(null);
-  const [subjectToDelete, setSubjectToDelete] = useState(null);
 
   // ── Global Drawer Registrations ───────────────────────────────────────────────
   useDrawerRegistration(
@@ -190,18 +183,6 @@ export default function ExamSchedulesView({
     });
   }, [exams, selectedYearFilter, selectedStatusFilter, searchQuery]);
 
-  // Toggle Subject Routines Accordion
-  const toggleExpand = (examId) => {
-    const key = String(examId);
-    setExpandedExams((prev) => {
-      const isCurrentlyOpen = prev[key] !== undefined ? prev[key] : true;
-      return {
-        ...prev,
-        [key]: !isCurrentlyOpen,
-      };
-    });
-  };
-
   const handleOpenNewExam = () => {
     openDrawer('exam_session', { mode: 'add' });
   };
@@ -216,14 +197,6 @@ export default function ExamSchedulesView({
     refreshExamData();
     showToast(`Examination session "${examToDelete.name}" deleted.`, 'success');
     setExamToDelete(null);
-  };
-
-  const handleConfirmDeleteSubject = () => {
-    if (!subjectToDelete) return;
-    examStore.deleteExamSubject(tenantId, subjectToDelete.id);
-    refreshExamData();
-    showToast(`Subject schedule "${subjectToDelete.subjectName}" removed.`, 'success');
-    setSubjectToDelete(null);
   };
 
   const handleStatusChange = (examId, newStatus) => {
@@ -328,9 +301,6 @@ export default function ExamSchedulesView({
         <div className="space-y-6">
           {filteredExams.map((exam) => {
             const currentSubjects = examSubjects.filter((s) => String(s.examId) === String(exam.id));
-            const grading = gradingSystems.find((g) => g.id === exam.gradingSystemId);
-            const isExpanded = expandedExams[exam.id] ?? true;
-            const examDaysList = exam.scheduleDays || [];
             const currentStageIdx = getLifecycleStageIndex(exam.status);
 
             return (
@@ -387,20 +357,21 @@ export default function ExamSchedulesView({
                         </div>
                       </div>
 
-                      {/* Top Right Actions: Toggle Table Accordion & ActionMenu */}
+                      {/* Top Right Actions: Direct Subject Routine Matrix Navigation & ActionMenu */}
                       <div className="flex items-center gap-2 shrink-0 self-start lg:self-center">
-                        <button
+                        <CustomButton
                           type="button"
-                          onClick={() => toggleExpand(exam.id)}
-                          className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-sub/80 theme-text-secondary hover:theme-text-primary flex items-center gap-2 cursor-pointer transition-all shadow-2xs active:scale-95"
-                          title={isExpanded ? 'Hide Subject Routines' : 'Show Subject Routines'}
+                          variant="sub"
+                          size="sm"
+                          icon={BookOpenIcon}
+                          onClick={() => handleNavigateToMatrix(exam.id)}
+                          title="Open Subject Routine Matrix workspace for this examination session"
                         >
-                          <span>{isExpanded ? 'Hide Routines' : 'View Routines'}</span>
+                          <span>Subject Routine Matrix</span>
                           <span className="px-1.5 py-0.2 rounded-full font-mono text-[10px] theme-bg-surface border theme-border font-bold">
                             {currentSubjects.length}
                           </span>
-                          <ChevronIcon isOpen={isExpanded} className="w-3.5 h-3.5 transition-transform duration-200" />
-                        </button>
+                        </CustomButton>
 
                         <ActionMenu
                           actions={[
@@ -449,11 +420,17 @@ export default function ExamSchedulesView({
                     {/* Policy & Key Specifications 4-Tile Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
                       {/* Tile 1: Routine Coverage */}
-                      <ExamStatTile
-                        icon={BookOpenIcon}
-                        label="Routine Coverage"
-                        value={`${currentSubjects.length} ${currentSubjects.length === 1 ? 'Subject Routine' : 'Subject Routines'}`}
-                      />
+                      <div
+                        onClick={() => handleNavigateToMatrix(exam.id)}
+                        className="cursor-pointer transition-transform active:scale-98"
+                        title="Click to view and configure subject routines in Subject Routine Matrix"
+                      >
+                        <ExamStatTile
+                          icon={BookOpenIcon}
+                          label="Routine Coverage"
+                          value={`${currentSubjects.length} ${currentSubjects.length === 1 ? 'Subject Routine' : 'Subject Routines'}`}
+                        />
+                      </div>
 
                       {/* Tile 2: Full Marks */}
                       <ExamStatTile
@@ -633,66 +610,6 @@ export default function ExamSchedulesView({
                     </div>
                   </div>
                 </div>
-
-                {/* ── 4.2 Scheduled Subject Routines Table (Smooth Accordion Grid) ── */}
-                <div
-                  className={`grid transition-all duration-300 ease-in-out ${
-                    isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <div className="space-y-2.5 pt-1 pb-1">
-                      {/* Clean minimal sub-header without boxed background */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <BookOpenIcon className="w-4 h-4 theme-accent shrink-0" />
-                          <h4 className="text-xs sm:text-sm font-bold theme-text-primary tracking-tight">
-                            Scheduled Subject Routines & Components
-                          </h4>
-                          <span className="px-2 py-0.5 rounded-full font-mono text-[10px] theme-bg-sub theme-text-secondary border theme-border font-bold shadow-2xs shrink-0">
-                            {currentSubjects.length} {currentSubjects.length === 1 ? 'subject' : 'subjects'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <CustomButton
-                            variant="sub"
-                            size="xs"
-                            icon={EditIcon}
-                            onClick={() => handleNavigateToMatrix(exam.id)}
-                          >
-                            Open in Routine Matrix
-                          </CustomButton>
-                        </div>
-                      </div>
-
-                      {/* Table Body with Generous Row Height (Reusing SubjectMatrixTable) */}
-                      {currentSubjects.length === 0 ? (
-                        <div className="p-8 text-center border border-dashed theme-border rounded-2xl theme-bg-sub/10 space-y-2">
-                          <BookOpenIcon className="w-7 h-7 mx-auto theme-text-secondary opacity-60" />
-                          <p className="text-xs font-medium theme-text-secondary">
-                            No subjects scheduled yet for this examination session.
-                          </p>
-                          <CustomButton
-                            variant="sub"
-                            size="xs"
-                            icon={PlusIcon}
-                            onClick={() => handleNavigateToMatrix(exam.id)}
-                          >
-                            Configure Routine Matrix
-                          </CustomButton>
-                        </div>
-                      ) : (
-                        <SubjectMatrixTable
-                          activeExam={exam}
-                          filteredRows={currentSubjects}
-                          showActions={false}
-                          onOpenComponentModal={() => handleNavigateToMatrix(exam.id)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
             );
           })}
@@ -712,21 +629,6 @@ export default function ExamSchedulesView({
         requireNameMatch={false}
         confirmButtonText="Delete Examination"
         warningMessage="Permanently deleting this examination session will remove all associated subject routine schedules, invigilator assignments, recorded marks, and tabulation entries."
-      />
-
-      {/* ── 6. Standard DeleteImpactModal for Subject Routine Removal ── */}
-      <DeleteImpactModal
-        isOpen={Boolean(subjectToDelete)}
-        onClose={() => setSubjectToDelete(null)}
-        onConfirm={handleConfirmDeleteSubject}
-        title="Remove Subject Routine Schedule?"
-        subtitle={`You are about to remove "${subjectToDelete?.subjectName}" from the exam routine.`}
-        entityName={subjectToDelete?.subjectName || 'Subject Routine'}
-        entityType="Subject Schedule"
-        requireAck={false}
-        requireNameMatch={false}
-        confirmButtonText="Remove Schedule"
-        warningMessage="Removing this subject schedule will delete its scheduled date, shift timings, invigilator assignments, and mark components."
       />
     </PageContainer>
   );

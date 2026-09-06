@@ -5,8 +5,8 @@ import CustomSelect from '../../../components/ui/CustomSelect';
 import CustomButton from '../../../components/ui/CustomButton';
 import TeacherSelect from '../../../components/selectors/TeacherSelect';
 import { UserIcon, CheckIcon, TrashIcon } from '../../../components/ui/Icons';
-import { residentialStore } from '../../../utils/stores/residentialStore';
-import { students as studentStore } from '../../../utils/stores/academicStore';
+import { residentialStore } from '@/stores/residentialStore';
+import { students as studentStore } from '@/stores/academicStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
 
