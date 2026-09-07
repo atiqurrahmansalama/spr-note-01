@@ -13,7 +13,7 @@ import {
 } from '../../../components/ui/Icons';
 import { useToast } from '../../../context/ToastContext';
 import { examStore, DEFAULT_GRADING_SYSTEMS } from '@/stores/examStore';
-import { readJSON, writeJSON } from '@/stores/coreStore';
+import { useFormAutoSave } from '../../../hooks';
 
 export default function GradingRuleFormDrawer({
   system = null,
@@ -23,62 +23,45 @@ export default function GradingRuleFormDrawer({
 }) {
   const { showToast } = useToast();
 
-  const draftKey = `spr_grading_rule_draft_${tenantId}_${system?.id || 'new'}`;
-  const savedDraft = useMemo(() => {
-    return readJSON(draftKey, null);
-  }, [draftKey]);
-
-  const [isDraftRestored, setIsDraftRestored] = useState(() => Boolean(savedDraft));
-
-  const [name, setName] = useState(savedDraft?.name ?? system?.name ?? '');
-  const [code, setCode] = useState(savedDraft?.code ?? system?.code ?? `SCALE_${Date.now().toString(36).toUpperCase()}`);
-  const [description, setDescription] = useState(savedDraft?.description ?? system?.description ?? '');
-  const [rules, setRules] = useState(() => {
-    if (Array.isArray(savedDraft?.rules) && savedDraft.rules.length > 0) {
-      return savedDraft.rules;
-    }
-    if (system?.rules && system.rules.length > 0) {
-      return system.rules;
-    }
-    return [
-      { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
-      { grade: 'A', title: 'Excellent', minMark: 70, maxMark: 79, gradePoint: 4.0, division: '1st Division', isPass: true, color: 'teal' },
-      { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
-      { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
-      { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
-    ];
+  const [formData, setFormData] = useState({
+    name: system?.name ?? '',
+    code: system?.code ?? `SCALE_${Date.now().toString(36).toUpperCase()}`,
+    description: system?.description ?? '',
+    rules: system?.rules && system.rules.length > 0
+      ? system.rules
+      : [
+          { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
+          { grade: 'A', title: 'Excellent', minMark: 70, maxMark: 79, gradePoint: 4.0, division: '1st Division', isPass: true, color: 'teal' },
+          { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
+          { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
+          { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
+        ],
   });
+
+  const { name, code, description, rules } = formData;
+  const setName = (val) => setFormData((p) => ({ ...p, name: val }));
+  const setCode = (val) => setFormData((p) => ({ ...p, code: val }));
+  const setDescription = (val) => setFormData((p) => ({ ...p, description: val }));
+  const setRules = (valOrFn) => setFormData((p) => ({ ...p, rules: typeof valOrFn === 'function' ? valOrFn(p.rules) : valOrFn }));
+
+  // Auto-Save / Draft Persistence
+  const storageKey = system?.id ? `grading_rule_edit_${system.id}` : `grading_rule_create_${tenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft, hasRestoredDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
+
   const [saving, setSaving] = useState(false);
 
-  // Auto-save form draft with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const hasContent = Boolean(name.trim() || description.trim() || rules.length > 5);
-      if (hasContent) {
-        writeJSON(draftKey, {
-          name,
-          code,
-          description,
-          rules,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [draftKey, name, code, description, rules]);
-
   const handleDiscardDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch {}
-    setIsDraftRestored(false);
-
-    setName(system?.name || '');
-    setCode(system?.code || `SCALE_${Date.now().toString(36).toUpperCase()}`);
-    setDescription(system?.description || '');
-    setRules(
-      system?.rules && system.rules.length > 0
+    clearDraft();
+    setFormData({
+      name: system?.name || '',
+      code: system?.code || `SCALE_${Date.now().toString(36).toUpperCase()}`,
+      description: system?.description || '',
+      rules: system?.rules && system.rules.length > 0
         ? system.rules
         : [
             { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
@@ -86,9 +69,8 @@ export default function GradingRuleFormDrawer({
             { grade: 'B', title: 'Good', minMark: 50, maxMark: 69, gradePoint: 3.0, division: '2nd Division', isPass: true, color: 'blue' },
             { grade: 'C', title: 'Pass', minMark: 33, maxMark: 49, gradePoint: 2.0, division: '3rd Division', isPass: true, color: 'amber' },
             { grade: 'F', title: 'Fail', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
-          ]
-    );
-
+          ],
+    });
     showToast('Draft discarded and form reset.', 'info');
   };
 
@@ -164,11 +146,7 @@ export default function GradingRuleFormDrawer({
         showToast('New grading scale policy created.', 'success');
       }
 
-      // Clean up saved draft upon successful save
-      try {
-        localStorage.removeItem(draftKey);
-      } catch {}
-
+      clearDraft();
       onSaveSuccess?.();
     } catch {
       showToast('Failed to save grading scale policy.', 'error');
@@ -181,7 +159,7 @@ export default function GradingRuleFormDrawer({
     <DrawerContainer padding="none">
       <form onSubmit={handleSaveSystem} className="@container p-4 @[480px]:p-6 space-y-6 text-left">
         {/* Restored Draft Notice Banner */}
-        {isDraftRestored && (
+        {hasRestoredDraft && (
           <div className="flex items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-subtle text-xs animate-fade-in">
             <div className="flex items-center gap-2 theme-text-primary font-medium">
               <HistoryIcon className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -360,7 +338,10 @@ export default function GradingRuleFormDrawer({
         </DrawerSection>
 
         {/* Footer */}
-        <DrawerFooter>
+        <DrawerFooter
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
+        >
           <CustomButton
             type="button"
             variant="sub"

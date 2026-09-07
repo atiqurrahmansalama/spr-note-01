@@ -94,6 +94,8 @@ export default function DataTable({
   cellPaddingClass = '',
   wrapperClassName = '',
   tableClassName = '',
+  theadClassName = '',
+  headerClassName = '',
   rowClassName,
   // --- Sorting Props ---
   sortable = true,
@@ -110,7 +112,17 @@ export default function DataTable({
   idField = 'id',
   selectionHeaderClassName = 'w-12 text-center',
   selectionCellClassName = 'text-center',
+  // --- Reusable Serial Number / Row Index Props ---
+  showIndex = false,
+  showSerial = false,
+  indexHeader = 'No',
+  serialHeader = null,
+  startIndex = 1,
+  indexHeaderClassName = 'w-12 text-center text-xs font-bold font-mono',
+  indexCellClassName = 'w-12 text-center font-mono text-xs font-bold theme-text-secondary',
 }) {
+  const shouldShowSerial = Boolean(showIndex || showSerial);
+  const resolvedSerialHeader = serialHeader || indexHeader || 'No';
   // Internal sort state for uncontrolled mode
   const [internalSortConfig, setInternalSortConfig] = useState(() => {
     if (defaultSortKey) {
@@ -255,7 +267,7 @@ export default function DataTable({
       <div className="overflow-x-auto">
         <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
           {!hideHeader && (
-            <thead className="border-b theme-border theme-bg-sub theme-text-secondary uppercase text-[10px] tracking-wider font-bold">
+            <thead className={`border-b theme-border theme-bg-sub theme-text-secondary uppercase text-xs tracking-wider font-bold ${theadClassName || headerClassName}`}>
               <tr>
                 {selectable && (
                   <th
@@ -272,6 +284,15 @@ export default function DataTable({
                         }}
                         disabled={processedData.length === 0}
                       />
+                    </div>
+                  </th>
+                )}
+                {shouldShowSerial && (
+                  <th
+                    className={`${defaultHeaderPad} ${indexHeaderClassName}`}
+                  >
+                    <div className="flex items-center justify-center">
+                      <span>{resolvedSerialHeader}</span>
                     </div>
                   </th>
                 )}
@@ -428,6 +449,15 @@ export default function DataTable({
                           }}
                         />
                       </div>
+                    </td>
+                  )}
+                  {shouldShowSerial && (
+                    <td
+                      className={`${defaultCellPad} ${indexCellClassName} border-b theme-border`}
+                    >
+                      <span className="font-mono text-xs font-bold theme-text-secondary">
+                        {startIndex + rowIdx}
+                      </span>
                     </td>
                   )}
                   {columns.map((col, colIdx) => {

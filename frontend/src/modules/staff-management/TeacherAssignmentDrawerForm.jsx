@@ -10,6 +10,7 @@ import { fetchWithAuth } from '../../utils/authService';
 import CustomSelect from '../../components/ui/CustomSelect';
 import { ClassSelect, GroupSelect } from '../../components/selectors';
 import { DrawerContainer, DrawerBanner, DrawerSection, DrawerFooter } from '../../components/layout';
+import { useFormAutoSave } from '../../hooks';
 
 export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCancel }) {
   const { showToast } = useToast();
@@ -28,6 +29,15 @@ export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCanc
     student_group: '',
     session: '',
     role_in_class: 'LEAD_TEACHER',
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = teacher?.id ? `teacher_assign_${teacher.id}` : null;
+  const { clearDraft } = useFormAutoSave({
+    formData: form,
+    setFormData: setForm,
+    storageKey,
+    enabled: Boolean(storageKey),
   });
 
   useEffect(() => {
@@ -99,6 +109,7 @@ export default function TeacherAssignmentDrawerForm({ teacher, onUpdated, onCanc
       if (onUpdated) onUpdated();
 
       // Reset class & group
+      clearDraft();
       setForm((prev) => ({
         ...prev,
         student_class: '',

@@ -10,6 +10,7 @@ import {
 import CustomInput from "../../../../components/ui/CustomInput";
 import { ClassSelect, SectionSelect, TeacherSelect } from "../../../../components/selectors";
 import { DrawerContainer, DrawerFooter } from "../../../../components/layout";
+import { useFormAutoSave } from "../../../../hooks";
 
 /**
  * GroupForm Component
@@ -50,6 +51,16 @@ export default function GroupForm({
   }, [editingGroup, defaultClassId, defaultSectionId, classes]);
 
   const [formData, setFormData] = useState(initialValues);
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEdit ? `group_edit_${editingGroup.id}` : `group_create_${formData.student_class || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
+
   const [classList, setClassList] = useState(classes);
   const [teacherList, setTeacherList] = useState(teachers);
   const [loadingLookups, setLoadingLookups] = useState(false);
@@ -141,6 +152,7 @@ export default function GroupForm({
           "success"
         );
         window.dispatchEvent(new CustomEvent("spr_group_updated"));
+        clearDraft();
         onSaved?.();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -235,6 +247,8 @@ export default function GroupForm({
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEdit ? "Save Changes" : "Create Group"}
           onSubmit={true}
         />

@@ -37,6 +37,8 @@ import {
   focusNextInput,
   focusPrevInput,
 } from "../../utils/keyboardUtils";
+import TemplateActionToolbar from "./TemplateActionToolbar";
+import { useUndoRedo } from "../../context/useUndoRedo";
 
 /**
  * Enterprise Responsive Universal CustomInput Component
@@ -109,6 +111,24 @@ const CustomInput = forwardRef(function CustomInput(
     rows = 3,
     autoResize = false,
     inputMode,
+    enableTemplates = false,
+    templateCategory,
+    templateNamespace,
+    category,
+    namespace,
+    templateInitialList = [],
+    templateMode = "append",
+    showTemplateClear = true,
+    showTemplateSave = true,
+    showTemplateSaved = true,
+    showTemplateCount = true,
+    showTemplateSearch = true,
+    templateSearchable,
+    showTemplateEdit = true,
+    templateEditable,
+    showTemplateDelete = true,
+    templateDeletable,
+    showTemplateOnFocusOnly = false,
     ...restProps
   },
   forwardedRef
@@ -116,6 +136,21 @@ const CustomInput = forwardRef(function CustomInput(
   const autoId = useId();
   const inputId = id || autoId;
   const innerRef = useRef(null);
+
+  // Resolve template category: priority to explicit category/namespace, then field name, avoiding row-specific DOM ID
+  const resolvedTemplateCategory =
+    category ||
+    templateCategory ||
+    namespace ||
+    templateNamespace ||
+    (name ? name : "general");
+
+  let undoRedoCtx = null;
+  try {
+    undoRedoCtx = useUndoRedo();
+  } catch {
+    // Graceful fallback
+  }
 
   useImperativeHandle(forwardedRef, () => innerRef.current);
 
@@ -366,6 +401,21 @@ const CustomInput = forwardRef(function CustomInput(
   // KEYBOARD NAVIGATION
   // ----------------------------------------------------------------------------
   const handleKeyDown = (e) => {
+    // If consumer provided onKeyDown, invoke it first and respect defaultPrevented
+    onKeyDown?.(e);
+    if (e.defaultPrevented) return;
+
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+    if (isCmdOrCtrl && e.key.toLowerCase() === "z" && !e.shiftKey && !e.altKey && undoRedoCtx?.canUndo) {
+      e.preventDefault();
+      undoRedoCtx.undo();
+      return;
+    } else if (isCmdOrCtrl && ((e.key.toLowerCase() === "z" && e.shiftKey) || (e.key.toLowerCase() === "y" && !e.shiftKey)) && undoRedoCtx?.canRedo) {
+      e.preventDefault();
+      undoRedoCtx.redo();
+      return;
+    }
+
     if (normalizedType === "number") {
       if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -417,8 +467,6 @@ const CustomInput = forwardRef(function CustomInput(
         return;
       }
     }
-
-    onKeyDown?.(e);
   };
 
   // ----------------------------------------------------------------------------
@@ -600,7 +648,7 @@ const CustomInput = forwardRef(function CustomInput(
   return (
     <div className={`text-left font-sans ${isBorderless && !label && !subLabel && !badge && !optional ? (wrapperClassName || "w-full h-full") : `w-full ${wrapperClassName}`}`}>
       {/* Top Bar: Label, Optional Sublabel, and Badges */}
-      {(label || subLabel || badge || optional) && (
+      {(label || subLabel || badge || optional || enableTemplates) && (
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {label && (
@@ -621,6 +669,25 @@ const CustomInput = forwardRef(function CustomInput(
           </div>
 
           <div className="flex items-center gap-1.5">
+            {enableTemplates && !disabled && !readOnly && (
+              <TemplateActionToolbar
+                value={stringValue}
+                onChange={handleValueChange}
+                category={resolvedTemplateCategory}
+                namespace={resolvedTemplateCategory}
+                initialTemplates={templateInitialList}
+                mode={templateMode}
+                showClear={showTemplateClear}
+                showSave={showTemplateSave}
+                showSaved={showTemplateSaved}
+                showCount={showTemplateCount}
+                showSearch={templateSearchable !== undefined ? templateSearchable : showTemplateSearch}
+                showEdit={templateEditable !== undefined ? templateEditable : showTemplateEdit}
+                showDelete={templateDeletable !== undefined ? templateDeletable : showTemplateDelete}
+                showOnFocusOnly={showTemplateOnFocusOnly}
+                size="sm"
+              />
+            )}
             {badge && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border">
                 {badge}

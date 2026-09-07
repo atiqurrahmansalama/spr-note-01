@@ -9,4 +9,5 @@ from .reports import *
 from .staff import *
 from .attendance import *
 from .notifications import *
+from .templates import *
 from .system import *

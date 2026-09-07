@@ -8,6 +8,7 @@ import {
   resolveBookTeacher,
   doesLessonMatchClass,
 } from '../../dailyClassroomUtils';
+import { useFormAutoSave } from '../../../../../hooks';
 
 /**
  * useStudentAssessmentForm
@@ -91,6 +92,94 @@ export default function useStudentAssessmentForm({
   const [nextTarget, setNextTarget] = useState(evaluation?.next_target || '');
   const [saving, setSaving] = useState(false);
   const [isEditingContext, setIsEditingContext] = useState(false);
+
+  // ── Auto-save setup ────────────────────────────────────────────────────────
+  const initialFormSnapshot = useMemo(() => ({
+    selectedStudentId: studentId || evaluation?.student || '',
+    evaluationDate: date || evaluation?.evaluation_date || new Date().toISOString().split('T')[0],
+    periodSlotId: evaluation?.period_slot || (defaultPeriodId && defaultPeriodId !== 'ALL' ? String(defaultPeriodId) : ''),
+    curriculumBookId: evaluation?.curriculum_book_id ? String(evaluation.curriculum_book_id) : (assignedLesson?.curriculum_book_id ? String(assignedLesson.curriculum_book_id) : ''),
+    curriculumBookName: evaluation?.curriculum_book_name || assignedLesson?.curriculum_book_name || '',
+    subjectName: evaluation?.subject_name || assignedLesson?.subject_name || '',
+    lessonCovered: evaluation?.lesson_covered || assignedLesson?.lesson_title || '',
+    startUnit: evaluation?.start_unit !== undefined && evaluation?.start_unit !== '' ? String(evaluation.start_unit) : (assignedLesson?.start_unit !== undefined && assignedLesson?.start_unit !== '' ? String(assignedLesson.start_unit) : ''),
+    endUnit: evaluation?.end_unit !== undefined && evaluation?.end_unit !== '' ? String(evaluation.end_unit) : (assignedLesson?.end_unit !== undefined && assignedLesson?.end_unit !== '' ? String(assignedLesson.end_unit) : ''),
+    recitationScore: evaluation?.recitation_score !== undefined ? evaluation.recitation_score : 10.0,
+    homeworkScore: evaluation?.homework_score !== undefined ? evaluation.homework_score : 10.0,
+    maxScore: evaluation?.max_score !== undefined ? evaluation.max_score : 10.0,
+    totalMistakes: Number(evaluation?.total_mistakes || evaluation?.mistakes_count || 0),
+    totalStucks: Number(evaluation?.total_stucks || evaluation?.stucks_count || 0),
+    fluencyRating: evaluation?.fluency_rating || 5,
+    teacherRemarks: evaluation?.teacher_remarks || '',
+    nextTarget: evaluation?.next_target || '',
+  }), [studentId, date, evaluation, assignedLesson, defaultPeriodId]);
+
+  const currentFormState = useMemo(() => ({
+    selectedStudentId,
+    evaluationDate,
+    periodSlotId,
+    curriculumBookId,
+    curriculumBookName,
+    subjectName,
+    lessonCovered,
+    startUnit,
+    endUnit,
+    recitationScore,
+    homeworkScore,
+    maxScore,
+    totalMistakes,
+    totalStucks,
+    fluencyRating,
+    teacherRemarks,
+    nextTarget,
+  }), [
+    selectedStudentId,
+    evaluationDate,
+    periodSlotId,
+    curriculumBookId,
+    curriculumBookName,
+    subjectName,
+    lessonCovered,
+    startUnit,
+    endUnit,
+    recitationScore,
+    homeworkScore,
+    maxScore,
+    totalMistakes,
+    totalStucks,
+    fluencyRating,
+    teacherRemarks,
+    nextTarget,
+  ]);
+
+  const restoreFormState = useCallback((draft) => {
+    if (!draft) return;
+    if (draft.selectedStudentId !== undefined) setSelectedStudentId(draft.selectedStudentId);
+    if (draft.evaluationDate !== undefined) setEvaluationDate(draft.evaluationDate);
+    if (draft.periodSlotId !== undefined) setPeriodSlotId(draft.periodSlotId);
+    if (draft.curriculumBookId !== undefined) setCurriculumBookId(draft.curriculumBookId);
+    if (draft.curriculumBookName !== undefined) setCurriculumBookName(draft.curriculumBookName);
+    if (draft.subjectName !== undefined) setSubjectName(draft.subjectName);
+    if (draft.lessonCovered !== undefined) setLessonCovered(draft.lessonCovered);
+    if (draft.startUnit !== undefined) setStartUnit(draft.startUnit);
+    if (draft.endUnit !== undefined) setEndUnit(draft.endUnit);
+    if (draft.recitationScore !== undefined) setRecitationScore(draft.recitationScore);
+    if (draft.homeworkScore !== undefined) setHomeworkScore(draft.homeworkScore);
+    if (draft.maxScore !== undefined) setMaxScore(draft.maxScore);
+    if (draft.totalMistakes !== undefined) setTotalMistakes(draft.totalMistakes);
+    if (draft.totalStucks !== undefined) setTotalStucks(draft.totalStucks);
+    if (draft.fluencyRating !== undefined) setFluencyRating(draft.fluencyRating);
+    if (draft.teacherRemarks !== undefined) setTeacherRemarks(draft.teacherRemarks);
+    if (draft.nextTarget !== undefined) setNextTarget(draft.nextTarget);
+  }, []);
+
+  const storageKey = `student_assessment_form_${tenantId}_${evaluation?.id || selectedStudentId || 'new'}_${evaluationDate || 'today'}`;
+  const { autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    storageKey,
+    formData: currentFormState,
+    setFormData: restoreFormState,
+    initialData: initialFormSnapshot,
+  });
 
   // Sync prop changes
   useEffect(() => {
@@ -502,6 +591,7 @@ export default function useStudentAssessmentForm({
         }
       }
 
+      clearDraft();
       showToast(evaluation ? 'Student evaluation updated successfully.' : 'Student evaluation recorded successfully.', 'success');
       onSaveSuccess?.(payload);
     } catch (err) {
@@ -549,6 +639,9 @@ export default function useStudentAssessmentForm({
     saving,
     isEditingContext,
     setIsEditingContext,
+    autoSaveStatus,
+    lastSavedAt,
+    clearDraft,
     activeStudent,
     studentClassObj,
     studentDeptObj,

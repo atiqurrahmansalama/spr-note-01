@@ -82,17 +82,21 @@ export function UndoRedoProvider({ children }) {
 
   // Active scope stacks
   const currentScopeHistory = historyMap[activeScope] || { past: [], future: [] };
+  const globalScopeHistory = historyMap['global'] || { past: [], future: [] };
+
   const pastStack = currentScopeHistory.past || [];
   const futureStack = currentScopeHistory.future || [];
+  const globalPastStack = globalScopeHistory.past || [];
+  const globalFutureStack = globalScopeHistory.future || [];
 
   // Check if a registered scope handler is present
   const activeHandler = scopeHandlersRef.current.get(activeScope);
 
-  const canUndo = Boolean(activeHandler?.canUndo ?? pastStack.length > 0);
-  const canRedo = Boolean(activeHandler?.canRedo ?? futureStack.length > 0);
+  const canUndo = Boolean(activeHandler?.canUndo ?? (pastStack.length > 0 || globalPastStack.length > 0));
+  const canRedo = Boolean(activeHandler?.canRedo ?? (futureStack.length > 0 || globalFutureStack.length > 0));
 
-  const undoTitle = activeHandler?.undoTitle || (pastStack.length > 0 ? pastStack[pastStack.length - 1].title : null);
-  const redoTitle = activeHandler?.redoTitle || (futureStack.length > 0 ? futureStack[futureStack.length - 1].title : null);
+  const undoTitle = activeHandler?.undoTitle || (pastStack.length > 0 ? pastStack[pastStack.length - 1].title : (globalPastStack.length > 0 ? globalPastStack[globalPastStack.length - 1].title : null));
+  const redoTitle = activeHandler?.redoTitle || (futureStack.length > 0 ? futureStack[futureStack.length - 1].title : (globalFutureStack.length > 0 ? globalFutureStack[globalFutureStack.length - 1].title : null));
 
   /**
    * Pushes a new undoable action into the active scope's history
@@ -131,7 +135,7 @@ export function UndoRedoProvider({ children }) {
   }, []);
 
   /**
-   * Performs an Undo operation in the active scope
+   * Performs an Undo operation in the active scope (or global fallback)
    */
   const undo = useCallback(async () => {
     const scope = activeScopeRef.current;
@@ -148,7 +152,9 @@ export function UndoRedoProvider({ children }) {
 
     const currentMap = historyMapRef.current;
     const scopeHistory = currentMap[scope] || { past: [], future: [] };
-    const past = scopeHistory.past || [];
+    const targetScopeKey = (scopeHistory.past && scopeHistory.past.length > 0) ? scope : 'global';
+    const targetHistory = currentMap[targetScopeKey] || { past: [], future: [] };
+    const past = targetHistory.past || [];
 
     if (past.length === 0) {
       return;
@@ -156,22 +162,16 @@ export function UndoRedoProvider({ children }) {
 
     const actionToUndo = past[past.length - 1];
 
-    // Security check: verify scope matches current active scope
-    if (actionToUndo.scope && actionToUndo.scope !== scope && actionToUndo.scope !== 'global') {
-      console.warn(`[UndoRedoContext] Blocked undo: action scope "${actionToUndo.scope}" does not match active route "${scope}".`);
-      return;
-    }
-
     try {
       await actionToUndo.undo();
 
       setHistoryMap((prev) => {
-        const currentHist = prev[scope] || { past: [], future: [] };
+        const currentHist = prev[targetScopeKey] || { past: [], future: [] };
         const updatedPast = currentHist.past.slice(0, -1);
         const updatedFuture = [actionToUndo, ...(currentHist.future || [])];
         return {
           ...prev,
-          [scope]: {
+          [targetScopeKey]: {
             past: updatedPast,
             future: updatedFuture,
           },
@@ -186,7 +186,7 @@ export function UndoRedoProvider({ children }) {
   }, [showToast]);
 
   /**
-   * Performs a Redo operation in the active scope
+   * Performs a Redo operation in the active scope (or global fallback)
    */
   const redo = useCallback(async () => {
     const scope = activeScopeRef.current;
@@ -203,7 +203,9 @@ export function UndoRedoProvider({ children }) {
 
     const currentMap = historyMapRef.current;
     const scopeHistory = currentMap[scope] || { past: [], future: [] };
-    const future = scopeHistory.future || [];
+    const targetScopeKey = (scopeHistory.future && scopeHistory.future.length > 0) ? scope : 'global';
+    const targetHistory = currentMap[targetScopeKey] || { past: [], future: [] };
+    const future = targetHistory.future || [];
 
     if (future.length === 0) {
       return;
@@ -211,24 +213,18 @@ export function UndoRedoProvider({ children }) {
 
     const actionToRedo = future[0];
 
-    // Security check: verify scope matches current active scope
-    if (actionToRedo.scope && actionToRedo.scope !== scope && actionToRedo.scope !== 'global') {
-      console.warn(`[UndoRedoContext] Blocked redo: action scope "${actionToRedo.scope}" does not match active route "${scope}".`);
-      return;
-    }
-
     try {
       if (typeof actionToRedo.redo === 'function') {
         await actionToRedo.redo();
       }
 
       setHistoryMap((prev) => {
-        const currentHist = prev[scope] || { past: [], future: [] };
+        const currentHist = prev[targetScopeKey] || { past: [], future: [] };
         const updatedFuture = currentHist.future.slice(1);
         const updatedPast = [...(currentHist.past || []), actionToRedo];
         return {
           ...prev,
-          [scope]: {
+          [targetScopeKey]: {
             past: updatedPast,
             future: updatedFuture,
           },
@@ -274,34 +270,27 @@ export function UndoRedoProvider({ children }) {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       if (!isCmdOrCtrl) return;
 
-      const activeEl = document.activeElement;
-      if (isNativeTextEditingElement(activeEl)) {
-        // Native browser undo/redo is active inside input/textarea fields
-        return;
-      }
-
       const key = e.key.toLowerCase();
 
-      // Undo: Ctrl+Z (without Shift or Alt)
-      if (key === 'z' && !e.shiftKey && !e.altKey) {
-        const scope = activeScopeRef.current;
-        const currentMap = historyMapRef.current;
-        const scopeHistory = currentMap[scope] || { past: [], future: [] };
-        const handler = scopeHandlersRef.current.get(scope);
+      const scope = activeScopeRef.current;
+      const currentMap = historyMapRef.current;
+      const scopeHistory = currentMap[scope] || { past: [], future: [] };
+      const globalHistory = currentMap['global'] || { past: [], future: [] };
+      const handler = scopeHandlersRef.current.get(scope);
 
-        if ((handler && handler.canUndo) || (scopeHistory.past && scopeHistory.past.length > 0)) {
+      const hasUndo = Boolean(handler?.canUndo || (scopeHistory.past && scopeHistory.past.length > 0) || (globalHistory.past && globalHistory.past.length > 0));
+      const hasRedo = Boolean(handler?.canRedo || (scopeHistory.future && scopeHistory.future.length > 0) || (globalHistory.future && globalHistory.future.length > 0));
+
+      // Undo: Ctrl+Z
+      if (key === 'z' && !e.shiftKey && !e.altKey) {
+        if (hasUndo) {
           e.preventDefault();
           undo();
         }
       }
       // Redo: Ctrl+Y OR Ctrl+Shift+Z
       else if ((key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey)) {
-        const scope = activeScopeRef.current;
-        const currentMap = historyMapRef.current;
-        const scopeHistory = currentMap[scope] || { past: [], future: [] };
-        const handler = scopeHandlersRef.current.get(scope);
-
-        if ((handler && handler.canRedo) || (scopeHistory.future && scopeHistory.future.length > 0)) {
+        if (hasRedo) {
           e.preventDefault();
           redo();
         }

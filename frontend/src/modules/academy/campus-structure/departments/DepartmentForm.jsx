@@ -8,6 +8,7 @@ import { TeacherSelect } from "../../../../components/selectors";
 import CustomCheckbox from "../../../../components/ui/CustomCheckbox";
 import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../components/layout";
 import { createDepartment, updateDepartment } from "../../../../api/academy";
+import { useFormAutoSave } from "../../../../hooks";
 
 export default function DepartmentForm({ department = null, editingDepartment = null, onSaved, onCancel }) {
   const activeDept = department || editingDepartment;
@@ -49,6 +50,15 @@ export default function DepartmentForm({ department = null, editingDepartment = 
   const [teachers, setTeachers] = useState([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEdit ? `dept_edit_${activeDept.id}` : `dept_create_${formData.institution || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
 
   useEffect(() => {
     setFormData(initialValues);
@@ -131,6 +141,7 @@ export default function DepartmentForm({ department = null, editingDepartment = 
         await createDepartment(payload);
         showToast("Department created successfully!", "success");
       }
+      clearDraft();
       onSaved?.();
     } catch (err) {
       showToast(err.message || "Failed to save department.", "error");
@@ -240,6 +251,8 @@ export default function DepartmentForm({ department = null, editingDepartment = 
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEdit ? "Save Changes" : "Create Department"}
           onSubmit={true}
         />

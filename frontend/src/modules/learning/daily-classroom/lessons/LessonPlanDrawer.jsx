@@ -331,14 +331,15 @@ export default function LessonPlanDrawer({
         </DrawerSection>
 
         {/* Drawer Footer */}
-        <DrawerFooter>
-          <CustomButton type="button" variant="secondary" size="md" onClick={onCancel}>
-            Cancel
-          </CustomButton>
-          <CustomButton type="submit" variant="primary" size="md" loading={form.saving} icon={CheckIcon}>
-            {lesson && !lesson?.isDuplicate ? "Update Lesson" : "Assign Sabaq"}
-          </CustomButton>
-        </DrawerFooter>
+        <DrawerFooter
+          onCancel={onCancel}
+          isSubmitting={form.saving}
+          saveLabel={lesson && !lesson?.isDuplicate ? "Update Lesson" : "Assign Sabaq"}
+          saveIcon={CheckIcon}
+          onSubmit={true}
+          autoSaveStatus={form.autoSaveStatus}
+          lastSavedAt={form.lastSavedAt}
+        />
       </form>
     </DrawerContainer>
   );

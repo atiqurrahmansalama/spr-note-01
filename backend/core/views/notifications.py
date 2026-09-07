@@ -71,23 +71,8 @@ from core.cache_utils import get_or_set_cached_data, invalidate_tenant_cache
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-class SavedMessageViewSet(viewsets.ModelViewSet):
-    queryset = SavedMessage.objects.all().order_by('-created_at')
-    serializer_class = SavedMessageSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin]
-
-    def get_queryset(self):
-        user = self.request.user
-        if not user or not user.is_authenticated:
-            return self.queryset.none()
-
-        if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
-            return self.queryset.all()
-
-        return self.queryset.filter(created_by=user)
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+# Re-export SavedMessageViewSet from templates module for backward compatibility
+from .templates import SavedMessageViewSet
 
 
 class InAppNotificationViewSet(viewsets.ModelViewSet):

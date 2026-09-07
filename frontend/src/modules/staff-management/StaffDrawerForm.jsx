@@ -14,6 +14,7 @@ import CustomSelect from '../../components/ui/CustomSelect';
 import CustomInput from '../../components/ui/CustomInput';
 import AddressLocationPicker from '../../components/common/AddressLocationPicker';
 import { DrawerContainer, DrawerFooter } from '../../components/layout';
+import { useFormAutoSave } from '../../hooks';
 
 export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
   const { showToast } = useToast();
@@ -69,6 +70,15 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
     bank_name: '',
     bank_account_no: '',
     mobile_banking_no: '',
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEditing ? `staff_edit_${staffData.id}` : `staff_create_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   // Listen for live rank updates from Developer Tools
@@ -181,6 +191,7 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
         showToast('Staff member onboarded successfully.', 'success');
       }
 
+      clearDraft();
       if (onSaved) onSaved();
     } catch (err) {
       console.error('Error saving staff profile:', err);
@@ -642,6 +653,8 @@ export default function StaffDrawerForm({ staffData, onSaved, onCancel }) {
         <DrawerFooter
           onCancel={onCancel}
           isSubmitting={isSubmitting}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEditing ? 'Update Staff Profile' : 'Onboard Staff'}
           onSubmit={true}
         />

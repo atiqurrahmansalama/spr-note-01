@@ -9,6 +9,7 @@ import ReusableCalendar from '../../../components/common/ReusableCalendar';
 import { DrawerContainer, DrawerFooter } from '../../../components/layout';
 import { createStaffOnboardingToken, updateStaffOnboardingToken } from '../../../api/staffOnboarding';
 import { staffRanksStore, STAFF_CATEGORY_OPTIONS } from '../../../utils/localStore';
+import { useFormAutoSave } from '../../../hooks';
 
 export default function StaffInviteDrawerForm({ tokenData = null, onSuccess, onCancel }) {
   const { showToast } = useToast();
@@ -29,6 +30,15 @@ export default function StaffInviteDrawerForm({ tokenData = null, onSuccess, onC
     auto_approve: tokenData?.auto_approve !== undefined ? tokenData.auto_approve : true,
     is_active: tokenData?.is_active !== undefined ? tokenData.is_active : true,
     include_payroll: tokenData?.include_payroll !== undefined ? tokenData.include_payroll : false,
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEditing ? `staff_invite_edit_${tokenData.id}` : `staff_invite_create_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   // Listen for rank updates from Developer Tools
@@ -92,6 +102,7 @@ export default function StaffInviteDrawerForm({ tokenData = null, onSuccess, onC
         await createStaffOnboardingToken(payload);
         showToast('New staff onboarding QR & link generated!', 'success');
       }
+      clearDraft();
       onSuccess?.();
       handleClose();
     } catch (err) {
@@ -197,8 +208,10 @@ export default function StaffInviteDrawerForm({ tokenData = null, onSuccess, onC
         <DrawerFooter
           onCancel={handleClose}
           onSubmit={handleSubmit}
-          submitText={isEditing ? 'Save Changes' : 'Generate Link & QR'}
-          isLoading={submitting}
+          saveLabel={isEditing ? 'Save Changes' : 'Generate Link & QR'}
+          isSubmitting={submitting}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
         />
       </form>
     </DrawerContainer>

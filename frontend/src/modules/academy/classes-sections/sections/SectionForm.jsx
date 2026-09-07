@@ -14,6 +14,7 @@ import CustomInput from '../../../../components/ui/CustomInput';
 import { TeacherSelect, ClassSelect } from '../../../../components/selectors';
 import CustomCheckbox from '../../../../components/ui/CustomCheckbox';
 import { DrawerContainer, DrawerFooter } from '../../../../components/layout';
+import { useFormAutoSave } from '../../../../hooks';
 
 /**
  * SectionForm Component
@@ -54,6 +55,16 @@ export default function SectionForm({
   }, [section, defaultClassId, classes]);
 
   const [formData, setFormData] = useState(initialValues);
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEdit ? `section_edit_${section.id}` : `section_create_${formData.student_class || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
+
   const [classList, setClassList] = useState(classes);
   const [teacherList, setTeacherList] = useState(teachers);
   const [activeGroupCount, setActiveGroupCount] = useState(section?.group_count || 0);
@@ -163,6 +174,7 @@ export default function SectionForm({
         showToast('New section created successfully.', 'success');
       }
       window.dispatchEvent(new CustomEvent('spr_section_updated'));
+      clearDraft();
       onSaved?.();
     } catch (err) {
       const msg = err.response?.data?.has_groups?.[0] || err.message || 'Failed to save section.';
@@ -318,6 +330,8 @@ export default function SectionForm({
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEdit ? 'Save Changes' : 'Create Section'}
           onSubmit={true}
         />

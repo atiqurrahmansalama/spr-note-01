@@ -7,6 +7,7 @@ import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../component
 import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import { useFormAutoSave } from '../../../hooks';
 
 export default function ResidentialBuildingDrawer({
   building,
@@ -17,13 +18,22 @@ export default function ResidentialBuildingDrawer({
   const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    branch: 'MAIN_CAMPUS',
-    total_floors: 3,
-    warden: null,
-    warden_name: '',
-    description: '',
+    name: building?.name || '',
+    code: building?.code || '',
+    branch: building?.branch || 'MAIN_CAMPUS',
+    total_floors: building?.total_floors || 3,
+    warden: building?.warden || null,
+    warden_name: building?.warden_name || '',
+    description: building?.description || '',
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = building?.id ? `res_building_edit_${building.id}` : `res_building_create_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   const [saving, setSaving] = useState(false);
@@ -58,6 +68,7 @@ export default function ResidentialBuildingDrawer({
         residentialStore.addBuilding(activeTenantId, formData);
         showToast('Residential building created.', 'success');
       }
+      clearDraft();
       onSaveSuccess?.();
     } catch (err) {
       showToast(err.message || 'Failed to save building.', 'error');
@@ -154,6 +165,8 @@ export default function ResidentialBuildingDrawer({
           onCancel={onCancel}
           isSubmitting={saving}
           isSaveDisabled={!formData.name.trim()}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={building?.id ? 'Update Building' : 'Create Building'}
           onSubmit={true}
         />

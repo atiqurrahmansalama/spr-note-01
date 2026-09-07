@@ -215,7 +215,7 @@ export const syncSessionsAndComments = async () => {
 
   // 4c. Sync Comment Templates
   try {
-    const res = await fetchWithAuth("/messages/");
+    const res = await fetchWithAuth("/messages/?category=report_builder_comments");
     if (res.ok) {
       const localComments = commentStore.getAll();
       const localOnlyComments = (Array.isArray(localComments) ? localComments : []).filter((c) => {
@@ -231,7 +231,7 @@ export const syncSessionsAndComments = async () => {
         try {
           const postRes = await fetchWithAuth("/messages/", {
             method: "POST",
-            body: JSON.stringify({ text: commentText }),
+            body: JSON.stringify({ text: commentText, category: "report_builder_comments" }),
           });
           if (postRes.ok) {
             console.log("[SyncEngine] Synced comment template:", commentText);

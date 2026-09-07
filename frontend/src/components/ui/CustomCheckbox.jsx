@@ -66,10 +66,10 @@ export default function CustomCheckbox({
           className="sr-only"
         />
         <div
-          className={`flex items-center justify-center border transition-all duration-150 shadow-xs ${sizeBoxClasses} ${
+          className={`flex items-center justify-center border transition-all duration-150 shadow-2xs ${sizeBoxClasses} ${
             checked
               ? 'theme-bg-accent theme-accent-text border-[var(--accent-main)] shadow-xs scale-100'
-              : 'theme-bg-sub border-black/[0.15] dark:border-white/[0.18] group-hover:border-[var(--accent-main)]/60'
+              : 'theme-bg-surface theme-border group-hover:border-[var(--accent-main)]/60'
           } ${boxClassName}`}
         >
           <SleekCheckIcon

@@ -1,5 +1,6 @@
 import React from "react";
 import CustomButton from "../ui/CustomButton";
+import AutoSaveBadge from "../ui/AutoSaveBadge";
 
 /**
  * Enterprise Reusable Right Sidebar / Drawer Content Container
@@ -179,6 +180,9 @@ export function DrawerFooter({
   saveLabel = "Save Changes",
   isSubmitting = false,
   isSaveDisabled = false,
+  autoSaveStatus = null,
+  lastSavedAt = null,
+  showAutoSave = Boolean(autoSaveStatus || lastSavedAt),
   extraButtons,
   className = "",
   children,
@@ -187,8 +191,14 @@ export function DrawerFooter({
 
   if (!hasStandardActions && children) {
     return (
-      <div className={`pt-4 border-t theme-border w-full ${className}`}>
-        {children}
+      <div className={`pt-4 border-t theme-border w-full flex items-center justify-between gap-2.5 ${className}`}>
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          {showAutoSave && (
+            <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
+          )}
+          {extraButtons}
+          {children}
+        </div>
       </div>
     );
   }
@@ -197,7 +207,10 @@ export function DrawerFooter({
     <div
       className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border w-full ${className}`}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+        {showAutoSave && (
+          <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
+        )}
         {extraButtons}
         {children}
       </div>

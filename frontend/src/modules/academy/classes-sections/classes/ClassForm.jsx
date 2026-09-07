@@ -7,6 +7,7 @@ import CustomInput from "../../../../components/ui/CustomInput";
 import { TeacherSelect } from "../../../../components/selectors";
 import CustomCheckbox from "../../../../components/ui/CustomCheckbox";
 import { DrawerContainer, DrawerFooter } from "../../../../components/layout";
+import { useFormAutoSave } from "../../../../hooks";
 
 export default function ClassForm({ editingClass, onSaved, onCancel }) {
   const { showToast } = useToast();
@@ -21,6 +22,15 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
     has_sections: true,
     has_groups: true,
     is_active: true,
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = editingClass ? `class_edit_${editingClass.id}` : `class_create_${formData.department || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   const [teachers, setTeachers] = useState([]);
@@ -193,6 +203,7 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
           "success"
         );
         window.dispatchEvent(new CustomEvent("spr_class_updated"));
+        clearDraft();
         onSaved?.();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -378,6 +389,8 @@ export default function ClassForm({ editingClass, onSaved, onCancel }) {
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={editingClass ? "Save Changes" : "Create Class"}
           onSubmit={true}
         />

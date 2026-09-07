@@ -184,7 +184,7 @@ export default function AutocompleteDropdown({
 
 
       {isOpen && (
-        <ul className="absolute z-50 left-0 right-0 mt-1.5 max-h-56 overflow-y-auto theme-bg-surface rounded-xl shadow-2xl space-y-0.5 p-1 text-sm border theme-border">
+        <ul className="absolute z-50 left-0 right-0 mt-1.5 max-h-56 overflow-y-auto scrollbar-none no-scrollbar theme-bg-surface rounded-xl shadow-2xl space-y-0.5 p-1 text-sm border theme-border">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((item, index) => {
               const label = typeof item === "string" ? item : item.label;
@@ -198,8 +198,8 @@ export default function AutocompleteDropdown({
                   onClick={() => handleSelect(item)}
                   className={`px-3.5 py-2 rounded-lg cursor-pointer transition-colors flex justify-between items-center group/item ${
                     isHighlighted
-                      ? "theme-bg-elevated theme-accent font-semibold"
-                      : "hover:theme-bg-elevated theme-text-primary"
+                      ? "bg-[var(--accent-main)]/20 theme-accent font-semibold"
+                      : "hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -233,7 +233,7 @@ export default function AutocompleteDropdown({
                             setIsOpen(false);
                             item.onDelete(item);
                           }}
-                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:text-rose-400 transition cursor-pointer"
+                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-danger transition cursor-pointer"
                           title="Delete"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

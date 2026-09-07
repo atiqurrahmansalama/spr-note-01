@@ -167,7 +167,10 @@ export default function ExamFormDrawer({
         )}
 
         {/* Drawer Footer Actions */}
-        <DrawerFooter>
+        <DrawerFooter
+          autoSaveStatus={form.autoSaveStatus}
+          lastSavedAt={form.lastSavedAt}
+        >
           <div className="flex items-center justify-between gap-3 w-full">
             <div>
               {form.step > 1 ? (

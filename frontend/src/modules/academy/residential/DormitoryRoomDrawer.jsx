@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import BranchSelect from '../../../components/selectors/BranchSelect';
@@ -9,6 +9,7 @@ import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../component
 import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
+import { useFormAutoSave } from '../../../hooks';
 
 const ROOM_TYPE_OPTIONS = [
   { value: 'STUDENT_DORM', label: 'Student Dormitory' },
@@ -37,28 +38,9 @@ export default function DormitoryRoomDrawer({
   const { activeTenantId } = useTenant();
   const { showToast } = useToast();
 
-  const [formData, setFormData] = useState({
-    branch: 'MAIN_CAMPUS',
-    branch_name: 'Main Campus',
-    building: '',
-    building_name: '',
-    floor_number: 1,
-    room_number: '',
-    room_name: '',
-    room_type: 'STUDENT_DORM',
-    max_capacity: 6,
-    supervisor: null,
-    supervisor_name: '',
-    prefect: null,
-    prefect_name: '',
-    amenities: ['Ceiling Fans', 'Study Tables', 'Attached Washroom', 'Lockers'],
-  });
-
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
+  const initialFormState = useMemo(() => {
     if (room) {
-      setFormData({
+      return {
         branch: room.branch || 'MAIN_CAMPUS',
         branch_name: room.branch_name || 'Main Campus',
         building: room.building || '',
@@ -72,10 +54,41 @@ export default function DormitoryRoomDrawer({
         supervisor_name: room.supervisor_name || '',
         prefect: room.prefect || null,
         prefect_name: room.prefect_name || '',
-        amenities: Array.isArray(room.amenities) ? room.amenities : [],
-      });
+        amenities: Array.isArray(room.amenities) ? room.amenities : ['Ceiling Fans', 'Study Tables', 'Attached Washroom', 'Lockers'],
+      };
     }
+    return {
+      branch: 'MAIN_CAMPUS',
+      branch_name: 'Main Campus',
+      building: '',
+      building_name: '',
+      floor_number: 1,
+      room_number: '',
+      room_name: '',
+      room_type: 'STUDENT_DORM',
+      max_capacity: 6,
+      supervisor: null,
+      supervisor_name: '',
+      prefect: null,
+      prefect_name: '',
+      amenities: ['Ceiling Fans', 'Study Tables', 'Attached Washroom', 'Lockers'],
+    };
   }, [room]);
+
+  const [formData, setFormData] = useState(initialFormState);
+  const [saving, setSaving] = useState(false);
+
+  const storageKey = `dormitory_room_form_${room?.id || 'new'}`;
+  const { autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    storageKey,
+    formData,
+    setFormData,
+    initialData: initialFormState,
+  });
+
+  useEffect(() => {
+    setFormData(initialFormState);
+  }, [initialFormState]);
 
   const toggleAmenity = (item) => {
     setFormData((prev) => {
@@ -105,6 +118,7 @@ export default function DormitoryRoomDrawer({
         max_capacity: Number(formData.max_capacity) || 1,
       });
 
+      clearDraft();
       showToast(room?.id ? 'Dormitory room updated' : 'Dormitory room created', 'success');
       if (onSaveSuccess) onSaveSuccess();
     } catch {
@@ -266,6 +280,8 @@ export default function DormitoryRoomDrawer({
           isSaveDisabled={!formData.room_number.trim()}
           saveLabel={room?.id ? 'Update Room' : 'Create Room'}
           onSubmit={true}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
         />
       </form>
     </DrawerContainer>

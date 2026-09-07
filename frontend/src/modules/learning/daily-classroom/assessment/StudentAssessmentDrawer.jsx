@@ -328,26 +328,16 @@ export default function StudentAssessmentDrawer({
         </DrawerSection>
 
         {/* Drawer Footer with Save & Cancel */}
-        <DrawerFooter>
-          <CustomButton
-            type="button"
-            variant="secondary"
-            size="md"
-            onClick={onCancel}
-          >
-            Cancel
-          </CustomButton>
-          <CustomButton
-            type="submit"
-            variant="primary"
-            size="md"
-            loading={form.saving}
-            disabled={!form.selectedStudentId}
-            icon={CheckIcon}
-          >
-            {evaluation?.id ? 'Save Changes' : 'Save Assessment'}
-          </CustomButton>
-        </DrawerFooter>
+        <DrawerFooter
+          onCancel={onCancel}
+          isSubmitting={form.saving}
+          isSaveDisabled={!form.selectedStudentId}
+          saveLabel={evaluation?.id ? 'Save Changes' : 'Save Assessment'}
+          saveIcon={CheckIcon}
+          onSubmit={true}
+          autoSaveStatus={form.autoSaveStatus}
+          lastSavedAt={form.lastSavedAt}
+        />
       </form>
     </DrawerContainer>
   );

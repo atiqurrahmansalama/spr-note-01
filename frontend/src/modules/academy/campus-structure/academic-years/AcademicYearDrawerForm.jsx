@@ -15,6 +15,7 @@ import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../compon
 import { academicYearsStore } from "../../../../utils/localStore";
 import { getHijriDetails } from "../../../../utils/hijriUtils";
 import { useTenant } from "../../../../context/TenantContext";
+import { useFormAutoSave } from "../../../../hooks";
 
 const TERM_SYSTEM_OPTIONS = [
   { value: "SEMESTER", label: "Semester System (2 Terms)" },
@@ -135,6 +136,15 @@ export default function AcademicYearDrawerForm({
       termSystem: suggested.termSystem,
       terms: suggested.terms,
     };
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = year ? `acad_year_edit_${year.id}` : `acad_year_create_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   const [errors, setErrors] = useState({});
@@ -329,6 +339,7 @@ export default function AcademicYearDrawerForm({
       name: computedMeta.name || "Academic Year",
     };
 
+    clearDraft();
     if (onSave) {
       onSave(payload);
     }
@@ -539,6 +550,8 @@ export default function AcademicYearDrawerForm({
         {/* ─── 4. Action Buttons ────────────────────────────────────── */}
         <DrawerFooter
           onCancel={onCancel}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={year ? "Update Academic Year" : "Save Academic Year"}
           saveIcon={SaveIcon}
         />

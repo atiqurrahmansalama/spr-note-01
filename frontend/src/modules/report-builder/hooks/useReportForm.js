@@ -449,7 +449,7 @@ export function useReportForm() {
       const [studentsRes, sessionsRes, messagesRes] = await Promise.all([
         fetchWithAuth("/students/"),
         fetchWithAuth("/sessions/"),
-        fetchWithAuth("/messages/"),
+        fetchWithAuth("/messages/?category=report_builder_comments"),
       ]);
 
       if (studentsRes.ok) {

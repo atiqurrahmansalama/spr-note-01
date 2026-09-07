@@ -102,7 +102,15 @@ export default function SectionSelect({
   const filteredSections = useMemo(() => {
     let list = Array.isArray(internalSections) ? internalSections : [];
     if (classId && classId !== 'ALL') {
-      list = list.filter((s) => String(s.student_class) === String(classId) || String(s.student_class_id) === String(classId));
+      list = list.filter((s) => {
+        const rawClass = s.student_class !== undefined
+          ? s.student_class
+          : (s.student_class_id || s.class_id || s.classId || s.class);
+        const secClassId = rawClass
+          ? (typeof rawClass === 'object' ? String(rawClass.id || '') : String(rawClass))
+          : '';
+        return secClassId === String(classId);
+      });
     }
     if (branchId && branchId !== 'ALL') {
       list = list.filter((s) => String(s.branch) === String(branchId) || String(s.branch_id) === String(branchId));

@@ -198,9 +198,8 @@ export default function CustomSelect({
             <div
               style={{
                 maxHeight: `${Math.max(80, coords.maxHeight - (!compactMode && searchable ? 55 : 10))}px`,
-                scrollbarGutter: 'stable',
               }}
-              className={`${compactMode ? 'p-0.5 space-y-1' : 'p-1 space-y-0.5'} overflow-y-auto`}
+              className={`${compactMode ? 'p-0.5 space-y-1' : 'p-1 space-y-0.5'} overflow-y-auto scrollbar-none no-scrollbar`}
             >
               {filteredOptions.length === 0 ? (
                 <div className="px-2 py-2 text-center text-xs theme-text-secondary">
@@ -224,8 +223,8 @@ export default function CustomSelect({
                         onClick={() => handleSelect(opt)}
                         className={`w-full py-1.5 px-1 rounded-lg text-center text-[12px] sm:text-[14px] font-mono font-semibold transition-all cursor-pointer block ${
                           isSelected
-                            ? 'theme-bg-accent-soft theme-accent font-bold border border-[var(--accent-main)]/30 shadow-xs'
-                            : 'hover:theme-bg-sub theme-text-primary border border-transparent'
+                            ? 'theme-bg-accent theme-accent-text font-bold border border-[var(--accent-main)]/30 shadow-xs'
+                            : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary border border-transparent'
                         }`}
                       >
                         {optLabel}
@@ -238,10 +237,10 @@ export default function CustomSelect({
                       key={idx}
                       type="button"
                       onClick={() => handleSelect(opt)}
-                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer group/item ${
                         isSelected
-                          ? 'theme-bg-accent-soft theme-accent font-bold shadow-xs'
-                          : 'hover:theme-bg-sub/70 theme-text-primary'
+                          ? 'theme-bg-accent theme-accent-text font-bold shadow-xs'
+                          : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">

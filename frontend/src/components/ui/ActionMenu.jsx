@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DotsVerticalIcon } from './Icons';
+import { DotsVerticalIcon, ChevronIcon } from './Icons';
 
 export default function ActionMenu({
   items = [],
@@ -9,7 +9,13 @@ export default function ActionMenu({
   buttonClassName = '',
   menuClassName = '',
   icon: TriggerIcon = DotsVerticalIcon,
+  label = null,
+  disabled = false,
+  size = 'md', // 'xs' | 'sm' | 'md'
+  variant = 'default', // 'default' | 'sub' | 'surface'
+  showChevron = true,
   ariaLabel = 'Actions Menu',
+  header = null,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, right: 0, isFlipped: false });
@@ -19,9 +25,9 @@ export default function ActionMenu({
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = 180;
-    const menuHeight = 160;
-    const padding = 8;
+    const menuWidth = 200;
+    const menuHeight = 220;
+    const padding = 6;
 
     // Check if bottom overflow
     const spaceBelow = window.innerHeight - rect.bottom;
@@ -36,6 +42,7 @@ export default function ActionMenu({
 
   const handleToggle = (e) => {
     e.stopPropagation();
+    if (disabled) return;
     if (!isOpen) {
       updatePosition();
       setIsOpen(true);
@@ -98,19 +105,44 @@ export default function ActionMenu({
     return null;
   };
 
+  const sizeClasses =
+    size === 'xs'
+      ? 'px-2.5 py-1 text-xs gap-1.5 rounded-xl'
+      : size === 'sm'
+      ? 'px-3 py-1.5 text-xs gap-1.5 rounded-xl'
+      : 'px-3.5 py-2 text-xs gap-2 rounded-xl';
+
+  const variantClasses =
+    variant === 'surface'
+      ? 'theme-bg-surface hover:theme-bg-sub/60 theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
+      : variant === 'sub'
+      ? 'theme-bg-sub hover:theme-bg-elevated theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
+      : 'theme-bg-surface border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary shadow-xs';
+
   return (
     <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
       <button
         ref={buttonRef}
         type="button"
+        disabled={disabled}
         onClick={handleToggle}
         aria-label={ariaLabel}
         aria-expanded={isOpen}
-        className={`p-1.5 rounded-xl border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-all duration-150 cursor-pointer shadow-xs focus:outline-none flex items-center justify-center ${
+        className={`${
+          label
+            ? `inline-flex items-center font-semibold border transition-all duration-150 select-none ${sizeClasses} ${variantClasses}`
+            : `p-1.5 rounded-xl border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-all duration-150 shadow-xs focus:outline-none flex items-center justify-center`
+        } ${
+          disabled ? 'opacity-50 cursor-not-allowed pointer-events-none shadow-none' : 'cursor-pointer'
+        } ${
           isOpen ? 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30' : ''
         } ${buttonClassName}`}
       >
-        {renderIcon(TriggerIcon, "w-4 h-4")}
+        {renderIcon(TriggerIcon, label ? 'w-3.5 h-3.5 shrink-0 theme-accent' : 'w-4 h-4')}
+        {label && <span className="truncate">{label}</span>}
+        {label && showChevron && (
+          <ChevronIcon isOpen={isOpen} className="w-3 h-3 ml-0.5 shrink-0 opacity-70" />
+        )}
       </button>
 
       {isOpen &&
@@ -126,11 +158,16 @@ export default function ActionMenu({
               right: align === 'right' ? `${coords.right}px` : undefined,
               zIndex: 99999,
             }}
-            className={`w-48 rounded-2xl theme-bg-surface border theme-border shadow-2xl py-1.5 animate-scale-in text-left focus:outline-none backdrop-blur-md ${menuClassName}`}
+            className={`min-w-[190px] max-w-[280px] max-h-[320px] overflow-y-auto scrollbar-none no-scrollbar rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md ${menuClassName}`}
           >
+            {header && (
+              <div className="px-3 py-1.5 text-[10px] font-bold theme-text-secondary uppercase tracking-wider border-b theme-border-subtle mb-1">
+                {header}
+              </div>
+            )}
             {activeItems.map((item, index) => {
               if (item.divider) {
-                return <div key={`divider-${index}`} className="my-1 border-t theme-border" />;
+                return <div key={`divider-${index}`} className="my-1 border-t theme-border-subtle mx-1" />;
               }
 
               const isDanger = item.danger;
@@ -147,21 +184,30 @@ export default function ActionMenu({
                     setIsOpen(false);
                     item.onClick?.(e);
                   }}
-                  className={`w-full px-3.5 py-2 text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                  className={`w-full px-3 py-2 text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-all duration-150 cursor-pointer text-left select-none group/item ${
                     isDisabled
-                      ? 'opacity-40 cursor-not-allowed theme-text-muted'
+                      ? 'opacity-40 cursor-not-allowed theme-text-muted pointer-events-none'
                       : isDanger
-                      ? 'theme-danger hover:theme-bg-danger-soft focus:theme-bg-danger-soft'
-                      : 'theme-text-primary hover:theme-bg-sub focus:theme-bg-sub'
+                      ? 'theme-danger hover:bg-[var(--color-danger)]/15 hover:theme-danger focus:bg-[var(--color-danger)]/15 focus:theme-danger'
+                      : 'theme-text-primary hover:bg-[var(--accent-main)]/15 hover:theme-accent focus:bg-[var(--accent-main)]/15 focus:theme-accent'
                   }`}
+                  title={item.title || item.label}
                 >
                   {renderIcon(
                     item.icon,
-                    `w-3.5 h-3.5 shrink-0 ${isDanger ? 'theme-danger' : 'theme-text-secondary'}`
+                    `w-3.5 h-3.5 shrink-0 transition-transform duration-150 group-hover/item:scale-110 ${
+                      isDanger ? 'theme-danger' : 'theme-accent'
+                    }`
                   )}
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md theme-bg-sub border theme-border">
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md theme-bg-sub border theme-border transition-colors ${
+                        isDanger
+                          ? 'group-hover/item:border-red-500/30 group-hover/item:theme-danger'
+                          : 'group-hover/item:border-[var(--accent-main)]/30 group-hover/item:theme-accent'
+                      }`}
+                    >
                       {item.badge}
                     </span>
                   )}

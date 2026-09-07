@@ -32,6 +32,8 @@ import {
 } from "../../../utils/localStore";
 import { useTenant } from "../../../context/TenantContext";
 import { useAcademicSession } from "../../../context/AcademicSessionContext";
+import AutoSaveBadge from "../../../components/ui/AutoSaveBadge";
+import { useFormAutoSave } from "../../../hooks";
 
 const ADMISSION_STEPS = [
   { id: 1, label: "Profile & Photo" },
@@ -278,6 +280,15 @@ export default function FullAdmissionWizard({
 
   const sharedData = propSharedData || internalSharedData;
   const setSharedData = propSetSharedData || setInternalSharedData;
+
+  // Auto-Save / Draft Persistence
+  const storageKey = token ? `adm_wizard_pub_${token}` : `adm_wizard_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData: sharedData,
+    setFormData: setSharedData,
+    storageKey,
+    enabled: true,
+  });
 
   // Institutional Branches
   const [branches, setBranches] = useState([]);
@@ -947,6 +958,7 @@ export default function FullAdmissionWizard({
       }
 
       showToast("Student successfully enrolled & registered!", "success");
+      clearDraft();
       
       if (onSuccess) {
         const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);
@@ -1699,8 +1711,8 @@ export default function FullAdmissionWizard({
       </div>
 
       {/* Navigation Wizard Actions Footer */}
-      <div className="flex items-center justify-between pt-6 border-t theme-border">
-        <div>
+      <div className="flex items-center justify-between pt-6 border-t theme-border gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
           {currentStep > 1 ? (
             <button
               type="button"
@@ -1720,6 +1732,8 @@ export default function FullAdmissionWizard({
               Cancel
             </button>
           ) : <div />}
+
+          <AutoSaveBadge status={autoSaveStatus} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
         </div>
 
         <div>

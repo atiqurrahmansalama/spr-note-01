@@ -13,6 +13,7 @@ import AddressPickerInput from '../../../../components/ui/AddressPickerInput';
 import { createBranch, updateBranch } from '../../../../api/academy';
 import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../../components/layout';
 import { branchCategoriesStore } from '../../../../utils/localStore';
+import { useFormAutoSave } from '../../../../hooks';
 
 export default function BranchForm({ branch = null, editingBranch = null, onSaved, onCancel }) {
   const activeBranchData = branch || editingBranch;
@@ -78,6 +79,16 @@ export default function BranchForm({ branch = null, editingBranch = null, onSave
   }, [activeBranchData, activeTenantId, currentInstitution]);
 
   const [formData, setFormData] = useState(initialValues);
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEdit ? `branch_edit_${activeBranchData.id}` : `branch_create_${formData.institution || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
+
   const [staffList, setStaffList] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -165,6 +176,7 @@ export default function BranchForm({ branch = null, editingBranch = null, onSave
         await createBranch(payload);
         showToast('Academic Branch registered successfully!', 'success');
       }
+      clearDraft();
       onSaved?.();
     } catch (err) {
       showToast(err.message || 'Failed to save branch.', 'error');
@@ -295,6 +307,8 @@ export default function BranchForm({ branch = null, editingBranch = null, onSave
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEdit ? 'Save Changes' : 'Register Branch'}
           onSubmit={true}
         />

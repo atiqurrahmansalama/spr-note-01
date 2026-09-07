@@ -14,6 +14,7 @@ import CustomInput from "../../components/ui/CustomInput";
 import CustomCheckbox from "../../components/ui/CustomCheckbox";
 import { RoleSelect } from "../../components/selectors";
 import { DrawerContainer, DrawerSection, DrawerFooter } from "../../components/layout";
+import { useFormAutoSave } from "../../hooks";
 
 export default function UserDrawerForm({
   user = null,
@@ -24,22 +25,9 @@ export default function UserDrawerForm({
   const { showToast } = useToast();
   const isEditing = mode === "edit" && Boolean(user);
 
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone_number: "",
-    password: "",
-    user_type: "GUARDIAN",
-    is_active: true,
-  });
-
-  const [initialData, setInitialData] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
+  const initialData = useMemo(() => {
     if (isEditing && user) {
-      const initial = {
+      return {
         first_name: user.first_name || "",
         last_name: user.last_name || "",
         email: user.email || "",
@@ -48,22 +36,32 @@ export default function UserDrawerForm({
         user_type: user.role?.code || user.role_info?.code || user.user_type || "GUARDIAN",
         is_active: user.is_active !== false,
       };
-      setFormData(initial);
-      setInitialData(initial);
-    } else {
-      const initial = {
-        first_name: "",
-        last_name: "",
-        email: "",
-        phone_number: "",
-        password: "",
-        user_type: "GUARDIAN",
-        is_active: true,
-      };
-      setFormData(initial);
-      setInitialData(initial);
     }
+    return {
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone_number: "",
+      password: "",
+      user_type: "GUARDIAN",
+      is_active: true,
+    };
   }, [user, isEditing]);
+
+  const [formData, setFormData] = useState(initialData);
+  const [submitting, setSubmitting] = useState(false);
+
+  const storageKey = `admin_user_form_${user?.id || "new"}`;
+  const { autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    storageKey,
+    formData,
+    setFormData,
+    initialData,
+  });
+
+  useEffect(() => {
+    setFormData(initialData);
+  }, [initialData]);
 
   const isDirty = useMemo(() => {
     if (!initialData) return false;
@@ -155,6 +153,7 @@ export default function UserDrawerForm({
       }
 
       if (success) {
+        clearDraft();
         showToast(
           isEditing ? "User account updated successfully!" : "User account created successfully!",
           "success"
@@ -171,23 +170,25 @@ export default function UserDrawerForm({
   };
 
   return (
-    <DrawerContainer padding="normal" spacing="normal">
+    <DrawerContainer padding="none" spacing="normal">
       <form onSubmit={handleSubmit} className="space-y-5 text-left">
         {/* Personal & Identity Section */}
         <DrawerSection title="Personal Information" icon={UserIcon}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <CustomInput
-              label="First Name"
-              placeholder="e.g. Abdullah"
-              value={formData.first_name}
-              onChange={(val) => setFormData({ ...formData, first_name: val })}
-            />
-            <CustomInput
-              label="Last Name"
-              placeholder="e.g. Rahman"
-              value={formData.last_name}
-              onChange={(val) => setFormData({ ...formData, last_name: val })}
-            />
+          <div className="@container">
+            <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
+              <CustomInput
+                label="First Name"
+                placeholder="e.g. Abdullah"
+                value={formData.first_name}
+                onChange={(val) => setFormData({ ...formData, first_name: val })}
+              />
+              <CustomInput
+                label="Last Name"
+                placeholder="e.g. Rahman"
+                value={formData.last_name}
+                onChange={(val) => setFormData({ ...formData, last_name: val })}
+              />
+            </div>
           </div>
         </DrawerSection>
 
@@ -265,6 +266,8 @@ export default function UserDrawerForm({
           isDisabled={!isDirty || !isValid}
           saveLabel={isEditing ? "Update User" : "Create User"}
           saveIcon={SaveIcon}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
         />
       </form>
     </DrawerContainer>

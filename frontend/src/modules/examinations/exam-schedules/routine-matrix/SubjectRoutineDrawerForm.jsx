@@ -42,6 +42,8 @@ export default function SubjectRoutineDrawerForm({
     breakdownEnabled,
     formData,
     setFormData,
+    autoSaveStatus,
+    lastSavedAt,
     classMatchingBooks,
     bookOptions,
     departmentSchedule,
@@ -138,6 +140,8 @@ export default function SubjectRoutineDrawerForm({
           cancelLabel="Cancel"
           onSubmit={true}
           onSave={handleSubmit}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEditMode ? 'Update Subject Routine' : 'Create Subject Routine'}
           isSaveDisabled={isBreakdownEnabledOnExam && breakdownEnabled && !isMarksSumBalanced}
         />

@@ -34,18 +34,8 @@ from core.models import (
 )
 from core.services import get_scoped_tenant_id
 
-User = get_user_model()
-
-class SavedMessageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SavedMessage
-        fields = '__all__'
-
-    def to_internal_value(self, data):
-        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
-        if 'comment' in mutable_data and 'text' not in mutable_data:
-            mutable_data['text'] = mutable_data['comment']
-        return super().to_internal_value(mutable_data)
+# Re-export SavedMessageSerializer from templates module for backward compatibility
+from .templates import SavedMessageSerializer
 
 
 class NotificationGatewayConfigSerializer(serializers.ModelSerializer):

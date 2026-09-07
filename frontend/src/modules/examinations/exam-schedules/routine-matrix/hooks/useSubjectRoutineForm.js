@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useToast } from '../../../../../context/ToastContext';
 import { formatShortDateLabel, generateDateRange } from '../../utils/examScheduleUtils';
+import { useFormAutoSave } from '../../../../../hooks';
 
 /**
  * useSubjectRoutineForm
@@ -164,6 +165,17 @@ export default function useSubjectRoutineForm({
         { id: 'comp_2', name: 'Oral / Nazera', maxMarks: defaultFull - Math.round(defaultFull * 0.7) },
       ],
     };
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = isEditMode
+    ? `subj_routine_edit_${initialData?.id}`
+    : `subj_routine_create_${activeExam?.id || 'default'}_${formData.classId || 'all'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   // Dynamic Class-Filtered Curriculum Books
@@ -530,6 +542,7 @@ export default function useSubjectRoutineForm({
         : [],
     };
 
+    clearDraft();
     if (onSave) {
       onSave(payload);
     }
@@ -543,6 +556,9 @@ export default function useSubjectRoutineForm({
     breakdownEnabled,
     formData,
     setFormData,
+    autoSaveStatus,
+    lastSavedAt,
+    clearDraft,
     classMatchingBooks,
     bookOptions,
     departmentSchedule,

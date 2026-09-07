@@ -9,6 +9,7 @@ import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import AcademicScopePicker from '../../../../components/common/AcademicScopePicker';
 import { createPeriodSlot, updatePeriodSlot } from '../../../../api/academy';
 import { DrawerContainer, DrawerFooter } from '../../../../components/layout';
+import { useFormAutoSave } from '../../../../hooks';
 import {
   periodCategoriesStore,
   periodSequencesStore,
@@ -90,6 +91,15 @@ export default function PeriodSlotForm({
       : (defaultClassId ? String(defaultClassId) : ''),
     section: editingSlot?.section ? String(editingSlot.section) : '',
     effective_from: editingSlot?.effective_from || sessionMinDate,
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = editingSlot ? `period_edit_${editingSlot.id}` : `period_create_${formData.student_class || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
   });
 
   const [durationMinutes, setDurationMinutes] = useState(45);
@@ -349,6 +359,7 @@ export default function PeriodSlotForm({
         await createPeriodSlot(payload);
       }
       showToast(isEdit ? 'Period slot updated successfully.' : 'Period slot created successfully.', 'success');
+      clearDraft();
       onSaved?.();
     } catch (err) {
       showToast(err.message || 'Failed to save period slot.', 'error');
@@ -584,6 +595,8 @@ export default function PeriodSlotForm({
           onCancel={onCancel}
           isSubmitting={submitting}
           isSaveDisabled={!canSave}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEdit ? 'Save Changes' : 'Add Period Slot'}
           onSubmit={true}
         />

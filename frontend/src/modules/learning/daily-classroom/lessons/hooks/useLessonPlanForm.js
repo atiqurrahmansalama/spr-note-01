@@ -7,6 +7,7 @@ import {
   resolveBookTeacher,
   filterCurriculumBooks,
 } from "../../dailyClassroomUtils";
+import { useFormAutoSave } from "../../../../../hooks";
 
 /**
  * useLessonPlanForm
@@ -88,6 +89,90 @@ export default function useLessonPlanForm({
   const [saving, setSaving] = useState(false);
   const [isCarryForwardOpen, setIsCarryForwardOpen] = useState(false);
   const [isEditingContext, setIsEditingContext] = useState(false);
+
+  // ── Auto-save draft setup ──────────────────────────────────────────────────
+  const initialFormSnapshot = useMemo(() => ({
+    lessonDate: date || defaultDate || lesson?.lesson_date || new Date().toISOString().split("T")[0],
+    departmentId: lesson?.department_id ? String(lesson.department_id) : (defaultDepartmentId && defaultDepartmentId !== "ALL" ? String(defaultDepartmentId) : ""),
+    classId: lesson?.academic_class ? (typeof lesson.academic_class === "object" ? String(lesson.academic_class?.id || "") : String(lesson.academic_class)) : (defaultClassId && defaultClassId !== "ALL" ? String(defaultClassId) : ""),
+    sectionId: lesson?.section ? (typeof lesson.section === "object" ? String(lesson.section?.id || "") : String(lesson.section)) : (defaultSectionId && defaultSectionId !== "ALL" ? String(defaultSectionId) : ""),
+    periodSlotId: lesson?.period_slot || (defaultPeriodId && defaultPeriodId !== "ALL" ? String(defaultPeriodId) : ""),
+    curriculumBookId: lesson?.curriculum_book_id ? String(lesson.curriculum_book_id) : "",
+    curriculumBookName: lesson?.curriculum_book_name || "",
+    subjectName: lesson?.subject_name || "",
+    teacherName: lesson?.teacher_name || "",
+    lessonTitle: lesson?.lesson_title || "",
+    startUnit: lesson?.start_unit !== undefined && lesson?.start_unit !== "" ? String(lesson.start_unit) : "",
+    endUnit: lesson?.end_unit !== undefined && lesson?.end_unit !== "" ? String(lesson.end_unit) : "",
+    homeworkTask: lesson?.homework_task || "",
+    lessonInstructions: lesson?.lesson_instructions || "",
+    assignedScope: lesson?.assigned_scope || "CLASS_WIDE",
+    targetStudentIds: Array.isArray(lesson?.target_student_ids) ? lesson.target_student_ids.map(String) : [],
+  }), [lesson, date, defaultDate, defaultDepartmentId, defaultClassId, defaultSectionId, defaultPeriodId]);
+
+  const currentFormState = useMemo(() => ({
+    lessonDate,
+    departmentId,
+    classId,
+    sectionId,
+    periodSlotId,
+    curriculumBookId,
+    curriculumBookName,
+    subjectName,
+    teacherName,
+    lessonTitle,
+    startUnit,
+    endUnit,
+    homeworkTask,
+    lessonInstructions,
+    assignedScope,
+    targetStudentIds,
+  }), [
+    lessonDate,
+    departmentId,
+    classId,
+    sectionId,
+    periodSlotId,
+    curriculumBookId,
+    curriculumBookName,
+    subjectName,
+    teacherName,
+    lessonTitle,
+    startUnit,
+    endUnit,
+    homeworkTask,
+    lessonInstructions,
+    assignedScope,
+    targetStudentIds,
+  ]);
+
+  const restoreFormState = useCallback((draft) => {
+    if (!draft) return;
+    if (draft.lessonDate !== undefined) setLessonDate(draft.lessonDate);
+    if (draft.departmentId !== undefined) setDepartmentId(draft.departmentId);
+    if (draft.classId !== undefined) setClassId(draft.classId);
+    if (draft.sectionId !== undefined) setSectionId(draft.sectionId);
+    if (draft.periodSlotId !== undefined) setPeriodSlotId(draft.periodSlotId);
+    if (draft.curriculumBookId !== undefined) setCurriculumBookId(draft.curriculumBookId);
+    if (draft.curriculumBookName !== undefined) setCurriculumBookName(draft.curriculumBookName);
+    if (draft.subjectName !== undefined) setSubjectName(draft.subjectName);
+    if (draft.teacherName !== undefined) setTeacherName(draft.teacherName);
+    if (draft.lessonTitle !== undefined) setLessonTitle(draft.lessonTitle);
+    if (draft.startUnit !== undefined) setStartUnit(draft.startUnit);
+    if (draft.endUnit !== undefined) setEndUnit(draft.endUnit);
+    if (draft.homeworkTask !== undefined) setHomeworkTask(draft.homeworkTask);
+    if (draft.lessonInstructions !== undefined) setLessonInstructions(draft.lessonInstructions);
+    if (draft.assignedScope !== undefined) setAssignedScope(draft.assignedScope);
+    if (draft.targetStudentIds !== undefined) setTargetStudentIds(draft.targetStudentIds);
+  }, []);
+
+  const storageKey = `daily_lesson_form_${tenantId}_${lesson?.id || 'new'}_${classId || defaultClassId || 'general'}`;
+  const { autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    storageKey,
+    formData: currentFormState,
+    setFormData: restoreFormState,
+    initialData: initialFormSnapshot,
+  });
 
   // ── Auto-sync department from class ────────────────────────────────────────
 
@@ -391,6 +476,7 @@ export default function useLessonPlanForm({
         }
       }
 
+      clearDraft();
       showToast(lesson && !lesson?.isDuplicate ? "Daily lesson plan updated." : "Daily lesson assigned successfully.", "success");
       if (onSaveSuccess) onSaveSuccess();
     } catch {
@@ -420,6 +506,9 @@ export default function useLessonPlanForm({
     saving,
     isCarryForwardOpen, setIsCarryForwardOpen,
     isEditingContext, setIsEditingContext,
+    autoSaveStatus,
+    lastSavedAt,
+    clearDraft,
     // Derived
     availableBooks,
     selectedBook,

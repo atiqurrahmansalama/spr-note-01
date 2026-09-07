@@ -10,6 +10,7 @@ import { DrawerContainer, DrawerFooter } from '../../../components/layout';
 import { createAdmissionToken, updateAdmissionToken } from '../../../api/admissions';
 import { fetchWithAuth } from '../../../utils/authService';
 import { academicYearsStore, admissionSettingsStore, getAcademicYearStatus } from '../../../utils/localStore';
+import { useFormAutoSave } from '../../../hooks';
 
 export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess, onCancel }) {
   const { showToast } = useToast();
@@ -93,6 +94,15 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
     is_active: tokenData?.is_active !== undefined ? tokenData.is_active : true,
   });
 
+  // Auto-Save / Draft Persistence
+  const storageKey = isEditing ? `adm_invite_edit_${tokenData.id}` : `adm_invite_create_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: true,
+  });
+
   useEffect(() => {
     const loadClasses = async () => {
       setLoading(true);
@@ -149,6 +159,7 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
         showToast('New admission link & QR code generated!', 'success');
       }
 
+      clearDraft();
       handleClose();
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -232,6 +243,8 @@ export default function AdmissionInviteDrawerForm({ tokenData = null, onSuccess,
         <DrawerFooter
           onCancel={handleClose}
           isSubmitting={submitting}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel={isEditing ? 'Update Campaign' : 'Generate Link & QR'}
           onSubmit={true}
         />

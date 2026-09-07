@@ -587,8 +587,8 @@ export default function AppLayout() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden theme-bg-app theme-text-primary">
       {/* Global Top Navigation Bar */}
-      <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 relative">
+        <div className="flex items-center gap-3 z-10 shrink-0">
           <button 
             type="button"
             onClick={handleToggleMenu}
@@ -608,9 +608,9 @@ export default function AppLayout() {
           </button>
         </div>
 
-        {/* Selected Active Institution, Branch & Academic Year in Header Middle */}
+        {/* Selected Active Institution, Branch & Academic Year in Header Middle - Absolutely Centered to prevent shifting */}
         {currentInstitution?.name && (
-          <div className="flex-1 flex justify-center items-center px-2 sm:px-4 min-w-0 pointer-events-none text-center">
+          <div className="absolute left-1/2 -translate-x-1/2 flex justify-center items-center px-4 max-w-[calc(100%-420px)] pointer-events-none text-center">
             <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
               <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
                 {currentInstitution.name}
@@ -636,7 +636,7 @@ export default function AppLayout() {
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 z-10 shrink-0 ml-auto">
           <SaveStatusBadge />
 
           {/* Universal Route-Aware Undo / Redo Widget */}

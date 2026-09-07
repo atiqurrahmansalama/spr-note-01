@@ -11,11 +11,11 @@
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --accent-main: #6366f1;
-    --accent-soft: rgba(99, 102, 241, 0.12);
+    --accent-soft: color-mix(in srgb, var(--accent-main) 18%, transparent);
     --accent-text: #ffffff;
     --danger-main: #f43f5e;
-    --danger-soft: rgba(244, 63, 94, 0.12);
-    --danger-hover: rgba(244, 63, 94, 0.22);
+    --danger-soft: color-mix(in srgb, var(--color-danger, #f43f5e) 18%, transparent);
+    --danger-hover: color-mix(in srgb, var(--color-danger, #f43f5e) 25%, transparent);
     --danger-text: #fb7185;
 
     /* Global Semantic Status Tokens (Dark Default) */
@@ -51,6 +51,10 @@
   }
 
   html[data-mode="light"] {
+    --accent-soft: color-mix(in srgb, var(--accent-main) 12%, transparent);
+    --danger-soft: color-mix(in srgb, var(--color-danger, #e11d48) 12%, transparent);
+    --danger-hover: color-mix(in srgb, var(--color-danger, #e11d48) 18%, transparent);
+
     --color-success: #059669;
     --color-success-soft: rgba(5, 150, 105, 0.10);
     --color-success-border: rgba(5, 150, 105, 0.20);
@@ -132,8 +136,8 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom theme utility classes (Standard CSS class selectors) */
-.theme-bg-app {
+/* Custom theme utility classes (Tailwind v4 @utility directives for variant support) */
+@utility theme-bg-app {
   background-color: var(--bg-app);
 }
 .scrollbar-none {
@@ -143,80 +147,91 @@ body {
     display: none;
   }
 }
-.theme-bg-surface {
+@utility theme-bg-surface {
   background-color: var(--bg-surface);
 }
-.theme-bg-sub {
+@utility theme-bg-sub {
   background-color: var(--bg-surface-sub);
 }
-.theme-bg-elevated {
+@utility theme-bg-elevated {
   background-color: var(--bg-elevated);
 }
-.theme-border,
+@utility theme-border {
+  border-color: var(--border-color);
+}
 .divide-theme-border > :not([hidden]) ~ :not([hidden]),
 .divide-theme-border > * + * {
   border-color: var(--border-color);
 }
-.theme-text-primary {
+@utility theme-border-subtle {
+  border-color: color-mix(in srgb, var(--border-color) 45%, transparent);
+}
+@utility theme-border-light {
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+}
+@utility theme-text-primary {
   color: var(--text-primary);
 }
-.theme-text-secondary {
+@utility theme-text-secondary {
   color: var(--text-secondary);
 }
-.theme-accent {
+@utility theme-accent {
   color: var(--accent-main);
 }
-.theme-bg-accent {
+@utility theme-bg-accent {
   background-color: var(--accent-main);
 }
-.theme-bg-accent-soft {
+@utility theme-bg-accent-soft {
   background-color: var(--accent-soft);
 }
-.theme-accent-text {
+@utility theme-accent-text {
   color: var(--accent-text);
 }
-.theme-danger {
+@utility theme-danger {
   color: var(--danger-text);
 }
-.theme-bg-danger-soft {
+@utility theme-bg-danger {
+  background-color: var(--color-danger);
+  color: #ffffff;
+}
+@utility theme-bg-danger-soft {
   background-color: var(--danger-soft);
+}
+@utility theme-border-danger {
+  border-color: var(--color-danger-border);
 }
 
 /* Global Semantic Status Utility Classes */
-.theme-success { color: var(--color-success-text); }
-.theme-bg-success { background-color: var(--color-success); color: #ffffff; }
-.theme-bg-success-soft { background-color: var(--color-success-soft); }
-.theme-border-success { border-color: var(--color-success-border); }
+@utility theme-success { color: var(--color-success-text); }
+@utility theme-bg-success { background-color: var(--color-success); color: #ffffff; }
+@utility theme-bg-success-soft { background-color: var(--color-success-soft); }
+@utility theme-border-success { border-color: var(--color-success-border); }
 .theme-success-badge { background-color: var(--color-success-soft); color: var(--color-success-text); border: 1px solid var(--color-success-border); }
 
-.theme-warning { color: var(--color-warning-text); }
-.theme-bg-warning { background-color: var(--color-warning); color: #000000; }
-.theme-bg-warning-soft { background-color: var(--color-warning-soft); }
-.theme-border-warning { border-color: var(--color-warning-border); }
+@utility theme-warning { color: var(--color-warning-text); }
+@utility theme-bg-warning { background-color: var(--color-warning); color: #000000; }
+@utility theme-bg-warning-soft { background-color: var(--color-warning-soft); }
+@utility theme-border-warning { border-color: var(--color-warning-border); }
 .theme-warning-badge { background-color: var(--color-warning-soft); color: var(--color-warning-text); border: 1px solid var(--color-warning-border); }
 
-.theme-danger { color: var(--color-danger-text); }
-.theme-bg-danger { background-color: var(--color-danger); color: #ffffff; }
-.theme-bg-danger-soft { background-color: var(--color-danger-soft); }
-.theme-border-danger { border-color: var(--color-danger-border); }
 .theme-danger-badge { background-color: var(--color-danger-soft); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); }
 
-.theme-info { color: var(--color-info-text); }
-.theme-bg-info { background-color: var(--color-info); color: #ffffff; }
-.theme-bg-info-soft { background-color: var(--color-info-soft); }
-.theme-border-info { border-color: var(--color-info-border); }
+@utility theme-info { color: var(--color-info-text); }
+@utility theme-bg-info { background-color: var(--color-info); color: #ffffff; }
+@utility theme-bg-info-soft { background-color: var(--color-info-soft); }
+@utility theme-border-info { border-color: var(--color-info-border); }
 .theme-info-badge { background-color: var(--color-info-soft); color: var(--color-info-text); border: 1px solid var(--color-info-border); }
 
-.theme-purple { color: var(--color-purple-text); }
-.theme-bg-purple { background-color: var(--color-purple); color: #ffffff; }
-.theme-bg-purple-soft { background-color: var(--color-purple-soft); }
-.theme-border-purple { border-color: var(--color-purple-border); }
+@utility theme-purple { color: var(--color-purple-text); }
+@utility theme-bg-purple { background-color: var(--color-purple); color: #ffffff; }
+@utility theme-bg-purple-soft { background-color: var(--color-purple-soft); }
+@utility theme-border-purple { border-color: var(--color-purple-border); }
 .theme-purple-badge { background-color: var(--color-purple-soft); color: var(--color-purple-text); border: 1px solid var(--color-purple-border); }
 
-.theme-neutral { color: var(--color-neutral-text); }
-.theme-bg-neutral { background-color: var(--color-neutral); color: #ffffff; }
-.theme-bg-neutral-soft { background-color: var(--color-neutral-soft); }
-.theme-border-neutral { border-color: var(--color-neutral-border); }
+@utility theme-neutral { color: var(--color-neutral-text); }
+@utility theme-bg-neutral { background-color: var(--color-neutral); color: #ffffff; }
+@utility theme-bg-neutral-soft { background-color: var(--color-neutral-soft); }
+@utility theme-border-neutral { border-color: var(--color-neutral-border); }
 .theme-neutral-badge { background-color: var(--color-neutral-soft); color: var(--color-neutral-text); border: 1px solid var(--color-neutral-border); }
 
 /* 1. Enterprise Slate Theme */

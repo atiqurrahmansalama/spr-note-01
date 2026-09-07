@@ -276,7 +276,7 @@ export default function CustomTimePicker({
                 <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary pb-0.5">
                   Hr
                 </div>
-                <div className="h-36 overflow-y-auto scrollbar-thin p-1 rounded-xl theme-bg-sub border theme-border space-y-0.5">
+                <div className="h-36 overflow-y-auto scrollbar-none no-scrollbar p-1 rounded-xl theme-bg-sub border theme-border space-y-0.5">
                   {HOURS.map((h) => {
                     const isSelected = draftHour === h;
                     return (
@@ -303,7 +303,7 @@ export default function CustomTimePicker({
                 <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary pb-0.5">
                   Min
                 </div>
-                <div className="h-36 overflow-y-auto scrollbar-thin p-1 rounded-xl theme-bg-sub border theme-border space-y-0.5">
+                <div className="h-36 overflow-y-auto scrollbar-none no-scrollbar p-1 rounded-xl theme-bg-sub border theme-border space-y-0.5">
                   {MINUTES.map((m) => {
                     const isSelected = draftMinute === m;
                     return (

@@ -38,6 +38,8 @@ export default function useExamFormState({
   const [step, setStep] = useState(1);
   const [isDraftRestored, setIsDraftRestored] = useState(() => Boolean(savedDraft));
   const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('saved');
+  const [lastSavedAt, setLastSavedAt] = useState(() => savedDraft?.updatedAt ? new Date(savedDraft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
 
   // ── Step 1: General Info & Schedule ───────────────────────────────────────
   const [name, setName] = useState(savedDraft?.name ?? exam?.name ?? '');
@@ -621,6 +623,7 @@ export default function useExamFormState({
       );
 
       if (hasContent) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         writeJSON(draftKey, {
           name,
           code,
@@ -654,6 +657,8 @@ export default function useExamFormState({
           failSubjectRule,
           updatedAt: new Date().toISOString(),
         });
+        setAutoSaveStatus('saved');
+        setLastSavedAt(timeStr);
       }
     }, 300);
 
@@ -1035,5 +1040,7 @@ export default function useExamFormState({
     setRankingScope,
     failSubjectRule,
     setFailSubjectRule,
+    autoSaveStatus,
+    lastSavedAt,
   };
 }

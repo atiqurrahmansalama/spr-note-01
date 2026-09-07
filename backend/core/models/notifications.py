@@ -5,19 +5,8 @@ from django.utils import timezone
 import uuid
 import json
 
-class SavedMessage(models.Model):
-    text = models.TextField()
-    created_by = models.ForeignKey(
-        'User',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='created_messages'
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.text[:30]
+# Re-export SavedMessage from core.models.templates for 100% backward compatibility
+from .templates import SavedMessage
 
 
 class NotificationGatewayConfig(models.Model):

@@ -129,20 +129,41 @@ export default function useExamData() {
     return [{ value: '', label: 'All Branches (Main Campus)' }, ...list];
   }, [branches]);
 
-  // Options for Departments - 100% Dynamic from Academy
+  // Options for Departments - 100% Dynamic from Academy + Exam Matrix
   const departmentOptions = useMemo(() => {
-    const list = (departments || []).map((d) => ({
-      value: String(d.id),
-      label: d.name || d.department_name || 'Department',
-      code: d.code || d.department_code || '',
-      department: d,
-    }));
-    return [{ value: 'ALL', label: 'All Departments' }, ...list];
-  }, [departments]);
+    const map = new Map();
+    (departments || []).forEach((d) => {
+      const id = String(d.id);
+      map.set(id, {
+        value: id,
+        label: d.name || d.department_name || 'Department',
+        code: d.code || d.department_code || '',
+        department: d,
+      });
+    });
 
-  // Options for Classes - 100% Dynamic from Academy with robust department link
+    // Also collect any distinct departments from examSubjects
+    (examSubjects || []).forEach((s) => {
+      if (s.departmentId && s.departmentId !== 'ALL') {
+        const id = String(s.departmentId);
+        if (!map.has(id)) {
+          map.set(id, {
+            value: id,
+            label: s.departmentName || s.departmentId,
+            code: '',
+            department: { id: s.departmentId, name: s.departmentName },
+          });
+        }
+      }
+    });
+
+    return [{ value: 'ALL', label: 'All Departments' }, ...Array.from(map.values())];
+  }, [departments, examSubjects]);
+
+  // Options for Classes - 100% Dynamic from Academy + Exam Matrix with robust department link
   const classOptions = useMemo(() => {
-    return (classes || []).map((c) => {
+    const map = new Map();
+    (classes || []).forEach((c) => {
       let deptId = null;
       if (c.department !== undefined && c.department !== null) {
         deptId = typeof c.department === 'object' ? c.department.id : c.department;
@@ -156,27 +177,74 @@ export default function useExamData() {
         deptId = typeof c.dept === 'object' ? c.dept.id : c.dept;
       }
 
-      return {
-        value: String(c.id),
+      const id = String(c.id);
+      map.set(id, {
+        value: id,
         label: c.name || c.class_name || 'Class',
         departmentId: deptId !== null && deptId !== undefined ? String(deptId) : null,
         departmentName: c.department_name || (typeof c.department === 'object' ? c.department.name : '') || '',
         code: c.code || '',
         classObj: c,
-      };
+      });
     });
-  }, [classes]);
 
-  // Options for Sections - 100% Dynamic from Academy
+    // Also enrich from examSubjects to ensure classes in exams have departmentId linkage
+    (examSubjects || []).forEach((s) => {
+      if (s.classId) {
+        const id = String(s.classId);
+        const existing = map.get(id);
+        if (!existing) {
+          map.set(id, {
+            value: id,
+            label: s.className || `Class ${id}`,
+            departmentId: s.departmentId && s.departmentId !== 'ALL' ? String(s.departmentId) : null,
+            departmentName: s.departmentName || '',
+            code: '',
+            classObj: { id: s.classId, name: s.className, department_id: s.departmentId },
+          });
+        } else if (!existing.departmentId && s.departmentId && s.departmentId !== 'ALL') {
+          existing.departmentId = String(s.departmentId);
+          if (!existing.departmentName && s.departmentName) {
+            existing.departmentName = s.departmentName;
+          }
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [classes, examSubjects]);
+
+  // Options for Sections - 100% Dynamic from Academy + Exam Matrix
   const sectionOptions = useMemo(() => {
-    const list = sections.map((s) => ({
-      value: String(s.id),
-      label: s.section_name || s.name || 'Section',
-      classId: s.class !== undefined ? String(typeof s.class === 'object' ? s.class.id : s.class) : (s.class_id ? String(s.class_id) : null),
-      sectionObj: s,
-    }));
-    return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...list];
-  }, [sections]);
+    const map = new Map();
+    (sections || []).forEach((s) => {
+      const rawClassId = s.class !== undefined ? (typeof s.class === 'object' ? s.class.id : s.class) : (s.class_id || s.student_class_id || s.student_class);
+      const classId = rawClassId ? String(typeof rawClassId === 'object' ? rawClassId.id : rawClassId) : null;
+      const id = String(s.id);
+      map.set(id, {
+        value: id,
+        label: s.section_name || s.name || 'Section',
+        classId,
+        sectionObj: s,
+      });
+    });
+
+    (examSubjects || []).forEach((s) => {
+      if (s.sectionId && s.sectionId !== 'ALL') {
+        const id = String(s.sectionId);
+        if (!map.has(id)) {
+          map.set(id, {
+            value: id,
+            label: s.sectionName || `Section ${id}`,
+            classId: s.classId ? String(s.classId) : null,
+            sectionObj: { id: s.sectionId, name: s.sectionName, class_id: s.classId },
+          });
+        }
+      }
+    });
+
+    return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...Array.from(map.values())];
+  }, [sections, examSubjects]);
 
   // Curriculum Books - Direct resolution from active tenant store
   const resolvedCurriculumBooks = useMemo(() => {

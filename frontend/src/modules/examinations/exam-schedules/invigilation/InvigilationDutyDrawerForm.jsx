@@ -10,6 +10,7 @@ import {
   DocumentTextIcon,
 } from '../../../../components/ui/Icons';
 import { formatShortDateLabel } from '../utils/examScheduleUtils';
+import { useFormAutoSave } from '../../../../hooks';
 
 /**
  * InvigilationDutyDrawerForm
@@ -28,21 +29,33 @@ export default function InvigilationDutyDrawerForm({
   onSave,
   onCancel,
 }) {
-  const [teacherId, setTeacherId] = useState(() => String(slotData?.invigilatorId || slotData?.teacherId || ''));
-  const [teacherName, setTeacherName] = useState(() => slotData?.invigilatorName || slotData?.teacherName || '');
-  const [roomNo, setRoomNo] = useState(() => slotData?.roomNo || '');
-  const [notes, setNotes] = useState(() => slotData?.notes || '');
+  const [formData, setFormData] = useState({
+    teacherId: String(slotData?.invigilatorId || slotData?.teacherId || ''),
+    teacherName: slotData?.invigilatorName || slotData?.teacherName || '',
+    roomNo: slotData?.roomNo || '',
+    notes: slotData?.notes || '',
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = slotData ? `invigilation_${activeExam?.id || 'exam'}_${slotData.examDate}_${slotData.shiftId}` : null;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: Boolean(storageKey),
+  });
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
+    clearDraft();
     onSave?.({
       ...slotData,
-      invigilatorId: teacherId,
-      invigilatorName: teacherName,
-      teacherId,
-      teacherName,
-      roomNo,
-      notes,
+      invigilatorId: formData.teacherId,
+      invigilatorName: formData.teacherName,
+      teacherId: formData.teacherId,
+      teacherName: formData.teacherName,
+      roomNo: formData.roomNo,
+      notes: formData.notes,
     });
   };
 
@@ -101,7 +114,7 @@ export default function InvigilationDutyDrawerForm({
           <div className="space-y-3.5">
             <TeacherSelect
               label="Assigned Hall Invigilator"
-              value={teacherId}
+              value={formData.teacherId}
               teachers={teachers}
               allowAll={false}
               searchable={true}
@@ -114,23 +127,26 @@ export default function InvigilationDutyDrawerForm({
                   teacherObj?.user_name ||
                   teacherObj?.label ||
                   '';
-                setTeacherId(val || '');
-                setTeacherName(nameStr);
+                setFormData((prev) => ({
+                  ...prev,
+                  teacherId: val || '',
+                  teacherName: nameStr,
+                }));
               }}
             />
 
             <CustomInput
               label="Exam Hall / Room No"
-              value={roomNo}
-              onChange={(val) => setRoomNo(val)}
+              value={formData.roomNo}
+              onChange={(val) => setFormData((prev) => ({ ...prev, roomNo: val }))}
               placeholder="e.g. Central Hall 101, Main Auditorium"
               icon={BuildingLibraryIcon}
             />
 
             <CustomInput
               label="Duty Instructions / Notes"
-              value={notes}
-              onChange={(val) => setNotes(val)}
+              value={formData.notes}
+              onChange={(val) => setFormData((prev) => ({ ...prev, notes: val }))}
               placeholder="e.g. Verify student admit cards and question envelope seals"
               icon={DocumentTextIcon}
             />
@@ -142,6 +158,8 @@ export default function InvigilationDutyDrawerForm({
           onCancel={onCancel}
           cancelLabel="Cancel"
           onSubmit={true}
+          autoSaveStatus={autoSaveStatus}
+          lastSavedAt={lastSavedAt}
           saveLabel="Save Invigilator Duty"
         />
       </form>

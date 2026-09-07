@@ -10,6 +10,7 @@ import CustomSelect from '../../components/ui/CustomSelect';
 import CustomInput from '../../components/ui/CustomInput';
 import CustomTimePicker from '../../components/ui/CustomTimePicker';
 import { DrawerContainer, DrawerBanner, DrawerSection, DrawerFooter } from '../../components/layout';
+import { useFormAutoSave } from '../../hooks';
 
 export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
   const { showToast } = useToast();
@@ -27,6 +28,15 @@ export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
     start_time: '20:00',
     end_time: '23:00',
     location: '',
+  });
+
+  // Auto-Save / Draft Persistence
+  const storageKey = staff?.id ? `general_duty_${staff.id}` : null;
+  const { clearDraft } = useFormAutoSave({
+    formData: form,
+    setFormData: setForm,
+    storageKey,
+    enabled: Boolean(storageKey),
   });
 
   useEffect(() => {
@@ -77,6 +87,7 @@ export default function GeneralDutyDrawerForm({ staff, onUpdated, onCancel }) {
       if (onUpdated) onUpdated();
 
       // Reset form title
+      clearDraft();
       setForm((prev) => ({
         ...prev,
         title: '',
