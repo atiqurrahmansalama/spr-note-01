@@ -6,9 +6,10 @@ import MarkEntryHeader from './components/MarkEntryHeader';
 import MarkEntryFilterBar from './components/MarkEntryFilterBar';
 import MarkEntryStatsBar from './components/MarkEntryStatsBar';
 import MarkEntryGridTable from './components/MarkEntryGridTable';
-import PrintableAwardList from './components/PrintableAwardList';
 import CsvImportModal from './components/CsvImportModal';
 import SupervisorUnlockModal from './components/SupervisorUnlockModal';
+import MarkEntryPrintModal from './components/MarkEntryPrintModal';
+import { examStore } from '@/stores/examStore';
 import CustomButton from '../../../components/ui/CustomButton';
 import AutoSaveBadge from '../../../components/ui/AutoSaveBadge';
 import {
@@ -58,18 +59,33 @@ export default function MarkEntryDeskView({
     refreshExamData,
   } = useExamData();
 
+  // URL Search Params Hydration
+  const urlParams = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search);
+    }
+    return new URLSearchParams();
+  }, []);
+
+  const urlExamId = urlParams.get('examId') || urlParams.get('exam');
+  const urlSubjectId = urlParams.get('subjectId') || urlParams.get('subject');
+  const urlDepartmentId = urlParams.get('departmentId') || urlParams.get('dept');
+  const urlClassId = urlParams.get('classId') || urlParams.get('class');
+  const urlSectionId = urlParams.get('sectionId') || urlParams.get('section');
+  const urlPrint = urlParams.get('print');
+
   // Primary Selection States
   const [selectedExamId, setSelectedExamId] = useState(
-    initialExamId || (exams[0]?.id ? String(exams[0].id) : '')
+    initialExamId || urlExamId || (exams[0]?.id ? String(exams[0].id) : '')
   );
-  const [filterDepartmentId, setFilterDepartmentId] = useState('ALL');
-  const [filterClassId, setFilterClassId] = useState('');
-  const [filterSectionId, setFilterSectionId] = useState('ALL');
-  const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId || '');
+  const [filterDepartmentId, setFilterDepartmentId] = useState(urlDepartmentId || 'ALL');
+  const [filterClassId, setFilterClassId] = useState(urlClassId || '');
+  const [filterSectionId, setFilterSectionId] = useState(urlSectionId || 'ALL');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId || urlSubjectId || '');
 
-  // Modal Dialog States
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
+  const [isPrintStudioOpen, setIsPrintStudioOpen] = useState(Boolean(urlPrint));
 
   // Sync initial props
   useEffect(() => {
@@ -302,7 +318,7 @@ export default function MarkEntryDeskView({
   });
 
   const handlePrint = () => {
-    window.print();
+    setIsPrintStudioOpen(true);
   };
 
   // Bulk Quick Fill action menu items integrated into the bottom actions bar
@@ -479,17 +495,20 @@ export default function MarkEntryDeskView({
         </div>
       )}
 
-      {/* ── 8. Official Print-Ready Subject Award List (Visible only when printing) ── */}
-      <PrintableAwardList
+      {/* ── 8. Universal Fullscreen Print Studio ── */}
+      <MarkEntryPrintModal
+        isOpen={isPrintStudioOpen}
+        onClose={() => setIsPrintStudioOpen(false)}
         selectedExam={selectedExam}
         selectedSubject={selectedSubject}
-        students={targetStudents}
+        targetStudents={targetStudents}
         components={components}
         fullMarks={fullMarks}
         passMarks={passMarks}
         marksGrid={marksGrid}
-        gradingRules={activeGradingSystem?.rules || []}
+        activeGradingSystem={activeGradingSystem}
         stats={stats}
+        onExportCsv={exportToCsv}
       />
 
       {/* ── 9. CSV Import Modal ── */}

@@ -15,7 +15,7 @@ export default function ExaminationsHubView({ defaultTab = 'SCHEDULES' }) {
   if (defaultTab === 'MARK_ENTRY') {
     return <MarkEntryDeskView />;
   }
-  if (defaultTab === 'TABULATION') {
+  if (defaultTab === 'TABULATION' || defaultTab === 'MARKSHEET') {
     return <TabulationLedgerView />;
   }
   if (defaultTab === 'TRANSCRIPTS') {

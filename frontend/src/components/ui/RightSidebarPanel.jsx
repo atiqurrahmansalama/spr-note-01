@@ -49,9 +49,20 @@ export default function RightSidebarPanel({
   icon: Icon,
   size = "md",
   width,
+  isResizing = false,
+  onStartResize,
+  onResetResize,
   onClose,
   onBack,
   headerRight,
+  footer,
+  formId,
+  onSave,
+  onCancel,
+  saveLabel = "SAVE",
+  cancelLabel = "Cancel",
+  isSubmitting = false,
+  isSaveDisabled = false,
   children,
   className = "",
   bodyClassName = "",
@@ -108,14 +119,27 @@ export default function RightSidebarPanel({
     touchStartTimeRef.current = null;
   };
 
+  const resolvedWidth = width || (size ? resolveSidebarWidth(size) : undefined);
+
   return (
     <div
+      style={resolvedWidth ? { width: `min(${resolvedWidth}px, 100vw)`, transition: isResizing ? "none" : "width 0.15s ease-out" } : undefined}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`w-full h-full flex flex-col theme-bg-app text-left overflow-hidden relative @container ${className}`}
+      className={`h-full flex flex-col theme-bg-app text-left overflow-hidden relative shrink-0 border-l theme-border @container max-w-full ${className}`}
       role="region"
       aria-label={typeof title === "string" ? title : "Right Sidebar Panel"}
     >
+      {/* Universal Left Drag Resizer Handle */}
+      {onStartResize && (
+        <div
+          onMouseDown={onStartResize}
+          onTouchStart={onStartResize}
+          onDoubleClick={onResetResize}
+          className="hidden md:flex absolute top-0 left-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 hover:bg-[var(--accent-main)]/15 active:bg-[var(--accent-main)]/30 transition-colors"
+          title="Drag left or right to resize sidebar width (Double click to toggle size)"
+        />
+      )}
       {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
         
@@ -175,10 +199,40 @@ export default function RightSidebarPanel({
 
       {/* ─── Main Scrollable Body ───────────────────────────────────── */}
       <div className={`sidebar-screen-container flex-1 overflow-y-auto p-2 sm:p-3.5 @md:p-4 @lg:p-5 custom-scrollbar ${bodyClassName}`}>
-        <div className="w-full max-w-full min-w-0 animate-fade-in">
+        <div className="w-full max-w-full min-w-0 h-full flex flex-col flex-1 animate-fade-in">
           {children}
         </div>
       </div>
+
+      {/* ─── Sticky Footer ────────────────────────────────────────── */}
+      {(footer || onSave || formId) && (
+        <div className="theme-bg-surface border-t theme-border p-3 shrink-0">
+          {footer ? (
+            footer
+          ) : (
+            <div className="flex items-center justify-end gap-2">
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
+                >
+                  {cancelLabel}
+                </button>
+              )}
+              <button
+                type={formId ? "submit" : "button"}
+                form={formId}
+                onClick={!formId ? onSave : undefined}
+                disabled={isSaveDisabled || isSubmitting}
+                className="px-4 py-2 text-xs font-bold rounded-xl theme-bg-accent text-white hover:opacity-90 disabled:opacity-50 transition-all shadow-xs cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isSubmitting ? "Saving..." : saveLabel}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

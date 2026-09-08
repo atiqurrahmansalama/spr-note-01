@@ -106,7 +106,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", matchPaths: ["/studies/daily-classroom", "/studies", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
       ]
     },
     {
@@ -120,6 +120,7 @@ export default function SidebarContainer({
           id: "Exam Schedules",
           name: "Exam Schedules",
           path: "/examinations/schedules",
+          exactMatchPaths: ["/examinations", "/exams"],
           matchPaths: [
             "/examinations/schedules",
             "/examinations/routine-matrix",
@@ -127,8 +128,6 @@ export default function SidebarContainer({
             "/examinations/visual-timetable",
             "/examinations/invigilation",
             "/examinations/invigilation-schedule",
-            "/examinations",
-            "/exams",
             "/routine-matrix",
             "/routine-board",
             "/visual-timetable",
@@ -138,8 +137,8 @@ export default function SidebarContainer({
           key: "exam_schedules"
         },
         { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
-        { id: "Tabulation Sheet", name: "Tabulation Ledger", path: "/examinations/tabulation", matchPaths: ["/examinations/tabulation", "/tabulation-sheet"], Icon: ChartBarIcon, key: "exam_tabulation" },
-        { id: "Transcript Studio", name: "Marksheet Studio", path: "/examinations/transcripts", matchPaths: ["/examinations/transcripts", "/transcripts"], Icon: DocumentIcon, key: "exam_transcripts" },
+        { id: "Mark Sheet", name: "Mark Sheet", path: "/examinations/marksheet", matchPaths: ["/examinations/marksheet", "/examinations/tabulation", "/marksheet", "/tabulation-sheet", "/mark-sheet"], Icon: ChartBarIcon, key: "exam_tabulation" },
+        { id: "Transcript Studio", name: "Transcript Studio", path: "/examinations/transcripts", matchPaths: ["/examinations/transcripts", "/transcripts", "/academic-transcripts"], Icon: DocumentIcon, key: "exam_transcripts" },
         { id: "Grading Policies", name: "Grading Policies", path: "/examinations/grading-rules", matchPaths: ["/examinations/grading-rules", "/grading-rules"], Icon: SettingsIcon, key: "exam_grading_rules" },
       ]
     },
@@ -259,6 +258,9 @@ export default function SidebarContainer({
       return currentPath === "/" || currentPath === "/dashboard";
     }
     if (currentPath === path) return true;
+    if (item && Array.isArray(item.exactMatchPaths)) {
+      if (item.exactMatchPaths.some((p) => currentPath === p)) return true;
+    }
     if (item && Array.isArray(item.matchPaths)) {
       return item.matchPaths.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
     }

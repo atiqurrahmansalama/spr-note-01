@@ -113,7 +113,9 @@ export default function ActionMenu({
       : 'px-3.5 py-2 text-xs gap-2 rounded-xl';
 
   const variantClasses =
-    variant === 'surface'
+    variant === 'primary'
+      ? 'theme-bg-accent theme-accent-text hover:opacity-95 shadow-xs border-transparent font-bold'
+      : variant === 'surface'
       ? 'theme-bg-surface hover:theme-bg-sub/60 theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
       : variant === 'sub'
       ? 'theme-bg-sub hover:theme-bg-elevated theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
@@ -135,13 +137,25 @@ export default function ActionMenu({
         } ${
           disabled ? 'opacity-50 cursor-not-allowed pointer-events-none shadow-none' : 'cursor-pointer'
         } ${
-          isOpen ? 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30' : ''
+          isOpen
+            ? variant === 'primary'
+              ? 'opacity-95 ring-2 ring-[var(--accent-main)]/40'
+              : 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
+            : ''
         } ${buttonClassName}`}
       >
-        {renderIcon(TriggerIcon, label ? 'w-3.5 h-3.5 shrink-0 theme-accent' : 'w-4 h-4')}
+        {renderIcon(
+          TriggerIcon,
+          label
+            ? `w-3.5 h-3.5 shrink-0 ${variant === 'primary' ? '' : 'theme-accent'}`
+            : 'w-4 h-4'
+        )}
         {label && <span className="truncate">{label}</span>}
         {label && showChevron && (
-          <ChevronIcon isOpen={isOpen} className="w-3 h-3 ml-0.5 shrink-0 opacity-70" />
+          <ChevronIcon
+            isOpen={isOpen}
+            className={`w-3 h-3 ml-0.5 shrink-0 ${variant === 'primary' ? 'opacity-90' : 'opacity-70'}`}
+          />
         )}
       </button>
 
@@ -158,7 +172,7 @@ export default function ActionMenu({
               right: align === 'right' ? `${coords.right}px` : undefined,
               zIndex: 99999,
             }}
-            className={`min-w-[190px] max-w-[280px] max-h-[320px] overflow-y-auto scrollbar-none no-scrollbar rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md ${menuClassName}`}
+            className={`min-w-[190px] max-w-[280px] max-h-[320px] overflow-y-auto scrollbar-none no-scrollbar rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md print:hidden print-studio-no-print ${menuClassName}`}
           >
             {header && (
               <div className="px-3 py-1.5 text-[10px] font-bold theme-text-secondary uppercase tracking-wider border-b theme-border-subtle mb-1">
@@ -202,10 +216,8 @@ export default function ActionMenu({
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md theme-bg-sub border theme-border transition-colors ${
-                        isDanger
-                          ? 'group-hover/item:border-red-500/30 group-hover/item:theme-danger'
-                          : 'group-hover/item:border-[var(--accent-main)]/30 group-hover/item:theme-accent'
+                      className={`text-[10.5px] font-mono tracking-tight opacity-40 theme-text-muted group-hover/item:opacity-80 transition-opacity select-none ${
+                        item.badgeClassName || ''
                       }`}
                     >
                       {item.badge}

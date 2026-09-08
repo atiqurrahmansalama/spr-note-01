@@ -121,6 +121,7 @@ from .views import (
     NotificationTriggerRuleViewSet,
     NotificationDispatchLogViewSet,
     ManualBroadcastViewSet,
+    VectorPDFExportAPIView,
 )
 
 router = DefaultRouter()
@@ -323,6 +324,11 @@ urlpatterns = [
     path('activity/log-status/', LogActivityView.as_view(), name='activity_log_status'),
     path('api/activity/log-status/', LogActivityView.as_view(), name='activity_log_status_legacy'),
     path('activity/user-summary/', UserActivitySummaryView.as_view(), name='user_activity_summary'),
+
+    # Universal Document Export Suite
+    path('api/v1/export/vector-pdf/', VectorPDFExportAPIView.as_view(), name='export_vector_pdf_v1'),
+    path('api/export/vector-pdf/', VectorPDFExportAPIView.as_view(), name='export_vector_pdf_legacy'),
+
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),
     path('', include(router.urls)),

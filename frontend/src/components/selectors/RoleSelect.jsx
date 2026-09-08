@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '../ui/CustomSelect';
+import { ShieldIcon } from '../ui/Icons';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 
@@ -29,7 +30,7 @@ const DEFAULT_SYSTEM_ROLES = [
  * @param {'sm'|'md'|'lg'} [props.size='md'] - Selector size
  * @param {boolean} [props.compactMode=false] - Compact mode
  * @param {string} [props.error] - Error message
- * @param {React.ComponentType} [props.icon] - Optional leading icon
+ * @param {React.ComponentType} [props.icon] - Optional leading icon (defaults to ShieldIcon)
  * @param {Function} [props.onRolesLoaded] - Callback when roles are loaded via API
  */
 export default function RoleSelect({
@@ -48,7 +49,7 @@ export default function RoleSelect({
   size = 'md',
   compactMode = false,
   error,
-  icon,
+  icon = ShieldIcon,
   onRolesLoaded,
   ...rest
 }) {

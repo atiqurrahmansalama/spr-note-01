@@ -207,6 +207,7 @@ export default function App() {
               <Route path="/examinations/invigilation-schedule" element={<ExaminationsHubView defaultTab="INVIGILATION_SCHEDULE" />} />
               <Route path="/examinations/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
               <Route path="/examinations/tabulation" element={<ExaminationsHubView defaultTab="TABULATION" />} />
+              <Route path="/examinations/marksheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/examinations/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
               <Route path="/examinations/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
               <Route path="/exams" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
@@ -216,6 +217,8 @@ export default function App() {
               <Route path="/invigilation-schedule" element={<ExaminationsHubView defaultTab="INVIGILATION_SCHEDULE" />} />
               <Route path="/mark-entry" element={<ExaminationsHubView defaultTab="MARK_ENTRY" />} />
               <Route path="/tabulation-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
+              <Route path="/marksheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
+              <Route path="/mark-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
               <Route path="/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
 

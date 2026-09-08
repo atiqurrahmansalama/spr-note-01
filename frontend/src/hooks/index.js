@@ -7,3 +7,4 @@ export { useAutoSave as useAutoSaveNamed } from './useAutoSave';
 export { default as useFormAutoSave } from './useFormAutoSave';
 export { useFormAutoSave as useFormAutoSaveNamed } from './useFormAutoSave';
 export { default as useTemplateStore, useTemplateStore as useTemplateStoreNamed } from './useTemplateStore';
+export { useResizablePanel, useResizablePanel as default } from './useResizablePanel';

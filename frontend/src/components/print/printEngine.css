@@ -1,0 +1,424 @@
+/* ==========================================================================
+   Universal Print Studio Engine Styles
+   Enterprise-grade paper simulation, scalable canvas, & print media fidelity.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Paper Simulation Sizes (Screen WYSIWYG)
+   -------------------------------------------------------------------------- */
+
+.paper-sheet {
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #0f172a;
+  transform-origin: top center;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+}
+
+.paper-sheet > * {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* Studio Workbench Background (Theme-Aware Drafting Desk) */
+.universal-print-workbench {
+  background-color: var(--bg-app);
+  background-image: radial-gradient(var(--border-color) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* Screen Dimensions */
+.paper-sheet[data-size="A4"][data-orientation="PORTRAIT"] {
+  width: 794px;
+  min-height: 1123px;
+}
+.paper-sheet[data-size="A4"][data-orientation="LANDSCAPE"] {
+  width: 1123px;
+  min-height: 794px;
+}
+.paper-sheet[data-size="LEGAL"][data-orientation="PORTRAIT"] {
+  width: 816px;
+  min-height: 1344px;
+}
+.paper-sheet[data-size="LEGAL"][data-orientation="LANDSCAPE"] {
+  width: 1344px;
+  min-height: 816px;
+}
+.paper-sheet[data-size="LETTER"][data-orientation="PORTRAIT"] {
+  width: 816px;
+  min-height: 1056px;
+}
+.paper-sheet[data-size="LETTER"][data-orientation="LANDSCAPE"] {
+  width: 1056px;
+  min-height: 816px;
+}
+
+/* Screen Margins */
+.paper-sheet[data-margin="NORMAL"] {
+  padding: 38px 44px;
+}
+.paper-sheet[data-margin="NARROW"] {
+  padding: 22px 26px;
+}
+.paper-sheet[data-margin="WIDE"] {
+  padding: 56px 60px;
+}
+.paper-sheet[data-margin="NONE"] {
+  padding: 0;
+}
+
+/* Ink-Saver & Color Modes (Screen Only - Never apply CSS raster filters in print!) */
+@media screen {
+  .paper-sheet[data-color-mode="INK_SAVER"] {
+    filter: contrast(0.96) saturate(0.3);
+  }
+  .paper-sheet[data-color-mode="INK_SAVER"] * {
+    border-color: rgba(15, 23, 42, 0.3) !important;
+  }
+
+  .paper-sheet[data-color-mode="MONOCHROME"] {
+    filter: grayscale(1);
+  }
+  .paper-sheet[data-color-mode="MONOCHROME"] * {
+    border-color: #000000 !important;
+  }
+}
+
+/* Density Settings */
+.paper-sheet[data-density="ULTRA_COMPACT"] th,
+.paper-sheet[data-density="ULTRA_COMPACT"] td {
+  padding-top: 2.5px !important;
+  padding-bottom: 2.5px !important;
+  padding-left: 4.5px !important;
+  padding-right: 4.5px !important;
+  font-size: 9.5px !important;
+  line-height: 1.2 !important;
+}
+
+.paper-sheet[data-density="COMPACT"] th,
+.paper-sheet[data-density="COMPACT"] td {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+}
+
+.paper-sheet[data-density="NORMAL"] th,
+.paper-sheet[data-density="NORMAL"] td {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+
+.paper-sheet[data-density="RELAXED"] th,
+.paper-sheet[data-density="RELAXED"] td {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.paper-sheet[data-density="SPACIOUS"] th,
+.paper-sheet[data-density="SPACIOUS"] td {
+  padding-top: 13px !important;
+  padding-bottom: 13px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Printable Table & Document Elements
+   -------------------------------------------------------------------------- */
+.print-meta-grid {
+  border: 1px solid #cbd5e1;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.print-summary-box {
+  border: 1px solid #cbd5e1;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.print-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-collapse: collapse;
+  table-layout: auto;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #cbd5e1;
+  line-height: 1.3;
+  word-break: normal;
+  overflow-wrap: normal;
+  white-space: normal;
+}
+
+.print-table th {
+  background-color: #f1f5f9;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  border-bottom: 1.5px solid #94a3b8;
+}
+
+.print-avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Watermark */
+.print-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-35deg);
+  font-size: 5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: rgba(15, 23, 42, 0.05);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   3. Printing In-Progress Temporary State Class
+   -------------------------------------------------------------------------- */
+body.spr-printing-in-progress,
+body.spr-printing-in-progress .universal-print-studio-root,
+body.spr-printing-in-progress .universal-print-studio-container,
+body.spr-printing-in-progress .universal-print-workbench,
+body.spr-printing-in-progress .universal-print-canvas-wrapper,
+body.spr-printing-in-progress .universal-print-transform-wrapper,
+body.spr-printing-in-progress .paper-sheet,
+body.spr-printing-in-progress .print-document-sheet {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.spr-printing-in-progress .print-studio-no-print,
+body.spr-printing-in-progress .print-sidebar-control,
+body.spr-printing-in-progress .print-topbar-control,
+body.spr-printing-in-progress .universal-export-menu-portal {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Print Media Queries (@media print)
+   -------------------------------------------------------------------------- */
+@media print {
+  /* Exact color and background preservation */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Reset entire document and viewport to pure white */
+  html,
+  body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* 1. Hide UI controls, toolbars, background app root (DO NOT hide <header> inside document!) */
+  #root,
+  nav,
+  aside,
+  .print-studio-no-print,
+  .print-sidebar-control,
+  .print-topbar-control,
+  .universal-print-toolbar,
+  .universal-export-menu-portal,
+  [role="dialog"] > div:not(.universal-print-studio-container) {
+    display: none !important;
+  }
+
+  /* 2. Unpack modal containers to pure static document flow */
+  body > div,
+  .universal-print-studio-root,
+  .universal-print-studio-container,
+  .universal-print-workbench,
+  .universal-print-canvas-wrapper,
+  .universal-print-transform-wrapper {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    zoom: 1 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* 3. Paper Sheet Print Rules — High Specificity Full-Bleed Reset */
+  .paper-sheet,
+  .paper-sheet[data-size],
+  .paper-sheet[data-orientation],
+  .paper-sheet[data-margin],
+  .paper-sheet[data-color-mode],
+  .paper-sheet[data-density],
+  #universal-print-portal {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    filter: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .print-document-sheet {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  /* 4. Institutional Header & Metadata */
+  .print-document-header {
+    display: flex !important;
+    background: transparent !important;
+    border-bottom: 2px solid #0f172a !important;
+  }
+
+  .print-meta-grid {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-summary-box {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 5. Table Print Styling */
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+  }
+
+  .print-table thead {
+    display: table-header-group !important;
+  }
+
+  .print-table tfoot {
+    display: table-footer-group !important;
+  }
+
+  .print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-table th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-table td {
+    background-color: #ffffff !important;
+  }
+
+  .paper-sheet[data-color-mode="MONOCHROME"] .print-table th,
+  .paper-sheet[data-color-mode="MONOCHROME"] .print-table td {
+    border-color: #000000 !important;
+    color: #000000 !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+

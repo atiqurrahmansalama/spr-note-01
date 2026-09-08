@@ -83,13 +83,17 @@ export default function MetricsGrid({
 }) {
   if (!items || items.length === 0) return null;
 
-  let gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @2xl:grid-cols-4';
+  let gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
   if (cols === 1) gridColsClass = 'grid-cols-1';
-  else if (cols === 2) gridColsClass = 'grid-cols-1 @sm:grid-cols-2';
-  else if (cols === 3) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @xl:grid-cols-3';
-  else if (cols === 4) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @2xl:grid-cols-4';
-  else if (items.length === 3) gridColsClass = 'grid-cols-1 @sm:grid-cols-2 @xl:grid-cols-3';
-  else if (items.length === 2) gridColsClass = 'grid-cols-1 @sm:grid-cols-2';
+  else if (cols === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
+  else if (cols === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
+  else if (cols === 4) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
+  else if (cols === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
+  else if (cols === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
+  else if (items.length === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
+  else if (items.length === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
+  else if (items.length === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
+  else if (items.length === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
 
   return (
     <div className={`grid ${gridColsClass} gap-2.5 @sm:gap-3.5 w-full min-w-0 ${className}`}>

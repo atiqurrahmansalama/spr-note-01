@@ -11,3 +11,4 @@ from .attendance import *
 from .notifications import *
 from .templates import *
 from .system import *
+from .export_views import *

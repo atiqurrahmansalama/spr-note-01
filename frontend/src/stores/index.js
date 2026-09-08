@@ -14,5 +14,6 @@ export * from "./admissionStore";
 export * from "./residentialStore";
 export * from "./learningStore";
 export * from "./examStore";
+export * from "./printStore";
 
 

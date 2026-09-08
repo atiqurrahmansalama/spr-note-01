@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import CustomButton from "../ui/CustomButton";
 import AutoSaveBadge from "../ui/AutoSaveBadge";
+import { ChevronIcon } from "../ui/Icons";
 
 /**
  * Enterprise Reusable Right Sidebar / Drawer Content Container
@@ -124,8 +125,26 @@ export function DrawerSection({
   className = "",
   bodyClassName = "",
   variant = "streamlined", // "streamlined" (default) | "card"
+  collapsible = false,
+  defaultExpanded = true,
+  expanded: controlledExpanded,
+  onToggle,
   ...rest
 }) {
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const isControlled = controlledExpanded !== undefined;
+  const isExpanded = collapsible ? (isControlled ? controlledExpanded : internalExpanded) : true;
+
+  const handleToggle = () => {
+    if (!collapsible) return;
+    if (isControlled) {
+      onToggle?.(!isExpanded);
+    } else {
+      setInternalExpanded((prev) => !prev);
+      onToggle?.(!internalExpanded);
+    }
+  };
+
   const isCard = variant === "card";
 
   return (
@@ -137,14 +156,30 @@ export function DrawerSection({
       }
       {...rest}
     >
-      {(title || subtitle || headerRight) && (
-        <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 pb-2 border-b theme-border">
+      {(title || subtitle || headerRight || collapsible) && (
+        <div
+          role={collapsible ? "button" : undefined}
+          tabIndex={collapsible ? 0 : undefined}
+          aria-expanded={collapsible ? isExpanded : undefined}
+          onClick={collapsible ? handleToggle : undefined}
+          onKeyDown={collapsible ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleToggle();
+            }
+          } : undefined}
+          className={`flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 pb-2 border-b theme-border ${
+            collapsible ? "cursor-pointer select-none group" : ""
+          }`}
+        >
           <div className="flex items-center gap-2 min-w-0">
             {Icon && <Icon className="w-4 h-4 theme-accent shrink-0" />}
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 {title && (
-                  <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider theme-text-primary truncate ${
+                    collapsible ? "group-hover:theme-accent transition-colors" : ""
+                  }`}>
                     {title}
                   </h3>
                 )}
@@ -161,10 +196,25 @@ export function DrawerSection({
               )}
             </div>
           </div>
-          {headerRight && <div className="shrink-0 ml-auto flex items-center">{headerRight}</div>}
+          <div className="shrink-0 ml-auto flex items-center gap-2">
+            {headerRight && (
+              <div onClick={collapsible ? (e) => e.stopPropagation() : undefined}>
+                {headerRight}
+              </div>
+            )}
+            {collapsible && (
+              <div className="p-0.5 rounded-md theme-text-secondary group-hover:theme-text-primary group-hover:theme-bg-sub transition-colors">
+                <ChevronIcon isOpen={isExpanded} className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
         </div>
       )}
-      <div className={bodyClassName || "space-y-3.5"}>{children}</div>
+      {isExpanded && (
+        <div className={`${bodyClassName || "space-y-3.5"} ${collapsible ? "animate-fade-in" : ""}`}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

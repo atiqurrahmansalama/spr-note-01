@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '../ui/CustomSelect';
+import { TeacherIcon } from '../ui/Icons';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 
@@ -24,7 +25,7 @@ import { useTenant } from '../../context/TenantContext';
  * @param {'sm'|'md'|'lg'} [props.size='md'] - Selector size
  * @param {boolean} [props.compactMode=false] - Compact mode
  * @param {string} [props.error] - Error message
- * @param {React.ComponentType} [props.icon] - Optional leading icon
+ * @param {React.ComponentType} [props.icon] - Optional leading icon (defaults to TeacherIcon)
  * @param {Function} [props.onTeachersLoaded] - Callback when teachers are loaded via API
  */
 export default function TeacherSelect({
@@ -44,7 +45,7 @@ export default function TeacherSelect({
   size = 'md',
   compactMode = false,
   error,
-  icon,
+  icon = TeacherIcon,
   onTeachersLoaded,
   ...rest
 }) {

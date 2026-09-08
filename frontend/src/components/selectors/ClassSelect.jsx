@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '../ui/CustomSelect';
+import { ClassIcon } from '../ui/Icons';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 import { admissionSettingsStore } from '../../utils/localStore';
@@ -30,7 +31,7 @@ import { admissionSettingsStore } from '../../utils/localStore';
  * @param {'sm'|'md'|'lg'} [props.size='md'] - Selector size
  * @param {boolean} [props.compactMode=false] - Compact mode
  * @param {string} [props.error] - Error message
- * @param {React.ComponentType} [props.icon] - Optional leading icon
+ * @param {React.ComponentType} [props.icon] - Optional leading icon (defaults to ClassIcon)
  * @param {Function} [props.onClassesLoaded] - Callback when classes are loaded via API
  */
 export default function ClassSelect({
@@ -54,7 +55,7 @@ export default function ClassSelect({
   size = 'md',
   compactMode = false,
   error,
-  icon,
+  icon = ClassIcon,
   onClassesLoaded,
   ...rest
 }) {

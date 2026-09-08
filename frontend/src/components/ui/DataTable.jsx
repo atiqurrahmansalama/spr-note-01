@@ -92,6 +92,7 @@ export default function DataTable({
   hideHeader = false,
   compact = false,
   cellPaddingClass = '',
+  headerPaddingClass = '',
   wrapperClassName = '',
   tableClassName = '',
   theadClassName = '',
@@ -120,9 +121,17 @@ export default function DataTable({
   startIndex = 1,
   indexHeaderClassName = 'w-12 text-center text-xs font-bold font-mono',
   indexCellClassName = 'w-12 text-center font-mono text-xs font-bold theme-text-secondary',
+  // --- Header Orientation Props (Boolean flag: true = rotated vertical headers, false = standard horizontal) ---
+  verticalHeaders = false,
+  rotateHeaders = false,
+  isVerticalHeader = false,
+  tableTitle = null,
+  tableTitleIcon: TableTitleIcon = null,
+  headerActions = null,
 }) {
   const shouldShowSerial = Boolean(showIndex || showSerial);
   const resolvedSerialHeader = serialHeader || indexHeader || 'No';
+  const isVertical = Boolean(verticalHeaders || rotateHeaders || isVerticalHeader);
   // Internal sort state for uncontrolled mode
   const [internalSortConfig, setInternalSortConfig] = useState(() => {
     if (defaultSortKey) {
@@ -202,7 +211,7 @@ export default function DataTable({
   }, [data, isControlledSort, activeSortKey, activeSortDir, activeSortColumn]);
 
   // Selection memo & helpers (must remain at top level before early returns)
-  const defaultHeaderPad = compact ? 'py-2 px-3' : 'py-3.5 px-4 sm:px-6';
+  const defaultHeaderPad = headerPaddingClass || (compact ? 'py-1.5 px-2.5' : 'py-2 px-3 sm:px-4');
   const defaultCellPad = cellPaddingClass || (compact ? 'py-1.5 px-3' : 'py-3.5 px-4 sm:px-6');
 
   const getItemId = useCallback((item, idx) => {
@@ -263,149 +272,332 @@ export default function DataTable({
   }
 
   return (
-    <div className={`theme-bg-surface border theme-border rounded-2xl shadow-xs overflow-hidden ${wrapperClassName}`}>
-      <div className="overflow-x-auto">
-        <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
-          {!hideHeader && (
-            <thead className={`border-b theme-border theme-bg-sub theme-text-secondary uppercase text-xs tracking-wider font-bold ${theadClassName || headerClassName}`}>
-              <tr>
-                {selectable && (
-                  <th
-                    className={`${defaultHeaderPad} ${selectionHeaderClassName}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-center">
-                      <CustomCheckbox
-                        size="sm"
-                        checked={isAllSelected}
-                        onChange={(checked) => {
-                          const allIds = processedData.map((item, idx) => getItemId(item, idx));
-                          onSelectAll?.(checked ? allIds : [], checked);
-                        }}
-                        disabled={processedData.length === 0}
-                      />
-                    </div>
-                  </th>
-                )}
-                {shouldShowSerial && (
-                  <th
-                    className={`${defaultHeaderPad} ${indexHeaderClassName}`}
-                  >
-                    <div className="flex items-center justify-center">
-                      <span>{resolvedSerialHeader}</span>
-                    </div>
-                  </th>
-                )}
-                {columns.map((col, idx) => {
-                  const alignClass =
-                    col.align === 'center'
-                      ? 'text-center'
-                      : col.align === 'right'
-                      ? 'text-right'
-                      : 'text-left';
+    <div className="w-full space-y-2">
+      {/* ── Top Header Toolbar with Title and Custom Actions (if provided) ── */}
+      {(tableTitle || headerActions) && (
+        <div className="flex items-center justify-between gap-3 px-1 py-0.5 flex-wrap print:hidden">
+          {tableTitle ? (
+            <div className="flex items-center gap-2">
+              {TableTitleIcon && <TableTitleIcon className="w-4 h-4 theme-accent" />}
+              <h5 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+                {tableTitle}
+              </h5>
+            </div>
+          ) : (
+            <div />
+          )}
 
-                  const isStickyRight =
-                    col.sticky === 'right' ||
-                    col.sticky === true ||
-                    (col.key === 'actions' && col.sticky !== false) ||
-                    (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
-                    (typeof col.className === 'string' && col.className.includes('sticky right'));
+          {headerActions && (
+            <div className="flex items-center gap-2 flex-wrap ml-auto">
+              {headerActions}
+            </div>
+          )}
+        </div>
+      )}
 
-                  const isStickyLeft =
-                    col.sticky === 'left' ||
-                    (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
-                    (typeof col.className === 'string' && col.className.includes('sticky left'));
-
-                  const stickyHeaderClass = isStickyRight
-                    ? 'sticky right-0 z-20 theme-bg-sub'
-                    : isStickyLeft
-                    ? 'sticky left-0 z-20 theme-bg-sub'
-                    : '';
-
-                  const colSortKey = col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
-                  const isColSortable =
-                    sortable !== false &&
-                    col.sortable !== false &&
-                    col.key !== 'actions' &&
-                    col.id !== 'actions' &&
-                    Boolean(colSortKey || col.sortValue || col.sortFn);
-
-                  const isCurrentSort = isColSortable && activeSortKey === colSortKey && Boolean(activeSortDir);
-
-                  return (
+      {/* Main Table Container */}
+      <div className={`theme-bg-surface border theme-border rounded-2xl shadow-xs overflow-hidden ${wrapperClassName}`}>
+        <div className="overflow-x-auto">
+          <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
+            {!hideHeader && (
+              <thead
+                className={`border-b theme-border theme-bg-sub theme-text-secondary uppercase text-xs tracking-wider font-bold ${
+                  isVertical ? 'h-24 max-h-[96px] align-bottom' : 'max-h-[96px]'
+                } ${theadClassName || headerClassName}`}
+              >
+                <tr>
+                  {selectable && (
                     <th
-                      key={col.key || idx}
-                      onClick={() => handleHeaderClick(col)}
-                      onKeyDown={(e) => {
-                        if (isColSortable && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault();
-                          handleHeaderClick(col);
-                        }
-                      }}
-                      tabIndex={isColSortable ? 0 : undefined}
-                      role={isColSortable ? 'button' : undefined}
-                      aria-sort={
-                        isCurrentSort
-                          ? activeSortDir === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                          : isColSortable
-                          ? 'none'
-                          : undefined
-                      }
-                      title={
-                        isColSortable
-                          ? isCurrentSort
-                            ? activeSortDir === 'asc'
-                              ? 'Sorted ascending. Click to sort descending.'
-                              : 'Sorted descending. Click to reset sorting.'
-                            : `Click to sort by ${col.header ?? col.label ?? col.title ?? 'column'}`
-                          : undefined
-                      }
-                      className={`${defaultHeaderPad} ${alignClass} ${stickyHeaderClass} ${
-                        isColSortable
-                          ? 'cursor-pointer select-none group/col-header hover:theme-bg-sub/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-main)]'
-                          : ''
-                      } ${col.headerClassName || ''}`}
+                      className={`${defaultHeaderPad} ${selectionHeaderClassName} ${isVertical ? 'align-bottom pb-2' : ''} max-h-[96px]`}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <div
-                        className={`inline-flex items-center gap-1.5 ${
-                          alignClass === 'text-right'
-                            ? 'justify-end w-full'
-                            : alignClass === 'text-center'
-                            ? 'justify-center w-full'
-                            : 'justify-start'
-                        }`}
-                      >
-                        <span className={`truncate ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}>
-                          {col.header ?? col.label ?? col.title ?? ''}
-                        </span>
-                        {isColSortable && (
-                          <span
-                            className={`shrink-0 transition-all duration-150 inline-flex items-center ${
-                              isCurrentSort
-                                ? 'theme-text-accent scale-110'
-                                : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-70 group-hover/col-header:opacity-100'
-                            }`}
-                          >
-                            {isCurrentSort ? (
-                              activeSortDir === 'asc' ? (
-                                <SortAscIcon className="w-3.5 h-3.5" />
-                              ) : (
-                                <SortDescIcon className="w-3.5 h-3.5" />
-                              )
-                            ) : (
-                              <SortIcon className="w-3.5 h-3.5" />
-                            )}
-                          </span>
-                        )}
+                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-end' : ''}`}>
+                        <CustomCheckbox
+                          size="sm"
+                          checked={isAllSelected}
+                          onChange={(checked) => {
+                            const allIds = processedData.map((item, idx) => getItemId(item, idx));
+                            onSelectAll?.(checked ? allIds : [], checked);
+                          }}
+                          disabled={processedData.length === 0}
+                        />
                       </div>
                     </th>
-                  );
-                })}
-              </tr>
-            </thead>
-          )}
+                  )}
+                  {shouldShowSerial && (
+                    <th
+                      className={`${defaultHeaderPad} ${indexHeaderClassName} ${isVertical ? 'align-bottom pb-2' : ''} max-h-[96px]`}
+                    >
+                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-end' : ''}`}>
+                        <span>{resolvedSerialHeader}</span>
+                      </div>
+                    </th>
+                  )}
+                  {columns.map((col, idx) => {
+                    const alignClass =
+                      col.align === 'center'
+                        ? 'text-center'
+                        : col.align === 'right'
+                        ? 'text-right'
+                        : 'text-left';
+
+                    const isStickyRight =
+                      col.sticky === 'right' ||
+                      col.sticky === true ||
+                      (col.key === 'actions' && col.sticky !== false) ||
+                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
+                      (typeof col.className === 'string' && col.className.includes('sticky right')) ||
+                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky right'));
+
+                    const isStickyLeft =
+                      col.sticky === 'left' ||
+                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
+                      (typeof col.className === 'string' && col.className.includes('sticky left')) ||
+                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky left'));
+
+                    const stickyHeaderClass = isStickyRight
+                      ? 'sticky right-0 z-20 theme-bg-sub'
+                      : isStickyLeft
+                      ? 'sticky left-0 z-20 theme-bg-sub'
+                      : '';
+
+                    const colSortKey = col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
+                    const isColSortable =
+                      sortable !== false &&
+                      col.sortable !== false &&
+                      col.key !== 'actions' &&
+                      col.id !== 'actions' &&
+                      Boolean(colSortKey || col.sortValue || col.sortFn);
+
+                    const isCurrentSort = isColSortable && activeSortKey === colSortKey && Boolean(activeSortDir);
+
+                    const shouldRotateCol =
+                      isVertical &&
+                      col.rotatable !== false &&
+                      col.rotate !== false &&
+                      col.key !== 'actions' &&
+                      col.id !== 'actions';
+
+                    const resolvedHeaderContent = (() => {
+                      if (typeof col.verticalHeader === 'function' && isVertical) {
+                        return col.verticalHeader();
+                      }
+                      if (col.verticalHeader && isVertical) {
+                        return col.verticalHeader;
+                      }
+                      if (shouldRotateCol) {
+                        const labelText =
+                          col.headerText ||
+                          (typeof col.header === 'string'
+                            ? col.header
+                            : col.label || col.title || '');
+                        if (labelText) {
+                          return (
+                            <div
+                              className="flex flex-col items-center justify-end h-full w-full select-none pb-1"
+                              title={`${labelText}${col.subHeader ? ` (${col.subHeader})` : ''}`}
+                            >
+                              <div
+                                style={{
+                                  writingMode: 'vertical-rl',
+                                  textOrientation: 'sideways',
+                                  WebkitTextOrientation: 'sideways',
+                                  transform: 'rotate(180deg)',
+                                  WebkitFontSmoothing: 'antialiased',
+                                  MozOsxFontSmoothing: 'grayscale',
+                                  textRendering: 'optimizeLegibility',
+                                }}
+                                className="whitespace-normal break-words text-xs font-bold tracking-tight theme-text-primary max-h-20 overflow-hidden py-0.5 text-left leading-tight"
+                              >
+                                {labelText}
+                              </div>
+                              {col.subHeader && (
+                                <span className="text-[10px] font-mono font-bold theme-text-secondary mt-1 whitespace-nowrap">
+                                  {col.subHeader}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                      }
+
+                      // Horizontal mode: handle subHeader and multi-line wrapping cleanly
+                      if (col.subHeader && typeof col.header === 'string') {
+                        return (
+                          <div className="flex flex-col items-center justify-center text-center py-0.5 leading-snug w-full">
+                            <span className="whitespace-normal break-words text-xs font-bold leading-tight theme-text-primary text-center">
+                              {col.header}
+                            </span>
+                            <span className="text-[10px] font-mono font-semibold theme-text-secondary mt-0.5 whitespace-nowrap">
+                              {col.subHeader}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return col.header ?? col.label ?? col.title ?? '';
+                    })();
+
+                    const verticalThClass = isVertical ? 'align-bottom' : '';
+
+                    return (
+                      <th
+                        key={col.key || idx}
+                        onClick={() => handleHeaderClick(col)}
+                        onKeyDown={(e) => {
+                          if (isColSortable && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            handleHeaderClick(col);
+                          }
+                        }}
+                        tabIndex={isColSortable ? 0 : undefined}
+                        role={isColSortable ? 'button' : undefined}
+                        aria-sort={
+                          isCurrentSort
+                            ? activeSortDir === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : isColSortable
+                            ? 'none'
+                            : undefined
+                        }
+                        title={
+                          isColSortable
+                            ? isCurrentSort
+                              ? activeSortDir === 'asc'
+                                ? 'Sorted ascending. Click to sort descending.'
+                                : 'Sorted descending. Click to reset sorting.'
+                              : `Click to sort by ${typeof col.header === 'string' ? col.header : col.label ?? col.title ?? 'column'}`
+                            : undefined
+                        }
+                        className={`${defaultHeaderPad} ${alignClass} ${stickyHeaderClass} ${verticalThClass} ${
+                          isColSortable
+                            ? 'cursor-pointer select-none group/col-header hover:theme-bg-sub/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-main)]'
+                            : ''
+                        } ${col.headerClassName || ''}`}
+                      >
+                        {shouldRotateCol ? (
+                          <div className="flex flex-col items-center justify-end h-full w-full gap-0.5">
+                            {isColSortable && (
+                              <span
+                                className={`shrink-0 transition-all duration-150 inline-flex items-center mb-0.5 ${
+                                  isCurrentSort
+                                    ? 'theme-text-accent scale-110'
+                                    : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-0 group-hover/col-header:opacity-100'
+                                }`}
+                              >
+                                {isCurrentSort ? (
+                                  activeSortDir === 'asc' ? (
+                                    <SortAscIcon className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <SortDescIcon className="w-3.5 h-3.5" />
+                                  )
+                                ) : (
+                                  <SortIcon className="w-3.5 h-3.5" />
+                                )}
+                              </span>
+                            )}
+                            <div className={`w-full flex flex-col items-center justify-end ${isCurrentSort ? 'theme-text-accent' : ''}`}>
+                              {resolvedHeaderContent}
+                            </div>
+                          </div>
+                        ) : isVertical ? (
+                          <div className={`flex flex-col justify-end h-full w-full pb-1 ${
+                            alignClass === 'text-right'
+                              ? 'items-end text-right'
+                              : alignClass === 'text-center'
+                              ? 'items-center text-center'
+                              : 'items-start text-left'
+                          }`}>
+                            <div className="inline-flex items-center gap-1.5">
+                              {React.isValidElement(resolvedHeaderContent) ? (
+                                <div className={`${isCurrentSort ? 'theme-text-accent font-black' : ''}`}>
+                                  {resolvedHeaderContent}
+                                </div>
+                              ) : (
+                                <span
+                                  className={`${
+                                    col.nowrap
+                                      ? 'whitespace-nowrap truncate'
+                                      : 'whitespace-normal break-words leading-tight'
+                                  } ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}
+                                >
+                                  {resolvedHeaderContent}
+                                </span>
+                              )}
+                              {isColSortable && (
+                                <span
+                                  className={`shrink-0 transition-all duration-150 inline-flex items-center ${
+                                    isCurrentSort
+                                      ? 'theme-text-accent scale-110'
+                                      : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-70 group-hover/col-header:opacity-100'
+                                  }`}
+                                >
+                                  {isCurrentSort ? (
+                                    activeSortDir === 'asc' ? (
+                                      <SortAscIcon className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <SortDescIcon className="w-3.5 h-3.5" />
+                                    )
+                                  ) : (
+                                    <SortIcon className="w-3.5 h-3.5" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={`inline-flex items-center gap-1.5 h-full ${
+                              alignClass === 'text-right'
+                                ? 'justify-end w-full'
+                                : alignClass === 'text-center'
+                                ? 'justify-center w-full'
+                                : 'justify-start'
+                            }`}
+                          >
+                            {React.isValidElement(resolvedHeaderContent) ? (
+                              <div className={`min-w-0 h-full flex flex-col justify-center ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}>
+                                {resolvedHeaderContent}
+                              </div>
+                            ) : (
+                              <span
+                                className={`${
+                                  col.nowrap
+                                    ? 'whitespace-nowrap truncate'
+                                    : 'whitespace-normal break-words leading-tight'
+                                } ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}
+                              >
+                                {resolvedHeaderContent}
+                              </span>
+                            )}
+                            {isColSortable && (
+                              <span
+                                className={`shrink-0 transition-all duration-150 inline-flex items-center ${
+                                  isCurrentSort
+                                    ? 'theme-text-accent scale-110'
+                                    : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-70 group-hover/col-header:opacity-100'
+                                }`}
+                              >
+                                {isCurrentSort ? (
+                                  activeSortDir === 'asc' ? (
+                                    <SortAscIcon className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <SortDescIcon className="w-3.5 h-3.5" />
+                                  )
+                                ) : (
+                                  <SortIcon className="w-3.5 h-3.5" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+            )}
           <tbody className="divide-y divide-theme-border theme-border text-xs">
             {processedData.map((item, rowIdx) => {
               const rowKey = keyExtractor(item, rowIdx);
@@ -538,6 +730,7 @@ export default function DataTable({
         </table>
       </div>
     </div>
+  </div>
   );
 }
 

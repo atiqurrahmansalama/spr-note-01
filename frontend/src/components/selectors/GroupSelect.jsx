@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '../ui/CustomSelect';
+import { GroupIcon } from '../ui/Icons';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 
@@ -25,7 +26,7 @@ import { useTenant } from '../../context/TenantContext';
  * @param {'sm'|'md'|'lg'} [props.size='md'] - Selector size
  * @param {boolean} [props.compactMode=false] - Compact mode
  * @param {string} [props.error] - Error message
- * @param {React.ComponentType} [props.icon] - Optional leading icon
+ * @param {React.ComponentType} [props.icon] - Optional leading icon (defaults to GroupIcon)
  * @param {Function} [props.onGroupsLoaded] - Callback when groups are loaded via API
  */
 export default function GroupSelect({
@@ -45,7 +46,7 @@ export default function GroupSelect({
   size = 'md',
   compactMode = false,
   error,
-  icon,
+  icon = GroupIcon,
   onGroupsLoaded,
   ...rest
 }) {

@@ -1,46 +1,55 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import CustomSelect from '../../../components/ui/CustomSelect';
+import React, { useState, useMemo, useEffect } from 'react';
+import PageContainer from '../../../components/layout/PageContainer';
+import MetricsGrid from '../../../components/ui/MetricsGrid';
+import DataTable from '../../../components/ui/DataTable';
 import CustomButton from '../../../components/ui/CustomButton';
-import CustomInput from '../../../components/ui/CustomInput';
+import UniversalPrintModal from '../../../components/print/UniversalPrintModal';
 import ResultGazetteModal from './ResultGazetteModal';
+import TabulationHeader from './TabulationHeader';
+import MarkEntryFilterBar from '../mark-entry/components/MarkEntryFilterBar';
 import {
   ChartBarIcon,
-  DownloadIcon,
-  PrinterIcon,
-  CheckIcon,
-  SearchIcon,
   UserIcon,
-  DocumentIcon,
+  CheckCircleIcon,
   TrophyIcon,
-  SortIcon,
-  SortAscIcon,
-  SortDescIcon,
+  AcademicCapIcon,
 } from '../../../components/ui/Icons';
 import useExamData from '../hooks/useExamData';
 import useTabulationData from '../hooks/useTabulationData';
 
 /**
- * TabulationLedgerView
- * Master Tabulation Sheet & Academic Gazette with multi-level ranking,
- * metric statistics, print styles (A3/Legal landscape), and CSV exports.
+ * TabulationLedgerView (Master Mark Sheet Ledger)
+ * Enterprise Master Mark Sheet and Academic Ledger with multi-level ranking,
+ * metric statistics, full sorting, and integrated Canva/Adobe-Grade Universal Print Studio.
  */
-export default function TabulationLedgerView({ initialExamId = null, onNavigateToTranscripts }) {
+export default function TabulationLedgerView({
+  initialExamId = null,
+  isEmbedded = false,
+  onNavigateToTranscripts,
+}) {
   const {
     tenantId,
     exams,
     students,
     classOptions,
+    departmentOptions,
     sectionOptions,
+    examSubjects,
   } = useExamData();
 
   const [selectedExamId, setSelectedExamId] = useState(initialExamId || (exams[0]?.id ? String(exams[0].id) : ''));
+  const [filterDepartmentId, setFilterDepartmentId] = useState('ALL');
   const [selectedClassId, setSelectedClassId] = useState(classOptions[0]?.value ? String(classOptions[0].value) : '');
   const [selectedSectionId, setSelectedSectionId] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isGazetteOpen, setIsGazetteOpen] = useState(false);
+  const [isPrintStudioOpen, setIsPrintStudioOpen] = useState(false);
 
-  // Column Sort State
-  const [sortConfig, setSortConfig] = useState({ key: 'classRank', direction: 'asc' });
+  // Sync initialExamId
+  useEffect(() => {
+    if (initialExamId) {
+      setSelectedExamId(String(initialExamId));
+    }
+  }, [initialExamId]);
 
   // Exam Options
   const examOptions = useMemo(() => {
@@ -49,6 +58,83 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
       label: `${e.name} (${e.academicYearName || 'Session'})`,
     }));
   }, [exams]);
+
+  // Filtered Class Options: Narrowed down to selected Exam target classes and Department
+  const filteredClassOptions = useMemo(() => {
+    let list = classOptions;
+
+    const selectedExamObj = exams.find((e) => String(e.id) === String(selectedExamId));
+    if (selectedExamObj && Array.isArray(selectedExamObj.targetClassIds) && selectedExamObj.targetClassIds.length > 0) {
+      const targetSet = new Set(selectedExamObj.targetClassIds.map((id) => String(id)));
+      const hasMatch = list.some((c) => targetSet.has(String(c.value)));
+      if (hasMatch) {
+        list = list.filter((c) => targetSet.has(String(c.value)));
+      }
+    }
+
+    if (filterDepartmentId && filterDepartmentId !== 'ALL') {
+      list = list.filter((c) => {
+        if (c.departmentId && String(c.departmentId) === String(filterDepartmentId)) {
+          return true;
+        }
+        return (examSubjects || []).some(
+          (s) =>
+            String(s.classId) === String(c.value) &&
+            (s.departmentId === 'ALL' || String(s.departmentId) === String(filterDepartmentId))
+        );
+      });
+    }
+
+    return [{ value: '', label: 'All Classes' }, ...list];
+  }, [classOptions, exams, selectedExamId, filterDepartmentId, examSubjects]);
+
+  // Filtered Section Options: Narrowed down to selected Class and Department
+  const filteredSectionOptions = useMemo(() => {
+    let rawList = sectionOptions.filter((s) => s.value !== 'ALL');
+
+    if (selectedClassId) {
+      rawList = rawList.filter((s) => {
+        if (s.classId && String(s.classId) === String(selectedClassId)) return true;
+        return (examSubjects || []).some(
+          (sub) => String(sub.classId) === String(selectedClassId) && String(sub.sectionId) === String(s.value)
+        );
+      });
+    } else if (filterDepartmentId && filterDepartmentId !== 'ALL') {
+      const allowedClassIds = new Set(
+        filteredClassOptions
+          .map((c) => String(c.value))
+          .filter((v) => v && v !== '')
+      );
+      rawList = rawList.filter((s) => s.classId && allowedClassIds.has(String(s.classId)));
+    }
+
+    return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...rawList];
+  }, [sectionOptions, selectedClassId, filterDepartmentId, filteredClassOptions, examSubjects]);
+
+  // Cascading Auto-Reset: When Department changes, ensure Class is valid
+  useEffect(() => {
+    if (selectedClassId) {
+      const isValidClass = filteredClassOptions.some(
+        (c) => c.value && String(c.value) === String(selectedClassId)
+      );
+      if (!isValidClass) {
+        setSelectedClassId('');
+        setSelectedSectionId('ALL');
+      }
+    }
+  }, [filterDepartmentId, filteredClassOptions, selectedClassId]);
+
+  // Cascading Auto-Reset: When Class changes, ensure Section is valid
+  useEffect(() => {
+    if (selectedSectionId && selectedSectionId !== 'ALL') {
+      const isValidSection = filteredSectionOptions.some(
+        (s) => s.value !== 'ALL' && String(s.value) === String(selectedSectionId)
+      );
+      if (!isValidSection) {
+        setSelectedSectionId('ALL');
+      }
+    }
+  }, [selectedClassId, filteredSectionOptions, selectedSectionId]);
 
   const {
     exam,
@@ -69,454 +155,396 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
     students,
   });
 
-  const handleSortToggle = useCallback((colKey) => {
-    setSortConfig((prev) => {
-      if (prev.key === colKey) {
-        if (prev.direction === 'asc') return { key: colKey, direction: 'desc' };
-        if (prev.direction === 'desc') return { key: 'classRank', direction: 'asc' };
-      }
-      return { key: colKey, direction: 'asc' };
+  const selectedClassObj = useMemo(() => {
+    return classOptions.find((c) => String(c.value) === String(selectedClassId));
+  }, [classOptions, selectedClassId]);
+
+  const selectedSectionObj = useMemo(() => {
+    return sectionOptions.find((s) => String(s.value) === String(selectedSectionId));
+  }, [sectionOptions, selectedSectionId]);
+
+  const selectedClassName = selectedClassObj?.label || 'All Classes';
+  const selectedSectionName = selectedSectionId === 'ALL' ? 'All Sections' : (selectedSectionObj?.label || 'Section');
+
+  // Dynamic Columns Configuration for DataTable
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        key: 'classRank',
+        header: 'Rank',
+        rotatable: false,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => Number(st.classRank) || 0,
+        headerClassName: 'w-16 text-center font-bold',
+        cellClassName: 'text-center font-bold',
+        render: (st) => {
+          if (st.classRank === 1) {
+            return (
+              <span className="inline-flex items-center gap-1 font-black theme-text-accent">
+                <TrophyIcon className="w-3.5 h-3.5" /> 1st
+              </span>
+            );
+          }
+          if (st.classRank === 2) {
+            return <span className="font-black theme-text-secondary">2nd</span>;
+          }
+          if (st.classRank === 3) {
+            return <span className="font-black theme-text-primary">3rd</span>;
+          }
+          return <span className="font-mono theme-text-secondary">{st.classRank}</span>;
+        },
+      },
+      {
+        key: 'rollNumber',
+        header: 'Roll',
+        rotatable: false,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => Number(st.rollNumber) || st.rollNumber,
+        headerClassName: 'w-16 text-center font-mono',
+        cellClassName: 'text-center font-mono font-bold theme-text-primary',
+        render: (st) => st.rollNumber,
+      },
+      {
+        key: 'studentName',
+        header: 'Student Name',
+        rotatable: false,
+        align: 'left',
+        sortable: true,
+        sortValue: (st) => (st.studentName || '').toLowerCase(),
+        headerClassName: 'min-w-[170px]',
+        cellClassName: 'font-bold theme-text-primary',
+        render: (st) => (
+          <div>
+            <div className="font-bold theme-text-primary">{st.studentName}</div>
+            {st.studentUniqId && (
+              <div className="text-[10px] theme-text-secondary font-mono">
+                {st.studentUniqId}
+              </div>
+            )}
+          </div>
+        ),
+      },
+    ];
+
+    // Dynamic Subject Columns
+    const totalMaxMarks = (subjects || []).reduce((acc, sub) => acc + (Number(sub.fullMarks) || 0), 0);
+
+    (subjects || []).forEach((sub) => {
+      cols.push({
+        key: `subject_${sub.id}`,
+        header: sub.subjectName,
+        subHeader: `(${sub.fullMarks})`,
+        rotatable: true,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => {
+          const sm = st.subjectMarks?.find((s) => String(s.subjectId) === String(sub.id));
+          if (!sm) return -999;
+          if (sm.isAbsent) return -1;
+          return Number(sm.obtained) || 0;
+        },
+        headerClassName: 'min-w-[64px] max-w-[120px] text-center px-1.5',
+        cellClassName: 'text-center font-mono',
+        render: (st) => {
+          const sm = st.subjectMarks?.find((s) => String(s.subjectId) === String(sub.id));
+          if (!sm) return <span className="theme-text-secondary text-[11px]">-</span>;
+          if (sm.isAbsent) return <span className="theme-text-muted font-bold text-[11px]">ABS</span>;
+          return (
+            <span
+              className={`font-semibold ${
+                sm.isPassed ? 'theme-text-primary' : 'theme-text-danger font-bold underline'
+              }`}
+            >
+              {sm.obtained}
+            </span>
+          );
+        },
+      });
     });
-  }, []);
 
-  // Filter & sort students by name or roll search and active sort column
-  const filteredStudents = useMemo(() => {
-    let list = studentsData;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (st) =>
-          st.studentName.toLowerCase().includes(q) ||
-          String(st.rollNumber).toLowerCase().includes(q)
-      );
-    }
-
-    if (!sortConfig.key || !sortConfig.direction) return list;
-
-    const { key, direction } = sortConfig;
-    const isAsc = direction === 'asc';
-
-    return [...list].sort((a, b) => {
-      let valA;
-      let valB;
-
-      if (key.startsWith('subject_')) {
-        const subId = key.replace('subject_', '');
-        const smA = a.subjectMarks.find((s) => String(s.subjectId) === String(subId));
-        const smB = b.subjectMarks.find((s) => String(s.subjectId) === String(subId));
-        valA = smA ? (smA.isAbsent ? -1 : Number(smA.obtained) || 0) : 0;
-        valB = smB ? (smB.isAbsent ? -1 : Number(smB.obtained) || 0) : 0;
-      } else {
-        valA = a[key];
-        valB = b[key];
-      }
-
-      if (valA === null || valA === undefined) return 1;
-      if (valB === null || valB === undefined) return -1;
-
-      if (typeof valA === 'number' || (!isNaN(Number(valA)) && typeof valA !== 'string')) {
-        return isAsc ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
-      }
-
-      return isAsc
-        ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
-        : String(valB).localeCompare(String(valA), undefined, { numeric: true });
-    });
-  }, [studentsData, searchQuery, sortConfig]);
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const renderSortIndicator = (colKey) => {
-    const isCurrent = sortConfig.key === colKey;
-    return (
-      <span
-        className={`inline-flex items-center shrink-0 transition-colors ${
-          isCurrent ? 'theme-text-accent' : 'theme-text-muted/40 group-hover:theme-text-secondary opacity-60 group-hover:opacity-100'
-        }`}
-      >
-        {isCurrent ? (
-          sortConfig.direction === 'asc' ? (
-            <SortAscIcon className="w-3.5 h-3.5" />
+    // Summary Columns
+    cols.push(
+      {
+        key: 'totalObtained',
+        header: 'Total Marks',
+        subHeader: totalMaxMarks > 0 ? `(${totalMaxMarks})` : undefined,
+        rotatable: true,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => Number(st.totalObtained) || 0,
+        headerClassName: 'min-w-[64px] text-center font-mono px-1.5',
+        cellClassName: 'text-center font-mono font-black text-sm theme-text-primary',
+        render: (st) => st.totalObtained,
+      },
+      {
+        key: 'overallPercentage',
+        header: 'Percentage',
+        subHeader: '%',
+        rotatable: true,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => Number(st.overallPercentage) || 0,
+        headerClassName: 'min-w-[56px] text-center font-mono px-1.5',
+        cellClassName: 'text-center font-mono theme-text-secondary',
+        render: (st) => `${st.overallPercentage}%`,
+      },
+      {
+        key: 'grade',
+        header: 'Grade / GPA',
+        rotatable: true,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => Number(st.overallGpa) || 0,
+        headerClassName: 'min-w-[64px] text-center px-1.5',
+        cellClassName: 'text-center',
+        render: (st) => (
+          <div className="flex flex-col items-center justify-center leading-tight">
+            <span
+              className={`text-xs font-bold font-mono ${
+                st.isOverallPass ? 'theme-accent' : 'theme-text-danger'
+              }`}
+            >
+              {st.grade || 'F'}
+            </span>
+            <span className="text-[10px] theme-text-secondary font-mono leading-none mt-0.5">
+              GPA {Number(st.overallGpa || 0).toFixed(2)}
+            </span>
+          </div>
+        ),
+      },
+      {
+        key: 'isOverallPass',
+        header: 'Result Status',
+        rotatable: true,
+        align: 'center',
+        sortable: true,
+        sortValue: (st) => (st.isOverallPass ? 1 : 0),
+        headerClassName: 'min-w-[72px] text-center px-1.5',
+        cellClassName: 'text-center',
+        render: (st) => (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+              st.isOverallPass
+                ? 'theme-bg-accent-soft theme-accent'
+                : 'theme-bg-sub theme-text-secondary'
+            }`}
+          >
+            {st.isOverallPass ? 'PASSED' : 'FAILED'}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Action',
+        rotatable: false,
+        align: 'center',
+        sortable: false,
+        sticky: 'right',
+        headerClassName: 'w-24 text-center',
+        cellClassName: 'text-center',
+        render: (st) => (
+          onNavigateToTranscripts ? (
+            <CustomButton
+              variant="sub"
+              size="xs"
+              onClick={() => onNavigateToTranscripts(selectedExamId, st.studentId)}
+            >
+              Marksheet
+            </CustomButton>
           ) : (
-            <SortDescIcon className="w-3.5 h-3.5" />
+            <CustomButton
+              variant="sub"
+              size="xs"
+              onClick={() => setIsPrintStudioOpen(true)}
+            >
+              View
+            </CustomButton>
           )
-        ) : (
-          <SortIcon className="w-3.5 h-3.5" />
-        )}
-      </span>
+        ),
+      }
     );
-  };
+
+    return cols;
+  }, [subjects, onNavigateToTranscripts, selectedExamId]);
+
+  // ── Universal Print Studio Columns & Data Definition ────────────────────
+  const printColumns = useMemo(() => {
+    const cols = [
+      { id: 'classRank', header: 'Rank', label: 'Rank', align: 'center', width: '48px', nowrap: true, bold: true },
+      { id: 'rollNumber', header: 'Roll', label: 'Roll', align: 'center', width: '56px', nowrap: true, mono: true, bold: true },
+      { id: 'studentName', header: 'Student Name', label: 'Student Name', align: 'left', bold: true },
+      { id: 'studentSection', header: 'Section', label: 'Section', align: 'center', width: '70px' },
+    ];
+
+    (subjects || []).forEach((sub) => {
+      cols.push({
+        id: `subject_${sub.id}`,
+        header: sub.subjectName,
+        label: sub.subjectName,
+        subLabel: `(${sub.fullMarks})`,
+        align: 'center',
+        nowrap: true,
+        cell: (val, row) => {
+          const sm = row.subjectMarks?.find((s) => String(s.subjectId) === String(sub.id));
+          if (!sm) return '-';
+          if (sm.isAbsent) return 'ABS';
+          return sm.obtained;
+        },
+      });
+    });
+
+    cols.push(
+      { id: 'totalObtained', header: 'Total', label: 'Total Marks', align: 'center', width: '60px', bold: true, mono: true },
+      { id: 'overallPercentage', header: '%', label: 'Percentage', align: 'center', width: '52px', cell: (val, row) => `${row.overallPercentage}%` },
+      { id: 'overallGpa', header: 'GPA', label: 'GPA', align: 'center', width: '52px', bold: true, mono: true },
+      { id: 'grade', header: 'Grade', label: 'Grade / Division', align: 'center', width: '90px', bold: true },
+      { id: 'status', header: 'Status', label: 'Result Status', align: 'center', width: '70px', cell: (val, row) => (row.isOverallPass ? 'PASSED' : 'FAILED') }
+    );
+
+    return cols;
+  }, [subjects]);
+
+  const printMetaItems = useMemo(() => [
+    { label: 'Examination', value: exam?.name || 'Term Examination' },
+    { label: 'Academic Session', value: exam?.academicYearName || 'Current Session' },
+    { label: 'Class & Section', value: `${selectedClassName} — ${selectedSectionName}` },
+    { label: 'Grading Standard', value: gradingSystem?.name || 'Standard Scale' },
+    { label: 'Published Date', value: exam?.publishDate ? new Date(exam.publishDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Official Gazette' },
+    { label: 'Total Candidates', value: `${totalStudents} Registered` },
+  ], [exam, selectedClassName, selectedSectionName, gradingSystem, totalStudents]);
+
+  const printSummaryMetrics = useMemo(() => [
+    { label: 'Total Candidates', value: totalStudents },
+    { label: 'Passed', value: passedCount },
+    { label: 'Failed', value: failedCount },
+    { label: 'Pass Rate', value: `${passPercentage}%` },
+    { label: 'Highest Marks', value: stats.highestMarks || 0 },
+    { label: 'Average GPA', value: stats.averageGpa || 0 },
+  ], [totalStudents, passedCount, failedCount, passPercentage, stats]);
+
+  const metricItems = useMemo(() => [
+    {
+      id: 'passed',
+      label: 'Passed',
+      value: String(passedCount),
+      icon: CheckCircleIcon,
+      color: 'accent',
+    },
+    {
+      id: 'failed',
+      label: 'Failed',
+      value: String(failedCount),
+      icon: UserIcon,
+      color: 'default',
+    },
+    {
+      id: 'pass_rate',
+      label: 'Pass Rate',
+      value: `${passPercentage}%`,
+      icon: TrophyIcon,
+      color: 'accent',
+    },
+    {
+      id: 'highest',
+      label: 'Highest Marks',
+      value: String(stats.highestMarks || 0),
+      icon: TrophyIcon,
+      color: 'default',
+    },
+    {
+      id: 'average',
+      label: 'Average GPA',
+      value: String(stats.averageGpa || 0),
+      icon: ChartBarIcon,
+      color: 'accent',
+    },
+  ], [passedCount, failedCount, passPercentage, stats]);
 
   return (
-    <div className="space-y-6">
+    <PageContainer maxWidth="7xl" isEmbedded={isEmbedded}>
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6 rounded-2xl border theme-border theme-bg-surface shadow-xs print:hidden">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black theme-text-primary tracking-tight">
-            Master Tabulation Sheet & Ledger
-          </h1>
-          <p className="text-xs sm:text-sm theme-text-secondary mt-1">
-            Integrated class ledger displaying subject-wise scores, total marks, GPA, academic division, and class/section rank.
-          </p>
-        </div>
+      <TabulationHeader
+        exam={exam}
+        onExportCsv={exportToCsv}
+        onOpenPrintStudio={() => setIsPrintStudioOpen(true)}
+        onOpenGazette={() => setIsGazetteOpen(true)}
+      />
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <CustomButton
-            variant="sub"
-            size="sm"
-            icon={DownloadIcon}
-            onClick={exportToCsv}
-          >
-            Export CSV
-          </CustomButton>
-
-          <CustomButton
-            variant="sub"
-            size="sm"
-            icon={PrinterIcon}
-            onClick={handlePrint}
-          >
-            Print Sheet
-          </CustomButton>
-
-          <CustomButton
-            variant="primary"
-            size="sm"
-            icon={DocumentIcon}
-            onClick={() => setIsGazetteOpen(true)}
-          >
-            Result Gazette
-          </CustomButton>
-        </div>
-      </div>
-
-      {/* Target Selector Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs print:hidden">
-        <CustomSelect
-          label="Select Examination"
-          options={examOptions}
-          value={selectedExamId}
-          onChange={setSelectedExamId}
-          required
-        />
-
-        <CustomSelect
-          label="Target Class"
-          options={classOptions}
-          value={selectedClassId}
-          onChange={setSelectedClassId}
-          required
-        />
-
-        <CustomSelect
-          label="Target Section"
-          options={sectionOptions}
-          value={selectedSectionId}
-          onChange={setSelectedSectionId}
-        />
-      </div>
+      {/* Target Academic Filter Console (Reused from MarkEntryFilterBar with Department cascading & Mark Grades popover) */}
+      <MarkEntryFilterBar
+        examOptions={examOptions}
+        selectedExamId={selectedExamId}
+        setSelectedExamId={setSelectedExamId}
+        departmentOptions={departmentOptions}
+        filterDepartmentId={filterDepartmentId}
+        setFilterDepartmentId={setFilterDepartmentId}
+        classOptions={filteredClassOptions}
+        filterClassId={selectedClassId}
+        setFilterClassId={setSelectedClassId}
+        sectionOptions={filteredSectionOptions}
+        filterSectionId={selectedSectionId}
+        setFilterSectionId={setSelectedSectionId}
+        showSubject={false}
+        activeGradingSystem={gradingSystem}
+        selectedClassName={selectedClassName}
+        selectedSectionName={selectedSectionName}
+      />
 
       {/* Metric Cards Summary */}
       {selectedExamId && selectedClassId && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 print:hidden">
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold theme-text-secondary block">Total Students</span>
-            <span className="text-lg font-black theme-text-primary mt-0.5 block">{totalStudents}</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold text-emerald-600 block">Passed</span>
-            <span className="text-lg font-black text-emerald-600 mt-0.5 block">{passedCount}</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold text-rose-500 block">Failed</span>
-            <span className="text-lg font-black text-rose-500 mt-0.5 block">{failedCount}</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold theme-text-secondary block">Pass Rate</span>
-            <span className="text-lg font-black theme-text-accent mt-0.5 block">{passPercentage}%</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold theme-text-secondary block">Highest Marks</span>
-            <span className="text-lg font-black theme-text-primary mt-0.5 block">{stats.highestMarks}</span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border theme-border theme-bg-surface shadow-2xs">
-            <span className="text-[11px] font-semibold theme-text-secondary block">Class Average GPA</span>
-            <span className="text-lg font-black theme-text-primary mt-0.5 block">{stats.averageGpa}</span>
-          </div>
-        </div>
+        <MetricsGrid items={metricItems} cols={5} />
       )}
 
       {/* Main Tabulation Table */}
       {!selectedExamId || !selectedClassId ? (
-        <div className="p-12 text-center border theme-border rounded-2xl theme-bg-surface/50">
-          <ChartBarIcon className="w-12 h-12 mx-auto theme-text-secondary/50 mb-3" />
+        <div className="p-12 text-center border theme-border rounded-2xl theme-bg-surface/50 shadow-xs">
+          <ChartBarIcon className="w-12 h-12 mx-auto theme-accent opacity-60 mb-3" />
           <h3 className="text-base font-bold theme-text-primary">Select Examination & Class</h3>
-          <p className="text-xs theme-text-secondary mt-1">
-            Choose an examination term and target class from above to render the master tabulation ledger.
-          </p>
-        </div>
-      ) : studentsData.length === 0 ? (
-        <div className="p-12 text-center border theme-border rounded-2xl theme-bg-surface/50">
-          <UserIcon className="w-12 h-12 mx-auto theme-text-secondary/50 mb-3" />
-          <h3 className="text-base font-bold theme-text-primary">No Student Results Found</h3>
-          <p className="text-xs theme-text-secondary mt-1">
-            No marks have been recorded yet for this examination and class. Visit the Mark Entry Desk to enter subject marks.
+          <p className="text-xs theme-text-secondary mt-1 max-w-md mx-auto">
+            Choose an examination term and target class from above to render the master mark sheet ledger.
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Printable Official Header */}
-          <div className="hidden print:block text-center space-y-1 mb-6 border-b pb-4">
-            <h2 className="text-2xl font-black">{exam?.name || 'Examination Result'}</h2>
-            <p className="text-sm font-semibold">
-              Academic Session: {exam?.academicYearName} • Semester: {exam?.semesterName}
-            </p>
-            <p className="text-xs">
-              Grading Standard: {gradingSystem?.name} • Published Date: {exam?.publishDate || new Date().toISOString().split('T')[0]}
-            </p>
-          </div>
-
-          {/* Search Filter Bar */}
-          <div className="w-full max-w-sm print:hidden">
-            <CustomInput
-              placeholder="Filter by student name or roll..."
-              prefix={SearchIcon}
-              value={searchQuery}
-              onChange={setSearchQuery}
-            />
-          </div>
-
-          {/* Matrix Ledger */}
-          <div className="border theme-border rounded-2xl overflow-hidden theme-bg-surface shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b theme-border theme-bg-sub/60 font-bold theme-text-primary select-none">
-                    <th
-                      onClick={() => handleSortToggle('classRank')}
-                      className="py-3 px-3 w-14 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>Rank</span>
-                        {renderSortIndicator('classRank')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('rollNumber')}
-                      className="py-3 px-3 w-16 cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center gap-1">
-                        <span>Roll</span>
-                        {renderSortIndicator('rollNumber')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('studentName')}
-                      className="py-3 px-4 min-w-[160px] cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center gap-1">
-                        <span>Student Name</span>
-                        {renderSortIndicator('studentName')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('studentSection')}
-                      className="py-3 px-3 w-20 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>Section</span>
-                        {renderSortIndicator('studentSection')}
-                      </div>
-                    </th>
-                    {subjects.map((sub) => (
-                      <th
-                        key={sub.id}
-                        onClick={() => handleSortToggle(`subject_${sub.id}`)}
-                        className="py-3 px-2 text-center min-w-[90px] cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                      >
-                        <div className="flex flex-col items-center">
-                          <div className="inline-flex items-center gap-1 max-w-[120px]">
-                            <span className="block truncate" title={sub.subjectName}>
-                              {sub.subjectName}
-                            </span>
-                            {renderSortIndicator(`subject_${sub.id}`)}
-                          </div>
-                          <span className="block text-[10px] font-normal theme-text-secondary">
-                            ({sub.fullMarks})
-                          </span>
-                        </div>
-                      </th>
-                    ))}
-                    <th
-                      onClick={() => handleSortToggle('totalObtained')}
-                      className="py-3 px-3 w-20 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>Total</span>
-                        {renderSortIndicator('totalObtained')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('overallPercentage')}
-                      className="py-3 px-3 w-16 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>%</span>
-                        {renderSortIndicator('overallPercentage')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('overallGpa')}
-                      className="py-3 px-3 w-16 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>GPA</span>
-                        {renderSortIndicator('overallGpa')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('grade')}
-                      className="py-3 px-4 min-w-[130px] text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>Grade / Div</span>
-                        {renderSortIndicator('grade')}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSortToggle('isOverallPass')}
-                      className="py-3 px-3 w-24 text-center cursor-pointer group hover:theme-bg-sub/80 transition-colors"
-                    >
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span>Status</span>
-                        {renderSortIndicator('isOverallPass')}
-                      </div>
-                    </th>
-                    <th className="py-3 px-3 w-20 text-center print:hidden">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y theme-border">
-                  {filteredStudents.map((st) => (
-                    <tr
-                      key={st.studentId}
-                      className={`hover:theme-bg-sub/30 transition-colors ${
-                        !st.isOverallPass ? 'theme-bg-sub/10' : ''
-                      }`}
-                    >
-                      {/* Class Rank */}
-                      <td className="py-2.5 px-3 text-center font-bold">
-                        {st.classRank === 1 ? (
-                          <span className="inline-flex items-center gap-1 font-black text-amber-500">
-                            <TrophyIcon className="w-3.5 h-3.5" /> 1st
-                          </span>
-                        ) : st.classRank === 2 ? (
-                          <span className="font-black text-slate-400">2nd</span>
-                        ) : st.classRank === 3 ? (
-                          <span className="font-black text-amber-700">3rd</span>
-                        ) : (
-                          <span className="font-mono theme-text-secondary">{st.classRank}</span>
-                        )}
-                      </td>
-
-                      {/* Roll Number */}
-                      <td className="py-2.5 px-3 font-mono font-bold theme-text-primary">
-                        {st.rollNumber}
-                      </td>
-
-                      {/* Student Name */}
-                      <td className="py-2.5 px-4 font-bold theme-text-primary">
-                        {st.studentName}
-                      </td>
-
-                      {/* Section */}
-                      <td className="py-2.5 px-3 text-center theme-text-secondary">
-                        {st.studentSection || 'General'}
-                      </td>
-
-                      {/* Subject Marks */}
-                      {st.subjectMarks.map((sm) => (
-                        <td key={sm.subjectId} className="py-2.5 px-2 text-center font-mono">
-                          {sm.isAbsent ? (
-                            <span className="text-rose-500 font-bold text-[11px]">ABS</span>
-                          ) : (
-                            <span
-                              className={`font-semibold ${
-                                sm.isPassed ? 'theme-text-primary' : 'text-rose-500 font-bold'
-                              }`}
-                            >
-                              {sm.obtained}
-                            </span>
-                          )}
-                        </td>
-                      ))}
-
-                      {/* Total Obtained Marks */}
-                      <td className="py-2.5 px-3 text-center font-mono font-black text-sm theme-text-primary">
-                        {st.totalObtained}
-                      </td>
-
-                      {/* Overall Percentage */}
-                      <td className="py-2.5 px-3 text-center font-mono theme-text-secondary">
-                        {st.overallPercentage}%
-                      </td>
-
-                      {/* Overall GPA */}
-                      <td className="py-2.5 px-3 text-center font-mono font-bold theme-text-primary">
-                        {st.overallGpa}
-                      </td>
-
-                      {/* Grade & Division */}
-                      <td className="py-2.5 px-4 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                            st.isOverallPass
-                              ? 'theme-bg-accent/10 theme-text-accent'
-                              : 'bg-rose-500/10 text-rose-500'
-                          }`}
-                        >
-                          {st.grade}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            st.isOverallPass
-                              ? 'bg-emerald-500/10 text-emerald-600'
-                              : 'bg-rose-500/10 text-rose-500'
-                          }`}
-                        >
-                          {st.isOverallPass ? 'PASSED' : 'FAILED'}
-                        </span>
-                      </td>
-
-                      {/* Action */}
-                      <td className="py-2.5 px-3 text-center print:hidden">
-                        {onNavigateToTranscripts && (
-                          <CustomButton
-                            variant="sub"
-                            size="xs"
-                            onClick={() => onNavigateToTranscripts(selectedExamId, st.studentId)}
-                          >
-                            Marksheet
-                          </CustomButton>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div className="print:hidden w-full space-y-3">
+          {/* Master Marksheet Ledger DataTable */}
+          <DataTable
+            tableTitle={`${selectedClassName} Marksheet (${studentsData.length})`}
+            tableTitleIcon={AcademicCapIcon}
+            columns={columns}
+            data={studentsData}
+            keyExtractor={(st) => String(st.studentId)}
+            emptyTitle="No Student Results Found"
+            emptySubMessage="No marks have been recorded yet for this examination and class. Visit the Mark Entry Desk to enter subject marks."
+            emptyIcon={UserIcon}
+            sortable={true}
+            defaultSortKey="classRank"
+            defaultSortDirection="asc"
+            rowClassName={(st) => (!st.isOverallPass ? 'theme-bg-sub/10' : '')}
+            cellPaddingClass="py-2.5 px-3"
+          />
         </div>
+      )}
+
+      {/* Master Universal Print Studio */}
+      {isPrintStudioOpen && (
+        <UniversalPrintModal
+          isOpen={isPrintStudioOpen}
+          onClose={() => setIsPrintStudioOpen(false)}
+          title={`${exam?.name || 'Academic Examination'} — Master Mark Sheet`}
+          subtitle={`Class: ${selectedClassName} • Section: ${selectedSectionName}`}
+          metaItems={printMetaItems}
+          columns={printColumns}
+          data={studentsData}
+          summaryMetrics={printSummaryMetrics}
+          defaultOptions={{
+            orientation: 'LANDSCAPE',
+            pageSize: 'A4',
+            density: 'NORMAL',
+            showSignatures: true,
+          }}
+        />
       )}
 
       {/* Gazette Modal */}
@@ -530,6 +558,6 @@ export default function TabulationLedgerView({ initialExamId = null, onNavigateT
           onClose={() => setIsGazetteOpen(false)}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
