@@ -76,98 +76,13 @@ def get_scoped_tenant_id(request):
 
 def seed_system_roles():
     """
-    Ensures all baseline system roles and default action permissions exist.
+    Ensures all 11 baseline default system roles exist in clean English definitions.
+    Institutions can freely create additional custom roles via Role Management.
     """
-    from core.models import UserRole, RoleActionPermission
+    from core.services.auth_service import seed_system_roles_11_tier
+    from core.models import UserRole
 
-    system_roles = [
-        {
-            'code': 'SUPER_ADMIN',
-            'name': 'Super Admin',
-            'description': 'Full System & Security Control',
-            'hierarchy_level': 1,
-            'color_theme': 'rose',
-            'is_system_role': True,
-            'perms': {
-                'can_create_student': True,
-                'can_edit_student': True,
-                'can_delete_report': True,
-                'can_export_reports': True,
-                'can_manage_users': True,
-            }
-        },
-        {
-            'code': 'ADMIN',
-            'name': 'Admin / Nazim',
-            'description': 'Administrative & Institutional Control',
-            'hierarchy_level': 2,
-            'color_theme': 'amber',
-            'is_system_role': False,
-            'perms': {
-                'can_create_student': True,
-                'can_edit_student': True,
-                'can_delete_report': False,
-                'can_export_reports': True,
-                'can_manage_users': True,
-            }
-        },
-        {
-            'code': 'STAFF',
-            'name': 'Staff / Accountant',
-            'description': 'Staff & Administrative Support',
-            'hierarchy_level': 3,
-            'color_theme': 'purple',
-            'is_system_role': False,
-            'perms': {
-                'can_create_student': False,
-                'can_edit_student': False,
-                'can_delete_report': False,
-                'can_export_reports': True,
-                'can_manage_users': False,
-            }
-        },
-        {
-            'code': 'TEACHER',
-            'name': 'Teacher / Ustadh',
-            'description': 'Classroom & Student Evaluation Access',
-            'hierarchy_level': 4,
-            'color_theme': 'emerald',
-            'is_system_role': False,
-            'perms': {
-                'can_create_student': True,
-                'can_edit_student': True,
-                'can_delete_report': False,
-                'can_export_reports': True,
-                'can_manage_users': False,
-            }
-        },
-        {
-            'code': 'GUARDIAN',
-            'name': 'Guardian / Parent',
-            'description': 'Read-Only Ward Report Access',
-            'hierarchy_level': 10,
-            'color_theme': 'blue',
-            'is_system_role': False,
-            'perms': {
-                'can_create_student': False,
-                'can_edit_student': False,
-                'can_delete_report': False,
-                'can_export_reports': False,
-                'can_manage_users': False,
-            }
-        },
-    ]
-
-    for item in system_roles:
-        perms_data = item.pop('perms')
-        role, created = UserRole.objects.get_or_create(code=item['code'], defaults=item)
-        if created:
-            perm_obj, _ = RoleActionPermission.objects.get_or_create(role=role)
-            for pk, pv in perms_data.items():
-                setattr(perm_obj, pk, pv)
-            perm_obj.save()
-        else:
-            RoleActionPermission.objects.get_or_create(role=role)
+    seeded_count = seed_system_roles_11_tier()
 
     # Attach UserRole object to any legacy users missing ForeignKey linkage
     for u in User.objects.filter(role__isnull=True):
@@ -176,6 +91,8 @@ def seed_system_roles():
         if r:
             u.role = r
             u.save(update_fields=['role'])
+
+    return seeded_count
 
 
 def sync_feature_registry_to_db():

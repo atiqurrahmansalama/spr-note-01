@@ -1300,3 +1300,39 @@ export function SidebarRightIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export function MoveIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7l4-4m0 0l4 4m-4-4v18m0 0l-4-4m4 4l4-4M7 8l-4 4m0 0l4 4m-4-4h18m0 0l-4-4m4 4l-4 4" />
+    </svg>
+  );
+}
+
+export function HandIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V4a1.5 1.5 0 013 0v3.5m0 0a1.5 1.5 0 013 0V9a1.5 1.5 0 013 0v5" />
+    </svg>
+  );
+}
+
+export function CursorPointerIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3l7 18 3-7 7-3L3 3z" />
+    </svg>
+  );
+}
+
+export function XCircleIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+
+
+
+

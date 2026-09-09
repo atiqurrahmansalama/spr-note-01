@@ -336,7 +336,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         # Exclude students who were not yet admitted during the requested attendance period
         students_qs = students_qs.filter(
-            Q(admission_date__isnull=True, created_at__date__lte=end_date) |
+            Q(admission_date__isnull=True) |
             Q(admission_date__lte=end_date) |
             Q(attendances__date__gte=start_date, attendances__date__lte=end_date)
         ).distinct()

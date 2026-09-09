@@ -43,14 +43,24 @@ export default function PrintDocumentWrapper({
   }, [signatureLines]);
 
   const institutionName =
-    customInstitutionName ||
-    currentInstitution?.name ||
-    'SPR Note Academy';
+    options.customInstitutionName !== undefined && options.customInstitutionName !== ''
+      ? options.customInstitutionName
+      : (customInstitutionName || currentInstitution?.name || 'SPR Note Academy');
 
   const institutionAddress =
-    currentInstitution?.address ||
-    currentInstitution?.campus_address ||
-    'Central Campus & Academic Affairs';
+    options.customInstitutionAddress !== undefined && options.customInstitutionAddress !== ''
+      ? options.customInstitutionAddress
+      : (options.customAddress || currentInstitution?.address || currentInstitution?.campus_address || 'Central Campus & Academic Affairs');
+
+  const resolvedTitle =
+    options.customTitle !== undefined && options.customTitle !== ''
+      ? options.customTitle
+      : title;
+
+  const resolvedSubtitle =
+    options.customSubtitle !== undefined && options.customSubtitle !== ''
+      ? options.customSubtitle
+      : (customSubtitle || subtitle);
 
   const printDate = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -97,35 +107,53 @@ export default function PrintDocumentWrapper({
 
       {/* Top Document Content Area */}
       <div className="relative z-10 flex-1 space-y-3.5 bg-transparent">
-        {/* 1. Official Header & Institution Branding */}
+        {/* 1. Official Academy Branding Header */}
         {showHeader && (
-          <header className="print-document-header flex items-center justify-between pb-3 border-b-2 border-slate-900 bg-transparent">
-            <div className="flex items-center gap-3">
-              {showLogo && (
-                <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                  <BuildingOfficeIcon className="w-6 h-6" />
+          <header className="print-document-header pb-4 mb-4 border-b-2 border-slate-900 bg-transparent">
+            {/* Top Row: Institution Logo & Academy Name Header */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                {showLogo && (
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs border border-slate-800 shrink-0">
+                    <BuildingOfficeIcon className="w-7 h-7" />
+                  </div>
+                )}
+                <div className="space-y-0.5">
+                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-900 leading-tight">
+                    {institutionName}
+                  </h1>
+                  <p className="text-xs sm:text-[12.5px] text-slate-600 font-medium leading-normal">
+                    {institutionAddress}
+                  </p>
                 </div>
-              )}
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight leading-tight text-slate-900">
-                  {institutionName}
-                </h1>
-                <p className="text-[11px] text-slate-600 font-medium">{institutionAddress}</p>
+              </div>
+
+              {/* Right Side: Official Record Badge & Date */}
+              <div className="text-right space-y-1 shrink-0 self-start">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider border border-slate-300 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-700"></span>
+                  Official Record
+                </span>
+                <div className="text-[10.5px] sm:text-[11px] text-slate-500 font-mono font-medium pr-0.5">
+                  {printDate}
+                </div>
               </div>
             </div>
-
-            {/* Document Title & Subtitle Badge */}
-            <div className="text-right space-y-0.5">
-              <h2 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-900">
-                {title}
-              </h2>
-              {(customSubtitle || subtitle) && (
-                <p className="text-[11px] text-slate-600 font-medium">
-                  {customSubtitle || subtitle}
-                </p>
-              )}
-            </div>
           </header>
+        )}
+
+        {/* 2. Document Title & Subtitle Header (Centered with Generous Spacing) */}
+        {(resolvedTitle || resolvedSubtitle) && (
+          <div className="print-document-title-block text-center flex flex-col items-center justify-center space-y-1 pb-2 mb-4">
+            <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-slate-900 leading-tight">
+              {resolvedTitle}
+            </h2>
+            {resolvedSubtitle && (
+              <p className="text-xs sm:text-sm font-semibold text-slate-600 tracking-normal">
+                {resolvedSubtitle}
+              </p>
+            )}
+          </div>
         )}
 
         {/* 2. Structured Metadata Grid Strip */}
@@ -149,7 +177,7 @@ export default function PrintDocumentWrapper({
       </div>
 
       {/* Bottom Area: Signatures and Footer */}
-      <div className="relative z-10 pt-10 mt-auto space-y-4 print-avoid-break">
+      <div className="print-signature-footer-container relative z-10 pt-10 mt-auto space-y-4 print-avoid-break print:mt-auto print:pt-6">
         {/* 4. Official Signatures Block (Bottom Anchored) */}
         {showSignatures && activeSignatureLines.length > 0 && (
           <div

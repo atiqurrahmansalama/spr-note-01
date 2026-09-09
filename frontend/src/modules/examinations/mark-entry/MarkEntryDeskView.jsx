@@ -167,16 +167,20 @@ export default function MarkEntryDeskView({
     return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...rawList];
   }, [sectionOptions, filterClassId, filterDepartmentId, filteredClassOptions, examSubjects]);
 
-  // Cascading Auto-Reset: When Department changes, ensure Class is valid
+  // Cascading Auto-Select: When Department changes, ensure Class is valid or auto-select first class in department
   useEffect(() => {
-    if (filterClassId) {
-      const isValidClass = filteredClassOptions.some(
-        (c) => c.value && String(c.value) === String(filterClassId)
+    const validClasses = filteredClassOptions.filter((c) => c.value && c.value !== '');
+    if (validClasses.length > 0) {
+      const isValidClass = validClasses.some(
+        (c) => String(c.value) === String(filterClassId)
       );
       if (!isValidClass) {
-        setFilterClassId('');
+        setFilterClassId(String(validClasses[0].value));
         setFilterSectionId('ALL');
       }
+    } else {
+      setFilterClassId('');
+      setFilterSectionId('ALL');
     }
   }, [filterDepartmentId, filteredClassOptions, filterClassId]);
 

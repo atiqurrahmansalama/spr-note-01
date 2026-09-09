@@ -11,13 +11,18 @@
   box-sizing: border-box;
   background-color: #ffffff;
   color: #0f172a;
-  transform-origin: top center;
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
   position: relative;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
+  transition: box-shadow 0.2s ease;
+}
+
+.universal-print-transform-wrapper {
+  transform-origin: top center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .paper-sheet > * {
@@ -182,7 +187,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  border-bottom: 1.5px solid #94a3b8;
+  border: 1px solid #cbd5e1;
 }
 
 .print-avoid-break {
@@ -238,6 +243,11 @@ body.spr-printing-in-progress .universal-export-menu-portal {
    4. Print Media Queries (@media print)
    -------------------------------------------------------------------------- */
 @media print {
+  @page {
+    size: auto;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+
   /* Exact color and background preservation */
   *,
   *::before,
@@ -256,8 +266,8 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
+    height: 100% !important;
+    min-height: 100% !important;
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -288,9 +298,8 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
+    height: 100% !important;
+    min-height: 100% !important;
     overflow: visible !important;
     transform: none !important;
     zoom: 1 !important;
@@ -324,25 +333,37 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: calc(100vh - 16mm) !important;
     height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
     background-image: none !important;
     color: #0f172a !important;
-    page-break-after: auto !important;
-    break-after: auto !important;
   }
 
   .print-document-sheet {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(100vh - 16mm) !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
     color: #0f172a !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
-    min-height: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-signature-footer-container {
+    margin-top: auto !important;
+    padding-top: 1.5rem !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* 4. Institutional Header & Metadata */
@@ -421,4 +442,35 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     page-break-inside: avoid !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   7. Mouse Pointer & Canvas Interaction Modes
+   -------------------------------------------------------------------------- */
+.universal-print-canvas-wrapper.mode-hand {
+  cursor: grab;
+}
+
+.universal-print-canvas-wrapper.mode-hand.is-panning {
+  cursor: grabbing;
+}
+
+.universal-print-canvas-wrapper.mode-hand,
+.universal-print-canvas-wrapper.mode-hand * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.universal-print-canvas-wrapper.mode-select {
+  cursor: default;
+}
+
+.universal-print-canvas-wrapper.mode-select .paper-sheet {
+  cursor: default;
+}
+
+.universal-print-canvas-wrapper.mode-select .paper-sheet * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 

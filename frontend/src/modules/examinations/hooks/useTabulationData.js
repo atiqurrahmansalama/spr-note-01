@@ -9,6 +9,7 @@ import { useToast } from '../../../context/ToastContext';
 export default function useTabulationData({
   tenantId = 'default',
   examId = '',
+  departmentId = 'ALL',
   classId = '',
   sectionId = 'ALL',
   students = [],
@@ -16,7 +17,7 @@ export default function useTabulationData({
   const { showToast } = useToast();
 
   const tabulationResult = useMemo(() => {
-    if (!examId || !classId) {
+    if (!examId) {
       return {
         exam: null,
         subjects: [],
@@ -31,11 +32,12 @@ export default function useTabulationData({
 
     return examStore.calculateTabulationMatrix(tenantId, {
       examId,
+      departmentId,
       classId,
       sectionId,
       students,
     });
-  }, [tenantId, examId, classId, sectionId, students]);
+  }, [tenantId, examId, departmentId, classId, sectionId, students]);
 
   // Overall metrics
   const stats = useMemo(() => {

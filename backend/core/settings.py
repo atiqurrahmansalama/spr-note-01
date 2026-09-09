@@ -1,4 +1,6 @@
 import os
+import importlib
+import importlib.util
 import dj_database_url
 from pathlib import Path
 from datetime import timedelta
@@ -27,17 +29,11 @@ AUTH_USER_MODEL = "core.User"
 INSTALLED_APPS = []
 
 # Optional ASGI Daphne & Channels (if installed in environment)
-try:
-    import daphne  # noqa
+if importlib.util.find_spec("daphne") is not None:
     INSTALLED_APPS.append("daphne")
-except ImportError:
-    pass
 
-try:
-    import channels  # noqa
+if importlib.util.find_spec("channels") is not None:
     INSTALLED_APPS.append("channels")
-except ImportError:
-    pass
 
 INSTALLED_APPS += [
     "django.contrib.admin",
@@ -100,13 +96,16 @@ ASGI_APPLICATION = "core.asgi.application"
 
 USE_SQLITE = os.getenv("USE_SQLITE", "False").lower() in ("true", "1", "t")
 DATABASE_URL = os.getenv("DATABASE_URL")
+DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "False").lower() in ("true", "1", "t")
+DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "600"))
 
 if DATABASE_URL and not USE_SQLITE:
     DATABASES = {
         "default": dj_database_url.config(
             default=DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True,
+            conn_max_age=DB_CONN_MAX_AGE,
+            conn_health_checks=True,
+            ssl_require=DB_SSL_REQUIRE,
         )
     }
 else:
@@ -213,7 +212,7 @@ CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_ALWAYS_EAGER", "False").lower() in 
 
 # Redis & In-Memory High Performance Caching Layer
 REDIS_URL = os.getenv("REDIS_URL", os.getenv("CACHE_URL", ""))
-if REDIS_URL and not DEBUG:
+if REDIS_URL:
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -222,7 +221,7 @@ if REDIS_URL and not DEBUG:
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 "IGNORE_EXCEPTIONS": True,
             },
-            "KEY_PREFIX": "suffah_core",
+            "KEY_PREFIX": "spr_note",
             "TIMEOUT": 300,
         }
     }
@@ -230,7 +229,7 @@ else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "LOCATION": "suffah_local_cache",
+            "LOCATION": "spr_note_local_cache",
             "TIMEOUT": 300,
         }
     }
@@ -248,19 +247,19 @@ if "channels" in INSTALLED_APPS:
 
 # Sentry & System APM Observability (Production Ready)
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-if SENTRY_DSN and not DEBUG:
+if SENTRY_DSN and not DEBUG and importlib.util.find_spec("sentry_sdk") is not None:
     try:
-        import sentry_sdk
-        from sentry_sdk.integrations.django import DjangoIntegration
-        from sentry_sdk.integrations.celery import CeleryIntegration
-        from sentry_sdk.integrations.redis import RedisIntegration
+        sentry_sdk = importlib.import_module("sentry_sdk")
+        django_integ = importlib.import_module("sentry_sdk.integrations.django").DjangoIntegration
+        celery_integ = importlib.import_module("sentry_sdk.integrations.celery").CeleryIntegration
+        redis_integ = importlib.import_module("sentry_sdk.integrations.redis").RedisIntegration
 
         sentry_sdk.init(
             dsn=SENTRY_DSN,
             integrations=[
-                DjangoIntegration(),
-                CeleryIntegration(),
-                RedisIntegration(),
+                django_integ(),
+                celery_integ(),
+                redis_integ(),
             ],
             traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.2")),
             send_default_pii=False,

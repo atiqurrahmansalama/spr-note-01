@@ -15,6 +15,8 @@ import {
   SidebarRightIcon,
   UndoIcon,
   RedoIcon,
+  HandIcon,
+  CursorPointerIcon,
 } from '../ui/Icons';
 import './printEngine.css';
 
@@ -33,6 +35,8 @@ export default function UniversalPrintModal({
   columns = [],
   data = [],
   summaryMetrics = [],
+  footerRow = null,
+  footerRows = [],
   // Rich Custom Content Mode
   children = null,
   // Initial default options override
@@ -123,6 +127,9 @@ export default function UniversalPrintModal({
     () => (columns || []).map((c) => c.id || c.key || c.accessor || c.dataIndex).join(','),
     [columns]
   );
+
+  // Mouse Pointer & Canvas Tool Mode: 'hand' (Movable) | 'select' (Text Selection)
+  const [pointerMode, setPointerMode] = useState('hand');
 
   // Column Visibility State with localStorage Hydration
   const [visibleColumnKeys, setVisibleColumnKeys] = useState(() => {
@@ -371,8 +378,8 @@ export default function UniversalPrintModal({
   const { isFullscreen, setIsFullscreen, toggleFullscreen } = useFullscreen({ initialState: true });
 
   // Zoom handlers
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(2.2, +(z + 0.15).toFixed(2)));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.35, +(z - 0.15).toFixed(2)));
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(2.5, +(z + 0.15).toFixed(2)));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.3, +(z - 0.15).toFixed(2)));
   const handleResetZoom = () => setZoomLevel(1);
 
   // Print Trigger (Ctrl+P shortcut)
@@ -380,7 +387,7 @@ export default function UniversalPrintModal({
     printDocument();
   }, []);
 
-  // Keyboard Shortcuts (Ctrl+P, Esc, +, -, Ctrl+B, Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
+  // Keyboard Shortcuts (Ctrl+P, Esc, +, -, 0, Ctrl+B, Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -411,7 +418,10 @@ export default function UniversalPrintModal({
       } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
         e.preventDefault();
         handleZoomOut();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         setIsSidebarOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
@@ -427,12 +437,18 @@ export default function UniversalPrintModal({
           e.preventDefault();
           handleRedo();
         }
+      } else if (!inText && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'm') {
+          setPointerMode('hand');
+        } else if (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 's') {
+          setPointerMode('select');
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handlePrint, onClose, handleUndo, handleRedo]);
+  }, [isOpen, handlePrint, onClose, handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom]);
 
   // Lock body scroll when studio modal is active
   useEffect(() => {
@@ -693,6 +709,8 @@ export default function UniversalPrintModal({
               colorMode={options.colorMode}
               zoomLevel={zoomLevel}
               onZoomChange={setZoomLevel}
+              pointerMode={pointerMode}
+              onPointerModeChange={setPointerMode}
             >
               <PrintDocumentWrapper
                 title={title}
@@ -710,6 +728,8 @@ export default function UniversalPrintModal({
                     extraBlankRows={extraBlankRows}
                     summaryMetrics={options.showSummary !== false ? summaryMetrics : []}
                     density={options.density}
+                    footerRow={footerRow}
+                    footerRows={footerRows}
                   />
                 )}
               </PrintDocumentWrapper>
@@ -727,6 +747,10 @@ export default function UniversalPrintModal({
               <PrintConfigSidebar
                 options={options}
                 onOptionsChange={updateOptionsWithHistory}
+                defaultTitle={title}
+                defaultSubtitle={subtitle}
+                title={title}
+                subtitle={subtitle}
                 availableColumns={columns}
                 visibleColumnKeys={visibleColumnKeys}
                 onVisibleColumnsChange={updateVisibleColumnsWithHistory}

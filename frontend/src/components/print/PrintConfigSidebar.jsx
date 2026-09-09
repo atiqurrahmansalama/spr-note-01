@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTenant } from '../../context/TenantContext';
 import RightSidebarPanel from '../ui/RightSidebarPanel';
 import DrawerContainer, { DrawerSection } from '../layout/DrawerContainer';
 import CustomCheckbox from '../ui/CustomCheckbox';
@@ -37,6 +38,10 @@ import {
 export default function PrintConfigSidebar({
   options = {},
   onOptionsChange,
+  defaultTitle = 'Official Document',
+  defaultSubtitle = '',
+  title = '',
+  subtitle = '',
   availableColumns = [],
   visibleColumnKeys = [],
   onVisibleColumnsChange,
@@ -53,6 +58,7 @@ export default function PrintConfigSidebar({
   onResetResize,
   className = '',
 }) {
+  const { currentInstitution } = useTenant ? useTenant() : { currentInstitution: null };
   const [activeTab, setActiveTab] = useState('layout'); // 'layout' | 'content' | 'signatures'
   const [isEditSignaturesOpen, setIsEditSignaturesOpen] = useState(false);
   const [expandedSigIds, setExpandedSigIds] = useState([]);
@@ -270,26 +276,60 @@ export default function PrintConfigSidebar({
           {/* TAB 2: Content (Header, Watermark, Columns & Blank Rows) */}
           {activeTab === 'content' && (
             <>
-              {/* Section 1: Institutional Branding */}
+              {/* Section 1: Header Branding & Document Title */}
               <DrawerSection
                 icon={BuildingIcon}
-                title="Content Display"
+                title="Header & Document Title"
+              >
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
+                    <CustomCheckbox
+                      checked={options.showHeader !== false}
+                      onChange={(val) => updateOption('showHeader', val)}
+                      label="Show Institution Header"
+                      size="sm"
+                    />
+
+                    <CustomCheckbox
+                      checked={options.showLogo !== false}
+                      onChange={(val) => updateOption('showLogo', val)}
+                      label="Show Institution Logo"
+                      size="sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2.5 pt-2 border-t theme-border">
+                    <CustomInput
+                      label="Document Header (Title)"
+                      value={options.customTitle ?? ''}
+                      onChange={(val, e) => {
+                        const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
+                        updateOption('customTitle', nextVal);
+                      }}
+                      placeholder={defaultTitle || title || 'Official Document'}
+                      size="sm"
+                    />
+
+                    <CustomInput
+                      label="Document Header (Subtitle / Term)"
+                      value={options.customSubtitle ?? ''}
+                      onChange={(val, e) => {
+                        const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
+                        updateOption('customSubtitle', nextVal);
+                      }}
+                      placeholder={defaultSubtitle || subtitle || 'Academic Session / Examination'}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              </DrawerSection>
+
+              {/* Section 2: Sections & Display Bars */}
+              <DrawerSection
+                icon={GridIcon}
+                title="Sections & Display Bars"
               >
                 <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
-                  <CustomCheckbox
-                    checked={options.showHeader !== false}
-                    onChange={(val) => updateOption('showHeader', val)}
-                    label="Show Institution Header"
-                    size="sm"
-                  />
-
-                  <CustomCheckbox
-                    checked={options.showLogo !== false}
-                    onChange={(val) => updateOption('showLogo', val)}
-                    label="Show Institution Logo"
-                    size="sm"
-                  />
-
                   <CustomCheckbox
                     checked={options.showMeta !== false}
                     onChange={(val) => updateOption('showMeta', val)}
@@ -605,7 +645,7 @@ export default function PrintConfigSidebar({
                                   <div className="p-3 border-t theme-border theme-bg-sub/30 space-y-2.5 animate-fade-in">
                                     <div className="grid grid-cols-1 @[420px]:grid-cols-2 gap-2.5">
                                       <CustomInput
-                                        label="Title"
+                                        label="Primary Title / Role"
                                         value={sig.label}
                                         onChange={(val, e) => {
                                           const str = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
@@ -613,12 +653,12 @@ export default function PrintConfigSidebar({
                                           newLines[sIdx] = { ...newLines[sIdx], label: str };
                                           updateOption('signatureLines', newLines);
                                         }}
-                                        placeholder="e.g. Course Teacher"
+                                        placeholder="e.g. Prepared By / Tabulator"
                                         size="sm"
                                       />
 
                                       <CustomInput
-                                        label="Name"
+                                        label="Subtitle / Designation"
                                         value={sig.sub || ''}
                                         onChange={(val, e) => {
                                           const str = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
@@ -626,7 +666,7 @@ export default function PrintConfigSidebar({
                                           newLines[sIdx] = { ...newLines[sIdx], sub: str };
                                           updateOption('signatureLines', newLines);
                                         }}
-                                        placeholder="e.g. Signature / Seal"
+                                        placeholder="e.g. Head of Department / Seal"
                                         size="sm"
                                       />
                                     </div>

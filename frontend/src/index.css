@@ -175,7 +175,13 @@ body {
 @utility theme-text-secondary {
   color: var(--text-secondary);
 }
+@utility theme-text-muted {
+  color: color-mix(in srgb, var(--text-secondary) 75%, transparent);
+}
 @utility theme-accent {
+  color: var(--accent-main);
+}
+@utility theme-text-accent {
   color: var(--accent-main);
 }
 @utility theme-bg-accent {
@@ -189,6 +195,18 @@ body {
 }
 @utility theme-danger {
   color: var(--danger-text);
+}
+@utility theme-text-danger {
+  color: var(--color-danger, #f43f5e);
+}
+@utility theme-text-success {
+  color: var(--color-success-text, #10b981);
+}
+@utility theme-text-warning {
+  color: var(--color-warning-text, #f59e0b);
+}
+@utility theme-text-info {
+  color: var(--color-info-text, #0ea5e9);
 }
 @utility theme-bg-danger {
   background-color: var(--color-danger);
@@ -233,6 +251,44 @@ body {
 @utility theme-bg-neutral-soft { background-color: var(--color-neutral-soft); }
 @utility theme-border-neutral { border-color: var(--color-neutral-border); }
 .theme-neutral-badge { background-color: var(--color-neutral-soft); color: var(--color-neutral-text); border: 1px solid var(--color-neutral-border); }
+
+/* Solid Opaque Sticky Cell Background Handlers (100% opaque to prevent background bleed-through during horizontal scroll) */
+.theme-sticky-header {
+  background-color: var(--bg-surface-sub);
+}
+.theme-sticky-header:hover {
+  background-color: color-mix(in srgb, var(--text-primary) 4%, var(--bg-surface-sub));
+}
+
+.theme-sticky-cell-app {
+  background-color: var(--bg-app);
+}
+.group\/row:hover .theme-sticky-cell-app,
+tr:hover > .theme-sticky-cell-app {
+  background-color: color-mix(in srgb, var(--text-primary) 3%, var(--bg-app));
+}
+.theme-sticky-cell-app.is-selected {
+  background-color: color-mix(in srgb, var(--accent-main) 12%, var(--bg-app));
+}
+.group\/row:hover .theme-sticky-cell-app.is-selected,
+tr:hover > .theme-sticky-cell-app.is-selected {
+  background-color: color-mix(in srgb, var(--accent-main) 16%, var(--bg-app));
+}
+
+.theme-sticky-cell-surface {
+  background-color: var(--bg-surface);
+}
+.group\/row:hover .theme-sticky-cell-surface,
+tr:hover > .theme-sticky-cell-surface {
+  background-color: color-mix(in srgb, var(--text-primary) 3%, var(--bg-surface));
+}
+.theme-sticky-cell-surface.is-selected {
+  background-color: color-mix(in srgb, var(--accent-main) 12%, var(--bg-surface));
+}
+.group\/row:hover .theme-sticky-cell-surface.is-selected,
+tr:hover > .theme-sticky-cell-surface.is-selected {
+  background-color: color-mix(in srgb, var(--accent-main) 16%, var(--bg-surface));
+}
 
 /* 1. Enterprise Slate Theme */
 html[data-theme="slate"][data-mode="dark"] {

@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
-import PageHeader from '../../../components/ui/PageHeader';
-import ActionMenu from '../../../components/ui/ActionMenu';
+import PageHeader from '../../../../components/ui/PageHeader';
+import ActionMenu from '../../../../components/ui/ActionMenu';
 import {
   ChartBarIcon,
   DownloadIcon,
   PrinterIcon,
   DocumentIcon,
-} from '../../../components/ui/Icons';
+} from '../../../../components/ui/Icons';
 
 /**
- * TabulationHeader
- * Top control header utilizing the standard PageHeader and ActionMenu components,
- * matching the exact enterprise pattern of MarkEntryHeader.
+ * MarkSheetHeader
+ * Top control header utilizing standard PageHeader and ActionMenu (with Print, Result Gazette & Export CSV).
  */
-export default function TabulationHeader({
+export default function MarkSheetHeader({
   exam,
   onExportCsv,
   onOpenPrintStudio,
   onOpenGazette,
+  onOpenTranscripts,
 }) {
   const renderStatusBadge = () => {
     if (!exam) return null;
@@ -29,11 +29,11 @@ export default function TabulationHeader({
     );
   };
 
-  // Three-dot action menu items for data export/import & printing
+  // Three-dot action menu items for printing, gazette, transcripts & CSV export
   const menuActionItems = useMemo(
     () => [
       {
-        label: 'Print & Export Studio',
+        label: 'Print Ledger',
         icon: PrinterIcon,
         onClick: onOpenPrintStudio,
       },
@@ -42,6 +42,11 @@ export default function TabulationHeader({
         icon: DocumentIcon,
         onClick: onOpenGazette,
       },
+      {
+        label: 'Transcript Studio',
+        icon: DocumentIcon,
+        onClick: onOpenTranscripts,
+      },
       { divider: true },
       {
         label: 'Export CSV',
@@ -49,14 +54,14 @@ export default function TabulationHeader({
         onClick: onExportCsv,
       },
     ],
-    [onOpenPrintStudio, onOpenGazette, onExportCsv]
+    [onOpenPrintStudio, onOpenGazette, onOpenTranscripts, onExportCsv]
   );
 
   return (
     <div className="print:hidden">
       <PageHeader
         icon={ChartBarIcon}
-        title="Master Mark Sheet & Academic Ledger"
+        title="Examination Mark Sheet Ledger"
         subtitle="Integrated class marksheet ledger displaying subject scores, total marks, GPA, academic division, and class rankings."
         badge={renderStatusBadge()}
         actions={

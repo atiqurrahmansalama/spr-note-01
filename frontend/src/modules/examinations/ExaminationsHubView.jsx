@@ -1,7 +1,7 @@
 import React from 'react';
 import ExamSchedulesHubView from './exam-schedules/ExamSchedulesHubView';
 import MarkEntryDeskView from './mark-entry/MarkEntryDeskView';
-import TabulationLedgerView from './tabulation/TabulationLedgerView';
+import MarkSheetLedgerView from './mark-sheet/MarkSheetLedgerView';
 import TranscriptStudioView from './transcripts/TranscriptStudioView';
 import GradingRulesView from './grading-rules/GradingRulesView';
 
@@ -15,11 +15,11 @@ export default function ExaminationsHubView({ defaultTab = 'SCHEDULES' }) {
   if (defaultTab === 'MARK_ENTRY') {
     return <MarkEntryDeskView />;
   }
-  if (defaultTab === 'TABULATION' || defaultTab === 'MARKSHEET') {
-    return <TabulationLedgerView />;
+  if (defaultTab === 'TABULATION' || defaultTab === 'MARKSHEET' || defaultTab === 'MARK_SHEET') {
+    return <MarkSheetLedgerView />;
   }
   if (defaultTab === 'TRANSCRIPTS') {
-    return <TranscriptStudioView />;
+    return <MarkSheetLedgerView defaultSubTab="transcripts" />;
   }
   if (defaultTab === 'GRADING_RULES') {
     return <GradingRulesView />;

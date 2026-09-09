@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import CustomCheckbox from './CustomCheckbox';
 import { SortIcon, SortAscIcon, SortDescIcon } from './Icons';
 
@@ -79,6 +79,91 @@ function compareValues(valA, valB, direction = 'asc') {
   return isAsc ? cmp : -cmp;
 }
 
+/**
+ * Resolves standard text alignment class for tables
+ */
+function getAlignClass(align) {
+  if (align === 'center') return 'text-center';
+  if (align === 'right') return 'text-right';
+  return 'text-left';
+}
+
+/**
+ * Checks if a column is configured as sticky left or right
+ */
+function isStickyCol(col, position) {
+  if (!col) return false;
+  if (position === 'right') {
+    return (
+      col.sticky === 'right' ||
+      col.sticky === true ||
+      (col.key === 'actions' && col.sticky !== false) ||
+      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
+      (typeof col.className === 'string' && col.className.includes('sticky right')) ||
+      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky right'))
+    );
+  }
+  if (position === 'left') {
+    return (
+      col.sticky === 'left' ||
+      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
+      (typeof col.className === 'string' && col.className.includes('sticky left')) ||
+      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky left'))
+    );
+  }
+  return false;
+}
+
+/**
+ * Calculates sticky header classes for table headers, subheaders, and footers
+ */
+function getStickyHeaderClass(col, bgClass = 'theme-bg-sub') {
+  const isRight = isStickyCol(col, 'right');
+  const isLeft = isStickyCol(col, 'left');
+  if (!isRight && !isLeft) return bgClass;
+  const posClass = isRight ? 'sticky right-0 z-20' : 'sticky left-0 z-20';
+  return `${posClass} theme-sticky-header`;
+}
+
+/**
+ * Calculates sticky cell classes for table body rows
+ */
+function getStickyCellClass(col, itemSelected, isTransparentBg) {
+  const isRight = isStickyCol(col, 'right');
+  const isLeft = isStickyCol(col, 'left');
+  if (!isRight && !isLeft) return '';
+
+  const posClass = isRight ? 'sticky right-0 z-10' : 'sticky left-0 z-10';
+  const bgClass = isTransparentBg ? 'theme-sticky-cell-app' : 'theme-sticky-cell-surface';
+  const selectedClass = itemSelected ? 'is-selected' : '';
+
+  return `${posClass} ${bgClass} ${selectedClass} transition-colors`;
+}
+
+/**
+ * Calculates column width style based on user resize state and column definitions
+ */
+function getColumnStyle(colKey, activeWidths, col) {
+  const customWidth = activeWidths?.[colKey];
+  if (customWidth !== undefined) {
+    return {
+      width: `${customWidth}px`,
+      minWidth: `${customWidth}px`,
+      maxWidth: `${customWidth}px`,
+      boxSizing: 'border-box',
+    };
+  }
+  if (col?.width || col?.minWidth || col?.maxWidth) {
+    return {
+      width: col.width || undefined,
+      minWidth: col.minWidth || undefined,
+      maxWidth: col.maxWidth || undefined,
+      boxSizing: 'border-box',
+    };
+  }
+  return undefined;
+}
+
 export default function DataTable({
   columns = [],
   data = [],
@@ -91,6 +176,8 @@ export default function DataTable({
   onRowClick,
   hideHeader = false,
   compact = false,
+  transparent = true,
+  isTransparent = undefined,
   cellPaddingClass = '',
   headerPaddingClass = '',
   wrapperClassName = '',
@@ -98,6 +185,13 @@ export default function DataTable({
   theadClassName = '',
   headerClassName = '',
   rowClassName,
+  // --- Column Resizing Props ---
+  resizable = false,
+  columnWidths: controlledColumnWidths = null,
+  defaultColumnWidths = {},
+  onColumnResize = null,
+  minColumnWidth = 48,
+  maxColumnWidth = 800,
   // --- Sorting Props ---
   sortable = true,
   sortConfig: controlledSortConfig = null,
@@ -119,19 +213,134 @@ export default function DataTable({
   indexHeader = 'No',
   serialHeader = null,
   startIndex = 1,
-  indexHeaderClassName = 'w-12 text-center text-xs font-bold font-mono',
-  indexCellClassName = 'w-12 text-center font-mono text-xs font-bold theme-text-secondary',
-  // --- Header Orientation Props (Boolean flag: true = rotated vertical headers, false = standard horizontal) ---
+  indexHeaderClassName = 'w-12 text-center text-xs font-bold',
+  indexCellClassName = 'w-12 text-center text-xs font-bold theme-text-secondary',
+  // --- Header Orientation & Sub-Header Rows Props ---
   verticalHeaders = false,
   rotateHeaders = false,
   isVerticalHeader = false,
+  subHeaderRow = null,
+  subHeaderRows = [],
+  subHeaderRowClassName = '',
+  // --- Footer Props ---
+  footerRow = null,
+  footerRows = [],
+  footerRowClassName = '',
+  tfootClassName = '',
   tableTitle = null,
   tableTitleIcon: TableTitleIcon = null,
   headerActions = null,
 }) {
+  const isTransparentBg = isTransparent !== undefined ? Boolean(isTransparent) : Boolean(transparent);
   const shouldShowSerial = Boolean(showIndex || showSerial);
   const resolvedSerialHeader = serialHeader || indexHeader || 'No';
   const isVertical = Boolean(verticalHeaders || rotateHeaders || isVerticalHeader);
+
+  // Column widths state for resizing
+  const [internalColumnWidths, setInternalColumnWidths] = useState(() => ({ ...defaultColumnWidths }));
+  const activeColumnWidths = controlledColumnWidths || internalColumnWidths;
+  const resizingRef = useRef(null);
+
+  // Column resize drag handler with text/content protection
+  const handleResizeStart = useCallback(
+    (col, e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const colKey = col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
+      if (!colKey) return;
+
+      const thElement = e.currentTarget.closest('th');
+      const startWidth = thElement ? thElement.getBoundingClientRect().width : (activeColumnWidths[colKey] || 100);
+      const startX = e.touches ? e.touches[0].clientX : e.clientX;
+
+      resizingRef.current = {
+        colKey,
+        startX,
+        startWidth,
+        col,
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+
+      const handleMove = (moveEvent) => {
+        if (!resizingRef.current) return;
+        const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+        const deltaX = currentX - resizingRef.current.startX;
+
+        // Dynamic content-safe floor calculation: protects header and cell text from breaking
+        const headerText = typeof col.header === 'string' ? col.header : (col.label || col.title || '');
+        const isRotated = isVertical && col.rotatable !== false && col.rotate !== false && col.key !== 'actions';
+        const dynamicTextFloor = isRotated
+          ? 40
+          : Math.max(minColumnWidth, Math.min(140, headerText.length * 8 + 24));
+
+        const rawMin = col.minResizeWidth || col.minWidth || minColumnWidth;
+        const safeFloor = Math.max(
+          typeof rawMin === 'number' ? rawMin : parseInt(rawMin, 10) || minColumnWidth,
+          dynamicTextFloor
+        );
+        const maxW = col.maxResizeWidth || col.maxWidth || maxColumnWidth;
+        const safeMax = typeof maxW === 'number' ? maxW : parseInt(maxW, 10) || maxColumnWidth;
+
+        const newWidth = Math.max(safeFloor, Math.min(safeMax, Math.round(resizingRef.current.startWidth + deltaX)));
+
+        setInternalColumnWidths((prev) => {
+          const next = { ...prev, [colKey]: newWidth };
+          onColumnResize?.(colKey, newWidth, next);
+          return next;
+        });
+      };
+
+      const handleEnd = () => {
+        resizingRef.current = null;
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleEnd);
+        window.removeEventListener('touchmove', handleMove);
+        window.removeEventListener('touchend', handleEnd);
+      };
+
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleMove);
+      window.addEventListener('touchend', handleEnd);
+    },
+    [activeColumnWidths, isVertical, minColumnWidth, maxColumnWidth, onColumnResize]
+  );
+
+  const handleResetColumnWidth = useCallback(
+    (col) => {
+      const colKey = col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
+      if (!colKey) return;
+      setInternalColumnWidths((prev) => {
+        const next = { ...prev };
+        delete next[colKey];
+        onColumnResize?.(colKey, undefined, next);
+        return next;
+      });
+    },
+    [onColumnResize]
+  );
+
+  const resolvedSubHeaderRows = useMemo(() => {
+    if (Array.isArray(subHeaderRows) && subHeaderRows.length > 0) {
+      return subHeaderRows;
+    }
+    if (subHeaderRow && typeof subHeaderRow === 'object') {
+      return [subHeaderRow];
+    }
+    if (typeof subHeaderRow === 'function') {
+      return [subHeaderRow];
+    }
+    if (subHeaderRow === true || columns.some((col) => col.subHeader !== undefined && col.subHeader !== null)) {
+      return [(col) => col.subHeader ?? '-'];
+    }
+    return [];
+  }, [subHeaderRow, subHeaderRows, columns]);
+
   // Internal sort state for uncontrolled mode
   const [internalSortConfig, setInternalSortConfig] = useState(() => {
     if (defaultSortKey) {
@@ -149,7 +358,7 @@ export default function DataTable({
     if (!activeSortKey) return null;
     return columns.find(
       (c) =>
-        (c.sortKey || c.accessor || c.key || c.id || c.dataIndex) === activeSortKey
+        (c.sortKey || c.accessor || c.key || c.id || col?.dataIndex) === activeSortKey
     ) || null;
   }, [columns, activeSortKey]);
 
@@ -210,6 +419,22 @@ export default function DataTable({
     });
   }, [data, isControlledSort, activeSortKey, activeSortDir, activeSortColumn]);
 
+  const resolvedFooterRows = useMemo(() => {
+    if (Array.isArray(footerRows) && footerRows.length > 0) {
+      return footerRows;
+    }
+    if (footerRow && typeof footerRow === 'object') {
+      return [footerRow];
+    }
+    if (typeof footerRow === 'function') {
+      return [footerRow];
+    }
+    if (footerRow === true || columns.some((col) => col.footer !== undefined && col.footer !== null)) {
+      return [(col) => (typeof col.footer === 'function' ? col.footer(processedData, data) : (col.footer ?? '-'))];
+    }
+    return [];
+  }, [footerRow, footerRows, columns, processedData, data]);
+
   // Selection memo & helpers (must remain at top level before early returns)
   const defaultHeaderPad = headerPaddingClass || (compact ? 'py-1.5 px-2.5' : 'py-2 px-3 sm:px-4');
   const defaultCellPad = cellPaddingClass || (compact ? 'py-1.5 px-3' : 'py-3.5 px-4 sm:px-6');
@@ -244,7 +469,7 @@ export default function DataTable({
 
   if (isLoading) {
     return (
-      <div className={`theme-bg-surface border theme-border rounded-2xl p-12 text-center shadow-xs ${wrapperClassName}`}>
+      <div className={`${isTransparentBg ? 'bg-transparent' : 'theme-bg-surface'} border theme-border rounded-2xl p-12 text-center shadow-xs ${wrapperClassName}`}>
         <div className="flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin theme-accent"></div>
           <span className="text-xs font-semibold theme-text-secondary">{loadingMessage}</span>
@@ -255,7 +480,7 @@ export default function DataTable({
 
   if (!processedData || processedData.length === 0) {
     return (
-      <div className={`theme-bg-surface border theme-border rounded-2xl p-12 text-center shadow-xs space-y-3 ${wrapperClassName}`}>
+      <div className={`${isTransparentBg ? 'bg-transparent' : 'theme-bg-surface'} border theme-border rounded-2xl p-12 text-center shadow-xs space-y-3 ${wrapperClassName}`}>
         {EmptyIcon && (
           <div className="w-12 h-12 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center mx-auto theme-text-muted">
             <EmptyIcon className="w-6 h-6" />
@@ -296,22 +521,22 @@ export default function DataTable({
       )}
 
       {/* Main Table Container */}
-      <div className={`theme-bg-surface border theme-border rounded-2xl shadow-xs overflow-hidden ${wrapperClassName}`}>
+      <div className={`${isTransparentBg ? 'bg-transparent' : 'theme-bg-surface'} border theme-border rounded-2xl shadow-xs overflow-hidden ${wrapperClassName}`}>
         <div className="overflow-x-auto">
           <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
             {!hideHeader && (
               <thead
                 className={`border-b theme-border theme-bg-sub theme-text-secondary uppercase text-xs tracking-wider font-bold ${
-                  isVertical ? 'h-24 max-h-[96px] align-bottom' : 'max-h-[96px]'
+                  isVertical ? 'h-24 max-h-[96px] align-middle' : 'max-h-[96px]'
                 } ${theadClassName || headerClassName}`}
               >
                 <tr>
                   {selectable && (
                     <th
-                      className={`${defaultHeaderPad} ${selectionHeaderClassName} ${isVertical ? 'align-bottom pb-2' : ''} max-h-[96px]`}
+                      className={`${defaultHeaderPad} ${selectionHeaderClassName} ${isVertical ? 'align-middle' : ''} theme-bg-sub max-h-[96px]`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-end' : ''}`}>
+                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-center' : ''}`}>
                         <CustomCheckbox
                           size="sm"
                           checked={isAllSelected}
@@ -326,42 +551,21 @@ export default function DataTable({
                   )}
                   {shouldShowSerial && (
                     <th
-                      className={`${defaultHeaderPad} ${indexHeaderClassName} ${isVertical ? 'align-bottom pb-2' : ''} max-h-[96px]`}
+                      className={`${defaultHeaderPad} ${indexHeaderClassName} ${isVertical ? 'align-middle' : ''} theme-bg-sub max-h-[96px]`}
                     >
-                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-end' : ''}`}>
+                      <div className={`flex items-center justify-center ${isVertical ? 'h-full flex flex-col justify-center' : ''}`}>
                         <span>{resolvedSerialHeader}</span>
                       </div>
                     </th>
                   )}
                   {columns.map((col, idx) => {
-                    const alignClass =
-                      col.align === 'center'
-                        ? 'text-center'
-                        : col.align === 'right'
-                        ? 'text-right'
-                        : 'text-left';
-
-                    const isStickyRight =
-                      col.sticky === 'right' ||
-                      col.sticky === true ||
-                      (col.key === 'actions' && col.sticky !== false) ||
-                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
-                      (typeof col.className === 'string' && col.className.includes('sticky right')) ||
-                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky right'));
-
-                    const isStickyLeft =
-                      col.sticky === 'left' ||
-                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
-                      (typeof col.className === 'string' && col.className.includes('sticky left')) ||
-                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky left'));
-
-                    const stickyHeaderClass = isStickyRight
-                      ? 'sticky right-0 z-20 theme-bg-sub'
-                      : isStickyLeft
-                      ? 'sticky left-0 z-20 theme-bg-sub'
-                      : '';
-
+                    const alignClass = getAlignClass(col.align);
+                    const stickyHeaderClass = getStickyHeaderClass(col, 'theme-bg-sub');
                     const colSortKey = col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
+                    const colStyle = getColumnStyle(colSortKey, activeColumnWidths, col);
+                    const isStickyRight = isStickyCol(col, 'right');
+                    const isColResizable = resizable !== false && col.resizable !== false && col.key !== 'actions' && col.id !== 'actions' && !isStickyRight;
+
                     const isColSortable =
                       sortable !== false &&
                       col.sortable !== false &&
@@ -394,7 +598,7 @@ export default function DataTable({
                         if (labelText) {
                           return (
                             <div
-                              className="flex flex-col items-center justify-end h-full w-full select-none pb-1"
+                              className="flex flex-col items-center justify-end w-full h-full select-none min-h-[96px] max-h-[120px] py-1"
                               title={`${labelText}${col.subHeader ? ` (${col.subHeader})` : ''}`}
                             >
                               <div
@@ -403,19 +607,23 @@ export default function DataTable({
                                   textOrientation: 'sideways',
                                   WebkitTextOrientation: 'sideways',
                                   transform: 'rotate(180deg)',
+                                  transformOrigin: 'center center',
                                   WebkitFontSmoothing: 'antialiased',
                                   MozOsxFontSmoothing: 'grayscale',
                                   textRendering: 'optimizeLegibility',
+                                  textAlign: 'left',
+                                  maxHeight: '94px',
+                                  maxWidth: '22px',
+                                  lineHeight: '1.12',
+                                  overflow: 'hidden',
+                                  wordBreak: 'break-word',
+                                  display: 'inline-block',
+                                  clipPath: 'inset(0 0 0 0)',
                                 }}
-                                className="whitespace-normal break-words text-xs font-bold tracking-tight theme-text-primary max-h-20 overflow-hidden py-0.5 text-left leading-tight"
+                                className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary leading-tight"
                               >
                                 {labelText}
                               </div>
-                              {col.subHeader && (
-                                <span className="text-[10px] font-mono font-bold theme-text-secondary mt-1 whitespace-nowrap">
-                                  {col.subHeader}
-                                </span>
-                              )}
                             </div>
                           );
                         }
@@ -423,12 +631,30 @@ export default function DataTable({
 
                       // Horizontal mode: handle subHeader and multi-line wrapping cleanly
                       if (col.subHeader && typeof col.header === 'string') {
+                        const isLeft = alignClass === 'text-left' || (!col.align && !alignClass);
+                        const isRight = alignClass === 'text-right';
                         return (
-                          <div className="flex flex-col items-center justify-center text-center py-0.5 leading-snug w-full">
-                            <span className="whitespace-normal break-words text-xs font-bold leading-tight theme-text-primary text-center">
+                          <div
+                            className={`flex flex-col py-0.5 leading-snug w-full ${
+                              isRight
+                                ? 'items-end text-right justify-center'
+                                : isLeft
+                                ? 'items-start text-left justify-center'
+                                : 'items-center text-center justify-center'
+                            }`}
+                          >
+                            <span
+                              className={`whitespace-normal break-words text-xs uppercase tracking-wider leading-tight line-clamp-2 transition-colors ${
+                                isRight ? 'text-right' : isLeft ? 'text-left' : 'text-center'
+                              } ${
+                                isCurrentSort
+                                  ? 'theme-text-accent font-black'
+                                  : 'theme-text-secondary group-hover/col-header:theme-text-primary'
+                              }`}
+                            >
                               {col.header}
                             </span>
-                            <span className="text-[10px] font-mono font-semibold theme-text-secondary mt-0.5 whitespace-nowrap">
+                            <span className="text-[10px] theme-text-muted font-normal mt-0.5 whitespace-nowrap transition-colors group-hover/col-header:theme-text-secondary">
                               {col.subHeader}
                             </span>
                           </div>
@@ -438,11 +664,13 @@ export default function DataTable({
                       return col.header ?? col.label ?? col.title ?? '';
                     })();
 
-                    const verticalThClass = isVertical ? 'align-bottom' : '';
+                    const verticalThClass = shouldRotateCol ? 'align-bottom' : (isVertical ? 'align-middle' : '');
+                    const thPadding = shouldRotateCol ? 'py-1 px-1' : defaultHeaderPad;
 
                     return (
                       <th
                         key={col.key || idx}
+                        style={colStyle}
                         onClick={() => handleHeaderClick(col)}
                         onKeyDown={(e) => {
                           if (isColSortable && (e.key === 'Enter' || e.key === ' ')) {
@@ -470,20 +698,24 @@ export default function DataTable({
                               : `Click to sort by ${typeof col.header === 'string' ? col.header : col.label ?? col.title ?? 'column'}`
                             : undefined
                         }
-                        className={`${defaultHeaderPad} ${alignClass} ${stickyHeaderClass} ${verticalThClass} ${
+                        className={`relative ${thPadding} ${alignClass} ${stickyHeaderClass} ${verticalThClass} ${
                           isColSortable
-                            ? 'cursor-pointer select-none group/col-header hover:theme-bg-sub/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-main)]'
+                            ? `cursor-pointer select-none group/col-header ${
+                                !isStickyCol(col, 'right') && !isStickyCol(col, 'left')
+                                  ? 'hover:bg-black/[0.025] dark:hover:bg-white/[0.03]'
+                                  : ''
+                              } transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-main)]/40`
                             : ''
                         } ${col.headerClassName || ''}`}
                       >
                         {shouldRotateCol ? (
-                          <div className="flex flex-col items-center justify-end h-full w-full gap-0.5">
+                          <div className="flex flex-col items-center justify-end h-full w-full min-h-[84px] pb-1">
                             {isColSortable && (
                               <span
-                                className={`shrink-0 transition-all duration-150 inline-flex items-center mb-0.5 ${
+                                className={`shrink-0 transition-all duration-150 inline-flex items-center mb-1 ${
                                   isCurrentSort
                                     ? 'theme-text-accent scale-110'
-                                    : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-0 group-hover/col-header:opacity-100'
+                                    : 'theme-text-muted/40 group-hover/col-header:theme-text-primary opacity-0 group-hover/col-header:opacity-100'
                                 }`}
                               >
                                 {isCurrentSort ? (
@@ -502,7 +734,7 @@ export default function DataTable({
                             </div>
                           </div>
                         ) : isVertical ? (
-                          <div className={`flex flex-col justify-end h-full w-full pb-1 ${
+                          <div className={`flex flex-col justify-center h-full w-full py-1 ${
                             alignClass === 'text-right'
                               ? 'items-end text-right'
                               : alignClass === 'text-center'
@@ -511,7 +743,7 @@ export default function DataTable({
                           }`}>
                             <div className="inline-flex items-center gap-1.5">
                               {React.isValidElement(resolvedHeaderContent) ? (
-                                <div className={`${isCurrentSort ? 'theme-text-accent font-black' : ''}`}>
+                                <div className={`min-w-0 ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}>
                                   {resolvedHeaderContent}
                                 </div>
                               ) : (
@@ -520,7 +752,11 @@ export default function DataTable({
                                     col.nowrap
                                       ? 'whitespace-nowrap truncate'
                                       : 'whitespace-normal break-words leading-tight'
-                                  } ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}
+                                  } transition-colors ${
+                                    isCurrentSort
+                                      ? 'theme-text-accent font-black'
+                                      : 'theme-text-secondary group-hover/col-header:theme-text-primary'
+                                  }`}
                                 >
                                   {resolvedHeaderContent}
                                 </span>
@@ -530,7 +766,7 @@ export default function DataTable({
                                   className={`shrink-0 transition-all duration-150 inline-flex items-center ${
                                     isCurrentSort
                                       ? 'theme-text-accent scale-110'
-                                      : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-70 group-hover/col-header:opacity-100'
+                                      : 'theme-text-muted/40 group-hover/col-header:theme-text-primary opacity-0 group-hover/col-header:opacity-100'
                                   }`}
                                 >
                                   {isCurrentSort ? (
@@ -566,7 +802,11 @@ export default function DataTable({
                                   col.nowrap
                                     ? 'whitespace-nowrap truncate'
                                     : 'whitespace-normal break-words leading-tight'
-                                } ${isCurrentSort ? 'theme-text-accent font-black' : ''}`}
+                                } transition-colors ${
+                                  isCurrentSort
+                                    ? 'theme-text-accent font-black'
+                                    : 'theme-text-secondary group-hover/col-header:theme-text-primary'
+                                }`}
                               >
                                 {resolvedHeaderContent}
                               </span>
@@ -576,7 +816,7 @@ export default function DataTable({
                                 className={`shrink-0 transition-all duration-150 inline-flex items-center ${
                                   isCurrentSort
                                     ? 'theme-text-accent scale-110'
-                                    : 'theme-text-muted/30 group-hover/col-header:theme-text-secondary opacity-70 group-hover/col-header:opacity-100'
+                                    : 'theme-text-muted/40 group-hover/col-header:theme-text-primary opacity-0 group-hover/col-header:opacity-100'
                                 }`}
                               >
                                 {isCurrentSort ? (
@@ -592,10 +832,77 @@ export default function DataTable({
                             )}
                           </div>
                         )}
+
+                        {/* Interactive Column Resizer Handle */}
+                        {isColResizable && (
+                          <div
+                            className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize select-none touch-none z-30 group/resizer flex items-center justify-center transition-colors"
+                            onMouseDown={(e) => handleResizeStart(col, e)}
+                            onTouchStart={(e) => handleResizeStart(col, e)}
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              handleResetColumnWidth(col);
+                            }}
+                            title="Drag to resize column. Double click to auto-fit."
+                          >
+                            <div className="w-[1.5px] h-3/5 bg-transparent group-hover/col-header:bg-theme-border group-hover/resizer:bg-[var(--accent-main)]/60 transition-colors" />
+                          </div>
+                        )}
                       </th>
                     );
                   })}
                 </tr>
+                {resolvedSubHeaderRows.map((subRow, rIdx) => (
+                  <tr
+                    key={`subhead-row-${rIdx}`}
+                    className={`border-t border-b theme-border theme-bg-sub text-xs font-bold tracking-wider uppercase theme-text-secondary h-8 ${subHeaderRowClassName}`}
+                  >
+                    {selectable && (
+                      <th
+                        className={`${selectionHeaderClassName} text-center py-1.5 px-2 theme-text-muted font-normal select-none border-t border-b theme-border theme-bg-sub`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        -
+                      </th>
+                    )}
+                    {shouldShowSerial && (
+                      <th className={`${indexHeaderClassName} text-center py-1.5 px-2 theme-text-muted font-normal select-none border-t border-b theme-border theme-bg-sub`}>
+                        -
+                      </th>
+                    )}
+                    {columns.map((col, cIdx) => {
+                      const colKey = col.key || col.id || col.accessor || col.dataIndex;
+                      const colStyle = getColumnStyle(colKey, activeColumnWidths, col);
+                      const val = typeof subRow === 'function' ? subRow(col, cIdx) : (subRow?.[colKey] ?? col.subHeader ?? '-');
+                      const stickyHeaderClass = getStickyHeaderClass(col, 'theme-bg-sub');
+                      const alignClass = getAlignClass(col.align);
+                      const isLabelCol = colKey === 'studentName' || colKey === 'name' || String(val).toLowerCase() === 'full marks' || String(val).toLowerCase() === 'pass marks';
+
+                      return (
+                        <th
+                          key={colKey || cIdx}
+                          style={colStyle}
+                          className={`py-1.5 px-1 ${alignClass} ${stickyHeaderClass} border-t border-b theme-border ${col.headerClassName || ''}`}
+                        >
+                          {React.isValidElement(val) ? (
+                            val
+                          ) : val === '-' || val === undefined || val === null || val === '' ? (
+                            <span className="theme-text-muted font-normal select-none text-[11px]">-</span>
+                          ) : isLabelCol ? (
+                            <span className="font-bold text-[11px] uppercase tracking-wider theme-text-secondary">
+                              {val}
+                            </span>
+                          ) : (
+                            <span className="font-bold text-xs theme-text-primary">
+                              {val}
+                            </span>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                ))}
               </thead>
             )}
           <tbody className="divide-y divide-theme-border theme-border text-xs">
@@ -622,8 +929,8 @@ export default function DataTable({
                     }
                     onRowClick?.(item);
                   }}
-                  className={`group/row border-b theme-border hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors ${
-                    itemSelected ? 'theme-bg-accent-soft/20' : ''
+                  className={`group/row border-b theme-border hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors ${
+                    itemSelected ? 'theme-bg-accent-soft/10' : ''
                   } ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
                 >
                   {selectable && (
@@ -647,54 +954,21 @@ export default function DataTable({
                     <td
                       className={`${defaultCellPad} ${indexCellClassName} border-b theme-border`}
                     >
-                      <span className="font-mono text-xs font-bold theme-text-secondary">
+                      <span className="text-xs font-bold theme-text-secondary">
                         {startIndex + rowIdx}
                       </span>
                     </td>
                   )}
                   {columns.map((col, colIdx) => {
-                    const alignClass =
-                      col.align === 'center'
-                        ? 'text-center'
-                        : col.align === 'right'
-                        ? 'text-right'
-                        : 'text-left';
-
-                    const isStickyRight =
-                      col.sticky === 'right' ||
-                      col.sticky === true ||
-                      (col.key === 'actions' && col.sticky !== false) ||
-                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky right')) ||
-                      (typeof col.className === 'string' && col.className.includes('sticky right')) ||
-                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky right'));
-
-                    const isStickyLeft =
-                      col.sticky === 'left' ||
-                      (typeof col.headerClassName === 'string' && col.headerClassName.includes('sticky left')) ||
-                      (typeof col.className === 'string' && col.className.includes('sticky left')) ||
-                      (typeof col.cellClassName === 'string' && col.cellClassName.includes('sticky left'));
-
-                    const stickyCellClass = isStickyRight
-                      ? `sticky right-0 z-10 ${
-                          itemSelected
-                            ? 'theme-bg-sub'
-                            : 'theme-bg-surface group-hover/row:theme-bg-surface'
-                        }`
-                      : isStickyLeft
-                      ? `sticky left-0 z-10 ${
-                          itemSelected
-                            ? 'theme-bg-sub'
-                            : 'theme-bg-surface group-hover/row:theme-bg-surface'
-                        }`
-                      : '';
-
+                    const alignClass = getAlignClass(col.align);
+                    const stickyCellClass = getStickyCellClass(col, itemSelected, isTransparentBg);
                     const customCellClass =
                       typeof col.cellClassName === 'function'
                         ? col.cellClassName(item, rowIdx)
                         : (col.cellClassName || col.className || '');
 
-
                     const keyName = col.key || col.accessor || col.id || col.dataIndex;
+                    const colStyle = getColumnStyle(keyName, activeColumnWidths, col);
                     let content = null;
                     if (typeof col.render === 'function') {
                       content = col.render(item, rowIdx);
@@ -717,6 +991,7 @@ export default function DataTable({
                     return (
                       <td
                         key={col.key || colIdx}
+                        style={colStyle}
                         className={`${defaultCellPad} ${alignClass} ${stickyCellClass} border-b theme-border ${customCellClass}`}
                       >
                         {content}
@@ -727,6 +1002,69 @@ export default function DataTable({
               );
             })}
           </tbody>
+          {resolvedFooterRows.length > 0 && processedData.length > 0 && (
+            <tfoot className={`border-b theme-border theme-bg-sub text-xs font-bold tracking-wider uppercase theme-text-secondary ${tfootClassName}`}>
+              {resolvedFooterRows.map((fRow, rIdx) => (
+                <tr
+                  key={`footer-row-${rIdx}`}
+                  className={`border-b theme-border theme-bg-sub text-xs font-bold tracking-wider uppercase theme-text-secondary h-8 ${footerRowClassName}`}
+                >
+                  {selectable && (
+                    <td
+                      className={`${selectionHeaderClassName} text-center py-1.5 px-2 theme-text-muted font-normal select-none border-b theme-border theme-bg-sub`}
+                    >
+                      -
+                    </td>
+                  )}
+                  {shouldShowSerial && (
+                    <td
+                      className={`${indexHeaderClassName} text-center py-1.5 px-2 theme-text-muted font-normal select-none border-b theme-border theme-bg-sub`}
+                    >
+                      -
+                    </td>
+                  )}
+                  {columns.map((col, cIdx) => {
+                    const colKey = col.key || col.id || col.accessor || col.dataIndex;
+                    const colStyle = getColumnStyle(colKey, activeColumnWidths, col);
+                    let val;
+                    if (typeof fRow === 'function') {
+                      val = fRow(col, cIdx);
+                    } else if (fRow && typeof fRow === 'object') {
+                      val = fRow[colKey] ?? (typeof col.footer === 'function' ? col.footer(processedData, data) : col.footer) ?? '-';
+                    } else {
+                      val = typeof col.footer === 'function' ? col.footer(processedData, data) : (col.footer ?? '-');
+                    }
+
+                    const stickyFooterClass = getStickyHeaderClass(col, 'theme-bg-sub');
+                    const alignClass = getAlignClass(col.align);
+                    const isLabelCol = colKey === 'studentName' || colKey === 'name' || (typeof val === 'string' && (val.toLowerCase().includes('average') || val.toLowerCase().includes('total')));
+
+                    return (
+                      <td
+                        key={colKey || cIdx}
+                        style={colStyle}
+                        className={`py-1.5 px-1 ${alignClass} ${stickyFooterClass} border-b theme-border ${col.headerClassName || ''}`}
+                      >
+                        {React.isValidElement(val) ? (
+                          val
+                        ) : val === '-' || val === undefined || val === null || val === '' ? (
+                          <span className="theme-text-muted font-normal select-none text-[11px]">-</span>
+                        ) : isLabelCol ? (
+                          <span className="font-bold text-[11px] uppercase tracking-wider theme-text-secondary">
+                            {val}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-xs theme-text-primary">
+                            {val}
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

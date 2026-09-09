@@ -29,21 +29,33 @@ export default function MarkEntryFilterBar({
   examOptions = [],
   selectedExamId,
   setSelectedExamId,
+  onExamChange,
   departmentOptions = [],
   filterDepartmentId = 'ALL',
   setFilterDepartmentId,
+  selectedDepartmentId,
+  setSelectedDepartmentId,
+  onDepartmentChange,
   classOptions = [],
   filterClassId,
   setFilterClassId,
+  selectedClassId,
+  setSelectedClassId,
+  onClassChange,
   sectionOptions = [],
   filterSectionId = 'ALL',
   setFilterSectionId,
+  selectedSectionId,
+  setSelectedSectionId,
+  onSectionChange,
   subjectOptions = [],
   selectedSubjectId,
   setSelectedSubjectId,
+  onSubjectChange,
   selectedSubject = null,
   availableSubjects = [],
   activeGradingSystem = null,
+  gradingSystem = null,
   showSubject = true,
   selectedClassName = '',
   selectedSectionName = '',
@@ -58,6 +70,42 @@ export default function MarkEntryFilterBar({
   const detailsBtnRef = useRef(null);
   const gradesPopoverRef = useRef(null);
   const gradesBtnRef = useRef(null);
+
+  // Robust prop normalization
+  const currentExamId = selectedExamId !== undefined ? String(selectedExamId) : '';
+  const handleExamChange = (val) => {
+    onExamChange?.(val);
+    setSelectedExamId?.(val);
+  };
+
+  const currentDeptId = filterDepartmentId !== undefined ? String(filterDepartmentId) : (selectedDepartmentId !== undefined ? String(selectedDepartmentId) : 'ALL');
+  const handleDeptChange = (val) => {
+    onDepartmentChange?.(val);
+    setFilterDepartmentId?.(val);
+    setSelectedDepartmentId?.(val);
+  };
+
+  const currentClassId = filterClassId !== undefined ? String(filterClassId) : (selectedClassId !== undefined ? String(selectedClassId) : '');
+  const handleClassChange = (val) => {
+    onClassChange?.(val);
+    setFilterClassId?.(val);
+    setSelectedClassId?.(val);
+  };
+
+  const currentSectionId = filterSectionId !== undefined ? String(filterSectionId) : (selectedSectionId !== undefined ? String(selectedSectionId) : 'ALL');
+  const handleSectionChange = (val) => {
+    onSectionChange?.(val);
+    setFilterSectionId?.(val);
+    setSelectedSectionId?.(val);
+  };
+
+  const currentSubjectId = selectedSubjectId !== undefined ? String(selectedSubjectId) : '';
+  const handleSubjectChange = (val) => {
+    onSubjectChange?.(val);
+    setSelectedSubjectId?.(val);
+  };
+
+  const resolvedGradingSystem = activeGradingSystem || gradingSystem || null;
 
   // Auto-calculate smart placement based on available viewport space
   const updatePlacement = (btnEl, setPlacement) => {
@@ -120,30 +168,69 @@ export default function MarkEntryFilterBar({
 
   // Active Grading Rules
   const gradingRules = useMemo(() => {
-    if (activeGradingSystem?.rules && Array.isArray(activeGradingSystem.rules) && activeGradingSystem.rules.length > 0) {
-      return activeGradingSystem.rules;
+    if (resolvedGradingSystem?.rules && Array.isArray(resolvedGradingSystem.rules) && resolvedGradingSystem.rules.length > 0) {
+      return resolvedGradingSystem.rules;
     }
     const allSystems = examStore.getGradingSystems();
     return allSystems[0]?.rules || [];
-  }, [activeGradingSystem]);
+  }, [resolvedGradingSystem]);
 
   // Format raw entities for reusable selectors
   const rawDepartments = useMemo(() => {
-    return departmentOptions
-      .map((d) => d.department || d)
-      .filter((d) => d && d.id !== 'ALL' && d.value !== 'ALL');
+    return (departmentOptions || [])
+      .map((d) => {
+        if (!d) return null;
+        const obj = d.department || d.raw || d;
+        const id = d.value !== undefined ? d.value : (d.id !== undefined ? d.id : obj.id);
+        const name = d.label || d.name || obj.name || obj.department_name;
+        if (id === '' || id === 'ALL' || id === null || id === undefined) return null;
+        return {
+          ...obj,
+          id: String(id),
+          name: String(name || `Department ${id}`),
+        };
+      })
+      .filter(Boolean);
   }, [departmentOptions]);
 
   const rawClasses = useMemo(() => {
-    return classOptions
-      .map((c) => c.classObj || c)
-      .filter((c) => c && c.id !== '' && c.value !== '');
+    return (classOptions || [])
+      .map((c) => {
+        if (!c) return null;
+        const obj = c.classObj || c.raw || c;
+        const id = c.value !== undefined ? c.value : (c.id !== undefined ? c.id : obj.id);
+        const name = c.label || c.name || obj.name || obj.class_name;
+        const deptId = c.departmentId !== undefined ? c.departmentId : (c.department_id !== undefined ? c.department_id : (obj.department_id || obj.departmentId || obj.department));
+        if (id === '' || id === 'ALL' || id === null || id === undefined) return null;
+        return {
+          ...obj,
+          id: String(id),
+          name: String(name || `Class ${id}`),
+          department_id: deptId ? String(typeof deptId === 'object' ? deptId.id : deptId) : null,
+          department: deptId ? (typeof deptId === 'object' ? deptId : { id: deptId }) : null,
+        };
+      })
+      .filter(Boolean);
   }, [classOptions]);
 
   const rawSections = useMemo(() => {
-    return sectionOptions
-      .map((s) => s.sectionObj || s)
-      .filter((s) => s && s.id !== 'ALL' && s.value !== 'ALL');
+    return (sectionOptions || [])
+      .map((s) => {
+        if (!s) return null;
+        const obj = s.sectionObj || s.raw || s;
+        const id = s.value !== undefined ? s.value : (s.id !== undefined ? s.id : obj.id);
+        const name = s.label || s.name || obj.name || obj.section_name;
+        const cId = s.classId !== undefined ? s.classId : (s.class_id !== undefined ? s.class_id : (obj.class_id || obj.classId || obj.class));
+        if (id === '' || id === 'ALL' || id === null || id === undefined) return null;
+        return {
+          ...obj,
+          id: String(id),
+          name: String(name || `Section ${id}`),
+          class_id: cId ? String(typeof cId === 'object' ? cId.id : cId) : null,
+          class: cId ? (typeof cId === 'object' ? cId : { id: cId }) : null,
+        };
+      })
+      .filter(Boolean);
   }, [sectionOptions]);
 
   return (
@@ -155,13 +242,13 @@ export default function MarkEntryFilterBar({
           label="Examination"
           icon={CalendarIcon}
           options={examOptions}
-          value={selectedExamId}
+          value={currentExamId}
           onChange={(val) => {
-            setSelectedExamId(val);
-            setFilterDepartmentId?.('ALL');
-            setFilterClassId?.('');
-            setFilterSectionId?.('ALL');
-            setSelectedSubjectId?.('');
+            handleExamChange(val);
+            handleDeptChange('ALL');
+            handleClassChange('');
+            handleSectionChange('ALL');
+            handleSubjectChange('');
           }}
           placeholder="Choose Session..."
         />
@@ -170,15 +257,15 @@ export default function MarkEntryFilterBar({
         <DepartmentSelect
           label="Department"
           departments={rawDepartments}
-          value={filterDepartmentId}
+          value={currentDeptId}
           allowAll
           allLabel="All Departments"
           allValue="ALL"
           onChange={(val) => {
-            setFilterDepartmentId?.(val || 'ALL');
-            setFilterClassId?.('');
-            setFilterSectionId?.('ALL');
-            setSelectedSubjectId?.('');
+            handleDeptChange(val || 'ALL');
+            handleClassChange('');
+            handleSectionChange('ALL');
+            handleSubjectChange('');
           }}
           placeholder="All Departments"
         />
@@ -187,15 +274,15 @@ export default function MarkEntryFilterBar({
         <ClassSelect
           label="Class"
           classes={rawClasses}
-          departmentId={filterDepartmentId}
-          value={filterClassId}
+          departmentId={currentDeptId}
+          value={currentClassId}
           allowAll
           allLabel="All Classes"
           allValue=""
           onChange={(val) => {
-            setFilterClassId?.(val || '');
-            setFilterSectionId?.('ALL');
-            setSelectedSubjectId?.('');
+            handleClassChange(val || '');
+            handleSectionChange('ALL');
+            handleSubjectChange('');
           }}
           placeholder="All Classes"
         />
@@ -204,14 +291,14 @@ export default function MarkEntryFilterBar({
         <SectionSelect
           label="Section"
           sections={rawSections}
-          classId={filterClassId}
-          value={filterSectionId}
+          classId={currentClassId}
+          value={currentSectionId}
           allowAll
           allLabel="All Sections"
           allValue="ALL"
           onChange={(val) => {
-            setFilterSectionId?.(val || 'ALL');
-            setSelectedSubjectId?.('');
+            handleSectionChange(val || 'ALL');
+            handleSubjectChange('');
           }}
           placeholder="All Sections"
         />
@@ -222,10 +309,10 @@ export default function MarkEntryFilterBar({
             label={`Subject (${availableSubjects.length})`}
             icon={BookOpenIcon}
             options={subjectOptions}
-            value={selectedSubjectId || (selectedSubject?.id ? String(selectedSubject.id) : '')}
-            onChange={setSelectedSubjectId}
+            value={currentSubjectId || (selectedSubject?.id ? String(selectedSubject.id) : '')}
+            onChange={handleSubjectChange}
             placeholder={
-              !selectedExamId
+              !currentExamId
                 ? 'Select exam term first...'
                 : availableSubjects.length === 0
                 ? 'No subjects scheduled'
@@ -236,7 +323,7 @@ export default function MarkEntryFilterBar({
       </div>
 
       {/* Bottom Row: Selected Subject / Scope Summary, Details & Mark Grades Popovers */}
-      {(selectedSubject || (!showSubject && selectedExamId && filterClassId)) && (
+      {(selectedSubject || (!showSubject && currentExamId && currentClassId)) && (
         <div className="pt-2.5 mt-3 border-t theme-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Active Overview */}
           <div className="flex items-center gap-2.5 min-w-0 text-xs theme-text-secondary flex-wrap">

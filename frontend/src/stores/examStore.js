@@ -85,7 +85,7 @@ export const DEFAULT_EXAM_SESSIONS = [
     secondStartTime: '02:00 PM',
     secondEndTime: '04:00 PM',
     defaultFullMarks: 100,
-    targetClassIds: ['cls_1', 'cls_2', 'cls_3', 'cls_4'],
+    targetClassIds: ['cls_noorani', 'cls_1', 'cls_2', 'cls_3', 'cls_4'],
     shifts: [
       { id: 'shift_1', name: 'Shift 1 (Morning)', startTime: '09:00 AM', endTime: '11:00 AM' },
       { id: 'shift_2', name: 'Shift 2 (Afternoon)', startTime: '02:00 PM', endTime: '04:00 PM' },
@@ -114,6 +114,13 @@ export const DEFAULT_EXAM_SESSIONS = [
     },
     isMultiDepartmentSchedule: true,
     departmentSchedules: [
+      {
+        departmentId: 'dept_noorani',
+        departmentName: 'Noorani & Nazira Foundation',
+        departmentCode: 'NOOR',
+        startDate: '2026-10-10',
+        endDate: '2026-10-15',
+      },
       {
         departmentId: 'dept_hifz',
         departmentName: 'Hifzul Quran Department',
@@ -153,7 +160,7 @@ export const DEFAULT_EXAM_SESSIONS = [
     defaultEndTime: '11:00 AM',
     hasSecondShift: false,
     defaultFullMarks: 100,
-    targetClassIds: ['cls_1', 'cls_2', 'cls_3', 'cls_4'],
+    targetClassIds: ['cls_noorani', 'cls_1', 'cls_2', 'cls_3', 'cls_4'],
     shifts: [
       { id: 'shift_1', name: 'Shift 1 (Morning)', startTime: '09:00 AM', endTime: '11:00 AM' },
     ],
@@ -187,6 +194,80 @@ export const DEFAULT_EXAM_SESSIONS = [
  * Universal Default Examination Subjects (Matching Default Sessions)
  */
 export const DEFAULT_EXAM_SUBJECTS = [
+  {
+    id: 'exam_sub_noorani_1',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_noorani',
+    departmentName: 'Noorani & Nazira Foundation',
+    classId: 'cls_noorani',
+    className: 'Noorani Qaida & Basic Ampara Reading',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Noorani Qaida & Pronunciation',
+    curriculumBookId: 'syllabus_noorani_1',
+    curriculumBookName: 'Noorani Qaida Foundation',
+    invigilatorId: 'teacher_4',
+    invigilatorName: 'Hafiz Qari Osman',
+    examinerId: 'teacher_4',
+    examinerName: 'Hafiz Qari Osman',
+    evaluatorId: 'teacher_4',
+    evaluatorName: 'Hafiz Qari Osman',
+    teacherId: 'teacher_4',
+    teacherName: 'Hafiz Qari Osman',
+    roomNo: 'Room 101',
+    notes: 'Verify letter pronunciation and makharij',
+    examDate: '2026-10-10',
+    shiftId: 'shift_1',
+    shiftName: 'Shift 1 (Morning)',
+    startTime: '09:00 AM',
+    endTime: '11:00 AM',
+    fullMarks: 100,
+    passMarks: 33,
+    breakdownEnabled: true,
+    components: [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: 50 },
+      { id: 'comp_2', name: 'Oral / Tajweed', maxMarks: 50 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'exam_sub_noorani_2',
+    examId: 'exam_term_1_2026',
+    departmentId: 'dept_noorani',
+    departmentName: 'Noorani & Nazira Foundation',
+    classId: 'cls_noorani',
+    className: 'Noorani Qaida & Basic Ampara Reading',
+    sectionId: 'ALL',
+    sectionName: 'All Sections',
+    subjectName: 'Ampara Recitation & Masnoon Duas',
+    curriculumBookId: 'syllabus_noorani_2',
+    curriculumBookName: 'Ampara Foundation',
+    invigilatorId: 'teacher_4',
+    invigilatorName: 'Hafiz Qari Osman',
+    examinerId: 'teacher_4',
+    examinerName: 'Hafiz Qari Osman',
+    evaluatorId: 'teacher_4',
+    evaluatorName: 'Hafiz Qari Osman',
+    teacherId: 'teacher_4',
+    teacherName: 'Hafiz Qari Osman',
+    roomNo: 'Room 101',
+    notes: 'Daily Duas and short Surahs recitation',
+    examDate: '2026-10-11',
+    shiftId: 'shift_1',
+    shiftName: 'Shift 1 (Morning)',
+    startTime: '09:00 AM',
+    endTime: '11:00 AM',
+    fullMarks: 100,
+    passMarks: 33,
+    breakdownEnabled: true,
+    components: [
+      { id: 'comp_1', name: 'Oral Recitation', maxMarks: 70 },
+      { id: 'comp_2', name: 'Dua Memorization', maxMarks: 30 },
+    ],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
   {
     id: 'exam_sub_1',
     examId: 'exam_term_1_2026',
@@ -567,6 +648,22 @@ export const examStore = {
       writeJSON(key, DEFAULT_EXAM_SESSIONS);
       return DEFAULT_EXAM_SESSIONS;
     }
+    // Ensure default exam sessions have updated targetClassIds if they match default IDs
+    let modified = false;
+    stored = stored.map((e) => {
+      const def = DEFAULT_EXAM_SESSIONS.find((d) => d.id === e.id);
+      if (def && Array.isArray(def.targetClassIds)) {
+        const mergedClassIds = Array.from(new Set([...(e.targetClassIds || []), ...def.targetClassIds]));
+        if (mergedClassIds.length !== (e.targetClassIds || []).length) {
+          modified = true;
+          return { ...e, targetClassIds: mergedClassIds, departmentSchedules: def.departmentSchedules };
+        }
+      }
+      return e;
+    });
+    if (modified) {
+      writeJSON(key, stored);
+    }
     return stored;
   },
 
@@ -703,9 +800,16 @@ export const examStore = {
     if (stored === null && safeTenant !== 'default') {
       stored = readJSON(legacyKey, null);
     }
-    if (stored === null || stored === undefined) {
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
       writeJSON(key, DEFAULT_EXAM_SUBJECTS);
       stored = DEFAULT_EXAM_SUBJECTS;
+    } else {
+      const existingIds = new Set(stored.map((s) => String(s.id)));
+      const missingDefaults = DEFAULT_EXAM_SUBJECTS.filter((s) => !existingIds.has(String(s.id)));
+      if (missingDefaults.length > 0) {
+        stored = [...stored, ...missingDefaults];
+        writeJSON(key, stored);
+      }
     }
     if (examId) {
       return stored.filter((s) => String(s.examId) === String(examId));
@@ -884,24 +988,32 @@ export const examStore = {
     );
 
     const now = new Date().toISOString();
-    const formattedEntries = marksEntries.map((entry) => ({
-      id: entry.id || `mark_${examId}_${examSubjectId}_${entry.studentId}`,
-      examId: String(examId),
-      examSubjectId: String(examSubjectId),
-      studentId: String(entry.studentId),
-      studentName: entry.studentName || '',
-      studentRoll: entry.studentRoll || '',
-      classId: entry.classId || '',
-      sectionId: entry.sectionId || '',
-      componentMarks: entry.componentMarks || {},
-      obtainedMarks: Number(entry.obtainedMarks) || 0,
-      fullMarks: Number(entry.fullMarks) || 100,
-      passMarks: Number(entry.passMarks) || 33,
-      isAbsent: Boolean(entry.isAbsent),
-      teacherRemarks: entry.teacherRemarks || '',
-      status,
-      updatedAt: now,
-    }));
+    const formattedEntries = marksEntries.map((entry) => {
+      const compValues = entry.componentMarks ? Object.values(entry.componentMarks) : [];
+      const hasExplicitComp = compValues.some((v) => v !== '' && v !== null && v !== undefined);
+      const hasObtainedMarks = entry.obtainedMarks !== '' && entry.obtainedMarks !== null && entry.obtainedMarks !== undefined;
+      const isAbsent = Boolean(entry.isAbsent);
+      const hasEntry = hasExplicitComp || (compValues.length === 0 && hasObtainedMarks);
+
+      return {
+        id: entry.id || `mark_${examId}_${examSubjectId}_${entry.studentId}`,
+        examId: String(examId),
+        examSubjectId: String(examSubjectId),
+        studentId: String(entry.studentId),
+        studentName: entry.studentName || '',
+        studentRoll: entry.studentRoll || '',
+        classId: entry.classId || '',
+        sectionId: entry.sectionId || '',
+        componentMarks: entry.componentMarks || {},
+        obtainedMarks: hasEntry ? (Number(entry.obtainedMarks) || 0) : (isAbsent ? 0 : null),
+        fullMarks: Number(entry.fullMarks) || 100,
+        passMarks: Number(entry.passMarks) || 33,
+        isAbsent,
+        teacherRemarks: entry.teacherRemarks || '',
+        status: (hasEntry || isAbsent) ? status : 'NOT_ENTERED',
+        updatedAt: now,
+      };
+    });
 
     const updated = [...otherMarks, ...formattedEntries];
     examStore.saveExamMarks(safeTenant, updated);
@@ -1005,7 +1117,7 @@ export const examStore = {
     };
   },
 
-  calculateTabulationMatrix: (tenantId = 'default', { examId, classId, sectionId = 'ALL', students = [] }) => {
+  calculateTabulationMatrix: (tenantId = 'default', { examId, departmentId = 'ALL', classId = '', sectionId = 'ALL', students = [] }) => {
     const safeTenant = getSafeTenantId(tenantId);
     const exam = examStore.getExamById(safeTenant, examId);
     if (!exam) return { studentsData: [], subjects: [], gradingSystem: null };
@@ -1014,19 +1126,33 @@ export const examStore = {
     const gradingSystem = gradingSystems.find((g) => g.id === exam.gradingSystemId) || gradingSystems[0] || DEFAULT_GRADING_SYSTEMS[0];
     const rules = gradingSystem.rules || [];
 
-    // Filter subjects for class & section
-    let subjects = examStore.getExamSubjects(safeTenant, examId).filter(
-      (s) => String(s.classId) === String(classId)
-    );
+    // Filter subjects for department, class & section
+    let subjects = examStore.getExamSubjects(safeTenant, examId);
+    if (departmentId && departmentId !== 'ALL') {
+      subjects = subjects.filter((s) => s.departmentId === 'ALL' || String(s.departmentId) === String(departmentId));
+    }
+    if (classId && classId !== 'ALL' && classId !== '') {
+      subjects = subjects.filter((s) => String(s.classId) === String(classId));
+    }
     if (sectionId && sectionId !== 'ALL') {
       subjects = subjects.filter((s) => s.sectionId === 'ALL' || String(s.sectionId) === String(sectionId));
     }
 
-    // Filter students for class & section
-    let targetStudents = students.filter((st) => {
-      const stClassId = typeof st.class_id === 'object' ? st.class_id?.id : (st.class_id || st.student_class || st.classId);
-      return String(stClassId) === String(classId);
-    });
+    // Filter students for department, class & section
+    let targetStudents = students;
+    if (classId && classId !== 'ALL' && classId !== '') {
+      targetStudents = targetStudents.filter((st) => {
+        const stClassId = typeof st.class_id === 'object' ? st.class_id?.id : (st.class_id || st.student_class || st.classId);
+        return String(stClassId) === String(classId);
+      });
+    } else if (departmentId && departmentId !== 'ALL') {
+      const allowedClassIds = new Set(subjects.map((s) => String(s.classId)));
+      targetStudents = targetStudents.filter((st) => {
+        const stClassId = typeof st.class_id === 'object' ? st.class_id?.id : (st.class_id || st.student_class || st.classId);
+        const stDeptId = typeof st.department_id === 'object' ? st.department_id?.id : (st.department_id || st.department || st.deptId);
+        return (stDeptId && String(stDeptId) === String(departmentId)) || (stClassId && allowedClassIds.has(String(stClassId)));
+      });
+    }
     if (sectionId && sectionId !== 'ALL') {
       targetStudents = targetStudents.filter((st) => {
         const stSecId = typeof st.section === 'object' ? st.section?.id : (st.section || st.section_id || st.sectionId);
@@ -1048,91 +1174,126 @@ export const examStore = {
       let totalPoints = 0;
       let hasFailedSubject = false;
       let evaluatedSubjectCount = 0;
+      let hasAnyMarks = false;
 
       const subjectMarks = subjects.map((sub) => {
         const markEntry = marksByStudentAndSub.get(`${stId}_${sub.id}`);
-        const obtained = markEntry ? Number(markEntry.obtainedMarks) || 0 : 0;
+        const compValues = markEntry?.componentMarks ? Object.values(markEntry.componentMarks) : [];
+        const hasExplicitComp = compValues.some((v) => v !== '' && v !== null && v !== undefined);
+        const hasRawObtained = markEntry && markEntry.obtainedMarks !== null && markEntry.obtainedMarks !== undefined && markEntry.obtainedMarks !== '';
+        const isAbsent = Boolean(markEntry?.isAbsent);
+        const hasEntry = Boolean(
+          markEntry &&
+          markEntry.status !== 'NOT_ENTERED' &&
+          (hasExplicitComp || (compValues.length === 0 && hasRawObtained))
+        );
+
+        if (hasEntry || isAbsent) {
+          hasAnyMarks = true;
+        }
+
+        const obtained = (hasEntry && !isAbsent) ? (Number(markEntry.obtainedMarks) || 0) : null;
         const full = Number(sub.fullMarks) || 100;
         const pass = Number(sub.passMarks) || 33;
-        const isAbsent = Boolean(markEntry?.isAbsent);
-        const isPassed = !isAbsent && obtained >= pass;
+        const isPassed = !isAbsent && obtained !== null && obtained >= pass;
 
-        if (!isPassed) hasFailedSubject = true;
+        if ((hasEntry || isAbsent) && !isPassed) {
+          hasFailedSubject = true;
+        }
 
-        const subPercentage = full > 0 ? (obtained / full) * 100 : 0;
-        const gradeEval = examStore.evaluateGrade(subPercentage, rules);
+        const subPercentage = full > 0 && obtained !== null ? (obtained / full) * 100 : null;
+        const gradeEval = subPercentage !== null ? examStore.evaluateGrade(subPercentage, rules) : null;
 
-        totalObtained += isAbsent ? 0 : obtained;
-        totalFull += full;
-        totalPoints += gradeEval.gradePoint || 0;
-        evaluatedSubjectCount += 1;
+        if (hasEntry && !isAbsent) {
+          totalObtained += obtained;
+          totalFull += full;
+          totalPoints += gradeEval?.gradePoint || 0;
+          evaluatedSubjectCount += 1;
+        } else if (isAbsent) {
+          totalFull += full;
+          evaluatedSubjectCount += 1;
+        }
 
         return {
           subjectId: sub.id,
           subjectName: sub.subjectName,
-          obtained,
+          obtained: (hasEntry && !isAbsent) ? obtained : (isAbsent ? 0 : null),
+          hasEntry,
           full,
           pass,
           isAbsent,
           isPassed,
-          percentage: Math.round(subPercentage * 10) / 10,
-          grade: gradeEval.grade,
-          gradePoint: gradeEval.gradePoint,
-          division: gradeEval.division,
-          color: gradeEval.color,
-          status: markEntry?.status || 'NOT_ENTERED',
+          percentage: subPercentage !== null ? Math.round(subPercentage * 10) / 10 : null,
+          grade: gradeEval?.grade || '-',
+          gradePoint: gradeEval?.gradePoint ?? null,
+          division: gradeEval?.division || '-',
+          color: gradeEval?.color || 'slate',
+          status: markEntry?.status || (hasEntry || isAbsent ? 'ENTERED' : 'NOT_ENTERED'),
         };
       });
 
-      const overallPercentage = totalFull > 0 ? Math.round((totalObtained / totalFull) * 1000) / 10 : 0;
-      const overallGpa = evaluatedSubjectCount > 0 ? Math.round((totalPoints / evaluatedSubjectCount) * 100) / 100 : 0.0;
-      const overallGrade = examStore.evaluateGrade(overallPercentage, rules);
+      const overallPercentage = totalFull > 0 && hasAnyMarks ? Math.round((totalObtained / totalFull) * 1000) / 10 : null;
+      const overallGpa = evaluatedSubjectCount > 0 && hasAnyMarks ? Math.round((totalPoints / evaluatedSubjectCount) * 100) / 100 : null;
+      const overallGrade = overallPercentage !== null ? examStore.evaluateGrade(overallPercentage, rules) : null;
 
-      const isOverallPass = exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT'
-        ? !hasFailedSubject && overallGrade.isPass
-        : overallGrade.isPass;
+      const failingRule = rules.find((r) => r.isPass === false || Number(r.gradePoint) === 0) || rules[rules.length - 1] || {
+        grade: 'F', title: 'Fail', gradePoint: 0, division: 'Failed', isPass: false, color: 'rose'
+      };
+
+      const isOverallPass = hasAnyMarks
+        ? (exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT'
+            ? !hasFailedSubject && Boolean(overallGrade?.isPass)
+            : Boolean(overallGrade?.isPass))
+        : null;
 
       return {
         studentId: stId,
         studentName: st.name_en || st.name || 'Student',
-        rollNumber: st.roll_number || st.roll || st.uniq_id || 'N/A',
+        rollNumber: st.roll_number || st.roll || st.uniq_id || '-',
         studentClass: st.student_class_name || '',
         studentSection: st.section_name || '',
         sectionId: typeof st.section === 'object' ? st.section?.id : (st.section || st.section_id || ''),
         subjectMarks,
-        totalObtained,
+        hasAnyMarks,
+        totalObtained: hasAnyMarks ? totalObtained : null,
         totalFull,
         overallPercentage,
         overallGpa,
-        grade: hasFailedSubject && exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT' ? 'Rasib / Fail' : overallGrade.grade,
-        gradeTitle: overallGrade.title,
-        division: hasFailedSubject && exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT' ? 'Failed' : overallGrade.division,
+        grade: hasAnyMarks ? (hasFailedSubject && exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT' ? failingRule.grade : overallGrade?.grade || '-') : '-',
+        gradeTitle: hasAnyMarks ? (hasFailedSubject && exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT' ? failingRule.title : overallGrade?.title || '-') : '-',
+        division: hasAnyMarks ? (hasFailedSubject && exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT' ? failingRule.division : overallGrade?.division || '-') : '-',
         isOverallPass,
         hasFailedSubject,
-        color: !isOverallPass ? 'rose' : overallGrade.color,
+        color: !hasAnyMarks ? 'slate' : (!isOverallPass ? (failingRule.color || 'rose') : overallGrade?.color),
       };
     });
 
-    // Sort for Class Ranking (Highest Total Marks, then GPA)
-    studentsData.sort((a, b) => {
+    // Sort for Class Ranking (Only rank students with actual marks)
+    const studentsWithMarks = studentsData.filter((s) => s.hasAnyMarks);
+    const studentsWithoutMarks = studentsData.filter((s) => !s.hasAnyMarks);
+
+    studentsWithMarks.sort((a, b) => {
       if (exam.rankingConfig?.failSubjectRule === 'EXCLUDE_FROM_MERIT') {
         if (a.isOverallPass && !b.isOverallPass) return -1;
         if (!a.isOverallPass && b.isOverallPass) return 1;
       }
-      if (b.totalObtained !== a.totalObtained) {
-        return b.totalObtained - a.totalObtained;
+      if ((b.totalObtained ?? 0) !== (a.totalObtained ?? 0)) {
+        return (b.totalObtained ?? 0) - (a.totalObtained ?? 0);
       }
-      return b.overallGpa - a.overallGpa;
+      return (b.overallGpa ?? 0) - (a.overallGpa ?? 0);
     });
 
     // Assign Class Rank
-    studentsData.forEach((st, idx) => {
+    studentsWithMarks.forEach((st, idx) => {
       st.classRank = st.isOverallPass ? idx + 1 : '-';
+    });
+    studentsWithoutMarks.forEach((st) => {
+      st.classRank = '-';
     });
 
     // Assign Section Rank
     const sectionGroups = new Map();
-    studentsData.forEach((st) => {
+    studentsWithMarks.forEach((st) => {
       const sec = st.sectionId || 'DEFAULT';
       if (!sectionGroups.has(sec)) sectionGroups.set(sec, []);
       sectionGroups.get(sec).push(st);
@@ -1143,6 +1304,10 @@ export const examStore = {
       group.forEach((st) => {
         st.sectionRank = st.isOverallPass ? currentSecRank++ : '-';
       });
+    });
+
+    studentsWithoutMarks.forEach((st) => {
+      st.sectionRank = '-';
     });
 
     return {

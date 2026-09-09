@@ -15,6 +15,8 @@ export default function PrintTableRenderer({
   indexLabel = 'No',
   density = 'NORMAL',
   className = '',
+  footerRow = null,
+  footerRows = [],
 }) {
   // Filter visible columns
   const activeColumns = React.useMemo(() => {
@@ -79,19 +81,22 @@ export default function PrintTableRenderer({
         <thead>
           <tr className="font-bold bg-slate-100">
             {showIndex && (
-              <th className={`text-center w-8 whitespace-nowrap bg-slate-100 text-slate-900 border border-slate-300 ${currentDensity.headerPad}`}>
+              <th className={`text-center align-middle w-8 whitespace-nowrap bg-slate-100 text-slate-900 border border-slate-300 ${currentDensity.headerPad}`}>
                 {indexLabel}
               </th>
             )}
             {activeColumns.map((col, idx) => {
               const headerTitle = col.header ?? col.label ?? col.title ?? '';
               const colKey = col.id || col.key || col.accessor || col.dataIndex || idx;
+              const isRotated = Boolean(col.rotate || col.vertical || col.rotatable || col.isVertical);
 
               return (
                 <th
                   key={colKey}
-                  style={col.width ? { width: col.width } : undefined}
-                  className={`bg-slate-100 text-slate-900 border border-slate-300 ${currentDensity.headerPad} ${
+                  style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                  className={`bg-slate-100 text-slate-900 border border-slate-300 ${
+                    isRotated ? 'align-bottom p-0.5 pb-1' : `align-middle ${currentDensity.headerPad}`
+                  } ${
                     col.align === 'center'
                       ? 'text-center'
                       : col.align === 'right'
@@ -99,13 +104,49 @@ export default function PrintTableRenderer({
                       : 'text-left'
                   } ${col.headerClassName || ''}`}
                 >
-                  <div className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
-                    {headerTitle}
-                  </div>
-                  {col.subLabel && (
-                    <span className={`block font-normal text-slate-600 leading-tight ${currentDensity.subText} ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
-                      {col.subLabel}
-                    </span>
+                  {isRotated ? (
+                    <div className="flex flex-col items-center justify-end w-full h-full select-none min-h-[105px] max-h-[125px] py-1">
+                      <div
+                        style={{
+                          writingMode: 'vertical-rl',
+                          textOrientation: 'sideways',
+                          WebkitTextOrientation: 'sideways',
+                          transform: 'rotate(180deg)',
+                          transformOrigin: 'center center',
+                          WebkitFontSmoothing: 'antialiased',
+                          MozOsxFontSmoothing: 'grayscale',
+                          textRendering: 'optimizeLegibility',
+                          textAlign: 'left',
+                          maxHeight: '94px',
+                          maxWidth: '22px',
+                          lineHeight: '1.12',
+                          overflow: 'hidden',
+                          wordBreak: 'break-word',
+                          display: 'inline-block',
+                          clipPath: 'inset(0 0 0 0)',
+                        }}
+                        className="text-[9.5px] font-bold text-slate-900 tracking-tight"
+                        title={`${headerTitle}${col.subLabel ? ` ${col.subLabel}` : ''}`}
+                      >
+                        {headerTitle}
+                      </div>
+                      {col.subLabel && (
+                        <span className="block text-[8.5px] font-bold text-slate-700 mt-1 leading-none tracking-tight">
+                          {col.subLabel}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
+                        {headerTitle}
+                      </div>
+                      {col.subLabel && (
+                        <span className={`block font-normal text-slate-600 leading-tight ${currentDensity.subText} ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
+                          {col.subLabel}
+                        </span>
+                      )}
+                    </>
                   )}
                 </th>
               );
@@ -170,6 +211,38 @@ export default function PrintTableRenderer({
             </tr>
           ))}
         </tbody>
+        {(footerRow || (Array.isArray(footerRows) && footerRows.length > 0)) && (
+          <tfoot className="print-avoid-break">
+            {(Array.isArray(footerRows) && footerRows.length > 0 ? footerRows : [footerRow]).map((fRow, rIdx) => (
+              <tr key={`footer_${rIdx}`} className="font-bold bg-slate-100">
+                {showIndex && (
+                  <td className={`text-center font-bold text-slate-700 border border-slate-300 w-8 ${currentDensity.cellPad}`}>
+                    -
+                  </td>
+                )}
+                {activeColumns.map((col, cIdx) => {
+                  const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                  const val = typeof fRow === 'function' ? fRow(col, cIdx) : fRow?.[colKey];
+
+                  return (
+                    <td
+                      key={colKey || cIdx}
+                      className={`border border-slate-300 text-slate-900 font-bold ${currentDensity.cellPad} ${
+                        col.align === 'center'
+                          ? 'text-center'
+                          : col.align === 'right'
+                          ? 'text-right'
+                          : 'text-left'
+                      } ${col.className || ''}`}
+                    >
+                      {React.isValidElement(val) ? val : (val !== undefined && val !== null ? val : '-')}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tfoot>
+        )}
       </table>
 
       {/* Summary Metrics Box at bottom of table */}

@@ -118,8 +118,8 @@ export default function MarkEntryGridTable({
           const r = st.roll_number || st.roll || st.uniq_id || '';
           return isNaN(Number(r)) ? String(r) : Number(r);
         },
-        headerClassName: 'w-20 text-center text-xs font-bold',
-        className: 'w-20 font-mono font-bold theme-text-primary text-center',
+        headerClassName: 'w-16 min-w-[64px] max-w-[64px] text-center text-xs font-bold px-1',
+        className: 'w-16 min-w-[64px] max-w-[64px] font-bold theme-text-primary text-center px-1',
         render: (st) => st.roll_number || st.roll || st.uniq_id || '-',
       },
 
@@ -130,15 +130,15 @@ export default function MarkEntryGridTable({
         rotatable: false,
         sortable: true,
         sortValue: (st) => (st.name || st.student_name || '').toLowerCase(),
-        headerClassName: 'min-w-[180px] text-xs font-bold',
-        className: 'min-w-[180px]',
+        headerClassName: 'min-w-[200px] text-xs font-bold px-3',
+        className: 'min-w-[200px] px-3',
         render: (st) => {
           const sName = st.name || st.student_name || 'Unnamed Student';
           const sId = st.student_unique_id || st.student_id || st.admission_number || '';
           return (
             <div className="flex flex-col">
               <span className="font-semibold text-xs theme-text-primary truncate">{sName}</span>
-              {sId && <span className="text-[10px] font-mono theme-text-secondary">{sId}</span>}
+              {sId && <span className="text-[10px] theme-text-secondary">{sId}</span>}
             </div>
           );
         },
@@ -152,8 +152,8 @@ export default function MarkEntryGridTable({
         align: 'center',
         sortable: true,
         sortValue: (st) => (marksGrid[String(st.id)]?.isAbsent ? 1 : 0),
-        headerClassName: 'w-24 text-center text-xs font-bold',
-        className: 'w-24 text-center',
+        headerClassName: 'w-[90px] min-w-[90px] max-w-[96px] text-center text-xs font-bold px-1',
+        className: 'w-[90px] min-w-[90px] max-w-[96px] text-center px-1',
         render: (st) => {
           const stId = String(st.id);
           const isAbsent = Boolean(marksGrid[stId]?.isAbsent);
@@ -174,15 +174,14 @@ export default function MarkEntryGridTable({
       },
     ];
 
-    // 5. Dynamic Component Marks Columns
+    // 5. Dynamic Component Marks Columns (Uniform Equal Size for All Mark Columns)
     components.forEach((comp, cIdx) => {
       const compKey = `comp_${cIdx}`;
 
       cols.push({
         key: comp.id || compKey,
         header: comp.name,
-        subHeader: `(${comp.maxMarks})`,
-        rotatable: true,
+        rotatable: false,
         align: 'center',
         sortable: true,
         sortValue: (st) => {
@@ -191,8 +190,8 @@ export default function MarkEntryGridTable({
           const val = rowData.componentMarks?.[compKey];
           return val === '' || val === undefined ? -1 : Number(val);
         },
-        headerClassName: 'min-w-[56px] text-center text-xs font-bold px-1',
-        className: 'text-center',
+        headerClassName: 'w-[96px] min-w-[90px] max-w-[110px] text-center text-xs font-bold px-1',
+        className: 'w-[96px] min-w-[90px] max-w-[110px] text-center px-1',
         render: (st, sIdx) => {
           const stId = String(st.id);
           const rowData = marksGrid[stId] || {};
@@ -221,8 +220,8 @@ export default function MarkEntryGridTable({
                   handleKeyDown(e, sIdx, cIdx, students.length, components.length)
                 }
                 placeholder="0"
-                className="!w-14 !px-1 !min-h-[32px] !h-8"
-                inputClassName="text-center font-mono font-bold text-xs"
+                className="!w-16 !px-1 !min-h-[32px] !h-8"
+                inputClassName="text-center font-bold text-xs"
                 error={Boolean(cellError)}
               />
               {cellError && (
@@ -236,12 +235,11 @@ export default function MarkEntryGridTable({
       });
     });
 
-    // 6. Total Marks Column
+    // 6. Total Marks Column (Uniform Equal Size matching components)
     cols.push({
       key: 'total',
-      header: 'Total Marks',
-      subHeader: `(${fullMarks})`,
-      rotatable: true,
+      header: 'Total',
+      rotatable: false,
       align: 'center',
       sortable: true,
       sortValue: (st) => {
@@ -252,8 +250,8 @@ export default function MarkEntryGridTable({
           : (rowData.totalMarks !== undefined ? rowData.totalMarks : '');
         return val === '' || val === undefined ? -1 : Number(val);
       },
-      headerClassName: 'min-w-[56px] text-center text-xs font-bold px-1',
-      className: 'w-24 text-center font-mono font-bold text-xs',
+      headerClassName: 'w-[96px] min-w-[90px] max-w-[110px] text-center text-xs font-bold px-1',
+      className: 'w-[96px] min-w-[90px] max-w-[110px] text-center font-bold text-xs px-1',
       render: (st) => {
         const rowData = marksGrid[String(st.id)] || {};
         if (rowData.isAbsent) {
@@ -275,8 +273,8 @@ export default function MarkEntryGridTable({
     // 7. Computed Grade & Result Status Column
     cols.push({
       key: 'grade',
-      header: 'Grade / GPA',
-      rotatable: true,
+      header: 'Grade',
+      rotatable: false,
       align: 'center',
       sortable: true,
       sortValue: (st) => {
@@ -291,18 +289,20 @@ export default function MarkEntryGridTable({
         const gradeEval = examStore.evaluateGrade(pct, gradingRules);
         return gradeEval?.gradePoint ?? -1;
       },
-      headerClassName: 'min-w-[60px] text-center text-xs font-bold px-1',
-      className: 'w-20 text-center',
+      headerClassName: 'w-[96px] min-w-[90px] max-w-[110px] text-center text-xs font-bold px-1',
+      className: 'w-[96px] min-w-[90px] max-w-[110px] text-center px-1',
       render: (st) => {
         const rowData = marksGrid[String(st.id)] || {};
+        const failingRule = (gradingRules || []).find((r) => r.isPass === false || Number(r.gradePoint) === 0) || (gradingRules || [])[(gradingRules || []).length - 1];
+
         if (rowData.isAbsent) {
           return (
             <div className="flex flex-col items-center justify-center leading-tight">
               <span className="text-xs font-bold font-mono theme-text-danger">
-                F
+                {failingRule?.grade || 'F'}
               </span>
               <span className="text-[10px] theme-text-secondary font-mono leading-none mt-0.5">
-                GPA 0.0
+                GPA {Number(failingRule?.gradePoint ?? 0).toFixed(1)}
               </span>
             </div>
           );
@@ -318,8 +318,8 @@ export default function MarkEntryGridTable({
           const pct = fullMarks > 0 ? (num / fullMarks) * 100 : 0;
           const gradeEval = examStore.evaluateGrade(pct, gradingRules);
           const isPass = num >= passMarks && gradeEval?.isPass !== false;
-          const grade = rowData.grade || gradeEval?.grade || 'F';
-          const gpa = rowData.gpa !== undefined ? rowData.gpa : gradeEval?.gradePoint;
+          const grade = rowData.grade || (isPass ? gradeEval?.grade : (failingRule?.grade || gradeEval?.grade));
+          const gpa = rowData.gpa !== undefined ? rowData.gpa : (isPass ? gradeEval?.gradePoint : (failingRule?.gradePoint ?? 0));
 
           return (
             <div className="flex flex-col items-center justify-center leading-tight">
@@ -350,8 +350,8 @@ export default function MarkEntryGridTable({
       rotatable: false,
       sortable: true,
       sortValue: (st) => (marksGrid[String(st.id)]?.teacherRemarks || '').toLowerCase(),
-      headerClassName: 'min-w-[240px] text-xs font-bold',
-      className: 'min-w-[240px]',
+      headerClassName: 'min-w-[220px] text-xs font-bold px-3',
+      className: 'min-w-[220px] px-3',
       render: (st, sIdx) => {
         const stId = String(st.id);
         const rowData = marksGrid[stId] || {};
@@ -391,12 +391,29 @@ export default function MarkEntryGridTable({
     handleKeyDown,
   ]);
 
+  const fullMarksSubHeaderRow = useMemo(() => {
+    const row = {
+      roll: '-',
+      name: 'Full Marks',
+      status: '-',
+      total: fullMarks !== undefined && fullMarks !== null ? String(fullMarks) : '-',
+      grade: '-',
+      remarks: '-',
+    };
+    (components || []).forEach((comp, cIdx) => {
+      row[comp.id || `comp_${cIdx}`] = comp.maxMarks !== undefined ? String(comp.maxMarks) : '-';
+    });
+    return row;
+  }, [components, fullMarks]);
+
   return (
     <div className="print:hidden w-full space-y-3">
       <DataTable
         showSerial={true}
         tableTitle={`${title} (${students.length})`}
         tableTitleIcon={AcademicCapIcon}
+        verticalHeaders={false}
+        subHeaderRow={fullMarksSubHeaderRow}
         headerActions={
           quickFillActions && quickFillActions.length > 0 ? (
             <ActionMenu

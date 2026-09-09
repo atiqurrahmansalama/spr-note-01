@@ -116,14 +116,14 @@ export function compileVectorPDFDocument({
 
   let cursorY = pageMargin;
 
-  // ── 1. Official Header & Institution Branding ───────────────────────────
+  // ── 1. Official Academy Branding Header ─────────────────────────────────
   if (showHeader) {
     const headerStartY = cursorY;
     let textStartX = pageMargin;
 
     if (showLogo) {
       // Vector Logo Badge Box
-      const logoBoxSize = 32;
+      const logoBoxSize = 34;
       doc.setFillColor(15, 23, 42); // slate-900
       doc.roundedRect(pageMargin, headerStartY, logoBoxSize, logoBoxSize, 4, 4, 'F');
 
@@ -140,35 +140,53 @@ export function compileVectorPDFDocument({
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(institutionName, textStartX, headerStartY + 13);
+    doc.text(institutionName, textStartX, headerStartY + 14);
 
     // Institution Subtitle / Address
     doc.setTextColor(71, 85, 105); // slate-600
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(institutionAddress, textStartX, headerStartY + 25);
+    doc.setFontSize(8.5);
+    doc.text(institutionAddress, textStartX, headerStartY + 27);
 
-    // Right-Aligned Document Title
+    // Right-Aligned Date & Official Record Badge
     const rightX = pageWidth - pageMargin;
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(docTitle, rightX, headerStartY + 13, { align: 'right' });
+    doc.setFontSize(8.5);
+    doc.text('OFFICIAL RECORD', rightX, headerStartY + 13, { align: 'right' });
 
-    if (docSubtitle) {
-      doc.setTextColor(71, 85, 105);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text(docSubtitle, rightX, headerStartY + 25, { align: 'right' });
-    }
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(new Date().toLocaleDateString('en-GB'), rightX, headerStartY + 25, { align: 'right' });
 
-    cursorY = headerStartY + 36;
+    cursorY = headerStartY + 38;
 
     // Header Divider Line (1.5pt crisp vector stroke)
     doc.setDrawColor(15, 23, 42);
-    doc.setLineWidth(1.2);
+    doc.setLineWidth(1.5);
     doc.line(pageMargin, cursorY, pageWidth - pageMargin, cursorY);
-    cursorY += 8;
+    cursorY += 14;
+  }
+
+  // ── 2. Centered Document Header (Title & Subtitle) ──────────────────────
+  if (docTitle || docSubtitle) {
+    const centerX = pageWidth / 2;
+    if (docTitle) {
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text(docTitle, centerX, cursorY + 8, { align: 'center' });
+      cursorY += 13;
+    }
+    if (docSubtitle) {
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(docSubtitle, centerX, cursorY + 7, { align: 'center' });
+      cursorY += 11;
+    }
+    cursorY += 10;
   }
 
   // ── 2. Structured Metadata Grid ──────────────────────────────────────────
