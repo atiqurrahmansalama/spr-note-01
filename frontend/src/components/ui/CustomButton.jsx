@@ -24,6 +24,7 @@ function isConditionMet(val) {
  * - Theme-compliant design tokens & semantic variants
  * - Standardized responsive sizing & icon slots
  */
+/** @type {any} */
 const CustomButton = forwardRef(function CustomButton(
   {
     children,

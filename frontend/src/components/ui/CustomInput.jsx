@@ -49,6 +49,7 @@ import { useUndoRedo } from "../../context/useUndoRedo";
  * Fully responsive across Mobile, Tablet, and Desktop screens.
  * Uses 100% theme tokens with zero hardcoded styling.
  */
+/** @type {any} */
 const CustomInput = forwardRef(function CustomInput(
   {
     id,

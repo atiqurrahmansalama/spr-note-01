@@ -78,6 +78,19 @@ export const PRINT_SIGNATURE_STYLE_OPTIONS = [
   { value: 'DOTTED', label: 'Dotted Underline (Minimal)' },
 ];
 
+export const PRINT_META_FONT_SIZE_OPTIONS = [
+  { value: 'SM', label: 'Small (Compact 12px)' },
+  { value: 'MD', label: 'Medium (Standard 14px)' },
+  { value: 'LG', label: 'Large (Spacious 16px)' },
+];
+
+export const PRINT_TITLE_LINE_STYLE_OPTIONS = [
+  { value: 'SOLID', label: 'Solid Line (Standard 2px)' },
+  { value: 'DOUBLE', label: 'Double Line (Formal)' },
+  { value: 'DASHED', label: 'Dashed Line (Modern)' },
+  { value: 'DOTTED', label: 'Dotted Line (Minimal)' },
+];
+
 export const PRINT_SIGNATURE_PRESETS = [
   {
     id: 'academic-3',
@@ -116,7 +129,12 @@ export const DEFAULT_PRINT_OPTIONS = {
   colorMode: 'FULL_COLOR',
   showHeader: true,
   showLogo: true,
+  showTitle: true,
+  showTitleLine: false,
+  titleLineStyle: 'SOLID',
   showMeta: true,
+  showMetaBox: true,
+  metaFontSize: 'MD',
   showSummary: true,
   showFooter: true,
   showWatermark: false,

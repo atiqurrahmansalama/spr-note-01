@@ -11,13 +11,14 @@ import React from "react";
  * @param {React.ReactNode} children - Alternative slot for actions/extra controls
  * @param {string} className - Optional container styling
  */
+/** @type {any} */
 export default function PageHeader({
-  icon: Icon,
-  title,
-  subtitle,
-  badge,
-  actions,
-  children,
+  icon: Icon = null,
+  title = '',
+  subtitle = null,
+  badge = null,
+  actions = null,
+  children = null,
   className = "",
 }) {
   const actionContent = actions || children;

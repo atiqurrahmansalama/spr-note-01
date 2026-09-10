@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { DotsVerticalIcon, ChevronIcon } from './Icons';
 
+/** @type {any} */
 export default function ActionMenu({
   items = [],
-  actions,
+  actions = null,
   align = 'right',
   buttonClassName = '',
   menuClassName = '',

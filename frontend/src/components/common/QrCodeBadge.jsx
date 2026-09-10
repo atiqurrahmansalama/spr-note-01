@@ -1,5 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 
+/** @type {any} */
 export default function QrCodeBadge({ reportId, verificationUrl, size = 96, showLabel = true }) {
   const targetUrl = verificationUrl || `${window.location.origin}/verify-report/${reportId || 'DEMO-1001'}`;
 

@@ -3,24 +3,26 @@ import { createPortal } from 'react-dom';
 import { SleekCheckIcon, SearchIcon, AlertCircleIcon } from './Icons';
 import CustomInput from './CustomInput';
 
+/** @type {any} */
 export default function CustomSelect({
-  value,
-  onChange,
+  value = '',
+  onChange = (val) => {},
   options = [],
   placeholder = 'Select an option...',
-  label,
-  error,
+  label = '',
+  error = null,
   required = false,
   searchable = false,
   disabled = false,
   direction = 'auto', // 'auto', 'up', 'down'
-  icon: Icon,
+  icon: Icon = null,
   size = 'md', // 'sm' | 'md' | 'lg'
   compactMode = false, // compact mode for small juz-style dropdowns
   showDescription = false, // defaults to false to keep dropdown items clean and concise
   showBadge = true, // control visibility of category/type badge
   multiple = false,
   isMulti = false,
+  className = '',
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');

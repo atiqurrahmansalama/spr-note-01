@@ -14,6 +14,8 @@ import {
   PRINT_BLANK_ROWS_OPTIONS,
   PRINT_COLOR_MODE_OPTIONS,
   PRINT_SIGNATURE_STYLE_OPTIONS,
+  PRINT_META_FONT_SIZE_OPTIONS,
+  PRINT_TITLE_LINE_STYLE_OPTIONS,
 } from '../../stores/printStore';
 import {
   AdjustmentsHorizontalIcon,
@@ -47,6 +49,14 @@ export default function PrintConfigSidebar({
   onVisibleColumnsChange,
   extraBlankRows = 0,
   onExtraBlankRowsChange,
+  showSectionsAndBars = true,
+  showSectionsBar = true,
+  showDisplayBars = true,
+  showDataDisplay = true,
+  showColumns = true,
+  showHeaderSection = true,
+  showWatermarkSection = true,
+  showSignaturesSection = true,
   templates = [],
   activeTemplateId = null,
   onTemplateChange,
@@ -62,6 +72,37 @@ export default function PrintConfigSidebar({
   const [activeTab, setActiveTab] = useState('layout'); // 'layout' | 'content' | 'signatures'
   const [isEditSignaturesOpen, setIsEditSignaturesOpen] = useState(false);
   const [expandedSigIds, setExpandedSigIds] = useState([]);
+  const [isMetaOptionsExpanded, setIsMetaOptionsExpanded] = useState(false);
+  const [isTitleOptionsExpanded, setIsTitleOptionsExpanded] = useState(false);
+
+  // Dynamic Section Visibility Flags (Controlled via props or options)
+  const isSectionsAndBarsVisible =
+    showSectionsAndBars !== false &&
+    showSectionsBar !== false &&
+    showDisplayBars !== false &&
+    options.showSectionsAndBars !== false &&
+    options.showSectionsBar !== false &&
+    options.showDisplayBars !== false;
+
+  const isDataDisplayVisible =
+    showDataDisplay !== false &&
+    showColumns !== false &&
+    options.showDataDisplay !== false &&
+    options.showColumns !== false &&
+    availableColumns &&
+    availableColumns.length > 0;
+
+  const isHeaderSectionVisible =
+    showHeaderSection !== false &&
+    options.showHeaderSection !== false;
+
+  const isWatermarkSectionVisible =
+    showWatermarkSection !== false &&
+    options.showWatermarkSection !== false;
+
+  const isSignaturesSectionVisible =
+    showSignaturesSection !== false &&
+    options.showSignaturesSection !== false;
 
   const updateOption = (key, value) => {
     if (onOptionsChange) {
@@ -277,185 +318,291 @@ export default function PrintConfigSidebar({
           {activeTab === 'content' && (
             <>
               {/* Section 1: Header Branding & Document Title */}
-              <DrawerSection
-                icon={BuildingIcon}
-                title="Header & Document Title"
-              >
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
-                    <CustomCheckbox
-                      checked={options.showHeader !== false}
-                      onChange={(val) => updateOption('showHeader', val)}
-                      label="Show Institution Header"
-                      size="sm"
-                    />
+              {isHeaderSectionVisible && (
+                <DrawerSection
+                  icon={BuildingIcon}
+                  title="Header & Document Title"
+                >
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
+                      <CustomCheckbox
+                        checked={options.showHeader !== false}
+                        onChange={(val) => updateOption('showHeader', val)}
+                        label="Show Institution Header"
+                        size="sm"
+                      />
 
-                    <CustomCheckbox
-                      checked={options.showLogo !== false}
-                      onChange={(val) => updateOption('showLogo', val)}
-                      label="Show Institution Logo"
-                      size="sm"
-                    />
-                  </div>
+                      <CustomCheckbox
+                        checked={options.showLogo !== false}
+                        onChange={(val) => updateOption('showLogo', val)}
+                        label="Show Institution Logo"
+                        size="sm"
+                      />
+                    </div>
 
-                  <div className="space-y-2.5 pt-2 border-t theme-border">
-                    <CustomInput
-                      label="Document Header (Title)"
-                      value={options.customTitle ?? ''}
-                      onChange={(val, e) => {
-                        const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
-                        updateOption('customTitle', nextVal);
-                      }}
-                      placeholder={defaultTitle || title || 'Official Document'}
-                      size="sm"
-                    />
-
-                    <CustomInput
-                      label="Document Header (Subtitle / Term)"
-                      value={options.customSubtitle ?? ''}
-                      onChange={(val, e) => {
-                        const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
-                        updateOption('customSubtitle', nextVal);
-                      }}
-                      placeholder={defaultSubtitle || subtitle || 'Academic Session / Examination'}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              </DrawerSection>
-
-              {/* Section 2: Sections & Display Bars */}
-              <DrawerSection
-                icon={GridIcon}
-                title="Sections & Display Bars"
-              >
-                <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
-                  <CustomCheckbox
-                    checked={options.showMeta !== false}
-                    onChange={(val) => updateOption('showMeta', val)}
-                    label="Show Document Metadata Bar"
-                    size="sm"
-                  />
-
-                  <CustomCheckbox
-                    checked={options.showSummary !== false}
-                    onChange={(val) => updateOption('showSummary', val)}
-                    label="Show Summary & Statistics Bar"
-                    size="sm"
-                  />
-
-                  <CustomCheckbox
-                    checked={options.showFooter !== false}
-                    onChange={(val) => updateOption('showFooter', val)}
-                    label="Show Footer & Page Numbers"
-                    size="sm"
-                  />
-                </div>
-              </DrawerSection>
-
-              {/* Section 2: Security & Watermark */}
-              <DrawerSection
-                icon={SettingsIcon}
-                title="Security & Watermark"
-              >
-                <CustomCheckbox
-                  checked={Boolean(options.showWatermark)}
-                  onChange={(val) => updateOption('showWatermark', val)}
-                  label="Show Background Watermark"
-                  size="sm"
-                />
-
-                {options.showWatermark && (
-                  <div className="space-y-2 pt-1">
-                    <CustomInput
-                      label="Watermark Text"
-                      value={options.watermarkText || 'OFFICIAL'}
-                      onChange={(val, e) => {
-                        const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
-                        updateOption('watermarkText', nextVal);
-                      }}
-                      placeholder="e.g. CONFIDENTIAL / OFFICIAL"
-                      size="sm"
-                      enableTemplates={true}
-                      templateCategory="print_watermark_templates"
-                      templateMode="replace"
-                      templateInitialList={DEFAULT_WATERMARK_TEMPLATES}
-                      showTemplateClear={true}
-                      showTemplateSave={true}
-                      showTemplateSaved={true}
-                      showTemplateCount={true}
-                      showTemplateSearch={true}
-                      showTemplateEdit={true}
-                      showTemplateDelete={true}
-                    />
-                  </div>
-                )}
-              </DrawerSection>
-
-              {/* Section 3: Table Columns & Rows */}
-              <DrawerSection
-                icon={GridIcon}
-                title="Data Display"
-                headerRight={
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={selectAllColumns}
-                      className="text-[10px] theme-accent hover:underline cursor-pointer font-semibold"
-                    >
-                      All
-                    </button>
-                    <span className="theme-text-secondary opacity-40">•</span>
-                    <button
-                      type="button"
-                      onClick={deselectAllColumns}
-                      className="text-[10px] theme-text-secondary hover:theme-text-primary cursor-pointer font-semibold"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                }
-              >
-                <div className="space-y-1.5">
-                  {availableColumns.map((col) => {
-                    const colKey = col.id || col.key || col.accessor || col.dataIndex;
-                    const isChecked = visibleColumnKeys.includes(colKey);
-                    const label = col.label || col.header || col.title || colKey;
-
-                    return (
-                      <div
-                        key={colKey}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
-                          isChecked
-                            ? 'theme-bg-elevated theme-border'
-                            : 'opacity-60 theme-border hover:opacity-90'
-                        }`}
-                      >
+                    {/* Document Title & Subtitle Control */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
                         <CustomCheckbox
-                          checked={isChecked}
-                          onChange={() => toggleColumn(colKey)}
-                          label={label}
+                          checked={options.showTitle !== false}
+                          onChange={(val) => updateOption('showTitle', val)}
+                          label="Show Document Title & Header"
                           size="sm"
-                          className="w-full flex-1"
+                          className="flex-1"
                         />
-                        {col.subLabel && (
-                          <span className="text-[10px] theme-text-secondary font-medium shrink-0 ml-2">
-                            {col.subLabel}
-                          </span>
+
+                        {options.showTitle !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setIsTitleOptionsExpanded((prev) => !prev)}
+                            className="p-1 rounded-md transition-colors flex items-center justify-center cursor-pointer shrink-0 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub"
+                            title={isTitleOptionsExpanded ? 'Hide title styling options' : 'Customize title styling'}
+                          >
+                            <ChevronIcon
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                isTitleOptionsExpanded ? 'rotate-180 theme-accent' : ''
+                              }`}
+                            />
+                          </button>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
 
-                <CustomSelect
-                  label="Include Blank Rows (Offline Use)"
-                  value={String(extraBlankRows)}
-                  options={PRINT_BLANK_ROWS_OPTIONS}
-                  onChange={(val) => onExtraBlankRowsChange?.(parseInt(val, 10) || 0)}
-                  size="sm"
-                />
-              </DrawerSection>
+                      {/* Expandable Sub-options for Document Title (Collapsed by default) */}
+                      {options.showTitle !== false && isTitleOptionsExpanded && (
+                        <div className="p-3 rounded-xl theme-bg-sub/60 space-y-3 animate-fade-in pl-3.5">
+                          <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3 items-center">
+                            <CustomCheckbox
+                              checked={Boolean(options.showTitleLine)}
+                              onChange={(val) => updateOption('showTitleLine', val)}
+                              label="Show Line Below Title"
+                              size="sm"
+                            />
+
+                            {options.showTitleLine && (
+                              <CustomSelect
+                                label="Title Line Style"
+                                value={options.titleLineStyle || 'SOLID'}
+                                options={PRINT_TITLE_LINE_STYLE_OPTIONS}
+                                onChange={(val) => updateOption('titleLineStyle', val)}
+                                size="sm"
+                              />
+                            )}
+                          </div>
+
+                          <div className="space-y-2.5 pt-1 border-t theme-border">
+                            <CustomInput
+                              label="Document Header (Title)"
+                              value={options.customTitle ?? ''}
+                              onChange={(val, e) => {
+                                const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
+                                updateOption('customTitle', nextVal);
+                              }}
+                              placeholder={defaultTitle || title || 'Official Document'}
+                              size="sm"
+                            />
+
+                            <CustomInput
+                              label="Document Header (Subtitle / Term)"
+                              value={options.customSubtitle ?? ''}
+                              onChange={(val, e) => {
+                                const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
+                                updateOption('customSubtitle', nextVal);
+                              }}
+                              placeholder={defaultSubtitle || subtitle || 'Academic Session / Examination'}
+                              size="sm"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DrawerSection>
+              )}
+
+              {/* Section 2: Sections & Display Bars */}
+              {isSectionsAndBarsVisible && (
+                <DrawerSection
+                  icon={GridIcon}
+                  title="Sections & Display Bars"
+                >
+                  <div className="space-y-3">
+                    {/* 1. Document Metadata Bar Control & Expandable Styling */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <CustomCheckbox
+                          checked={options.showMeta !== false}
+                          onChange={(val) => updateOption('showMeta', val)}
+                          label="Show Document Metadata Bar"
+                          size="sm"
+                          className="flex-1"
+                        />
+
+                        {options.showMeta !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setIsMetaOptionsExpanded((prev) => !prev)}
+                            className="p-1 rounded-md transition-colors flex items-center justify-center cursor-pointer shrink-0 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub"
+                            title={isMetaOptionsExpanded ? 'Hide metadata styling options' : 'Customize metadata styling'}
+                          >
+                            <ChevronIcon
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                isMetaOptionsExpanded ? 'rotate-180 theme-accent' : ''
+                              }`}
+                            />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expandable Sub-options (Collapsed by default) */}
+                      {options.showMeta !== false && isMetaOptionsExpanded && (
+                        <div className="p-3 rounded-xl theme-bg-sub/60 space-y-2.5 animate-fade-in pl-3.5">
+                          <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3 items-center">
+                            <CustomCheckbox
+                              checked={options.showMetaBox !== false}
+                              onChange={(val) => updateOption('showMetaBox', val)}
+                              label="Show Background Box & Border"
+                              size="sm"
+                            />
+
+                            <CustomSelect
+                              label="Metadata Font Size"
+                              value={options.metaFontSize || 'MD'}
+                              options={PRINT_META_FONT_SIZE_OPTIONS}
+                              onChange={(val) => updateOption('metaFontSize', val)}
+                              size="sm"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Additional Section Bars (Summary & Footer) */}
+                    <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5 @[420px]:gap-3">
+                      <CustomCheckbox
+                        checked={options.showSummary !== false}
+                        onChange={(val) => updateOption('showSummary', val)}
+                        label="Show Summary & Statistics Bar"
+                        size="sm"
+                      />
+
+                      <CustomCheckbox
+                        checked={options.showFooter !== false}
+                        onChange={(val) => updateOption('showFooter', val)}
+                        label="Show Footer & Page Numbers"
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+                </DrawerSection>
+              )}
+
+              {/* Section 3: Security & Watermark */}
+              {isWatermarkSectionVisible && (
+                <DrawerSection
+                  icon={SettingsIcon}
+                  title="Security & Watermark"
+                >
+                  <CustomCheckbox
+                    checked={Boolean(options.showWatermark)}
+                    onChange={(val) => updateOption('showWatermark', val)}
+                    label="Show Background Watermark"
+                    size="sm"
+                  />
+
+                  {options.showWatermark && (
+                    <div className="space-y-2 pt-1">
+                      <CustomInput
+                        label="Watermark Text"
+                        value={options.watermarkText || 'OFFICIAL'}
+                        onChange={(val, e) => {
+                          const nextVal = typeof val === 'string' ? val : (e?.target?.value ?? val ?? '');
+                          updateOption('watermarkText', nextVal);
+                        }}
+                        placeholder="e.g. CONFIDENTIAL / OFFICIAL"
+                        size="sm"
+                        enableTemplates={true}
+                        templateCategory="print_watermark_templates"
+                        templateMode="replace"
+                        templateInitialList={DEFAULT_WATERMARK_TEMPLATES}
+                        showTemplateClear={true}
+                        showTemplateSave={true}
+                        showTemplateSaved={true}
+                        showTemplateCount={true}
+                        showTemplateSearch={true}
+                        showTemplateEdit={true}
+                        showTemplateDelete={true}
+                      />
+                    </div>
+                  )}
+                </DrawerSection>
+              )}
+
+              {/* Section 4: Table Columns & Rows (Data Display) */}
+              {isDataDisplayVisible && (
+                <DrawerSection
+                  icon={GridIcon}
+                  title="Data Display"
+                  headerRight={
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllColumns}
+                        className="text-[10px] theme-accent hover:underline cursor-pointer font-semibold"
+                      >
+                        All
+                      </button>
+                      <span className="theme-text-secondary opacity-40">•</span>
+                      <button
+                        type="button"
+                        onClick={deselectAllColumns}
+                        className="text-[10px] theme-text-secondary hover:theme-text-primary cursor-pointer font-semibold"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  }
+                >
+                  <div className="space-y-1.5">
+                    {availableColumns.map((col) => {
+                      const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                      const isChecked = visibleColumnKeys.includes(colKey);
+                      const label = col.label || col.header || col.title || colKey;
+
+                      return (
+                        <div
+                          key={colKey}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+                            isChecked
+                              ? 'theme-bg-elevated theme-border'
+                              : 'opacity-60 theme-border hover:opacity-90'
+                          }`}
+                        >
+                          <CustomCheckbox
+                            checked={isChecked}
+                            onChange={() => toggleColumn(colKey)}
+                            label={label}
+                            size="sm"
+                            className="w-full flex-1"
+                          />
+                          {col.subLabel && (
+                            <span className="text-[10px] theme-text-secondary font-medium shrink-0 ml-2">
+                              {col.subLabel}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <CustomSelect
+                    label="Include Blank Rows (Offline Use)"
+                    value={String(extraBlankRows)}
+                    options={PRINT_BLANK_ROWS_OPTIONS}
+                    onChange={(val) => onExtraBlankRowsChange?.(parseInt(val, 10) || 0)}
+                    size="sm"
+                  />
+                </DrawerSection>
+              )}
             </>
           )}
 

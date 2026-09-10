@@ -164,6 +164,7 @@ function getColumnStyle(colKey, activeWidths, col) {
   return undefined;
 }
 
+/** @type {any} */
 export default function DataTable({
   columns = [],
   data = [],
@@ -172,8 +173,8 @@ export default function DataTable({
   loadingMessage = 'Loading records...',
   emptyTitle = 'No Records Found',
   emptySubMessage = 'No matching data available to display.',
-  emptyIcon: EmptyIcon,
-  onRowClick,
+  emptyIcon: EmptyIcon = null,
+  onRowClick = null,
   hideHeader = false,
   compact = false,
   transparent = true,
@@ -184,7 +185,7 @@ export default function DataTable({
   tableClassName = '',
   theadClassName = '',
   headerClassName = '',
-  rowClassName,
+  rowClassName = '',
   // --- Column Resizing Props ---
   resizable = false,
   columnWidths: controlledColumnWidths = null,
@@ -202,8 +203,8 @@ export default function DataTable({
   // --- Reusable Multi-Selection Props ---
   selectable = false,
   selectedIds = [],
-  onSelectRow,
-  onSelectAll,
+  onSelectRow = null,
+  onSelectAll = null,
   idField = 'id',
   selectionHeaderClassName = 'w-12 text-center',
   selectionCellClassName = 'text-center',

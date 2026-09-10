@@ -22,7 +22,12 @@ export default function PrintDocumentWrapper({
   const {
     showHeader = true,
     showLogo = true,
+    showTitle = true,
+    showTitleLine = false,
+    titleLineStyle = 'SOLID',
     showMeta = true,
+    showMetaBox = true,
+    metaFontSize = 'MD',
     showWatermark = false,
     watermarkText = 'OFFICIAL',
     showSignatures = true,
@@ -143,11 +148,25 @@ export default function PrintDocumentWrapper({
         )}
 
         {/* 2. Document Title & Subtitle Header (Centered with Generous Spacing) */}
-        {(resolvedTitle || resolvedSubtitle) && (
-          <div className="print-document-title-block text-center flex flex-col items-center justify-center space-y-1 pb-2 mb-4">
-            <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-slate-900 leading-tight">
-              {resolvedTitle}
-            </h2>
+        {showTitle !== false && (resolvedTitle || resolvedSubtitle) && (
+          <div
+            className={`print-document-title-block text-center flex flex-col items-center justify-center space-y-1 mb-4 ${
+              showTitleLine
+                ? titleLineStyle === 'DOUBLE'
+                  ? 'border-b-4 border-double border-slate-900 pb-2.5'
+                  : titleLineStyle === 'DASHED'
+                  ? 'border-b border-dashed border-slate-400 pb-2'
+                  : titleLineStyle === 'DOTTED'
+                  ? 'border-b border-dotted border-slate-400 pb-2'
+                  : 'border-b-2 border-slate-900 pb-2'
+                : 'pb-2'
+            }`}
+          >
+            {resolvedTitle && (
+              <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-slate-900 leading-tight">
+                {resolvedTitle}
+              </h2>
+            )}
             {resolvedSubtitle && (
               <p className="text-xs sm:text-sm font-semibold text-slate-600 tracking-normal">
                 {resolvedSubtitle}
@@ -157,20 +176,60 @@ export default function PrintDocumentWrapper({
         )}
 
         {/* 2. Structured Metadata Grid Strip */}
-        {showMeta && metaItems && metaItems.length > 0 && (
-          <div className="print-meta-grid grid grid-cols-2 sm:grid-cols-4 gap-2 py-2 px-3 rounded-lg border border-slate-300 bg-slate-50 text-xs text-slate-900">
-            {metaItems.map((item, idx) => (
-              <div key={idx} className="space-y-0.5">
-                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">
-                  {item.label}
-                </span>
-                <span className="font-bold text-[11px] text-slate-900 truncate block">
-                  {item.value || '-'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {showMeta && metaItems && metaItems.length > 0 && (() => {
+          const resolvedCols = options.metaCols || (metaItems.length === 5 || metaItems.length === 3 ? 3 : (metaItems.length === 2 ? 2 : 4));
+          const gridColsClass =
+            resolvedCols === 3
+              ? 'grid-cols-2 sm:grid-cols-3'
+              : resolvedCols === 2
+              ? 'grid-cols-2'
+              : resolvedCols === 5
+              ? 'grid-cols-2 sm:grid-cols-5'
+              : resolvedCols === 6
+              ? 'grid-cols-3 sm:grid-cols-6'
+              : 'grid-cols-2 sm:grid-cols-4';
+
+          return (
+            <div
+              className={`print-meta-grid grid ${gridColsClass} gap-3 text-slate-900 ${
+                showMetaBox !== false
+                  ? 'print-meta-grid-boxed py-3 px-4 rounded-xl border border-slate-300 bg-slate-50 shadow-2xs'
+                  : 'print-meta-grid-plain py-2 px-0 bg-transparent border-none shadow-none'
+              }`}
+            >
+              {metaItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`space-y-0.5 ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
+                  style={item.colSpan ? { gridColumn: `span ${item.colSpan} / span ${item.colSpan}` } : undefined}
+                >
+                  <span
+                    className={`uppercase tracking-wider text-slate-500 font-bold block ${
+                      metaFontSize === 'SM'
+                        ? 'text-[9px]'
+                        : metaFontSize === 'LG'
+                        ? 'text-[11px]'
+                        : 'text-[10px]'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                  <span
+                    className={`font-extrabold text-slate-900 truncate block ${
+                      metaFontSize === 'SM'
+                        ? 'text-[12px] sm:text-[13px]'
+                        : metaFontSize === 'LG'
+                        ? 'text-[15px] sm:text-[16px]'
+                        : 'text-[13px] sm:text-[14px]'
+                    }`}
+                  >
+                    {item.value || '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* 3. Primary Printable Document Body */}
         <main className="w-full bg-transparent">{children}</main>

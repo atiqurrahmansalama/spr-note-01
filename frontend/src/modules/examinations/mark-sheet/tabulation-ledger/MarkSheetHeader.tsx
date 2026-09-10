@@ -1,24 +1,27 @@
 import React, { useMemo } from 'react';
-import PageHeader from '../../../../components/ui/PageHeader';
-import ActionMenu from '../../../../components/ui/ActionMenu';
+import PageHeader from '@/components/ui/PageHeader';
+import ActionMenu from '@/components/ui/ActionMenu';
 import {
   ChartBarIcon,
   DownloadIcon,
   PrinterIcon,
   DocumentIcon,
-} from '../../../../components/ui/Icons';
+} from '@/components/ui/Icons';
+import { MarkSheetHeaderProps } from '../types';
 
 /**
  * MarkSheetHeader
- * Top control header utilizing standard PageHeader and ActionMenu (with Print, Result Gazette & Export CSV).
+ * Top control header utilizing standard PageHeader and ActionMenu (with Print Ledger, Transcripts & Export CSV).
  */
 export default function MarkSheetHeader({
   exam,
+  activeSubTab = 'ledger',
   onExportCsv,
   onOpenPrintStudio,
-  onOpenGazette,
   onOpenTranscripts,
-}) {
+  onSwitchToLedger,
+  onPrintCurrentMarkSheet,
+}: MarkSheetHeaderProps) {
   const renderStatusBadge = () => {
     if (!exam) return null;
     return (
@@ -29,21 +32,37 @@ export default function MarkSheetHeader({
     );
   };
 
-  // Three-dot action menu items for printing, gazette, transcripts & CSV export
-  const menuActionItems = useMemo(
-    () => [
+  // Three-dot action menu items for printing, transcripts & CSV export
+  const menuActionItems = useMemo(() => {
+    if (activeSubTab === 'transcripts') {
+      return [
+        {
+          label: 'Print MarkSheet',
+          icon: PrinterIcon,
+          onClick: onPrintCurrentMarkSheet || (() => window.print()),
+        },
+        {
+          label: 'Print Tabulation Ledger',
+          icon: PrinterIcon,
+          onClick: onOpenPrintStudio,
+        },
+        { divider: true },
+        {
+          label: 'Export CSV',
+          icon: DownloadIcon,
+          onClick: onExportCsv,
+        },
+      ];
+    }
+
+    return [
       {
         label: 'Print Ledger',
         icon: PrinterIcon,
         onClick: onOpenPrintStudio,
       },
       {
-        label: 'Result Gazette',
-        icon: DocumentIcon,
-        onClick: onOpenGazette,
-      },
-      {
-        label: 'Transcript Studio',
+        label: 'Student MarkSheet',
         icon: DocumentIcon,
         onClick: onOpenTranscripts,
       },
@@ -53,9 +72,8 @@ export default function MarkSheetHeader({
         icon: DownloadIcon,
         onClick: onExportCsv,
       },
-    ],
-    [onOpenPrintStudio, onOpenGazette, onOpenTranscripts, onExportCsv]
-  );
+    ];
+  }, [activeSubTab, onOpenPrintStudio, onOpenTranscripts, onExportCsv, onPrintCurrentMarkSheet]);
 
   return (
     <div className="print:hidden">

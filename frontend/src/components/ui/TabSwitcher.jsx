@@ -11,11 +11,12 @@ import React, { useRef, useEffect } from 'react';
  * @param {React.ReactNode} rightContent
  * @param {string} className
  */
+/** @type {any} */
 export default function TabSwitcher({
   tabs = [],
-  activeTab,
-  onChange,
-  onTabChange,
+  activeTab = '',
+  onChange = null,
+  onTabChange = null,
   rightContent = null,
   className = '',
 }) {

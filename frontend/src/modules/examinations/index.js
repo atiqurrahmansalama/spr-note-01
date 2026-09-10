@@ -6,10 +6,8 @@ export { default as SubjectRoutineMatrixView } from './exam-schedules/routine-ma
 export { default as InvigilationScheduleView } from './exam-schedules/invigilation/InvigilationScheduleView';
 export { default as MarkEntryDeskView } from './mark-entry/MarkEntryDeskView';
 export { default as MarkSheetLedgerView, TabulationLedgerView } from './mark-sheet/MarkSheetLedgerView';
-export { default as MarkSheetPrint } from './mark-sheet/components/MarkSheetPrint';
-export { default as ResultGazetteTab } from './mark-sheet/components/ResultGazetteTab';
-export { default as TranscriptStudioView } from './transcripts/TranscriptStudioView';
-export { default as TranscriptCard } from './transcripts/TranscriptCard';
+export { TabulationLedgerTab, MarkSheetHeader, MarkSheetPrint } from './mark-sheet/tabulation-ledger';
+export { TranscriptStudioTab, TranscriptStudioView, TranscriptCard } from './mark-sheet/transcript-studio';
 export { default as GradingRulesView } from './grading-rules/GradingRulesView';
 
 export { default as useExamData } from './hooks/useExamData';

@@ -12,3 +12,9 @@
    - **Streamlined Section Separation (Zero Boxed Cards):** All right sidebar drawer forms must group inputs into clean, distinct logical sections (e.g. `Campus Information`, `Location Details`, `Leadership & Contact`) using streamlined section headers (`flex items-center gap-2 pb-2 border-b theme-border`) with proper top and vertical breathing space (`space-y-6 pt-2`), avoiding redundant nested card backgrounds/borders (`DrawerSection` card wrappers).
    - **Complementary Field Pairing:** Complementary fields (e.g. Category & Sequence, Start & End Time, Department & Target Class, Section Scope & Target Section) must share a container-responsive row (`@[480px]:grid-cols-2`).
    - **Unique Form Keys:** Always pass unique dynamic `key` props to form components inside drawer registrations to ensure pristine mounting and state initialization across Add and Edit modes.
+6. **Mandatory TypeScript for All New Features & Files:**
+   - **TypeScript Default:** All new features, components, modules, submodules, stores, hooks, and utilities must be created in TypeScript (`.tsx` and `.ts`).
+   - **Explicit Type Interfaces:** Every component and module must define and export explicit TypeScript interfaces and type definitions (e.g. `types.ts` or colocated exported interfaces).
+   - **Strict Type Safety:** Ensure zero runtime type ambiguity and strict type safety across all frontend workflows to guarantee seamless mobile app code-sharing and native Android compilation (Capacitor / React Native).
+   - **Progressive Migration:** Existing legacy `.jsx`/`.js` files should be progressively converted to `.tsx`/`.ts` during feature updates.
+

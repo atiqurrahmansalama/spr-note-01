@@ -25,9 +25,10 @@ import './printEngine.css';
  * Master Universal Print & Export Studio following SPR Note Fullscreen Standards (as in Attendance).
  * Supports both 100% Viewport Fullscreen Portal and Spacious Modal Windowing with Right Sidebar configuration.
  */
+/** @type {any} */
 export default function UniversalPrintModal({
   isOpen = false,
-  onClose,
+  onClose = () => {},
   title = 'Official Document',
   subtitle = '',
   metaItems = [], // [{ label: 'Class', value: 'Class 10' }]
@@ -44,7 +45,16 @@ export default function UniversalPrintModal({
   // Pre-configured templates list
   templates = [],
   activeTemplateId = null,
-  onTemplateChange,
+  onTemplateChange = null,
+  // Section Visibility Switches & Controls
+  showSectionsAndBars = true,
+  showSectionsBar = true,
+  showDisplayBars = true,
+  showDataDisplay = true,
+  showColumns = true,
+  showHeaderSection = true,
+  showWatermarkSection = true,
+  showSignaturesSection = true,
   // Format Visibility Switches & Filters
   showPrint = true,
   showPDF = true,
@@ -56,14 +66,14 @@ export default function UniversalPrintModal({
   showJpg = true,
   enabledFormats = null,
   // Custom action triggers
-  onPrint,
-  onExportPDF,
-  onExportExcel,
-  onExportCsv,
-  onExportTxt,
-  onExportWord,
-  onExportPng,
-  onExportJpg,
+  onPrint = null,
+  onExportPDF = null,
+  onExportExcel = null,
+  onExportCsv = null,
+  onExportTxt = null,
+  onExportWord = null,
+  onExportPng = null,
+  onExportJpg = null,
   // URL Deep-Linking & History Sync
   urlSync = true,
   urlParam = 'print',
@@ -246,7 +256,12 @@ export default function UniversalPrintModal({
           colorMode: options.colorMode,
           showHeader: options.showHeader,
           showLogo: options.showLogo,
+          showTitle: options.showTitle,
+          showTitleLine: options.showTitleLine,
+          titleLineStyle: options.titleLineStyle,
           showMeta: options.showMeta,
+          showMetaBox: options.showMetaBox,
+          metaFontSize: options.metaFontSize,
           showSummary: options.showSummary,
           showFooter: options.showFooter,
           showWatermark: options.showWatermark,
@@ -756,6 +771,14 @@ export default function UniversalPrintModal({
                 onVisibleColumnsChange={updateVisibleColumnsWithHistory}
                 extraBlankRows={extraBlankRows}
                 onExtraBlankRowsChange={updateExtraBlankRowsWithHistory}
+                showSectionsAndBars={showSectionsAndBars}
+                showSectionsBar={showSectionsBar}
+                showDisplayBars={showDisplayBars}
+                showDataDisplay={showDataDisplay}
+                showColumns={showColumns}
+                showHeaderSection={showHeaderSection}
+                showWatermarkSection={showWatermarkSection}
+                showSignaturesSection={showSignaturesSection}
                 templates={templates}
                 activeTemplateId={activeTemplateId}
                 onTemplateChange={onTemplateChange}

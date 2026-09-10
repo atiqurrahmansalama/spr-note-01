@@ -74,7 +74,12 @@ export function compileVectorPDFDocument({
     density = 'NORMAL',
     showHeader = true,
     showLogo = true,
+    showTitle = true,
+    showTitleLine = false,
+    titleLineStyle = 'SOLID',
     showMeta = true,
+    showMetaBox = true,
+    metaFontSize = 'MD',
     showSummary = true,
     showSignatures = true,
     signatureLines = [
@@ -170,7 +175,7 @@ export function compileVectorPDFDocument({
   }
 
   // ── 2. Centered Document Header (Title & Subtitle) ──────────────────────
-  if (docTitle || docSubtitle) {
+  if (showTitle !== false && (docTitle || docSubtitle)) {
     const centerX = pageWidth / 2;
     if (docTitle) {
       doc.setTextColor(15, 23, 42);
@@ -186,6 +191,34 @@ export function compileVectorPDFDocument({
       doc.text(docSubtitle, centerX, cursorY + 7, { align: 'center' });
       cursorY += 11;
     }
+
+    if (showTitleLine) {
+      doc.setDrawColor(15, 23, 42);
+      if (titleLineStyle === 'DOUBLE') {
+        doc.setLineWidth(0.75);
+        doc.line(pageMargin, cursorY + 2, pageWidth - pageMargin, cursorY + 2);
+        doc.line(pageMargin, cursorY + 4.5, pageWidth - pageMargin, cursorY + 4.5);
+        cursorY += 6;
+      } else if (titleLineStyle === 'DASHED') {
+        doc.setLineWidth(0.75);
+        doc.setLineDashPattern([3, 3], 0);
+        doc.line(pageMargin, cursorY + 2, pageWidth - pageMargin, cursorY + 2);
+        doc.setLineDashPattern([], 0);
+        cursorY += 5;
+      } else if (titleLineStyle === 'DOTTED') {
+        doc.setLineWidth(0.75);
+        doc.setLineDashPattern([1, 2], 0);
+        doc.line(pageMargin, cursorY + 2, pageWidth - pageMargin, cursorY + 2);
+        doc.setLineDashPattern([], 0);
+        cursorY += 5;
+      } else {
+        // SOLID
+        doc.setLineWidth(1);
+        doc.line(pageMargin, cursorY + 2, pageWidth - pageMargin, cursorY + 2);
+        cursorY += 5;
+      }
+    }
+
     cursorY += 10;
   }
 
@@ -194,36 +227,50 @@ export function compileVectorPDFDocument({
     const validMeta = metaItems.filter((m) => m && (m.label || m.value));
     if (validMeta.length > 0) {
       const metaBoxY = cursorY;
-      const metaCols = isLandscape ? Math.min(validMeta.length, 6) : Math.min(validMeta.length, 4);
+      const metaCols =
+        options.metaCols ||
+        (isLandscape
+          ? Math.min(validMeta.length, 6)
+          : validMeta.length === 5 || validMeta.length === 3
+          ? 3
+          : validMeta.length === 2
+          ? 2
+          : Math.min(validMeta.length, 4));
       const metaRows = Math.ceil(validMeta.length / metaCols);
-      const metaBoxHeight = metaRows * 22 + 8;
+      const rowHeight = metaFontSize === 'LG' ? 26 : metaFontSize === 'SM' ? 18 : 22;
+      const metaBoxHeight = metaRows * rowHeight + 8;
 
-      // Background rounded vector box
-      doc.setFillColor(248, 250, 252); // slate-50
-      doc.setDrawColor(203, 213, 225); // slate-300
-      doc.setLineWidth(0.5);
-      doc.roundedRect(pageMargin, metaBoxY, contentWidth, metaBoxHeight, 4, 4, 'FD');
+      if (showMetaBox !== false) {
+        // Background rounded vector box
+        doc.setFillColor(248, 250, 252); // slate-50
+        doc.setDrawColor(203, 213, 225); // slate-300
+        doc.setLineWidth(0.5);
+        doc.roundedRect(pageMargin, metaBoxY, contentWidth, metaBoxHeight, 4, 4, 'FD');
+      }
 
       const colWidth = contentWidth / metaCols;
+      const labelFontSize = metaFontSize === 'LG' ? 7.5 : metaFontSize === 'SM' ? 5.5 : 6.5;
+      const valueFontSize = metaFontSize === 'LG' ? 10 : metaFontSize === 'SM' ? 7.5 : 8.5;
+      const valueOffsetY = metaFontSize === 'LG' ? 11 : metaFontSize === 'SM' ? 8 : 10;
 
       validMeta.forEach((item, idx) => {
         const colIdx = idx % metaCols;
         const rowIdx = Math.floor(idx / metaCols);
-        const cellX = pageMargin + colIdx * colWidth + 8;
-        const cellY = metaBoxY + rowIdx * 22 + 12;
+        const cellX = pageMargin + colIdx * colWidth + (showMetaBox !== false ? 8 : 2);
+        const cellY = metaBoxY + rowIdx * rowHeight + 12;
 
-        // Label (bold 6.5pt slate-500)
+        // Label (bold slate-500)
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6.5);
+        doc.setFontSize(labelFontSize);
         doc.setTextColor(100, 116, 139);
         doc.text(String(item.label || '').toUpperCase(), cellX, cellY);
 
-        // Value (bold 8.5pt slate-900)
+        // Value (bold slate-900)
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
+        doc.setFontSize(valueFontSize);
         doc.setTextColor(15, 23, 42);
         const valText = extractPureText(item.value) || '-';
-        doc.text(valText, cellX, cellY + 10);
+        doc.text(valText, cellX, cellY + valueOffsetY);
       });
 
       cursorY = metaBoxY + metaBoxHeight + 8;

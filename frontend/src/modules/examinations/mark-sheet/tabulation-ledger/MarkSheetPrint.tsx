@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import UniversalPrintModal from '../../../../components/print/UniversalPrintModal';
-import { examStore } from '../../../../stores/examStore';
+import UniversalPrintModal from '@/components/print/UniversalPrintModal';
+import { examStore } from '@/stores/examStore';
+import { MarkSheetPrintProps, StudentResult } from '../types';
 
 /**
  * MarkSheetPrint
@@ -25,10 +26,10 @@ export default function MarkSheetPrint({
   passPercentage = 0,
   stats = {},
   totalMaxMarks = 0,
-}) {
+}: MarkSheetPrintProps) {
   // 1. Columns Definition for Universal Print Studio
   const printColumns = useMemo(() => {
-    const cols = [
+    const cols: any[] = [
       { id: 'rollNumber', header: 'Roll', label: 'Roll', align: 'center', width: '56px', nowrap: true, bold: true },
       { id: 'studentName', header: 'Student Name', label: 'Student Name', align: 'left', bold: true },
     ];
@@ -45,7 +46,7 @@ export default function MarkSheetPrint({
         width: '44px',
         headerClassName: 'w-[44px] min-w-[44px] max-w-[44px] text-center p-0.5 pb-1',
         className: 'text-center font-semibold text-xs',
-        cell: (val, row) => {
+        cell: (val: any, row: StudentResult) => {
           const sm = row.subjectMarks?.find((s) => String(s.subjectId) === String(sub.id));
           if (!sm || sm.obtained === null || sm.obtained === undefined || sm.status === 'NOT_ENTERED') return '-';
           if (sm.isAbsent) return 'ABS';
@@ -62,7 +63,7 @@ export default function MarkSheetPrint({
         label: 'Percentage',
         align: 'center',
         width: '52px',
-        cell: (val, row) =>
+        cell: (val: any, row: StudentResult) =>
           row.hasAnyMarks && row.overallPercentage !== null && row.overallPercentage !== undefined
             ? `${row.overallPercentage}%`
             : '0%',
@@ -74,7 +75,7 @@ export default function MarkSheetPrint({
         align: 'center',
         width: '52px',
         bold: true,
-        cell: (val, row) =>
+        cell: (val: any, row: StudentResult) =>
           row.hasAnyMarks && row.overallGpa !== null && row.overallGpa !== undefined
             ? Number(row.overallGpa).toFixed(2)
             : '-',
@@ -86,7 +87,7 @@ export default function MarkSheetPrint({
         align: 'center',
         width: '90px',
         bold: true,
-        cell: (val, row) => (row.hasAnyMarks && row.grade && row.grade !== '-' ? row.grade : '-'),
+        cell: (val: any, row: StudentResult) => (row.hasAnyMarks && row.grade && row.grade !== '-' ? row.grade : '-'),
       },
       {
         id: 'classRank',
@@ -95,7 +96,7 @@ export default function MarkSheetPrint({
         align: 'center',
         width: '52px',
         bold: true,
-        cell: (val, row) => (row.hasAnyMarks && row.classRank && row.classRank !== '-' ? row.classRank : '-'),
+        cell: (val: any, row: StudentResult) => (row.hasAnyMarks && row.classRank && row.classRank !== '-' ? row.classRank : '-'),
       },
     );
 
@@ -132,7 +133,7 @@ export default function MarkSheetPrint({
   const printFooterRow = useMemo(() => {
     if (!studentsData || studentsData.length === 0) return null;
 
-    const row = {
+    const row: Record<string, any> = {
       rollNumber: '-',
       studentName: 'Average',
       studentSection: '-',
@@ -153,7 +154,7 @@ export default function MarkSheetPrint({
         );
 
       if (validMarks.length > 0) {
-        const sum = validMarks.reduce((acc, m) => acc + Number(m.obtained), 0);
+        const sum = validMarks.reduce((acc, m) => acc + Number(m!.obtained), 0);
         const avg = sum / validMarks.length;
         const subFullMarks = Number(sub.fullMarks) || 100;
         const avgPct = subFullMarks > 0 ? (avg / subFullMarks) * 100 : avg;
