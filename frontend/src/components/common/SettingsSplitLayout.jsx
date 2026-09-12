@@ -18,6 +18,7 @@ export default function SettingsSplitLayout({
   sections = [],
   activeSection,
   onSectionChange,
+  onBackToMenu,
   title = "Settings",
   subtitle = "",
   headerIcon: HeaderIcon,
@@ -29,7 +30,7 @@ export default function SettingsSplitLayout({
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showCompactDetail, setShowCompactDetail] = useState(false);
+  const [showCompactDetailLocal, setShowCompactDetailLocal] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -46,6 +47,9 @@ export default function SettingsSplitLayout({
   }, []);
 
   const isCompact = containerWidth < 740;
+
+  // On compact/mobile (<740px): show detail view if activeSection is explicitly provided or locally toggled
+  const showCompactDetail = isCompact && (Boolean(activeSection) || showCompactDetailLocal);
 
   // Filter sections by search query if applicable
   const filteredSections = sections.filter((sec) => {
@@ -67,17 +71,20 @@ export default function SettingsSplitLayout({
     return acc;
   }, {});
 
-  const currentSectionObj = sections.find((s) => s.id === activeSection) || sections[0];
+  const currentSectionObj = sections.find((s) => s.id === (activeSection || sections[0]?.id)) || sections[0];
 
   const handleSelectSection = (secId) => {
+    setShowCompactDetailLocal(true);
     if (onSectionChange) onSectionChange(secId);
-    if (isCompact) {
-      setShowCompactDetail(true);
-    }
   };
 
   const handleBackToList = () => {
-    setShowCompactDetail(false);
+    setShowCompactDetailLocal(false);
+    if (onBackToMenu) {
+      onBackToMenu();
+    } else if (onSectionChange) {
+      onSectionChange(null);
+    }
   };
 
   /**

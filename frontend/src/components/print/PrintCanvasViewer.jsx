@@ -148,7 +148,9 @@ export default function PrintCanvasViewer({
         e.target.closest('button') ||
         e.target.closest('select') ||
         e.target.closest('textarea') ||
-        e.target.closest('a')
+        e.target.closest('a') ||
+        e.target.isContentEditable ||
+        e.target.closest('[contenteditable="true"]')
       ) {
         return;
       }
@@ -314,10 +316,10 @@ export default function PrintCanvasViewer({
         }}
         className="universal-print-transform-wrapper print:!transform-none print:p-0 print:m-0 print:w-full print:block print:bg-transparent"
       >
-        {/* Physical Paper Sheet Simulation with 100% Vector Sharp Zoom */}
+        {/* Physical Paper Sheet Simulation Canvas with 100% Vector Sharp Zoom */}
         <div
           id="universal-print-portal"
-          className={`paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white ${
+          className={`universal-print-portal-container flex flex-col items-center gap-8 print:gap-0 print:block print:!transform-none ${
             effectivePointerMode === 'hand' ? 'select-none' : 'select-text'
           }`}
           style={{
@@ -325,11 +327,6 @@ export default function PrintCanvasViewer({
             userSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
             WebkitUserSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
           }}
-          data-size={pageSize}
-          data-orientation={orientation}
-          data-margin={margin}
-          data-density={density}
-          data-color-mode={colorMode}
         >
           {children}
         </div>

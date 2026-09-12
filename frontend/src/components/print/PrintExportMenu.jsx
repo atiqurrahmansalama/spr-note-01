@@ -117,7 +117,7 @@ export default function PrintExportMenu({
         label: 'Print Document',
         icon: PrinterIcon,
         badge: 'Ctrl+P',
-        onClick: () => (onPrint ? onPrint() : printDocument()),
+        onClick: () => (onPrint ? onPrint() : printDocument(options)),
         title: 'System printer & dialog',
       });
     }

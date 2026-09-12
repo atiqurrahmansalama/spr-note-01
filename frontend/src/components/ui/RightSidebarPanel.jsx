@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { CloseIcon } from "./Icons";
+import { CloseIcon, ChevronLeftIcon } from "./Icons";
+import PanelResizer from "./PanelResizer";
 
 /**
  * Standard Width Presets for Right Sidebar Drawer (in pixels)
@@ -119,27 +120,22 @@ export default function RightSidebarPanel({
     touchStartTimeRef.current = null;
   };
 
-  const resolvedWidth = width || (size ? resolveSidebarWidth(size) : undefined);
-
   return (
     <div
-      style={resolvedWidth ? { width: `min(${resolvedWidth}px, 100vw)`, transition: isResizing ? "none" : "width 0.15s ease-out" } : undefined}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`h-full flex flex-col theme-bg-app text-left overflow-hidden relative shrink-0 border-l theme-border @container max-w-full ${className}`}
+      style={width ? { width: typeof width === "number" ? `${width}px` : width } : undefined}
+      className={`w-full h-full flex flex-col theme-bg-app text-left overflow-visible relative shrink-0 @container max-w-full ${className}`}
       role="region"
       aria-label={typeof title === "string" ? title : "Right Sidebar Panel"}
     >
       {/* Universal Left Drag Resizer Handle */}
-      {onStartResize && (
-        <div
-          onMouseDown={onStartResize}
-          onTouchStart={onStartResize}
-          onDoubleClick={onResetResize}
-          className="hidden md:flex absolute top-0 left-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 hover:bg-[var(--accent-main)]/15 active:bg-[var(--accent-main)]/30 transition-colors"
-          title="Drag left or right to resize sidebar width (Double click to toggle size)"
-        />
-      )}
+      <PanelResizer
+        onStartResize={onStartResize}
+        onResetResize={onResetResize}
+        isResizing={isResizing}
+        position="left"
+      />
       {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
         
@@ -154,9 +150,7 @@ export default function RightSidebarPanel({
               title="Back to parent page"
               aria-label="Back to parent page"
             >
-              <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeftIcon className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
             </button>
           )}
 

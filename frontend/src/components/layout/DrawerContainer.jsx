@@ -23,7 +23,7 @@ export default function DrawerContainer({
   footer,
   spacing = "normal",
   padding = "normal",
-  animate = true,
+  animate = false,
   className = "",
   ...rest
 }) {

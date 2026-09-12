@@ -6,8 +6,8 @@ import MarkEntryFilterBar from '../mark-entry/components/MarkEntryFilterBar';
 import TabulationLedgerTab from './tabulation-ledger/TabulationLedgerTab';
 import MarkSheetHeader from './tabulation-ledger/MarkSheetHeader';
 import MarkSheetPrint from './tabulation-ledger/MarkSheetPrint';
-import TranscriptStudioTab from './transcript-studio/TranscriptStudioTab';
-import StudentMarkSheetPrint from './transcript-studio/StudentMarkSheetPrint';
+import StudentMarkSheetView from './student-marksheet/StudentMarkSheetView';
+import StudentMarkSheetPrint from './student-marksheet/StudentMarkSheetPrint';
 import {
   ChartBarIcon,
   AcademicCapIcon,
@@ -78,13 +78,46 @@ export default function MarkSheetLedgerView({
     urlPrint === 'mark_sheet' ||
       urlPrint === 'marksheet' ||
       urlPrint === 'tabulation' ||
-      urlPrint === 'ledger'
+      urlPrint === 'ledger' ||
+      urlPrint === 'bulk_marksheet' ||
+      urlPrint === 'bulk_tabulation'
   );
+  const [academicPrintMode, setAcademicPrintMode] = useState<'single' | 'bulk'>(
+    urlPrint === 'bulk_marksheet' || urlPrint === 'bulk_tabulation' ? 'bulk' : 'single'
+  );
+
+  const handleOpenAcademicPrint = (mode: 'single' | 'bulk' = 'single') => {
+    setAcademicPrintMode(mode);
+    setIsPrintStudioOpen(true);
+  };
+
   const [isStudentPrintOpen, setIsStudentPrintOpen] = useState<boolean>(
     urlPrint === 'student_marksheet' ||
       urlPrint === 'transcript' ||
-      urlPrint === 'transcripts'
+      urlPrint === 'transcripts' ||
+      urlPrint === 'bulk_student_marksheet'
   );
+  const [studentPrintMode, setStudentPrintMode] = useState<'single' | 'bulk'>(
+    urlPrint === 'bulk_student_marksheet' ? 'bulk' : 'single'
+  );
+  const [selectedStudentIdsForPrint, setSelectedStudentIdsForPrint] = useState<(string | number)[]>([]);
+
+  const handleOpenStudentPrint = (
+    studentId?: string | number | null,
+    mode: 'single' | 'bulk' = 'single',
+    customIds?: (string | number)[]
+  ) => {
+    if (studentId) {
+      setSelectedStudentId(String(studentId));
+    }
+    setStudentPrintMode(mode);
+    if (customIds && customIds.length > 0) {
+      setSelectedStudentIdsForPrint(customIds);
+    } else {
+      setSelectedStudentIdsForPrint([]);
+    }
+    setIsStudentPrintOpen(true);
+  };
 
   const handleViewStudentTranscript = (studentId: string | number) => {
     if (studentId) {
@@ -388,30 +421,54 @@ export default function MarkSheetLedgerView({
   const renderTabAction = () => {
     if (activeSubTab === 'ledger' && selectedExamId) {
       return (
-        <CustomButton
-          type="button"
-          variant="sub"
-          size="sm"
-          icon={PrinterIcon}
-          onClick={() => setIsPrintStudioOpen(true)}
-          className="w-full sm:w-auto"
-        >
-          Print Ledger
-        </CustomButton>
+        <div className="flex items-center gap-2">
+          <CustomButton
+            type="button"
+            variant="sub"
+            size="sm"
+            icon={PrinterIcon}
+            onClick={() => handleOpenAcademicPrint('single')}
+            className="w-full sm:w-auto"
+          >
+            Print Academic MarkSheet
+          </CustomButton>
+          <CustomButton
+            type="button"
+            variant="accent"
+            size="sm"
+            icon={PrinterIcon}
+            onClick={() => handleOpenAcademicPrint('bulk')}
+            className="w-full sm:w-auto"
+          >
+            Bulk Print
+          </CustomButton>
+        </div>
       );
     }
     if (activeSubTab === 'transcripts' && selectedExamId) {
       return (
-        <CustomButton
-          type="button"
-          variant="sub"
-          size="sm"
-          icon={PrinterIcon}
-          onClick={() => setIsStudentPrintOpen(true)}
-          className="w-full sm:w-auto"
-        >
-          Print MarkSheet
-        </CustomButton>
+        <div className="flex items-center gap-2">
+          <CustomButton
+            type="button"
+            variant="sub"
+            size="sm"
+            icon={PrinterIcon}
+            onClick={() => handleOpenStudentPrint(selectedStudentId, 'single')}
+            className="w-full sm:w-auto"
+          >
+            Print Student MarkSheet
+          </CustomButton>
+          <CustomButton
+            type="button"
+            variant="accent"
+            size="sm"
+            icon={PrinterIcon}
+            onClick={() => handleOpenStudentPrint(null, 'bulk')}
+            className="w-full sm:w-auto"
+          >
+            Bulk Print
+          </CustomButton>
+        </div>
       );
     }
     return null;
@@ -424,10 +481,12 @@ export default function MarkSheetLedgerView({
         exam={exam}
         activeSubTab={activeSubTab}
         onExportCsv={exportToCsv}
-        onOpenPrintStudio={() => setIsPrintStudioOpen(true)}
+        onOpenPrintStudio={() => handleOpenAcademicPrint('single')}
+        onBulkPrintAcademicMarkSheet={() => handleOpenAcademicPrint('bulk')}
         onOpenTranscripts={() => setActiveSubTab('transcripts')}
         onSwitchToLedger={() => setActiveSubTab('ledger')}
-        onPrintCurrentMarkSheet={() => setIsStudentPrintOpen(true)}
+        onPrintCurrentMarkSheet={() => handleOpenStudentPrint(selectedStudentId, 'single')}
+        onBulkPrintStudentMarkSheet={() => handleOpenStudentPrint(null, 'bulk')}
       />
 
       {/* 2. Unified Project-Standard TabSwitcher with Dynamic Action Button */}
@@ -476,7 +535,7 @@ export default function MarkSheetLedgerView({
           </p>
         </div>
       ) : activeSubTab === 'transcripts' ? (
-        <TranscriptStudioTab
+        <StudentMarkSheetView
           exam={exam}
           selectedClassId={selectedClassId}
           selectedClassName={selectedClassName}
@@ -489,6 +548,7 @@ export default function MarkSheetLedgerView({
           failedCount={failedCount}
           selectedStudentId={selectedStudentId}
           onSelectStudentId={setSelectedStudentId}
+          onOpenStudentPrint={handleOpenStudentPrint}
           subjects={subjects}
         />
       ) : (
@@ -507,7 +567,7 @@ export default function MarkSheetLedgerView({
           stats={stats}
           totalMaxMarks={totalMaxMarks}
           onViewStudentTranscript={handleViewStudentTranscript}
-          onOpenPrintStudio={() => setIsPrintStudioOpen(true)}
+          onOpenPrintStudio={() => handleOpenAcademicPrint('single')}
         />
       )}
 
@@ -530,6 +590,10 @@ export default function MarkSheetLedgerView({
           passPercentage={passPercentage}
           stats={stats}
           totalMaxMarks={totalMaxMarks}
+          initialMode={academicPrintMode}
+          classesList={filteredClassOptions.filter((c: OptionItem) => c.value && c.value !== '')}
+          students={students}
+          tenantId={tenantId}
         />
       )}
 
@@ -541,12 +605,15 @@ export default function MarkSheetLedgerView({
           exam={exam}
           studentResult={currentSelectedStudentResult}
           studentsData={studentsData}
+          selectedStudentIds={selectedStudentIdsForPrint}
+          initialMode={studentPrintMode}
           selectedClassId={selectedClassId}
           selectedClassName={selectedClassName}
           selectedSectionId={selectedSectionId}
           selectedSectionName={selectedSectionName}
           gradingSystem={gradingSystem}
           subjects={subjects}
+          totalStudents={totalStudents}
         />
       )}
     </PageContainer>

@@ -127,6 +127,7 @@ export const DEFAULT_PRINT_OPTIONS = {
   margin: 'NORMAL',
   density: 'NORMAL',
   colorMode: 'FULL_COLOR',
+  enablePageBreak: true,
   showHeader: true,
   showLogo: true,
   showTitle: true,

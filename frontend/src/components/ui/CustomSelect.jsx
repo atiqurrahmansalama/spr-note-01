@@ -22,6 +22,14 @@ export default function CustomSelect({
   showBadge = true, // control visibility of category/type badge
   multiple = false,
   isMulti = false,
+  onManage = null,
+  manageLabel = 'Manage',
+  manageTitle = null,
+  onActionClick = null,
+  actionLabel = null,
+  headerAction = null,
+  badge = null,
+  subLabel = null,
   className = '',
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -113,22 +121,24 @@ export default function CustomSelect({
     return [];
   }, [value, isMultiple]);
 
-  const filteredOptions = options.filter((opt) => {
-    const labelText = typeof opt === 'string' ? opt : opt.label || opt.name || '';
+  const safeOptions = Array.isArray(options) ? options : [];
+
+  const filteredOptions = safeOptions.filter((opt) => {
+    const labelText = typeof opt === 'string' ? opt : opt?.label || opt?.name || '';
     return labelText.toLowerCase().includes(search.toLowerCase());
   });
 
   const selectedOption = !isMultiple
-    ? options.find((opt) => {
+    ? safeOptions.find((opt) => {
         if (typeof opt === 'string') return opt === value;
-        return opt.value === value || opt.id === value;
+        return opt?.value === value || opt?.id === value;
       })
     : null;
 
   const selectedLabel = selectedOption
     ? typeof selectedOption === 'string'
       ? selectedOption
-      : selectedOption.label || selectedOption.name
+      : selectedOption?.label || selectedOption?.name || ''
     : '';
 
   const handleSelect = (opt) => {
@@ -305,12 +315,42 @@ export default function CustomSelect({
       className={`relative w-full text-left font-sans ${compactMode ? 'h-full' : ''}`}
       ref={containerRef}
     >
-      {label && (
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
-            {label} {required && <span className="theme-danger">*</span>}
-          </label>
+      {(label || subLabel || onManage || onActionClick || headerAction || badge) && (
+        <div className="flex items-center justify-between gap-2 mb-2 select-none">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {label && (
+              <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                {label} {required && <span className="theme-danger">*</span>}
+              </label>
+            )}
+            {badge && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border">
+                {badge}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {headerAction ? (
+              headerAction
+            ) : (onManage || onActionClick) ? (
+              <button
+                type="button"
+                onClick={onManage || onActionClick}
+                className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
+                title={manageTitle || `Manage ${label || 'options'}`}
+              >
+                <span>{manageLabel || actionLabel || 'Manage'}</span>
+              </button>
+            ) : null}
+          </div>
         </div>
+      )}
+
+      {subLabel && (
+        <p className="text-[11px] theme-text-secondary mb-2 font-medium leading-tight">
+          {subLabel}
+        </p>
       )}
 
       {/* Trigger Button */}

@@ -17,4 +17,5 @@ export { default as RightSidebarPanel } from './RightSidebarPanel';
 export { default as TemplateActionToolbar } from './TemplateActionToolbar';
 export { default as TemplateTextarea } from './TemplateTextarea';
 export { default as CollapsibleCard } from './CollapsibleCard';
+export { default as PanelResizer } from './PanelResizer';
 export * from './Icons';

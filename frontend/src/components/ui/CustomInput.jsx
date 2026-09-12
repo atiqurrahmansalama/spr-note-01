@@ -130,6 +130,12 @@ const CustomInput = forwardRef(function CustomInput(
     showTemplateDelete = true,
     templateDeletable,
     showTemplateOnFocusOnly = false,
+    onManage = null,
+    manageLabel = 'Manage',
+    manageTitle = null,
+    onActionClick = null,
+    actionLabel = null,
+    headerAction = null,
     ...restProps
   },
   forwardedRef
@@ -376,27 +382,42 @@ const CustomInput = forwardRef(function CustomInput(
   // STEPPING & NUMBER SHORTCUTS
   // ----------------------------------------------------------------------------
   const updateNumberValue = (stepAmount) => {
+    const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+    const numStep = typeof stepAmount === "number" ? stepAmount : parseFloat(stepAmount) || numericStep;
+
     let current = parseFloat(stringValue);
     if (isNaN(current)) {
-      current = stepAmount > 0 ? (min !== undefined ? min : 0) : (max !== undefined ? max : 0);
+      current = numStep > 0 ? (min !== undefined ? Number(min) : 0) : (max !== undefined ? Number(max) : (min !== undefined ? Number(min) : 0));
     } else {
-      current += stepAmount;
+      current += numStep;
     }
 
-    if (min !== undefined && current < min) {
-      current = max !== undefined ? max : min;
-    } else if (max !== undefined && current > max) {
-      current = min !== undefined ? min : max;
+    // Minimum boundary check (clamp, no wrap-around)
+    const effectiveMin = min !== undefined ? Number(min) : (!allowNegative ? 0 : undefined);
+    if (effectiveMin !== undefined && current < effectiveMin) {
+      current = effectiveMin;
+    }
+
+    // Maximum boundary check (clamp, no wrap-around)
+    if (max !== undefined && current > Number(max)) {
+      current = Number(max);
     }
 
     // Round to avoid floating point anomalies if stepping decimals
     if (allowDecimals) {
-      const precision = (step.toString().split(".")[1] || "").length;
-      current = parseFloat(current.toFixed(precision || 2));
+      const stepStr = numericStep.toString();
+      const precision = stepStr.includes(".") ? (stepStr.split(".")[1] || "").length : 2;
+      current = parseFloat(current.toFixed(precision));
+    } else {
+      current = Math.round(current);
     }
 
     handleValueChange(current.toString());
   };
+
+  // Keep a ref to latest updateNumberValue for stable event listeners
+  const updateNumberValueRef = useRef(updateNumberValue);
+  updateNumberValueRef.current = updateNumberValue;
 
   // ----------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
@@ -418,13 +439,14 @@ const CustomInput = forwardRef(function CustomInput(
     }
 
     if (normalizedType === "number") {
+      const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        updateNumberValue(step || 1);
+        updateNumberValue(numericStep);
         return;
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        updateNumberValue(-(step || 1));
+        updateNumberValue(-numericStep);
         return;
       } else if (e.key === "ArrowLeft") {
         if (e.target.selectionStart === 0) {
@@ -480,13 +502,14 @@ const CustomInput = forwardRef(function CustomInput(
 
     const onWheel = (e) => {
       e.preventDefault();
-      const direction = e.deltaY < 0 ? (step || 1) : -(step || 1);
-      updateNumberValue(direction);
+      const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+      const direction = e.deltaY < 0 ? numericStep : -numericStep;
+      updateNumberValueRef.current?.(direction);
     };
 
     inputEl.addEventListener("wheel", onWheel, { passive: false });
     return () => inputEl.removeEventListener("wheel", onWheel);
-  }, [normalizedType, scrollable, disabled, readOnly, stringValue, min, max, step]);
+  }, [normalizedType, scrollable, disabled, readOnly, step]);
 
   // ----------------------------------------------------------------------------
   // AUTO RESIZE TEXTAREA
@@ -670,6 +693,18 @@ const CustomInput = forwardRef(function CustomInput(
           </div>
 
           <div className="flex items-center gap-1.5">
+            {headerAction ? (
+              headerAction
+            ) : (onManage || onActionClick) ? (
+              <button
+                type="button"
+                onClick={onManage || onActionClick}
+                className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
+                title={manageTitle || `Manage ${label || 'options'}`}
+              >
+                <span>{manageLabel || actionLabel || 'Manage'}</span>
+              </button>
+            ) : null}
             {enableTemplates && !disabled && !readOnly && (
               <TemplateActionToolbar
                 value={stringValue}
@@ -785,7 +820,10 @@ const CustomInput = forwardRef(function CustomInput(
                 <button
                   type="button"
                   tabIndex={-1}
-                  onClick={() => updateNumberValue(step || 1)}
+                  onClick={() => {
+                    const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+                    updateNumberValue(numericStep);
+                  }}
                   className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
                   title="Increase value"
                 >
@@ -794,7 +832,10 @@ const CustomInput = forwardRef(function CustomInput(
                 <button
                   type="button"
                   tabIndex={-1}
-                  onClick={() => updateNumberValue(-(step || 1))}
+                  onClick={() => {
+                    const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+                    updateNumberValue(-numericStep);
+                  }}
                   className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
                   title="Decrease value"
                 >

@@ -67,11 +67,18 @@ export interface StudentResult {
 
 export interface GradingRule {
   grade: string;
-  minPercentage: number;
-  maxPercentage: number;
-  gpa: number;
+  minPercentage?: number;
+  maxPercentage?: number;
+  minMark?: number;
+  maxMark?: number;
+  gpa?: number;
+  gradePoint?: number;
+  title?: string;
   division?: string;
   remarks?: string;
+  color?: string;
+  isPass?: boolean;
+  [key: string]: any;
 }
 
 export interface GradingSystem {
@@ -102,9 +109,11 @@ export interface MarkSheetHeaderProps {
   activeSubTab?: 'ledger' | 'transcripts';
   onExportCsv?: () => void;
   onOpenPrintStudio?: () => void;
+  onBulkPrintAcademicMarkSheet?: () => void;
   onOpenTranscripts?: () => void;
   onSwitchToLedger?: () => void;
   onPrintCurrentMarkSheet?: () => void;
+  onBulkPrintStudentMarkSheet?: () => void;
 }
 
 export interface TabulationLedgerTabProps {
@@ -138,8 +147,11 @@ export interface TranscriptStudioTabProps {
   failedCount?: number;
   selectedStudentId?: string | number | null;
   onSelectStudentId?: (studentId: string) => void;
+  onOpenStudentPrint?: (studentId?: string | number | null, mode?: 'single' | 'bulk', selectedIds?: (string | number)[]) => void;
   subjects?: Subject[];
 }
+
+export type StudentMarkSheetViewProps = TranscriptStudioTabProps;
 
 export interface TranscriptCardProps {
   studentResult?: StudentResult | null;
@@ -161,6 +173,11 @@ export interface MarkSheetPrintProps {
   gradingSystem?: GradingSystem | null;
   subjects?: Subject[];
   studentsData?: StudentResult[];
+  selectedStudentIds?: (string | number)[];
+  initialMode?: 'single' | 'bulk';
+  classesList?: OptionItem[];
+  students?: any[];
+  tenantId?: string;
   totalStudents?: number;
   passedCount?: number;
   failedCount?: number;
@@ -175,6 +192,8 @@ export interface StudentMarkSheetPrintProps {
   exam?: Exam | null;
   studentResult?: StudentResult | null;
   studentsData?: StudentResult[];
+  selectedStudentIds?: (string | number)[];
+  initialMode?: 'single' | 'bulk';
   selectedClassId?: string;
   selectedClassName?: string;
   selectedSectionId?: string;
@@ -183,7 +202,10 @@ export interface StudentMarkSheetPrintProps {
   institutionName?: string;
   institutionAddress?: string;
   subjects?: Subject[];
+  totalStudents?: number;
 }
+
+export type TranscriptPrintProps = StudentMarkSheetPrintProps;
 
 export interface MarkSheetLedgerViewProps {
   initialExamId?: string | number | null;

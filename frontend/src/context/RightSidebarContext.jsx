@@ -66,15 +66,20 @@ const RightSidebarContext = createContext({
 
 export function RightSidebarProvider({ children }) {
   const [rightSidebarConfig, setRightSidebarConfig] = useState(null);
-  const [drawerWidth, setDrawerWidthState] = useState(580);
+  const [drawerWidth, setDrawerWidthState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('spr_right_drawer_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 360 && parsed <= 1200) return parsed;
+      }
+    } catch {}
+    return 580;
+  });
 
   const setDrawerWidth = useCallback((widthOrFn) => {
     setDrawerWidthState((prev) => {
-      const next = typeof widthOrFn === 'function' ? widthOrFn(prev) : widthOrFn;
-      try {
-        localStorage.setItem('spr_right_drawer_width', String(next));
-      } catch {}
-      return next;
+      return typeof widthOrFn === 'function' ? widthOrFn(prev) : widthOrFn;
     });
   }, []);
 

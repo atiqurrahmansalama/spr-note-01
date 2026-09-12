@@ -255,6 +255,20 @@ declare module '@/components/print/UniversalPrintModal' {
     metaItems?: { label: string; value: string }[];
     columns?: any[];
     data?: any[];
+    isColumnMandatory?: (col: any, index: number) => boolean;
+    isColumnRequired?: (col: any, index: number) => boolean;
+    requiredColumnKeys?: (string | number)[];
+    visibleColumnKeys?: (string | number)[];
+    onVisibleColumnsChange?: (keys: (string | number)[]) => void;
+    visibleRowKeys?: (string | number)[];
+    onVisibleRowsChange?: (keys: (string | number)[]) => void;
+    isRowMandatory?: (row: any, index: number) => boolean;
+    isRowRequired?: (row: any, index: number) => boolean;
+    requiredRowKeys?: (string | number)[];
+    getRowKey?: (row: any, index: number) => string | number;
+    rowKey?: string;
+    getRowLabel?: (row: any, index: number) => string;
+    getRowSubLabel?: (row: any, index: number) => string;
     footerRow?: Record<string, any> | null;
     summaryMetrics?: { label: string; value: string | number }[];
     defaultOptions?: any;
@@ -262,6 +276,7 @@ declare module '@/components/print/UniversalPrintModal' {
     urlParam?: string;
     urlParamValue?: string;
     children?: React.ReactNode;
+    customSheets?: boolean;
     templates?: any[];
     activeTemplateId?: string | number | null;
     onTemplateChange?: (id: any) => void;
@@ -270,6 +285,7 @@ declare module '@/components/print/UniversalPrintModal' {
     showDisplayBars?: boolean;
     showDataDisplay?: boolean;
     showColumns?: boolean;
+    showRows?: boolean;
     showHeaderSection?: boolean;
     showWatermarkSection?: boolean;
     showSignaturesSection?: boolean;
@@ -293,6 +309,61 @@ declare module '@/components/print/UniversalPrintModal' {
   }
   const UniversalPrintModal: React.ComponentType<UniversalPrintModalProps>;
   export default UniversalPrintModal;
+}
+
+declare module '@/components/print/PrintItemSelector' {
+  export interface PrintItem {
+    key: string;
+    label: string;
+    subLabel?: string;
+    required?: boolean;
+    mandatory?: boolean;
+    isMandatory?: boolean;
+    locked?: boolean;
+    isLocked?: boolean;
+  }
+  export interface PrintItemSelectorProps {
+    icon?: React.ComponentType<any>;
+    title?: React.ReactNode;
+    items?: PrintItem[];
+    selectedKeys?: string[];
+    requiredKeys?: string[];
+    isItemRequired?: (item: PrintItem) => boolean;
+    onSelectionChange?: (keys: string[]) => void;
+    onSelectAll?: () => void;
+    onDeselectAll?: () => void;
+    minSelected?: number;
+    showSearch?: boolean;
+    searchable?: boolean;
+    showSearchThreshold?: number;
+    searchPlaceholder?: string;
+    emptyMessage?: string;
+    maxHeight?: string;
+    defaultExpanded?: boolean;
+    expanded?: boolean;
+    onToggle?: (expanded: boolean) => void;
+    className?: string;
+  }
+  const PrintItemSelector: React.ComponentType<PrintItemSelectorProps>;
+  export default PrintItemSelector;
+}
+
+declare module '@/components/print/PrintCollapsibleOption' {
+  export interface PrintCollapsibleOptionProps {
+    checked?: boolean;
+    onChange?: (checked: boolean) => void;
+    label?: React.ReactNode;
+    isExpanded?: boolean;
+    defaultExpanded?: boolean;
+    onToggleExpand?: (expanded: boolean) => void;
+    children?: React.ReactNode;
+    expandTitle?: string;
+    collapseTitle?: string;
+    className?: string;
+    contentClassName?: string;
+  }
+  const PrintCollapsibleOption: React.ComponentType<PrintCollapsibleOptionProps>;
+  export default PrintCollapsibleOption;
 }
 
 declare module '@/components/common/QrCodeBadge' {
@@ -321,3 +392,139 @@ declare module '@/components/layout/PageContainer' {
   const PageContainer: React.ComponentType<PageContainerProps>;
   export default PageContainer;
 }
+
+declare module '@/components/ui/CustomCheckbox' {
+  export interface CustomCheckboxProps {
+    id?: string;
+    name?: string;
+    checked?: boolean;
+    onChange?: (checked: boolean, e?: React.ChangeEvent<HTMLInputElement>) => void;
+    label?: React.ReactNode;
+    subLabel?: React.ReactNode;
+    description?: React.ReactNode;
+    disabled?: boolean;
+    readOnly?: boolean;
+    size?: 'sm' | 'md' | 'lg' | string;
+    className?: string;
+    boxClassName?: string;
+    [key: string]: any;
+  }
+  const CustomCheckbox: React.ComponentType<CustomCheckboxProps>;
+  export default CustomCheckbox;
+}
+
+declare module '@/components/layout' {
+  export interface DrawerContainerProps {
+    children?: React.ReactNode;
+    header?: React.ReactNode;
+    footer?: React.ReactNode;
+    spacing?: 'normal' | 'compact' | 'relaxed' | 'none' | string;
+    padding?: 'normal' | 'compact' | 'none' | string;
+    animate?: boolean;
+    className?: string;
+    [key: string]: any;
+  }
+  export interface DrawerSectionProps {
+    title?: React.ReactNode;
+    subtitle?: React.ReactNode;
+    icon?: React.ComponentType<{ className?: string }>;
+    badge?: React.ReactNode;
+    headerRight?: React.ReactNode;
+    children?: React.ReactNode;
+    className?: string;
+    bodyClassName?: string;
+    variant?: 'streamlined' | 'card' | string;
+    collapsible?: boolean;
+    defaultExpanded?: boolean;
+    expanded?: boolean;
+    onToggle?: (expanded: boolean) => void;
+    [key: string]: any;
+  }
+  export interface DrawerFooterProps {
+    onCancel?: () => void;
+    onSubmit?: (e?: any) => void;
+    onSave?: (e?: any) => void;
+    cancelLabel?: string;
+    saveLabel?: string;
+    isSubmitting?: boolean;
+    isSaveDisabled?: boolean;
+    autoSaveStatus?: any;
+    lastSavedAt?: any;
+    showAutoSave?: boolean;
+    extraButtons?: React.ReactNode;
+    className?: string;
+    children?: React.ReactNode;
+    [key: string]: any;
+  }
+  export interface DrawerBannerProps {
+    icon?: React.ComponentType<{ className?: string }>;
+    title?: React.ReactNode;
+    subtitle?: React.ReactNode;
+    badge?: React.ReactNode;
+    actions?: React.ReactNode;
+    className?: string;
+    children?: React.ReactNode;
+    [key: string]: any;
+  }
+  export const DrawerContainer: React.ComponentType<DrawerContainerProps> & {
+    Banner: React.ComponentType<DrawerBannerProps>;
+    Section: React.ComponentType<DrawerSectionProps>;
+    Footer: React.ComponentType<DrawerFooterProps>;
+  };
+  export const DrawerBanner: React.ComponentType<DrawerBannerProps>;
+  export const DrawerSection: React.ComponentType<DrawerSectionProps>;
+  export const DrawerFooter: React.ComponentType<DrawerFooterProps>;
+  export const PageContainer: React.ComponentType<any>;
+  export const RightSidebarContainer: React.ComponentType<DrawerContainerProps>;
+}
+
+declare module '@/context/RightSidebarContext' {
+  export interface RightSidebarConfig {
+    title?: React.ReactNode;
+    subtitle?: React.ReactNode;
+    category?: string;
+    content?: React.ReactNode;
+    size?: 'sm' | 'md' | 'lg' | 'xl' | string;
+    width?: number | string;
+    onClose?: () => void;
+    ownerId?: string | null;
+    drawerKey?: string | null;
+    [key: string]: any;
+  }
+  export interface RightSidebarContextValue {
+    isRightSidebarOpen: boolean;
+    rightSidebarConfig: RightSidebarConfig | null;
+    drawerWidth: number;
+    setDrawerWidth: (width: number | ((prev: number) => number)) => void;
+    openRightSidebar: (config: RightSidebarConfig) => void;
+    closeRightSidebar: (skipUrlClean?: boolean) => void;
+    openDrawer: (drawerKeyOrConfig: string | RightSidebarConfig, queryParams?: Record<string, any>) => void;
+    closeDrawer: () => void;
+  }
+  export function RightSidebarProvider(props: { children: React.ReactNode }): React.ReactElement;
+  export function useRightSidebar(): RightSidebarContextValue;
+  export function useScopedRightSidebar(): RightSidebarContextValue;
+  export function useDrawerRegistration(
+    drawerKey: string,
+    rendererFn: (params: URLSearchParams) => RightSidebarConfig | null,
+    dependencies?: any[]
+  ): void;
+}
+
+declare module '@/components/ui/PanelResizer' {
+  export interface PanelResizerProps {
+    onStartResize?: (e: React.MouseEvent | React.TouchEvent) => void;
+    onResetResize?: () => void;
+    position?: 'left' | 'right' | 'top' | 'bottom';
+    orientation?: 'vertical' | 'horizontal';
+    isResizing?: boolean;
+    title?: string;
+    className?: string;
+    indicatorClassName?: string;
+    [key: string]: any;
+  }
+  const PanelResizer: React.ComponentType<PanelResizerProps>;
+  export default PanelResizer;
+}
+
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useParams, useSearchParams, useLocation } from "react-router-dom";
 import SettingsSplitLayout from "../../../components/common/SettingsSplitLayout";
 import CompactTaxonomyManager from "../../../components/common/CompactTaxonomyManager";
 import {
@@ -18,12 +18,14 @@ import {
   ServerStackIcon,
   BookOpenIcon,
   TimerIcon,
+  AcademicCapIcon,
 } from "../../../components/ui/Icons";
 import SessionManager from "../../student-directory/SessionManager";
 import ReportSettingsView from "../../settings/ReportSettingsView";
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import AdmissionSettingsPanel from "./AdmissionSettingsPanel";
 import WeeklyHolidaySettingsPanel from "./WeeklyHolidaySettingsPanel";
+import GradingRulesView from "../../examinations/grading-rules/GradingRulesView";
 import {
   getInstitutionCategories,
   createInstitutionCategory,
@@ -90,6 +92,13 @@ const SECTIONS = [
     title: "Curriculum Subjects",
     description: "Manage textbook subjects, Islamic sciences (Fiqh, Hadith, Tafsir, Nahw), and academic disciplines across syllabus tracking",
     icon: BookOpenIcon,
+  },
+  {
+    id: "grading-policies",
+    group: "Academic Structure",
+    title: "Grading Policies & GPA Scales",
+    description: "Universal grading scale builder, GPA thresholds, letter marks, and division honors across Dars-e-Nizami, National 5.0 GPA, and University 4.0 scales",
+    icon: AcademicCapIcon,
   },
 
   // Group 2: Event & Calendar Schedules
@@ -274,17 +283,41 @@ export default function DeveloperToolsHubView() {
     }));
   }, [docTypes]);
 
-  const activeSection = searchParams.get("tab") || "categories";
+  const { sectionId: routeSectionId } = useParams();
+  const rawParam = routeSectionId || searchParams.get("tab") || searchParams.get("section");
+  const matchedSection = rawParam ? SECTIONS.find((s) => s.id === rawParam) : null;
+  const activeSection = matchedSection ? matchedSection.id : (rawParam || null);
+
+  // Default section for rendering content on wide desktop screens (when no section is in URL)
+  const currentRenderSection = activeSection || "categories";
 
   const handleSectionChange = (sectionId) => {
+    if (!sectionId) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("tab");
+          next.delete("section");
+          return next;
+        },
+        { replace: false }
+      );
+      return;
+    }
+
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.set("tab", sectionId);
+        next.delete("section");
         return next;
       },
-      { replace: true }
+      { replace: false }
     );
+  };
+
+  const handleBackToMenu = () => {
+    handleSectionChange(null);
   };
 
   const handleClearCache = () => {
@@ -315,10 +348,11 @@ export default function DeveloperToolsHubView() {
       sections={SECTIONS}
       activeSection={activeSection}
       onSectionChange={handleSectionChange}
+      onBackToMenu={handleBackToMenu}
     >
       <div className="w-full">
         {/* Section 1: Academy Categories & Branch Categories */}
-        {activeSection === "categories" && (
+        {currentRenderSection === "categories" && (
           <div className="space-y-8">
             <CompactTaxonomyManager
               title="Academy Categories"
@@ -345,7 +379,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Period Sequences & Numbers */}
-        {activeSection === "period-sequences" && (
+        {currentRenderSection === "period-sequences" && (
           <CompactTaxonomyManager
             title="Period Sequences & Number Ordering"
             description="Configure daily timetable period sequences, ordinal labels (1st Period, 2nd Period, etc.), and slot rank orders used across Daily Period Slots and Lesson Delivery."
@@ -359,7 +393,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Period Categories */}
-        {activeSection === "period-categories" && (
+        {currentRenderSection === "period-categories" && (
           <CompactTaxonomyManager
             title="Period Categories & Slot Types"
             description="Manage pre-configured lecture periods, break intervals, prayer sessions, and mutala routines available in Period Schedules and Timetables."
@@ -398,7 +432,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Staff Ranks & Designations */}
-        {activeSection === "staff-ranks" && (
+        {currentRenderSection === "staff-ranks" && (
           <CompactTaxonomyManager
             title="Staff Ranks & Designations"
             description="Manage institutional hierarchy, staff designations, and priority rank order (e.g. Principal / Muhtamim, Vice Principal, Shaikhul Hadith, etc.). Lower rank numbers indicate higher institutional authority."
@@ -415,7 +449,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Academic Subjects & Curriculum Taxonomy */}
-        {activeSection === "academic-subjects" && (
+        {currentRenderSection === "academic-subjects" && (
           <CompactTaxonomyManager
             title="Curriculum Subjects"
             description="Manage institutional subject taxonomy, Islamic sciences (Fiqh, Hadith, Tafsir, Nahw, Sarf, Balaghah, Mantiq), and academic disciplines available in curriculum and syllabus creation."
@@ -429,8 +463,15 @@ export default function DeveloperToolsHubView() {
           />
         )}
 
+        {/* Section: Universal Grading Policies & GPA Evaluation Systems */}
+        {currentRenderSection === "grading-policies" && (
+          <div className="w-full animate-fade-in">
+            <GradingRulesView />
+          </div>
+        )}
+
         {/* Section 2: Working Hours & Shifts */}
-        {activeSection === "working-schedules" && (
+        {currentRenderSection === "working-schedules" && (
           <CompactTaxonomyManager
             title="Working Hours & Operational Shifts"
             description="Manage pre-configured operational shifts, lecture sessions, and faculty duty hours available in the Working Hours entry picker."
@@ -445,14 +486,14 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section 2.5: Weekly Holidays & Weekend Schedule */}
-        {activeSection === "weekly-holidays" && (
+        {currentRenderSection === "weekly-holidays" && (
           <div className="w-full animate-fade-in">
             <WeeklyHolidaySettingsPanel activeTenantId={activeTenantId} />
           </div>
         )}
 
         {/* Section 3: Schedule & Event Types */}
-        {activeSection === "event-types" && (
+        {currentRenderSection === "event-types" && (
           <CompactTaxonomyManager
             title="Schedule & Event Types"
             description="Pre-configured event titles and schedule categories available in the Calendar & Events picker dropdown."
@@ -470,7 +511,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section 3: System Impact Scopes */}
-        {activeSection === "impact-scopes" && (
+        {currentRenderSection === "impact-scopes" && (
           <CompactTaxonomyManager
             title="System Impact Scopes"
             description="Manage integration modules and services affected by calendar schedules & events (e.g. Attendance, Push Notifications, Daily Routine, etc.)."
@@ -484,14 +525,14 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Admission Policies & Field Controls */}
-        {activeSection === "admission-settings" && (
+        {currentRenderSection === "admission-settings" && (
           <div className="w-full animate-fade-in">
             <AdmissionSettingsPanel />
           </div>
         )}
 
         {/* Section: Document Titles & Types */}
-        {activeSection === "document-types" && (
+        {currentRenderSection === "document-types" && (
           <CompactTaxonomyManager
             title="Document Titles"
             description="Manage pre-configured document titles, sanads, academic certificates, and identity credentials available across Staff Onboarding and Student Admissions (e.g. Dawra-e-Hadith, Kamil, Hifz, Birth Certificate, NID, etc.)."
@@ -532,7 +573,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Class Admission Document Requirements */}
-        {activeSection === "admission-doc-requirements" && (
+        {currentRenderSection === "admission-doc-requirements" && (
           <CompactTaxonomyManager
             title="Admission Requirements"
             description="Configure mandatory admission documents and credentials per academic class or track (e.g. Primary & Hifz requires BRN + Guardian NID; Secondary & Higher requires Transfer Certificate + Marksheets). Required documents will automatically open in the Admission Wizard and cannot be removed."
@@ -602,7 +643,7 @@ export default function DeveloperToolsHubView() {
         )}
 
         {/* Section: Staff Recruitment Document Rules */}
-        {activeSection === "staff-recruitment-rules" && (
+        {currentRenderSection === "staff-recruitment-rules" && (
           <CompactTaxonomyManager
             title="Staff Recruitment Rules"
             description="Configure mandatory verification documents, academic sanads, and credential checklists required for onboarding different staff categories (Teaching Faculty, Administrative Staff, Finance, Support)."
@@ -664,28 +705,28 @@ export default function DeveloperToolsHubView() {
 
 
         {/* Section: Report Sessions */}
-        {(activeSection === "report-sessions" || activeSection === "sessions-comments" || activeSection === "sessions") && (
+        {(currentRenderSection === "report-sessions" || currentRenderSection === "sessions-comments" || currentRenderSection === "sessions") && (
           <div className="w-full animate-fade-in">
             <SessionManager />
           </div>
         )}
 
         {/* Section: Report Settings */}
-        {activeSection === "report-settings" && (
+        {currentRenderSection === "report-settings" && (
           <div className="w-full animate-fade-in">
             <ReportSettingsView />
           </div>
         )}
 
         {/* Section: Trash & Restoration */}
-        {activeSection === "trash" && (
+        {currentRenderSection === "trash" && (
           <div className="w-full animate-fade-in">
             <TrashRestorationView />
           </div>
         )}
 
         {/* Section: System Diagnostics & Cache */}
-        {activeSection === "system" && (
+        {currentRenderSection === "system" && (
           <div className="space-y-4 animate-fade-in text-left">
             {/* Live APM & Service Health Monitor */}
             <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-4">

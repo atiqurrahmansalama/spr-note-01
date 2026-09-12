@@ -7,4 +7,5 @@ export { default as PrintExportMenu } from './PrintExportMenu';
 export * from './printExportUtils';
 export { default as usePrintStudio } from './usePrintStudio';
 export { usePrintStudio as useUniversalPrint } from './usePrintStudio';
-
+export { default as PrintItemSelector } from './PrintItemSelector';
+export { default as PrintCollapsibleOption } from './PrintCollapsibleOption';

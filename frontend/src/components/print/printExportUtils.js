@@ -90,11 +90,50 @@ function extractTableDataFromDOM(portalEl) {
 }
 
 /**
+ * Helper to get exact page margin CSS string for @page rule
+ */
+export function getPageMarginCSS(margin) {
+  const norm = String(margin || 'NORMAL').toUpperCase();
+  if (norm === 'NARROW') return '5mm 6mm 5mm 6mm';
+  if (norm === 'WIDE') return '14mm 16mm 14mm 16mm';
+  if (norm === 'NONE') return '0';
+  return '8mm 10mm 8mm 10mm'; // NORMAL default
+}
+
+/**
+ * Injects or updates dynamic @page CSS rule for browser print dialog
+ */
+export function updatePrintPageStyle(options = {}) {
+  if (typeof document === 'undefined') return;
+  const pageSize = String(options.pageSize || 'A4').toLowerCase();
+  const orientation = String(options.orientation || 'PORTRAIT').toLowerCase();
+
+  let styleEl = document.getElementById('spr-dynamic-print-page-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'spr-dynamic-print-page-style';
+    document.head.appendChild(styleEl);
+  }
+
+  styleEl.textContent = `
+    @media print {
+      @page {
+        size: ${pageSize} ${orientation};
+        margin: 8mm 10mm;
+      }
+    }
+  `;
+}
+
+/**
  * 1. Native Print Dialog
  */
-export function printDocument() {
+export function printDocument(options = {}) {
   if (typeof document !== 'undefined') {
     document.body.classList.add('spr-printing-in-progress');
+    if (options && (options.pageSize || options.orientation || options.margin)) {
+      updatePrintPageStyle(options);
+    }
   }
 
   setTimeout(() => {

@@ -2,25 +2,26 @@ import React, { useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import ActionMenu from '@/components/ui/ActionMenu';
 import {
-  ChartBarIcon,
   DownloadIcon,
   PrinterIcon,
   DocumentIcon,
+  AcademicCapIcon,
 } from '@/components/ui/Icons';
 import { MarkSheetHeaderProps } from '../types';
 
 /**
  * MarkSheetHeader
- * Top control header utilizing standard PageHeader and ActionMenu (with Print Ledger, Transcripts & Export CSV).
+ * Top control header utilizing standard PageHeader and ActionMenu with dedicated
+ * distinct actions for Academic MarkSheet Ledger and Student MarkSheet Transcripts.
  */
 export default function MarkSheetHeader({
   exam,
   activeSubTab = 'ledger',
   onExportCsv,
   onOpenPrintStudio,
-  onOpenTranscripts,
-  onSwitchToLedger,
+  onBulkPrintAcademicMarkSheet,
   onPrintCurrentMarkSheet,
+  onBulkPrintStudentMarkSheet,
 }: MarkSheetHeaderProps) {
   const renderStatusBadge = () => {
     if (!exam) return null;
@@ -32,23 +33,41 @@ export default function MarkSheetHeader({
     );
   };
 
-  // Three-dot action menu items for printing, transcripts & CSV export
+  // Header Title, Subtitle and Icon based on active tab
+  const headerDetails = useMemo(() => {
+    if (activeSubTab === 'transcripts') {
+      return {
+        icon: DocumentIcon,
+        title: 'Student MarkSheet & Transcripts',
+        subtitle:
+          'Individual student academic mark sheets featuring official evaluation breakdown, GPA, verified letter grade, and merit positioning.',
+      };
+    }
+    return {
+      icon: AcademicCapIcon,
+      title: 'Academic MarkSheet Ledger',
+      subtitle:
+        'Consolidated class examination ledger with dynamic subject matrix, total marks, GPA, academic division, and class rankings.',
+    };
+  }, [activeSubTab]);
+
+  // Three-dot action menu items tailored distinctly for each tab
   const menuActionItems = useMemo(() => {
     if (activeSubTab === 'transcripts') {
       return [
         {
-          label: 'Print MarkSheet',
+          label: 'Print Student MarkSheet',
           icon: PrinterIcon,
           onClick: onPrintCurrentMarkSheet || (() => window.print()),
         },
         {
-          label: 'Print Tabulation Ledger',
+          label: 'Bulk Print Student MarkSheets',
           icon: PrinterIcon,
-          onClick: onOpenPrintStudio,
+          onClick: onBulkPrintStudentMarkSheet || onPrintCurrentMarkSheet || (() => window.print()),
         },
         { divider: true },
         {
-          label: 'Export CSV',
+          label: 'Export Transcripts (CSV)',
           icon: DownloadIcon,
           onClick: onExportCsv,
         },
@@ -57,30 +76,37 @@ export default function MarkSheetHeader({
 
     return [
       {
-        label: 'Print Ledger',
+        label: 'Print Academic MarkSheet',
         icon: PrinterIcon,
         onClick: onOpenPrintStudio,
       },
       {
-        label: 'Student MarkSheet',
-        icon: DocumentIcon,
-        onClick: onOpenTranscripts,
+        label: 'Bulk Print Academic MarkSheet',
+        icon: PrinterIcon,
+        onClick: onBulkPrintAcademicMarkSheet || onOpenPrintStudio,
       },
       { divider: true },
       {
-        label: 'Export CSV',
+        label: 'Export Ledger (CSV)',
         icon: DownloadIcon,
         onClick: onExportCsv,
       },
     ];
-  }, [activeSubTab, onOpenPrintStudio, onOpenTranscripts, onExportCsv, onPrintCurrentMarkSheet]);
+  }, [
+    activeSubTab,
+    onOpenPrintStudio,
+    onBulkPrintAcademicMarkSheet,
+    onExportCsv,
+    onPrintCurrentMarkSheet,
+    onBulkPrintStudentMarkSheet,
+  ]);
 
   return (
     <div className="print:hidden">
       <PageHeader
-        icon={ChartBarIcon}
-        title="Examination Mark Sheet Ledger"
-        subtitle="Integrated class marksheet ledger displaying subject scores, total marks, GPA, academic division, and class rankings."
+        icon={headerDetails.icon}
+        title={headerDetails.title}
+        subtitle={headerDetails.subtitle}
         badge={renderStatusBadge()}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -90,7 +116,7 @@ export default function MarkSheetHeader({
               align="right"
               ariaLabel="More Options"
               items={menuActionItems}
-              menuClassName="w-52"
+              menuClassName="w-56"
             />
           </div>
         }

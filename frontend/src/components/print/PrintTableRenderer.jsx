@@ -9,6 +9,14 @@ export default function PrintTableRenderer({
   columns = [],
   data = [],
   visibleColumnKeys = null, // array of keys or null to show all
+  isColumnMandatory = null,
+  isColumnRequired = null,
+  requiredColumnKeys = [],
+  visibleRowKeys = null, // array of row keys or null to show all
+  isRowMandatory = null,
+  isRowRequired = null,
+  requiredRowKeys = [],
+  getRowKey = null, // custom function (row, idx) => key
   extraBlankRows = 0,
   summaryMetrics = [], // [{ label: 'Total Appeared', value: 45 }]
   showIndex = true,
@@ -17,17 +25,48 @@ export default function PrintTableRenderer({
   className = '',
   footerRow = null,
   footerRows = [],
+  startIndex = 0,
 }) {
   // Filter visible columns
   const activeColumns = React.useMemo(() => {
     if (!visibleColumnKeys || !Array.isArray(visibleColumnKeys)) {
       return columns;
     }
-    return columns.filter((col) => {
-      const key = col.id || col.key || col.accessor || col.dataIndex;
-      return visibleColumnKeys.includes(key);
+    const visibleSet = new Set(visibleColumnKeys.map(String));
+    return columns.filter((col, idx) => {
+      const key = String(col.id || col.key || col.accessor || col.dataIndex || `col_${idx}`);
+      const isMandatory =
+        (typeof isColumnMandatory === 'function' && isColumnMandatory(col, idx)) ||
+        (typeof isColumnRequired === 'function' && isColumnRequired(col, idx)) ||
+        (requiredColumnKeys && Array.isArray(requiredColumnKeys) && requiredColumnKeys.map(String).includes(key)) ||
+        Boolean(col?.required || col?.mandatory || col?.isMandatory || col?.locked || col?.isLocked);
+
+      return isMandatory || visibleSet.has(key);
     });
-  }, [columns, visibleColumnKeys]);
+  }, [columns, visibleColumnKeys, isColumnMandatory, isColumnRequired, requiredColumnKeys]);
+
+  // Filter visible rows
+  const activeData = React.useMemo(() => {
+    if (!visibleRowKeys || !Array.isArray(visibleRowKeys) || !Array.isArray(data)) {
+      return data || [];
+    }
+    const visibleSet = new Set(visibleRowKeys.map(String));
+    return data.filter((row, idx) => {
+      let key;
+      if (typeof getRowKey === 'function') {
+        key = String(getRowKey(row, idx));
+      } else {
+        key = String(row?.id ?? row?.key ?? row?._id ?? row?.studentId ?? row?.subjectId ?? `row_${idx}`);
+      }
+      const isMandatory =
+        (typeof isRowMandatory === 'function' && isRowMandatory(row, idx)) ||
+        (typeof isRowRequired === 'function' && isRowRequired(row, idx)) ||
+        (requiredRowKeys && Array.isArray(requiredRowKeys) && requiredRowKeys.map(String).includes(key)) ||
+        Boolean(row?.required || row?.mandatory || row?.isMandatory || row?.locked || row?.isLocked);
+
+      return isMandatory || visibleSet.has(key);
+    });
+  }, [data, visibleRowKeys, getRowKey, isRowMandatory, isRowRequired, requiredRowKeys]);
 
   const blankRowsArray = React.useMemo(() => {
     const count = Math.max(0, parseInt(extraBlankRows, 10) || 0);
@@ -75,7 +114,7 @@ export default function PrintTableRenderer({
   const currentDensity = densityConfig[density] || densityConfig.NORMAL;
 
   return (
-    <div className={`w-full max-w-full overflow-hidden space-y-4 ${className}`}>
+    <div className={`w-full max-w-full overflow-hidden space-y-2.5 print:space-y-1.5 ${className}`}>
       {/* Table Grid */}
       <table className={`print-table w-full max-w-full ${currentDensity.fontSize}`}>
         <thead>
@@ -105,7 +144,7 @@ export default function PrintTableRenderer({
                   } ${col.headerClassName || ''}`}
                 >
                   {isRotated ? (
-                    <div className="flex flex-col items-center justify-end w-full h-full select-none min-h-[105px] max-h-[125px] py-1">
+                    <div className="flex flex-col items-center justify-end w-full h-full select-none min-h-[75px] max-h-[90px] py-0.5 print:min-h-[68px] print:max-h-[82px]">
                       <div
                         style={{
                           writingMode: 'vertical-rl',
@@ -117,21 +156,21 @@ export default function PrintTableRenderer({
                           MozOsxFontSmoothing: 'grayscale',
                           textRendering: 'optimizeLegibility',
                           textAlign: 'left',
-                          maxHeight: '94px',
+                          maxHeight: '74px',
                           maxWidth: '22px',
-                          lineHeight: '1.12',
+                          lineHeight: '1.1',
                           overflow: 'hidden',
                           wordBreak: 'break-word',
                           display: 'inline-block',
                           clipPath: 'inset(0 0 0 0)',
                         }}
-                        className="text-[9.5px] font-bold text-slate-900 tracking-tight"
+                        className="text-[9px] font-bold text-slate-900 tracking-tight"
                         title={`${headerTitle}${col.subLabel ? ` ${col.subLabel}` : ''}`}
                       >
                         {headerTitle}
                       </div>
                       {col.subLabel && (
-                        <span className="block text-[8.5px] font-bold text-slate-700 mt-1 leading-none tracking-tight">
+                        <span className="block text-[8px] font-bold text-slate-700 mt-0.5 leading-none tracking-tight">
                           {col.subLabel}
                         </span>
                       )}
@@ -154,11 +193,11 @@ export default function PrintTableRenderer({
           </tr>
         </thead>
         <tbody>
-          {data.map((row, rIdx) => (
+          {activeData.map((row, rIdx) => (
             <tr key={row.id || rIdx} className="print-avoid-break bg-white hover:bg-slate-50/60">
               {showIndex && (
                 <td className={`text-center font-mono font-medium text-slate-700 border border-slate-300 w-8 whitespace-nowrap ${currentDensity.cellPad}`}>
-                  {rIdx + 1}
+                  {rIdx + 1 + (typeof startIndex === 'number' ? startIndex : 0)}
                 </td>
               )}
               {activeColumns.map((col, cIdx) => {
@@ -197,7 +236,7 @@ export default function PrintTableRenderer({
             <tr key={`blank_${bIdx}`} className={`print-avoid-break bg-white ${currentDensity.blankHeight}`}>
               {showIndex && (
                 <td className={`text-center font-mono font-medium text-slate-400 border border-slate-300 w-10 ${currentDensity.cellPad}`}>
-                  {data.length + bIdx + 1}
+                  {activeData.length + bIdx + 1}
                 </td>
               )}
               {activeColumns.map((col, cIdx) => (
@@ -213,34 +252,138 @@ export default function PrintTableRenderer({
         </tbody>
         {(footerRow || (Array.isArray(footerRows) && footerRows.length > 0)) && (
           <tfoot className="print-avoid-break">
-            {(Array.isArray(footerRows) && footerRows.length > 0 ? footerRows : [footerRow]).map((fRow, rIdx) => (
-              <tr key={`footer_${rIdx}`} className="font-bold bg-slate-100">
-                {showIndex && (
-                  <td className={`text-center font-bold text-slate-700 border border-slate-300 w-8 ${currentDensity.cellPad}`}>
-                    -
-                  </td>
-                )}
-                {activeColumns.map((col, cIdx) => {
-                  const colKey = col.id || col.key || col.accessor || col.dataIndex;
-                  const val = typeof fRow === 'function' ? fRow(col, cIdx) : fRow?.[colKey];
-
-                  return (
+            {(Array.isArray(footerRows) && footerRows.length > 0 ? footerRows : [footerRow]).map((fRow, rIdx) => {
+              if (fRow?.isSpacer || fRow?.type === 'spacer') {
+                const totalColsCount = activeColumns.length + (showIndex ? 1 : 0);
+                return (
+                  <tr key={`footer_spacer_${rIdx}`} className="print-table-spacer border-none bg-transparent">
                     <td
-                      key={colKey || cIdx}
-                      className={`border border-slate-300 text-slate-900 font-bold ${currentDensity.cellPad} ${
-                        col.align === 'center'
-                          ? 'text-center'
-                          : col.align === 'right'
-                          ? 'text-right'
-                          : 'text-left'
-                      } ${col.className || ''}`}
+                      colSpan={totalColsCount}
+                      style={{
+                        border: 'none',
+                        borderLeft: 'hidden',
+                        borderRight: 'hidden',
+                        borderTop: 'none',
+                        borderBottom: 'none',
+                        borderColor: 'transparent',
+                        backgroundColor: 'transparent',
+                        height: fRow.height || '12px',
+                        padding: 0,
+                        lineHeight: 1,
+                      }}
+                      className="print-cell-borderless border-0 border-transparent bg-transparent text-transparent select-none"
                     >
-                      {React.isValidElement(val) ? val : (val !== undefined && val !== null ? val : '-')}
+                      &nbsp;
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
+                  </tr>
+                );
+              }
+
+              if (Array.isArray(fRow?.cells)) {
+                return (
+                  <tr key={`footer_${rIdx}`} className={`font-bold ${fRow.className || 'bg-transparent'}`}>
+                    {showIndex && !fRow.ignoreIndex && !fRow.mergeIndex && (
+                      <td className={`text-center font-bold text-slate-700 border border-slate-300 bg-slate-100 w-8 ${currentDensity.cellPad}`}>
+                        -
+                      </td>
+                    )}
+                    {fRow.cells.map((cell, cellIdx) => {
+                      let colSpan = 1;
+                      if (typeof cell.colSpan === 'function') {
+                        colSpan = cell.colSpan(activeColumns.length, showIndex);
+                      } else if (cell.colSpan) {
+                        colSpan = cell.colSpan;
+                        if (cellIdx === 0 && showIndex && fRow.mergeIndex) {
+                          colSpan += 1;
+                        }
+                      } else if (cellIdx === 0 && showIndex && fRow.mergeIndex) {
+                        colSpan = 2;
+                      }
+
+                      const isBorderless = Boolean(
+                        cell.borderless ||
+                        cell.transparent ||
+                        cell.className?.includes('border-transparent') ||
+                        cell.className?.includes('border-0') ||
+                        cell.className?.includes('border-none')
+                      );
+
+                      return (
+                        <td
+                          key={`fcell_${rIdx}_${cellIdx}`}
+                          colSpan={colSpan}
+                          style={{
+                            ...(cell.className?.includes('font-normal') ? { fontWeight: 'normal' } : {}),
+                            ...(cell.style || {}),
+                            ...(isBorderless
+                              ? {
+                                  border: 'none',
+                                  borderLeft: 'none',
+                                  borderTop: 'none',
+                                  borderRight: 'hidden',
+                                  borderBottom: 'hidden',
+                                  borderColor: 'transparent',
+                                  backgroundColor: 'transparent',
+                                }
+                              : {}),
+                          }}
+                          className={`${
+                            isBorderless
+                              ? 'print-cell-borderless border-0 border-transparent bg-transparent text-transparent select-none'
+                              : `border border-slate-300 bg-slate-100 ${
+                                  cell.className?.includes('font-normal')
+                                    ? '!font-normal font-normal text-slate-700'
+                                    : 'text-slate-900 font-bold'
+                                }`
+                          } ${currentDensity.cellPad} ${
+                            cell.align === 'center'
+                              ? 'text-center'
+                              : cell.align === 'right'
+                              ? 'text-right'
+                              : cell.align === 'left'
+                              ? 'text-left'
+                              : 'text-center'
+                          } ${cell.className || ''}`}
+                        >
+                          {React.isValidElement(cell.content ?? cell.value ?? cell)
+                            ? (cell.content ?? cell.value ?? cell)
+                            : (cell.content !== undefined && cell.content !== null ? cell.content : (isBorderless ? '' : '-'))}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              }
+
+              return (
+                <tr key={`footer_${rIdx}`} className="font-bold bg-slate-100">
+                  {showIndex && (
+                    <td className={`text-center font-bold text-slate-700 border border-slate-300 w-8 ${currentDensity.cellPad}`}>
+                      -
+                    </td>
+                  )}
+                  {activeColumns.map((col, cIdx) => {
+                    const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                    const val = typeof fRow === 'function' ? fRow(col, cIdx) : fRow?.[colKey];
+
+                    return (
+                      <td
+                        key={colKey || cIdx}
+                        className={`border border-slate-300 text-slate-900 font-bold ${currentDensity.cellPad} ${
+                          col.align === 'center'
+                            ? 'text-center'
+                            : col.align === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                        } ${col.className || ''}`}
+                      >
+                        {React.isValidElement(val) ? val : (val !== undefined && val !== null ? val : '-')}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tfoot>
         )}
       </table>

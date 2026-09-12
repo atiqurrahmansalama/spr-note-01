@@ -25,11 +25,12 @@
   -webkit-backface-visibility: hidden;
 }
 
-.paper-sheet > * {
+.paper-sheet > .print-document-sheet {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  height: 100%;
 }
 
 /* Studio Workbench Background (Theme-Aware Drafting Desk) */
@@ -39,30 +40,50 @@
   background-size: 24px 24px;
 }
 
-/* Screen Dimensions */
+/* Screen Dimensions (Physical Paper Aspect Ratio Simulation) */
 .paper-sheet[data-size="A4"][data-orientation="PORTRAIT"] {
   width: 794px;
   min-height: 1123px;
+  height: auto;
+  box-sizing: border-box;
 }
 .paper-sheet[data-size="A4"][data-orientation="LANDSCAPE"] {
   width: 1123px;
   min-height: 794px;
+  height: auto;
+  box-sizing: border-box;
 }
 .paper-sheet[data-size="LEGAL"][data-orientation="PORTRAIT"] {
   width: 816px;
   min-height: 1344px;
+  height: auto;
+  box-sizing: border-box;
 }
 .paper-sheet[data-size="LEGAL"][data-orientation="LANDSCAPE"] {
   width: 1344px;
   min-height: 816px;
+  height: auto;
+  box-sizing: border-box;
 }
 .paper-sheet[data-size="LETTER"][data-orientation="PORTRAIT"] {
   width: 816px;
   min-height: 1056px;
+  height: auto;
+  box-sizing: border-box;
 }
 .paper-sheet[data-size="LETTER"][data-orientation="LANDSCAPE"] {
   width: 1056px;
   min-height: 816px;
+  height: auto;
+  box-sizing: border-box;
+}
+
+/* Continuous Sheet Mode (when Auto Page Break is switched OFF) */
+.paper-sheet[data-page-break="false"] {
+  height: auto !important;
+  max-height: none !important;
+  min-height: 1123px !important;
+  overflow: visible !important;
 }
 
 /* Screen Margins */
@@ -203,6 +224,32 @@
   border: 1px solid #cbd5e1;
 }
 
+.print-table tr.print-table-spacer,
+.print-table tr.print-table-spacer td {
+  border: none !important;
+  border-left: hidden !important;
+  border-right: hidden !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-color: transparent !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.print-table td.border-transparent,
+.print-table td.border-0,
+.print-table td.border-none,
+.print-table td.print-cell-borderless {
+  border: none !important;
+  border-left: none !important;
+  border-top: none !important;
+  border-right: hidden !important;
+  border-bottom: hidden !important;
+  border-color: transparent !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
 .print-avoid-break {
   break-inside: avoid;
   page-break-inside: avoid;
@@ -256,11 +303,6 @@ body.spr-printing-in-progress .universal-export-menu-portal {
    4. Print Media Queries (@media print)
    -------------------------------------------------------------------------- */
 @media print {
-  @page {
-    size: auto;
-    margin: 8mm 10mm 8mm 10mm;
-  }
-
   /* Exact color and background preservation */
   *,
   *::before,
@@ -268,6 +310,7 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+    box-sizing: border-box !important;
   }
 
   /* Reset entire document and viewport to pure white */
@@ -279,7 +322,7 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     min-height: 100% !important;
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
@@ -311,8 +354,8 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100% !important;
-    min-height: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
     overflow: visible !important;
     transform: none !important;
     zoom: 1 !important;
@@ -328,41 +371,97 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     -webkit-backdrop-filter: none !important;
   }
 
-  /* 3. Paper Sheet Print Rules — High Specificity Full-Bleed Reset */
-  .paper-sheet,
-  .paper-sheet[data-size],
-  .paper-sheet[data-orientation],
-  .paper-sheet[data-margin],
-  .paper-sheet[data-color-mode],
-  .paper-sheet[data-density],
-  #universal-print-portal {
+  /* 3. Paper Sheet Print Rules — Exact Physical Paper Dimensions (WYSIWYG 1:1 Parity) */
+  #universal-print-portal,
+  .universal-print-portal-container {
     box-shadow: none !important;
     border: none !important;
-    border-radius: 0 !important;
     transform: none !important;
-    filter: none !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: calc(100vh - 16mm) !important;
-    height: auto !important;
-    background: #ffffff !important;
+    display: block !important;
+    background: transparent !important;
+    zoom: 1 !important;
+  }
+
+  .paper-sheet-wrapper {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    zoom: 1 !important;
+  }
+
+  .paper-sheet-wrapper:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  #universal-print-portal > .paper-sheet {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  #universal-print-portal > .paper-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Base Printable Paper Sheet */
+  .paper-sheet {
+    box-sizing: border-box !important;
     background-color: #ffffff !important;
-    background-image: none !important;
     color: #0f172a !important;
+    position: relative !important;
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: visible !important;
+    zoom: 1 !important;
+  }
+
+  /* Internal Physical Margins (Padding) matching Canvas */
+  .paper-sheet[data-margin="NORMAL"],
+  .paper-sheet[data-margin="NARROW"],
+  .paper-sheet[data-margin="WIDE"],
+  .paper-sheet[data-margin="NONE"] {
+    padding: 0 !important;
+  }
+
+  /* Continuous non-paginated sheet override */
+  .paper-sheet[data-page-break="false"] {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .print-document-sheet {
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
-    min-height: calc(100vh - 16mm) !important;
+    display: block !important;
     height: auto !important;
-    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: none !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
     color: #0f172a !important;
@@ -370,11 +469,20 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     margin: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .print-document-sheet > div:first-child {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   .print-signature-footer-container {
-    margin-top: auto !important;
-    padding-top: 1.5rem !important;
+    display: block !important;
+    margin-top: 1.25rem !important;
+    padding-top: 0.5rem !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
@@ -451,10 +559,72 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     background-color: #ffffff !important;
   }
 
+  .print-table tr.print-table-spacer,
+  .print-table tr.print-table-spacer td {
+    border: none !important;
+    border-left: hidden !important;
+    border-right: hidden !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-color: transparent !important;
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  .print-table td.border-transparent,
+  .print-table td.border-0,
+  .print-table td.border-none,
+  .print-table td.print-cell-borderless {
+    border: none !important;
+    border-left: none !important;
+    border-top: none !important;
+    border-right: hidden !important;
+    border-bottom: hidden !important;
+    border-color: transparent !important;
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
   .paper-sheet[data-color-mode="MONOCHROME"] .print-table th,
   .paper-sheet[data-color-mode="MONOCHROME"] .print-table td {
     border-color: #000000 !important;
     color: #000000 !important;
+  }
+
+  /* 6. Rotated Table Headers for Ledger / Mark Sheets */
+  .print-table th div[style*="vertical-rl"],
+  .print-table th [style*="vertical-rl"] {
+    writing-mode: vertical-rl !important;
+    -webkit-writing-mode: vertical-rl !important;
+    transform: rotate(180deg) !important;
+    transform-origin: center center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: inline-block !important;
+  }
+
+  /* 7. Footer Rows and Table Footers */
+  .print-table tfoot td {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-table tfoot td.print-cell-borderless,
+  .print-table tfoot td.border-transparent,
+  .print-table tfoot td.border-0,
+  .print-table tfoot td.border-none,
+  .print-table tfoot tr.print-table-spacer td {
+    border: none !important;
+    border-left: none !important;
+    border-top: none !important;
+    border-right: hidden !important;
+    border-bottom: hidden !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    background-color: transparent !important;
   }
 
   .print-avoid-break {
@@ -474,12 +644,6 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   cursor: grabbing;
 }
 
-.universal-print-canvas-wrapper.mode-hand,
-.universal-print-canvas-wrapper.mode-hand * {
-  user-select: none !important;
-  -webkit-user-select: none !important;
-}
-
 .universal-print-canvas-wrapper.mode-select {
   cursor: default;
 }
@@ -488,7 +652,15 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   cursor: default;
 }
 
-.universal-print-canvas-wrapper.mode-select .paper-sheet * {
+/* Document Content & Editable Elements Selection & Cursor */
+[contenteditable="true"],
+[contenteditable="true"] * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+
+.paper-sheet {
   user-select: text;
   -webkit-user-select: text;
 }

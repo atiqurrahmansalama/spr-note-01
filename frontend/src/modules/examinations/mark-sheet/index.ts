@@ -9,12 +9,13 @@ export {
   MarkSheetPrint,
 } from './tabulation-ledger';
 
-// 2. Transcript Studio Sub-Module
+// 2. Student Mark Sheet Sub-Module
 export {
-  TranscriptStudioTab,
+  StudentMarkSheetView,
+  StudentMarkSheetPrint,
   TranscriptCard,
-  TranscriptStudioView,
-} from './transcript-studio';
+  TranscriptPrint,
+} from './student-marksheet';
 
 // TypeScript Types & Interfaces Export
 export * from './types';

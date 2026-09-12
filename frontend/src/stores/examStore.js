@@ -17,6 +17,7 @@ export const DEFAULT_GRADING_SYSTEMS = [
     name: 'Dars-e-Nizami / Qawmi Standard (Befaq)',
     code: 'BEFAQ_QAWMI',
     description: 'Traditional Islamic academic grading standard (Mumtaz to Rasib).',
+    includeGradePoint: true,
     isDefault: true,
     rules: [
       { grade: 'Mumtaz', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Star', isPass: true, color: 'emerald' },
@@ -31,6 +32,7 @@ export const DEFAULT_GRADING_SYSTEMS = [
     name: 'General Academic 5.0 GPA Scale',
     code: 'GENERAL_GPA5',
     description: 'National and international 5.0 GPA standard scale.',
+    includeGradePoint: true,
     isDefault: false,
     rules: [
       { grade: 'A+', title: 'Outstanding', minMark: 80, maxMark: 100, gradePoint: 5.0, division: '1st Division', isPass: true, color: 'emerald' },
@@ -47,20 +49,51 @@ export const DEFAULT_GRADING_SYSTEMS = [
     name: 'Percentage & Division Scale',
     code: 'PERCENTAGE_DIV',
     description: 'Simple division scale based on aggregate percentages.',
+    includeGradePoint: false,
     isDefault: false,
     rules: [
-      { grade: '1st Div (Distinction)', title: 'Distinction', minMark: 75, maxMark: 100, gradePoint: 4.0, division: '1st Division with Distinction', isPass: true, color: 'emerald' },
-      { grade: '1st Division', title: 'First Division', minMark: 60, maxMark: 74, gradePoint: 3.0, division: '1st Division', isPass: true, color: 'teal' },
-      { grade: '2nd Division', title: 'Second Division', minMark: 45, maxMark: 59, gradePoint: 2.0, division: '2nd Division', isPass: true, color: 'blue' },
-      { grade: '3rd Division', title: 'Third Division', minMark: 33, maxMark: 44, gradePoint: 1.0, division: '3rd Division', isPass: true, color: 'amber' },
+      { grade: '1st Div (Distinction)', title: 'Distinction', minMark: 75, maxMark: 100, gradePoint: 0.0, division: '1st Division with Distinction', isPass: true, color: 'emerald' },
+      { grade: '1st Division', title: 'First Division', minMark: 60, maxMark: 74, gradePoint: 0.0, division: '1st Division', isPass: true, color: 'teal' },
+      { grade: '2nd Division', title: 'Second Division', minMark: 45, maxMark: 59, gradePoint: 0.0, division: '2nd Division', isPass: true, color: 'blue' },
+      { grade: '3rd Division', title: 'Third Division', minMark: 33, maxMark: 44, gradePoint: 0.0, division: '3rd Division', isPass: true, color: 'amber' },
       { grade: 'Failed', title: 'Failed', minMark: 0, maxMark: 32, gradePoint: 0.0, division: 'Failed', isPass: false, color: 'rose' },
     ],
   },
 ];
 
 /**
- * Universal Default Examination Sessions
+ * Universal Default Grading Meaning Presets
  */
+export const DEFAULT_GRADING_MEANINGS = [
+  { id: 'gm_outstanding', value: 'Outstanding', label: 'Outstanding' },
+  { id: 'gm_excellent', value: 'Excellent', label: 'Excellent' },
+  { id: 'gm_very_good', value: 'Very Good', label: 'Very Good' },
+  { id: 'gm_good', value: 'Good', label: 'Good' },
+  { id: 'gm_satisfactory', value: 'Satisfactory', label: 'Satisfactory' },
+  { id: 'gm_pass', value: 'Pass', label: 'Pass' },
+  { id: 'gm_marginal', value: 'Marginal', label: 'Marginal' },
+  { id: 'gm_needs_improvement', value: 'Needs Improvement', label: 'Needs Improvement' },
+  { id: 'gm_fail', value: 'Fail', label: 'Fail' },
+  { id: 'gm_failed', value: 'Failed', label: 'Failed' },
+  { id: 'gm_distinction', value: 'Distinction', label: 'Distinction' },
+  { id: 'gm_1st_div', value: 'First Division', label: 'First Division' },
+  { id: 'gm_2nd_div', value: 'Second Division', label: 'Second Division' },
+  { id: 'gm_3rd_div', value: 'Third Division', label: 'Third Division' },
+];
+
+/**
+ * Universal Default Grading Division Honor Presets
+ */
+export const DEFAULT_GRADING_DIVISIONS = [
+  { id: 'gd_1st_star', value: '1st Star', label: '1st Star' },
+  { id: 'gd_1st_distinction', value: '1st Division with Distinction', label: '1st Division with Distinction' },
+  { id: 'gd_1st_div', value: '1st Division', label: '1st Division' },
+  { id: 'gd_2nd_div', value: '2nd Division', label: '2nd Division' },
+  { id: 'gd_3rd_div', value: '3rd Division', label: '3rd Division' },
+  { id: 'gd_pass_div', value: 'Pass Division', label: 'Pass Division' },
+  { id: 'gd_failed', value: 'Failed', label: 'Failed' },
+];
+
 export const DEFAULT_EXAM_SESSIONS = [
   {
     id: 'exam_term_1_2026',
@@ -583,7 +616,12 @@ export const examStore = {
       writeJSON(key, DEFAULT_GRADING_SYSTEMS);
       return DEFAULT_GRADING_SYSTEMS;
     }
-    return stored;
+    return stored.map((s) => ({
+      ...s,
+      includeGradePoint: s.includeGradePoint !== undefined
+        ? Boolean(s.includeGradePoint)
+        : (s.id === 'percentage_division_scale' ? false : true),
+    }));
   },
 
   saveGradingSystems: (tenantId = 'default', systems = []) => {
@@ -604,6 +642,7 @@ export const examStore = {
       name: systemData.name || 'Custom Grading System',
       code: systemData.code || `SCALE_${Date.now().toString(36).toUpperCase()}`,
       description: systemData.description || '',
+      includeGradePoint: systemData.includeGradePoint !== undefined ? Boolean(systemData.includeGradePoint) : true,
       isDefault: Boolean(systemData.isDefault),
       rules: systemData.rules || [],
       createdAt: new Date().toISOString(),
@@ -633,6 +672,134 @@ export const examStore = {
     const list = examStore.getGradingSystems(tenantId);
     const updated = list.filter((s) => s.id !== systemId);
     examStore.saveGradingSystems(tenantId, updated);
+  },
+
+  // ── 1.1 GRADING MEANINGS TAXONOMY ──────────────────────────────────────────
+  getGradingMeanings: (tenantId = 'default') => {
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_meanings_${safeTenant}`;
+    const legacyKey = 'spr_grading_meanings_default';
+    let stored = readJSON(key, null);
+    if (!stored && safeTenant !== 'default') {
+      stored = readJSON(legacyKey, null);
+    }
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      writeJSON(key, DEFAULT_GRADING_MEANINGS);
+      return DEFAULT_GRADING_MEANINGS;
+    }
+    return stored.map((item) => (typeof item === 'string' ? { id: item, value: item, label: item } : item));
+  },
+
+  saveGradingMeanings: (tenantId = 'default', meanings = []) => {
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_meanings_${safeTenant}`;
+    const safe = Array.isArray(meanings) ? meanings : [];
+    writeJSON(key, safe);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('spr_grading_meanings_updated', { detail: safe }));
+    }
+    return safe;
+  },
+
+  addGradingMeaning: (tenantId = 'default', meaningLabel) => {
+    const trimmed = String(meaningLabel || '').trim();
+    if (!trimmed) return null;
+    const list = examStore.getGradingMeanings(tenantId);
+    const existing = list.find((m) => m.value.toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      return existing;
+    }
+    const newItem = {
+      id: `gm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      value: trimmed,
+      label: trimmed,
+    };
+    const updated = [...list, newItem];
+    examStore.saveGradingMeanings(tenantId, updated);
+    return newItem;
+  },
+
+  updateGradingMeaning: (tenantId = 'default', oldVal, newLabel) => {
+    const trimmed = String(newLabel || '').trim();
+    if (!trimmed) return;
+    const list = examStore.getGradingMeanings(tenantId);
+    const updated = list.map((m) => {
+      if (m.value === oldVal || m.id === oldVal) {
+        return { ...m, value: trimmed, label: trimmed };
+      }
+      return m;
+    });
+    examStore.saveGradingMeanings(tenantId, updated);
+  },
+
+  deleteGradingMeaning: (tenantId = 'default', valToDelete) => {
+    const list = examStore.getGradingMeanings(tenantId);
+    const updated = list.filter((m) => m.value !== valToDelete && m.id !== valToDelete);
+    examStore.saveGradingMeanings(tenantId, updated);
+  },
+
+  // ── 1.2 GRADING DIVISION HONORS TAXONOMY ────────────────────────────────────
+  getGradingDivisions: (tenantId = 'default') => {
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_divisions_${safeTenant}`;
+    const legacyKey = 'spr_grading_divisions_default';
+    let stored = readJSON(key, null);
+    if (!stored && safeTenant !== 'default') {
+      stored = readJSON(legacyKey, null);
+    }
+    if (!stored || !Array.isArray(stored) || stored.length === 0) {
+      writeJSON(key, DEFAULT_GRADING_DIVISIONS);
+      return DEFAULT_GRADING_DIVISIONS;
+    }
+    return stored.map((item) => (typeof item === 'string' ? { id: item, value: item, label: item } : item));
+  },
+
+  saveGradingDivisions: (tenantId = 'default', divisions = []) => {
+    const safeTenant = getSafeTenantId(tenantId);
+    const key = `spr_grading_divisions_${safeTenant}`;
+    const safe = Array.isArray(divisions) ? divisions : [];
+    writeJSON(key, safe);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('spr_grading_divisions_updated', { detail: safe }));
+    }
+    return safe;
+  },
+
+  addGradingDivision: (tenantId = 'default', divisionLabel) => {
+    const trimmed = String(divisionLabel || '').trim();
+    if (!trimmed) return null;
+    const list = examStore.getGradingDivisions(tenantId);
+    const existing = list.find((d) => d.value.toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      return existing;
+    }
+    const newItem = {
+      id: `gd_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      value: trimmed,
+      label: trimmed,
+    };
+    const updated = [...list, newItem];
+    examStore.saveGradingDivisions(tenantId, updated);
+    return newItem;
+  },
+
+  updateGradingDivision: (tenantId = 'default', oldVal, newLabel) => {
+    const trimmed = String(newLabel || '').trim();
+    if (!trimmed) return;
+    const list = examStore.getGradingDivisions(tenantId);
+    const updated = list.map((d) => {
+      if (d.value === oldVal || d.id === oldVal) {
+        return { ...d, value: trimmed, label: trimmed };
+      }
+      return d;
+    });
+    examStore.saveGradingDivisions(tenantId, updated);
+  },
+
+  deleteGradingDivision: (tenantId = 'default', valToDelete) => {
+    const list = examStore.getGradingDivisions(tenantId);
+    const updated = list.filter((d) => d.value !== valToDelete && d.id !== valToDelete);
+    examStore.saveGradingDivisions(tenantId, updated);
   },
 
   // ── 2. EXAMINATIONS & TERMS ─────────────────────────────────────────────────

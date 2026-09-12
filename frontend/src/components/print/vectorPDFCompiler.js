@@ -231,7 +231,7 @@ export function compileVectorPDFDocument({
         options.metaCols ||
         (isLandscape
           ? Math.min(validMeta.length, 6)
-          : validMeta.length === 5 || validMeta.length === 3
+          : validMeta.length === 6 || validMeta.length === 5 || validMeta.length === 3
           ? 3
           : validMeta.length === 2
           ? 2
@@ -248,7 +248,31 @@ export function compileVectorPDFDocument({
         doc.roundedRect(pageMargin, metaBoxY, contentWidth, metaBoxHeight, 4, 4, 'FD');
       }
 
-      const colWidth = contentWidth / metaCols;
+      let colOffsets = [];
+      let colWidths = [];
+
+      if (options.metaGridTemplate && typeof options.metaGridTemplate === 'string') {
+        const parts = options.metaGridTemplate.trim().split(/\s+/).map((p) => parseFloat(p) || 1);
+        if (parts.length === metaCols) {
+          const totalWeight = parts.reduce((a, b) => a + b, 0);
+          let currentOffset = 0;
+          for (let i = 0; i < parts.length; i++) {
+            const w = (parts[i] / totalWeight) * contentWidth;
+            colWidths.push(w);
+            colOffsets.push(currentOffset);
+            currentOffset += w;
+          }
+        }
+      }
+
+      if (colWidths.length === 0) {
+        const colWidth = contentWidth / metaCols;
+        for (let i = 0; i < metaCols; i++) {
+          colWidths.push(colWidth);
+          colOffsets.push(i * colWidth);
+        }
+      }
+
       const labelFontSize = metaFontSize === 'LG' ? 7.5 : metaFontSize === 'SM' ? 5.5 : 6.5;
       const valueFontSize = metaFontSize === 'LG' ? 10 : metaFontSize === 'SM' ? 7.5 : 8.5;
       const valueOffsetY = metaFontSize === 'LG' ? 11 : metaFontSize === 'SM' ? 8 : 10;
@@ -256,7 +280,7 @@ export function compileVectorPDFDocument({
       validMeta.forEach((item, idx) => {
         const colIdx = idx % metaCols;
         const rowIdx = Math.floor(idx / metaCols);
-        const cellX = pageMargin + colIdx * colWidth + (showMetaBox !== false ? 8 : 2);
+        const cellX = pageMargin + (colOffsets[colIdx] ?? (colIdx * (contentWidth / metaCols))) + (showMetaBox !== false ? 8 : 2);
         const cellY = metaBoxY + rowIdx * rowHeight + 12;
 
         // Label (bold slate-500)

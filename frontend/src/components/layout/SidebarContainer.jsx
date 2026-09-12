@@ -138,7 +138,6 @@ export default function SidebarContainer({
         },
         { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
         { id: "Mark Sheet", name: "Mark Sheet", path: "/examinations/marksheet", matchPaths: ["/examinations/marksheet", "/examinations/mark-sheet", "/examinations/tabulation", "/marksheet", "/tabulation-sheet", "/mark-sheet", "/examinations/transcripts", "/transcripts", "/academic-transcripts"], Icon: ChartBarIcon, key: "exam_tabulation" },
-        { id: "Grading Policies", name: "Grading Policies", path: "/examinations/grading-rules", matchPaths: ["/examinations/grading-rules", "/grading-rules"], Icon: SettingsIcon, key: "exam_grading_rules" },
       ]
     },
     {

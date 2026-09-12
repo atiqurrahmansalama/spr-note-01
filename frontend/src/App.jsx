@@ -210,7 +210,7 @@ export default function App() {
               <Route path="/examinations/marksheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/examinations/mark-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/examinations/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
-              <Route path="/examinations/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
+              <Route path="/examinations/grading-rules" element={<Navigate to="/admin-tools?section=grading-policies" replace />} />
               <Route path="/exams" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
               <Route path="/routine-matrix" element={<ExaminationsHubView defaultTab="SUBJECT_MATRIX" />} />
               <Route path="/routine-board" element={<ExaminationsHubView defaultTab="SUBJECT_MATRIX" />} />
@@ -221,7 +221,7 @@ export default function App() {
               <Route path="/marksheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/mark-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
               <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
-              <Route path="/grading-rules" element={<ExaminationsHubView defaultTab="GRADING_RULES" />} />
+              <Route path="/grading-rules" element={<Navigate to="/admin-tools?section=grading-policies" replace />} />
 
               <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
               <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
@@ -245,8 +245,11 @@ export default function App() {
               <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
               <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
               <Route path="/admin-tools" element={<DeveloperToolsHubView />} />
+              <Route path="/admin-tools/:sectionId" element={<DeveloperToolsHubView />} />
               <Route path="/developer-tools" element={<DeveloperToolsHubView />} />
+              <Route path="/developer-tools/:sectionId" element={<DeveloperToolsHubView />} />
               <Route path="/sp-management" element={<DeveloperToolsHubView />} />
+              <Route path="/sp-management/:sectionId" element={<DeveloperToolsHubView />} />
               <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
               <Route path="/app-management/notifications" element={<NotificationManagementView />} />
               <Route path="/notifications" element={<NotificationManagementView />} />

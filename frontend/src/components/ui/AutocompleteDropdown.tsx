@@ -1,43 +1,76 @@
-import { useState, useRef, useEffect } from "react";
-import { ChevronIcon } from "./Icons";
-import { focusNextInput } from "../../utils/keyboardUtils";
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronIcon } from './Icons';
+import { focusNextInput } from '../../utils/keyboardUtils';
 
+export interface AutocompleteOption {
+  label?: string;
+  name?: string;
+  value?: any;
+  sub?: string;
+  group_name?: string;
+  onEdit?: (item: any) => void;
+  onDelete?: (item: any) => void;
+  [key: string]: any;
+}
+
+export interface AutocompleteDropdownProps {
+  options?: (string | AutocompleteOption)[];
+  value?: string | AutocompleteOption;
+  onChange?: (val: any) => void;
+  onAddNew?: (val: string) => void;
+  onNextFocus?: () => void;
+  placeholder?: string;
+  className?: string;
+  autoFocus?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null> | null;
+  disableSaveButton?: boolean;
+  showAllOptionsOnFocus?: boolean;
+  readOnly?: boolean;
+  [key: string]: any;
+}
+
+/**
+ * AutocompleteDropdown
+ * Enterprise keyboard-navigable autocomplete dropdown with quick creation,
+ * inline search filtering, and custom item actions.
+ */
 export default function AutocompleteDropdown({
   options = [],
-  value = "",
+  value = '',
   onChange,
   onAddNew,
   onNextFocus,
-  placeholder = "Search or type...",
-  className = "",
+  placeholder = 'Search or type...',
+  className = '',
   autoFocus = false,
   inputRef = null,
   disableSaveButton = false,
   showAllOptionsOnFocus = false,
   readOnly = false,
-}) {
+}: AutocompleteDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(value);
+  const initialSearchTerm = typeof value === 'string' ? value : value?.label || '';
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [prevValue, setPrevValue] = useState(value);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const localInputRef = useRef(null);
-  const refToUse = inputRef || localInputRef;
-  const containerRef = useRef(null);
+  const localInputRef = useRef<HTMLInputElement>(null);
+  const refToUse = (inputRef as React.RefObject<HTMLInputElement>) || localInputRef;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   if (value !== prevValue) {
     setPrevValue(value);
-    setSearchTerm(value);
+    setSearchTerm(typeof value === 'string' ? value : value?.label || '');
   }
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -50,14 +83,14 @@ export default function AutocompleteDropdown({
     }
   }, [autoFocus, refToUse]);
 
-  const safeSearchTerm = typeof searchTerm === "string" ? searchTerm : (searchTerm?.label || "");
+  const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : (searchTerm as any)?.label || '';
 
-  const filteredOptions = options.filter((item) => {
+  const filteredOptions = (options || []).filter((item) => {
     if (showAllOptionsOnFocus && isOpen) return true;
     if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
     const term = safeSearchTerm.trim().toLowerCase();
-    const label = (typeof item === "string" ? item : (item?.label || item?.name || "")).toLowerCase();
-    const sub = (typeof item === "object" ? (item?.sub || item?.group_name || "") : "").toLowerCase();
+    const label = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
+    const sub = (typeof item === 'object' ? item?.sub || item?.group_name || '' : '').toLowerCase();
     return label.includes(term) || sub.includes(term);
   });
 
@@ -68,20 +101,22 @@ export default function AutocompleteDropdown({
       onNextFocus();
     } else {
       setTimeout(() => {
-        focusNextInput(refToUse.current);
+        if (refToUse.current) {
+          focusNextInput(refToUse.current);
+        }
       }, 30);
     }
   };
 
-  const handleSelect = (item) => {
-    const selectedLabel = typeof item === "string" ? item : item.label;
+  const handleSelect = (item: string | AutocompleteOption) => {
+    const selectedLabel = typeof item === 'string' ? item : item.label || item.name || '';
     setSearchTerm(selectedLabel);
     setIsOpen(false);
     if (onChange) onChange(item);
     triggerNextFocus();
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchTerm(val);
     setIsOpen(true);
@@ -89,36 +124,36 @@ export default function AutocompleteDropdown({
     if (onChange) onChange(val);
   };
 
-  const handleSaveClick = (e) => {
+  const handleSaveClick = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setIsOpen(false);
     if (onAddNew) onAddNew(safeSearchTerm);
   };
 
-  const handleKeyDown = (e) => {
-    // If user presses Shift + '+' (Shift + Plus) to trigger Save Student Panel
-    if (e.shiftKey && (e.key === "+" || e.key === "=")) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // If user presses Shift + '+' (Shift + Plus) to trigger quick save
+    if (e.shiftKey && (e.key === '+' || e.key === '=')) {
       if (onAddNew) {
         e.preventDefault();
-        handleSaveClick(e);
+        handleSaveClick();
         return;
       }
     }
 
     if (isOpen && filteredOptions.length > 0) {
-      if (e.key === "ArrowDown") {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
         setHighlightedIndex((prev) => (prev + 1) % filteredOptions.length);
         return;
       }
 
-      if (e.key === "ArrowUp") {
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
         setHighlightedIndex((prev) => (prev - 1 + filteredOptions.length) % filteredOptions.length);
         return;
       }
 
-      if (e.key === "Enter") {
+      if (e.key === 'Enter') {
         e.preventDefault();
         const selected = filteredOptions[highlightedIndex];
         if (selected) {
@@ -131,7 +166,7 @@ export default function AutocompleteDropdown({
       }
     }
 
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
       setIsOpen(false);
       triggerNextFocus();
@@ -154,7 +189,7 @@ export default function AutocompleteDropdown({
             onClick={() => setIsOpen(true)}
             placeholder={placeholder}
             className={`w-full theme-bg-sub rounded-xl px-4 py-2.5 theme-text-primary font-medium text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-8 ${
-              readOnly ? "cursor-pointer select-none" : ""
+              readOnly ? 'cursor-pointer select-none' : ''
             }`}
           />
 
@@ -175,21 +210,20 @@ export default function AutocompleteDropdown({
             type="button"
             onClick={handleSaveClick}
             className="theme-bg-accent hover:opacity-90 theme-accent-text text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors shadow shrink-0 cursor-pointer"
-            title="Click or press Shift + + to save student record"
+            title="Click or press Shift + + to save new record"
           >
             + Save
           </button>
         )}
       </div>
 
-
       {isOpen && (
         <ul className="absolute z-50 left-0 right-0 mt-1.5 max-h-56 overflow-y-auto scrollbar-none no-scrollbar theme-bg-surface rounded-xl shadow-2xl space-y-0.5 p-1 text-sm border theme-border">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((item, index) => {
-              const label = typeof item === "string" ? item : item.label;
-              const sub = typeof item === "object" ? item.sub : null;
-              const hasActions = typeof item === "object" && (item.onEdit || item.onDelete);
+              const label = typeof item === 'string' ? item : item.label || item.name || '';
+              const sub = typeof item === 'object' ? item.sub || item.group_name : null;
+              const hasActions = typeof item === 'object' && (item.onEdit || item.onDelete);
               const isHighlighted = index === highlightedIndex;
 
               return (
@@ -198,8 +232,8 @@ export default function AutocompleteDropdown({
                   onClick={() => handleSelect(item)}
                   className={`px-3.5 py-2 rounded-lg cursor-pointer transition-colors flex justify-between items-center group/item ${
                     isHighlighted
-                      ? "bg-[var(--accent-main)]/20 theme-accent font-semibold"
-                      : "hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary"
+                      ? 'bg-[var(--accent-main)]/20 theme-accent font-semibold'
+                      : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -207,7 +241,7 @@ export default function AutocompleteDropdown({
                     {sub && <span className="text-[11px] theme-text-secondary font-sans truncate">{sub}</span>}
                   </div>
 
-                  {hasActions && (
+                  {hasActions && typeof item === 'object' && (
                     <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
                       {item.onEdit && (
                         <button
@@ -215,7 +249,7 @@ export default function AutocompleteDropdown({
                           onClick={(e) => {
                             e.stopPropagation();
                             setIsOpen(false);
-                            item.onEdit(item);
+                            item.onEdit?.(item);
                           }}
                           className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-accent transition cursor-pointer"
                           title="Edit"
@@ -231,7 +265,7 @@ export default function AutocompleteDropdown({
                           onClick={(e) => {
                             e.stopPropagation();
                             setIsOpen(false);
-                            item.onDelete(item);
+                            item.onDelete?.(item);
                           }}
                           className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-danger transition cursor-pointer"
                           title="Delete"

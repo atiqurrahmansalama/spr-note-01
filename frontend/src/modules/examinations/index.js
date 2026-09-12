@@ -7,7 +7,7 @@ export { default as InvigilationScheduleView } from './exam-schedules/invigilati
 export { default as MarkEntryDeskView } from './mark-entry/MarkEntryDeskView';
 export { default as MarkSheetLedgerView, TabulationLedgerView } from './mark-sheet/MarkSheetLedgerView';
 export { TabulationLedgerTab, MarkSheetHeader, MarkSheetPrint } from './mark-sheet/tabulation-ledger';
-export { TranscriptStudioTab, TranscriptStudioView, TranscriptCard } from './mark-sheet/transcript-studio';
+export { StudentMarkSheetView, StudentMarkSheetPrint, TranscriptStudioTab, TranscriptPrint, TranscriptCard } from './mark-sheet/student-marksheet';
 export { default as GradingRulesView } from './grading-rules/GradingRulesView';
 
 export { default as useExamData } from './hooks/useExamData';

@@ -6,3 +6,6 @@ export const FeatureGuard = ({ sectionKey, children, fallback = null }) => {
   if (loading) return null;
   return isSectionEnabled(sectionKey) ? children : fallback;
 };
+
+export default FeatureGuard;
+

@@ -1,14 +1,31 @@
 import React, { useId } from 'react';
 import { SleekCheckIcon } from './Icons';
 
+/**
+ * CustomCheckbox
+ * Reusable Enterprise Checkbox Component
+ * @param {Object} [props]
+ * @param {string} [props.id]
+ * @param {string} [props.name]
+ * @param {boolean} [props.checked=false]
+ * @param {(checked: boolean, e?: any) => void} [props.onChange]
+ * @param {React.ReactNode} [props.label]
+ * @param {React.ReactNode} [props.subLabel]
+ * @param {React.ReactNode} [props.description]
+ * @param {boolean} [props.disabled=false]
+ * @param {boolean} [props.readOnly=false]
+ * @param {'sm' | 'md' | 'lg' | string} [props.size='md']
+ * @param {string} [props.className='']
+ * @param {string} [props.boxClassName='']
+ */
 export default function CustomCheckbox({
-  id,
-  name,
+  id = undefined,
+  name = undefined,
   checked = false,
-  onChange,
-  label,
-  subLabel,
-  description,
+  onChange = undefined,
+  label = undefined,
+  subLabel = undefined,
+  description = undefined,
   disabled = false,
   readOnly = false,
   size = 'md', // 'sm' | 'md' | 'lg'

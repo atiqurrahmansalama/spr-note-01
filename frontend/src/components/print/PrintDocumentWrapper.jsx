@@ -12,12 +12,19 @@ export default function PrintDocumentWrapper({
   subtitle = '',
   metaItems = [], // [{ label: 'Class', value: 'Class 10' }, { label: 'Subject', value: 'Arabic' }]
   options = {},
+  onOptionsChange = null,
+  isEditable = false,
   children,
   pageIndex = 0,
   totalPages = 1,
+  isFirstPage = true,
+  isLastPage = true,
   className = '',
 }) {
   const { currentInstitution } = useTenant();
+
+  const effectiveIsFirstPage = isFirstPage !== undefined ? isFirstPage : pageIndex === 0;
+  const effectiveIsLastPage = isLastPage !== undefined ? isLastPage : pageIndex === totalPages - 1;
 
   const {
     showHeader = true,
@@ -81,10 +88,9 @@ export default function PrintDocumentWrapper({
 
   return (
     <div
-      className={`print-document-sheet relative flex flex-col justify-between bg-white text-slate-900 leading-normal print:p-0 ${className}`}
+      className={`print-document-sheet relative flex flex-col justify-between bg-white text-slate-900 leading-normal print:p-0 print:block print:min-h-0 print:h-auto ${className}`}
       style={{
         width: '100%',
-        minHeight: '100%',
         boxSizing: 'border-box',
         position: 'relative',
         backgroundColor: '#ffffff',
@@ -111,134 +117,212 @@ export default function PrintDocumentWrapper({
       )}
 
       {/* Top Document Content Area */}
-      <div className="relative z-10 flex-1 space-y-3.5 bg-transparent">
-        {/* 1. Official Academy Branding Header */}
-        {showHeader && (
-          <header className="print-document-header pb-4 mb-4 border-b-2 border-slate-900 bg-transparent">
+      <div className="relative z-10 flex-1 space-y-2.5 sm:space-y-3 bg-transparent print:space-y-2 print:block print:flex-none print:h-auto">
+        {/* 1. Official Academy Branding Header (Page 1 or All Pages) */}
+        {showHeader && (effectiveIsFirstPage || options.showHeaderOnAllPages) && (
+          <header className="print-document-header pb-2.5 mb-2.5 sm:pb-3 sm:mb-3 border-b-2 border-slate-900 bg-transparent print:pb-2 print:mb-2">
             {/* Top Row: Institution Logo & Academy Name Header */}
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3">
                 {showLogo && (
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs border border-slate-800 shrink-0">
-                    <BuildingOfficeIcon className="w-7 h-7" />
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs border border-slate-800 shrink-0 print:w-10 print:h-10">
+                    <BuildingOfficeIcon className="w-6 h-6 print:w-5 print:h-5" />
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-900 leading-tight">
+                  <h1
+                    contentEditable={isEditable}
+                    suppressContentEditableWarning
+                    onBlur={(e) => {
+                      if (!onOptionsChange) return;
+                      const val = e.currentTarget.textContent?.trim();
+                      onOptionsChange({ ...options, customInstitutionName: val });
+                    }}
+                    className={`text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900 leading-tight print:text-base ${
+                      isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
+                    }`}
+                  >
                     {institutionName}
                   </h1>
-                  <p className="text-xs sm:text-[12.5px] text-slate-600 font-medium leading-normal">
+                  <p
+                    contentEditable={isEditable}
+                    suppressContentEditableWarning
+                    onBlur={(e) => {
+                      if (!onOptionsChange) return;
+                      const val = e.currentTarget.textContent?.trim();
+                      onOptionsChange({ ...options, customInstitutionAddress: val });
+                    }}
+                    className={`text-xs text-slate-600 font-medium leading-normal print:text-[11px] ${
+                      isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
+                    }`}
+                  >
                     {institutionAddress}
                   </p>
-                </div>
-              </div>
-
-              {/* Right Side: Official Record Badge & Date */}
-              <div className="text-right space-y-1 shrink-0 self-start">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider border border-slate-300 shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-700"></span>
-                  Official Record
-                </span>
-                <div className="text-[10.5px] sm:text-[11px] text-slate-500 font-mono font-medium pr-0.5">
-                  {printDate}
                 </div>
               </div>
             </div>
           </header>
         )}
 
-        {/* 2. Document Title & Subtitle Header (Centered with Generous Spacing) */}
-        {showTitle !== false && (resolvedTitle || resolvedSubtitle) && (
+        {/* 2. Document Title & Subtitle Header (Centered with Balanced Spacing) */}
+        {showTitle !== false && (effectiveIsFirstPage || options.showTitleOnAllPages) && (resolvedTitle || resolvedSubtitle) && (
           <div
-            className={`print-document-title-block text-center flex flex-col items-center justify-center space-y-1 mb-4 ${
+            className={`print-document-title-block text-center flex flex-col items-center justify-center space-y-0.5 mb-2.5 pb-1 sm:mb-3 sm:pb-1.5 print:mb-2 print:pb-1 ${
               showTitleLine
                 ? titleLineStyle === 'DOUBLE'
-                  ? 'border-b-4 border-double border-slate-900 pb-2.5'
+                  ? 'border-b-4 border-double border-slate-900 pb-2'
                   : titleLineStyle === 'DASHED'
-                  ? 'border-b border-dashed border-slate-400 pb-2'
+                  ? 'border-b border-dashed border-slate-400 pb-1.5'
                   : titleLineStyle === 'DOTTED'
-                  ? 'border-b border-dotted border-slate-400 pb-2'
-                  : 'border-b-2 border-slate-900 pb-2'
-                : 'pb-2'
+                  ? 'border-b border-dotted border-slate-400 pb-1.5'
+                  : 'border-b-2 border-slate-900 pb-1.5'
+                : 'pb-1'
             }`}
           >
             {resolvedTitle && (
-              <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-slate-900 leading-tight">
+              <h2
+                contentEditable={isEditable}
+                suppressContentEditableWarning
+                onBlur={(e) => {
+                  if (!onOptionsChange) return;
+                  const val = e.currentTarget.textContent?.trim();
+                  onOptionsChange({ ...options, customTitle: val });
+                }}
+                className={`text-base sm:text-lg font-black uppercase tracking-wider text-slate-900 leading-tight print:text-sm ${
+                  isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
+                }`}
+              >
                 {resolvedTitle}
               </h2>
             )}
             {resolvedSubtitle && (
-              <p className="text-xs sm:text-sm font-semibold text-slate-600 tracking-normal">
+              <p
+                contentEditable={isEditable}
+                suppressContentEditableWarning
+                onBlur={(e) => {
+                  if (!onOptionsChange) return;
+                  const val = e.currentTarget.textContent?.trim();
+                  onOptionsChange({ ...options, customSubtitle: val });
+                }}
+                className={`text-xs font-semibold text-slate-600 tracking-normal print:text-[11px] ${
+                  isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
+                }`}
+              >
                 {resolvedSubtitle}
               </p>
             )}
           </div>
         )}
 
-        {/* 2. Structured Metadata Grid Strip */}
-        {showMeta && metaItems && metaItems.length > 0 && (() => {
-          const resolvedCols = options.metaCols || (metaItems.length === 5 || metaItems.length === 3 ? 3 : (metaItems.length === 2 ? 2 : 4));
+        {/* Continuation Subheader on Subsequent Pages */}
+        {!effectiveIsFirstPage && !options.showHeaderOnAllPages && !options.showTitleOnAllPages && resolvedTitle && (
+          <div className="pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold">
+            <span className="uppercase tracking-wide text-slate-900">{resolvedTitle} (Continued)</span>
+            <span className="font-mono text-[11px] text-slate-500 font-medium">Page {pageIndex + 1} of {totalPages}</span>
+          </div>
+        )}
+
+        {/* 3. Structured Metadata Grid Strip (Page 1 Only) */}
+        {showMeta && effectiveIsFirstPage && metaItems && metaItems.length > 0 && (() => {
+          const resolvedCols =
+            options.metaCols ||
+            (metaItems.length === 6 || metaItems.length === 3 || metaItems.length === 5
+              ? 3
+              : metaItems.length === 2
+              ? 2
+              : metaItems.length === 4
+              ? 4
+              : 3);
           const gridColsClass =
             resolvedCols === 3
-              ? 'grid-cols-2 sm:grid-cols-3'
+              ? 'grid-cols-3'
               : resolvedCols === 2
               ? 'grid-cols-2'
               : resolvedCols === 5
-              ? 'grid-cols-2 sm:grid-cols-5'
+              ? 'grid-cols-5'
               : resolvedCols === 6
-              ? 'grid-cols-3 sm:grid-cols-6'
-              : 'grid-cols-2 sm:grid-cols-4';
+              ? 'grid-cols-6'
+              : 'grid-cols-4';
+
+          const gridStyle = options.metaGridTemplate
+            ? { gridTemplateColumns: options.metaGridTemplate }
+            : undefined;
 
           return (
             <div
-              className={`print-meta-grid grid ${gridColsClass} gap-3 text-slate-900 ${
+              className={`print-meta-grid grid ${!options.metaGridTemplate ? gridColsClass : ''} gap-x-4 gap-y-2 text-slate-900 mb-3 print:mb-2 print:gap-y-1.5 ${
                 showMetaBox !== false
-                  ? 'print-meta-grid-boxed py-3 px-4 rounded-xl border border-slate-300 bg-slate-50 shadow-2xs'
-                  : 'print-meta-grid-plain py-2 px-0 bg-transparent border-none shadow-none'
+                  ? 'print-meta-grid-boxed py-2 px-3.5 sm:py-2.5 sm:px-4 rounded-xl border border-slate-300/90 bg-slate-50/80 shadow-2xs print:border-slate-300 print:bg-slate-50/70 print:py-1.5 print:px-3'
+                  : 'print-meta-grid-plain py-1 px-0 bg-transparent border-none shadow-none'
               }`}
+              style={gridStyle}
             >
-              {metaItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`space-y-0.5 ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
-                  style={item.colSpan ? { gridColumn: `span ${item.colSpan} / span ${item.colSpan}` } : undefined}
-                >
-                  <span
-                    className={`uppercase tracking-wider text-slate-500 font-bold block ${
-                      metaFontSize === 'SM'
-                        ? 'text-[9px]'
-                        : metaFontSize === 'LG'
-                        ? 'text-[11px]'
-                        : 'text-[10px]'
-                    }`}
+              {metaItems.map((item, idx) => {
+                const resolvedVal =
+                  options.customMetaValues && options.customMetaValues[item.label] !== undefined
+                    ? options.customMetaValues[item.label]
+                    : item.value;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`space-y-0.5 min-w-0 ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
+                    style={item.colSpan ? { gridColumn: `span ${item.colSpan} / span ${item.colSpan}` } : undefined}
                   >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`font-extrabold text-slate-900 truncate block ${
-                      metaFontSize === 'SM'
-                        ? 'text-[12px] sm:text-[13px]'
-                        : metaFontSize === 'LG'
-                        ? 'text-[15px] sm:text-[16px]'
-                        : 'text-[13px] sm:text-[14px]'
-                    }`}
-                  >
-                    {item.value || '-'}
-                  </span>
-                </div>
-              ))}
+                    <span
+                      className={`uppercase tracking-wider text-slate-500 font-bold block ${
+                        metaFontSize === 'SM'
+                          ? 'text-[8.5px]'
+                          : metaFontSize === 'LG'
+                          ? 'text-[10.5px]'
+                          : 'text-[9.5px]'
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                    <span
+                      contentEditable={isEditable}
+                      suppressContentEditableWarning
+                      onBlur={(e) => {
+                        if (!onOptionsChange) return;
+                        const val = e.currentTarget.textContent?.trim();
+                        onOptionsChange({
+                          ...options,
+                          customMetaValues: {
+                            ...(options.customMetaValues || {}),
+                            [item.label]: val,
+                          },
+                        });
+                      }}
+                      className={`font-extrabold text-slate-900 block break-words whitespace-normal leading-snug ${
+                        metaFontSize === 'SM'
+                          ? 'text-[11px]'
+                          : metaFontSize === 'LG'
+                          ? 'text-[14px]'
+                          : 'text-[12px]'
+                      } ${
+                        isEditable
+                          ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
+                          : ''
+                      }`}
+                    >
+                      {resolvedVal !== undefined && resolvedVal !== null ? resolvedVal : '-'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
 
-        {/* 3. Primary Printable Document Body */}
+        {/* 4. Primary Printable Document Body */}
         <main className="w-full bg-transparent">{children}</main>
       </div>
 
       {/* Bottom Area: Signatures and Footer */}
-      <div className="print-signature-footer-container relative z-10 pt-10 mt-auto space-y-4 print-avoid-break print:mt-auto print:pt-6">
-        {/* 4. Official Signatures Block (Bottom Anchored) */}
-        {showSignatures && activeSignatureLines.length > 0 && (
+      <div className="print-signature-footer-container relative z-10 pt-3 sm:pt-4 mt-auto space-y-2.5 print-avoid-break print:block print:mt-4 print:pt-2 print:space-y-1.5">
+        {/* 5. Official Signatures Block (Bottom Anchored on Last Page) */}
+        {showSignatures && effectiveIsLastPage && activeSignatureLines.length > 0 && (
           <div
             className={`grid gap-4 text-center text-xs ${
               activeSignatureLines.length === 1
@@ -258,9 +342,9 @@ export default function PrintDocumentWrapper({
                 }`}
               >
                 {/* Physical Signing Space / Stamp Area */}
-                <div className="h-10 sm:h-12 flex items-end justify-center pb-1">
+                <div className="h-6 sm:h-7 flex items-end justify-center pb-0.5 print:h-5">
                   {sig.placeholder && (
-                    <span className="text-[9px] text-slate-400 uppercase tracking-widest font-mono select-none">
+                    <span className="text-[8.5px] text-slate-400 uppercase tracking-widest font-mono select-none">
                       {sig.placeholder}
                     </span>
                   )}
@@ -268,7 +352,7 @@ export default function PrintDocumentWrapper({
 
                 {/* Signature Underline (0.5px border, reduced width) */}
                 <div
-                  className={`w-36 sm:w-40 max-w-full pt-1.5 space-y-0.5 text-center ${
+                  className={`w-32 sm:w-36 max-w-full pt-1 space-y-0.5 text-center ${
                     signatureStyle === 'DASHED'
                       ? 'border-t-[0.5px] border-dashed border-slate-700'
                       : signatureStyle === 'DOTTED'
@@ -276,11 +360,43 @@ export default function PrintDocumentWrapper({
                       : 'border-t-[0.5px] border-slate-900'
                   }`}
                 >
-                  <p className="font-bold text-[11px] tracking-tight leading-tight text-slate-900">
+                  <p
+                    contentEditable={isEditable}
+                    suppressContentEditableWarning
+                    onBlur={(e) => {
+                      if (!onOptionsChange) return;
+                      const val = e.currentTarget.textContent?.trim();
+                      const updated = (options.signatureLines || signatureLines || []).map((s, sIdx) =>
+                        (s.id === sig.id || sIdx === idx) ? { ...s, label: val } : s
+                      );
+                      onOptionsChange({ ...options, signatureLines: updated });
+                    }}
+                    className={`font-bold text-[10.5px] tracking-tight leading-tight text-slate-900 print:text-[10px] ${
+                      isEditable
+                        ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
+                        : ''
+                    }`}
+                  >
                     {sig.label}
                   </p>
                   {sig.sub && (
-                    <p className="text-[10px] text-slate-600 font-medium leading-tight">
+                    <p
+                      contentEditable={isEditable}
+                      suppressContentEditableWarning
+                      onBlur={(e) => {
+                        if (!onOptionsChange) return;
+                        const val = e.currentTarget.textContent?.trim();
+                        const updated = (options.signatureLines || signatureLines || []).map((s, sIdx) =>
+                          (s.id === sig.id || sIdx === idx) ? { ...s, sub: val } : s
+                        );
+                        onOptionsChange({ ...options, signatureLines: updated });
+                      }}
+                      className={`text-[9.5px] text-slate-600 font-medium leading-tight print:text-[9px] ${
+                        isEditable
+                          ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
+                          : ''
+                      }`}
+                    >
                       {sig.sub}
                     </p>
                   )}
@@ -290,9 +406,9 @@ export default function PrintDocumentWrapper({
           </div>
         )}
 
-        {/* 5. Document Footer & Timestamp */}
+        {/* 6. Document Footer & Timestamp */}
         {showFooter && (
-          <div className="pt-2 border-t-[0.5px] border-slate-300 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+          <div className="pt-1.5 border-t-[0.5px] border-slate-300 flex items-center justify-between text-[9.5px] text-slate-500 font-medium print:pt-1 print:text-[9px]">
             <span>
               Generated via SPR Note System • {printDate}, {printTime}
             </span>
