@@ -1208,6 +1208,13 @@ class StaffLeaveService:
                     http_method="PATCH"
                 )
 
+        try:
+            from core.notifications import notify_staff_leave_action
+            notify_staff_leave_action(leave_request, action_status)
+        except Exception as notif_err:
+            import logging
+            logging.getLogger('core').error(f"[Staff Leave Notification Error] {str(notif_err)}")
+
         return leave_request
 
 

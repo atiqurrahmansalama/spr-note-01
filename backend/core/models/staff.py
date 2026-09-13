@@ -15,8 +15,16 @@ class StaffProfile(models.Model):
 
     EMPLOYMENT_STATUS_CHOICES = (
         ('PERMANENT', 'Permanent'),
+        ('FULL_TIME', 'Full-Time'),
+        ('PART_TIME', 'Part-Time'),
         ('PROBATION', 'Probationary'),
         ('CONTRACT', 'Contractual'),
+        ('VISITING', 'Visiting Faculty'),
+        ('TEMPORARY', 'Temporary'),
+        ('VOLUNTEER', 'Volunteer'),
+        ('SUSPENDED', 'Suspended'),
+        ('RESIGNED', 'Resigned'),
+        ('RETIRED', 'Retired'),
         ('TERMINATED', 'Terminated'),
     )
 

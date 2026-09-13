@@ -63,6 +63,7 @@ from core.notifications import (
     ping_gateway,
     fetch_gateway_balance,
     seed_default_templates,
+    notify_new_admission,
 )
 from core.middleware import detect_device_type, detect_device_info, get_client_ip
 from core.authentication import FlexibleJWTAuthentication
@@ -134,6 +135,10 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = StudentAdmissionSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             student = serializer.save()
+            try:
+                notify_new_admission(student)
+            except Exception as notif_err:
+                logger.error(f"[Admission Notification Error] {str(notif_err)}")
             res_serializer = StudentFullProfileSerializer(student, context={'request': request})
             return Response(res_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

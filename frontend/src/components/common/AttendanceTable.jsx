@@ -27,9 +27,9 @@ import {
  */
 export default function AttendanceTable({
   // Matrix data (Supports both legacy matrixData format and normalized props)
-  matrixData,
-  daysHeader: propDaysHeader,
-  rows: propRows,
+  matrixData = null,
+  daysHeader: propDaysHeader = [],
+  rows: propRows = [],
 
   // Column Labels & Config
   idLabel = 'Roll',
@@ -40,27 +40,27 @@ export default function AttendanceTable({
 
   // State & Interactivity
   isEditing = false,
-  onToggleCell,
-  onAdminEditCell,
-  onInspectHistory,
+  onToggleCell = null,
+  onAdminEditCell = null,
+  onInspectHistory = null,
   isHijriEnabled = false,
-  selectedYear,
-  selectedMonth,
-  onRowClick,
-  onStudentClick,
-  onDateClick,
+  selectedYear = null,
+  selectedMonth = null,
+  onRowClick = null,
+  onStudentClick = null,
+  onDateClick = null,
   isLoading = false,
   emptyMessage = 'No attendance records found matching your filter criteria.',
   tableContainerClass = 'overflow-x-auto max-h-[75vh]',
 
   // Footer Legend Ribbon & Baseline Config
   showFooter = true,
-  totalCount,
-  totalCountLabel,
+  totalCount = 0,
+  totalCountLabel = '',
   calculationBaselineDate = null,
   calculationBaselineLabel = 'Calculated Since',
   isFullscreen = false,
-  onToggleFullscreen,
+  onToggleFullscreen = null,
 }) {
   const containerRef = useRef(null);
 

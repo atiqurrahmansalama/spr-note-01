@@ -63,6 +63,7 @@ from core.notifications import (
     ping_gateway,
     fetch_gateway_balance,
     seed_default_templates,
+    get_student_guardian_info,
 )
 from core.middleware import detect_device_type, detect_device_info, get_client_ip
 from core.authentication import FlexibleJWTAuthentication
@@ -308,6 +309,7 @@ class NotificationDispatchLogViewSet(viewsets.ReadOnlyModelViewSet):
         sms_count = qs.filter(channel='SMS').count()
         wa_count = qs.filter(channel='WHATSAPP').count()
         email_count = qs.filter(channel='EMAIL').count()
+        tg_count = qs.filter(channel='TELEGRAM').count()
 
         return Response({
             "total_dispatched": total,
@@ -320,6 +322,7 @@ class NotificationDispatchLogViewSet(viewsets.ReadOnlyModelViewSet):
                 "SMS": sms_count,
                 "WHATSAPP": wa_count,
                 "EMAIL": email_count,
+                "TELEGRAM": tg_count,
             }
         }, status=status.HTTP_200_OK)
 
@@ -373,26 +376,26 @@ class ManualBroadcastViewSet(viewsets.ViewSet):
         recipients = []
 
         if target_audience in ['ALL', 'STUDENTS', 'CLASS']:
-            student_qs = Student.objects.filter(institution=inst, is_deleted=False)
+            student_qs = Student.objects.filter(institution=inst, is_deleted=False).select_related('student_class')
             if target_audience == 'CLASS' and class_id:
                 student_qs = student_qs.filter(student_class_id=class_id)
 
             for stu in student_qs[:500]:
-                guardian = stu.guardians.first()
-                g_user = guardian.user if guardian else None
-                g_phone = guardian.user.phone_number if (guardian and guardian.user) else None
+                g_name, g_phone, g_user = get_student_guardian_info(stu)
+                stu_name = getattr(stu, 'name_en', None) or getattr(stu, 'name_bn', None) or "Student"
                 recipients.append({
                     "user": g_user,
                     "phone": g_phone,
                     "context": {
-                        "student_name": stu.name,
+                        "student_name": stu_name,
+                        "guardian_name": g_name,
                         "class_name": stu.student_class.name if stu.student_class else "",
                         "roll_number": str(stu.roll_number or ""),
                     }
                 })
 
         if target_audience in ['ALL', 'TEACHERS', 'STAFF']:
-            staff_qs = StaffProfile.objects.filter(institution=inst, is_active=True)
+            staff_qs = StaffProfile.objects.filter(institution=inst, is_active=True).select_related('user')
             if target_audience == 'TEACHERS':
                 staff_qs = staff_qs.filter(staff_type='TEACHING')
             elif target_audience == 'STAFF':
@@ -404,7 +407,22 @@ class ManualBroadcastViewSet(viewsets.ViewSet):
                     "user": u,
                     "phone": u.phone_number if u else stf.emergency_contact,
                     "context": {
-                        "staff_name": stf.designation or (u.username if u else "Staff"),
+                        "staff_name": (
+                            getattr(stf, 'name_en', None) or
+                            getattr(stf, 'name_bn', None) or
+                            (u.get_full_name() if u else (u.username if u else "Staff"))
+                        ),
+                    }
+                })
+
+        # When target_audience is ALL or if recipients is empty, ensure the sender/admin gets the in-app notice
+        if (target_audience == 'ALL' or not recipients) and request.user.is_authenticated:
+            if not any(r.get('user') and r['user'].id == request.user.id for r in recipients):
+                recipients.append({
+                    "user": request.user,
+                    "phone": getattr(request.user, 'phone_number', None),
+                    "context": {
+                        "staff_name": request.user.get_full_name() or request.user.username,
                     }
                 })
 
@@ -432,7 +450,7 @@ class ManualBroadcastViewSet(viewsets.ViewSet):
 
         return Response({
             "status": "success",
-            "message": f"Broadcast queued and dispatched to {dispatched_count} recipients across {', '.join(channels)}.",
+            "message": f"Broadcast dispatched to {dispatched_count} recipient{'s' if dispatched_count != 1 else ''}.",
             "dispatched_count": dispatched_count,
             "channels": channels
         }, status=status.HTTP_200_OK)

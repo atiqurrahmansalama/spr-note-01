@@ -217,6 +217,16 @@ FEATURE_REGISTRY = [
         "sort_order": 43,
     },
     {
+        "key": "staff_attendance",
+        "label": "Staff Attendance Register",
+        "category": "STAFF",
+        "description": "Staff attendance logs, punch-in records, and monthly sheets",
+        "is_parent": False,
+        "parent_key": "nav_staff_management",
+        "default_enabled": True,
+        "sort_order": 44,
+    },
+    {
         "key": "staff_leaves",
         "label": "Leave & Substitution Desk",
         "category": "STAFF",
@@ -224,7 +234,7 @@ FEATURE_REGISTRY = [
         "is_parent": False,
         "parent_key": "nav_staff_management",
         "default_enabled": True,
-        "sort_order": 44,
+        "sort_order": 45,
     },
 
     # --- ATTENDANCE SETTINGS, CALENDAR & DEVICES (PARENT) ---

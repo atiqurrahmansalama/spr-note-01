@@ -17,6 +17,7 @@ import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
+import LanguageSelectorDropdown from "./LanguageSelectorDropdown";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useUndoRedo } from "../../context/useUndoRedo";
 import { UndoIcon, RedoIcon } from "../ui/Icons";
@@ -25,8 +26,8 @@ import { UndoIcon, RedoIcon } from "../ui/Icons";
 export const ROUTE_TITLE_MAP = {
   "/": { title: "Dashboard", category: "Navigation", isDashboard: true },
   "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
-  "/report-builder": { title: "Generate Report", category: "Report Generator" },
-  "/student-reports": { title: "Student Reports", category: "Report Generator" },
+  "/report-builder": { title: "Generate Report", category: "Academic Studies" },
+  "/student-reports": { title: "Student Reports", category: "Academic Studies" },
   "/copy-report": { title: "Report Settings", category: "Admin Tools" },
   "/sessions-comments": { title: "Report Sessions", category: "Admin Tools" },
   "/report-sessions": { title: "Report Sessions", category: "Admin Tools" },
@@ -61,6 +62,10 @@ export const ROUTE_TITLE_MAP = {
   "/academy/classes-groups": { title: "Classes & Groups", category: "Academy" },
   "/classes-groups": { title: "Classes & Groups", category: "Academy" },
   "/academy/branches": { title: "Branches", category: "Academy" },
+  "/academy/residential-quarters": { title: "Residential & Quarters", category: "Academy" },
+  "/academy/residential": { title: "Residential & Quarters", category: "Academy" },
+  "/academy/dormitory": { title: "Residential & Quarters", category: "Academy" },
+  "/residential-quarters": { title: "Residential & Quarters", category: "Academy" },
   "/academy-profile": { title: "Profile", category: "Academy" },
   "/settings/institution": { title: "Profile", category: "Academy" },
   "/institution-profile": { title: "Profile", category: "Academy" },
@@ -621,9 +626,9 @@ export default function AppLayout() {
           
           <button 
             type="button"
-            onClick={() => navigate("/report-builder")}
+            onClick={() => navigate("/studies/daily-classroom")}
             className="flex items-center gap-2 cursor-pointer text-left group"
-            title="Open Report Generator"
+            title="SPR Note"
           >
             <span className="font-bold theme-text-primary text-lg tracking-wide group-hover:theme-accent transition-colors">SPR Note</span>
           </button>
@@ -711,6 +716,9 @@ export default function AppLayout() {
             )}
           </button>
 
+          {/* Multi-Language & RTL Switcher */}
+          <LanguageSelectorDropdown />
+
           {/* Real-time In-App Notification Bell */}
           <NotificationBellDropdown />
 
@@ -747,12 +755,13 @@ export default function AppLayout() {
           setIsProfileOpen={setIsProfileOpen}
         />
 
-        {/* Center / Dashboard Main Form Area or Coming Soon Dashboard */}
+        {/* Center / Dashboard Main Content Area */}
         {isDashboardRoute && (
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-center min-w-0">
-            <DashboardComingSoon />
+          <main className="flex-1 h-full overflow-y-auto transition-all duration-300 min-w-0">
+            <Outlet context={{ timeZone, setTimeZone, dateFormat, setDateFormat }} />
           </main>
         )}
+
 
         {isMainFormView && (
           <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start min-w-0">
@@ -908,23 +917,4 @@ export default function AppLayout() {
   );
 }
 
-function DashboardComingSoon() {
-  return (
-    <div className="flex flex-col items-center justify-center text-center font-sans space-y-5 p-6 py-12 theme-bg-surface border theme-border rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in">
-      <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-md">
-        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-base font-bold theme-text-primary">Dashboard Coming Soon</h2>
-        <p className="text-xs theme-text-secondary leading-relaxed max-w-xs mx-auto">
-          We are currently building advanced analytics, key performance indicators, and data visualizations. Stay tuned!
-        </p>
-      </div>
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent border theme-border shadow-sm">
-        Under Development
-      </span>
-    </div>
-  );
-}
+

@@ -12,6 +12,20 @@ if (typeof window !== 'undefined') {
       });
     };
   }
+
+  // Register ServiceWorker for native OS push & device notifications
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => {
+          console.debug('[SW] Registered successfully:', reg.scope);
+        })
+        .catch((err) => {
+          console.debug('[SW] Registration notice:', err);
+        });
+    });
+  }
 }
 
 import React from 'react'

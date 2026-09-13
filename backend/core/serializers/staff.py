@@ -69,6 +69,7 @@ class GeneralStaffDetailSerializer(serializers.ModelSerializer):
 
 class StaffProfileSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True, default='')
+    bangla_name = serializers.CharField(source='user.name_bn', read_only=True, default='')
     user_phone = serializers.CharField(source='user.phone_number', read_only=True, default='')
     user_email = serializers.CharField(source='user.email', read_only=True, default='')
     user_avatar = serializers.CharField(source='user.avatar_url', read_only=True, default='')
@@ -80,15 +81,26 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     active_assignments_count = serializers.SerializerMethodField()
     active_duties_count = serializers.SerializerMethodField()
 
+    # Writeable identity fields targeting linked user
+    name = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    name_bn = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    email = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
     class Meta:
         model = StaffProfile
         fields = [
             'id',
             'user',
             'user_name',
+            'bangla_name',
             'user_phone',
             'user_email',
             'user_avatar',
+            'name',
+            'name_bn',
+            'phone_number',
+            'email',
             'institution',
             'institution_name',
             'employee_id',
@@ -138,7 +150,34 @@ class StaffProfileSerializer(serializers.ModelSerializer):
         data = data.copy() if hasattr(data, 'copy') else dict(data)
         if 'user_id' in data and 'user' not in data:
             data['user'] = data.pop('user_id')
+        if 'bangla_name' in data and 'name_bn' not in data:
+            data['name_bn'] = data.get('bangla_name')
+        if 'name_en' in data and 'name' not in data:
+            data['name'] = data.get('name_en')
+        if 'employment_status' in data and data['employment_status']:
+            es = str(data['employment_status']).upper().strip()
+            if es in ('FULLTIME', 'FULL_TIME'):
+                data['employment_status'] = 'FULL_TIME'
+            elif es in ('PARTTIME', 'PART_TIME'):
+                data['employment_status'] = 'PART_TIME'
         return super().to_internal_value(data)
+
+    def validate_employment_status(self, value):
+        if not value:
+            return 'PERMANENT'
+        val = str(value).upper().strip()
+        valid_choices = [c[0] for c in StaffProfile.EMPLOYMENT_STATUS_CHOICES]
+        if val in valid_choices:
+            return val
+        alias_map = {
+            'FULLTIME': 'FULL_TIME',
+            'FULL_TIME': 'FULL_TIME',
+            'PARTTIME': 'PART_TIME',
+            'PART_TIME': 'PART_TIME',
+            'PROBATIONARY': 'PROBATION',
+            'CONTRACTUAL': 'CONTRACT',
+        }
+        return alias_map.get(val, 'PERMANENT')
 
     def validate(self, attrs):
         staff_type = attrs.get('staff_type') or (self.instance.staff_type if self.instance else 'TEACHING')
@@ -157,6 +196,10 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         teacher_data = validated_data.pop('teacher_detail', None)
         general_data = validated_data.pop('general_detail', None)
+        name = validated_data.pop('name', None)
+        name_bn = validated_data.pop('name_bn', None)
+        phone_number = validated_data.pop('phone_number', None)
+        email = validated_data.pop('email', None)
 
         if not validated_data.get('employee_id'):
             from core.services import StaffOnboardingService
@@ -167,6 +210,23 @@ class StaffProfileSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             staff = StaffProfile.objects.create(**validated_data)
+
+            if staff.user:
+                user_updated = False
+                if name and staff.user.name != name:
+                    staff.user.name = name
+                    user_updated = True
+                if name_bn and staff.user.name_bn != name_bn:
+                    staff.user.name_bn = name_bn
+                    user_updated = True
+                if phone_number and staff.user.phone_number != phone_number.strip():
+                    staff.user.phone_number = phone_number.strip()
+                    user_updated = True
+                if email and staff.user.email != email.strip():
+                    staff.user.email = email.strip()
+                    user_updated = True
+                if user_updated:
+                    staff.user.save()
 
             if staff.staff_type == 'TEACHING':
                 td = teacher_data or {}
@@ -180,8 +240,29 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         teacher_data = validated_data.pop('teacher_detail', None)
         general_data = validated_data.pop('general_detail', None)
+        name = validated_data.pop('name', None)
+        name_bn = validated_data.pop('name_bn', None)
+        phone_number = validated_data.pop('phone_number', None)
+        email = validated_data.pop('email', None)
 
         with transaction.atomic():
+            if instance.user:
+                user_updated = False
+                if name is not None and instance.user.name != name:
+                    instance.user.name = name
+                    user_updated = True
+                if name_bn is not None and instance.user.name_bn != name_bn:
+                    instance.user.name_bn = name_bn
+                    user_updated = True
+                if phone_number is not None and phone_number.strip() and instance.user.phone_number != phone_number.strip():
+                    instance.user.phone_number = phone_number.strip()
+                    user_updated = True
+                if email is not None and instance.user.email != email.strip():
+                    instance.user.email = email.strip()
+                    user_updated = True
+                if user_updated:
+                    instance.user.save()
+
             old_staff_type = instance.staff_type
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)

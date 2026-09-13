@@ -138,7 +138,12 @@ class NotificationTriggerRuleSerializer(serializers.ModelSerializer):
 
 class InAppNotificationSerializer(serializers.ModelSerializer):
     notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
-    recipient_name = serializers.CharField(source='recipient.username', read_only=True)
+    recipient_name = serializers.SerializerMethodField()
+
+    def get_recipient_name(self, obj):
+        if not obj.recipient:
+            return ""
+        return obj.recipient.name or obj.recipient.phone_number or obj.recipient.email or f"User #{obj.recipient.id}"
 
     class Meta:
         model = InAppNotification
@@ -162,7 +167,12 @@ class InAppNotificationSerializer(serializers.ModelSerializer):
 class NotificationDispatchLogSerializer(serializers.ModelSerializer):
     channel_display = serializers.CharField(source='get_channel_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    recipient_name = serializers.CharField(source='recipient_user.username', read_only=True, default='')
+    recipient_name = serializers.SerializerMethodField()
+
+    def get_recipient_name(self, obj):
+        if obj.recipient_user:
+            return obj.recipient_user.name or obj.recipient_user.phone_number or obj.recipient_user.email or obj.recipient_identifier or f"User #{obj.recipient_user.id}"
+        return obj.recipient_identifier or ""
 
     class Meta:
         model = NotificationDispatchLog
@@ -193,7 +203,7 @@ class ManualBroadcastSerializer(serializers.Serializer):
     )
     class_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     channels = serializers.ListField(
-        child=serializers.ChoiceField(choices=['IN_APP', 'SMS', 'WHATSAPP', 'EMAIL']),
+        child=serializers.ChoiceField(choices=['IN_APP', 'SMS', 'WHATSAPP', 'EMAIL', 'TELEGRAM', 'PUSH_FCM']),
         default=['IN_APP']
     )
     title = serializers.CharField(max_length=200, default='Institutional Announcement')

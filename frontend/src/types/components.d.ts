@@ -140,6 +140,8 @@ declare module '@/components/ui/DataTable' {
     defaultSortDirection?: 'asc' | 'desc';
     cellPaddingClass?: string;
     isLoading?: boolean;
+    loading?: boolean;
+    emptyMessage?: string;
     loadingMessage?: string;
     onRowClick?: (item: T) => void;
     rowClassName?: ((item: T, idx: number) => string) | string;
@@ -184,6 +186,7 @@ declare module '@/components/ui/PageHeader' {
     subtitle?: React.ReactNode;
     badge?: React.ReactNode;
     actions?: React.ReactNode;
+    breadcrumbs?: any[];
     children?: React.ReactNode;
     className?: string;
     [key: string]: any;
@@ -222,29 +225,27 @@ declare module '@/components/ui/ActionMenu' {
   export default ActionMenu;
 }
 
-declare module '@/components/ui/MetricsGrid' {
-  export interface MetricItem {
-    id?: string;
-    label?: string;
-    value?: string | number;
-    subLabel?: string;
-    icon?: React.ComponentType<{ className?: string }>;
-    color?: 'accent' | 'default' | 'danger' | 'warning' | 'success' | string;
-    badge?: string;
-    onClick?: () => void;
-    className?: string;
+declare module '@/components/ui/DataCardGrid' {
+  export interface DataCardGridProps<T = any> {
+    data?: T[];
+    items?: T[];
+    renderCard?: (item: T, idx?: number) => React.ReactNode;
+    keyExtractor?: (item: T, idx?: number) => string | number;
+    isLoading?: boolean;
+    loading?: boolean;
+    loadingMessage?: string;
+    emptyTitle?: string;
+    emptySubMessage?: string;
+    emptyMessage?: string;
+    emptyIcon?: React.ComponentType<{ className?: string }>;
+    gridClassName?: string;
+    wrapperClassName?: string;
     [key: string]: any;
   }
-  export interface MetricsGridProps {
-    items?: MetricItem[];
-    cols?: number;
-    className?: string;
-    [key: string]: any;
-  }
-  export function MetricCard(props: any): React.ReactElement;
-  const MetricsGrid: React.ComponentType<MetricsGridProps>;
-  export default MetricsGrid;
+  const DataCardGrid: React.ComponentType<DataCardGridProps>;
+  export default DataCardGrid;
 }
+
 
 declare module '@/components/print/UniversalPrintModal' {
   export interface UniversalPrintModalProps {
@@ -393,25 +394,6 @@ declare module '@/components/layout/PageContainer' {
   export default PageContainer;
 }
 
-declare module '@/components/ui/CustomCheckbox' {
-  export interface CustomCheckboxProps {
-    id?: string;
-    name?: string;
-    checked?: boolean;
-    onChange?: (checked: boolean, e?: React.ChangeEvent<HTMLInputElement>) => void;
-    label?: React.ReactNode;
-    subLabel?: React.ReactNode;
-    description?: React.ReactNode;
-    disabled?: boolean;
-    readOnly?: boolean;
-    size?: 'sm' | 'md' | 'lg' | string;
-    className?: string;
-    boxClassName?: string;
-    [key: string]: any;
-  }
-  const CustomCheckbox: React.ComponentType<CustomCheckboxProps>;
-  export default CustomCheckbox;
-}
 
 declare module '@/components/layout' {
   export interface DrawerContainerProps {
@@ -442,8 +424,8 @@ declare module '@/components/layout' {
   }
   export interface DrawerFooterProps {
     onCancel?: () => void;
-    onSubmit?: (e?: any) => void;
-    onSave?: (e?: any) => void;
+    onSubmit?: ((e?: any) => void) | boolean;
+    onSave?: ((e?: any) => void) | boolean;
     cancelLabel?: string;
     saveLabel?: string;
     isSubmitting?: boolean;

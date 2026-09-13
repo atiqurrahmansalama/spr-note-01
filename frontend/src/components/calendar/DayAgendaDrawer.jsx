@@ -44,19 +44,19 @@ function formatFullDate(dateStr) {
 }
 
 export default function DayAgendaDrawer({
-  dateStr,
-  activeTenantId,
-  calendarEvent,
+  dateStr = '',
+  activeTenantId = undefined,
+  calendarEvent = null,
   events = [],
   isHoliday = false,
   holidayTitle = "",
   isClassOff = false,
   classOffReason = "",
-  onClose,
-  onEditEvent,
-  onOpenEventForm,
-  onDeleteEvent,
-  onAddEvent,
+  onClose = null,
+  onEditEvent = null,
+  onOpenEventForm = null,
+  onDeleteEvent = null,
+  onAddEvent = null,
   readOnly = false,
 }) {
   const [selectedEventId, setSelectedEventId] = useState(null);

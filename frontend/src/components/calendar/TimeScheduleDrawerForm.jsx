@@ -546,12 +546,13 @@ export function resolveEventFormColor(evt, targetCategory, kinds = [], types = [
 }
 
 export default function TimeScheduleDrawerForm({
-  event,
-  initialDate,
+  event = null,
+  initialDate = '',
   defaultCategory = "WORKING_HOURS",
   formId = "time-schedule-drawer-form",
-  onSave,
-  onCancel,
+  onSave = null,
+  onSaveSuccess = null,
+  onCancel = null,
 }) {
   const { activeTenantId } = useTenant();
   const [eventTypes, setEventTypes] = useState(() => calendarEventTypesStore.getEventTypes(activeTenantId));
@@ -986,20 +987,24 @@ export default function TimeScheduleDrawerForm({
       ? (formData.audience.length === 0 ? "ALL" : formData.audience.join(", "))
       : (formData.audience || "ALL");
 
+    const payload = {
+      ...formData,
+      color: formData.color || resolveEventFormColor(formData, formData.category, eventKinds, eventTypes),
+      priorityRank: Number(formData.priorityRank) || 1,
+      audience: audienceString,
+      impacts: Array.isArray(formData.impacts) ? formData.impacts : (formData.impacts ? [formData.impacts] : ["ALL"]),
+      id: event ? event.id : undefined,
+      targetDate: effectiveTargetDate,
+      editScope: isRecurringOrMultiDay ? editScope : "ALL_EVENTS",
+      endDate: formData.until === "DATE" ? (formData.untilDate || formData.endDate) : "",
+      startTime: formData.isFullDay ? "" : formData.startTime,
+      endTime: formData.isFullDay ? "" : formData.endTime,
+    };
+
     if (onSave) {
-      onSave({
-        ...formData,
-        color: formData.color || resolveEventFormColor(formData, formData.category, eventKinds, eventTypes),
-        priorityRank: Number(formData.priorityRank) || 1,
-        audience: audienceString,
-        impacts: Array.isArray(formData.impacts) ? formData.impacts : (formData.impacts ? [formData.impacts] : ["ALL"]),
-        id: event ? event.id : undefined,
-        targetDate: effectiveTargetDate,
-        editScope: isRecurringOrMultiDay ? editScope : "ALL_EVENTS",
-        endDate: formData.until === "DATE" ? (formData.untilDate || formData.endDate) : "",
-        startTime: formData.isFullDay ? "" : formData.startTime,
-        endTime: formData.isFullDay ? "" : formData.endTime,
-      });
+      onSave(payload);
+    } else if (onSaveSuccess) {
+      onSaveSuccess(payload);
     }
   };
 

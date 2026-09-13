@@ -63,6 +63,7 @@ from core.notifications import (
     ping_gateway,
     fetch_gateway_balance,
     seed_default_templates,
+    notify_student_attendance,
 )
 from core.middleware import detect_device_type, detect_device_info, get_client_ip
 from core.authentication import FlexibleJWTAuthentication
@@ -283,6 +284,14 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
                         marked_by=request.user if request.user.is_authenticated else None,
                         source='WEB_PORTAL'
                     )
+
+                # Trigger automated guardian notification for ABSENT or LATE
+                if clean_status in ['ABSENT', 'LATE']:
+                    try:
+                        notify_student_attendance(student, clean_status, date_val, in_time)
+                    except Exception as notif_err:
+                        logger.error(f"[Attendance Notification Error] {str(notif_err)}")
+
                 created_or_updated += 1
 
         return Response({

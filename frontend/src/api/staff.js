@@ -237,7 +237,9 @@ export const getStaffAttendance = async (params = {}) => {
   const qs = query.toString() ? `?${query.toString()}` : '';
   const response = await fetchWithAuth(`/api/v1/staff/attendance/${qs}`);
   if (!response.ok) {
-    throw new Error('Failed to fetch staff attendance sheet');
+    const err = await response.json().catch(() => ({}));
+    const msg = extractErrorMessage(err) || 'Failed to fetch staff attendance sheet';
+    throw new Error(msg);
   }
   return await response.json();
 };

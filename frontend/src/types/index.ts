@@ -10,3 +10,5 @@ export * from './academic';
 export * from './exam';
 export * from './attendance';
 export * from './hifz';
+export * from './residential';
+export * from './notifications';

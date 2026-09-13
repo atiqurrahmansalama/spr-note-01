@@ -75,11 +75,11 @@ export function isEventImpactedForModule(evt, moduleType = 'ALL') {
  * - Fullscreen mode & Escape key handling
  */
 export function useAttendanceDateManager({
-  activeTenantId,
+  activeTenantId = undefined,
   moduleType = 'ALL',
   isAdmin = false,
-  initialYear,
-  initialMonth,
+  initialYear = undefined,
+  initialMonth = undefined,
   initialStartDate = '',
   initialEndDate = '',
 } = {}) {

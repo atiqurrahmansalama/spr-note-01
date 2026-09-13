@@ -14,6 +14,7 @@ class NotificationGatewayConfig(models.Model):
         ('SMS', 'SMS Gateway Provider'),
         ('WHATSAPP', 'WhatsApp Cloud API'),
         ('SMTP_EMAIL', 'SMTP Email Server'),
+        ('TELEGRAM', 'Telegram Bot / Channel'),
         ('PUSH_FCM', 'Firebase Push Notification (FCM)'),
     )
 
@@ -24,6 +25,7 @@ class NotificationGatewayConfig(models.Model):
         ('BULK_SMS_BD', 'BulkSMS BD Provider'),
         ('WHATSAPP_META', 'Meta WhatsApp Business Cloud API'),
         ('SMTP_CUSTOM', 'Custom SMTP Email Server'),
+        ('TELEGRAM_BOT', 'Telegram Official Bot API'),
         ('GENERIC_REST', 'Custom REST Webhook Gateway'),
     )
 
@@ -174,7 +176,8 @@ class InAppNotification(models.Model):
         verbose_name_plural = "In-App Notifications"
 
     def __str__(self):
-        return f"[{self.notification_type}] {self.title} to {self.recipient.username} (Read: {self.is_read})"
+        user_label = getattr(self.recipient, 'name', '') or getattr(self.recipient, 'phone_number', '') or f"User #{self.recipient.id}"
+        return f"[{self.notification_type}] {self.title} to {user_label} (Read: {self.is_read})"
 
 
 class NotificationDispatchLog(models.Model):
@@ -183,6 +186,7 @@ class NotificationDispatchLog(models.Model):
         ('SMS', 'SMS Gateway Provider'),
         ('WHATSAPP', 'WhatsApp Cloud API'),
         ('EMAIL', 'SMTP Email Server'),
+        ('TELEGRAM', 'Telegram Bot / Channel'),
         ('PUSH_FCM', 'Firebase Push Notification'),
     )
 
@@ -201,7 +205,7 @@ class NotificationDispatchLog(models.Model):
     )
     channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='SMS', db_index=True)
     event_type = models.CharField(max_length=50, blank=True, default='', db_index=True)
-    recipient_identifier = models.CharField(max_length=150)
+    recipient_identifier = models.CharField(max_length=150, blank=True, default='')
     recipient_user = models.ForeignKey('core.User',
         null=True,
         blank=True,

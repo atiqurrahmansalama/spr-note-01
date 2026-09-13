@@ -104,13 +104,14 @@ export function resolvePolicyForDate(targetDate, basePolicy) {
  * Resolves cell lifecycle state, editability, allowed statuses, and display fallback.
  * 
  * @param {Object} params
- * @param {'CLASS'|'RESIDENTIAL'|'STAFF'|'TEACHER_CLASS'} params.moduleType
+ * @param {'CLASS'|'RESIDENTIAL'|'STAFF'|'TEACHER_CLASS'|'TEACHER'} params.moduleType
  * @param {string} params.targetDate - 'YYYY-MM-DD'
  * @param {string} [params.startTime] - 'HH:MM'
  * @param {string} [params.endTime] - 'HH:MM'
  * @param {Object} [params.policy] - Attendance Policy Object
  * @param {boolean} [params.isAdmin] - Whether the active user is an Admin / SuperAdmin / Principal
  * @param {string} [params.currentStatus] - Current recorded status (e.g. 'PRESENT', 'LATE', 'ABSENT', 'ON_LEAVE')
+ * @param {string|null} [params.effectiveStartDate] - Effective joining or admission date
  * @param {Date} [params.nowDate] - Current real-world datetime object
  * @returns {Object} { state, isEditable, allowedStatuses, displayStatus, lateMinutes, tooltip, canEditArrivalTime }
  */

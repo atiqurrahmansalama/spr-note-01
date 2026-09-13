@@ -31,6 +31,13 @@ class HasSectionAccess(BasePermission):
                 
         from core.services import get_resolved_feature_flags_for_user
         flags, _ = get_resolved_feature_flags_for_user(request.user)
+        
+        if isinstance(section_key, (list, tuple, set)):
+            return any(flags.get(k, False) for k in section_key)
+            
+        if section_key in ('staff_attendance', 'staff_daily_attendance'):
+            return flags.get('staff_attendance', False) or flags.get('staff_daily_attendance', False) or flags.get('staff_management', False)
+
         return flags.get(section_key, False)
 
 

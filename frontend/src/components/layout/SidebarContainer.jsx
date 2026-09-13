@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import UserProfileCard from "./UserProfileCard";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
+import { useTranslation } from "../../i18n";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -58,6 +59,7 @@ export default function SidebarContainer({
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = propActivePath || location.pathname;
+  const { t } = useTranslation('navigation');
 
   const { isMultiTenantAdmin } = useTenant();
   const [openSubMenus, setOpenSubMenus] = useState({
@@ -68,7 +70,6 @@ export default function SidebarContainer({
     "Student": true,
     "Staff Management": false,
     "Settings & Devices": false,
-    "Report Generator": false,
     "App Management": false,
     Settings: false,
   });
@@ -83,35 +84,40 @@ export default function SidebarContainer({
   const { isSectionEnabled } = useFeatureControl();
 
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
+    { id: "Dashboard", name: "Dashboard", i18nKey: "dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
     {
       id: "Academy",
       name: "Academy",
+      i18nKey: "academy",
       Icon: BuildingOfficeIcon,
       hasSub: true,
       key: "nav_institution",
       subItems: [
-        { id: "Profile", name: "Profile & Branding", path: "/academy-profile", matchPaths: ["/academy-profile", "/academy/profile", "/settings/institution", "/institution-profile"], Icon: BuildingOfficeIcon, key: "settings_institution" },
-        { id: "Academies & Departments", name: "Campus Structure", path: "/academy/campus-profile", matchPaths: ["/academy/campus-profile", "/campus-profile", "/academy/branches", "/academy/departments", "/student-management/departments"], Icon: BuildingOfficeIcon, key: "campus_profile" },
-        { id: "Classes & Groups", name: "Classes & Sections", path: "/academy/classes-groups", matchPaths: ["/academy/classes-groups", "/classes-groups", "/academy/classes", "/academy/groups", "/student-management/classes", "/student-management/groups"], Icon: ClassIcon, key: "student_classes" },
-        { id: "Period Schedules", name: "Routine & Curriculum", path: "/academy/periods", matchPaths: ["/academy/periods"], Icon: TimerIcon, key: "class_period_slots" },
-        { id: "Calendar & Events", name: "Calendar & Events", path: "/academy/calendar-events", matchPaths: ["/academy/calendar-events", "/academy/calendar-schedule", "/academy/working-hours"], Icon: CalendarIcon, key: "academy_calendar_events" },
-        { id: "Residential Quarters", name: "Residential & Quarters", path: "/academy/residential-quarters", matchPaths: ["/academy/residential-quarters", "/academy/residential", "/academy/dormitory", "/residential-quarters"], Icon: HomeIcon, key: "residential_quarters" },
+        { id: "Profile", name: "Profile & Branding", i18nKey: "institutionProfile", path: "/academy-profile", matchPaths: ["/academy-profile", "/academy/profile", "/settings/institution", "/institution-profile"], Icon: BuildingOfficeIcon, key: "settings_institution" },
+        { id: "Academies & Departments", name: "Campus Structure", i18nKey: "campusProfile", path: "/academy/campus-profile", matchPaths: ["/academy/campus-profile", "/campus-profile", "/academy/branches", "/academy/departments", "/student-management/departments"], Icon: BuildingOfficeIcon, key: "campus_profile" },
+        { id: "Classes & Groups", name: "Classes & Sections", i18nKey: "classesGroups", path: "/academy/classes-groups", matchPaths: ["/academy/classes-groups", "/classes-groups", "/academy/classes", "/academy/groups", "/student-management/classes", "/student-management/groups"], Icon: ClassIcon, key: "student_classes" },
+        { id: "Period Schedules", name: "Routine & Curriculum", i18nKey: "routineCurriculum", path: "/academy/periods", matchPaths: ["/academy/periods"], Icon: TimerIcon, key: "class_period_slots" },
+        { id: "Calendar & Events", name: "Calendar & Events", i18nKey: "calendarSchedule", path: "/academy/calendar-events", matchPaths: ["/academy/calendar-events", "/academy/calendar-schedule", "/academy/working-hours"], Icon: CalendarIcon, key: "academy_calendar_events" },
+        { id: "Residential Quarters", name: "Residential & Quarters", i18nKey: "residentialDormitory", path: "/academy/residential-quarters", matchPaths: ["/academy/residential-quarters", "/academy/residential", "/academy/dormitory", "/residential-quarters"], Icon: HomeIcon, key: "residential_quarters" },
       ]
     },
     {
       id: "Academic Studies",
       name: "Academic Studies",
+      i18nKey: "academicStudies",
       Icon: BookOpenIcon,
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Generate Report", name: "Generate Report", i18nKey: "generateReport", path: "/report-builder", matchPaths: ["/report-builder"], Icon: SavedMessagesIcon, key: "report_builder" },
+        { id: "Student Reports", name: "Student Recitation Log", i18nKey: "studentReports", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
       ]
     },
     {
       id: "Examination & Results",
       name: "Examination & Results",
+      i18nKey: "examinations",
       Icon: AcademicCapIcon,
       hasSub: true,
       key: "nav_examinations",
@@ -119,6 +125,7 @@ export default function SidebarContainer({
         {
           id: "Exam Schedules",
           name: "Exam Schedules",
+          i18nKey: "examSchedules",
           path: "/examinations/schedules",
           exactMatchPaths: ["/examinations", "/exams"],
           matchPaths: [
@@ -136,81 +143,73 @@ export default function SidebarContainer({
           Icon: CalendarIcon,
           key: "exam_schedules"
         },
-        { id: "Mark Entry Desk", name: "Mark Entry Desk", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
-        { id: "Mark Sheet", name: "Mark Sheet", path: "/examinations/marksheet", matchPaths: ["/examinations/marksheet", "/examinations/mark-sheet", "/examinations/tabulation", "/marksheet", "/tabulation-sheet", "/mark-sheet", "/examinations/transcripts", "/transcripts", "/academic-transcripts"], Icon: ChartBarIcon, key: "exam_tabulation" },
+        { id: "Mark Entry Desk", name: "Mark Entry Desk", i18nKey: "markEntry", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
+        { id: "Mark Sheet", name: "Mark Sheet", i18nKey: "tabulationSheet", path: "/examinations/marksheet", matchPaths: ["/examinations/marksheet", "/examinations/mark-sheet", "/examinations/tabulation", "/marksheet", "/tabulation-sheet", "/mark-sheet", "/examinations/transcripts", "/transcripts", "/academic-transcripts"], Icon: ChartBarIcon, key: "exam_tabulation" },
       ]
     },
     {
       id: "Student",
       name: "Student",
+      i18nKey: "students",
       Icon: GroupsIcon,
       hasSub: true,
       key: "nav_student_management",
       subItems: [
-        { id: "Student Roster", name: "Student Roster", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
-        { id: "Class Attendance", name: "Class Attendance", path: "/attendance/students/monthly-matrix", matchPaths: ["/attendance/students/monthly-matrix", "/attendance/student", "/attendance/monthly-register"], Icon: MatrixIcon, key: "monthly_attendance_matrix" },
-        { id: "Residential Attendance", name: "Residential Attendance", path: "/attendance/students/residential", matchPaths: ["/attendance/students/residential"], Icon: TimerIcon, key: "residential_attendance" },
-        { id: "Admission", name: "Admission", path: "/admission", matchPaths: ["/admission", "/short-admission", "/admission/short"], Icon: AdmissionIcon, key: "student_admission" },
+        { id: "Student Roster", name: "Student Roster", i18nKey: "studentDirectory", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
+        { id: "Class Attendance", name: "Class Attendance", i18nKey: "classAttendance", path: "/attendance/students/monthly-matrix", matchPaths: ["/attendance/students/monthly-matrix", "/attendance/student", "/attendance/monthly-register"], Icon: MatrixIcon, key: "monthly_attendance_matrix" },
+        { id: "Residential Attendance", name: "Residential Attendance", i18nKey: "residentialAttendance", path: "/attendance/students/residential", matchPaths: ["/attendance/students/residential"], Icon: TimerIcon, key: "residential_attendance" },
+        { id: "Admission", name: "Admission", i18nKey: "admission", path: "/admission", matchPaths: ["/admission", "/short-admission", "/admission/short"], Icon: AdmissionIcon, key: "student_admission" },
       ]
     },
     {
       id: "Staff Management",
       name: "Staff Management",
+      i18nKey: "staffManagement",
       Icon: TeacherIcon,
       hasSub: true,
       key: "nav_staff_management",
       subItems: [
-        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", path: "/staff/roster", matchPaths: ["/staff/roster"], Icon: TeacherIcon, key: "staff_roster" },
-        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "staff_roster" },
-        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_roster" },
-        { id: "Staff Onboarding", name: "Staff Onboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
-      ]
-    },
-    {
-      id: "Report Generator",
-      name: "Report Generator",
-      Icon: SavedMessagesIcon,
-      hasSub: true,
-      key: "nav_report_generator",
-      subItems: [
-        { id: "Generate Report", name: "Generate Report", path: "/report-builder", matchPaths: ["/report-builder"], Icon: SavedMessagesIcon, key: "report_builder" },
-        { id: "Academic Reports", name: "Multi-Period Reports", path: "/academy/academic-reports", matchPaths: ["/academy/academic-reports"], Icon: SavedMessagesIcon, key: "academic_reports" },
-        { id: "Student Reports", name: "Student Recitation Log", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
+        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", i18nKey: "staffRoster", path: "/staff/roster", matchPaths: ["/staff/roster"], Icon: TeacherIcon, key: "staff_roster" },
+        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", i18nKey: "teacherAttendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "staff_roster" },
+        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", i18nKey: "staffDailyAttendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_roster" },
+        { id: "Staff Onboarding", name: "Staff Onboarding", i18nKey: "staffOnboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },
     {
       id: "App Management",
       name: "App Management",
+      i18nKey: "appManagement",
       Icon: SettingsIcon,
       hasSub: true,
       key: "nav_app_management",
       subItems: [
-        { id: "Section Control", name: "Section Control", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
-        { id: "User Management", name: "User Management", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
-        { id: "Role Management", name: "Role Management", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
-        { id: "Activity Analytics", name: "Activity Analytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },
-        { id: "Role QR & Invites", name: "Role QR & Invites", path: "/app-management/role-invites", matchPaths: ["/app-management/role-invites"], Icon: SectionControlIcon, key: "app_role_invites" },
-        { id: "Notification Management", name: "Notification Management", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management" },
+        { id: "Section Control", name: "Section Control", i18nKey: "sectionControl", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
+        { id: "User Management", name: "User Management", i18nKey: "userManagement", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
+        { id: "Role Management", name: "Role Management", i18nKey: "roleManagement", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
+        { id: "Activity Analytics", name: "Activity Analytics", i18nKey: "activityAnalytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },
+        { id: "Role QR & Invites", name: "Role QR & Invites", i18nKey: "roleInvites", path: "/app-management/role-invites", matchPaths: ["/app-management/role-invites"], Icon: SectionControlIcon, key: "app_role_invites" },
+        { id: "Notification Management", name: "Notification Management", i18nKey: "notificationGateways", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management" },
       ]
     },
     { 
       id: "Settings", 
       name: "Settings", 
+      i18nKey: "settings",
       Icon: SettingsIcon, 
       hasSub: true, 
       key: "nav_settings",
       subItems: [
-        { id: "Profile Settings", name: "Profile Settings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
-        { id: "Attendance Settings", name: "Attendance Settings", path: "/attendance/settings", matchPaths: ["/attendance/settings"], Icon: AttendanceIcon, key: "attendance_policies_slots" },
-        { id: "Security & Sessions", name: "Security & Sessions", path: "/security-sessions", matchPaths: ["/security-sessions"], Icon: SettingsIcon, key: "settings_security" },
-        { id: "Personalize", name: "Personalize", path: "/personalize", matchPaths: ["/personalize", "/appearance", "/date-time", "/language"], Icon: AppearanceIcon, key: "settings_personalize" },
-        { id: "Data & Backup", name: "Data & Backup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup" },
-        { id: "Admin Tools", name: "Admin Tools", path: "/admin-tools", matchPaths: ["/admin-tools", "/developer-tools", "/sp-management"], Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
+        { id: "Profile Settings", name: "Profile Settings", i18nKey: "profileSettings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
+        { id: "Attendance Settings", name: "Attendance Settings", i18nKey: "attendanceSettings", path: "/attendance/settings", matchPaths: ["/attendance/settings"], Icon: AttendanceIcon, key: "attendance_policies_slots" },
+        { id: "Security & Sessions", name: "Security & Sessions", i18nKey: "securitySessions", path: "/security-sessions", matchPaths: ["/security-sessions"], Icon: SettingsIcon, key: "settings_security" },
+        { id: "Personalize", name: "Personalize", i18nKey: "appearanceTheme", path: "/personalize", matchPaths: ["/personalize", "/appearance", "/date-time", "/language"], Icon: AppearanceIcon, key: "settings_personalize" },
+        { id: "Data & Backup", name: "Data & Backup", i18nKey: "dataBackup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup" },
+        { id: "Admin Tools", name: "Admin Tools", i18nKey: "developerTools", path: "/admin-tools", matchPaths: ["/admin-tools", "/developer-tools", "/sp-management"], Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
       ]
     },
-    { id: "Shortcuts", name: "Shortcuts", path: "/shortcuts", matchPaths: ["/shortcuts"], Icon: ShortcutsIcon, key: "nav_shortcuts" },
-    { id: "App Guide", name: "App Guide", path: "/guide", matchPaths: ["/guide"], Icon: AppGuideIcon, key: "nav_app_guide" },
-    { id: "About", name: "About", path: "/about", matchPaths: ["/about"], Icon: AboutIcon, key: "nav_about" },
+    { id: "Shortcuts", name: "Shortcuts", i18nKey: "shortcuts", path: "/shortcuts", matchPaths: ["/shortcuts"], Icon: ShortcutsIcon, key: "nav_shortcuts" },
+    { id: "App Guide", name: "App Guide", i18nKey: "appGuide", path: "/guide", matchPaths: ["/guide"], Icon: AppGuideIcon, key: "nav_app_guide" },
+    { id: "About", name: "About", i18nKey: "about", path: "/about", matchPaths: ["/about"], Icon: AboutIcon, key: "nav_about" },
   ];
 
   const handleNavigate = (path) => {
@@ -317,7 +316,7 @@ export default function SidebarContainer({
                   <button
                     type="button"
                     onClick={() => toggleSubMenu(item.id)}
-                    title={item.name}
+                    title={t(item.i18nKey, item.name)}
                     className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "justify-between px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                       isParentActive || isAnySubActive
                         ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
@@ -326,7 +325,7 @@ export default function SidebarContainer({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <ItemIcon className={`w-[18px] h-[18px] sm:w-[18px] sm:h-[18px] shrink-0 ${isParentActive || isAnySubActive ? "theme-accent" : "opacity-80"}`} />
-                      {!isCollapsed && <span className="truncate text-[14px] sm:text-[13.5px] font-medium tracking-normal leading-normal">{item.name}</span>}
+                      {!isCollapsed && <span className="truncate text-[14px] sm:text-[13.5px] font-medium tracking-normal leading-normal">{t(item.i18nKey, item.name)}</span>}
                     </div>
 
                     {!isCollapsed && (
@@ -351,7 +350,7 @@ export default function SidebarContainer({
                             key={sub.id}
                             type="button"
                             onClick={() => handleNavigate(sub.path)}
-                            title={sub.name}
+                            title={t(sub.i18nKey, sub.name)}
                             className={`w-full flex items-center gap-3 relative ${isCollapsed ? "justify-center p-2" : "px-3 sm:px-3 py-2 sm:py-2"} rounded-xl transition-all cursor-pointer select-none ${
                               isSubActive
                                 ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
@@ -360,7 +359,7 @@ export default function SidebarContainer({
                           >
                             <SubIcon className={`w-4 h-4 shrink-0 ${isSubActive ? "theme-accent" : "opacity-80"}`} />
                             {!isCollapsed && (
-                              <span className="truncate text-[13.5px] sm:text-[13px] font-medium tracking-normal leading-normal">{sub.name}</span>
+                              <span className="truncate text-[13.5px] sm:text-[13px] font-medium tracking-normal leading-normal">{t(sub.i18nKey, sub.name)}</span>
                             )}
                           </button>
                         );
@@ -377,7 +376,7 @@ export default function SidebarContainer({
                 key={item.id}
                 type="button"
                 onClick={() => handleNavigate(item.path)}
-                title={item.name}
+                title={t(item.i18nKey, item.name)}
                 className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                   isActive
                     ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
@@ -386,7 +385,7 @@ export default function SidebarContainer({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <ItemIcon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "theme-accent" : "opacity-80"}`} />
-                  {!isCollapsed && <span className="truncate text-[14px] sm:text-[13.5px] font-medium tracking-normal leading-normal">{item.name}</span>}
+                  {!isCollapsed && <span className="truncate text-[14px] sm:text-[13.5px] font-medium tracking-normal leading-normal">{t(item.i18nKey, item.name)}</span>}
                 </div>
               </button>
             );
@@ -401,7 +400,7 @@ export default function SidebarContainer({
               if (isOverlay) onClose();
               navigate("/");
             }}
-            title="Official Website & Public Portal"
+            title={t('officialWebsite', 'Official Website')}
             className={`w-full flex items-center ${
               isCollapsed ? "justify-center p-2" : "justify-start px-3 py-2.5 gap-3"
             } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-all cursor-pointer shadow-xs group`}
@@ -412,9 +411,9 @@ export default function SidebarContainer({
               </svg>
             </div>
             {!isCollapsed && (
-              <div className="flex flex-col text-left min-w-0">
-                <span className="text-[13px] font-bold theme-text-primary leading-tight truncate">Official Website</span>
-                <span className="text-[11px] theme-text-secondary leading-tight truncate mt-0.5">Public Portal &amp; Verification</span>
+              <div className="flex flex-col text-left rtl:text-right min-w-0">
+                <span className="text-[13px] font-bold theme-text-primary leading-tight truncate">{t('officialWebsite', 'Official Website')}</span>
+                <span className="text-[11px] theme-text-secondary leading-tight truncate mt-0.5">{t('publicPortalVerification', 'Public Portal & Verification')}</span>
               </div>
             )}
           </button>

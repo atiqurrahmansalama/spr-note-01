@@ -1340,6 +1340,48 @@ export function DuplicateIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export function Volume2Icon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+    </svg>
+  );
+}
+
+export function VolumeXIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.586 15H2v-6h3.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l5-5m0 5l-5-5" />
+    </svg>
+  );
+}
+
+export function TelegramIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-17.5 7a2.25 2.25 0 0 0 .145 4.17l4.5 1.5 1.5 4.5a2.25 2.25 0 0 0 3.738.736l2.85-2.85 4.962 3.722a2.25 2.25 0 0 0 3.525-1.42l3-15a2.25 2.25 0 0 0-2.698-2.573z" />
+      <path d="M8.5 15.5l11-10" />
+    </svg>
+  );
+}
+
+export function LanguagesIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m5 8 6 6" />
+      <path d="m4 14 6-6 2-3" />
+      <path d="M2 5h12" />
+      <path d="M7 2h1" />
+      <path d="m22 22-5-10-5 10" />
+      <path d="M14 18h6" />
+    </svg>
+  );
+}
+
+
+
+
+
 
 
 

@@ -239,16 +239,22 @@ def send_sms_via_provider(gateway_config, phone_number, message_text):
         return {"status": "FAILED", "error": str(e), "response": {}}
 
 
-def send_whatsapp_via_provider(gateway_config, phone_number, message_text):
+def send_whatsapp_via_provider(gateway_config, phone_number, message_text, template_name=None, template_lang="en_US", template_params=None):
     """
     Dispatches WhatsApp message through Meta WhatsApp Business Cloud API.
+    Supports both template messages (required outside 24h session window) and freeform text messages.
     """
     if not phone_number:
         return {"status": "FAILED", "error": "No recipient phone number provided", "response": {}}
 
-    cleaned_phone = re.sub(r'[^\d]', '', phone_number)
+    cleaned_phone = re.sub(r'[^\d]', '', str(phone_number))
     if cleaned_phone.startswith('01') and len(cleaned_phone) == 11:
         cleaned_phone = '88' + cleaned_phone
+    elif cleaned_phone.startswith('8801') and len(cleaned_phone) == 13:
+        cleaned_phone = cleaned_phone
+
+    if len(cleaned_phone) < 10:
+        return {"status": "FAILED", "error": f"Invalid recipient phone number: '{phone_number}'", "response": {}}
 
     if not gateway_config or not gateway_config.is_active or not gateway_config.api_secret_or_token:
         logger.info(f"[WHATSAPP SIMULATED] To: {cleaned_phone} | Msg: {message_text[:80]}")
@@ -258,8 +264,15 @@ def send_whatsapp_via_provider(gateway_config, phone_number, message_text):
             "response": {"note": "Simulated WhatsApp dispatch in development", "phone": cleaned_phone},
         }
 
-    phone_number_id = gateway_config.sender_id_or_phone or gateway_config.api_key
-    access_token = gateway_config.api_secret_or_token
+    phone_number_id = (gateway_config.api_key or gateway_config.sender_id_or_phone or "").strip()
+    access_token = (gateway_config.api_secret_or_token or "").strip()
+    if access_token.startswith("Bearer "):
+        access_token = access_token.replace("Bearer ", "", 1).strip()
+
+    # Meta Phone Number ID validation check
+    if phone_number_id.startswith('01') or (len(phone_number_id) <= 11 and not phone_number_id.startswith('10')):
+        logger.warning(f"[WhatsApp Notice] phone_number_id '{phone_number_id}' looks like a phone number rather than a Meta Phone Number ID.")
+
     url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
 
     try:
@@ -268,20 +281,64 @@ def send_whatsapp_via_provider(gateway_config, phone_number, message_text):
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         }
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": cleaned_phone,
-            "type": "text",
-            "text": {"preview_url": True, "body": message_text},
-        }
-        resp = requests.post(url, headers=headers, json=payload, timeout=8)
-        resp_data = resp.json() if resp.status_code in [200, 201] else {"error": resp.text}
+
+        # If template_name is specified, use Meta Template schema
+        if template_name:
+            template_obj = {
+                "name": template_name,
+                "language": {"code": template_lang or "en_US"}
+            }
+            if template_params and isinstance(template_params, (list, tuple)):
+                template_obj["components"] = [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": str(p)} for p in template_params
+                        ]
+                    }
+                ]
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": cleaned_phone,
+                "type": "template",
+                "template": template_obj
+            }
+        else:
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": cleaned_phone,
+                "type": "text",
+                "text": {"preview_url": True, "body": message_text},
+            }
+
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        resp_data = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {"text": resp.text}
         is_ok = resp.status_code in [200, 201] and "messages" in resp_data
+        
+        err_msg = ""
+        if not is_ok:
+            if isinstance(resp_data, dict) and "error" in resp_data:
+                err_meta = resp_data["error"]
+                code = err_meta.get("code")
+                msg = err_meta.get("message", "")
+                
+                if code == 131030 or "Recipient phone number not in allowed list" in msg:
+                    err_msg = f"Meta Sandbox Error (#131030): Recipient '{cleaned_phone}' is not in your Meta WhatsApp Test Allowed list. In developers.facebook.com > WhatsApp > API Setup > 'To' dropdown, click 'Manage phone number list' to add and verify this number with OTP."
+                elif code == 190:
+                    err_msg = "Meta Error (#190): Access Token expired or invalid. Please generate a new Temporary/Permanent Access Token in Meta Developer Portal."
+                elif code == 100 and "does not exist" in msg:
+                    err_msg = f"Meta Error (#100): Phone Number ID '{phone_number_id}' is invalid. Please enter the 15-digit Meta 'Phone Number ID' from developers.facebook.com WhatsApp API Setup."
+                else:
+                    err_msg = f"Meta WhatsApp Error (#{code}): {msg}"
+            else:
+                err_msg = str(resp_data)
+
         return {
             "status": "DELIVERED" if is_ok else "FAILED",
             "response": resp_data,
-            "error": "" if is_ok else str(resp_data),
+            "error": err_msg,
         }
     except Exception as e:
         logger.error(f"[WhatsApp Error] {str(e)}")
@@ -338,6 +395,100 @@ def send_email_via_provider(gateway_config, recipient_email, subject, message_te
         return {"status": "FAILED", "error": str(e), "response": {}}
 
 
+def send_telegram_via_provider(gateway_config, recipient_chat_id, message_text, title=None, parse_mode="HTML"):
+    """
+    Dispatches notifications to Telegram Channel, Group, or Direct Chat via Telegram Bot API.
+    """
+    if not message_text:
+        return {"status": "FAILED", "error": "Message body is required", "response": {}}
+
+    if not gateway_config or not gateway_config.is_active:
+        logger.info(f"[TELEGRAM SIMULATED] Chat: {recipient_chat_id} | Msg: {message_text[:80]}")
+        return {
+            "status": "SIMULATED",
+            "provider": "TELEGRAM_BOT",
+            "response": {"note": "Simulated Telegram dispatch in development", "chat_id": recipient_chat_id},
+        }
+
+    bot_token = (gateway_config.api_secret_or_token or gateway_config.api_key or "").strip()
+    if not bot_token:
+        return {"status": "FAILED", "error": "Telegram Bot Token is missing in gateway configuration.", "response": {}}
+
+    # Determine target chat: recipient_chat_id or gateway default channel/group
+    target_chat = (
+        recipient_chat_id or 
+        gateway_config.sender_id_or_phone or 
+        (gateway_config.extra_headers_or_params.get('default_chat_id') if isinstance(gateway_config.extra_headers_or_params, dict) else None)
+    )
+
+    if not target_chat:
+        return {
+            "status": "FAILED",
+            "error": "No Telegram Chat ID, Channel Username (@channel_name), or Group ID provided.",
+            "response": {}
+        }
+
+    # Format content with optional bold title
+    if title and str(title).strip():
+        formatted_text = f"<b>{title.strip()}</b>\n\n{message_text}"
+    else:
+        formatted_text = message_text
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": str(target_chat).strip(),
+        "text": formatted_text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": False
+    }
+
+    try:
+        import requests
+        resp = requests.post(url, json=payload, timeout=10)
+        resp_data = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {"text": resp.text}
+
+        if resp.status_code == 200 and resp_data.get("ok"):
+            return {
+                "status": "DELIVERED",
+                "response": resp_data.get("result", {}),
+                "error": "",
+            }
+
+        # If HTML parse error occurred, retry once as plain text
+        if resp_data.get("error_code") == 400 and "can't parse entities" in resp_data.get("description", "").lower():
+            payload.pop("parse_mode", None)
+            plain_resp = requests.post(url, json=payload, timeout=10)
+            plain_data = plain_resp.json() if plain_resp.headers.get('content-type', '').startswith('application/json') else {"text": plain_resp.text}
+            if plain_resp.status_code == 200 and plain_data.get("ok"):
+                return {
+                    "status": "DELIVERED",
+                    "response": plain_data.get("result", {}),
+                    "error": "",
+                }
+
+        # Format user-friendly error message
+        err_code = resp_data.get("error_code")
+        err_desc = resp_data.get("description", "")
+        if err_code == 401:
+            err_msg = "Telegram Error (401 Unauthorized): Invalid Bot Token. Please check the token provided by @BotFather."
+        elif err_code == 400 and "chat not found" in err_desc.lower():
+            err_msg = f"Telegram Error (400 Chat Not Found): Could not find chat '{target_chat}'. For channels/groups, verify the username and ensure the Bot has been added as an Administrator."
+        elif err_code == 403:
+            err_msg = f"Telegram Error (403 Forbidden): Bot was blocked by user or lacks permission to post in channel '{target_chat}'."
+        else:
+            err_msg = f"Telegram Error ({err_code}): {err_desc}"
+
+        return {
+            "status": "FAILED",
+            "response": resp_data,
+            "error": err_msg,
+        }
+
+    except Exception as e:
+        logger.error(f"[Telegram Error] {str(e)}")
+        return {"status": "FAILED", "error": str(e), "response": {}}
+
+
 # ==============================================================================
 # LIVE GATEWAY PING & BALANCE INQUIRY
 # ==============================================================================
@@ -358,10 +509,50 @@ def ping_gateway(gateway_config, test_target=None):
         res = send_sms_via_provider(gateway_config, target, test_msg)
     elif gateway_config.gateway_type == 'WHATSAPP':
         target = test_target or "01700000000"
-        res = send_whatsapp_via_provider(gateway_config, target, test_msg)
+        # Meta WhatsApp requires a pre-approved template ('hello_world') to initiate outbound messages
+        res = send_whatsapp_via_provider(gateway_config, target, test_msg, template_name="hello_world")
+        if res.get("status") == "FAILED" and "template" in str(res.get("error", "")):
+            res = send_whatsapp_via_provider(gateway_config, target, test_msg)
     elif gateway_config.gateway_type == 'SMTP_EMAIL':
         target = test_target or "test@example.com"
         res = send_email_via_provider(gateway_config, target, "Ping Test", test_msg)
+    elif gateway_config.gateway_type == 'TELEGRAM':
+        bot_token = (gateway_config.api_secret_or_token or gateway_config.api_key or "").strip()
+        if not bot_token:
+            res = {"status": "FAILED", "error": "Telegram Bot Token is not configured."}
+        else:
+            import requests
+            try:
+                # 1. Ping Telegram getMe
+                get_me_url = f"https://api.telegram.org/bot{bot_token}/getMe"
+                me_resp = requests.get(get_me_url, timeout=10)
+                me_data = me_resp.json() if me_resp.headers.get('content-type', '').startswith('application/json') else {"text": me_resp.text}
+                
+                if me_resp.status_code == 200 and me_data.get("ok"):
+                    bot_info = me_data.get("result", {})
+                    # If target provided, also attempt sending ping message
+                    if test_target or gateway_config.sender_id_or_phone:
+                        res = send_telegram_via_provider(gateway_config, test_target, test_msg, title="SPR Note Bot Ping")
+                    else:
+                        res = {
+                            "status": "DELIVERED",
+                            "response": {
+                                "bot_id": bot_info.get("id"),
+                                "bot_name": bot_info.get("first_name"),
+                                "username": f"@{bot_info.get('username')}",
+                                "can_join_groups": bot_info.get("can_join_groups"),
+                                "can_read_all_group_messages": bot_info.get("can_read_all_group_messages"),
+                            },
+                            "error": ""
+                        }
+                else:
+                    res = {
+                        "status": "FAILED",
+                        "error": f"Telegram Bot Ping Failed: {me_data.get('description', 'Unauthorized')}",
+                        "response": me_data
+                    }
+            except Exception as e:
+                res = {"status": "FAILED", "error": str(e), "response": {}}
     else:
         res = {"status": "SIMULATED", "response": {"note": "Gateway ping simulated"}}
 
@@ -504,6 +695,23 @@ def dispatch_notification(
 
     results = {}
 
+    # Helper to resolve a guaranteed non-null recipient identifier
+    def resolve_safe_identifier(user, fallback_value=""):
+        if fallback_value and str(fallback_value).strip():
+            return str(fallback_value).strip()
+        if user:
+            phone = getattr(user, 'phone_number', None)
+            if phone and str(phone).strip():
+                return str(phone).strip()
+            email = getattr(user, 'email', None)
+            if email and str(email).strip():
+                return str(email).strip()
+            name = getattr(user, 'name', None)
+            if name and str(name).strip():
+                return str(name).strip()
+            return f"User #{user.id}"
+        return "Unknown Recipient"
+
     # --- CHANNEL A: IN-APP NOTIFICATION ---
     if 'IN_APP' in channels:
         if recipient_user:
@@ -519,7 +727,7 @@ def dispatch_notification(
                 institution=institution,
                 channel='IN_APP',
                 event_type=event_type,
-                recipient_identifier=recipient_user.username,
+                recipient_identifier=resolve_safe_identifier(recipient_user, recipient_identifier),
                 recipient_user=recipient_user,
                 message_title=resolved_title,
                 message_body=resolved_body,
@@ -538,7 +746,7 @@ def dispatch_notification(
             institution=institution,
             channel='SMS',
             event_type=event_type,
-            recipient_identifier=target_phone,
+            recipient_identifier=resolve_safe_identifier(recipient_user, target_phone or recipient_identifier),
             recipient_user=recipient_user,
             message_title=resolved_title,
             message_body=resolved_body,
@@ -551,12 +759,23 @@ def dispatch_notification(
     # --- CHANNEL C: WHATSAPP CLOUD API ---
     if 'WHATSAPP' in channels and target_phone:
         wa_gw = gateways.get('WHATSAPP')
-        wa_res = send_whatsapp_via_provider(wa_gw, target_phone, resolved_body)
+        wa_tpl = wa_gw.extra_headers_or_params.get('template_name') if wa_gw and isinstance(wa_gw.extra_headers_or_params, dict) else None
+        wa_lang = wa_gw.extra_headers_or_params.get('template_lang', 'en_US') if wa_gw and isinstance(wa_gw.extra_headers_or_params, dict) else 'en_US'
+        wa_params = [recipient_user.name if recipient_user and recipient_user.name else "Member", resolved_body] if wa_tpl and wa_tpl != "hello_world" else None
+
+        wa_res = send_whatsapp_via_provider(
+            wa_gw, 
+            target_phone, 
+            resolved_body,
+            template_name=wa_tpl,
+            template_lang=wa_lang,
+            template_params=wa_params
+        )
         NotificationDispatchLog.objects.create(
             institution=institution,
             channel='WHATSAPP',
             event_type=event_type,
-            recipient_identifier=target_phone,
+            recipient_identifier=resolve_safe_identifier(recipient_user, target_phone or recipient_identifier),
             recipient_user=recipient_user,
             message_title=resolved_title,
             message_body=resolved_body,
@@ -574,7 +793,7 @@ def dispatch_notification(
             institution=institution,
             channel='EMAIL',
             event_type=event_type,
-            recipient_identifier=target_email,
+            recipient_identifier=resolve_safe_identifier(recipient_user, target_email or recipient_identifier),
             recipient_user=recipient_user,
             message_title=resolved_title,
             message_body=resolved_body,
@@ -583,6 +802,29 @@ def dispatch_notification(
             error_reason=email_res.get('error', '')
         )
         results['EMAIL'] = email_res
+
+    # --- CHANNEL E: TELEGRAM BOT & CHANNELS ---
+    if 'TELEGRAM' in channels:
+        tg_gw = gateways.get('TELEGRAM')
+        # Check recipient target: direct chat_id/channel or fallback to gateway's default channel
+        tg_target = (
+            recipient_identifier if (recipient_identifier and (str(recipient_identifier).startswith('@') or str(recipient_identifier).startswith('-') or str(recipient_identifier).isdigit()))
+            else (getattr(recipient_user, 'telegram_chat_id', None) if recipient_user else None)
+        )
+        tg_res = send_telegram_via_provider(tg_gw, tg_target, resolved_body, title=resolved_title)
+        NotificationDispatchLog.objects.create(
+            institution=institution,
+            channel='TELEGRAM',
+            event_type=event_type,
+            recipient_identifier=resolve_safe_identifier(recipient_user, tg_target or (tg_gw.sender_id_or_phone if tg_gw else '') or recipient_identifier),
+            recipient_user=recipient_user,
+            message_title=resolved_title,
+            message_body=resolved_body,
+            status=tg_res.get('status', 'SENT'),
+            provider_response=tg_res.get('response', {}),
+            error_reason=tg_res.get('error', '')
+        )
+        results['TELEGRAM'] = tg_res
 
     return {
         "status": "COMPLETED",
@@ -630,6 +872,163 @@ def send_sms_notification(phone_number, message_text):
     return send_sms_via_provider(None, phone_number, message_text)
 
 
+def get_student_guardian_info(student):
+    """
+    Extracts primary guardian name, phone number, and linked User model for a given Student.
+    """
+    if not student:
+        return ("Guardian", None, None)
+
+    guardian_name = getattr(student, 'guardian_name', None)
+    guardian_phone = getattr(student, 'guardian_phone', None)
+    guardian_user = None
+
+    if hasattr(student, 'guardian_detail') and student.guardian_detail:
+        guardian_phone = student.guardian_detail.primary_guardian_phone or guardian_phone
+        guardian_name = student.guardian_detail.primary_guardian_name or guardian_name
+
+    if hasattr(student, 'guardians') and student.guardians.exists():
+        g_profile = student.guardians.first()
+        if g_profile and g_profile.user:
+            guardian_user = g_profile.user
+            guardian_phone = guardian_phone or g_profile.user.phone_number
+            guardian_name = guardian_name or g_profile.name_en or g_profile.user.get_full_name()
+
+    return (guardian_name or "Guardian", guardian_phone, guardian_user)
+
+
+def notify_student_attendance(student, status_val, date_val, time_val=None):
+    """
+    Dispatches automated attendance alert to guardian on absence or late arrival.
+    """
+    try:
+        if not student:
+            return
+
+        institution = getattr(student, 'institution', None)
+        if not institution:
+            return
+
+        status_str = str(status_val).upper()
+        if status_str not in ['ABSENT', 'LATE']:
+            return
+
+        event_type = "STUDENT_ABSENT" if status_str == "ABSENT" else "STUDENT_LATE"
+        guardian_name, guardian_phone, guardian_user = get_student_guardian_info(student)
+
+        student_name = getattr(student, 'name_en', None) or getattr(student, 'name_bn', None) or getattr(student, 'name', 'Student')
+        class_obj = getattr(student, 'student_class', None)
+        class_name = class_obj.name if class_obj else 'General'
+
+        context = {
+            "student_name": student_name,
+            "roll_number": str(getattr(student, 'roll_number', '') or '--'),
+            "class_name": class_name,
+            "guardian_name": guardian_name,
+            "date": str(date_val),
+            "time": str(time_val or timezone.now().strftime("%I:%M %p")),
+            "institution_name": getattr(institution, 'name', 'SPR Note'),
+            "action_url": f"/attendance/students?student_id={student.id}&date={date_val}",
+        }
+
+        dispatch_notification(
+            institution=institution,
+            event_type=event_type,
+            recipient_user=guardian_user,
+            recipient_identifier=guardian_phone,
+            dynamic_context=context,
+            notification_type="WARNING" if event_type == "STUDENT_ABSENT" else "INFO",
+            action_url=context["action_url"]
+        )
+    except Exception as e:
+        logger.error(f"Error in notify_student_attendance: {str(e)}")
+
+
+def notify_new_admission(student):
+    """
+    Dispatches admission confirmation voucher notification.
+    """
+    try:
+        if not student:
+            return
+
+        institution = getattr(student, 'institution', None)
+        if not institution:
+            return
+
+        guardian_name, guardian_phone, guardian_user = get_student_guardian_info(student)
+        student_name = getattr(student, 'name_en', None) or getattr(student, 'name_bn', None) or getattr(student, 'name', 'Student')
+        class_obj = getattr(student, 'student_class', None)
+        class_name = class_obj.name if class_obj else 'General'
+
+        context = {
+            "student_name": student_name,
+            "student_id": getattr(student, 'uniq_id', '') or str(student.id),
+            "roll_number": str(getattr(student, 'roll_number', '') or '--'),
+            "class_name": class_name,
+            "guardian_name": guardian_name,
+            "date": timezone.now().strftime("%Y-%m-%d"),
+            "institution_name": getattr(institution, 'name', 'SPR Note'),
+        }
+
+        dispatch_notification(
+            institution=institution,
+            event_type="NEW_ADMISSION",
+            recipient_user=guardian_user,
+            recipient_identifier=guardian_phone,
+            dynamic_context=context,
+            notification_type="SUCCESS",
+            action_url=f"/students?id={student.id}"
+        )
+    except Exception as e:
+        logger.error(f"Error in notify_new_admission: {str(e)}")
+
+
+def notify_staff_leave_action(leave_request, action_status):
+    """
+    Dispatches staff leave decision notice to the applied staff member.
+    """
+    try:
+        if not leave_request or not leave_request.staff:
+            return
+
+        staff = leave_request.staff
+        institution = getattr(staff, 'institution', None)
+        if not institution:
+            return
+
+        staff_user = getattr(staff, 'user', None)
+        staff_phone = staff_user.phone_number if staff_user else None
+        staff_name = (
+            getattr(staff, 'name_en', None) or
+            getattr(staff, 'name_bn', None) or
+            (staff_user.get_full_name() if staff_user else 'Staff Member')
+        )
+        leave_type_display = leave_request.get_leave_type_display() if hasattr(leave_request, 'get_leave_type_display') else str(leave_request.leave_type)
+
+        context = {
+            "staff_name": staff_name,
+            "leave_type": leave_type_display,
+            "start_date": str(leave_request.start_date),
+            "end_date": str(leave_request.end_date),
+            "leave_status": str(action_status).upper(),
+            "institution_name": getattr(institution, 'name', 'SPR Note'),
+            "action_url": "/staff/leaves",
+        }
+
+        dispatch_notification(
+            institution=institution,
+            event_type="STAFF_LEAVE_ACTION",
+            recipient_user=staff_user,
+            recipient_identifier=staff_phone,
+            dynamic_context=context,
+            notification_type="SUCCESS" if str(action_status).upper() == 'APPROVED' else "WARNING",
+            action_url=context["action_url"]
+        )
+    except Exception as e:
+        logger.error(f"Error in notify_staff_leave_action: {str(e)}")
+
+
 def notify_report_saved(report, action="CREATED"):
     """
     Triggered when a StudentDailyReport is created or updated.
@@ -644,13 +1043,7 @@ def notify_report_saved(report, action="CREATED"):
         if not institution:
             return
 
-        guardian_user = None
-        guardian_phone = None
-        if student:
-            primary_guardian = student.guardians.first()
-            if primary_guardian:
-                guardian_user = primary_guardian.user
-                guardian_phone = primary_guardian.user.phone_number if primary_guardian.user else None
+        guardian_name, guardian_phone, guardian_user = get_student_guardian_info(student)
 
         score_val = getattr(report, 'score', None)
         context = {
@@ -658,6 +1051,8 @@ def notify_report_saved(report, action="CREATED"):
             "date": str(report.date),
             "status": str(report.status),
             "score": str(score_val if score_val is not None else '--'),
+            "institution_name": getattr(institution, 'name', 'SPR Note'),
+            "guardian_name": guardian_name,
             "action_url": f"/student-reports?student_id={student.id if student else ''}",
         }
 
