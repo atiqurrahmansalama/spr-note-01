@@ -214,6 +214,16 @@ export default function App() {
                 <Route path="/examinations/marksheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
                 <Route path="/examinations/mark-sheet" element={<ExaminationsHubView defaultTab="TABULATION" />} />
                 <Route path="/examinations/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
+                <Route path="/examinations/hall-logistics" element={<ExaminationsHubView defaultTab="HALL_LOGISTICS" />} />
+                <Route path="/examinations/admit-cards" element={<ExaminationsHubView defaultTab="ADMIT_CARDS" />} />
+                <Route path="/examinations/seat-plan" element={<ExaminationsHubView defaultTab="SEAT_PLAN" />} />
+                <Route path="/examinations/desk-slips" element={<ExaminationsHubView defaultTab="SEAT_PLAN" />} />
+                <Route path="/examinations/hall-attendance" element={<ExaminationsHubView defaultTab="ATTENDANCE_SHEETS" />} />
+                <Route path="/examinations/attendance-sheets" element={<ExaminationsHubView defaultTab="ATTENDANCE_SHEETS" />} />
+                <Route path="/admit-cards" element={<ExaminationsHubView defaultTab="ADMIT_CARDS" />} />
+                <Route path="/seat-plan" element={<ExaminationsHubView defaultTab="SEAT_PLAN" />} />
+                <Route path="/desk-slips" element={<ExaminationsHubView defaultTab="SEAT_PLAN" />} />
+                <Route path="/hall-attendance" element={<ExaminationsHubView defaultTab="ATTENDANCE_SHEETS" />} />
                 <Route path="/examinations/grading-rules" element={<Navigate to="/admin-tools?section=grading-policies" replace />} />
                 <Route path="/exams" element={<ExaminationsHubView defaultTab="SCHEDULES" />} />
                 <Route path="/routine-matrix" element={<ExaminationsHubView defaultTab="SUBJECT_MATRIX" />} />

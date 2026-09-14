@@ -5,6 +5,7 @@ export { default as PrintCanvasViewer } from './PrintCanvasViewer';
 export { default as PrintConfigSidebar } from './PrintConfigSidebar';
 export { default as PrintExportMenu } from './PrintExportMenu';
 export * from './printExportUtils';
+export * from './vectorDocxCompiler';
 export { default as usePrintStudio } from './usePrintStudio';
 export { usePrintStudio as useUniversalPrint } from './usePrintStudio';
 export { default as PrintItemSelector } from './PrintItemSelector';

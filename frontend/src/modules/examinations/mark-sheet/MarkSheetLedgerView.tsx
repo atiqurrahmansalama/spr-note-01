@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import TabSwitcher from '@/components/ui/TabSwitcher';
-import CustomButton from '@/components/ui/CustomButton';
-import MarkEntryFilterBar from '../mark-entry/components/MarkEntryFilterBar';
+import MarkSheetFilterBar from './MarkSheetFilterBar';
+import MarkEntryDeskView from './mark-entry/MarkEntryDeskView';
 import TabulationLedgerTab from './tabulation-ledger/TabulationLedgerTab';
-import MarkSheetHeader from './tabulation-ledger/MarkSheetHeader';
+import MarkSheetHeader from './MarkSheetHeader';
 import MarkSheetPrint from './tabulation-ledger/MarkSheetPrint';
 import StudentMarkSheetView from './student-marksheet/StudentMarkSheetView';
 import StudentMarkSheetPrint from './student-marksheet/StudentMarkSheetPrint';
@@ -13,14 +13,15 @@ import {
   AcademicCapIcon,
   PrinterIcon,
   DocumentIcon,
+  EditIcon,
 } from '@/components/ui/Icons';
 import useExamData from '../hooks/useExamData';
 import useTabulationData from '../hooks/useTabulationData';
 import { MarkSheetLedgerViewProps, OptionItem } from './types';
 
 /**
- * MarkSheetLedgerView (Master Mark Sheet Hub)
- * Master router and unified console for Tabulation Ledger and Transcript Studio.
+ * MarkSheetLedgerView (Master Mark Sheet & Tabulation Hub)
+ * Master router and unified console for Mark Entry Desk, Tabulation Ledger and Transcript Studio.
  */
 export default function MarkSheetLedgerView({
   initialExamId = null,
@@ -47,19 +48,47 @@ export default function MarkSheetLedgerView({
   }, []);
 
   const urlExamId = urlParams.get('examId') || urlParams.get('exam');
+  const urlSubjectId = urlParams.get('subjectId') || urlParams.get('subject');
   const urlDepartmentId = urlParams.get('departmentId') || urlParams.get('dept');
   const urlClassId = urlParams.get('classId') || urlParams.get('class');
   const urlSectionId = urlParams.get('sectionId') || urlParams.get('section');
   const urlStudentId = urlParams.get('studentId') || urlParams.get('student');
   const urlPrint = urlParams.get('print');
 
-  const resolveActiveSubTab = (): 'ledger' | 'transcripts' => {
-    if (defaultSubTab === 'transcripts') return 'transcripts';
-    const tabParam = urlParams.get('tab');
+  const resolveActiveSubTab = (): 'entry' | 'ledger' | 'transcripts' => {
+    // 1. URL searchParams `tab` has highest priority
+    const tabParam = urlParams.get('tab')?.toLowerCase();
+    if (tabParam === 'entry' || tabParam === 'mark-entry' || tabParam === 'mark_entry') {
+      return 'entry';
+    }
     if (tabParam === 'transcripts' || tabParam === 'transcript' || tabParam === 'studio') {
       return 'transcripts';
     }
-    return 'ledger';
+    if (tabParam === 'ledger' || tabParam === 'tabulation' || tabParam === 'marksheet' || tabParam === 'mark-sheet') {
+      return 'ledger';
+    }
+
+    // 2. Specific pathname checks
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path.includes('mark-entry') || path.includes('mark_entry')) return 'entry';
+      if (path.includes('transcripts') || path.includes('transcript')) return 'transcripts';
+      if (
+        path.includes('tabulation') ||
+        path.includes('marksheet') ||
+        path.includes('mark-sheet') ||
+        path.includes('tabulation-sheet')
+      ) {
+        return 'ledger';
+      }
+    }
+
+    // 3. Fallback to defaultSubTab prop
+    if (defaultSubTab === 'entry' || (defaultSubTab as any) === 'MARK_ENTRY') return 'entry';
+    if (defaultSubTab === 'transcripts' || (defaultSubTab as any) === 'STUDENT_MARKSHEET') return 'transcripts';
+    if (defaultSubTab === 'ledger' || (defaultSubTab as any) === 'TABULATION' || (defaultSubTab as any) === 'MARKSHEET') return 'ledger';
+
+    return 'entry';
   };
 
   const [selectedExamId, setSelectedExamId] = useState<string>(
@@ -70,10 +99,56 @@ export default function MarkSheetLedgerView({
     urlClassId || (classOptions[0]?.value ? String(classOptions[0].value) : '')
   );
   const [selectedSectionId, setSelectedSectionId] = useState<string>(urlSectionId || 'ALL');
-  const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'transcripts'>(resolveActiveSubTab);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(urlSubjectId || '');
+  const [activeSubTab, setActiveSubTab] = useState<'entry' | 'ledger' | 'transcripts'>(resolveActiveSubTab);
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     initialStudentId ? String(initialStudentId) : urlStudentId || ''
   );
+
+  const handleTabChange = (tabId: 'entry' | 'ledger' | 'transcripts') => {
+    setActiveSubTab(tabId);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (tabId === 'entry') {
+        url.searchParams.set('tab', 'entry');
+        if (url.pathname.includes('/examinations/')) {
+          url.pathname = '/examinations/mark-entry';
+        }
+      } else if (tabId === 'transcripts') {
+        url.searchParams.set('tab', 'transcripts');
+        if (url.pathname.includes('/examinations/')) {
+          url.pathname = '/examinations/transcripts';
+        }
+      } else {
+        url.searchParams.delete('tab');
+        if (url.pathname.includes('/examinations/')) {
+          url.pathname = '/examinations/marksheet';
+        }
+      }
+      window.history.replaceState(null, '', url.toString());
+    }
+  };
+
+  // Sync external defaultSubTab prop changes
+  useEffect(() => {
+    if (defaultSubTab) {
+      if (defaultSubTab === 'entry' || (defaultSubTab as any) === 'MARK_ENTRY') {
+        setActiveSubTab('entry');
+      } else if (defaultSubTab === 'transcripts' || (defaultSubTab as any) === 'STUDENT_MARKSHEET') {
+        setActiveSubTab('transcripts');
+      } else if (defaultSubTab === 'ledger' || (defaultSubTab as any) === 'TABULATION' || (defaultSubTab as any) === 'MARKSHEET') {
+        setActiveSubTab('ledger');
+      }
+    }
+  }, [defaultSubTab]);
+  const [deskActions, setDeskActions] = useState<{
+    exportCsv?: () => void;
+    openCsvImport?: () => void;
+    openPrint?: (mode?: 'single' | 'bulk') => void;
+    openSupervisorUnlock?: () => void;
+    isLocked?: boolean;
+  }>({});
+
   const [isPrintStudioOpen, setIsPrintStudioOpen] = useState<boolean>(
     urlPrint === 'mark_sheet' ||
       urlPrint === 'marksheet' ||
@@ -164,6 +239,7 @@ export default function MarkSheetLedgerView({
 
     const handlePopState = () => {
       const currentUrl = new URL(window.location.href);
+      const path = currentUrl.pathname.toLowerCase();
       const printParam = currentUrl.searchParams.get('print');
       setIsPrintStudioOpen(
         printParam === 'mark_sheet' ||
@@ -178,7 +254,20 @@ export default function MarkSheetLedgerView({
       );
 
       const tabParam = currentUrl.searchParams.get('tab');
-      if (tabParam === 'transcripts' || tabParam === 'transcript') {
+      if (
+        path.includes('mark-entry') ||
+        path.includes('mark_entry') ||
+        tabParam === 'entry' ||
+        tabParam === 'mark-entry' ||
+        tabParam === 'mark_entry'
+      ) {
+        setActiveSubTab('entry');
+      } else if (
+        path.includes('transcripts') ||
+        path.includes('transcript') ||
+        tabParam === 'transcripts' ||
+        tabParam === 'transcript'
+      ) {
         setActiveSubTab('transcripts');
       } else {
         setActiveSubTab('ledger');
@@ -193,8 +282,14 @@ export default function MarkSheetLedgerView({
       const secParam = currentUrl.searchParams.get('sectionId') || currentUrl.searchParams.get('section');
       if (secParam) setSelectedSectionId(secParam);
 
+      const subParam = currentUrl.searchParams.get('subjectId') || currentUrl.searchParams.get('subject');
+      if (subParam) setSelectedSubjectId(subParam);
+
       const deptParam = currentUrl.searchParams.get('departmentId') || currentUrl.searchParams.get('dept');
       if (deptParam) setFilterDepartmentId(deptParam);
+
+      const stParam = currentUrl.searchParams.get('studentId') || currentUrl.searchParams.get('student');
+      if (stParam) setSelectedStudentId(stParam);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -207,8 +302,14 @@ export default function MarkSheetLedgerView({
     const url = new URL(window.location.href);
     let changed = false;
 
+    // 1. Tab Sync
     if (activeSubTab) {
-      if (activeSubTab === 'transcripts') {
+      if (activeSubTab === 'entry') {
+        if (url.searchParams.get('tab') !== 'entry') {
+          url.searchParams.set('tab', 'entry');
+          changed = true;
+        }
+      } else if (activeSubTab === 'transcripts') {
         if (url.searchParams.get('tab') !== 'transcripts') {
           url.searchParams.set('tab', 'transcripts');
           changed = true;
@@ -219,12 +320,18 @@ export default function MarkSheetLedgerView({
       }
     }
 
+    // 2. Exam Sync
     if (selectedExamId) {
       if (url.searchParams.get('examId') !== selectedExamId) {
         url.searchParams.set('examId', selectedExamId);
         changed = true;
       }
+    } else if (url.searchParams.has('examId')) {
+      url.searchParams.delete('examId');
+      changed = true;
     }
+
+    // 3. Class Sync
     if (selectedClassId) {
       if (url.searchParams.get('classId') !== selectedClassId) {
         url.searchParams.set('classId', selectedClassId);
@@ -235,6 +342,7 @@ export default function MarkSheetLedgerView({
       changed = true;
     }
 
+    // 4. Section Sync
     if (selectedSectionId && selectedSectionId !== 'ALL') {
       if (url.searchParams.get('sectionId') !== selectedSectionId) {
         url.searchParams.set('sectionId', selectedSectionId);
@@ -245,6 +353,7 @@ export default function MarkSheetLedgerView({
       changed = true;
     }
 
+    // 5. Department Sync
     if (filterDepartmentId && filterDepartmentId !== 'ALL') {
       if (url.searchParams.get('departmentId') !== filterDepartmentId) {
         url.searchParams.set('departmentId', filterDepartmentId);
@@ -255,10 +364,41 @@ export default function MarkSheetLedgerView({
       changed = true;
     }
 
+    // 6. Subject Sync (specifically for Mark Entry Desk)
+    if (activeSubTab === 'entry' && selectedSubjectId) {
+      if (url.searchParams.get('subjectId') !== selectedSubjectId) {
+        url.searchParams.set('subjectId', selectedSubjectId);
+        changed = true;
+      }
+    } else if (activeSubTab !== 'entry' && url.searchParams.has('subjectId')) {
+      url.searchParams.delete('subjectId');
+      changed = true;
+    }
+
+    // 7. Student Sync (specifically for Student Transcripts)
+    if (activeSubTab === 'transcripts' && selectedStudentId) {
+      if (url.searchParams.get('studentId') !== selectedStudentId) {
+        url.searchParams.set('studentId', selectedStudentId);
+        changed = true;
+      }
+    } else if (activeSubTab !== 'transcripts' && url.searchParams.has('studentId')) {
+      url.searchParams.delete('studentId');
+      changed = true;
+    }
+
     if (changed) {
       window.history.replaceState(null, '', url.toString());
     }
-  }, [activeSubTab, selectedExamId, selectedClassId, selectedSectionId, filterDepartmentId, isEmbedded]);
+  }, [
+    activeSubTab,
+    selectedExamId,
+    selectedClassId,
+    selectedSectionId,
+    filterDepartmentId,
+    selectedSubjectId,
+    selectedStudentId,
+    isEmbedded,
+  ]);
 
   // Exam Options
   const examOptions = useMemo(() => {
@@ -351,7 +491,80 @@ export default function MarkSheetLedgerView({
         setSelectedSectionId('ALL');
       }
     }
-  }, [selectedClassId, filteredSectionOptions, selectedSectionId]);
+  }, [selectedClassId, filteredSectionOptions]);
+
+  // Filtered Subject Routines for selected Exam & Scope
+  const availableSubjects = useMemo(() => {
+    if (!selectedExamId) return [];
+    let list = (examSubjects || []).filter((s: any) => String(s.examId) === String(selectedExamId));
+
+    if (filterDepartmentId && filterDepartmentId !== 'ALL') {
+      list = list.filter(
+        (s: any) => s.departmentId === 'ALL' || String(s.departmentId) === String(filterDepartmentId)
+      );
+    }
+
+    if (selectedClassId) {
+      list = list.filter((s: any) => String(s.classId) === String(selectedClassId));
+    }
+
+    if (selectedSectionId && selectedSectionId !== 'ALL') {
+      list = list.filter(
+        (s: any) => s.sectionId === 'ALL' || String(s.sectionId) === String(selectedSectionId)
+      );
+    }
+
+    return list;
+  }, [examSubjects, selectedExamId, filterDepartmentId, selectedClassId, selectedSectionId]);
+
+  // Subject Dropdown Options
+  const subjectOptions = useMemo(() => {
+    return availableSubjects.map((s: any) => {
+      const book = (s.curriculumBookName || '').trim();
+      const subject = (s.subjectName || 'Subject').trim();
+      const code = (s.subjectCode || '').trim();
+
+      let label = subject;
+      if (book && book.toLowerCase() !== subject.toLowerCase()) {
+        label = `${book} — ${subject}`;
+      }
+      if (code && !label.includes(code)) {
+        label = `${label} (${code})`;
+      }
+
+      return {
+        value: String(s.id),
+        label,
+        subject: s,
+      };
+    });
+  }, [availableSubjects]);
+
+  // Selected Subject Routine
+  const selectedSubject = useMemo(() => {
+    if (!selectedSubjectId) {
+      return availableSubjects[0] || null;
+    }
+    return (
+      availableSubjects.find((s: any) => String(s.id) === String(selectedSubjectId)) ||
+      availableSubjects[0] ||
+      null
+    );
+  }, [availableSubjects, selectedSubjectId]);
+
+  // Auto-sync first subject when availableSubjects change
+  useEffect(() => {
+    if (availableSubjects.length > 0) {
+      const isCurrentValid = availableSubjects.some(
+        (s: any) => String(s.id) === String(selectedSubjectId)
+      );
+      if (!isCurrentValid) {
+        setSelectedSubjectId(String(availableSubjects[0].id));
+      }
+    } else {
+      setSelectedSubjectId('');
+    }
+  }, [availableSubjects, selectedSubjectId]);
 
   const {
     exam,
@@ -397,6 +610,11 @@ export default function MarkSheetLedgerView({
   const subTabs = useMemo(
     () => [
       {
+        id: 'entry' as const,
+        label: 'Mark Entry Desk',
+        icon: EditIcon,
+      },
+      {
         id: 'ledger' as const,
         label: 'Academic MarkSheet',
         icon: AcademicCapIcon,
@@ -410,123 +628,79 @@ export default function MarkSheetLedgerView({
     []
   );
 
-  const currentSelectedStudentResult = useMemo(() => {
-    if (selectedStudentId) {
-      const found = studentsData.find((s) => String(s.studentId) === String(selectedStudentId));
-      if (found) return found;
-    }
-    return studentsData[0] || null;
-  }, [studentsData, selectedStudentId]);
-
-  const renderTabAction = () => {
-    if (activeSubTab === 'ledger' && selectedExamId) {
-      return (
-        <div className="flex items-center gap-2">
-          <CustomButton
-            type="button"
-            variant="sub"
-            size="sm"
-            icon={PrinterIcon}
-            onClick={() => handleOpenAcademicPrint('single')}
-            className="w-full sm:w-auto"
-          >
-            Print Academic MarkSheet
-          </CustomButton>
-          <CustomButton
-            type="button"
-            variant="accent"
-            size="sm"
-            icon={PrinterIcon}
-            onClick={() => handleOpenAcademicPrint('bulk')}
-            className="w-full sm:w-auto"
-          >
-            Bulk Print
-          </CustomButton>
-        </div>
-      );
-    }
-    if (activeSubTab === 'transcripts' && selectedExamId) {
-      return (
-        <div className="flex items-center gap-2">
-          <CustomButton
-            type="button"
-            variant="sub"
-            size="sm"
-            icon={PrinterIcon}
-            onClick={() => handleOpenStudentPrint(selectedStudentId, 'single')}
-            className="w-full sm:w-auto"
-          >
-            Print Student MarkSheet
-          </CustomButton>
-          <CustomButton
-            type="button"
-            variant="accent"
-            size="sm"
-            icon={PrinterIcon}
-            onClick={() => handleOpenStudentPrint(null, 'bulk')}
-            className="w-full sm:w-auto"
-          >
-            Bulk Print
-          </CustomButton>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <PageContainer maxWidth="7xl" isEmbedded={isEmbedded}>
-      {/* 1. Top Header */}
+      {/* 1. Top Master Page Header with 3-Dot Action Menu for each Tab */}
       <MarkSheetHeader
         exam={exam}
         activeSubTab={activeSubTab}
-        onExportCsv={exportToCsv}
+        onExportCsv={activeSubTab === 'entry' ? deskActions.exportCsv : exportToCsv}
+        onOpenCsvImport={deskActions.openCsvImport}
+        onPrintAwardList={() => deskActions.openPrint?.('single')}
+        onBulkPrintSubjectMarkSheet={() => deskActions.openPrint?.('bulk')}
+        onOpenSupervisorUnlock={deskActions.openSupervisorUnlock}
+        isLocked={deskActions.isLocked}
         onOpenPrintStudio={() => handleOpenAcademicPrint('single')}
         onBulkPrintAcademicMarkSheet={() => handleOpenAcademicPrint('bulk')}
-        onOpenTranscripts={() => setActiveSubTab('transcripts')}
-        onSwitchToLedger={() => setActiveSubTab('ledger')}
+        onOpenTranscripts={() => handleTabChange('transcripts')}
+        onSwitchToLedger={() => handleTabChange('ledger')}
+        onSwitchToEntry={() => handleTabChange('entry')}
         onPrintCurrentMarkSheet={() => handleOpenStudentPrint(selectedStudentId, 'single')}
         onBulkPrintStudentMarkSheet={() => handleOpenStudentPrint(null, 'bulk')}
       />
 
-      {/* 2. Unified Project-Standard TabSwitcher with Dynamic Action Button */}
+      {/* 2. Unified Project-Standard TabSwitcher */}
       <TabSwitcher
         tabs={subTabs}
         activeTab={activeSubTab}
-        onChange={(tabId: any) => setActiveSubTab(tabId)}
-        rightContent={renderTabAction()}
+        onChange={(tabId: any) => handleTabChange(tabId)}
         className="print:hidden"
       />
 
-      {/* 3. Target Academic Filter Console */}
-      <MarkEntryFilterBar
+      {/* 3. Universal Shared Academic Filter Console (For All 3 Tabs) */}
+      <MarkSheetFilterBar
         examOptions={examOptions}
         selectedExamId={selectedExamId}
-        setSelectedExamId={setSelectedExamId}
-        onExamChange={(eId: string) => setSelectedExamId(eId)}
+        onExamChange={setSelectedExamId}
         departmentOptions={departmentOptions}
-        filterDepartmentId={filterDepartmentId}
-        setFilterDepartmentId={setFilterDepartmentId}
-        onDepartmentChange={(deptId: string) => setFilterDepartmentId(deptId)}
+        selectedDepartmentId={filterDepartmentId}
+        onDepartmentChange={setFilterDepartmentId}
         classOptions={filteredClassOptions}
-        filterClassId={selectedClassId}
         selectedClassId={selectedClassId}
-        setFilterClassId={setSelectedClassId}
-        onClassChange={(cId: string) => setSelectedClassId(cId)}
+        onClassChange={setSelectedClassId}
         sectionOptions={filteredSectionOptions}
-        filterSectionId={selectedSectionId}
         selectedSectionId={selectedSectionId}
-        setFilterSectionId={setSelectedSectionId}
-        onSectionChange={(sId: string) => setSelectedSectionId(sId)}
-        showSubject={false}
+        onSectionChange={setSelectedSectionId}
+        subjectOptions={subjectOptions}
+        selectedSubjectId={selectedSubjectId}
+        onSubjectChange={setSelectedSubjectId}
+        selectedSubject={selectedSubject}
+        availableSubjects={availableSubjects}
+        showSubject={activeSubTab === 'entry'}
         selectedClassName={selectedClassName}
         selectedSectionName={selectedSectionName}
-        activeGradingSystem={gradingSystem}
         gradingSystem={gradingSystem}
       />
 
-      {/* Main View Content */}
-      {!selectedExamId ? (
+      {/* 4. Main View Content */}
+      {activeSubTab === 'entry' ? (
+        <MarkEntryDeskView
+          selectedExamId={selectedExamId}
+          selectedSubjectId={selectedSubjectId}
+          selectedDepartmentId={filterDepartmentId}
+          selectedClassId={selectedClassId}
+          selectedSectionId={selectedSectionId}
+          selectedSubject={selectedSubject}
+          hideFilterBar={true}
+          isEmbedded={true}
+          onRegisterActions={setDeskActions}
+          onNavigateToTabulation={() => handleTabChange('ledger')}
+          onNavigateToTranscripts={(studentId: any) => {
+            if (studentId) setSelectedStudentId(String(studentId));
+            handleTabChange('transcripts');
+          }}
+        />
+      ) : !selectedExamId ? (
         <div className="p-12 text-center border theme-border rounded-2xl theme-bg-surface/50 shadow-xs">
           <ChartBarIcon className="w-12 h-12 mx-auto theme-accent opacity-60 mb-3" />
           <h3 className="text-base font-bold theme-text-primary">Select Examination</h3>
@@ -572,50 +746,50 @@ export default function MarkSheetLedgerView({
       )}
 
       {/* Master Mark Sheet (Tabulation Ledger) Print Studio */}
-      {isPrintStudioOpen && (
-        <MarkSheetPrint
-          isOpen={isPrintStudioOpen}
-          onClose={() => setIsPrintStudioOpen(false)}
-          exam={exam}
-          selectedClassId={selectedClassId}
-          selectedClassName={selectedClassName}
-          selectedSectionId={selectedSectionId}
-          selectedSectionName={selectedSectionName}
-          gradingSystem={gradingSystem}
-          subjects={subjects}
-          studentsData={studentsData}
-          totalStudents={totalStudents}
-          passedCount={passedCount}
-          failedCount={failedCount}
-          passPercentage={passPercentage}
-          stats={stats}
-          totalMaxMarks={totalMaxMarks}
-          initialMode={academicPrintMode}
-          classesList={filteredClassOptions.filter((c: OptionItem) => c.value && c.value !== '')}
-          students={students}
-          tenantId={tenantId}
-        />
-      )}
+      <MarkSheetPrint
+        isOpen={isPrintStudioOpen}
+        onClose={() => setIsPrintStudioOpen(false)}
+        exam={exam}
+        selectedClassId={selectedClassId}
+        selectedClassName={selectedClassName}
+        selectedSectionId={selectedSectionId}
+        selectedSectionName={selectedSectionName}
+        gradingSystem={gradingSystem}
+        subjects={subjects}
+        studentsData={studentsData}
+        totalStudents={totalStudents}
+        passedCount={passedCount}
+        failedCount={failedCount}
+        passPercentage={passPercentage}
+        stats={stats}
+        totalMaxMarks={totalMaxMarks}
+        initialMode={academicPrintMode}
+      />
 
-      {/* Dedicated Student Mark Sheet (Transcript) Print Studio */}
-      {isStudentPrintOpen && (
-        <StudentMarkSheetPrint
-          isOpen={isStudentPrintOpen}
-          onClose={() => setIsStudentPrintOpen(false)}
-          exam={exam}
-          studentResult={currentSelectedStudentResult}
-          studentsData={studentsData}
-          selectedStudentIds={selectedStudentIdsForPrint}
-          initialMode={studentPrintMode}
-          selectedClassId={selectedClassId}
-          selectedClassName={selectedClassName}
-          selectedSectionId={selectedSectionId}
-          selectedSectionName={selectedSectionName}
-          gradingSystem={gradingSystem}
-          subjects={subjects}
-          totalStudents={totalStudents}
-        />
-      )}
+      {/* Student Mark Sheet (Transcripts) Print Studio */}
+      <StudentMarkSheetPrint
+        isOpen={isStudentPrintOpen}
+        onClose={() => {
+          setIsStudentPrintOpen(false);
+          setSelectedStudentIdsForPrint([]);
+        }}
+        exam={exam}
+        studentResult={
+          selectedStudentId
+            ? studentsData.find((s) => String(s.studentId) === String(selectedStudentId)) || null
+            : null
+        }
+        studentsData={studentsData}
+        selectedStudentIds={selectedStudentIdsForPrint}
+        selectedClassId={selectedClassId}
+        selectedClassName={selectedClassName}
+        selectedSectionId={selectedSectionId}
+        selectedSectionName={selectedSectionName}
+        gradingSystem={gradingSystem}
+        subjects={subjects}
+        totalStudents={totalStudents}
+        initialMode={studentPrintMode}
+      />
     </PageContainer>
   );
 }

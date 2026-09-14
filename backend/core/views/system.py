@@ -875,6 +875,69 @@ class ControlPanelAuditLogView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Enterprise Immutable Audit Trail ViewSet.
+    Provides tenant-scoped, filterable audit history for compliance and accountability.
+    Strictly Read-Only (Disallows Direct Mutations to Preserve Audit Integrity).
+    """
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated, IsInstitutionAdmin]
+    pagination_class = PageNumberPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return AuditLog.objects.none()
+
+        qs = AuditLog.objects.select_related('institution', 'actor').all()
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id and str(tenant_id).upper() != 'ALL':
+            qs = qs.filter(institution_id=tenant_id)
+        elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            if user.institution_id:
+                qs = qs.filter(institution_id=user.institution_id)
+            else:
+                return AuditLog.objects.none()
+
+        # Query Filters
+        action_param = self.request.query_params.get('action')
+        if action_param and action_param.upper() != 'ALL':
+            qs = qs.filter(action=action_param.upper())
+
+        resource_type = self.request.query_params.get('resource_type')
+        if resource_type and resource_type.upper() != 'ALL':
+            qs = qs.filter(resource_type__iexact=resource_type)
+
+        resource_id = self.request.query_params.get('resource_id')
+        if resource_id:
+            qs = qs.filter(resource_id=str(resource_id))
+
+        actor_id = self.request.query_params.get('actor_id')
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+
+        start_date = self.request.query_params.get('start_date')
+        if start_date:
+            qs = qs.filter(created_at__date__gte=start_date)
+
+        end_date = self.request.query_params.get('end_date')
+        if end_date:
+            qs = qs.filter(created_at__date__lte=end_date)
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(changes_summary__icontains=search) |
+                Q(actor_name__icontains=search) |
+                Q(resource_name__icontains=search) |
+                Q(reason__icontains=search) |
+                Q(request_id__icontains=search)
+            )
+
+        return qs.order_by('-created_at')
+
+
 class SystemHealthDiagnosticsView(APIView):
     """
     Tier-1 Enterprise Observability & System APM Healthcheck Endpoint.

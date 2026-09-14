@@ -120,6 +120,21 @@ class StudentViewSet(viewsets.ModelViewSet):
                     Q(student_group__name__iexact=group_param)
                 )
 
+        # Search filter
+        search_query = self.request.query_params.get('search') or self.request.query_params.get('q')
+        if search_query:
+            sq = search_query.strip()
+            from django.db.models import Q
+            base_qs = base_qs.filter(
+                Q(name_en__icontains=sq) |
+                Q(name__icontains=sq) |
+                Q(bangla_name__icontains=sq) |
+                Q(uniq_id__icontains=sq) |
+                Q(student_id_card_number__icontains=sq) |
+                Q(nid_no__icontains=sq) |
+                Q(birth_certificate_no__icontains=sq)
+            )
+
         return base_qs.order_by('roll_number', 'name_en')
 
     def perform_create(self, serializer):

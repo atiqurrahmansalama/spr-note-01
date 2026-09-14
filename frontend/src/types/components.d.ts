@@ -279,6 +279,7 @@ declare module '@/components/print/UniversalPrintModal' {
     children?: React.ReactNode;
     customSheets?: boolean;
     templates?: any[];
+    placeholderKeys?: any[];
     activeTemplateId?: string | number | null;
     onTemplateChange?: (id: any) => void;
     showSectionsAndBars?: boolean;

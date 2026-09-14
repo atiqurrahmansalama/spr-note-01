@@ -632,6 +632,9 @@ class DailyLessonPlanSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'institution': {'required': False, 'allow_null': True},
+        }
 
 
 class HomeworkSubmissionSerializer(serializers.ModelSerializer):

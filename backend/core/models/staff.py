@@ -109,6 +109,10 @@ class StaffProfile(models.Model):
         ordering = ['rank_order', 'employee_id']
         verbose_name = "Staff Profile"
         verbose_name_plural = "Staff Profiles"
+        indexes = [
+            models.Index(fields=['institution', 'is_deleted', 'staff_type'], name='idx_stf_inst_del_type'),
+            models.Index(fields=['institution', 'is_active'], name='idx_stf_inst_active'),
+        ]
 
     def __str__(self):
         user_name = self.user.name if self.user and self.user.name else (self.user.phone_number if self.user else "Unlinked User")
@@ -280,6 +284,10 @@ class StaffAttendance(models.Model):
 
     class Meta:
         ordering = ['-date', 'staff__employee_id']
+        indexes = [
+            models.Index(fields=['staff', 'date'], name='idx_stf_att_dt'),
+            models.Index(fields=['date', 'status'], name='idx_stf_att_stat'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['staff', 'date'],
@@ -342,6 +350,12 @@ class StaffLeaveRequest(models.Model):
         ordering = ['-created_at']
         verbose_name = "Staff Leave Request"
         verbose_name_plural = "Staff Leave Requests"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(end_date__gte=models.F('start_date')),
+                name='check_staff_leave_end_gte_start'
+            )
+        ]
 
     def __str__(self):
         return f"{self.staff.employee_id} - {self.get_leave_type_display()} [{self.start_date} to {self.end_date}] ({self.get_status_display()})"

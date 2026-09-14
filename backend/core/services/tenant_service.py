@@ -36,6 +36,7 @@ def provision_new_institution(data: Dict[str, Any]) -> AcademicInstitution:
     return institution
 
 
+@transaction.atomic
 def update_tenant_taxonomy(institution_id: str, taxonomy_key: str, data: list) -> TenantTaxonomySetting:
     """Updates taxonomy display records for an institution."""
     setting, _ = TenantTaxonomySetting.objects.get_or_create(

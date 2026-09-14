@@ -102,6 +102,11 @@ class AttendanceSlotViewSet(viewsets.ModelViewSet):
 
         return base_qs.order_by('order_rank', 'start_time', 'name')
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsInstitutionAdmin()]
+        return [IsAuthenticated()]
+
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
         if not tenant_id:
@@ -119,6 +124,43 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = StudentAttendanceSerializer
     queryset = StudentAttendance.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        user = request.user
+        is_admin = (
+            user.is_superuser or 
+            getattr(user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN'] or 
+            user.is_staff
+        )
+        if not is_admin:
+            raise PermissionDenied("Deleting attendance records is restricted to Institution Administrators.")
+        
+        instance = self.get_object()
+        before_state = {
+            "id": str(instance.id),
+            "student_id": instance.student_id,
+            "student_name": instance.student.name_en or getattr(instance.student, 'name', 'Student') if instance.student else "Student",
+            "date": str(instance.date),
+            "status": instance.status,
+            "remarks": instance.remarks,
+        }
+        response = super().destroy(request, *args, **kwargs)
+        try:
+            from core.services.audit_service import record_audit_log
+            record_audit_log(
+                action="DELETE",
+                resource_type="StudentAttendance",
+                resource_id=before_state["id"],
+                resource_name=f"Attendance for {before_state['student_name']} on {before_state['date']}",
+                before_state=before_state,
+                after_state=None,
+                changes_summary=f"Deleted attendance record for student '{before_state['student_name']}' on {before_state['date']} (Status was {before_state['status']})",
+                request=request,
+                institution=instance.student.institution if instance.student else None
+            )
+        except Exception:
+            pass
+        return response
 
     def get_queryset(self):
         user = self.request.user
@@ -1492,65 +1534,71 @@ class BiometricGatewayViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='push')
     def device_push(self, request):
         serial = request.data.get('serial_number') or request.data.get('SN') or request.query_params.get('SN')
+        device_token = request.headers.get('X-Device-Token') or request.headers.get('X-API-Key') or request.data.get('device_token')
+
+        if not serial:
+            return Response({"error": "Device serial identifier is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        device = BiometricDevice.objects.filter(device_serial=serial, is_active=True).first()
+        if not device:
+            return Response({"error": "Unregistered or inactive biometric device."}, status=status.HTTP_403_FORBIDDEN)
+
         punches = request.data.get('punches', [])
         if not punches and 'user_pin' in request.data:
             punches = [request.data]
 
-        device = None
-        if serial:
-            device = BiometricDevice.objects.filter(device_serial=serial).first()
-            if device:
-                device.last_heartbeat = timezone.now()
-                device.save(update_fields=['last_heartbeat'])
+        device.last_heartbeat = timezone.now()
+        device.save(update_fields=['last_heartbeat'])
 
         processed_count = 0
-        for p in punches:
-            pin = str(p.get('user_pin') or p.get('PIN') or p.get('card_no', '')).strip()
-            punch_time_raw = p.get('timestamp') or p.get('time')
-            try:
-                punch_dt = datetime.fromisoformat(punch_time_raw) if punch_time_raw else timezone.now()
-            except Exception:
-                punch_dt = timezone.now()
+        with transaction.atomic():
+            for p in punches:
+                pin = str(p.get('user_pin') or p.get('PIN') or p.get('card_no', '')).strip()
+                punch_time_raw = p.get('timestamp') or p.get('time')
+                try:
+                    punch_dt = datetime.fromisoformat(punch_time_raw) if punch_time_raw else timezone.now()
+                except Exception:
+                    punch_dt = timezone.now()
 
-            p_type = p.get('punch_type', 'CHECK_IN')
-            raw_log = RawAttendancePunchLog.objects.create(
-                device=device,
-                user_pin_or_card=pin,
-                punch_timestamp=punch_dt,
-                punch_type=p_type,
-                raw_payload=p,
-                is_processed=False
-            )
+                p_type = p.get('punch_type', 'CHECK_IN')
+                raw_log = RawAttendancePunchLog.objects.create(
+                    device=device,
+                    user_pin_or_card=pin,
+                    punch_timestamp=punch_dt,
+                    punch_type=p_type,
+                    raw_payload=p,
+                    is_processed=False
+                )
 
-            # Auto-match with student or staff
-            student = Student.objects.filter(
-                Q(roll_number__iexact=pin) | Q(student_id_card_number__iexact=pin) | Q(uniq_id__iexact=pin)
-            ).first()
-            if student:
-                raw_log.matched_student = student
-                raw_log.is_processed = True
-                raw_log.processing_notes = f"Matched Student {student.name}"
-                raw_log.save()
-
-                if device and device.institution_id:
-                    GateEntryExitLog.objects.create(
-                        institution_id=device.institution_id,
-                        student=student,
-                        person_name=student.name,
-                        barcode_or_rfid=pin,
-                        punch_time=punch_dt,
-                        direction='ENTRY' if p_type in ['CHECK_IN', 'BREAK_IN'] else 'EXIT',
-                        device_name=device.device_name
-                    )
-                processed_count += 1
-            else:
-                teacher = TeacherProfile.objects.filter(Q(user__phone_number__iexact=pin) | Q(user__username__iexact=pin)).first()
-                if teacher:
-                    raw_log.matched_teacher = teacher
+                # Auto-match with student or staff
+                student = Student.objects.filter(
+                    Q(roll_number__iexact=pin) | Q(student_id_card_number__iexact=pin) | Q(uniq_id__iexact=pin)
+                ).first()
+                if student:
+                    raw_log.matched_student = student
                     raw_log.is_processed = True
-                    raw_log.processing_notes = f"Matched Teacher {teacher.name_en}"
+                    raw_log.processing_notes = f"Matched Student {student.name}"
                     raw_log.save()
+
+                    if device and device.institution_id:
+                        GateEntryExitLog.objects.create(
+                            institution_id=device.institution_id,
+                            student=student,
+                            person_name=student.name,
+                            barcode_or_rfid=pin,
+                            punch_time=punch_dt,
+                            direction='ENTRY' if p_type in ['CHECK_IN', 'BREAK_IN'] else 'EXIT',
+                            device_name=device.device_name
+                        )
                     processed_count += 1
+                else:
+                    teacher = TeacherProfile.objects.filter(Q(user__phone_number__iexact=pin) | Q(user__username__iexact=pin)).first()
+                    if teacher:
+                        raw_log.matched_teacher = teacher
+                        raw_log.is_processed = True
+                        raw_log.processing_notes = f"Matched Teacher {teacher.name_en}"
+                        raw_log.save()
+                        processed_count += 1
 
         return Response({
             "status": "success",
@@ -1561,6 +1609,11 @@ class BiometricGatewayViewSet(viewsets.ViewSet):
 
 class AttendancePolicyViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsInstitutionAdmin()]
+        return [IsAuthenticated()]
 
     def list(self, request):
         tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)

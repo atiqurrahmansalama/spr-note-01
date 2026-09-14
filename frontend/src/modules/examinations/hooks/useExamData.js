@@ -133,11 +133,15 @@ export default function useExamData() {
   const departmentOptions = useMemo(() => {
     const map = new Map();
     (departments || []).forEach((d) => {
-      const id = String(d.id);
+      const id = String(d.id !== undefined && d.id !== null ? d.id : d.value || '');
+      const name = d.name || d.department_name || d.label || 'Department';
+      const code = d.code || d.department_code || '';
       map.set(id, {
+        id,
+        name,
         value: id,
-        label: d.name || d.department_name || 'Department',
-        code: d.code || d.department_code || '',
+        label: name,
+        code,
         department: d,
       });
     });
@@ -147,9 +151,12 @@ export default function useExamData() {
       if (s.departmentId && s.departmentId !== 'ALL') {
         const id = String(s.departmentId);
         if (!map.has(id)) {
+          const name = s.departmentName || `Department ${s.departmentId}`;
           map.set(id, {
+            id,
+            name,
             value: id,
-            label: s.departmentName || s.departmentId,
+            label: name,
             code: '',
             department: { id: s.departmentId, name: s.departmentName },
           });
@@ -157,7 +164,7 @@ export default function useExamData() {
       }
     });
 
-    return [{ value: 'ALL', label: 'All Departments' }, ...Array.from(map.values())];
+    return Array.from(map.values());
   }, [departments, examSubjects]);
 
   // Options for Classes - 100% Dynamic from Academy + Exam Matrix with robust department link
@@ -177,13 +184,17 @@ export default function useExamData() {
         deptId = typeof c.dept === 'object' ? c.dept.id : c.dept;
       }
 
-      const id = String(c.id);
+      const id = String(c.id !== undefined && c.id !== null ? c.id : c.value || '');
+      const name = c.name || c.class_name || c.className || c.label || 'Class';
+      const code = c.code || c.class_code || '';
       map.set(id, {
+        id,
+        name,
         value: id,
-        label: c.name || c.class_name || 'Class',
+        label: name,
         departmentId: deptId !== null && deptId !== undefined ? String(deptId) : null,
         departmentName: c.department_name || (typeof c.department === 'object' ? c.department.name : '') || '',
-        code: c.code || '',
+        code,
         classObj: c,
       });
     });
@@ -194,9 +205,12 @@ export default function useExamData() {
         const id = String(s.classId);
         const existing = map.get(id);
         if (!existing) {
+          const name = s.className || `Class ${id}`;
           map.set(id, {
+            id,
+            name,
             value: id,
-            label: s.className || `Class ${id}`,
+            label: name,
             departmentId: s.departmentId && s.departmentId !== 'ALL' ? String(s.departmentId) : null,
             departmentName: s.departmentName || '',
             code: '',
@@ -218,13 +232,18 @@ export default function useExamData() {
   const sectionOptions = useMemo(() => {
     const map = new Map();
     (sections || []).forEach((s) => {
-      const rawClassId = s.class !== undefined ? (typeof s.class === 'object' ? s.class.id : s.class) : (s.class_id || s.student_class_id || s.student_class);
+      const rawClassId = s.class !== undefined ? (typeof s.class === 'object' ? s.class.id : s.class) : (s.class_id || s.student_class_id || s.student_class || s.classId);
       const classId = rawClassId ? String(typeof rawClassId === 'object' ? rawClassId.id : rawClassId) : null;
-      const id = String(s.id);
+      const id = String(s.id !== undefined && s.id !== null ? s.id : s.value || '');
+      const name = s.section_name || s.name || s.label || 'Section';
       map.set(id, {
+        id,
+        name,
+        section_name: name,
         value: id,
-        label: s.section_name || s.name || 'Section',
+        label: name,
         classId,
+        student_class_id: classId,
         sectionObj: s,
       });
     });
@@ -233,17 +252,22 @@ export default function useExamData() {
       if (s.sectionId && s.sectionId !== 'ALL') {
         const id = String(s.sectionId);
         if (!map.has(id)) {
+          const name = s.sectionName || `Section ${id}`;
           map.set(id, {
+            id,
+            name,
+            section_name: name,
             value: id,
-            label: s.sectionName || `Section ${id}`,
+            label: name,
             classId: s.classId ? String(s.classId) : null,
+            student_class_id: s.classId ? String(s.classId) : null,
             sectionObj: { id: s.sectionId, name: s.sectionName, class_id: s.classId },
           });
         }
       }
     });
 
-    return [{ value: 'ALL', label: 'All Sections (Class Wide)' }, ...Array.from(map.values())];
+    return Array.from(map.values());
   }, [sections, examSubjects]);
 
   // Curriculum Books - Direct resolution from active tenant store

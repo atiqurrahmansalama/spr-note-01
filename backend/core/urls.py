@@ -122,9 +122,11 @@ from .views import (
     NotificationDispatchLogViewSet,
     ManualBroadcastViewSet,
     VectorPDFExportAPIView,
+    AuditLogViewSet,
 )
 
 router = DefaultRouter()
+router.register(r'audit-logs', AuditLogViewSet, basename='audit-logs')
 router.register(r'institutions', InstitutionViewSet, basename='institution')
 router.register(r'institution-categories', InstitutionCategoryViewSet, basename='institution-category')
 router.register(r'academy-categories', InstitutionCategoryViewSet, basename='academy-category')

@@ -128,11 +128,22 @@ class StudentAttendance(models.Model):
 
     class Meta:
         ordering = ['-date', 'student__roll_number', 'student__name']
+        indexes = [
+            models.Index(fields=['student', 'date'], name='idx_att_stu_date'),
+            models.Index(fields=['student_class', 'date'], name='idx_att_cls_date'),
+            models.Index(fields=['date', 'status'], name='idx_att_dt_stat'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['student', 'period_slot', 'date'],
+                condition=models.Q(period_slot__isnull=False),
                 name='unique_student_period_date_attendance'
-            )
+            ),
+            models.UniqueConstraint(
+                fields=['student', 'session_slot', 'date'],
+                condition=models.Q(session_slot__isnull=False),
+                name='unique_student_session_date_attendance'
+            ),
         ]
         verbose_name = "Student Attendance"
         verbose_name_plural = "Student Attendance Records"
@@ -182,6 +193,9 @@ class GateEntryExitLog(models.Model):
 
     class Meta:
         ordering = ['-punch_time']
+        indexes = [
+            models.Index(fields=['institution', 'punch_time'], name='idx_gate_inst_time'),
+        ]
         verbose_name = "Gate Entry/Exit Log"
         verbose_name_plural = "Gate Entry/Exit Logs"
 

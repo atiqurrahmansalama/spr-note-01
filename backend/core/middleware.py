@@ -1,7 +1,9 @@
 import threading
+import uuid
 from django.utils import timezone
 from django.db import close_old_connections
 from core.authentication import FlexibleJWTAuthentication
+from core.logging_formatters import set_request_context, clear_request_context
 
 
 def get_client_ip(request):
@@ -202,3 +204,54 @@ class UserActivityMiddleware:
                 )
         except Exception:
             pass
+
+
+class RequestCorrelationMiddleware:
+    """
+    Enterprise Request Correlation & Observability Middleware.
+    Assigns or preserves unique correlation Request ID (UUID v4) for every HTTP request,
+    stores correlation telemetry in thread-local storage for structured logs,
+    and attaches X-Request-ID to all HTTP response headers.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 1. Extract or generate Correlation Request ID
+        request_id = (
+            request.headers.get('X-Request-ID')
+            or request.META.get('HTTP_X_REQUEST_ID')
+            or str(uuid.uuid4())
+        )
+        request.id = request_id
+
+        # 2. Extract tenant and user telemetry
+        tenant_id = request.headers.get('X-Tenant-ID') or request.META.get('HTTP_X_TENANT_ID')
+        if not tenant_id and getattr(request, 'user', None) and request.user.is_authenticated:
+            tenant_id = str(getattr(request.user, 'institution_id', '') or '')
+        
+        user_identifier = "Anonymous"
+        if getattr(request, 'user', None) and request.user.is_authenticated:
+            user_identifier = getattr(request.user, 'phone_number', None) or getattr(request.user, 'email', None) or str(request.user.id)
+
+        ip_address = get_client_ip(request)
+        set_request_context(
+            request_id=request_id,
+            tenant_id=str(tenant_id or "-"),
+            user_id=user_identifier,
+            endpoint=request.path,
+            method=request.method,
+            ip_address=ip_address
+        )
+
+        try:
+            response = self.get_response(request)
+        finally:
+            clear_request_context()
+
+        # 3. Attach X-Request-ID header to response
+        if response is not None:
+            response['X-Request-ID'] = request_id
+
+        return response
+

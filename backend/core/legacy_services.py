@@ -733,6 +733,13 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
     effective_date = transition_date or timezone.now().date()
     reason = transition_reason.strip() or "Academic Reassignment / Level Promotion"
 
+    before_state = {
+        "class_id": str(student.student_class_id) if student.student_class_id else None,
+        "class_name": student.student_class.name if student.student_class else None,
+        "group_id": student.student_group_id if student.student_group_id else None,
+        "group_name": student.group_name
+    }
+
     with transaction.atomic():
         # Close any current active academic history
         StudentAcademicHistory.objects.filter(student=student, is_current=True).update(
@@ -759,6 +766,32 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
             transition_reason=reason,
             transferred_by=performed_by
         )
+
+        after_state = {
+            "class_id": str(student.student_class_id) if student.student_class_id else None,
+            "class_name": student.student_class.name if student.student_class else None,
+            "group_id": student.student_group_id if student.student_group_id else None,
+            "group_name": student.group_name
+        }
+
+        try:
+            from core.services.audit_service import record_audit_log
+            from core.models import User
+            actor_user = performed_by if (performed_by and isinstance(performed_by, User)) else None
+            record_audit_log(
+                action="TRANSFER",
+                resource_type="Student",
+                resource_id=student.id,
+                resource_name=student.name_en or getattr(student, 'name', 'Student'),
+                before_state=before_state,
+                after_state=after_state,
+                changes_summary=f"Changed Student #{student.id} Class: {before_state.get('class_name')} -> {after_state.get('class_name')}",
+                reason=reason,
+                actor=actor_user,
+                institution=student.institution
+            )
+        except Exception:
+            pass
 
     return {
         "status": "success",

@@ -11,6 +11,7 @@ from core.models.institutions import AcademicInstitution, AcademicBranch, Academ
 from core.models.students import Student
 from core.models.staff import StaffProfile
 from core.models.academy import Session, StudentClass, ClassSection
+from core.models.attendance import StudentAttendance, AttendanceSessionSlot, AttendancePolicySetting
 from core.validators.tenant_validator import validate_tenant_match, TenantSecurityException
 from core.selectors.student_selectors import get_scoped_students
 from core.selectors.staff_selectors import get_scoped_teachers
@@ -265,3 +266,76 @@ class TenantIsolationTestCase(TestCase):
 
         # Invalidate Alpha cache
         invalidate_tenant_cache(str(self.inst_alpha.id))
+
+    def test_teacher_cannot_delete_attendance_returns_403(self):
+        """Teacher can view and create attendance, but DELETE /api/v1/attendance/students/{id}/ returns 403 Forbidden."""
+        att = StudentAttendance.objects.create(
+            student=self.student_alpha,
+            date="2026-09-14",
+            status="PRESENT",
+            student_class=self.class_alpha,
+            marked_by=self.user_alpha_teacher
+        )
+        # Teacher attempts DELETE -> 403 Forbidden
+        self.client.force_authenticate(user=self.user_alpha_teacher)
+        res = self.client.delete(f'/api/v1/attendance/students/{att.id}/')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Admin can delete attendance
+        self.client.force_authenticate(user=self.user_alpha_admin)
+        admin_res = self.client.delete(f'/api/v1/attendance/students/{att.id}/')
+        self.assertEqual(admin_res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_tenant_a_cannot_update_or_delete_tenant_b_data(self):
+        """Tenant Alpha user cannot modify or delete Tenant Beta entities."""
+        self.client.force_authenticate(user=self.user_alpha_admin)
+
+        # Attempt to update Beta Student
+        patch_res = self.client.patch(
+            f'/api/v1/students/{self.student_beta.id}/',
+            {'name_en': 'Hacked Name'},
+            format='json'
+        )
+        self.assertIn(patch_res.status_code, [status.HTTP_404_NOT_FOUND, status.HTTP_403_FORBIDDEN])
+        self.student_beta.refresh_from_db()
+        self.assertEqual(self.student_beta.name_en, "Beta Student One")
+
+        # Attempt to delete Beta Class
+        del_res = self.client.delete(f'/api/v1/classes/{self.class_beta.id}/')
+        self.assertIn(del_res.status_code, [status.HTTP_404_NOT_FOUND, status.HTTP_403_FORBIDDEN])
+
+    def test_tenant_a_cannot_search_or_leak_tenant_b_data(self):
+        """Tenant Alpha search queries never return Tenant Beta data."""
+        self.client.force_authenticate(user=self.user_alpha_admin)
+        res = self.client.get('/api/v1/students/?search=Beta')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        results = res.data.get('results', res.data) if isinstance(res.data, dict) else res.data
+        if isinstance(results, list):
+            self.assertEqual(len(results), 0)
+
+    def test_non_admin_cannot_mutate_attendance_policy_or_slots(self):
+        """Teacher cannot create, update, or delete attendance policy settings or slots."""
+        self.client.force_authenticate(user=self.user_alpha_teacher)
+
+        # Mutate policy
+        policy_res = self.client.post('/api/v1/attendance/policy/', {'weekend_days': ['SUNDAY']}, format='json')
+        self.assertEqual(policy_res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Mutate slot
+        slot_res = self.client.post('/api/v1/attendance/slots/', {'name': 'Unauthorized Slot'}, format='json')
+        self.assertEqual(slot_res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_biometric_gateway_unregistered_device_rejected(self):
+        """Biometric device push with missing or unregistered device serial returns 400/403."""
+        # Missing serial
+        res_missing = self.client.post('/api/v1/attendance/biometric/push/', {'punches': []}, format='json')
+        self.assertEqual(res_missing.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Unregistered serial
+        res_unregistered = self.client.post(
+            '/api/v1/attendance/biometric/push/',
+            {'serial_number': 'UNKNOWN_SN_99999', 'punches': []},
+            format='json'
+        )
+        self.assertEqual(res_unregistered.status_code, status.HTTP_403_FORBIDDEN)
+

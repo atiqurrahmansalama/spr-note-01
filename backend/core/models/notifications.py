@@ -172,6 +172,9 @@ class InAppNotification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at'], name='idx_notif_rec_read_crt'),
+        ]
         verbose_name = "In-App Notification"
         verbose_name_plural = "In-App Notifications"
 

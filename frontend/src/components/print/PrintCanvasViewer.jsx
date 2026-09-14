@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { CrosshairIcon, HandIcon, CursorPointerIcon } from '../ui/Icons';
+import { CrosshairIcon, HandIcon, CursorPointerIcon, UndoIcon, RedoIcon } from '../ui/Icons';
 
 /**
  * PrintCanvasViewer
@@ -22,8 +22,12 @@ export default function PrintCanvasViewer({
   colorMode = 'FULL_COLOR', // 'FULL_COLOR' | 'INK_SAVER' | 'MONOCHROME'
   zoomLevel = 1, // 0.3 to 2.5
   onZoomChange,
-  pointerMode = 'hand', // 'hand' (Movable / Pan) | 'select' (Select text)
+  pointerMode = 'select', // 'hand' (Movable / Pan) | 'select' (Select text & Live Edit)
   onPointerModeChange,
+  canUndo = false,
+  canRedo = false,
+  onUndo = null,
+  onRedo = null,
   children,
   className = '',
 }) {
@@ -332,9 +336,53 @@ export default function PrintCanvasViewer({
         </div>
       </div>
 
-      {/* Floating Canvas Tool Dock (Select Mode, Move Mode, and Recenter View) */}
+      {/* Floating Canvas Tool Dock (Select Mode, Move Mode, Undo/Redo, and Recenter View) */}
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 p-1 rounded-2xl theme-bg-elevated/95 theme-text-primary border theme-border shadow-xl backdrop-blur-md animate-fade-in print:hidden select-none">
-        {/* Pointer Mode: Select Text */}
+        {/* Undo Action */}
+        {onUndo && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUndo();
+            }}
+            disabled={!canUndo}
+            className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              canUndo
+                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub border border-transparent'
+                : 'theme-text-muted/30 opacity-30 cursor-not-allowed border border-transparent'
+            }`}
+            title="Undo last change (Ctrl + Z)"
+            aria-label="Undo"
+          >
+            <UndoIcon className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Redo Action */}
+        {onRedo && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRedo();
+            }}
+            disabled={!canRedo}
+            className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              canRedo
+                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub border border-transparent'
+                : 'theme-text-muted/30 opacity-30 cursor-not-allowed border border-transparent'
+            }`}
+            title="Redo change (Ctrl + Y / Ctrl + Shift + Z)"
+            aria-label="Redo"
+          >
+            <RedoIcon className="w-4 h-4" />
+          </button>
+        )}
+
+        {(onUndo || onRedo) && <div className="w-[1px] h-4 theme-border bg-current opacity-20 mx-0.5" />}
+
+        {/* Pointer Mode: Select Text & Edit */}
         <button
           type="button"
           onClick={(e) => {
@@ -346,7 +394,7 @@ export default function PrintCanvasViewer({
               ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
               : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
           }`}
-          title="Select Text Mode (V) — Highlight and copy text"
+          title="Select & Edit Mode (V) — Click anywhere on text to edit inline"
           aria-label="Select Text Mode"
         >
           <CursorPointerIcon className="w-4 h-4" />

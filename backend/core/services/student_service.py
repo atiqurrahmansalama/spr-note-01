@@ -36,6 +36,7 @@ def register_student(institution_id: str, data: Dict[str, Any]) -> Student:
     return student
 
 
+@transaction.atomic
 def promote_student_class(
     student_id: str,
     target_class_id: str,

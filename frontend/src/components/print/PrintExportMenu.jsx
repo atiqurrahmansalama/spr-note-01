@@ -205,16 +205,22 @@ export default function PrintExportMenu({
         id: 'word',
         label: 'Word Document',
         icon: FileTextIcon,
-        badge: '.doc',
+        badge: '.docx',
         onClick: () =>
           exportToWord({
             title,
-            orientation: options.orientation,
-            pageSize: options.pageSize,
+            subtitle,
+            metaItems,
+            columns,
+            visibleColumnKeys,
+            data,
+            extraBlankRows,
+            summaryMetrics,
+            options,
             showToast,
             onCustomExport: onExportWord,
           }),
-        title: 'Editable doc format',
+        title: 'Native Microsoft Word & Google Docs (.docx)',
       });
     }
 

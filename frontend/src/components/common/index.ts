@@ -18,4 +18,6 @@ export { default as ScheduleTimelineDrawer } from './ScheduleTimelineDrawer';
 export { default as SettingsSplitLayout } from './SettingsSplitLayout';
 export { default as SkeletonLoader } from './SkeletonLoader';
 export { default as UniversalManagementView } from './UniversalManagementView';
+export { default as QRCodeCardModal } from './QRCodeCardModal';
+export type { QRCodeCardModalProps } from './QRCodeCardModal';
 export * from './TimetableMatrixGrid';

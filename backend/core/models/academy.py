@@ -55,6 +55,15 @@ class StudentClass(models.Model):
         ordering = ['order_rank', 'name']
         verbose_name = "Student Class"
         verbose_name_plural = "Student Classes"
+        indexes = [
+            models.Index(fields=['institution', 'is_deleted'], name='idx_cls_inst_del'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['institution', 'name'],
+                name='unique_inst_class_name'
+            )
+        ]
 
     def save(self, *args, **kwargs):
         if self.department:
@@ -117,6 +126,15 @@ class ClassSection(models.Model):
         ordering = ['student_class', 'section_name']
         verbose_name = "Class Section"
         verbose_name_plural = "Class Sections"
+        indexes = [
+            models.Index(fields=['student_class', 'is_deleted'], name='idx_sec_cls_del'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student_class', 'section_name'],
+                name='unique_class_section_name'
+            )
+        ]
 
     def __str__(self):
         return f"{self.student_class.name} - Section {self.section_name}"
@@ -189,6 +207,12 @@ class ClassPeriodSlot(models.Model):
         ordering = ['period_order', 'start_time', 'period_name']
         verbose_name = "Class Period Slot"
         verbose_name_plural = "Class Period Slots"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(duration_minutes__gt=0),
+                name='check_period_duration_positive'
+            )
+        ]
 
     def save(self, *args, **kwargs):
         if self.start_time and self.end_time:
@@ -346,6 +370,15 @@ class AcademicCalendarEvent(models.Model):
         ordering = ['start_date', 'title']
         verbose_name = "Academic Calendar Event"
         verbose_name_plural = "Academic Calendar Events"
+        indexes = [
+            models.Index(fields=['institution', 'start_date', 'end_date'], name='idx_cal_inst_dates'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(end_date__gte=models.F('start_date')),
+                name='check_calendar_event_end_gte_start'
+            )
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.start_date} -> {self.end_date}) [{self.get_event_type_display()}]"
@@ -740,6 +773,12 @@ class BedAllocation(models.Model):
         ordering = ['room', 'bed_number']
         verbose_name = "Bed Allocation"
         verbose_name_plural = "Bed Allocations"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['room', 'bed_number'],
+                name='unique_dorm_room_bed_number'
+            )
+        ]
 
     def __str__(self):
         return f"{self.room.room_number} - {self.bed_number} [{self.status}]"

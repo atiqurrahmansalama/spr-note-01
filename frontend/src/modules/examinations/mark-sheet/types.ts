@@ -106,12 +106,18 @@ export interface OptionItem {
 
 export interface MarkSheetHeaderProps {
   exam: Exam | null;
-  activeSubTab?: 'ledger' | 'transcripts';
+  activeSubTab?: 'entry' | 'ledger' | 'transcripts';
   onExportCsv?: () => void;
+  onOpenCsvImport?: () => void;
+  onPrintAwardList?: () => void;
+  onBulkPrintSubjectMarkSheet?: () => void;
+  onOpenSupervisorUnlock?: () => void;
+  isLocked?: boolean;
   onOpenPrintStudio?: () => void;
   onBulkPrintAcademicMarkSheet?: () => void;
   onOpenTranscripts?: () => void;
   onSwitchToLedger?: () => void;
+  onSwitchToEntry?: () => void;
   onPrintCurrentMarkSheet?: () => void;
   onBulkPrintStudentMarkSheet?: () => void;
 }
@@ -210,7 +216,7 @@ export type TranscriptPrintProps = StudentMarkSheetPrintProps;
 export interface MarkSheetLedgerViewProps {
   initialExamId?: string | number | null;
   initialStudentId?: string | number | null;
-  defaultSubTab?: 'ledger' | 'transcripts' | null;
+  defaultSubTab?: 'entry' | 'ledger' | 'transcripts' | null;
   isEmbedded?: boolean;
   onNavigateToTranscripts?: (studentId: string | number) => void;
 }

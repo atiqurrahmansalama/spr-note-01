@@ -187,6 +187,24 @@ class Student(models.Model):
     def group(self):
         return self.group_name or ""
 
+    class Meta:
+        ordering = ['student_class', 'roll_number', 'name_en']
+        verbose_name = "Student"
+        verbose_name_plural = "Students"
+        indexes = [
+            models.Index(fields=['institution', 'is_deleted'], name='idx_stu_inst_del'),
+            models.Index(fields=['institution', 'student_class', 'is_deleted'], name='idx_stu_inst_cls_del'),
+            models.Index(fields=['institution', 'status'], name='idx_stu_inst_status'),
+            models.Index(fields=['institution', 'student_id_card_number'], name='idx_stu_inst_card'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['institution', 'student_id_card_number'],
+                condition=models.Q(student_id_card_number__isnull=False) & ~models.Q(student_id_card_number=''),
+                name='unique_inst_student_card_no'
+            )
+        ]
+
     def __str__(self):
         return f"[{self.roll_number or '--'}] {self.name_en or 'Unnamed'} ({self.group_name or 'No Group'})"
 

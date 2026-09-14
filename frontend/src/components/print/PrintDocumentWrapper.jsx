@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useTenant } from '../../context/TenantContext';
-import { BuildingOfficeIcon } from '../ui/Icons';
+import { BuildingOfficeIcon, TrashIcon } from '../ui/Icons';
 
 /**
  * PrintDocumentWrapper
@@ -11,6 +11,7 @@ export default function PrintDocumentWrapper({
   title = 'Official Document',
   subtitle = '',
   metaItems = [], // [{ label: 'Class', value: 'Class 10' }, { label: 'Subject', value: 'Arabic' }]
+  onMetaItemsChange = null,
   options = {},
   onOptionsChange = null,
   isEditable = false,
@@ -266,33 +267,65 @@ export default function PrintDocumentWrapper({
                 return (
                   <div
                     key={idx}
-                    className={`space-y-0.5 min-w-0 ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
+                    className={`space-y-0.5 min-w-0 relative group/meta ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
                     style={item.colSpan ? { gridColumn: `span ${item.colSpan} / span ${item.colSpan}` } : undefined}
                   >
-                    <span
-                      className={`uppercase tracking-wider text-slate-500 font-bold block ${
-                        metaFontSize === 'SM'
-                          ? 'text-[8.5px]'
-                          : metaFontSize === 'LG'
-                          ? 'text-[10.5px]'
-                          : 'text-[9.5px]'
-                      }`}
-                    >
-                      {item.label}
-                    </span>
+                    <div className="flex items-center justify-between gap-1">
+                      <span
+                        contentEditable={isEditable}
+                        suppressContentEditableWarning
+                        onBlur={(e) => {
+                          if (!onMetaItemsChange) return;
+                          const newLabel = e.currentTarget.textContent?.trim() || item.label;
+                          const updated = metaItems.map((m, mIdx) => (mIdx === idx ? { ...m, label: newLabel } : m));
+                          onMetaItemsChange(updated);
+                        }}
+                        className={`uppercase tracking-wider text-slate-500 font-bold block ${
+                          metaFontSize === 'SM'
+                            ? 'text-[8.5px]'
+                            : metaFontSize === 'LG'
+                            ? 'text-[10.5px]'
+                            : 'text-[9.5px]'
+                        } ${
+                          isEditable
+                            ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-0.5 hover:bg-slate-200/50 cursor-text'
+                            : ''
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                      {isEditable && onMetaItemsChange && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const updated = metaItems.filter((_, mIdx) => mIdx !== idx);
+                            onMetaItemsChange(updated);
+                          }}
+                          title="Remove metadata field"
+                          className="opacity-0 group-hover/meta:opacity-100 p-0.5 rounded text-rose-500 hover:bg-rose-100 cursor-pointer print:hidden transition-opacity"
+                        >
+                          <TrashIcon className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
                     <span
                       contentEditable={isEditable}
                       suppressContentEditableWarning
                       onBlur={(e) => {
-                        if (!onOptionsChange) return;
                         const val = e.currentTarget.textContent?.trim();
-                        onOptionsChange({
-                          ...options,
-                          customMetaValues: {
-                            ...(options.customMetaValues || {}),
-                            [item.label]: val,
-                          },
-                        });
+                        if (onMetaItemsChange) {
+                          const updated = metaItems.map((m, mIdx) => (mIdx === idx ? { ...m, value: val } : m));
+                          onMetaItemsChange(updated);
+                        } else if (onOptionsChange) {
+                          onOptionsChange({
+                            ...options,
+                            customMetaValues: {
+                              ...(options.customMetaValues || {}),
+                              [item.label]: val,
+                            },
+                          });
+                        }
                       }}
                       className={`font-extrabold text-slate-900 block break-words whitespace-normal leading-snug ${
                         metaFontSize === 'SM'

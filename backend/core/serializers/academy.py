@@ -210,16 +210,29 @@ class StudentClassSerializer(serializers.ModelSerializer):
             'id', 'created_at', 'updated_at', 'student_count', 'section_count', 'group_count',
             'institution_name', 'department_name', 'department_code', 'has_quran_tracker'
         ]
+        validators = []  # Uniqueness handled in validate() and database UniqueConstraint to support auto-resolved institution
 
     def validate(self, attrs):
         dept = attrs.get('department') or getattr(self.instance, 'department', None)
         if not dept:
             raise serializers.ValidationError({"department": "An Academic Department is strictly required for every class."})
         inst = attrs.get('institution') or getattr(self.instance, 'institution', None)
+        if not inst and dept and dept.institution:
+            inst = dept.institution
+            attrs['institution'] = inst
+
         if inst and dept.institution_id and inst.id != dept.institution_id:
             raise serializers.ValidationError({
                 "department": f"Selected department '{dept.name}' does not belong to institution '{inst.name}'."
             })
+
+        name = attrs.get('name') or (self.instance.name if self.instance else None)
+        if inst and name:
+            existing_qs = StudentClass.objects.filter(institution=inst, name__iexact=name.strip())
+            if self.instance:
+                existing_qs = existing_qs.exclude(pk=self.instance.pk)
+            if existing_qs.exists():
+                raise serializers.ValidationError({"name": f"A class named '{name}' already exists in this institution."})
         
         # Enforce data integrity: Cannot disable sections if class already contains active sections
         if self.instance and attrs.get('has_sections') is False:

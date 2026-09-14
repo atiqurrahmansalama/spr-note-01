@@ -320,6 +320,11 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = DocumentTemplateConfigSerializer
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'set_default']:
+            return [IsAuthenticated(), IsInstitutionAdmin()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
         if not tenant_id:

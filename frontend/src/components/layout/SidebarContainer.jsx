@@ -45,6 +45,7 @@ import {
   ChartBarIcon,
   DocumentIcon,
   EditIcon,
+  IdentificationIcon,
 } from "../ui/Icons";
 
 export default function SidebarContainer({ 
@@ -143,8 +144,47 @@ export default function SidebarContainer({
           Icon: CalendarIcon,
           key: "exam_schedules"
         },
-        { id: "Mark Entry Desk", name: "Mark Entry Desk", i18nKey: "markEntry", path: "/examinations/mark-entry", matchPaths: ["/examinations/mark-entry", "/mark-entry"], Icon: EditIcon, key: "exam_mark_entry" },
-        { id: "Mark Sheet", name: "Mark Sheet", i18nKey: "tabulationSheet", path: "/examinations/marksheet", matchPaths: ["/examinations/marksheet", "/examinations/mark-sheet", "/examinations/tabulation", "/marksheet", "/tabulation-sheet", "/mark-sheet", "/examinations/transcripts", "/transcripts", "/academic-transcripts"], Icon: ChartBarIcon, key: "exam_tabulation" },
+        {
+          id: "Admit Cards & Hall Planning",
+          name: "Admit Cards & Hall Planning",
+          i18nKey: "hallLogistics",
+          path: "/examinations/hall-logistics",
+          matchPaths: [
+            "/examinations/hall-logistics",
+            "/examinations/admit-cards",
+            "/examinations/seat-plan",
+            "/examinations/desk-slips",
+            "/examinations/hall-attendance",
+            "/examinations/attendance-sheets",
+            "/admit-cards",
+            "/seat-plan",
+            "/desk-slips",
+            "/hall-attendance"
+          ],
+          Icon: IdentificationIcon,
+          key: "exam_hall_logistics"
+        },
+        {
+          id: "Mark Sheet & Tabulation",
+          name: "Mark Sheet & Tabulation",
+          i18nKey: "tabulationSheet",
+          path: "/examinations/marksheet",
+          matchPaths: [
+            "/examinations/marksheet",
+            "/examinations/mark-sheet",
+            "/examinations/tabulation",
+            "/examinations/transcripts",
+            "/examinations/mark-entry",
+            "/mark-entry",
+            "/marksheet",
+            "/tabulation-sheet",
+            "/mark-sheet",
+            "/transcripts",
+            "/academic-transcripts"
+          ],
+          Icon: ChartBarIcon,
+          key: "exam_tabulation"
+        },
       ]
     },
     {

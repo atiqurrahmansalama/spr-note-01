@@ -2,6 +2,7 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas-pro';
+import { exportToNativeDocx, compileNativeDocxDocument } from './vectorDocxCompiler';
 
 /**
  * Standard page dimensions in points (pt) for jsPDF
@@ -484,118 +485,13 @@ export function exportToPlainText({
 }
 
 /**
- * 5. Word Document (.doc) Exporter
+ * 5. Native OpenXML Word Document (.docx) Exporter
  */
-export function exportToWord({
-  targetId = 'universal-print-portal',
-  title = 'Official_Document',
-  orientation = 'PORTRAIT',
-  pageSize = 'A4',
-  showToast,
-  onCustomExport,
-}) {
-  if (onCustomExport) {
-    onCustomExport();
-    return;
-  }
-
-  const portalEl = document.getElementById(targetId);
-  if (!portalEl) {
-    showToast?.('Document element not ready for Word export.', 'error');
-    return;
-  }
-
-  showToast?.('Exporting Word Document (.doc)...', 'info');
-
-  try {
-    const isLandscape = String(orientation || '').toUpperCase() === 'LANDSCAPE';
-    const cloned = portalEl.cloneNode(true);
-
-    // Clean up unnecessary UI / controls from cloned node
-    cloned.querySelectorAll('.print-studio-no-print, button').forEach((el) => el.remove());
-
-    const wordHtml = `
-      <!DOCTYPE html>
-      <html xmlns:o='urn:schemas-microsoft-com:office:office'
-            xmlns:w='urn:schemas-microsoft-com:office:word'
-            xmlns='http://www.w3.org/TR/REC-html40'>
-      <head>
-        <meta charset="utf-8">
-        <title>${title}</title>
-        <!--[if gte mso 9]>
-        <xml>
-          <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-            <w:DoNotOptimizeForBrowser/>
-          </w:WordDocument>
-        </xml>
-        <![endif]-->
-        <style>
-          @page Section1 {
-            size: ${pageSize.toLowerCase() === 'legal' ? '8.5in 14in' : pageSize.toLowerCase() === 'letter' ? '8.5in 11in' : '21.0cm 29.7cm'};
-            mso-page-orientation: ${isLandscape ? 'landscape' : 'portrait'};
-            margin: 1.0in 1.0in 1.0in 1.0in;
-            mso-header-margin: 0.5in;
-            mso-footer-margin: 0.5in;
-            mso-paper-source: 0;
-          }
-          div.Section1 { page: Section1; }
-          body {
-            font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
-            font-size: 11pt;
-            color: #0f172a;
-            background: #ffffff;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12pt;
-            margin-bottom: 12pt;
-          }
-          th, td {
-            border: 1px solid #cbd5e1;
-            padding: 6pt 8pt;
-            text-align: left;
-            vertical-align: middle;
-            font-size: 10pt;
-          }
-          th {
-            background-color: #f1f5f9;
-            font-weight: bold;
-            color: #0f172a;
-          }
-          tr:nth-child(even) td {
-            background-color: #f8fafc;
-          }
-          h1 { font-size: 18pt; font-weight: bold; margin: 0 0 4pt 0; color: #0f172a; }
-          h2 { font-size: 13pt; font-weight: bold; margin: 0 0 4pt 0; color: #334155; }
-          p { margin: 2pt 0; font-size: 10pt; color: #475569; }
-        </style>
-      </head>
-      <body>
-        <div class="Section1">
-          ${cloned.innerHTML}
-        </div>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([wordHtml], { type: 'application/msword;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getSafeFilename(title, 'doc');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast?.('Word document (.doc) downloaded successfully!', 'success');
-  } catch (err) {
-    console.error('Word export failed:', err);
-    showToast?.('Failed to export Word document', 'error');
-  }
+export async function exportToWord(params = {}) {
+  return exportToNativeDocx(params);
 }
+
+export { exportToNativeDocx, compileNativeDocxDocument };
 
 /**
  * 6 & 7. Lossless PNG & JPEG Image Exporter (300+ DPI Ultra HD)

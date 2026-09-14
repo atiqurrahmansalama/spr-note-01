@@ -18,10 +18,17 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Security Headers & Env Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key-change-in-production"))
-DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() == "true"
+SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key-change-in-production-min-50-characters-long"))
+DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() in ("true", "1", "t")
 
-ALLOWED_HOSTS = ['*']
+# Dynamic Allowed Hosts (Safe environment extraction)
+_raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")
+if _raw_allowed_hosts.strip() == "*":
+    ALLOWED_HOSTS = ["*"] if DEBUG else ["localhost", "127.0.0.1", "[::1]"]
+else:
+    ALLOWED_HOSTS = [h.strip() for h in _raw_allowed_hosts.split(",") if h.strip()]
+if "localhost" not in ALLOWED_HOSTS and DEBUG:
+    ALLOWED_HOSTS.extend(["localhost", "127.0.0.1", "[::1]"])
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "core.User"
@@ -56,6 +63,7 @@ INSTALLED_APPS += [
 ]
 
 MIDDLEWARE = [
+    "core.middleware.RequestCorrelationMiddleware",  # Correlation ID (Must be 1st)
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Static files (must be 2nd)
     "corsheaders.middleware.CorsMiddleware",
@@ -154,12 +162,13 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
 }
 
-# SimpleJWT Settings
+# SimpleJWT Settings (Hardened Lifetimes & Token Rotation)
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", "60"))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv("JWT_REFRESH_TOKEN_LIFETIME_DAYS", "14"))),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
@@ -279,44 +288,74 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-csrftoken',
 ]
 
-# In production, restrict to Vercel frontend URL
+# In production, restrict to explicit frontend domain URLs
 CORS_ALLOWED_ORIGINS_STR = os.getenv("CORS_ALLOWED_ORIGINS", "")
 if CORS_ALLOWED_ORIGINS_STR:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED_ORIGINS_STR.split(",") if o.strip()]
     CORS_ALLOW_ALL_ORIGINS = False
 else:
-    # Dev fallback
-    CORS_ALLOW_ALL_ORIGINS = True
+    # Explicit safe development origins (No wildcard allowed)
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+    CORS_ALLOW_ALL_ORIGINS = False
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 
-# Security settings (only in production)
-if not DEBUG:
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = "DENY"
+# Baseline & Production Security Headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
-# Logging
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in ("true", "1", "t")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# Logging & Observability
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "correlation": {
+            "()": "core.logging_formatters.CorrelationLogFilter",
+        },
+    },
     "formatters": {
         "verbose": {
-            "format": "[{asctime}] [{levelname}] [{name}:{lineno}] - {message}",
+            "format": "[{asctime}] [{levelname}] [req:{request_id}] [tenant:{tenant_id}] [{name}:{lineno}] - {message}",
             "style": "{",
+        },
+        "json": {
+            "()": "core.logging_formatters.StructuredJsonLogFormatter",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": "json" if os.getenv("STRUCTURED_LOGGING", "False").lower() in ("true", "1") or not DEBUG else "verbose",
+            "filters": ["correlation"],
         },
     },
     "loggers": {
         "django": {
             "handlers": ["console"],
             "level": "INFO",
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
         },
         "core": {
             "handlers": ["console"],

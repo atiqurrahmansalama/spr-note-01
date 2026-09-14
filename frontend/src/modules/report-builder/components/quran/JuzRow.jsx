@@ -1,6 +1,6 @@
 import React from "react";
 import CustomInput from "../../../../components/ui/CustomInput";
-import PageRangeInput from "./PageRangeInput";
+import PageRangeInput from "../../../../components/ui/PageRangeInput";
 import { CloseIcon } from "../../../../components/ui/Icons";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../utils/keyboardUtils";
 import { QURAN_CONSTANTS } from "../../../../constants/quranConstants";

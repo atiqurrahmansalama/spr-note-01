@@ -77,6 +77,8 @@ export default function PrintConfigSidebar({
   templates = [],
   activeTemplateId = null,
   onTemplateChange,
+  onOpenDocxModal = null,
+  onDeleteDocxTemplate = null,
   onResetDefaults,
   onClose,
   width,
@@ -329,34 +331,72 @@ export default function PrintConfigSidebar({
             ))}
           </div>
         </div>
-          {/* Template Selector (if templates provided) */}
-          {templates && templates.length > 0 && (
+          {/* Template Selector & Word Ingestion */}
+          {((templates && templates.length > 0) || onOpenDocxModal) && (
             <DrawerSection
               icon={FileIcon}
-              title="Document Presets"
+              title="Document Presets & Word Templates"
             >
               <div className="space-y-1.5">
-                {templates.map((tmpl) => (
-                  <button
+                {(templates || []).map((tmpl) => (
+                  <div
                     key={tmpl.id}
-                    type="button"
-                    onClick={() => onTemplateChange?.(tmpl.id)}
-                    className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                    className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
                       activeTemplateId === tmpl.id
                         ? 'border-[var(--accent-main)] theme-bg-accent-soft theme-text-primary font-semibold'
                         : 'theme-border hover:theme-bg-sub theme-text-secondary'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => onTemplateChange?.(tmpl.id)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer"
+                    >
                       <FileIcon className="w-4 h-4 shrink-0 opacity-70" />
-                      <span className="text-xs truncate">{tmpl.name}</span>
+                      <div className="truncate">
+                        <div className="text-xs truncate">{tmpl.name}</div>
+                        {tmpl.isWordDocx && (
+                          <span className="text-[9px] text-blue-600 font-semibold font-mono">Word .docx</span>
+                        )}
+                      </div>
+                    </button>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {activeTemplateId === tmpl.id && (
+                        <CheckCircleIcon className="w-4 h-4 theme-accent" />
+                      )}
+                      {tmpl.isWordDocx && onDeleteDocxTemplate && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete custom Word template "${tmpl.name}"?`)) {
+                              onDeleteDocxTemplate(tmpl.id);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                          title="Delete this custom Word template"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    {activeTemplateId === tmpl.id && (
-                      <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
-                    )}
-                  </button>
+                  </div>
                 ))}
               </div>
+
+              {onOpenDocxModal && (
+                <div className="pt-2 border-t theme-border mt-2">
+                  <button
+                    type="button"
+                    onClick={onOpenDocxModal}
+                    className="w-full py-2 px-3 rounded-xl border border-dashed theme-border theme-text-secondary hover:theme-accent hover:border-[var(--accent-main)] theme-bg-sub/40 hover:theme-bg-sub transition-all text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span>Upload Word Template (.docx)</span>
+                  </button>
+                </div>
+              )}
             </DrawerSection>
           )}
 

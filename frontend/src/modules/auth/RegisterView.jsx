@@ -95,7 +95,7 @@ export default function RegisterView() {
 
   // Standard Google OAuth 2.0 direct authorization URL (Same-Window Anchor Navigation)
   const getGoogleAuthUrl = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '923073525317-71l2q5h0u3rbat0rnpmsunaaged0m3sa.apps.googleusercontent.com';
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     const redirectUri = window.location.origin;
     const scope = encodeURIComponent('openid email profile');
 

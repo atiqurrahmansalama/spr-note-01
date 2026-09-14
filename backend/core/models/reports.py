@@ -99,6 +99,15 @@ class StudentDailyReport(models.Model):
         status_obj = getattr(self, 'status_info', None)
         return status_obj.is_deleted if status_obj else False
 
+    class Meta:
+        ordering = ['-date', '-created_at']
+        verbose_name = "Student Daily Report"
+        verbose_name_plural = "Student Daily Reports"
+        indexes = [
+            models.Index(fields=['student', 'date'], name='idx_rep_stu_dt'),
+            models.Index(fields=['date', 'status'], name='idx_rep_dt_stat'),
+        ]
+
     def __str__(self):
         return f"{self.report_unique_id} - {self.student_name} ({self.date})"
 
@@ -418,6 +427,9 @@ class DailyLessonPlan(models.Model):
         ordering = ['-lesson_date', '-created_at']
         verbose_name = "Daily Lesson Plan"
         verbose_name_plural = "Daily Lesson Plans"
+        indexes = [
+            models.Index(fields=['institution', 'academic_class', 'lesson_date'], name='idx_les_inst_cls_dt'),
+        ]
 
     def __str__(self):
         return f"{self.lesson_title} - {self.subject_name} ({self.lesson_date})"
@@ -465,6 +477,19 @@ class LessonEvaluation(models.Model):
         unique_together = ('lesson_plan', 'student')
         verbose_name = "Lesson Evaluation"
         verbose_name_plural = "Lesson Evaluations"
+        indexes = [
+            models.Index(fields=['student', 'evaluation_date'], name='idx_eval_stu_dt'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(score__gte=0) & models.Q(max_score__gt=0) & models.Q(score__lte=models.F('max_score')),
+                name='check_evaluation_score_range'
+            ),
+            models.CheckConstraint(
+                check=models.Q(fluency_rating__gte=1) & models.Q(fluency_rating__lte=5),
+                name='check_fluency_rating_1_to_5'
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student_name} - {self.evaluation_status} ({self.evaluation_date})"

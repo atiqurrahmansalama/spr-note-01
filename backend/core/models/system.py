@@ -127,3 +127,75 @@ class SystemSetting(models.Model):
         setting.save()
         return setting
 
+
+class AuditLog(models.Model):
+    """
+    Enterprise Immutable Audit Trail Model.
+    Captures complete actor, tenant, action, resource, before/after diffs, and network/device telemetry.
+    """
+    ACTION_CHOICES = (
+        ('CREATE', 'Created Resource'),
+        ('UPDATE', 'Updated Resource'),
+        ('DELETE', 'Deleted Resource'),
+        ('RESTORE', 'Restored Resource'),
+        ('PROMOTE', 'Promoted Student'),
+        ('TRANSFER', 'Transferred Student/Staff'),
+        ('STATUS_CHANGE', 'Status Changed'),
+        ('BULK_MARK', 'Bulk Marked Attendance'),
+        ('EVALUATE', 'Evaluated Sabaq/Lesson'),
+        ('PUBLISH', 'Published Results/Routine'),
+        ('CONFIG_CHANGE', 'Configuration Changed'),
+        ('LOGIN', 'User Logged In'),
+        ('EXPORT', 'Data Exported'),
+        ('IMPORT', 'Data Imported'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='audit_logs',
+        null=True,
+        blank=True,
+        db_index=True
+    )
+    actor = models.ForeignKey(
+        'core.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_actions'
+    )
+    actor_name = models.CharField(max_length=150, blank=True, default='')
+    actor_phone = models.CharField(max_length=32, blank=True, default='')
+    actor_role = models.CharField(max_length=64, blank=True, default='')
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
+    resource_type = models.CharField(max_length=100, db_index=True)
+    resource_id = models.CharField(max_length=100, db_index=True)
+    resource_name = models.CharField(max_length=255, blank=True, default='')
+    before_state = models.JSONField(null=True, blank=True)
+    after_state = models.JSONField(null=True, blank=True)
+    changes_summary = models.TextField(blank=True, default='')
+    reason = models.TextField(blank=True, default='')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
+    device_metadata = models.JSONField(null=True, blank=True)
+    request_id = models.CharField(max_length=64, db_index=True, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Audit Log"
+        verbose_name_plural = "Audit Logs"
+        indexes = [
+            models.Index(fields=['institution', '-created_at'], name='idx_audit_inst_created'),
+            models.Index(fields=['resource_type', 'resource_id'], name='idx_audit_resource'),
+            models.Index(fields=['actor', '-created_at'], name='idx_audit_actor_created'),
+            models.Index(fields=['action', '-created_at'], name='idx_audit_action_created'),
+        ]
+
+    def __str__(self):
+        actor_disp = self.actor_name or (self.actor.phone_number if self.actor else "System")
+        return f"[{self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else 'NEW'}] {actor_disp} {self.action} {self.resource_type}#{self.resource_id}"
+
+

@@ -17,6 +17,18 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
   transition: box-shadow 0.2s ease;
+  width: 794px;
+  min-height: 1123px;
+  height: 1123px;
+  max-height: 1123px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.paper-sheet-wrapper {
+  flex-shrink: 0;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .universal-print-transform-wrapper {
@@ -40,42 +52,57 @@
   background-size: 24px 24px;
 }
 
-/* Screen Dimensions (Physical Paper Aspect Ratio Simulation) */
-.paper-sheet[data-size="A4"][data-orientation="PORTRAIT"] {
+/* Screen Dimensions (Physical Paper Aspect Ratio Simulation - Strict Immutable Bounds) */
+.paper-sheet[data-size="A4" i][data-orientation="PORTRAIT" i],
+.paper-sheet[data-size="A4" i]:not([data-orientation="LANDSCAPE" i]) {
   width: 794px;
   min-height: 1123px;
-  height: auto;
+  height: 1123px;
+  max-height: 1123px;
   box-sizing: border-box;
+  overflow: hidden;
 }
-.paper-sheet[data-size="A4"][data-orientation="LANDSCAPE"] {
+.paper-sheet[data-size="A4" i][data-orientation="LANDSCAPE" i] {
   width: 1123px;
   min-height: 794px;
-  height: auto;
+  height: 794px;
+  max-height: 794px;
   box-sizing: border-box;
+  overflow: hidden;
 }
-.paper-sheet[data-size="LEGAL"][data-orientation="PORTRAIT"] {
+.paper-sheet[data-size="LEGAL" i][data-orientation="PORTRAIT" i],
+.paper-sheet[data-size="LEGAL" i]:not([data-orientation="LANDSCAPE" i]) {
   width: 816px;
   min-height: 1344px;
-  height: auto;
+  height: 1344px;
+  max-height: 1344px;
   box-sizing: border-box;
+  overflow: hidden;
 }
-.paper-sheet[data-size="LEGAL"][data-orientation="LANDSCAPE"] {
+.paper-sheet[data-size="LEGAL" i][data-orientation="LANDSCAPE" i] {
   width: 1344px;
   min-height: 816px;
-  height: auto;
+  height: 816px;
+  max-height: 816px;
   box-sizing: border-box;
+  overflow: hidden;
 }
-.paper-sheet[data-size="LETTER"][data-orientation="PORTRAIT"] {
+.paper-sheet[data-size="LETTER" i][data-orientation="PORTRAIT" i],
+.paper-sheet[data-size="LETTER" i]:not([data-orientation="LANDSCAPE" i]) {
   width: 816px;
   min-height: 1056px;
-  height: auto;
+  height: 1056px;
+  max-height: 1056px;
   box-sizing: border-box;
+  overflow: hidden;
 }
-.paper-sheet[data-size="LETTER"][data-orientation="LANDSCAPE"] {
+.paper-sheet[data-size="LETTER" i][data-orientation="LANDSCAPE" i] {
   width: 1056px;
   min-height: 816px;
-  height: auto;
+  height: 816px;
+  max-height: 816px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Continuous Sheet Mode (when Auto Page Break is switched OFF) */
@@ -87,17 +114,17 @@
 }
 
 /* Screen Margins */
-.paper-sheet[data-margin="NORMAL"] {
+.paper-sheet[data-margin="NORMAL" i] {
   padding: 38px 44px;
 }
-.paper-sheet[data-margin="NARROW"] {
+.paper-sheet[data-margin="NARROW" i] {
   padding: 22px 26px;
 }
-.paper-sheet[data-margin="WIDE"] {
+.paper-sheet[data-margin="WIDE" i] {
   padding: 56px 60px;
 }
-.paper-sheet[data-margin="NONE"] {
-  padding: 0;
+.paper-sheet[data-margin="NONE" i] {
+  padding: 0 !important;
 }
 
 /* Ink-Saver & Color Modes (Screen Only - Never apply CSS raster filters in print!) */
@@ -664,5 +691,64 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* --------------------------------------------------------------------------
+   8. High-Fidelity Word (.docx) OpenXML Document Styles
+   -------------------------------------------------------------------------- */
+.docx-live-container {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: #0f172a;
+}
+
+.docx-live-container .docx-preview-sandbox,
+.docx-live-container .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  width: 100% !important;
+  min-height: auto !important;
+}
+
+.docx-live-container section.docx,
+.docx-live-container article.docx,
+.docx-live-container .docx {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: auto !important;
+}
+
+.docx-live-container table {
+  border-collapse: collapse !important;
+}
+
+.docx-live-container p {
+  line-height: inherit;
+}
+
+.docx-live-container img {
+  max-width: 100%;
+  height: auto;
+}
+
+.docx-preview-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.docx-preview-content th,
+.docx-preview-content td {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+}
+
 
 

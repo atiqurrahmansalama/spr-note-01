@@ -1,9 +1,11 @@
 import React from 'react';
+import { TrashIcon, PlusIcon, ChevronUpIcon, ChevronDownIcon } from '../ui/Icons';
 
 /**
  * PrintTableRenderer
  * Universal high-contrast, density-aware tabular grid for print documents.
  * Supports dynamic column filtering, custom renderers, metrics summary boxes, and extra blank rows.
+ * Features full WYSIWYG Live Canvas Editing: Inline cell text edit, hover row delete/insert/move, and header renaming.
  */
 export default function PrintTableRenderer({
   columns = [],
@@ -26,6 +28,14 @@ export default function PrintTableRenderer({
   footerRow = null,
   footerRows = [],
   startIndex = 0,
+  // WYSIWYG Live Document Canvas Editing Handlers
+  isEditable = false,
+  onCellChange = null, // (rowIndex, colKey, value) => void
+  onRowDelete = null, // (rowIndex) => void
+  onRowInsert = null, // (rowIndex, position) => void
+  onRowMove = null, // (fromIndex, toIndex) => void
+  onColumnHeaderChange = null, // (colKey, newHeader) => void
+  onAddRow = null, // () => void
 }) {
   // Filter visible columns
   const activeColumns = React.useMemo(() => {
@@ -114,9 +124,9 @@ export default function PrintTableRenderer({
   const currentDensity = densityConfig[density] || densityConfig.NORMAL;
 
   return (
-    <div className={`w-full max-w-full overflow-hidden space-y-2.5 print:space-y-1.5 ${className}`}>
+    <div className={`w-full max-w-full overflow-hidden space-y-2.5 print:space-y-1.5 relative ${className}`}>
       {/* Table Grid */}
-      <table className={`print-table w-full max-w-full ${currentDensity.fontSize}`}>
+      <table className={`print-table w-full max-w-full ${currentDensity.fontSize} relative`}>
         <thead>
           <tr className="font-bold bg-slate-100">
             {showIndex && (
@@ -177,7 +187,20 @@ export default function PrintTableRenderer({
                     </div>
                   ) : (
                     <>
-                      <div className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
+                      <div
+                        contentEditable={isEditable}
+                        suppressContentEditableWarning
+                        onBlur={(e) => {
+                          if (!onColumnHeaderChange) return;
+                          const val = e.currentTarget.textContent?.trim();
+                          onColumnHeaderChange(colKey, val);
+                        }}
+                        className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'} ${
+                          isEditable
+                            ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-0.5 hover:bg-slate-200/60 cursor-text transition-all'
+                            : ''
+                        }`}
+                      >
                         {headerTitle}
                       </div>
                       {col.subLabel && (
@@ -193,43 +216,125 @@ export default function PrintTableRenderer({
           </tr>
         </thead>
         <tbody>
-          {activeData.map((row, rIdx) => (
-            <tr key={row.id || rIdx} className="print-avoid-break bg-white hover:bg-slate-50/60">
-              {showIndex && (
-                <td className={`text-center font-mono font-medium text-slate-700 border border-slate-300 w-8 whitespace-nowrap ${currentDensity.cellPad}`}>
-                  {rIdx + 1 + (typeof startIndex === 'number' ? startIndex : 0)}
-                </td>
-              )}
-              {activeColumns.map((col, cIdx) => {
-                const colKey = col.id || col.key || col.accessor || col.dataIndex;
-                const cellValue = typeof col.accessor === 'function' ? col.accessor(row) : row[colKey];
+          {activeData.map((row, rIdx) => {
+            const actualIdx = rIdx + (typeof startIndex === 'number' ? startIndex : 0);
+            return (
+              <tr key={row.id || rIdx} className="print-avoid-break bg-white hover:bg-blue-50/20 relative group/row transition-colors">
+                {showIndex && (
+                  <td className={`text-center font-mono font-medium text-slate-700 border border-slate-300 w-8 whitespace-nowrap relative ${currentDensity.cellPad}`}>
+                    {actualIdx + 1}
 
-                let content = cellValue;
-                if (col.cell) {
-                  content = col.cell(cellValue, row, rIdx);
-                } else if (col.render) {
-                  content = col.render(row, rIdx, cellValue);
-                }
-
-                return (
-                  <td
-                    key={colKey || cIdx}
-                    className={`border border-slate-300 text-slate-900 ${currentDensity.cellPad} ${
-                      col.align === 'center'
-                        ? 'text-center'
-                        : col.align === 'right'
-                        ? 'text-right'
-                        : 'text-left'
-                    } ${col.bold ? 'font-bold' : ''} ${col.mono ? 'font-mono' : ''} ${
-                      col.nowrap ? 'whitespace-nowrap' : 'break-normal'
-                    } ${col.className || ''}`}
-                  >
-                    {content !== undefined && content !== null ? content : '-'}
+                    {/* Floating Row Actions (Delete Line, Insert Below, Move Up/Down) on Hover */}
+                    {isEditable && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+4px)] opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center gap-0.5 z-30 print:hidden select-none bg-white p-0.5 rounded-lg border border-slate-300 shadow-md">
+                        {onRowMove && actualIdx > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowMove(actualIdx, actualIdx - 1);
+                            }}
+                            title="Move row up"
+                            className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+                          >
+                            <ChevronUpIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onRowMove && actualIdx < activeData.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowMove(actualIdx, actualIdx + 1);
+                            }}
+                            title="Move row down"
+                            className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+                          >
+                            <ChevronDownIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onRowInsert && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowInsert(actualIdx, 'below');
+                            }}
+                            title="Insert new row below"
+                            className="p-1 rounded text-blue-600 hover:bg-blue-50 cursor-pointer"
+                          >
+                            <PlusIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                        {onRowDelete && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowDelete(actualIdx);
+                            }}
+                            title="Delete this row (Cut line)"
+                            className="p-1 rounded text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          >
+                            <TrashIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
-                );
-              })}
-            </tr>
-          ))}
+                )}
+                {activeColumns.map((col, cIdx) => {
+                  const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                  const cellValue = typeof col.accessor === 'function' ? col.accessor(row) : row[colKey];
+
+                  let content = cellValue;
+                  if (col.cell) {
+                    content = col.cell(cellValue, row, rIdx);
+                  } else if (col.render) {
+                    content = col.render(row, rIdx, cellValue);
+                  }
+
+                  const isReactNode = React.isValidElement(content);
+
+                  return (
+                    <td
+                      key={colKey || cIdx}
+                      className={`border border-slate-300 text-slate-900 ${currentDensity.cellPad} ${
+                        col.align === 'center'
+                          ? 'text-center'
+                          : col.align === 'right'
+                          ? 'text-right'
+                          : 'text-left'
+                      } ${col.bold ? 'font-bold' : ''} ${col.mono ? 'font-mono' : ''} ${
+                        col.nowrap ? 'whitespace-nowrap' : 'break-normal'
+                      } ${col.className || ''}`}
+                    >
+                      {isReactNode ? (
+                        content
+                      ) : (
+                        <div
+                          contentEditable={isEditable}
+                          suppressContentEditableWarning
+                          onBlur={(e) => {
+                            if (!onCellChange) return;
+                            const val = e.currentTarget.textContent;
+                            onCellChange(actualIdx, colKey, val);
+                          }}
+                          className={
+                            isEditable
+                              ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-blue-50/40 cursor-text transition-all min-h-[1.2em]'
+                              : ''
+                          }
+                        >
+                          {content !== undefined && content !== null ? content : isEditable ? '' : '-'}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
 
           {/* Extra Blank Rows (e.g. for offline handwritten marks) */}
           {blankRowsArray.map((_, bIdx) => (

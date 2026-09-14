@@ -128,17 +128,22 @@ export default function DepartmentSelect({
 
     if (allowAll) {
       opts.push({
-        value: allValue,
+        value: allValue !== undefined ? allValue : '',
         label: allLabel,
         description: 'Institution-wide department scope',
       });
     }
 
     effectiveDepartments.forEach((dept) => {
-      const deptId = String(dept.id);
-      const name = dept.name || dept.department_name || 'Department';
+      const deptId = String(dept.id !== undefined && dept.id !== null ? dept.id : dept.value ?? '');
+      // Prevent duplicate 'All Departments' if already present in passed array
+      if (allowAll && (deptId === '' || deptId === 'ALL' || deptId === allValue)) {
+        return;
+      }
+
+      const name = dept.name || dept.department_name || dept.departmentName || dept.label || 'Department';
       const nameBn = dept.name_bn || '';
-      const displayLabel = nameBn ? `${name} (${nameBn})` : name;
+      const displayLabel = nameBn && !name.includes(nameBn) ? `${name} (${nameBn})` : name;
 
       opts.push({
         value: deptId,
@@ -186,7 +191,7 @@ export default function DepartmentSelect({
       value={value !== undefined && value !== null ? String(value) : allValue}
       onChange={handleChange}
       disabled={disabled || loading}
-      searchable={searchable || options.length > 8}
+      searchable={searchable}
       showBadge={showBadge}
       size={size}
       compactMode={compactMode}

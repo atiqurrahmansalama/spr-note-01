@@ -8,6 +8,15 @@ import PrintConfigSidebar from './PrintConfigSidebar';
 import PrintCanvasViewer from './PrintCanvasViewer';
 import PrintDocumentWrapper from './PrintDocumentWrapper';
 import PrintTableRenderer from './PrintTableRenderer';
+import DocxTemplateModal from './DocxTemplateModal';
+import DocxLiveRenderer from './DocxLiveRenderer';
+import {
+  getSavedDocxTemplates,
+  deleteDocxTemplate,
+  bulkMergeTemplate,
+  mergeTemplateWithData,
+  separateDocxStylesAndBody,
+} from './docxTemplateEngine';
 import { DEFAULT_PRINT_OPTIONS } from '../../stores/printStore';
 import { printDocument, updatePrintPageStyle, getPageMarginCSS } from './printExportUtils';
 import {
@@ -18,6 +27,8 @@ import {
   RedoIcon,
   HandIcon,
   CursorPointerIcon,
+  FileIcon,
+  SparklesIcon,
 } from '../ui/Icons';
 import './printEngine.css';
 
@@ -62,6 +73,8 @@ export default function UniversalPrintModal({
   templates = [],
   activeTemplateId = null,
   onTemplateChange = null,
+  // Template Placeholder keys for Word (.docx) dynamic merge
+  placeholderKeys = [],
   // Section Visibility Switches & Controls
   showSectionsAndBars = true,
   showSectionsBar = true,
@@ -141,17 +154,84 @@ export default function UniversalPrintModal({
     };
   });
 
-  // Sync defaultOptions if provided
+  // Sync defaultOptions if provided with strict signature change detection
+  const defaultOptionsSig = useMemo(
+    () => (defaultOptions && typeof defaultOptions === 'object' ? JSON.stringify(defaultOptions) : ''),
+    [defaultOptions]
+  );
+  const prevDefaultOptionsSigRef = useRef(defaultOptionsSig);
+
   useEffect(() => {
     if (defaultOptions && Object.keys(defaultOptions).length > 0) {
-      setOptions((prev) => ({ ...prev, ...defaultOptions }));
+      if (defaultOptionsSig !== prevDefaultOptionsSigRef.current) {
+        prevDefaultOptionsSigRef.current = defaultOptionsSig;
+        setOptions((prev) => ({ ...prev, ...defaultOptions }));
+      }
     }
-  }, [defaultOptions]);
+  }, [defaultOptionsSig, defaultOptions]);
+
+  // ── WYSIWYG Live Canvas State (Data Rows, Columns, Metadata, Summaries) ───
+  const [liveData, setLiveData] = useState(() => (Array.isArray(data) ? [...data] : []));
+  const [liveColumns, setLiveColumns] = useState(() => (Array.isArray(columns) ? [...columns] : []));
+  const [liveMetaItems, setLiveMetaItems] = useState(() => (Array.isArray(metaItems) ? [...metaItems] : []));
+  const [liveSummaryMetrics, setLiveSummaryMetrics] = useState(() => (Array.isArray(summaryMetrics) ? [...summaryMetrics] : []));
+
+  const dataSignature = useMemo(
+    () => (Array.isArray(data) ? `${data.length}_${data[0]?.id || data[0]?.key || ''}` : ''),
+    [data]
+  );
+  const prevDataSigRef = useRef(dataSignature);
+
+  useEffect(() => {
+    if (isOpen && Array.isArray(data) && dataSignature !== prevDataSigRef.current) {
+      prevDataSigRef.current = dataSignature;
+      setLiveData(data);
+    }
+  }, [isOpen, dataSignature, data]);
+
+  const columnsSignature = useMemo(
+    () => (Array.isArray(columns) ? columns.map((c) => c.id || c.key || c.accessor || c.dataIndex).join(',') : ''),
+    [columns]
+  );
+  const prevColumnsSigRef = useRef(columnsSignature);
+
+  useEffect(() => {
+    if (isOpen && Array.isArray(columns) && columnsSignature !== prevColumnsSigRef.current) {
+      prevColumnsSigRef.current = columnsSignature;
+      setLiveColumns(columns);
+    }
+  }, [isOpen, columnsSignature, columns]);
+
+  const metaSignature = useMemo(
+    () => (Array.isArray(metaItems) ? JSON.stringify(metaItems) : ''),
+    [metaItems]
+  );
+  const prevMetaSigRef = useRef(metaSignature);
+
+  useEffect(() => {
+    if (isOpen && Array.isArray(metaItems) && metaSignature !== prevMetaSigRef.current) {
+      prevMetaSigRef.current = metaSignature;
+      setLiveMetaItems(metaItems);
+    }
+  }, [isOpen, metaSignature, metaItems]);
+
+  const summarySignature = useMemo(
+    () => (Array.isArray(summaryMetrics) ? JSON.stringify(summaryMetrics) : ''),
+    [summaryMetrics]
+  );
+  const prevSummarySigRef = useRef(summarySignature);
+
+  useEffect(() => {
+    if (isOpen && Array.isArray(summaryMetrics) && summarySignature !== prevSummarySigRef.current) {
+      prevSummarySigRef.current = summarySignature;
+      setLiveSummaryMetrics(summaryMetrics);
+    }
+  }, [isOpen, summarySignature, summaryMetrics]);
 
   // Column and Row key signatures to prevent wiping user uncheck selections
   const columnKeySignature = useMemo(
-    () => (columns || []).map((c) => c.id || c.key || c.accessor || c.dataIndex).join(','),
-    [columns]
+    () => (liveColumns || []).map((c) => c.id || c.key || c.accessor || c.dataIndex).join(','),
+    [liveColumns]
   );
 
   const getRowIdentifier = useCallback(
@@ -164,11 +244,100 @@ export default function UniversalPrintModal({
   );
 
   const allRowKeys = useMemo(() => {
-    if (!Array.isArray(data)) return [];
-    return data.map((r, i) => getRowIdentifier(r, i));
-  }, [data, getRowIdentifier]);
+    if (!Array.isArray(liveData)) return [];
+    return liveData.map((r, i) => getRowIdentifier(r, i));
+  }, [liveData, getRowIdentifier]);
 
   const rowKeySignature = useMemo(() => allRowKeys.join(','), [allRowKeys]);
+
+  // ── Word (.docx) Document & Template Ingestion State ─────────────────────
+  const [isDocxModalOpen, setIsDocxModalOpen] = useState(false);
+  const [customDocxTemplate, setCustomDocxTemplate] = useState(null);
+  const [savedWordTemplates, setSavedWordTemplates] = useState(() => {
+    try {
+      return getSavedDocxTemplates();
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Combine built-in templates with user-saved Word (.docx) templates
+  const combinedTemplates = useMemo(() => {
+    const list = Array.isArray(templates) ? [...templates] : [];
+    if (Array.isArray(savedWordTemplates)) {
+      savedWordTemplates.forEach((wt) => {
+        list.push({
+          id: wt.id,
+          name: wt.name,
+          description: wt.description || 'Custom Word (.docx) Template',
+          isWordDocx: true,
+          rawHtml: wt.rawHtml,
+        });
+      });
+    }
+    return list;
+  }, [templates, savedWordTemplates]);
+
+  // Handle template selection (built-in or Word docx)
+  const handleTemplateSelection = useCallback((templateIdOrObj) => {
+    const tId = typeof templateIdOrObj === 'object' ? templateIdOrObj?.id : templateIdOrObj;
+    const foundWordTemplate = (savedWordTemplates || []).find((t) => t.id === tId);
+    if (foundWordTemplate) {
+      setCustomDocxTemplate({
+        html: foundWordTemplate.rawHtml,
+        isTableDocument: foundWordTemplate.isTableDocument,
+        columns: foundWordTemplate.sampleColumns || [],
+        data: foundWordTemplate.sampleData || [],
+        templateMeta: foundWordTemplate,
+      });
+    } else {
+      setCustomDocxTemplate(null);
+    }
+    onTemplateChange?.(templateIdOrObj);
+  }, [savedWordTemplates, onTemplateChange]);
+
+  const handleApplyDocxTemplate = useCallback((result) => {
+    if (result.templateMeta) {
+      setSavedWordTemplates(getSavedDocxTemplates());
+    }
+    // Always set customDocxTemplate so the document canvas mounts immediately
+    setCustomDocxTemplate(result);
+    if (result.isTableDocument && result.columns?.length > 0 && result.data?.length > 0) {
+      setLiveColumns(result.columns);
+      setVisibleColumnKeys(result.columns.map((c) => c.id));
+    }
+  }, []);
+
+  const handleDeleteDocxTemplate = useCallback((templateId) => {
+    deleteDocxTemplate(templateId);
+    setSavedWordTemplates(getSavedDocxTemplates());
+    if (customDocxTemplate?.templateMeta?.id === templateId) {
+      setCustomDocxTemplate(null);
+    }
+  }, [customDocxTemplate]);
+
+  // Extracted docx scoped styles rendered once at canvas container level (prevents 100 duplicate <style> tags)
+  const docxStyles = useMemo(() => {
+    if (!customDocxTemplate?.html) return '';
+    const { styles } = separateDocxStylesAndBody(customDocxTemplate.html);
+    return styles;
+  }, [customDocxTemplate?.html]);
+
+  // Memoized merged pages for Word (.docx) mode: eliminates continuous re-merges during zoom, resize, or pan
+  const mergedDocxPages = useMemo(() => {
+    if (!customDocxTemplate?.html) return [];
+    const { body } = separateDocxStylesAndBody(customDocxTemplate.html);
+    const contentToMerge = body || customDocxTemplate.html;
+
+    if (Array.isArray(liveData) && liveData.length > 0 && (contentToMerge.includes('{{') || /\{[a-zA-Z0-9_]+\}/.test(contentToMerge))) {
+      return bulkMergeTemplate(contentToMerge, liveData);
+    }
+    return [
+      Array.isArray(liveData) && liveData.length > 0
+        ? mergeTemplateWithData(contentToMerge, liveData[0])
+        : contentToMerge,
+    ];
+  }, [customDocxTemplate?.html, liveData]);
 
   // Mouse Pointer & Canvas Tool Mode: 'hand' (Movable) | 'select' (Text Selection & Live Edit)
   const [pointerMode, setPointerMode] = useState('select');
@@ -196,16 +365,18 @@ export default function UniversalPrintModal({
   });
 
   useEffect(() => {
-    if (columns && columns.length > 0) {
-      setVisibleColumnKeys((prev) => {
-        if (!prev || prev.length === 0) {
-          return columns.map((c) => c.id || c.key || c.accessor || c.dataIndex);
-        }
-        const currentKeys = new Set(columns.map((c) => c.id || c.key || c.accessor || c.dataIndex));
-        const retained = prev.filter((k) => currentKeys.has(k));
-        return retained.length > 0 ? retained : columns.map((c) => c.id || c.key || c.accessor || c.dataIndex);
-      });
-    }
+    if (!liveColumns || liveColumns.length === 0) return;
+    setVisibleColumnKeys((prev) => {
+      if (!prev || prev.length === 0) {
+        return liveColumns.map((c) => c.id || c.key || c.accessor || c.dataIndex);
+      }
+      const currentKeys = new Set(liveColumns.map((c) => c.id || c.key || c.accessor || c.dataIndex));
+      const retained = prev.filter((k) => currentKeys.has(k));
+      if (retained.length === prev.length && retained.every((k, i) => k === prev[i])) {
+        return prev;
+      }
+      return retained.length > 0 ? retained : liveColumns.map((c) => c.id || c.key || c.accessor || c.dataIndex);
+    });
   }, [columnKeySignature]);
 
   // Row Visibility State with localStorage Hydration
@@ -236,14 +407,16 @@ export default function UniversalPrintModal({
       setVisibleRowKeys(propVisibleRowKeys.map(String));
       return;
     }
-    if (allRowKeys && allRowKeys.length > 0) {
-      setVisibleRowKeys((prev) => {
-        if (!prev || prev.length === 0) return allRowKeys;
-        const currentSet = new Set(allRowKeys);
-        const retained = prev.filter((k) => currentSet.has(k));
-        return retained.length > 0 ? retained : allRowKeys;
-      });
-    }
+    if (!allRowKeys || allRowKeys.length === 0) return;
+    setVisibleRowKeys((prev) => {
+      if (!prev || prev.length === 0) return allRowKeys;
+      const currentSet = new Set(allRowKeys);
+      const retained = prev.filter((k) => currentSet.has(k));
+      if (retained.length === prev.length && retained.every((k, i) => k === prev[i])) {
+        return prev;
+      }
+      return retained.length > 0 ? retained : allRowKeys;
+    });
   }, [rowKeySignature, propVisibleRowKeys]);
 
   // Extra Blank Rows with localStorage Hydration
@@ -378,12 +551,16 @@ export default function UniversalPrintModal({
       visibleColumnKeys: Array.isArray(visibleColumnKeys) ? [...visibleColumnKeys] : [],
       visibleRowKeys: Array.isArray(visibleRowKeys) ? [...visibleRowKeys] : [],
       extraBlankRows,
+      liveData: Array.isArray(liveData) ? JSON.parse(JSON.stringify(liveData)) : [],
+      liveColumns: Array.isArray(liveColumns) ? JSON.parse(JSON.stringify(liveColumns)) : [],
+      liveMetaItems: Array.isArray(liveMetaItems) ? JSON.parse(JSON.stringify(liveMetaItems)) : [],
+      liveSummaryMetrics: Array.isArray(liveSummaryMetrics) ? JSON.parse(JSON.stringify(liveSummaryMetrics)) : [],
     };
     pastStackRef.current = [...pastStackRef.current, prevSnapshot].slice(-40);
     futureStackRef.current = [];
     updaterFn();
     setHistoryVersion((v) => v + 1);
-  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows]);
+  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, liveData, liveColumns, liveMetaItems, liveSummaryMetrics]);
 
   // Wrapped State Setters
   const updateOptionsWithHistory = useCallback((nextValOrUpdater) => {
@@ -414,6 +591,70 @@ export default function UniversalPrintModal({
     });
   }, [pushStateChange]);
 
+  // ── WYSIWYG Live Canvas Mutation Handlers ─────────────────────────────────
+  const handleCellChange = useCallback((rowIndex, colKey, newValue) => {
+    pushStateChange(() => {
+      setLiveData((prev) => {
+        const next = [...prev];
+        if (next[rowIndex]) {
+          next[rowIndex] = { ...next[rowIndex], [colKey]: newValue };
+        }
+        return next;
+      });
+    });
+  }, [pushStateChange]);
+
+  const handleRowDelete = useCallback((rowIndex) => {
+    pushStateChange(() => {
+      setLiveData((prev) => prev.filter((_, idx) => idx !== rowIndex));
+    });
+  }, [pushStateChange]);
+
+  const handleRowInsert = useCallback((rowIndex, position = 'below') => {
+    pushStateChange(() => {
+      setLiveData((prev) => {
+        const newRow = { id: `row_custom_${Date.now()}` };
+        (liveColumns || []).forEach((c) => {
+          const k = c.id || c.key || c.accessor || c.dataIndex;
+          if (k) newRow[k] = '';
+        });
+        const insertIdx = position === 'above' ? rowIndex : rowIndex + 1;
+        const next = [...prev];
+        next.splice(insertIdx, 0, newRow);
+        return next;
+      });
+    });
+  }, [liveColumns, pushStateChange]);
+
+  const handleRowMove = useCallback((fromIndex, toIndex) => {
+    pushStateChange(() => {
+      setLiveData((prev) => {
+        if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+    });
+  }, [pushStateChange]);
+
+  const handleColumnHeaderChange = useCallback((colKey, newHeader) => {
+    pushStateChange(() => {
+      setLiveColumns((prev) =>
+        prev.map((c) => {
+          const k = c.id || c.key || c.accessor || c.dataIndex;
+          return k === colKey ? { ...c, header: newHeader, label: newHeader, title: newHeader } : c;
+        })
+      );
+    });
+  }, [pushStateChange]);
+
+  const handleMetaItemsChange = useCallback((newMetaItems) => {
+    pushStateChange(() => {
+      setLiveMetaItems(newMetaItems);
+    });
+  }, [pushStateChange]);
+
   // Undo Handler
   const handleUndo = useCallback(() => {
     if (pastStackRef.current.length === 0) return;
@@ -422,6 +663,10 @@ export default function UniversalPrintModal({
       visibleColumnKeys: Array.isArray(visibleColumnKeys) ? [...visibleColumnKeys] : [],
       visibleRowKeys: Array.isArray(visibleRowKeys) ? [...visibleRowKeys] : [],
       extraBlankRows,
+      liveData: Array.isArray(liveData) ? JSON.parse(JSON.stringify(liveData)) : [],
+      liveColumns: Array.isArray(liveColumns) ? JSON.parse(JSON.stringify(liveColumns)) : [],
+      liveMetaItems: Array.isArray(liveMetaItems) ? JSON.parse(JSON.stringify(liveMetaItems)) : [],
+      liveSummaryMetrics: Array.isArray(liveSummaryMetrics) ? JSON.parse(JSON.stringify(liveSummaryMetrics)) : [],
     };
     const previousSnapshot = pastStackRef.current[pastStackRef.current.length - 1];
     pastStackRef.current = pastStackRef.current.slice(0, -1);
@@ -432,9 +677,13 @@ export default function UniversalPrintModal({
     setVisibleColumnKeys(previousSnapshot.visibleColumnKeys);
     setVisibleRowKeys(previousSnapshot.visibleRowKeys || allRowKeys);
     setExtraBlankRows(previousSnapshot.extraBlankRows);
+    if (previousSnapshot.liveData) setLiveData(previousSnapshot.liveData);
+    if (previousSnapshot.liveColumns) setLiveColumns(previousSnapshot.liveColumns);
+    if (previousSnapshot.liveMetaItems) setLiveMetaItems(previousSnapshot.liveMetaItems);
+    if (previousSnapshot.liveSummaryMetrics) setLiveSummaryMetrics(previousSnapshot.liveSummaryMetrics);
     isRestoringRef.current = false;
     setHistoryVersion((v) => v + 1);
-  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, allRowKeys]);
+  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, allRowKeys, liveData, liveColumns, liveMetaItems, liveSummaryMetrics]);
 
   // Redo Handler
   const handleRedo = useCallback(() => {
@@ -444,6 +693,10 @@ export default function UniversalPrintModal({
       visibleColumnKeys: Array.isArray(visibleColumnKeys) ? [...visibleColumnKeys] : [],
       visibleRowKeys: Array.isArray(visibleRowKeys) ? [...visibleRowKeys] : [],
       extraBlankRows,
+      liveData: Array.isArray(liveData) ? JSON.parse(JSON.stringify(liveData)) : [],
+      liveColumns: Array.isArray(liveColumns) ? JSON.parse(JSON.stringify(liveColumns)) : [],
+      liveMetaItems: Array.isArray(liveMetaItems) ? JSON.parse(JSON.stringify(liveMetaItems)) : [],
+      liveSummaryMetrics: Array.isArray(liveSummaryMetrics) ? JSON.parse(JSON.stringify(liveSummaryMetrics)) : [],
     };
     const nextSnapshot = futureStackRef.current[0];
     futureStackRef.current = futureStackRef.current.slice(1);
@@ -454,9 +707,13 @@ export default function UniversalPrintModal({
     setVisibleColumnKeys(nextSnapshot.visibleColumnKeys);
     setVisibleRowKeys(nextSnapshot.visibleRowKeys || allRowKeys);
     setExtraBlankRows(nextSnapshot.extraBlankRows);
+    if (nextSnapshot.liveData) setLiveData(nextSnapshot.liveData);
+    if (nextSnapshot.liveColumns) setLiveColumns(nextSnapshot.liveColumns);
+    if (nextSnapshot.liveMetaItems) setLiveMetaItems(nextSnapshot.liveMetaItems);
+    if (nextSnapshot.liveSummaryMetrics) setLiveSummaryMetrics(nextSnapshot.liveSummaryMetrics);
     isRestoringRef.current = false;
     setHistoryVersion((v) => v + 1);
-  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, allRowKeys]);
+  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, allRowKeys, liveData, liveColumns, liveMetaItems, liveSummaryMetrics]);
 
   // Reset to Defaults
   const handleResetDefaults = useCallback(() => {
@@ -469,12 +726,16 @@ export default function UniversalPrintModal({
         // ignore
       }
       setOptions(factoryDefaults);
+      setLiveData(Array.isArray(data) ? [...data] : []);
+      setLiveColumns(Array.isArray(columns) ? [...columns] : []);
+      setLiveMetaItems(Array.isArray(metaItems) ? [...metaItems] : []);
+      setLiveSummaryMetrics(Array.isArray(summaryMetrics) ? [...summaryMetrics] : []);
       setVisibleColumnKeys((columns || []).map((c) => c.id || c.key || c.accessor || c.dataIndex));
       setVisibleRowKeys(allRowKeys);
       setExtraBlankRows(0);
       setZoomLevel(1);
     });
-  }, [docKey, factoryDefaults, columns, allRowKeys, pushStateChange]);
+  }, [docKey, factoryDefaults, columns, data, metaItems, summaryMetrics, allRowKeys, pushStateChange]);
 
   // Universal Project Fullscreen Hook (identical to Attendance module)
   const { isFullscreen, setIsFullscreen, toggleFullscreen } = useFullscreen({ initialState: true });
@@ -629,11 +890,11 @@ export default function UniversalPrintModal({
 
   // Filter active visible rows for accurate pagination calculation
   const activeData = useMemo(() => {
-    if (!visibleRowKeys || !Array.isArray(visibleRowKeys) || !Array.isArray(data)) {
-      return data || [];
+    if (!visibleRowKeys || !Array.isArray(visibleRowKeys) || !Array.isArray(liveData)) {
+      return liveData || [];
     }
     const visibleSet = new Set(visibleRowKeys.map(String));
-    return (data || []).filter((row, idx) => {
+    return (liveData || []).filter((row, idx) => {
       const key = getRowIdentifier(row, idx);
       const isMandatory =
         (typeof isRowMandatory === 'function' && isRowMandatory(row, idx)) ||
@@ -643,7 +904,7 @@ export default function UniversalPrintModal({
 
       return isMandatory || visibleSet.has(key);
     });
-  }, [data, visibleRowKeys, getRowIdentifier, isRowMandatory, isRowRequired, requiredRowKeys]);
+  }, [liveData, visibleRowKeys, getRowIdentifier, isRowMandatory, isRowRequired, requiredRowKeys]);
 
   // ── Dynamic Real-Pixel DOM Measurement & Auto-Pagination Engine ───────────
   const measureSandboxRef = useRef(null);
@@ -842,35 +1103,14 @@ export default function UniversalPrintModal({
   const recalcRef = useRef(recalculateDOMPagination);
   recalcRef.current = recalculateDOMPagination;
 
-  // Trigger measurement synchronously after DOM mutation & on resize
+  // Trigger measurement synchronously after DOM mutation
   useLayoutEffect(() => {
     if (!isOpen) return;
-
-    // Immediate calculation
     recalcRef.current();
-
-    // Use requestAnimationFrame for secondary pass after styles apply
-    const rafId = requestAnimationFrame(() => {
-      recalcRef.current();
-    });
-
-    // ResizeObserver on measuring sandbox to automatically track any text wrapping / live editing changes
-    let observer;
-    if (typeof ResizeObserver !== 'undefined' && measureSandboxRef.current) {
-      observer = new ResizeObserver(() => {
-        recalcRef.current();
-      });
-      observer.observe(measureSandboxRef.current);
-    }
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      if (observer) observer.disconnect();
-    };
   }, [
     isOpen,
     activeData,
-    columns,
+    liveColumns,
     visibleRowKeys,
     visibleColumnKeys,
     extraBlankRows,
@@ -888,11 +1128,32 @@ export default function UniversalPrintModal({
     options.showFooter,
     title,
     subtitle,
-    metaItems,
-    summaryMetrics,
+    liveMetaItems,
+    liveSummaryMetrics,
     footerRows,
     footerRow,
   ]);
+
+  // Persistent, debounced ResizeObserver on measuring sandbox
+  useEffect(() => {
+    if (!isOpen || typeof ResizeObserver === 'undefined') return;
+    const sandbox = measureSandboxRef.current;
+    if (!sandbox) return;
+
+    let rafId = null;
+    const observer = new ResizeObserver(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        recalcRef.current();
+      });
+    });
+
+    observer.observe(sandbox);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [isOpen]);
 
   // Calculate final pages consuming dynamic DOM measurement directly
   const paginationResult = useMemo(() => {
@@ -1012,6 +1273,9 @@ export default function UniversalPrintModal({
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold theme-bg-sub theme-text-secondary border theme-border uppercase">
                   {paginationResult.totalPages > 1 ? `${paginationResult.totalPages} Pages • ` : ''}{options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'}
                 </span>
+                <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                  Live Canvas • Click to Edit
+                </span>
               </div>
               <p className="text-xs theme-text-secondary truncate leading-tight">
                 {title} {subtitle ? `— ${subtitle}` : ''}
@@ -1019,8 +1283,19 @@ export default function UniversalPrintModal({
             </div>
           </div>
 
-          {/* Center: Interactive Undo/Redo & Zoom Controller */}
+          {/* Center: Interactive Undo/Redo, Zoom Controller, and Word (.docx) Ingestion */}
           <div className="hidden sm:flex items-center gap-2">
+            {/* Import Word Template Action */}
+            <button
+              type="button"
+              onClick={() => setIsDocxModalOpen(true)}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl theme-bg-sub/80 border theme-border theme-text-primary hover:theme-accent hover:border-[var(--accent-main)]/50 transition-all cursor-pointer shadow-2xs text-xs font-bold"
+              title="Import Microsoft Word (.docx) Document or Template"
+            >
+              <FileIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Import Word (.docx)</span>
+            </button>
+
             {/* Undo / Redo Actions */}
             <div className="flex items-center gap-1 px-1.5 py-1 rounded-2xl theme-bg-sub/80 border theme-border shadow-2xl">
               <button
@@ -1095,13 +1370,13 @@ export default function UniversalPrintModal({
             <PrintExportMenu
               title={title}
               subtitle={subtitle}
-              metaItems={metaItems}
-              summaryMetrics={summaryMetrics}
+              metaItems={liveMetaItems}
+              summaryMetrics={liveSummaryMetrics}
               options={options}
-              columns={columns}
+              columns={liveColumns}
               visibleColumnKeys={visibleColumnKeys}
               extraBlankRows={extraBlankRows}
-              data={data}
+              data={liveData}
               showPrint={showPrint}
               showPDF={showPDF}
               showExcel={showExcel}
@@ -1164,8 +1439,46 @@ export default function UniversalPrintModal({
               onZoomChange={setZoomLevel}
               pointerMode={pointerMode}
               onPointerModeChange={setPointerMode}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
             >
-              {customSheets ? (
+              {/* 1. Custom Word (.docx) Template Mode */}
+              {customDocxTemplate ? (
+                <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
+                  {/* Single shared style block injected once for the entire batch */}
+                  {docxStyles && (
+                    <div
+                      dangerouslySetInnerHTML={{ __html: docxStyles }}
+                      className="hidden"
+                    />
+                  )}
+                  {mergedDocxPages.map((pageHtml, pIdx) => (
+                    <div key={`docx_page_${pIdx}`} className="relative paper-sheet-wrapper group">
+                      <div
+                        className="paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative"
+                        data-size={options.pageSize || 'A4'}
+                        data-orientation={options.orientation || 'PORTRAIT'}
+                        data-margin={options.margin || 'NORMAL'}
+                        data-density={options.density || 'NORMAL'}
+                        data-color-mode={options.colorMode || 'FULL_COLOR'}
+                        data-page-break="true"
+                      >
+                        <div className="w-full h-full p-6 sm:p-8 print:p-4">
+                          <DocxLiveRenderer
+                            htmlContent={pageHtml}
+                            isEditable={true}
+                            onContentChange={(newHtml) => {
+                              setCustomDocxTemplate((prev) => (prev ? { ...prev, html: newHtml } : null));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : customSheets ? (
                 children
               ) : children ? (
                 <div className="relative paper-sheet-wrapper group">
@@ -1181,7 +1494,8 @@ export default function UniversalPrintModal({
                     <PrintDocumentWrapper
                       title={title}
                       subtitle={subtitle}
-                      metaItems={metaItems}
+                      metaItems={liveMetaItems}
+                      onMetaItemsChange={handleMetaItemsChange}
                       options={options}
                       onOptionsChange={updateOptionsWithHistory}
                       isEditable={true}
@@ -1209,7 +1523,8 @@ export default function UniversalPrintModal({
                       <PrintDocumentWrapper
                         title={title}
                         subtitle={subtitle}
-                        metaItems={metaItems}
+                        metaItems={liveMetaItems}
+                        onMetaItemsChange={handleMetaItemsChange}
                         options={options}
                         onOptionsChange={updateOptionsWithHistory}
                         isEditable={true}
@@ -1219,7 +1534,7 @@ export default function UniversalPrintModal({
                         isLastPage={page.isLastPage}
                       >
                         <PrintTableRenderer
-                          columns={columns}
+                          columns={liveColumns}
                           data={page.rows}
                           visibleColumnKeys={visibleColumnKeys}
                           isColumnMandatory={isColumnMandatory}
@@ -1231,11 +1546,17 @@ export default function UniversalPrintModal({
                           requiredRowKeys={requiredRowKeys}
                           getRowKey={getRowIdentifier}
                           extraBlankRows={page.extraBlanks}
-                          summaryMetrics={page.isLastPage && options.showSummary !== false ? summaryMetrics : []}
+                          summaryMetrics={page.isLastPage && options.showSummary !== false ? liveSummaryMetrics : []}
                           density={options.density}
                           footerRow={page.isLastPage ? footerRow : null}
                           footerRows={page.isLastPage ? footerRows : []}
                           startIndex={page.startIndex}
+                          isEditable={true}
+                          onCellChange={handleCellChange}
+                          onRowDelete={handleRowDelete}
+                          onRowInsert={handleRowInsert}
+                          onRowMove={handleRowMove}
+                          onColumnHeaderChange={handleColumnHeaderChange}
                         />
                       </PrintDocumentWrapper>
                     </div>
@@ -1273,13 +1594,13 @@ export default function UniversalPrintModal({
                   defaultSubtitle={subtitle}
                   title={title}
                   subtitle={subtitle}
-                  availableColumns={columns}
+                  availableColumns={liveColumns}
                   visibleColumnKeys={visibleColumnKeys}
                   onVisibleColumnsChange={updateVisibleColumnsWithHistory}
                   isColumnMandatory={isColumnMandatory}
                   isColumnRequired={isColumnRequired}
                   requiredColumnKeys={requiredColumnKeys}
-                  availableRows={data}
+                  availableRows={liveData}
                   visibleRowKeys={visibleRowKeys}
                   onVisibleRowsChange={updateVisibleRowsWithHistory}
                   isRowMandatory={isRowMandatory}
@@ -1299,9 +1620,11 @@ export default function UniversalPrintModal({
                   showHeaderSection={showHeaderSection}
                   showWatermarkSection={showWatermarkSection}
                   showSignaturesSection={showSignaturesSection}
-                  templates={templates}
-                  activeTemplateId={activeTemplateId}
-                  onTemplateChange={onTemplateChange}
+                  templates={combinedTemplates}
+                  activeTemplateId={customDocxTemplate?.templateMeta?.id || activeTemplateId}
+                  onTemplateChange={handleTemplateSelection}
+                  onOpenDocxModal={() => setIsDocxModalOpen(true)}
+                  onDeleteDocxTemplate={handleDeleteDocxTemplate}
                   onResetDefaults={handleResetDefaults}
                   onClose={() => setIsSidebarOpen(false)}
                   className="w-full h-full max-w-full print-sidebar-control print-studio-no-print shadow-2xl md:shadow-none"
@@ -1311,6 +1634,19 @@ export default function UniversalPrintModal({
           )}
         </div>
       </div>
+
+      {/* Docx Template Ingestion Modal */}
+      {isDocxModalOpen && (
+        <DocxTemplateModal
+          isOpen={isDocxModalOpen}
+          onClose={() => setIsDocxModalOpen(false)}
+          onApplyTemplate={handleApplyDocxTemplate}
+          placeholderKeys={placeholderKeys}
+          sampleData={liveData && liveData[0] ? { ...liveData[0], title, subtitle } : { title, subtitle }}
+          columns={liveColumns}
+          metaItems={metaItems}
+        />
+      )}
 
       {/* Active Global Drag Overlay to ensure uninterrupted smooth resizing without mouse event trapping */}
       {isSidebarResizing && (
@@ -1354,7 +1690,7 @@ export default function UniversalPrintModal({
           <PrintDocumentWrapper
             title={title}
             subtitle={subtitle}
-            metaItems={metaItems}
+            metaItems={liveMetaItems}
             options={options}
             pageIndex={0}
             totalPages={1}
@@ -1363,7 +1699,7 @@ export default function UniversalPrintModal({
             isEditable={false}
           >
             <PrintTableRenderer
-              columns={columns}
+              columns={liveColumns}
               data={activeData}
               visibleColumnKeys={visibleColumnKeys}
               isColumnMandatory={isColumnMandatory}
@@ -1375,7 +1711,7 @@ export default function UniversalPrintModal({
               requiredRowKeys={requiredRowKeys}
               getRowKey={getRowIdentifier}
               extraBlankRows={extraBlankRows}
-              summaryMetrics={options.showSummary !== false ? summaryMetrics : []}
+              summaryMetrics={options.showSummary !== false ? liveSummaryMetrics : []}
               density={options.density}
               footerRow={footerRow}
               footerRows={footerRows}

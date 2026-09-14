@@ -28,4 +28,12 @@
    - **Universal `useTranslation` Hook Usage:** Always consume translations using `const { t, formatNumber, formatDate, isRTL } = useTranslation(namespace);` with standard fallback chaining: `t('key', 'Default English Text', params)`.
    - **Bidirectional RTL Compliance:** Every UI layout, flex arrangement, text alignment, and icon orientation must seamlessly adapt to RTL mode when Arabic or Urdu is active (using `rtl:...`, CSS logical properties, or text alignment tokens).
    - **Intl Number & Date Formatting:** All displayed numbers, dates, and times must pass through centralized formatters (`formatNumber`, `formatDate`, `formatTime`) to ensure culturally accurate numeral rendering across Bengali (`১, ২, ৩`) and standard/Arabic formats.
-
+8. **Large Feature & Module Decomposition Standard (Strict Modular Architecture):**
+   - **File Size Threshold:** No single view/component file should become overly large or monolithic (>300-400 lines). When a feature or screen grows complex, it must be proactively decomposed into dedicated subfolders and single-responsibility modules.
+   - **Standard Modular Directory Structure:**
+     - `MainView.tsx` — Lean, readable high-level orchestrator focusing exclusively on layout composition, top-level state wiring, and coordination.
+     - `components/` — Dedicated subfolder for all specialized UI blocks, sub-components, table cell editors, action toolbars, and feature-specific modals (with a clean `index.ts` barrel export).
+     - `hooks/` — Dedicated subfolder for isolated custom hooks managing filter scopes, cascading state, column configurations, metric builders, and complex grid/form operations (with a clean `index.ts` barrel export).
+     - `types.ts` — Shared interfaces, parameter contracts, and action types.
+     - `index.ts` — Centralized module-level barrel re-exporting views, sub-components, and hooks cleanly.
+   - **Zero Logic Bloat in Views:** Keep view files focused on orchestration by delegating heavy business logic, column constructions, and modal bodies to their respective subfolders.

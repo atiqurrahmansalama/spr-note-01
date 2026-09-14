@@ -30,7 +30,7 @@ from core.models import (
     AttendancePolicySetting, DocumentTemplateConfig, NotificationGatewayConfig,
     NotificationTemplate, NotificationTriggerRule, InAppNotification,
     NotificationDispatchLog, UserSession, UserDevice, UserLoginLog, UserActivityLog,
-    ActivityLog, TeacherProfile, GuardianProfile
+    ActivityLog, TeacherProfile, GuardianProfile, AuditLog
 )
 from core.services import get_scoped_tenant_id
 
@@ -655,4 +655,47 @@ class RoleInviteTokenSerializer(serializers.ModelSerializer):
             'is_active', 'created_by', 'created_by_name', 'created_at', 'is_valid'
         ]
         read_only_fields = ['id', 'token', 'used_count', 'created_by', 'created_at', 'is_valid']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Enterprise AuditLog records (Read-Only).
+    """
+    institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    actor_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id',
+            'institution',
+            'institution_name',
+            'actor',
+            'actor_name',
+            'actor_phone',
+            'actor_role',
+            'actor_display',
+            'action',
+            'resource_type',
+            'resource_id',
+            'resource_name',
+            'before_state',
+            'after_state',
+            'changes_summary',
+            'reason',
+            'ip_address',
+            'user_agent',
+            'device_metadata',
+            'request_id',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_actor_display(self, obj) -> str:
+        if obj.actor_name:
+            return obj.actor_name
+        if obj.actor:
+            return obj.actor.phone_number or obj.actor.email or str(obj.actor.id)
+        return "System"
+
 

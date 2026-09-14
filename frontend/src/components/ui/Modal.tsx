@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CloseIcon } from './Icons';
+import { CloseIcon, CheckIcon, AlertCircleIcon } from './Icons';
+import CustomButton from './CustomButton';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export interface ModalProps {
   headerClassName?: string;
   bodyClassName?: string;
   footerClassName?: string;
+  overlayClassName?: string;
+  zIndex?: number | string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -38,6 +41,8 @@ export const Modal: React.FC<ModalProps> = ({
   headerClassName = '',
   bodyClassName = '',
   footerClassName = '',
+  overlayClassName = '',
+  zIndex = 10000,
 }) => {
   // ESC key listener
   useEffect(() => {
@@ -80,7 +85,8 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-xs animate-fade-in text-left font-sans"
+      className={`fixed inset-0 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-xs animate-fade-in text-left font-sans ${overlayClassName}`}
+      style={{ zIndex }}
       onClick={(e) => {
         if (closeOnOverlayClick && e.target === e.currentTarget) {
           onClose?.();
@@ -151,6 +157,193 @@ export const Modal: React.FC<ModalProps> = ({
   );
 
   return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+};
+
+// ── ConfirmModal (Ultra-Reusable Enterprise Confirmation & Alert Modal) ── //
+
+export interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title?: string;
+  subtitle?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  badge?: React.ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  confirmVariant?: 'primary' | 'secondary' | 'sub' | 'surface' | 'outline' | 'soft' | 'danger' | 'danger-solid' | 'success' | 'success-solid' | 'warning' | 'ghost';
+  confirmIcon?: React.ComponentType<{ className?: string }>;
+  confirmLoading?: boolean;
+  confirmLoadingText?: string;
+  confirmDisabled?: boolean;
+  showCancelButton?: boolean;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | string;
+  callout?: {
+    type?: 'info' | 'warning' | 'danger' | 'success';
+    title?: string;
+    message: React.ReactNode;
+    icon?: React.ComponentType<{ className?: string }>;
+  };
+  summaryItems?: Array<{
+    label: string;
+    value: React.ReactNode;
+    color?: string;
+    subLabel?: string;
+  }>;
+  note?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+}
+
+export const ConfirmModal: React.FC<ConfirmModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = 'Confirmation Required',
+  subtitle,
+  icon = AlertCircleIcon,
+  badge,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  confirmVariant = 'primary',
+  confirmIcon = CheckIcon,
+  confirmLoading = false,
+  confirmLoadingText,
+  confirmDisabled = false,
+  showCancelButton = true,
+  size = 'md',
+  callout,
+  summaryItems,
+  note,
+  children,
+  className = '',
+}) => {
+  const calloutStyles: Record<string, string> = {
+    info: 'border-blue-500/20 bg-blue-500/10 text-blue-800 dark:text-blue-300',
+    warning: 'border-[var(--accent-main)]/30 theme-bg-accent-soft theme-text-secondary',
+    danger: 'border-red-500/20 bg-red-500/10 text-red-800 dark:text-red-300',
+    success: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+  };
+
+  const footerActions = (
+    <div className="flex items-center justify-end gap-2.5 w-full">
+      {showCancelButton && (
+        <CustomButton
+          variant="sub"
+          size="sm"
+          onClick={onClose}
+          disabled={confirmLoading}
+        >
+          {cancelText}
+        </CustomButton>
+      )}
+      <CustomButton
+        variant={confirmVariant}
+        size="sm"
+        icon={confirmIcon}
+        loading={confirmLoading}
+        loadingText={confirmLoadingText || 'Processing...'}
+        disabled={confirmDisabled}
+        onClick={onConfirm}
+      >
+        {confirmText}
+      </CustomButton>
+    </div>
+  );
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      icon={icon}
+      badge={badge}
+      size={size}
+      footer={footerActions}
+      className={className}
+    >
+      <div className="p-4 sm:p-6 space-y-4 text-xs">
+        {/* Callout Box */}
+        {callout && (
+          <div
+            className={`flex items-start gap-3 p-3.5 rounded-2xl border ${
+              calloutStyles[callout.type || 'warning'] || calloutStyles.warning
+            }`}
+          >
+            {callout.icon ? (
+              <callout.icon className="w-5 h-5 theme-accent shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircleIcon className="w-5 h-5 theme-accent shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-1 min-w-0 flex-1">
+              {callout.title && (
+                <p className="font-bold theme-text-primary text-xs">
+                  {callout.title}
+                </p>
+              )}
+              {callout.message && (
+                <div className="text-[11px] leading-relaxed opacity-90">
+                  {callout.message}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Summary Cards Grid */}
+        {summaryItems && summaryItems.length > 0 && (
+          <div className="p-3.5 rounded-2xl border theme-border theme-bg-sub/50 space-y-2">
+            <p className="text-[11px] font-bold theme-text-secondary uppercase tracking-wider">
+              Summary Details
+            </p>
+            <div
+              className={`grid gap-2 text-center pt-1 ${
+                summaryItems.length === 2
+                  ? 'grid-cols-2'
+                  : summaryItems.length === 4
+                  ? 'grid-cols-2 sm:grid-cols-4'
+                  : 'grid-cols-3'
+              }`}
+            >
+              {summaryItems.map((item, idx) => (
+                <div
+                  key={`sum_item_${idx}`}
+                  className="p-2.5 rounded-xl theme-bg-surface border theme-border"
+                >
+                  <span className="block text-[10px] theme-text-secondary truncate">
+                    {item.label}
+                  </span>
+                  <span
+                    className={`text-sm font-bold block mt-0.5 ${
+                      item.color || 'theme-text-primary'
+                    }`}
+                  >
+                    {item.value}
+                  </span>
+                  {item.subLabel && (
+                    <span className="block text-[9px] theme-text-secondary opacity-75 mt-0.5">
+                      {item.subLabel}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Custom Input / Nested Form Content */}
+        {children && <div className="space-y-3">{children}</div>}
+
+        {/* Supplementary Note */}
+        {note && (
+          <p className="text-[11px] theme-text-secondary italic leading-relaxed">
+            {note}
+          </p>
+        )}
+      </div>
+    </Modal>
+  );
 };
 
 export default Modal;
