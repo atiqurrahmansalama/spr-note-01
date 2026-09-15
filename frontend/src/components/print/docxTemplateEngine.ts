@@ -1,10 +1,13 @@
 import { renderAsync } from 'docx-preview';
 import mammoth from 'mammoth';
 
+export type DocxTemplateType = 'template' | 'generated';
+
 export interface CustomDocxTemplate {
   id: string;
   name: string;
   description?: string;
+  scopeId?: string;
   rawHtml: string;
   detectedPlaceholders: string[];
   createdAt: string;
@@ -12,6 +15,9 @@ export interface CustomDocxTemplate {
   isTableDocument?: boolean;
   sampleColumns?: Array<{ id: string; header: string; label: string }>;
   sampleData?: Array<Record<string, any>>;
+  templateType?: DocxTemplateType;
+  recordsCount?: number;
+  sourceTemplateId?: string;
 }
 
 export interface DocxParseResult {
@@ -24,6 +30,37 @@ export interface DocxParseResult {
 }
 
 const TEMPLATES_STORAGE_KEY = 'spr_custom_docx_templates';
+
+export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
+  ['name', 'student_name', 'studentname', 'student_full_name', 'fullname', 'staff_name', 'employee_name'],
+  ['roll', 'roll_number', 'rollnumber', 'roll_no', 'rollno'],
+  ['class', 'class_name', 'classname', 'class_section'],
+  ['section', 'section_name', 'sectionname'],
+  ['grade', 'letter_grade', 'overall_grade'],
+  ['exam', 'exam_name', 'examname', 'examination', 'exam_title'],
+  ['session', 'academic_session', 'academicsession', 'academic_year', 'academicyear'],
+  ['department', 'department_name', 'departmentname'],
+  ['institution', 'institution_name', 'institutionname', 'school_name', 'schoolname', 'academy_name', 'academyname'],
+  ['total', 'total_marks', 'totalmarks', 'grand_total'],
+  ['obtained', 'obtained_marks', 'obtainedmarks', 'total_obtained', 'totalobtained'],
+  ['student_id', 'studentid', 'student_uniq_id', 'reg_no', 'regno', 'uniq_id', 'student_code'],
+  ['highest_marks', 'highestmarks', 'highest', 'highest_total', 'highestmark'],
+  ['highest_gpa', 'highestgpa'],
+  ['highest_percentage', 'highestpercentage'],
+  ['subject', 'subject_name', 'subjectname', 'course_name', 'course'],
+  ['full_marks', 'fullmarks', 'full'],
+  ['pass_marks', 'passmarks', 'pass'],
+  ['cq_marks', 'cqmarks', 'cq', 'creative'],
+  ['mcq_marks', 'mcqmarks', 'mcq'],
+  ['practical_marks', 'practicalmarks', 'practical', 'pr'],
+  ['ca_marks', 'camarks', 'ca', 'continuous'],
+  ['voucher_no', 'voucher', 'invoice_no', 'bill_no'],
+  ['fee_amount', 'amount', 'payable_amount', 'total_fee'],
+  ['paid_amount', 'paid', 'total_paid'],
+  ['due_amount', 'due', 'balance'],
+  ['employee_id', 'staff_id', 'emp_id'],
+  ['designation', 'designation_name', 'post', 'job_title'],
+];
 
 /**
  * Parses a Word document (.docx) ArrayBuffer into 100% exact OpenXML high-fidelity HTML and extracts structured tables.
@@ -171,19 +208,28 @@ export function extractTableDataFromHtml(html: string): {
 
 /**
  * Cleans Word HTML by collapsing split run tags inside {{placeholders}} or {placeholders}.
+ * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
  */
 export function sanitizeDocxPlaceholders(html: string): string {
   if (!html) return '';
-  // Collapse HTML tags between {{ and }}
+
+  // 1. Collapse HTML tags between {{ and }}
   let cleaned = html.replace(/\{\{([\s\S]*?)\}\}/g, (match, inner) => {
     const stripped = inner.replace(/<[^>]*>/g, '').trim();
-    return `{{${stripped}}}`;
+    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return `{{${cleanKey}}}`;
   });
-  // Collapse HTML tags between single { and } where it looks like a variable
-  cleaned = cleaned.replace(/\{([a-zA-Z0-9_\-\.\s]{1,50})\}/g, (match, inner) => {
+
+  // 2. Collapse standalone single {variable} ONLY if not preceded or followed by { or }
+  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s]{1,50})\}(?!\})/g, (match, inner) => {
     const stripped = inner.replace(/<[^>]*>/g, '').trim();
-    return `{{${stripped}}}`;
+    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return `{{${cleanKey}}}`;
   });
+
+  // 3. Prevent and collapse any accidental triple or quadruple braces: {{{key}}} -> {{key}}
+  cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
+
   return cleaned;
 }
 
@@ -214,7 +260,7 @@ function normalizeKey(str: string): string {
 
 /**
  * Builds an enriched key-value lookup map supporting camelCase, snake_case, spaces, nested properties, and casing variations.
- * 100% Dynamic & Algorithmic - Zero hardcoded domain aliases.
+ * 100% Dynamic & Algorithmic with smart universal domain alias resolution.
  */
 function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, string> {
   const map = new Map<string, string>();
@@ -256,6 +302,17 @@ function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, strin
     if (spaceCase) {
       map.set(spaceCase, strVal);
     }
+
+    // 7. Universal Declarative Synonym Matching
+    for (const group of UNIVERSAL_SYNONYM_GROUPS) {
+      if (group.some((syn) => syn.replace(/[^a-z0-9]/g, '') === norm)) {
+        group.forEach((syn) => {
+          map.set(syn, strVal);
+          map.set(syn.replace(/[^a-z0-9]/g, ''), strVal);
+        });
+        break;
+      }
+    }
   };
 
   // Process all direct and nested properties
@@ -296,6 +353,343 @@ export function separateDocxStylesAndBody(html: string): { styles: string; body:
 }
 
 /**
+ * Detects if a template is a Tabular Template (Type 1) containing repeating table rows or loop tags.
+ */
+export function isTabularTemplate(html: string): boolean {
+  if (!html) return false;
+  // 1. Explicit loop block markers (e.g. {{#rows}}, {{#students}}, {{#records}})
+  if (/\{\{#(rows|students|records|data|items|table|list|row)\}\}/i.test(html)) {
+    return true;
+  }
+
+  // 2. DOM-based table check with repeating placeholders
+  if (typeof document !== 'undefined' && html.includes('<table')) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const tables = doc.querySelectorAll('table');
+      for (const table of Array.from(tables)) {
+        const rows = table.querySelectorAll('tr');
+        for (const tr of Array.from(rows)) {
+          // Check if this row contains {{...}} placeholders and is not purely <th> header cells
+          const hasPlaceholders = /\{\{([a-zA-Z0-9_\-\.\s]+)\}\}/.test(tr.innerHTML);
+          const hasOnlyTh = tr.querySelectorAll('th').length > 0 && tr.querySelectorAll('td').length === 0;
+          if (hasPlaceholders && !hasOnlyTh) {
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      // fallback to regex
+    }
+  }
+
+  // 3. Fallback regex for tables containing placeholders inside <td>
+  const tdPlaceholderRegex = /<tr\b[^>]*>[\s\S]*?<td\b[^>]*>[\s\S]*?\{\{([a-zA-Z0-9_\-\.\s]+)\}\}[\s\S]*?<\/td>[\s\S]*?<\/tr>/i;
+  return tdPlaceholderRegex.test(html);
+}
+
+/**
+ * Type 1: Tabular Column-Loop / Table Data Row Merging Engine
+ * Merges a table template with an array of records by repeating the template data row
+ * for each record, populating column variables and sequential index (Sl/No/Index).
+ */
+export function mergeTabularTemplateWithData(
+  templateHtml: string,
+  records: Array<Record<string, any>>,
+  baseContext: Record<string, any> = {}
+): string {
+  if (!templateHtml) return '';
+  if (!Array.isArray(records) || records.length === 0) {
+    return mergeTemplateWithData(templateHtml, baseContext);
+  }
+
+  const sanitized = sanitizeDocxPlaceholders(templateHtml);
+
+  // 1. Check for explicit loop block syntax: {{#rows}} ... {{/rows}}
+  const loopBlockRegex = /\{\{#(rows|students|records|data|items|table|list|row)\}\}([\s\S]*?)\{\{\/\1\}\}/gi;
+  if (loopBlockRegex.test(sanitized)) {
+    const expanded = sanitized.replace(loopBlockRegex, (_, _tagName, blockContent) => {
+      return records
+        .map((rec, rIdx) => {
+          const rowData = {
+            sl: rIdx + 1,
+            serial: rIdx + 1,
+            no: rIdx + 1,
+            index: rIdx + 1,
+            row_num: rIdx + 1,
+            row_number: rIdx + 1,
+            index_0: rIdx,
+            '@index': rIdx + 1,
+            '#index': rIdx + 1,
+            ...baseContext,
+            ...rec,
+          };
+          return mergeTemplateWithData(blockContent, rowData);
+        })
+        .join('\n');
+    });
+
+    const finalContext = {
+      ...baseContext,
+      total_students: records.length,
+      total_records: records.length,
+      records_count: records.length,
+      total_count: records.length,
+    };
+    return mergeTemplateWithData(expanded, finalContext);
+  }
+
+  // 2. Implicit Table Row Detection via DOMParser
+  if (typeof document !== 'undefined' && sanitized.includes('<table')) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitized, 'text/html');
+      const tables = doc.querySelectorAll('table');
+      let tableFoundAndProcessed = false;
+
+      tables.forEach((table) => {
+        const trEls = Array.from(table.querySelectorAll('tr'));
+        // Find the template row: a <tr> that contains <td> cells with {{...}} placeholders
+        const templateRow = trEls.find((tr) => {
+          const cells = tr.querySelectorAll('td');
+          if (cells.length === 0) return false;
+          return /\{\{([a-zA-Z0-9_\-\.\s]+)\}\}/.test(tr.innerHTML);
+        });
+
+        if (templateRow && templateRow.parentNode) {
+          tableFoundAndProcessed = true;
+          const parent = templateRow.parentNode;
+          const rowTemplateHtml = templateRow.outerHTML;
+
+          // Generate a populated row for each record
+          records.forEach((rec, rIdx) => {
+            const rowData = {
+              sl: rIdx + 1,
+              serial: rIdx + 1,
+              no: rIdx + 1,
+              index: rIdx + 1,
+              row_num: rIdx + 1,
+              row_number: rIdx + 1,
+              index_0: rIdx,
+              '@index': rIdx + 1,
+              '#index': rIdx + 1,
+              ...baseContext,
+              ...rec,
+            };
+
+            const populatedRowHtml = mergeTemplateWithData(rowTemplateHtml, rowData);
+            const tempContainer = doc.createElement('tbody');
+            tempContainer.innerHTML = populatedRowHtml;
+            const newTr = tempContainer.firstElementChild;
+            if (newTr) {
+              parent.insertBefore(newTr, templateRow);
+            }
+          });
+
+          // Remove the placeholder template row
+          parent.removeChild(templateRow);
+        }
+      });
+
+      if (tableFoundAndProcessed) {
+        const bodyContent = doc.body.innerHTML;
+        const finalContext = {
+          ...baseContext,
+          total_students: records.length,
+          total_records: records.length,
+          records_count: records.length,
+          total_count: records.length,
+        };
+        return mergeTemplateWithData(bodyContent, finalContext);
+      }
+    } catch (e) {
+      console.warn('DOM table parsing failed in mergeTabularTemplateWithData, falling back to regex', e);
+    }
+  }
+
+  // 3. Fallback Regex for single-table row template
+  const rowRegex = /<tr\b[^>]*>[\s\S]*?<td\b[^>]*>[\s\S]*?\{\{([a-zA-Z0-9_\-\.\s]+)\}\}[\s\S]*?<\/td>[\s\S]*?<\/tr>/i;
+  const match = rowRegex.exec(sanitized);
+  if (match) {
+    const templateTr = match[0];
+    const repeatedRows = records
+      .map((rec, rIdx) => {
+        const rowData = {
+          sl: rIdx + 1,
+          serial: rIdx + 1,
+          no: rIdx + 1,
+          index: rIdx + 1,
+          row_num: rIdx + 1,
+          row_number: rIdx + 1,
+          index_0: rIdx,
+          '@index': rIdx + 1,
+          '#index': rIdx + 1,
+          ...baseContext,
+          ...rec,
+        };
+        return mergeTemplateWithData(templateTr, rowData);
+      })
+      .join('\n');
+
+    const expanded = sanitized.replace(templateTr, repeatedRows);
+    const finalContext = {
+      ...baseContext,
+      total_students: records.length,
+      total_records: records.length,
+      records_count: records.length,
+      total_count: records.length,
+    };
+    return mergeTemplateWithData(expanded, finalContext);
+  }
+
+  return mergeTemplateWithData(sanitized, baseContext);
+}
+
+/**
+ * Universal Nested Array and Table Row Expansion Engine.
+ * 100% Domain-Agnostic: Discovers any nested array of objects inside dataRecord
+ * (e.g. subjectMarks, feeItems, items, records, rows, data) and dynamically
+ * expands explicit loop tags ({{#arrayKey}} ... {{/arrayKey}}) or repeating table rows.
+ */
+function expandNestedArraysAndTables(html: string, dataRecord: Record<string, any>): string {
+  if (!html || !dataRecord || typeof dataRecord !== 'object') return html;
+
+  let result = html;
+
+  // Find all array properties in dataRecord containing objects
+  const arrayEntries = Object.entries(dataRecord).filter(
+    ([_, val]) => Array.isArray(val) && val.length > 0 && typeof val[0] === 'object'
+  );
+
+  if (arrayEntries.length === 0) {
+    return result;
+  }
+
+  // 1. Universal Explicit Loop Tags: {{#arrayKey}} ... {{/arrayKey}}
+  arrayEntries.forEach(([arrayKey, items]) => {
+    const loopRegex = new RegExp(`\\{\\{#(${arrayKey}|items|rows|list|data)\\}\\}([\\s\\S]*?)\\{\\{/\\1\\}\\}`, 'gi');
+    if (loopRegex.test(result)) {
+      result = result.replace(loopRegex, (_, _tagName, blockContent) => {
+        return items
+          .map((item: any, idx: number) => {
+            const enrichedItem = {
+              sl: idx + 1,
+              serial: idx + 1,
+              index: idx + 1,
+              no: idx + 1,
+              ...item,
+            };
+            return mergeTemplateWithData(blockContent, enrichedItem);
+          })
+          .join('\n');
+      });
+    }
+  });
+
+  // 2. Universal DOM-Based Repeating Table Row Detection
+  if (typeof document !== 'undefined' && result.includes('<table')) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(result, 'text/html');
+      const tables = doc.querySelectorAll('table');
+      let tableModified = false;
+
+      tables.forEach((table) => {
+        const trEls = Array.from(table.querySelectorAll('tr'));
+        if (trEls.length === 0) return;
+
+        // Try to match this table against any array in arrayEntries
+        for (const [_, items] of arrayEntries) {
+          if (!Array.isArray(items) || items.length === 0) continue;
+
+          // Collect all known keys present in this array's items
+          const sampleItem = items[0] || {};
+          const itemKeys = Object.keys(sampleItem).map((k) => k.toLowerCase());
+
+          // Find a template <tr> that contains placeholders matching keys in this array's items
+          const templateTr = trEls.find((tr, rIdx) => {
+            const cells = tr.querySelectorAll('td');
+            if (cells.length === 0) return false;
+
+            // Skip top row if it's purely header (<th>)
+            if (rIdx === 0 && trEls.length > 1 && tr.querySelectorAll('th').length > 0) {
+              return false;
+            }
+
+            const inner = tr.innerHTML.toLowerCase();
+            const placeholders = detectPlaceholders(inner);
+
+            // Check if row placeholders match keys in the array
+            const matchesArrayKeys = placeholders.some((p) => {
+              const norm = normalizeKey(p);
+              return itemKeys.some((k) => normalizeKey(k) === norm);
+            });
+
+            // Or if first cell contains sample placeholder text like "Subject 1", "Item 1", "Row 1"
+            const hasSamplePattern = /(subject|item|row|entry|record)\s*[-_]?\s*0?1\b/i.test(inner);
+
+            return matchesArrayKeys || hasSamplePattern;
+          });
+
+          if (templateTr && templateTr.parentNode) {
+            tableModified = true;
+            const parent = templateTr.parentNode;
+            let rowTemplateHtml = templateTr.outerHTML;
+
+            // Replace generic sample text like "Subject 1", "Item 1" in column with first item name key
+            const preferredNameKey =
+              Object.keys(sampleItem).find((k) =>
+                ['subject_name', 'subjectname', 'item_name', 'itemname', 'name', 'title', 'label', 'description'].includes(k.toLowerCase())
+              ) ||
+              Object.keys(sampleItem).find((k) =>
+                typeof sampleItem[k] === 'string' &&
+                !k.toLowerCase().includes('id') &&
+                !k.toLowerCase().includes('key') &&
+                !k.toLowerCase().includes('code') &&
+                !k.toLowerCase().includes('status') &&
+                k !== 'sl' &&
+                k !== 'index'
+              ) ||
+              'name';
+
+            rowTemplateHtml = rowTemplateHtml.replace(/(subject|item|row|entry|record)\s*[-_]?\s*0?1\b/gi, `{{${preferredNameKey}}}`);
+
+            items.forEach((item: any, idx: number) => {
+              const enrichedItem = {
+                sl: idx + 1,
+                serial: idx + 1,
+                index: idx + 1,
+                no: idx + 1,
+                ...item,
+              };
+              const populatedTrHtml = mergeTemplateWithData(rowTemplateHtml, enrichedItem);
+              const temp = doc.createElement('tbody');
+              temp.innerHTML = populatedTrHtml;
+              const newRow = temp.firstElementChild;
+              if (newRow) {
+                parent.insertBefore(newRow, templateTr);
+              }
+            });
+
+            parent.removeChild(templateTr);
+            break; // Table processed for this array
+          }
+        }
+      });
+
+      if (tableModified) {
+        result = doc.body.innerHTML;
+      }
+    } catch (e) {
+      console.warn('Universal table expansion failed in mergeTemplateWithData', e);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Merges template HTML with a single record or multiple records with smart fuzzy key matching.
  */
 export function mergeTemplateWithData(
@@ -303,7 +697,11 @@ export function mergeTemplateWithData(
   dataRecord: Record<string, any>
 ): string {
   if (!templateHtml || !dataRecord) return templateHtml;
-  const sanitized = sanitizeDocxPlaceholders(templateHtml);
+  let sanitized = sanitizeDocxPlaceholders(templateHtml);
+
+  // Expand any nested arrays or repeating table rows generically
+  sanitized = expandNestedArraysAndTables(sanitized, dataRecord);
+
   const lookup = buildEnrichedLookup(dataRecord);
 
   // Match any {{placeholder}} or {placeholder}
@@ -342,12 +740,13 @@ export function bulkMergeTemplate(
   const { styles, body } = separateDocxStylesAndBody(templateHtml);
   const targetBody = body || templateHtml;
 
-  // Sanitize template body ONCE instead of inside every record loop
-  const sanitizedBody = sanitizeDocxPlaceholders(targetBody);
-  const placeholderRegex = /\{\{([\s\S]*?)\}\}/g;
-
   return records.map((record) => {
+    let populatedBody = targetBody;
+    populatedBody = expandNestedArraysAndTables(populatedBody, record);
+    const sanitizedBody = sanitizeDocxPlaceholders(populatedBody);
     const lookup = buildEnrichedLookup(record);
+    const placeholderRegex = /\{\{([\s\S]*?)\}\}/g;
+
     const merged = sanitizedBody.replace(placeholderRegex, (fullMatch, token) => {
       const rawKey = token.trim();
       const norm = normalizeKey(rawKey);
@@ -544,7 +943,7 @@ export function extractAvailableKeysFromContext(
         map.set(colId, {
           key: colId,
           label: col.label || col.header || col.id,
-          category: 'academic',
+          category: 'general',
           sampleValue: liveVal,
           description: `Table column field`,
         });

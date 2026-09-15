@@ -33,6 +33,10 @@ const StaffDailyAttendanceView = lazy(() => import("./modules/staff-management/S
 const StaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/StaffOnboardingView"));
 const StaffProfileDetailView = lazy(() => import("./modules/staff-management/StaffProfileDetailView"));
 
+// ─── Protected Print Studio Views (TypeScript Views) ─────────────────────────
+const PrintStudioHubView = lazy(() => import("./modules/print-studio/PrintStudioHubView"));
+
+
 // ─── Protected Attendance Views (Lazy Loaded) ───────────────────────────────
 const ClassAttendanceView = lazy(() => import("./modules/attendance/ClassAttendanceView"));
 const AttendanceSettingsView = lazy(() => import("./modules/attendance/AttendanceSettingsView"));
@@ -145,6 +149,7 @@ export default function App() {
                 <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
                 <Route path="/staff" element={<Navigate to="/staff/roster" replace />} />
                 <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><StaffProfileDetailView /></FeatureGuard>} />
+                <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio" fallback={<Navigate to="/dashboard" replace />}><PrintStudioHubView /></FeatureGuard>} />
                 
                 {/* Student Attendance Multi-Dimensional Routes */}
                 <Route path="/attendance/students/roll-call" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />

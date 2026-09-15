@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import UniversalPrintModal from '@/components/print/UniversalPrintModal';
-import PrintDocumentWrapper from '@/components/print/PrintDocumentWrapper';
-import PrintTableRenderer from '@/components/print/PrintTableRenderer';
+import UniversalPrintStudio from '@/components/print/UniversalPrintStudio';
+import { PrintBatchDocument } from '@/components/print/types';
 import { examStore } from '@/stores/examStore';
 import { MarkSheetPrintProps, StudentResult } from '../types';
 
@@ -283,60 +282,41 @@ export default function MarkSheetPrint({
     []
   );
 
-  // 6. Bulk Mode Multi-Page Sheets Content
-  const bulkAcademicSheetsContent = useMemo(() => {
-    if (printMode !== 'bulk') return null;
+  // 6. Batch Documents for Bulk Mode
+  const batchDocuments: PrintBatchDocument[] = useMemo(() => {
+    if (printMode !== 'bulk') return [];
+    return bulkClassesData.map((item) => ({
+      id: String(item.classObj.value),
+      title: `${exam?.name || 'Academic Examination'} — Academic Mark Sheet`,
+      subtitle: `Class: ${item.classObj.label}`,
+      metaItems: item.metaItems,
+      columns: item.columns,
+      data: item.matrix.studentsData,
+      footerRow: item.footerRow,
+    }));
+  }, [printMode, bulkClassesData, exam?.name]);
 
-    if (bulkClassesData.length === 0) {
-      return (
-        <div className="p-12 text-center text-xs theme-text-secondary">
-          No class records or student marks found for bulk Academic MarkSheet printing.
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
-        {bulkClassesData.map((item, idx) => (
-          <div
-            key={item.classObj.value || idx}
-            className="relative paper-sheet-wrapper group"
-          >
-            <div
-              className="paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative"
-              data-size="A4"
-              data-orientation="LANDSCAPE"
-              data-margin="NORMAL"
-              data-density="NORMAL"
-              data-color-mode="FULL_COLOR"
-              data-page-break="true"
-            >
-              <PrintDocumentWrapper
-                title={`${exam?.name || 'Academic Examination'} — Academic Mark Sheet`}
-                subtitle={`Class: ${item.classObj.label}`}
-                metaItems={item.metaItems}
-                options={defaultPrintOptions}
-                pageIndex={idx}
-                totalPages={bulkClassesData.length}
-                isFirstPage={true}
-                isLastPage={true}
-              >
-                <PrintTableRenderer
-                  columns={item.columns}
-                  data={item.matrix.studentsData}
-                  footerRow={item.footerRow}
-                  density="NORMAL"
-                />
-              </PrintDocumentWrapper>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }, [printMode, bulkClassesData, exam?.name, defaultPrintOptions]);
+  const TABULATION_PLACEHOLDER_KEYS = [
+    { key: 'class_name', label: 'Class / Grade', category: 'academic', example: 'Class 10' },
+    { key: 'section_name', label: 'Section / Branch', category: 'academic', example: 'Section A' },
+    { key: 'exam_name', label: 'Examination Title', category: 'exam', example: 'Annual Examination 2026' },
+    { key: 'academic_session', label: 'Academic Session', category: 'academic', example: '2025 - 2026' },
+    { key: 'student_name', label: 'Student Name', category: 'student', example: 'Abdullah Al Mamun' },
+    { key: 'roll_number', label: 'Roll Number', category: 'student', example: '01' },
+    { key: 'total_marks', label: 'Total Full Marks', category: 'exam', example: '500' },
+    { key: 'obtained_marks', label: 'Obtained Total Marks', category: 'exam', example: '475' },
+    { key: 'gpa', label: 'Overall GPA Score', category: 'exam', example: '5.00' },
+    { key: 'grade', label: 'Overall Letter Grade', category: 'exam', example: 'A+' },
+    { key: 'merit_position', label: 'Class Rank / Position', category: 'exam', example: '1st' },
+    { key: 'percentage', label: 'Average Percentage', category: 'exam', example: '95.00%' },
+    { key: 'institution_name', label: 'Institution Name', category: 'institution', example: 'Jamia Islamia Markaz' },
+    { key: 'issue_date', label: 'Issue Date', category: 'system', example: new Date().toLocaleDateString() },
+    { key: 'principal_signature', label: 'Principal Signature Line', category: 'signatures', example: 'Principal' },
+    { key: 'exam_controller_signature', label: 'Exam Controller Signature', category: 'signatures', example: 'Exam Controller' },
+  ];
 
   return (
-    <UniversalPrintModal
+    <UniversalPrintStudio
       isOpen={isOpen}
       onClose={onClose}
       title={
@@ -345,23 +325,23 @@ export default function MarkSheetPrint({
           : `${exam?.name || 'Academic Examination'} — Academic Mark Sheet`
       }
       subtitle={printMode === 'bulk' ? 'All Classes Master Ledger' : `Class: ${selectedClassName} • Section: ${selectedSectionName}`}
+      documents={printMode === 'bulk' ? batchDocuments : undefined}
       metaItems={printMode === 'single' ? singlePrintMetaItems : []}
       columns={printMode === 'single' ? singlePrintColumns : []}
       data={printMode === 'single' ? studentsData : []}
       footerRow={printMode === 'single' ? singlePrintFooterRow : null}
       summaryMetrics={printMode === 'single' ? singlePrintSummaryMetrics : []}
+      placeholderKeys={TABULATION_PLACEHOLDER_KEYS}
       defaultOptions={defaultPrintOptions}
       showRows={printMode === 'single'}
       getRowKey={(r: StudentResult) => String(r.studentId)}
       getRowLabel={(r: StudentResult) => r.studentName}
       getRowSubLabel={(r: StudentResult) => `Roll: ${r.rollNumber || '-'} • GPA ${Number(r.overallGpa || 0).toFixed(2)}`}
       visibleRowKeys={selectedStudentIds && selectedStudentIds.length > 0 ? selectedStudentIds.map(String) : null}
-      customSheets={printMode === 'bulk'}
+      scopeId="tabulation_sheet"
       urlSync={true}
       urlParam="print"
       urlParamValue={printMode === 'bulk' ? 'bulk_marksheet' : 'mark_sheet'}
-    >
-      {printMode === 'bulk' ? bulkAcademicSheetsContent : null}
-    </UniversalPrintModal>
+    />
   );
 }

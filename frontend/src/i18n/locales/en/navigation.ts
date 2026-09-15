@@ -66,4 +66,6 @@ export const navigation = {
   routineCurriculum: 'Routine & Curriculum',
   officialWebsite: 'Official Website',
   publicPortalVerification: 'Public Portal & Verification',
+  printStudio: 'Print Studio',
 };
+

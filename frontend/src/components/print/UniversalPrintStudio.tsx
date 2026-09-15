@@ -1,0 +1,501 @@
+import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useFullscreen, useResizablePanel } from '../../hooks';
+import { useTenant } from '../../context/TenantContext';
+import PanelResizer from '../ui/PanelResizer';
+import PrintConfigSidebar from './PrintConfigSidebar';
+import DocxTemplateModal from './DocxTemplateModal';
+import TemplateLibraryModal from './TemplateLibraryModal';
+import { insertTokenAtActiveCaret } from './caretInsertManager';
+import { getPageMarginCSS } from './printExportUtils';
+import {
+  getDefaultTemplateIdForScope,
+  setDefaultTemplateForScope,
+  validateTemplateForScope,
+} from './scopeTemplateStore';
+import { getSavedDocxTemplates } from './docxTemplateEngine';
+import {
+  usePrintStudioState,
+  usePrintDocxEngine,
+  usePrintPagination,
+  usePrintStudioShortcuts,
+} from './hooks';
+import { PrintStudioHeader, PrintStudioWorkbench } from './components';
+import { UniversalPrintStudioProps } from './types';
+import './printEngine.css';
+
+/**
+ * UniversalPrintStudio
+ * Master Universal Print & Export Studio following SPR Note Enterprise Standards.
+ * Decomposed into dedicated custom hooks and modular sub-components with strict TypeScript safety.
+ */
+export default function UniversalPrintStudio({
+  isOpen = false,
+  onClose = () => {},
+  title = 'Official Document',
+  subtitle = '',
+  metaItems = [],
+  columns = [],
+  data = [],
+  summaryMetrics = [],
+  footerRow = null,
+  footerRows = [],
+  documents = undefined,
+  batchDocuments = undefined,
+  isColumnMandatory = null,
+  isColumnRequired = null,
+  requiredColumnKeys = [],
+  visibleRowKeys: propVisibleRowKeys = null,
+  onVisibleRowsChange: propOnVisibleRowsChange = null,
+  isRowMandatory = null,
+  isRowRequired = null,
+  requiredRowKeys = [],
+  getRowKey = null,
+  rowKey = null,
+  getRowLabel = null,
+  getRowSubLabel = null,
+  showRows = true,
+  children = null,
+  customSheets = false,
+  defaultOptions = {},
+  templates = [],
+  activeTemplateId = null,
+  onTemplateChange = null,
+  placeholderKeys = [],
+  showSectionsAndBars = true,
+  showSectionsBar = true,
+  showDisplayBars = true,
+  showDataDisplay = true,
+  showColumns = true,
+  showHeaderSection = true,
+  showWatermarkSection = true,
+  showSignaturesSection = true,
+  showPrint = true,
+  showPDF = true,
+  showExcel = true,
+  showTxt = true,
+  showWord = true,
+  showImages = true,
+  showPng = true,
+  showJpg = true,
+  enabledFormats = null,
+  onPrint = undefined,
+  onExportPDF = undefined,
+  onExportExcel = undefined,
+  onExportCsv = undefined,
+  onExportTxt = undefined,
+  onExportWord = undefined,
+  onExportPng = undefined,
+  onExportJpg = undefined,
+  scopeId = 'general_document',
+  scopeName = '',
+  scopeDescription = '',
+  requiredKeys = [],
+  urlSync = false,
+  urlParam = 'print_studio',
+  urlParamValue = null,
+}: UniversalPrintStudioProps) {
+  const { tenant } = useTenant();
+
+  // 1. Core State & History Hook
+  const {
+    options,
+    setOptions,
+    updateOptionsWithHistory,
+    liveData,
+    liveColumns,
+    setLiveColumns,
+    liveMetaItems,
+    liveSummaryMetrics,
+    visibleColumnKeys,
+    setVisibleColumnKeys,
+    visibleRowKeys,
+    updateVisibleRowsWithHistory,
+    extraBlankRows,
+    zoomLevel,
+    setZoomLevel,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    isSidebarOpen,
+    setIsSidebarOpen,
+    pointerMode,
+    setPointerMode,
+    canUndo,
+    canRedo,
+    handleUndo,
+    handleRedo,
+    handleResetDefaults,
+    handleCellChange,
+    handleRowDelete,
+    handleRowInsert,
+    handleRowMove,
+    handleColumnHeaderChange,
+    handleMetaItemsChange,
+    getRowIdentifier,
+  } = usePrintStudioState({
+    isOpen,
+    title,
+    defaultOptions,
+    columns,
+    placeholderKeys,
+    data,
+    metaItems,
+    summaryMetrics,
+    propVisibleRowKeys,
+    propOnVisibleRowsChange,
+    getRowKey,
+    rowKey,
+  });
+
+  const institutionName = options.customInstitutionName || tenant?.name || 'Institution Name';
+  const institutionAddress = options.customCampusAddress || tenant?.address || '';
+  const resolvedTitle = options.customTitle || title;
+  const resolvedSubtitle = options.customSubtitle || subtitle;
+
+  // 2. Word (.docx) & Scope Template Engine Hook
+  const {
+    isDocxModalOpen,
+    setIsDocxModalOpen,
+    isTemplateLibraryOpen,
+    setIsTemplateLibraryOpen,
+    setSavedWordTemplates,
+    customDocxTemplate,
+    setCustomDocxTemplate,
+    combinedTemplates,
+    docxStyles,
+    docxRenderMode,
+    setDocxRenderMode,
+    mergedDocxPages,
+    handleTemplateSelection,
+    handleApplyDocxTemplate,
+    handleDeleteDocxTemplate,
+    handleSaveCurrentTemplate,
+    handleDuplicateDocxTemplate,
+    handleSetScopeDefault,
+  } = usePrintDocxEngine({
+    isOpen,
+    scopeId,
+    scopeName,
+    templates,
+    placeholderKeys,
+    options,
+    liveData,
+    liveMetaItems,
+    liveColumns,
+    setLiveColumns,
+    setVisibleColumnKeys,
+    institutionName,
+    institutionAddress,
+    resolvedTitle,
+    resolvedSubtitle,
+    onTemplateChange,
+  });
+
+  // 3. Dynamic Page Slicing & Pagination Hook
+  const { paginationResult } = usePrintPagination({
+    liveData,
+    visibleRowKeys,
+    extraBlankRows,
+    getRowIdentifier,
+    isRowMandatory,
+    isRowRequired,
+    requiredRowKeys,
+    enablePageBreak: options.enablePageBreak,
+    pageSize: options.pageSize,
+    density: options.density,
+    hasChildren: Boolean(children),
+  });
+
+  // 4. Global Keyboard Shortcuts & URL Sync Hook
+  usePrintStudioShortcuts({
+    isOpen,
+    options,
+    title,
+    onClose,
+    handleUndo,
+    handleRedo,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    setIsSidebarOpen,
+    setPointerMode,
+    urlSync,
+    urlParam,
+    urlParamValue,
+  });
+
+  // 5. Layout & Resizing
+  const { isFullscreen, toggleFullscreen } = useFullscreen({ initialState: true });
+  const {
+    width: sidebarWidth,
+    isResizing: isSidebarResizing,
+    startResizing: startSidebarResizing,
+    toggleWidth: handleSidebarResizerDoubleClick,
+  } = useResizablePanel({
+    storageKey: 'spr_print_sidebar_width',
+    defaultWidth: 580,
+    minWidth: 360,
+    maxWidth: 1080,
+    maxRatio: 0.85,
+    side: 'right',
+    toggleCompactWidth: 580,
+    toggleExpandedWidth: 760,
+  });
+
+  if (!isOpen) return null;
+
+  const studioContent = (
+    <div
+      className={`universal-print-studio-root ${
+        isFullscreen
+          ? 'fixed inset-0 z-[9999] flex flex-col theme-bg-app theme-text-primary overflow-hidden select-none animate-fade-in w-screen h-screen'
+          : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs animate-fade-in text-left font-sans select-none'
+      } print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:backdrop-filter-none print:shadow-none print:overflow-visible`}
+    >
+      {/* Dynamic @page Rules for Clean Browser Print Dialog */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              @page {
+                size: ${options.pageSize || 'A4'} ${(options.orientation || 'PORTRAIT').toLowerCase()};
+                margin: ${getPageMarginCSS(options.margin)};
+              }
+            }
+          `,
+        }}
+      />
+
+      <div
+        className={`universal-print-studio-container ${
+          isFullscreen
+            ? 'w-full h-full flex flex-col overflow-hidden'
+            : 'w-full max-w-7xl h-[92vh] rounded-3xl theme-bg-surface border theme-border shadow-2xl overflow-hidden flex flex-col animate-scale-up'
+        } print:static print:block print:w-full print:max-w-none print:h-auto print:rounded-none print:border-none print:shadow-none print:bg-white print:overflow-visible`}
+      >
+        {/* 1. Master Top Action Toolbar */}
+        <PrintStudioHeader
+          title={title}
+          subtitle={subtitle}
+          totalPages={
+            documents && documents.length > 0
+              ? documents.length
+              : batchDocuments && batchDocuments.length > 0
+              ? batchDocuments.length
+              : paginationResult.totalPages
+          }
+          pageSize={options.pageSize}
+          orientation={options.orientation}
+          onOpenDocxModal={() => setIsDocxModalOpen(true)}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          zoomLevel={zoomLevel}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          isFullscreen={isFullscreen}
+          toggleFullscreen={toggleFullscreen}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onClose={onClose}
+          options={options}
+          liveMetaItems={liveMetaItems}
+          liveSummaryMetrics={liveSummaryMetrics}
+          liveColumns={liveColumns}
+          visibleColumnKeys={visibleColumnKeys}
+          extraBlankRows={extraBlankRows}
+          liveData={liveData}
+          showPrint={showPrint}
+          showPDF={showPDF}
+          showExcel={showExcel}
+          showTxt={showTxt}
+          showWord={showWord}
+          showImages={showImages}
+          showPng={showPng}
+          showJpg={showJpg}
+          enabledFormats={enabledFormats as any}
+          onPrint={onPrint}
+          onExportPDF={onExportPDF}
+          onExportExcel={onExportExcel}
+          onExportCsv={onExportCsv}
+          onExportTxt={onExportTxt}
+          onExportWord={onExportWord}
+          onExportPng={onExportPng}
+          onExportJpg={onExportJpg}
+        />
+
+        {/* 2. Main Studio Body: Workbench Canvas (Left/Center) + Right Configuration Sidebar */}
+        <div className="flex-1 flex overflow-hidden relative print:static print:block print:w-full print:h-auto print:overflow-visible">
+          {/* Main Live Paper Canvas Preview Area (Studio Workbench) */}
+          <PrintStudioWorkbench
+            options={options}
+            updateOptionsWithHistory={updateOptionsWithHistory}
+            title={title}
+            subtitle={subtitle}
+            liveMetaItems={liveMetaItems}
+            handleMetaItemsChange={handleMetaItemsChange}
+            liveColumns={liveColumns}
+            visibleColumnKeys={visibleColumnKeys}
+            isColumnMandatory={isColumnMandatory}
+            isColumnRequired={isColumnRequired}
+            requiredColumnKeys={requiredColumnKeys}
+            visibleRowKeys={visibleRowKeys}
+            isRowMandatory={isRowMandatory}
+            isRowRequired={isRowRequired}
+            requiredRowKeys={requiredRowKeys}
+            getRowIdentifier={getRowIdentifier}
+            liveSummaryMetrics={liveSummaryMetrics}
+            footerRow={footerRow}
+            footerRows={footerRows}
+            documents={documents}
+            batchDocuments={batchDocuments}
+            paginationResult={paginationResult}
+            customDocxTemplate={customDocxTemplate}
+            setCustomDocxTemplate={setCustomDocxTemplate}
+            docxStyles={docxStyles}
+            mergedDocxPages={mergedDocxPages}
+            docxRenderMode={docxRenderMode}
+            setDocxRenderMode={setDocxRenderMode}
+            liveData={liveData}
+            customSheets={customSheets}
+            children={children}
+            zoomLevel={zoomLevel}
+            setZoomLevel={setZoomLevel}
+            pointerMode={pointerMode}
+            setPointerMode={setPointerMode}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            handleUndo={handleUndo}
+            handleRedo={handleRedo}
+            handleCellChange={handleCellChange}
+            handleRowDelete={handleRowDelete}
+            handleRowInsert={handleRowInsert}
+            handleRowMove={handleRowMove}
+            handleColumnHeaderChange={handleColumnHeaderChange}
+          />
+
+          {/* Right Configuration Sidebar */}
+          {isSidebarOpen && (
+            <div
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsSidebarOpen(false);
+              }}
+              className="fixed md:relative inset-0 md:inset-auto z-40 md:z-auto flex h-full justify-end bg-black/40 md:bg-transparent backdrop-blur-xs md:backdrop-blur-none animate-fade-in print:hidden print-studio-no-print shrink-0 md:border-l theme-border shadow-2xl min-w-0"
+              style={{
+                width: `${sidebarWidth || 580}px`,
+                maxWidth: 'min(1080px, 85vw)',
+                minWidth: '360px',
+                transition: isSidebarResizing ? 'none' : 'width 0.15s ease-out',
+              }}
+            >
+              <PanelResizer
+                onStartResize={startSidebarResizing}
+                onResetResize={handleSidebarResizerDoubleClick}
+                isResizing={isSidebarResizing}
+                position="left"
+              />
+              <div className="w-full h-full flex-1 overflow-hidden">
+                <PrintConfigSidebar
+                  options={options}
+                  onOptionsChange={updateOptionsWithHistory}
+                  templates={combinedTemplates}
+                  customDocxTemplate={customDocxTemplate}
+                  activeTemplateId={customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id || activeTemplateId}
+                  onTemplateChange={handleTemplateSelection}
+                  onOpenDocxModal={() => setIsDocxModalOpen(true)}
+                  onOpenTemplateLibrary={() => setIsTemplateLibraryOpen(true)}
+                  onDeleteDocxTemplate={handleDeleteDocxTemplate}
+                  onSaveCurrentTemplate={handleSaveCurrentTemplate}
+                  onDuplicateDocxTemplate={handleDuplicateDocxTemplate}
+                  onSetScopeDefault={handleSetScopeDefault}
+                  scopeId={scopeId}
+                  scopeName={scopeName}
+                  scopeDescription={scopeDescription}
+                  placeholderKeys={placeholderKeys}
+                  requiredKeys={requiredKeys}
+                  isScopeDefault={
+                    (customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id)
+                      ? getDefaultTemplateIdForScope(scopeId) === (customDocxTemplate.id || customDocxTemplate.templateMeta?.id)
+                      : false
+                  }
+                  onToggleScopeDefault={() => {
+                    const currentTmplId = customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id;
+                    if (!currentTmplId) return;
+                    const currentDefId = getDefaultTemplateIdForScope(scopeId);
+                    if (currentDefId === currentTmplId) {
+                      setDefaultTemplateForScope(scopeId, null);
+                    } else {
+                      const val = validateTemplateForScope(customDocxTemplate, scopeId);
+                      if (!val.isValid) {
+                        const proceed = window.confirm(
+                          `Warning: This template is missing ${val.missingRequiredKeys.length} required key(s) for "${val.scopeName}":\n\n${val.missingRequiredKeys.map((k) => `• {{${k}}}`).join('\n')}\n\nSetting this template as default may result in missing data during print generation. Do you want to set it as default anyway?`
+                        );
+                        if (!proceed) return;
+                      }
+                      setDefaultTemplateForScope(scopeId, currentTmplId);
+                    }
+                    setSavedWordTemplates(getSavedDocxTemplates());
+                  }}
+                  activeRecord={liveData && liveData[0] ? liveData[0] : {}}
+                  docxRenderMode={docxRenderMode}
+                  onDocxRenderModeChange={setDocxRenderMode}
+                  totalRecordsCount={liveData?.length || 0}
+                  onInsertKey={(token) => {
+                    insertTokenAtActiveCaret(token);
+                  }}
+                  onResetDefaults={handleResetDefaults}
+                  onClose={() => setIsSidebarOpen(false)}
+                  className="w-full h-full max-w-full print-sidebar-control print-studio-no-print shadow-2xl md:shadow-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Docx Template Ingestion Modal */}
+      {isDocxModalOpen && (
+        <DocxTemplateModal
+          isOpen={isDocxModalOpen}
+          onClose={() => setIsDocxModalOpen(false)}
+          onApplyTemplate={handleApplyDocxTemplate}
+          placeholderKeys={placeholderKeys}
+          sampleData={liveData && liveData[0] ? { ...liveData[0], title, subtitle } : { title, subtitle }}
+          columns={liveColumns}
+          metaItems={metaItems}
+        />
+      )}
+
+      {/* Universal Template Library Hub Modal */}
+      {isTemplateLibraryOpen && (
+        <TemplateLibraryModal
+          isOpen={isTemplateLibraryOpen}
+          onClose={() => setIsTemplateLibraryOpen(false)}
+          onApplyTemplate={(tmpl) => {
+            handleApplyDocxTemplate(tmpl);
+            setSavedWordTemplates(getSavedDocxTemplates());
+          }}
+          activeScopeId={scopeId}
+        />
+      )}
+
+      {/* Active Global Drag Overlay for smooth sidebar resizing */}
+      {isSidebarResizing && (
+        <div
+          className="fixed inset-0 z-[99999] select-none bg-transparent cursor-col-resize pointer-events-auto"
+          style={{ cursor: 'col-resize' }}
+        />
+      )}
+    </div>
+  );
+
+  return typeof document !== 'undefined'
+    ? createPortal(studioContent, document.body)
+    : studioContent;
+}
+
+// Backward-compatible alias export for legacy consumers
+export { UniversalPrintStudio as UniversalPrintModal };

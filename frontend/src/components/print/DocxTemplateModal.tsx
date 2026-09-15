@@ -1,32 +1,29 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Modal, CustomButton, CustomInput, CustomSelect, DataTable } from '../ui';
+import React, { useState, useRef } from 'react';
+import { Modal, CustomButton, CustomInput } from '../ui';
 import {
   FileIcon,
   CheckCircleIcon,
   SparklesIcon,
   UploadIcon,
-  CopyIcon,
-  PlusIcon,
-  TrashIcon,
-  SleekCheckIcon,
   EditIcon,
-  SearchIcon,
 } from '../ui/Icons';
 import {
   parseDocxDocument,
   saveDocxTemplate,
-  mergeTemplateWithData,
-  extractAvailableKeysFromContext,
   DocxParseResult,
   CustomDocxTemplate,
   TemplatePlaceholderKey,
 } from './docxTemplateEngine';
+import { ALL_DOCUMENT_SCOPES } from './scopeTemplateStore';
 
 export interface DocxTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyTemplate: (result: {
+    id?: string;
+    name?: string;
     html: string;
+    rawHtml?: string;
     isTableDocument: boolean;
     columns: Array<{ id: string; header: string; label: string }>;
     data: Array<Record<string, any>>;
@@ -36,12 +33,12 @@ export interface DocxTemplateModalProps {
   columns?: Array<{ id: string; header: string; label: string }>;
   metaItems?: Array<{ label: string; value: any }>;
   placeholderKeys?: TemplatePlaceholderKey[];
+  initialScopeId?: string;
 }
 
-const CUSTOM_USER_KEYS_STORAGE_KEY = 'spr_custom_template_user_keys_v1';
-
 /**
- * Enterprise Word (.docx) Template & Document Ingestion Modal with Dynamic Placeholder Manager
+ * Enterprise Word (.docx) Document Ingestion & Preview Modal
+ * Clean, lightweight, and focused purely on document file upload and canvas mounting.
  */
 export default function DocxTemplateModal({
   isOpen,
@@ -51,132 +48,17 @@ export default function DocxTemplateModal({
   columns = [],
   metaItems = [],
   placeholderKeys = [],
+  initialScopeId = 'general_document',
 }: DocxTemplateModalProps) {
+  const [targetScopeId, setTargetScopeId] = useState<string>(initialScopeId || 'general_document');
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [parseResult, setParseResult] = useState<DocxParseResult | null>(null);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
-  const [activeTab, setActiveTab] = useState<'upload' | 'keys' | 'mapping' | 'preview' | 'merge'>('keys');
+  const [previewTab, setPreviewTab] = useState<'preview' | 'html'>('preview');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Search & category filter for Available Placeholders
-  const [keySearchQuery, setKeySearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [copiedAll, setCopiedAll] = useState(false);
-
-  // User-defined custom keys state (Hydrated from localStorage)
-  const [customUserKeys, setCustomUserKeys] = useState<TemplatePlaceholderKey[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(CUSTOM_USER_KEYS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to load custom user keys', e);
-    }
-    return [];
-  });
-
-  // New Custom Key Form
-  const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyLabel, setNewKeyLabel] = useState('');
-  const [newKeyValue, setNewKeyValue] = useState('');
-  const [isAddingKey, setIsAddingKey] = useState(false);
-
-  // Custom Tag Remapping state: maps detected word placeholder -> target system key or static text
-  const [customMappings, setCustomMappings] = useState<Record<string, string>>({});
-
-  // Consolidated available keys from module taxonomy, runtime sampleData, columns, meta, and user custom keys
-  const availableKeysList = useMemo(() => {
-    return extractAvailableKeysFromContext({
-      moduleKeys: placeholderKeys,
-      sampleData,
-      columns,
-      metaItems,
-      customKeys: customUserKeys,
-    });
-  }, [placeholderKeys, sampleData, columns, metaItems, customUserKeys]);
-
-  // Handle switching to upload tab when file is chosen or vice-versa
-  useEffect(() => {
-    if (parseResult && activeTab === 'upload') {
-      setActiveTab('merge');
-    }
-  }, [parseResult]);
-
-  const handleCopyKey = (keyName: string) => {
-    const formattedToken = `{{${keyName}}}`;
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(formattedToken);
-    }
-    setCopiedKey(keyName);
-    setTimeout(() => {
-      setCopiedKey((prev) => (prev === keyName ? null : prev));
-    }, 1800);
-  };
-
-  const handleCopyAllKeys = () => {
-    const text = availableKeysList
-      .map((k) => `{{${k.key}}}  -  ${k.label}${k.sampleValue ? ` (Sample: ${k.sampleValue})` : ''}`)
-      .join('\n');
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-    }
-    setCopiedAll(true);
-    setTimeout(() => {
-      setCopiedAll(false);
-    }, 2000);
-  };
-
-  const handleAddCustomKey = () => {
-    const cleanKey = newKeyName.trim().replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-    if (!cleanKey) {
-      alert('Please provide a valid key identifier (e.g. center_code).');
-      return;
-    }
-
-    const newKeyObj: TemplatePlaceholderKey = {
-      key: cleanKey,
-      label: newKeyLabel.trim() || cleanKey,
-      category: 'custom',
-      sampleValue: newKeyValue.trim() || `[${cleanKey}]`,
-      description: 'Custom user-defined template placeholder',
-      isCustom: true,
-    };
-
-    const updated = [...customUserKeys.filter((k) => k.key.toLowerCase() !== cleanKey), newKeyObj];
-    setCustomUserKeys(updated);
-
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(CUSTOM_USER_KEYS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to persist custom keys', e);
-      }
-    }
-
-    setNewKeyName('');
-    setNewKeyLabel('');
-    setNewKeyValue('');
-    setIsAddingKey(false);
-  };
-
-  const handleDeleteCustomKey = (keyName: string) => {
-    const updated = customUserKeys.filter((k) => k.key.toLowerCase() !== keyName.toLowerCase());
-    setCustomUserKeys(updated);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(CUSTOM_USER_KEYS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to delete custom key', e);
-      }
-    }
-  };
 
   const handleFileSelected = async (selectedFile: File) => {
     if (!selectedFile || !/\.docx$/i.test(selectedFile.name)) {
@@ -192,7 +74,6 @@ export default function DocxTemplateModal({
       const arrayBuffer = await selectedFile.arrayBuffer();
       const result = await parseDocxDocument(arrayBuffer);
       setParseResult(result);
-      setActiveTab('merge');
     } catch (err) {
       console.error('Failed to parse docx document', err);
       alert('Failed to parse Word document. Please ensure the file is not corrupted.');
@@ -209,291 +90,60 @@ export default function DocxTemplateModal({
     }
   };
 
-  // Build merged HTML accounting for custom user key values and remappings
-  const getProcessedHtml = useMemo(() => {
-    if (!parseResult) return '';
-    let html = parseResult.html;
-
-    // Apply custom placeholder remappings
-    Object.entries(customMappings).forEach(([detectedTag, targetFieldOrValue]) => {
-      if (!targetFieldOrValue) return;
-      const regex = new RegExp(`\\{\\{\\s*${detectedTag}\\s*\\}\\}|\\{\\s*${detectedTag}\\s*\\}`, 'gi');
-      if (targetFieldOrValue.startsWith('{{') && targetFieldOrValue.endsWith('}}')) {
-        html = html.replace(regex, targetFieldOrValue);
-      } else {
-        html = html.replace(regex, `{{${targetFieldOrValue}}}`);
-      }
-    });
-
-    return html;
-  }, [parseResult, customMappings]);
-
-  // Combined sample data merging active context + custom user key values
-  const effectiveSampleData = useMemo(() => {
-    const data: Record<string, any> = { ...sampleData };
-    customUserKeys.forEach((ck) => {
-      if (ck.sampleValue !== undefined && !data[ck.key]) {
-        data[ck.key] = ck.sampleValue;
-      }
-    });
-    return data;
-  }, [sampleData, customUserKeys]);
+  const handleResetFile = () => {
+    setFile(null);
+    setParseResult(null);
+    setTemplateName('');
+    setTemplateDescription('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleApply = (saveAsTemplate = false) => {
     if (!parseResult) return;
-    const finalHtml = getProcessedHtml;
+    const finalHtml = parseResult.html;
+    const templateId = `docx_upload_${Date.now()}`;
+    const cleanName = templateName.trim() || file?.name?.replace(/\.[^/.]+$/, '') || 'Custom Word Template';
 
     let savedTemplate: CustomDocxTemplate | undefined;
     if (saveAsTemplate) {
-      const templateId = `docx_tpl_${Date.now()}`;
-      savedTemplate = saveDocxTemplate({
+      const newTmpl: CustomDocxTemplate = {
         id: templateId,
-        name: templateName.trim() || 'Custom Word Template',
+        name: cleanName,
         description: templateDescription.trim(),
         rawHtml: finalHtml,
         detectedPlaceholders: parseResult.detectedPlaceholders,
         isTableDocument: parseResult.isTableDocument,
         sampleColumns: parseResult.extractedColumns,
         sampleData: parseResult.extractedRows,
-      });
+      };
+      (newTmpl as any).scopeId = targetScopeId;
+      savedTemplate = saveDocxTemplate(newTmpl);
     }
 
+    const templateMeta: CustomDocxTemplate = savedTemplate || {
+      id: templateId,
+      name: cleanName,
+      description: templateDescription.trim(),
+      rawHtml: finalHtml,
+      detectedPlaceholders: parseResult.detectedPlaceholders,
+      isTableDocument: parseResult.isTableDocument,
+      sampleColumns: parseResult.extractedColumns,
+      sampleData: parseResult.extractedRows,
+    };
+
     onApplyTemplate({
+      id: templateId,
+      name: cleanName,
       html: finalHtml,
+      rawHtml: finalHtml,
       isTableDocument: parseResult.isTableDocument,
       columns: parseResult.extractedColumns,
       data: parseResult.extractedRows,
-      templateMeta: savedTemplate,
+      templateMeta: templateMeta,
     });
 
     onClose();
   };
-
-  // Filtered available keys
-  const filteredKeys = useMemo(() => {
-    return availableKeysList.filter((item) => {
-      const matchesCat = selectedCategory === 'all' || item.category === selectedCategory;
-      if (!matchesCat) return false;
-      if (!keySearchQuery.trim()) return true;
-      const q = keySearchQuery.toLowerCase();
-      return (
-        item.key.toLowerCase().includes(q) ||
-        item.label.toLowerCase().includes(q) ||
-        (item.sampleValue && String(item.sampleValue).toLowerCase().includes(q)) ||
-        (item.description && item.description.toLowerCase().includes(q))
-      );
-    });
-  }, [availableKeysList, selectedCategory, keySearchQuery]);
-
-  // Dynamic categories derived from available active keys
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    availableKeysList.forEach((k) => {
-      if (k.category) set.add(k.category);
-    });
-
-    const categoryLabelMap: Record<string, string> = {
-      student: 'Student Bio',
-      examination: 'Examination',
-      logistics: 'Hall & Seating',
-      institution: 'Institution',
-      academic: 'Academic Data',
-      attendance: 'Attendance',
-      marks: 'Marks & Results',
-      general: 'General Meta',
-      custom: `Custom (${customUserKeys.length})`,
-    };
-
-    const dynamicPills = Array.from(set).map((catId) => ({
-      id: catId,
-      label: categoryLabelMap[catId] || catId.charAt(0).toUpperCase() + catId.slice(1),
-    }));
-
-    return [
-      { id: 'all', label: `All Available Keys (${availableKeysList.length})` },
-      ...dynamicPills,
-    ];
-  }, [availableKeysList, customUserKeys.length]);
-
-  // Dynamic columns definition for the reusable project DataTable
-  const keyTableColumns = useMemo(() => [
-    {
-      key: 'key',
-      label: 'Placeholder Token',
-      sortable: true,
-      render: (_: any, item: TemplatePlaceholderKey) => {
-        const isCopied = copiedKey === item.key;
-        return (
-          <button
-            type="button"
-            onClick={() => handleCopyKey(item.key)}
-            title="Click to copy token into clipboard"
-            className={`font-mono text-xs font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-              isCopied
-                ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40 shadow-2xs'
-                : 'theme-bg-sub theme-text-primary hover:theme-bg-accent-soft hover:theme-accent hover:border-[var(--accent-main)]/50 theme-border'
-            }`}
-          >
-            <span>{`{{${item.key}}}`}</span>
-            {isCopied ? (
-              <SleekCheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            ) : (
-              <CopyIcon className="w-3.5 h-3.5 opacity-40 hover:opacity-100 shrink-0" />
-            )}
-          </button>
-        );
-      },
-    },
-    {
-      key: 'label',
-      label: 'Field Label & Category',
-      sortable: true,
-      render: (_: any, item: TemplatePlaceholderKey) => (
-        <div className="py-0.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold theme-text-primary text-xs">
-              {item.label}
-            </span>
-            {item.category && item.category !== 'general' && (
-              <span className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold theme-bg-sub uppercase tracking-wider theme-text-secondary shrink-0">
-                {item.category}
-              </span>
-            )}
-          </div>
-          {item.description && (
-            <p className="text-[11px] theme-text-secondary mt-0.5 line-clamp-1 opacity-80">
-              {item.description}
-            </p>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'sampleValue',
-      label: 'Live Preview Value',
-      sortable: true,
-      render: (_: any, item: TemplatePlaceholderKey) => (
-        item.sampleValue ? (
-          <span className="inline-block font-mono text-xs px-2.5 py-1 rounded-lg theme-bg-sub theme-text-primary border theme-border/60 max-w-full truncate" title={String(item.sampleValue)}>
-            {String(item.sampleValue)}
-          </span>
-        ) : (
-          <span className="text-xs theme-text-secondary italic opacity-50">
-            Empty
-          </span>
-        )
-      ),
-    },
-    {
-      key: 'action',
-      label: 'Action',
-      align: 'right',
-      render: (_: any, item: TemplatePlaceholderKey) => {
-        const isCopied = copiedKey === item.key;
-        return (
-          <div className="flex items-center justify-end gap-1.5">
-            <CustomButton
-              variant="outline"
-              size="xs"
-              onClick={() => handleCopyKey(item.key)}
-              icon={isCopied ? SleekCheckIcon : CopyIcon}
-              className={isCopied ? 'text-emerald-600 border-emerald-500/40 bg-emerald-500/10' : ''}
-            >
-              {isCopied ? 'Copied' : 'Copy'}
-            </CustomButton>
-
-            {item.isCustom && (
-              <button
-                type="button"
-                onClick={() => handleDeleteCustomKey(item.key)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                title="Delete custom key"
-              >
-                <TrashIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        );
-      },
-    },
-  ], [copiedKey]);
-
-  // Dynamic columns definition for Field Mapping DataTable
-  const mappingTableColumns = useMemo(() => [
-    {
-      key: 'placeholder',
-      label: 'Detected Word Token',
-      sortable: true,
-      render: (_: any, item: { id: string; placeholder: string }) => (
-        <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-block">
-          {`{{${item.placeholder}}}`}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Matched System Field & Live Value',
-      render: (_: any, item: { id: string; placeholder: string }) => {
-        const ph = item.placeholder;
-        const currentMapped = customMappings[ph] || ph;
-        const matchedSysKey = availableKeysList.find(
-          (k) => k.key.toLowerCase() === currentMapped.toLowerCase()
-        );
-        const isAutoMatched = Boolean(matchedSysKey);
-        return (
-          <div className="py-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold theme-text-primary">
-                {matchedSysKey ? matchedSysKey.label : 'Custom / Unmapped'}
-              </span>
-              <span
-                className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
-                  isAutoMatched
-                    ? 'bg-emerald-500/10 text-emerald-600'
-                    : 'bg-amber-500/10 text-amber-600'
-                }`}
-              >
-                {isAutoMatched ? 'Auto Matched' : 'Needs Mapping'}
-              </span>
-            </div>
-            {matchedSysKey?.sampleValue && (
-              <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
-                Live Value: <span className="font-mono">{String(matchedSysKey.sampleValue)}</span>
-              </p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'mapping',
-      label: 'Map to System Variable',
-      align: 'right',
-      render: (_: any, item: { id: string; placeholder: string }) => {
-        const ph = item.placeholder;
-        return (
-          <div className="w-56 ml-auto">
-            <select
-              value={customMappings[ph] || ph}
-              onChange={(e) => {
-                const val = e.target.value;
-                setCustomMappings((prev) => ({ ...prev, [ph]: val }));
-              }}
-              className="w-full px-2.5 py-1.5 rounded-xl text-xs theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)] cursor-pointer"
-            >
-              <optgroup label="Standard System Fields">
-                {availableKeysList.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    {k.label} ({`{{${k.key}}}`})
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-        );
-      },
-    },
-  ], [customMappings, availableKeysList]);
 
   if (!isOpen) return null;
 
@@ -502,9 +152,9 @@ export default function DocxTemplateModal({
       isOpen={isOpen}
       onClose={onClose}
       zIndex={10000}
-      title="Word (.docx) Template Studio"
-      subtitle="Use any Microsoft Word document as an automated template. Copy dynamic tags and map them with real exam & student data."
-      size="5xl"
+      title="Upload Word Document (.docx)"
+      subtitle="Upload any Microsoft Word file to convert and design as a live document on canvas."
+      size={parseResult ? '3xl' : '2xl'}
       bodyClassName="p-5 sm:p-6 space-y-4"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -525,7 +175,7 @@ export default function DocxTemplateModal({
                 icon={SparklesIcon}
                 className="theme-border text-xs"
               >
-                Save as Reusable Studio Template
+                Save as Reusable Template
               </CustomButton>
             )}
 
@@ -544,240 +194,10 @@ export default function DocxTemplateModal({
       }
     >
       <div className="space-y-4">
-        {/* Top Feature Navigation Tabs */}
-        <div className="flex items-center justify-between border-b theme-border pb-2.5 flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setActiveTab('keys')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'keys'
-                  ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
-                  : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-              }`}
-            >
-              <SparklesIcon className="w-3.5 h-3.5" />
-              <span>Available Dynamic Keys ({availableKeysList.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('upload')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'upload'
-                  ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
-                  : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-              }`}
-            >
-              <UploadIcon className="w-3.5 h-3.5" />
-              <span>{file ? `File: ${file.name.slice(0, 20)}...` : 'Upload Word Document (.docx)'}</span>
-            </button>
-
-            {parseResult && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('mapping')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'mapping'
-                      ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
-                      : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                  }`}
-                >
-                  <EditIcon className="w-3.5 h-3.5" />
-                  <span>Field Mapping ({parseResult.detectedPlaceholders.length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('merge')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'merge'
-                      ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
-                      : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                  }`}
-                >
-                  <CheckCircleIcon className="w-3.5 h-3.5" />
-                  <span>Live Data Merge Preview</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'preview'
-                      ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
-                      : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                  }`}
-                >
-                  <FileIcon className="w-3.5 h-3.5" />
-                  <span>Raw HTML</span>
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="text-[11px] font-mono theme-text-secondary">
-            {parseResult ? `${parseResult.detectedPlaceholders.length} Placeholders Detected` : 'Ready to Parse'}
-          </div>
-        </div>
-
-        {/* ─── TAB 1: AVAILABLE DYNAMIC KEYS CHEAT SHEET & CUSTOM KEY CREATOR ─── */}
-        {activeTab === 'keys' && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Top Action Bar: Search, Category Pills, Copy All Keys, and Add Custom Key */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <input
-                  type="text"
-                  placeholder="Search keys (e.g. student_name, roll)..."
-                  value={keySearchQuery}
-                  onChange={(e) => setKeySearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 rounded-xl text-xs theme-bg-sub border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <SearchIcon className="w-3.5 h-3.5" />
-                </div>
-              </div>
-
-              {/* Category Filter Pills (Only shown if multiple categories exist) */}
-              {categories.length > 2 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                        selectedCategory === cat.id
-                          ? 'theme-bg-accent theme-accent-text shadow-2xs'
-                          : 'theme-bg-sub theme-text-secondary hover:theme-text-primary'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 sm:ml-auto">
-                <CustomButton
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyAllKeys}
-                  icon={copiedAll ? SleekCheckIcon : CopyIcon}
-                  className="text-xs"
-                >
-                  {copiedAll ? 'Copied All Tokens!' : 'Copy All Keys'}
-                </CustomButton>
-
-                <CustomButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddingKey((prev) => !prev)}
-                  icon={PlusIcon}
-                  className="text-xs"
-                >
-                  {isAddingKey ? 'Cancel New Key' : 'Add Custom Key'}
-                </CustomButton>
-              </div>
-            </div>
-
-            {/* Quick Add Custom Key Card Form */}
-            {isAddingKey && (
-              <div className="p-4 rounded-2xl theme-bg-sub border border-[var(--accent-main)]/40 shadow-sm space-y-3 animate-slide-down">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
-                    <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
-                    <span>Create New Custom Template Placeholder</span>
-                  </h4>
-                  <span className="text-[10.5px] theme-text-secondary">
-                    Will be available across all Word templates
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold theme-text-secondary block mb-1">
-                      Key Identifier (e.g. <code>center_code</code>)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. center_code"
-                      value={newKeyName}
-                      onChange={(e) => setNewKeyName(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl text-xs theme-bg-surface border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)] font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold theme-text-secondary block mb-1">
-                      Human Label (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Exam Center Code"
-                      value={newKeyLabel}
-                      onChange={(e) => setNewKeyLabel(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl text-xs theme-bg-surface border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold theme-text-secondary block mb-1">
-                      Default / Fallback Value
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. DH-102 (Main Hall)"
-                      value={newKeyValue}
-                      onChange={(e) => setNewKeyValue(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl text-xs theme-bg-surface border theme-border theme-text-primary focus:outline-none focus:border-[var(--accent-main)]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <CustomButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsAddingKey(false)}
-                    className="text-xs"
-                  >
-                    Cancel
-                  </CustomButton>
-                  <CustomButton
-                    variant="primary"
-                    size="sm"
-                    onClick={handleAddCustomKey}
-                    icon={CheckCircleIcon}
-                    className="text-xs"
-                  >
-                    Save &amp; Register Key
-                  </CustomButton>
-                </div>
-              </div>
-            )}
-
-            {/* Standard Project Reusable DataTable */}
-            <div className="rounded-2xl border theme-border overflow-hidden theme-bg-surface shadow-2xs">
-              <DataTable
-                data={filteredKeys}
-                columns={keyTableColumns}
-                keyExtractor={(item: TemplatePlaceholderKey) => item.key}
-                sortable={true}
-                emptyTitle="No placeholder keys found"
-                emptySubMessage="Try searching for another keyword or click Add Custom Key."
-                wrapperClassName="max-h-[380px] overflow-y-auto"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 2: UPLOAD & TEMPLATE INFO ─── */}
-        {activeTab === 'upload' && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Drag and Drop Zone */}
+        {/* If no file is parsed yet, show Upload Box & Scope Selector */}
+        {!parseResult ? (
+          <div className="space-y-4">
+            {/* Drag & Drop Upload Area */}
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -809,10 +229,10 @@ export default function DocxTemplateModal({
               </div>
 
               <h3 className="text-sm font-bold theme-text-primary">
-                {isParsing ? 'Parsing Microsoft Word Document...' : 'Choose a Word document or drag it here'}
+                {isParsing ? 'Parsing Word Document...' : 'Choose a Word document (.docx) or drag it here'}
               </h3>
               <p className="text-xs theme-text-secondary mt-1 max-w-sm">
-                Supports <strong className="theme-text-primary">.docx</strong> files. All styles, tables, borders, alignments, and <code>{'{{placeholders}}'}</code> will be loaded.
+                Upload your document to render in high fidelity. You can format and edit text directly on canvas.
               </p>
 
               <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold theme-bg-surface border theme-border theme-text-secondary">
@@ -821,7 +241,81 @@ export default function DocxTemplateModal({
               </div>
             </div>
 
-            {/* Template Identification Form */}
+            {/* Target Scope Selection */}
+            <div className="p-3 rounded-xl border theme-border theme-bg-sub/40 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold theme-text-primary">Target Document Scope</div>
+                <div className="text-[11px] theme-text-secondary">Assign which module or scope this template belongs to</div>
+              </div>
+              <select
+                value={targetScopeId}
+                onChange={(e) => setTargetScopeId(e.target.value)}
+                className="px-3 py-1.5 rounded-xl text-xs theme-bg-surface border theme-border theme-text-primary font-medium focus:outline-none focus:border-[var(--accent-main)] cursor-pointer"
+              >
+                {ALL_DOCUMENT_SCOPES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.category})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          /* File Loaded: Show Metadata & Live Document Preview */
+          <div className="space-y-4 animate-fade-in">
+            {/* Active File Bar */}
+            <div className="p-3 rounded-xl theme-bg-sub border theme-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
+                  <FileIcon className="w-4 h-4" />
+                </div>
+                <div className="truncate min-w-0">
+                  <div className="text-xs font-bold theme-text-primary truncate">{file?.name}</div>
+                  <div className="text-[10.5px] theme-text-secondary">
+                    {file ? `${(file.size / 1024).toFixed(1)} KB` : ''} • Ready to Apply
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center p-0.5 rounded-xl theme-bg-surface border theme-border text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('preview')}
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                      previewTab === 'preview'
+                        ? 'theme-bg-accent-soft theme-accent font-bold shadow-2xs'
+                        : 'theme-text-secondary hover:theme-text-primary'
+                    }`}
+                  >
+                    Document Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('html')}
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                      previewTab === 'html'
+                        ? 'theme-bg-accent-soft theme-accent font-bold shadow-2xs'
+                        : 'theme-text-secondary hover:theme-text-primary'
+                    }`}
+                  >
+                    Source HTML
+                  </button>
+                </div>
+
+                <CustomButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetFile}
+                  icon={EditIcon}
+                  className="text-xs"
+                >
+                  Change File
+                </CustomButton>
+              </div>
+            </div>
+
+            {/* Template Info Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <CustomInput
                 label="Template Name"
@@ -836,70 +330,25 @@ export default function DocxTemplateModal({
                 onChange={(e: any) => setTemplateDescription(e.target.value)}
               />
             </div>
-          </div>
-        )}
 
-        {/* ─── TAB 3: FIELD MAPPING & INSPECTION ─── */}
-        {activeTab === 'mapping' && parseResult && (
-          <div className="space-y-3.5 animate-fade-in">
-            <div className="p-3 rounded-xl theme-bg-sub border theme-border text-xs theme-text-secondary flex items-center justify-between">
-              <div>
-                <strong>{parseResult.detectedPlaceholders.length} placeholders</strong> found in this Word document. Map any non-standard tags to system fields:
+            {/* Document Live Preview Box (Pure White Paper in Light & Dark Modes) */}
+            {previewTab === 'preview' ? (
+              <div className="max-h-[460px] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-slate-100 dark:bg-slate-900 border theme-border shadow-inner flex justify-center">
+                <div className="w-full max-w-2xl min-h-[380px] !bg-white !text-slate-900 p-6 sm:p-8 rounded-lg shadow-md border border-slate-200">
+                  <div
+                    className="docx-preview-content font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900"
+                    dangerouslySetInnerHTML={{ __html: parseResult.html }}
+                  />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setCustomMappings({})}
-                className="text-xs font-bold theme-accent hover:underline cursor-pointer"
-              >
-                Reset Mappings
-              </button>
-            </div>
-
-            <div className="rounded-2xl border theme-border overflow-hidden theme-bg-surface shadow-2xs">
-              <DataTable
-                data={parseResult.detectedPlaceholders.map((ph) => ({ id: ph, placeholder: ph }))}
-                columns={mappingTableColumns}
-                keyExtractor={(item: { id: string }) => item.id}
-                sortable={true}
-                emptyTitle="No placeholders detected"
-                emptySubMessage="This Word document does not contain any {{placeholder}} tokens."
-                wrapperClassName="max-h-[380px] overflow-y-auto"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 4: LIVE DATA MERGE TEST PREVIEW ─── */}
-        {activeTab === 'merge' && parseResult && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="flex items-center justify-between text-xs theme-text-secondary px-1">
-              <span>Previewing document merged with active record:</span>
-              <span className="font-mono">{file?.name}</span>
-            </div>
-
-            <div className="max-h-[420px] overflow-y-auto p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs">
-              <div
-                className="docx-preview-content font-sans text-xs sm:text-sm"
-                dangerouslySetInnerHTML={{
-                  __html: mergeTemplateWithData(getProcessedHtml, effectiveSampleData),
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 5: RAW HTML PREVIEW ─── */}
-        {activeTab === 'preview' && parseResult && (
-          <div className="space-y-3 animate-fade-in">
-            <div className="max-h-[420px] overflow-y-auto p-5 rounded-2xl theme-bg-surface border theme-border font-mono text-xs">
-              <pre className="whitespace-pre-wrap theme-text-secondary">
-                {getProcessedHtml}
-              </pre>
-            </div>
+            ) : (
+              <div className="max-h-[460px] overflow-y-auto p-4 rounded-2xl !bg-slate-950 !text-slate-100 border border-slate-800 font-mono text-xs">
+                <pre className="whitespace-pre-wrap">{parseResult.html}</pre>
+              </div>
+            )}
           </div>
         )}
       </div>
     </Modal>
   );
 }
-

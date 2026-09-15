@@ -46,7 +46,9 @@ import {
   DocumentIcon,
   EditIcon,
   IdentificationIcon,
+  PrinterIcon,
 } from "../ui/Icons";
+
 
 export default function SidebarContainer({ 
   isOpen, 
@@ -215,6 +217,7 @@ export default function SidebarContainer({
         { id: "Staff Onboarding", name: "Staff Onboarding", i18nKey: "staffOnboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },
+    { id: "Print Studio", name: "Print Studio", i18nKey: "printStudio", path: "/print-studio", matchPaths: ["/print-studio"], Icon: PrinterIcon, key: "nav_print_studio" },
     {
       id: "App Management",
       name: "App Management",

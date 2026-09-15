@@ -313,61 +313,12 @@ declare module '@/components/print/UniversalPrintModal' {
   export default UniversalPrintModal;
 }
 
-declare module '@/components/print/PrintItemSelector' {
-  export interface PrintItem {
-    key: string;
-    label: string;
-    subLabel?: string;
-    required?: boolean;
-    mandatory?: boolean;
-    isMandatory?: boolean;
-    locked?: boolean;
-    isLocked?: boolean;
-  }
-  export interface PrintItemSelectorProps {
-    icon?: React.ComponentType<any>;
-    title?: React.ReactNode;
-    items?: PrintItem[];
-    selectedKeys?: string[];
-    requiredKeys?: string[];
-    isItemRequired?: (item: PrintItem) => boolean;
-    onSelectionChange?: (keys: string[]) => void;
-    onSelectAll?: () => void;
-    onDeselectAll?: () => void;
-    minSelected?: number;
-    showSearch?: boolean;
-    searchable?: boolean;
-    showSearchThreshold?: number;
-    searchPlaceholder?: string;
-    emptyMessage?: string;
-    maxHeight?: string;
-    defaultExpanded?: boolean;
-    expanded?: boolean;
-    onToggle?: (expanded: boolean) => void;
-    className?: string;
-  }
-  const PrintItemSelector: React.ComponentType<PrintItemSelectorProps>;
-  export default PrintItemSelector;
+declare module '@/components/print/UniversalPrintStudio' {
+  import type { UniversalPrintStudioProps } from '@/components/print/types';
+  const UniversalPrintStudio: React.ComponentType<UniversalPrintStudioProps>;
+  export { UniversalPrintStudio as UniversalPrintModal };
+  export default UniversalPrintStudio;
 }
-
-declare module '@/components/print/PrintCollapsibleOption' {
-  export interface PrintCollapsibleOptionProps {
-    checked?: boolean;
-    onChange?: (checked: boolean) => void;
-    label?: React.ReactNode;
-    isExpanded?: boolean;
-    defaultExpanded?: boolean;
-    onToggleExpand?: (expanded: boolean) => void;
-    children?: React.ReactNode;
-    expandTitle?: string;
-    collapseTitle?: string;
-    className?: string;
-    contentClassName?: string;
-  }
-  const PrintCollapsibleOption: React.ComponentType<PrintCollapsibleOptionProps>;
-  export default PrintCollapsibleOption;
-}
-
 declare module '@/components/common/QrCodeBadge' {
   export interface QrCodeBadgeProps {
     verificationUrl?: string;

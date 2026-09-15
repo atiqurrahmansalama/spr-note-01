@@ -104,14 +104,26 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         isRefreshing = false;
+
+        // Check if another tab recently refreshed the access token in localStorage
+        const latestToken = authStore.getAccessToken();
+        const requestAuthToken = (originalRequest.headers?.Authorization || '').replace('Bearer ', '').trim();
+        if (latestToken && latestToken !== requestAuthToken) {
+          apiClient.defaults.headers.common.Authorization = `Bearer ${latestToken}`;
+          originalRequest.headers.Authorization = `Bearer ${latestToken}`;
+          return apiClient(originalRequest);
+        }
         
-        // Only clear tokens and redirect to login if the server explicitly rejected the refresh token (e.g. 400, 401, 403).
-        // Avoid logging out on temporary network/connection drop.
+        // Only clear tokens and redirect to login if the server explicitly rejected the refresh token (e.g. 400, 401, 403)
+        // AND no other tab has written a new valid token.
         const status = refreshErr.response?.status;
         if (status && (status === 400 || status === 401 || status === 403)) {
-          authStore.clearTokens();
-          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-            window.location.href = '/login';
+          const freshToken = authStore.getAccessToken();
+          if (!freshToken) {
+            authStore.clearTokens();
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+              window.location.href = '/login';
+            }
           }
         }
         return Promise.reject(refreshErr);

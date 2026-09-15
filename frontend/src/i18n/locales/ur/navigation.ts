@@ -66,4 +66,6 @@ export const navigation = {
   routineCurriculum: 'روٹین اور نصاب',
   officialWebsite: 'سرکاری ویب سائٹ',
   publicPortalVerification: 'عوامی پورٹل اور تصدیق',
+  printStudio: 'پرنٹ اسٹوڈیو',
 };
+

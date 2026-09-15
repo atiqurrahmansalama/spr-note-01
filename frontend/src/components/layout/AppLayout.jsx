@@ -51,6 +51,7 @@ export const ROUTE_TITLE_MAP = {
   "/staff/daily-attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
   "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
   "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
+  "/print-studio": { title: "Print Studio", category: "Print Studio" },
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },
 

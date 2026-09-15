@@ -66,4 +66,6 @@ export const navigation = {
   routineCurriculum: 'الجدول والمنهج الدراسي',
   officialWebsite: 'الموقع الرسمي',
   publicPortalVerification: 'البوابة العامة والتحقق',
+  printStudio: 'استوديو الطباعة',
 };
+

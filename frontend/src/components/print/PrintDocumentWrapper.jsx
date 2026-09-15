@@ -131,32 +131,10 @@ export default function PrintDocumentWrapper({
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  <h1
-                    contentEditable={isEditable}
-                    suppressContentEditableWarning
-                    onBlur={(e) => {
-                      if (!onOptionsChange) return;
-                      const val = e.currentTarget.textContent?.trim();
-                      onOptionsChange({ ...options, customInstitutionName: val });
-                    }}
-                    className={`text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900 leading-tight print:text-base ${
-                      isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
-                    }`}
-                  >
+                  <h1 className="text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900 leading-tight print:text-base">
                     {institutionName}
                   </h1>
-                  <p
-                    contentEditable={isEditable}
-                    suppressContentEditableWarning
-                    onBlur={(e) => {
-                      if (!onOptionsChange) return;
-                      const val = e.currentTarget.textContent?.trim();
-                      onOptionsChange({ ...options, customInstitutionAddress: val });
-                    }}
-                    className={`text-xs text-slate-600 font-medium leading-normal print:text-[11px] ${
-                      isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
-                    }`}
-                  >
+                  <p className="text-xs text-slate-600 font-medium leading-normal print:text-[11px]">
                     {institutionAddress}
                   </p>
                 </div>
@@ -181,34 +159,12 @@ export default function PrintDocumentWrapper({
             }`}
           >
             {resolvedTitle && (
-              <h2
-                contentEditable={isEditable}
-                suppressContentEditableWarning
-                onBlur={(e) => {
-                  if (!onOptionsChange) return;
-                  const val = e.currentTarget.textContent?.trim();
-                  onOptionsChange({ ...options, customTitle: val });
-                }}
-                className={`text-base sm:text-lg font-black uppercase tracking-wider text-slate-900 leading-tight print:text-sm ${
-                  isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
-                }`}
-              >
+              <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-slate-900 leading-tight print:text-sm">
                 {resolvedTitle}
               </h2>
             )}
             {resolvedSubtitle && (
-              <p
-                contentEditable={isEditable}
-                suppressContentEditableWarning
-                onBlur={(e) => {
-                  if (!onOptionsChange) return;
-                  const val = e.currentTarget.textContent?.trim();
-                  onOptionsChange({ ...options, customSubtitle: val });
-                }}
-                className={`text-xs font-semibold text-slate-600 tracking-normal print:text-[11px] ${
-                  isEditable ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-50 cursor-text' : ''
-                }`}
-              >
+              <p className="text-xs font-semibold text-slate-600 tracking-normal print:text-[11px]">
                 {resolvedSubtitle}
               </p>
             )}
@@ -270,73 +226,24 @@ export default function PrintDocumentWrapper({
                     className={`space-y-0.5 min-w-0 relative group/meta ${item.colSpan ? `col-span-${item.colSpan}` : ''} ${item.className || ''}`}
                     style={item.colSpan ? { gridColumn: `span ${item.colSpan} / span ${item.colSpan}` } : undefined}
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        contentEditable={isEditable}
-                        suppressContentEditableWarning
-                        onBlur={(e) => {
-                          if (!onMetaItemsChange) return;
-                          const newLabel = e.currentTarget.textContent?.trim() || item.label;
-                          const updated = metaItems.map((m, mIdx) => (mIdx === idx ? { ...m, label: newLabel } : m));
-                          onMetaItemsChange(updated);
-                        }}
-                        className={`uppercase tracking-wider text-slate-500 font-bold block ${
-                          metaFontSize === 'SM'
-                            ? 'text-[8.5px]'
-                            : metaFontSize === 'LG'
-                            ? 'text-[10.5px]'
-                            : 'text-[9.5px]'
-                        } ${
-                          isEditable
-                            ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-0.5 hover:bg-slate-200/50 cursor-text'
-                            : ''
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                      {isEditable && onMetaItemsChange && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updated = metaItems.filter((_, mIdx) => mIdx !== idx);
-                            onMetaItemsChange(updated);
-                          }}
-                          title="Remove metadata field"
-                          className="opacity-0 group-hover/meta:opacity-100 p-0.5 rounded text-rose-500 hover:bg-rose-100 cursor-pointer print:hidden transition-opacity"
-                        >
-                          <TrashIcon className="w-2.5 h-2.5" />
-                        </button>
-                      )}
-                    </div>
                     <span
-                      contentEditable={isEditable}
-                      suppressContentEditableWarning
-                      onBlur={(e) => {
-                        const val = e.currentTarget.textContent?.trim();
-                        if (onMetaItemsChange) {
-                          const updated = metaItems.map((m, mIdx) => (mIdx === idx ? { ...m, value: val } : m));
-                          onMetaItemsChange(updated);
-                        } else if (onOptionsChange) {
-                          onOptionsChange({
-                            ...options,
-                            customMetaValues: {
-                              ...(options.customMetaValues || {}),
-                              [item.label]: val,
-                            },
-                          });
-                        }
-                      }}
+                      className={`uppercase tracking-wider text-slate-500 font-bold block ${
+                        metaFontSize === 'SM'
+                          ? 'text-[8.5px]'
+                          : metaFontSize === 'LG'
+                          ? 'text-[10.5px]'
+                          : 'text-[9.5px]'
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                    <span
                       className={`font-extrabold text-slate-900 block break-words whitespace-normal leading-snug ${
                         metaFontSize === 'SM'
                           ? 'text-[11px]'
                           : metaFontSize === 'LG'
                           ? 'text-[14px]'
                           : 'text-[12px]'
-                      } ${
-                        isEditable
-                          ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
-                          : ''
                       }`}
                     >
                       {resolvedVal !== undefined && resolvedVal !== null ? resolvedVal : '-'}

@@ -95,6 +95,7 @@ export default function HallAttendancePrintModal({
       data={activeData.students || []}
       placeholderKeys={HALL_ATTENDANCE_PLACEHOLDER_KEYS}
       defaultOptions={defaultPrintOptions}
+      scopeId="attendance_register"
       urlSync={true}
       urlParam="print"
       urlParamValue="hall_attendance"

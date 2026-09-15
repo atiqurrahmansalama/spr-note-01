@@ -157,10 +157,16 @@ export const refreshToken = async () => {
       const data = await response.json();
       if (data.access) {
         authStore.saveAccessToken(data.access);
+        if (data.refresh) {
+          authStore.saveRefreshToken(data.refresh);
+        }
         return data.access;
       }
     } else if (response.status === 400 || response.status === 401 || response.status === 403) {
-      authStore.clear();
+      const latestToken = authStore.getAccessToken();
+      if (!latestToken) {
+        authStore.clear();
+      }
     }
   } catch (err) {
     console.warn('[authService] Token refresh failed (network/server error):', err.message);
@@ -189,14 +195,19 @@ export const fetchWithAuth = async (url, options = {}) => {
 
   if (response.status === 401) {
     console.warn('[authService] Access token expired or invalid (401). Attempting auto refresh...');
-    const newToken = await refreshToken();
-    
-    if (newToken) {
-      response = await makeRequest(newToken);
+    // Check if another tab has already refreshed token
+    const latestToken = authStore.getAccessToken();
+    if (latestToken && latestToken !== token) {
+      response = await makeRequest(latestToken);
     } else {
-      if (!authStore.getRefreshToken()) {
-        authStore.clear();
-        response = await makeRequest(null);
+      const newToken = await refreshToken();
+      if (newToken) {
+        response = await makeRequest(newToken);
+      } else {
+        if (!authStore.getRefreshToken()) {
+          authStore.clear();
+          response = await makeRequest(null);
+        }
       }
     }
   }

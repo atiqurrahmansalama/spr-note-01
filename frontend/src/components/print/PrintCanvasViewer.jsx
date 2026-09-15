@@ -32,6 +32,7 @@ export default function PrintCanvasViewer({
   className = '',
 }) {
   const containerRef = useRef(null);
+  const contentRef = useRef(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -43,6 +44,57 @@ export default function PrintCanvasViewer({
   const touchStartDistRef = useRef(null);
   const touchStartZoomRef = useRef(zoomLevel);
   const touchStartPanRef = useRef({ x: 0, y: 0, touchX: 0, touchY: 0 });
+
+  // Professional Fluid Canvas Bounds Calculation
+  const clampPan = useCallback(
+    (targetX, targetY) => {
+      const container = containerRef.current;
+      const portal = contentRef.current || (typeof document !== 'undefined' ? document.getElementById('universal-print-portal') : null);
+
+      if (!container || !portal) {
+        return {
+          x: targetX,
+          y: targetY,
+        };
+      }
+
+      const viewportWidth = container.clientWidth || 800;
+      const viewportHeight = container.clientHeight || 600;
+
+      // Real layout dimensions unaffected by CSS translate matrix
+      const contentHeight = (portal.scrollHeight || portal.offsetHeight || 1200) * (zoomLevel || 1);
+      const contentWidth = (portal.scrollWidth || portal.offsetWidth || 800) * (zoomLevel || 1);
+
+      // Top bound: allow comfortable breathing space above paper
+      const maxPanY = 120;
+
+      // Bottom bound: allow scrolling freely down to view the entire document, multi-page batches, and footers
+      const maxScrollDown = Math.max(contentHeight + 300, viewportHeight + 400);
+      const minPanY = -(maxScrollDown - viewportHeight + 100);
+
+      const clampedY = Math.min(maxPanY, Math.max(minPanY, targetY));
+
+      // Horizontal clamping: allow smooth horizontal scrolling when zoomed or wide
+      const maxScrollX = Math.max(200, (contentWidth - viewportWidth) / 2 + 200);
+      const clampedX = Math.min(maxScrollX, Math.max(-maxScrollX, targetX));
+
+      return { x: clampedX, y: clampedY };
+    },
+    [zoomLevel]
+  );
+
+  // Re-clamp position on zoom change or window resize to prevent floating away
+  useEffect(() => {
+    setPan((prev) => clampPan(prev.x, prev.y));
+  }, [zoomLevel, clampPan]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setPan((prev) => clampPan(prev.x, prev.y));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampPan]);
 
   // Spacebar Key Listener for temporary Hand/Pan Mode (like Photoshop / Figma / Canva)
   useEffect(() => {
@@ -76,7 +128,7 @@ export default function PrintCanvasViewer({
 
   const effectivePointerMode = isSpacePressed ? 'hand' : pointerMode;
 
-  // 1. Mouse Wheel & Trackpad Handling (Ctrl+Wheel Zoom, Shift+Wheel Horizontal Pan, Wheel Vertical Pan)
+  // 1. Mouse Wheel & Trackpad Handling (Ctrl+Wheel Zoom, Shift+Wheel Horizontal Pan, Wheel Vertical Pan with Canva-like Top Lock)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -117,27 +169,29 @@ export default function PrintCanvasViewer({
         e.preventDefault();
         e.stopPropagation();
         const delta = e.deltaY || e.deltaX;
-        setPan((prev) => ({
-          ...prev,
-          x: prev.x - delta * 1.1,
-        }));
+        setPan((prev) => {
+          const targetX = prev.x - delta * 1.0;
+          return clampPan(targetX, prev.y);
+        });
         return;
       }
 
-      // 3. Normal Wheel => Smooth Vertical Panning
+      // 3. Normal Wheel => Smooth Vertical Panning with Top Lock like Canva
       e.preventDefault();
-      setPan((prev) => ({
-        ...prev,
-        y: prev.y - e.deltaY * 1.1,
-      }));
+      setPan((prev) => {
+        const targetY = prev.y - e.deltaY * 1.0;
+        return clampPan(prev.x, targetY);
+      });
     };
 
-    container.addEventListener('wheel', handleWheel, { passive: false });
+    const wheelOptions = { passive: false };
+    container.addEventListener('wheel', handleWheel, wheelOptions);
     return () => {
-      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('wheel', handleWheel, wheelOptions);
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
-  }, [onZoomChange, zoomLevel]);
+  }, [onZoomChange, zoomLevel, clampPan]);
+
 
   // 2. Click & Drag Canvas Handlers (Pan in all 360-degree directions)
   const handleMouseDown = useCallback(
@@ -191,10 +245,10 @@ export default function PrintCanvasViewer({
       const dx = e.clientX - panStartRef.current.mouseX;
       const dy = e.clientY - panStartRef.current.mouseY;
 
-      setPan({
-        x: panStartRef.current.panX + dx,
-        y: panStartRef.current.panY + dy,
-      });
+      const targetX = panStartRef.current.panX + dx;
+      const targetY = panStartRef.current.panY + dy;
+
+      setPan(clampPan(targetX, targetY));
     };
 
     const handleMouseUp = () => {
@@ -212,7 +266,7 @@ export default function PrintCanvasViewer({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
+  }, [clampPan]);
 
   // 3. Touch Pinch-to-Zoom & Touch Pan Support for Tablets & Mobile
   const handleTouchStart = useCallback(
@@ -259,13 +313,12 @@ export default function PrintCanvasViewer({
         const t = e.touches[0];
         const dx = t.clientX - touchStartPanRef.current.touchX;
         const dy = t.clientY - touchStartPanRef.current.touchY;
-        setPan({
-          x: touchStartPanRef.current.x + dx,
-          y: touchStartPanRef.current.y + dy,
-        });
+        const targetX = touchStartPanRef.current.x + dx;
+        const targetY = touchStartPanRef.current.y + dy;
+        setPan(clampPan(targetX, targetY));
       }
     },
-    [onZoomChange]
+    [onZoomChange, clampPan]
   );
 
   const handleTouchEnd = useCallback(() => {
@@ -322,12 +375,14 @@ export default function PrintCanvasViewer({
       >
         {/* Physical Paper Sheet Simulation Canvas with 100% Vector Sharp Zoom */}
         <div
+          ref={contentRef}
           id="universal-print-portal"
           className={`universal-print-portal-container flex flex-col items-center gap-8 print:gap-0 print:block print:!transform-none ${
             effectivePointerMode === 'hand' ? 'select-none' : 'select-text'
           }`}
           style={{
             zoom: zoomLevel,
+
             userSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
             WebkitUserSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
           }}

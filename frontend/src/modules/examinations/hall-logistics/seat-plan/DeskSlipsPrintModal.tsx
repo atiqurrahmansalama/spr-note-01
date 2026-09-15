@@ -145,6 +145,7 @@ export default function DeskSlipsPrintModal({
         if (tpl?.id) setLayout(tpl.id as DeskSlipPrintLayout);
       }}
       defaultOptions={defaultPrintOptions}
+      scopeId="student_id_card"
       urlSync={true}
       urlParam="print"
       urlParamValue="desk_slips"

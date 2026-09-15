@@ -120,7 +120,7 @@ export function updatePrintPageStyle(options = {}) {
     @media print {
       @page {
         size: ${pageSize} ${orientation};
-        margin: 8mm 10mm;
+        margin: ${getPageMarginCSS(options.margin)};
       }
     }
   `;

@@ -84,18 +84,34 @@ export function AuthProvider({ children }) {
 
     // 2. LISTEN FOR STORAGE SYNC EVENTS ACROSS TABS
     const handleStorageChange = (e) => {
-      if (e.key === 'auth_sync_event') {
+      if (
+        !e.key ||
+        e.key === 'accessToken' ||
+        e.key === 'access_token' ||
+        e.key === 'refreshToken' ||
+        e.key === 'refresh_token' ||
+        e.key === 'user' ||
+        e.key === 'spr_saved_accounts' ||
+        e.key === 'auth_sync_event'
+      ) {
         const token = authStore.getAccessToken() || localStorage.getItem('accessToken') || localStorage.getItem('access_token');
         const userDataStr = localStorage.getItem('user');
-        const userData = userDataStr ? JSON.parse(userDataStr) : null;
+        let userData = null;
+        try {
+          userData = userDataStr ? JSON.parse(userDataStr) : authStore.getUserProfile();
+        } catch {
+          userData = null;
+        }
 
         if (token) {
           setAccessToken(token);
           if (userData) {
             setUser(userData);
-            authStore.saveUserProfile(userData);
           }
-          window.location.href = '/dashboard';
+          apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+        } else if (!token) {
+          setAccessToken(null);
+          setUser(null);
         }
       }
     };

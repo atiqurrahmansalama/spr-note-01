@@ -64,6 +64,9 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   staff_onboarding: true,
   staff_management: true,
 
+  nav_print_studio: true,
+  print_studio: true,
+
   nav_attendance_management: true,
   attendance_policies_slots: true,
   biometric_device_manager: true,

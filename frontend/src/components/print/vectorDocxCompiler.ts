@@ -392,7 +392,7 @@ export function compileNativeDocxDocument({
             ? AlignmentType.RIGHT
             : AlignmentType.LEFT;
 
-        const isBold = col.bold || col.isBold || colKey === 'name' || colKey === 'studentName' || colKey === 'sl';
+        const isBold = Boolean(col.bold || col.isBold || colKey === 'name' || colKey.includes('name') || colKey === 'sl' || colKey === 'title');
 
         return new TableCell({
           verticalAlign: VerticalAlign.CENTER,

@@ -114,6 +114,8 @@
 }
 
 /* Screen Margins */
+.paper-sheet,
+.paper-sheet:not([data-margin]),
 .paper-sheet[data-margin="NORMAL" i] {
   padding: 38px 44px;
 }
@@ -693,13 +695,15 @@ body.spr-printing-in-progress .universal-export-menu-portal {
 }
 
 /* --------------------------------------------------------------------------
-   8. High-Fidelity Word (.docx) OpenXML Document Styles
+   8. High-Fidelity Word (.docx) OpenXML Document Styles & Live Typography
    -------------------------------------------------------------------------- */
 .docx-live-container {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
   color: #0f172a;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .docx-live-container .docx-preview-sandbox,
@@ -726,12 +730,32 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   min-height: auto !important;
 }
 
+/* Ensure empty paragraphs, blank lines, and newlines in Word docs never collapse to 0 height */
+.docx-live-container p,
+.docx-live-container div.docx_p {
+  min-height: 1.2em;
+}
+
+.docx-live-container p:empty,
+.docx-live-container div.docx_p:empty {
+  min-height: 1.2em;
+  display: block;
+}
+
+.docx-live-container p:empty::before,
+.docx-live-container div.docx_p:empty::before {
+  content: "\00a0";
+  visibility: hidden;
+  display: inline-block;
+}
+
 .docx-live-container table {
   border-collapse: collapse !important;
 }
 
-.docx-live-container p {
-  line-height: inherit;
+.docx-live-container table td,
+.docx-live-container table th {
+  vertical-align: top;
 }
 
 .docx-live-container img {
@@ -739,15 +763,27 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   height: auto;
 }
 
+.docx-preview-content {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.docx-preview-content * {
+  color: inherit;
+}
+
 .docx-preview-content table {
   width: 100%;
   border-collapse: collapse;
+  background-color: #ffffff !important;
 }
 
 .docx-preview-content th,
 .docx-preview-content td {
   padding: 4px 8px;
   border: 1px solid #cbd5e1;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 

@@ -179,6 +179,7 @@ export default function AdmitCardPrintModal({
         if (tpl?.id) setLayout(tpl.id as AdmitCardPrintLayout);
       }}
       defaultOptions={defaultPrintOptions}
+      scopeId="exam_admit_card"
       urlSync={true}
       urlParam="print"
       urlParamValue="admit_cards"

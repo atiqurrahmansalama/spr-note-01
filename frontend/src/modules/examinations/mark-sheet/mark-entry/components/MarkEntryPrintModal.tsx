@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import UniversalPrintModal from '@/components/print/UniversalPrintModal';
-import PrintDocumentWrapper from '@/components/print/PrintDocumentWrapper';
-import PrintTableRenderer from '@/components/print/PrintTableRenderer';
+import UniversalPrintStudio from '@/components/print/UniversalPrintStudio';
+import { PrintBatchDocument } from '@/components/print/types';
 import { formatDateLabel, formatCleanRange } from '../../../exam-schedules/utils/examScheduleUtils';
 import { examStore } from '@/stores/examStore';
 import { GradingSystem, Subject } from '../../types';
@@ -408,57 +407,26 @@ export default function MarkEntryPrintModal({
     [getSignatureLines, selectedSubject]
   );
 
-  // 5. Bulk Print Sheets Content Renderer
-  const bulkPrintSheetsContent = useMemo(() => {
-    if (printMode !== 'bulk') return null;
+  // 5. Batch Documents for Bulk Mode
+  const batchDocuments: PrintBatchDocument[] = useMemo(() => {
+    if (printMode !== 'bulk') return [];
 
-    return (
-      <div className="space-y-8 print:space-y-0 w-full">
-        {resolvedSubjectsList.map((sub, sIdx) => {
-          const isCurrent = Boolean(selectedSubject?.id && String(selectedSubject.id) === String(sub.id));
-          const { rows, subComponents, subFullMarks, subSummaryMetrics } = buildSubjectDataAndStats(sub, isCurrent);
-          const subCols = buildSubjectColumns(subComponents, subFullMarks);
-          const subMeta = buildSubjectMetaItems(sub);
-          const subOptions = {
-            ...defaultPrintOptions,
-            signatureLines: getSignatureLines(sub),
-          };
+    return resolvedSubjectsList.map((sub) => {
+      const isCurrent = Boolean(selectedSubject?.id && String(selectedSubject.id) === String(sub.id));
+      const { rows, subComponents, subFullMarks, subSummaryMetrics } = buildSubjectDataAndStats(sub, isCurrent);
+      const subCols = buildSubjectColumns(subComponents, subFullMarks);
+      const subMeta = buildSubjectMetaItems(sub);
 
-          return (
-            <div
-              key={`subject_sheet_${sub.id || sIdx}`}
-              className="print:break-after-page print:page-break-after-always print:min-h-screen"
-            >
-              <div
-                className="sheet-page-wrapper"
-                data-page-size="A4"
-                data-orientation="PORTRAIT"
-                data-density="NORMAL"
-                data-color-mode="FULL_COLOR"
-                data-page-break="true"
-              >
-                <PrintDocumentWrapper
-                  title="Subject MarkSheet (Award List)"
-                  subtitle={`${selectedExam?.name || 'Examination Session'} • Academic Year: ${selectedExam?.academicYearName || '2026'}`}
-                  metaItems={subMeta}
-                  options={subOptions}
-                  pageIndex={sIdx}
-                  totalPages={resolvedSubjectsList.length}
-                  isFirstPage={true}
-                  isLastPage={true}
-                >
-                  <PrintTableRenderer
-                    columns={subCols as any}
-                    data={rows}
-                    density="NORMAL"
-                  />
-                </PrintDocumentWrapper>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+      return {
+        id: String(sub.id),
+        title: 'Subject MarkSheet (Award List)',
+        subtitle: `${selectedExam?.name || 'Examination Session'} • Academic Year: ${selectedExam?.academicYearName || '2026'}`,
+        metaItems: subMeta,
+        columns: subCols as any,
+        data: rows,
+        summaryMetrics: subSummaryMetrics as any,
+      };
+    });
   }, [
     printMode,
     resolvedSubjectsList,
@@ -466,8 +434,6 @@ export default function MarkEntryPrintModal({
     buildSubjectDataAndStats,
     buildSubjectColumns,
     buildSubjectMetaItems,
-    defaultPrintOptions,
-    getSignatureLines,
     selectedExam,
   ]);
 
@@ -485,7 +451,7 @@ export default function MarkEntryPrintModal({
   }, [buildSubjectMetaItems, selectedSubject]);
 
   return (
-    <UniversalPrintModal
+    <UniversalPrintStudio
       isOpen={isOpen}
       onClose={onClose}
       title={
@@ -498,18 +464,16 @@ export default function MarkEntryPrintModal({
           ? `Batch Award List Studio • ${selectedExam?.academicYearName || '2026'}`
           : `${selectedExam?.name || 'Examination Session'} • Academic Year: ${selectedExam?.academicYearName || '2026'}`
       }
+      documents={printMode === 'bulk' ? batchDocuments : undefined}
       data={printMode === 'single' ? singleEvaluation.rows : []}
       columns={printMode === 'single' ? (singleColumns as any) : []}
       metaItems={printMode === 'single' ? (singleMetaItems as any) : []}
       summaryMetrics={printMode === 'single' ? (singleEvaluation.subSummaryMetrics as any) : []}
       defaultOptions={defaultPrintOptions as any}
-      customSheets={printMode === 'bulk'}
       onExportCsv={onExportCsv}
       urlSync={true}
       urlParam="print"
       urlParamValue={printMode === 'bulk' ? 'bulk_subject_marksheet' : 'subject_marksheet'}
-    >
-      {printMode === 'bulk' ? bulkPrintSheetsContent : null}
-    </UniversalPrintModal>
+    />
   );
 }

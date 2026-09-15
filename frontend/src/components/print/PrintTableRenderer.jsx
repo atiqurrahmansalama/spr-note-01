@@ -66,7 +66,7 @@ export default function PrintTableRenderer({
       if (typeof getRowKey === 'function') {
         key = String(getRowKey(row, idx));
       } else {
-        key = String(row?.id ?? row?.key ?? row?._id ?? row?.studentId ?? row?.subjectId ?? `row_${idx}`);
+        key = String(row?.id ?? row?.key ?? row?._id ?? row?.uid ?? row?.code ?? `row_${idx}`);
       }
       const isMandatory =
         (typeof isRowMandatory === 'function' && isRowMandatory(row, idx)) ||
@@ -187,20 +187,7 @@ export default function PrintTableRenderer({
                     </div>
                   ) : (
                     <>
-                      <div
-                        contentEditable={isEditable}
-                        suppressContentEditableWarning
-                        onBlur={(e) => {
-                          if (!onColumnHeaderChange) return;
-                          const val = e.currentTarget.textContent?.trim();
-                          onColumnHeaderChange(colKey, val);
-                        }}
-                        className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'} ${
-                          isEditable
-                            ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-0.5 hover:bg-slate-200/60 cursor-text transition-all'
-                            : ''
-                        }`}
-                      >
+                      <div className={`leading-tight font-bold text-slate-900 ${col.nowrap ? 'whitespace-nowrap' : 'break-normal'}`}>
                         {headerTitle}
                       </div>
                       {col.subLabel && (
@@ -219,68 +206,10 @@ export default function PrintTableRenderer({
           {activeData.map((row, rIdx) => {
             const actualIdx = rIdx + (typeof startIndex === 'number' ? startIndex : 0);
             return (
-              <tr key={row.id || rIdx} className="print-avoid-break bg-white hover:bg-blue-50/20 relative group/row transition-colors">
+              <tr key={row.id || rIdx} className="print-avoid-break bg-white hover:bg-slate-50/50 relative transition-colors">
                 {showIndex && (
-                  <td className={`text-center font-mono font-medium text-slate-700 border border-slate-300 w-8 whitespace-nowrap relative ${currentDensity.cellPad}`}>
+                  <td className={`text-center font-mono font-medium text-slate-700 border border-slate-300 w-8 whitespace-nowrap ${currentDensity.cellPad}`}>
                     {actualIdx + 1}
-
-                    {/* Floating Row Actions (Delete Line, Insert Below, Move Up/Down) on Hover */}
-                    {isEditable && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+4px)] opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center gap-0.5 z-30 print:hidden select-none bg-white p-0.5 rounded-lg border border-slate-300 shadow-md">
-                        {onRowMove && actualIdx > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowMove(actualIdx, actualIdx - 1);
-                            }}
-                            title="Move row up"
-                            className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
-                          >
-                            <ChevronUpIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                        {onRowMove && actualIdx < activeData.length - 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowMove(actualIdx, actualIdx + 1);
-                            }}
-                            title="Move row down"
-                            className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
-                          >
-                            <ChevronDownIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                        {onRowInsert && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowInsert(actualIdx, 'below');
-                            }}
-                            title="Insert new row below"
-                            className="p-1 rounded text-blue-600 hover:bg-blue-50 cursor-pointer"
-                          >
-                            <PlusIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                        {onRowDelete && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowDelete(actualIdx);
-                            }}
-                            title="Delete this row (Cut line)"
-                            className="p-1 rounded text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          >
-                            <TrashIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </td>
                 )}
                 {activeColumns.map((col, cIdx) => {
@@ -312,21 +241,8 @@ export default function PrintTableRenderer({
                       {isReactNode ? (
                         content
                       ) : (
-                        <div
-                          contentEditable={isEditable}
-                          suppressContentEditableWarning
-                          onBlur={(e) => {
-                            if (!onCellChange) return;
-                            const val = e.currentTarget.textContent;
-                            onCellChange(actualIdx, colKey, val);
-                          }}
-                          className={
-                            isEditable
-                              ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-blue-50/40 cursor-text transition-all min-h-[1.2em]'
-                              : ''
-                          }
-                        >
-                          {content !== undefined && content !== null ? content : isEditable ? '' : '-'}
+                        <div className="leading-snug">
+                          {content !== undefined && content !== null ? content : '-'}
                         </div>
                       )}
                     </td>

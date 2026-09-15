@@ -1,3 +1,4 @@
+import React from 'react';
 import { StudentResult, Subject, GradingSystem } from '../types';
 
 /**
@@ -155,3 +156,159 @@ export function computeClassStats(
     highestGrade: topGrade !== '-' ? topGrade : defaultTopGrade,
   };
 }
+
+/**
+ * Constructs clean, theme-token styled table footer rows for a student transcript table.
+ */
+export function buildStudentFooterRows({
+  studentResult,
+  subjects = [],
+  classStats,
+  scaleMaxGpa = '5.00',
+  scaleTopGrade = 'A+',
+  totalStudents = 0,
+}: {
+  studentResult: StudentResult | null;
+  subjects?: Subject[];
+  classStats: {
+    highestTotal: number | string;
+    highestPercentage: string;
+    highestGpa: string;
+    highestGrade: string;
+  };
+  scaleMaxGpa?: string;
+  scaleTopGrade?: string;
+  totalStudents?: number;
+}): any[] {
+  if (!studentResult) return [];
+
+  const rankText = formatRankOrdinal(
+    studentResult.classRank || studentResult.meritPosition || studentResult.rank || studentResult.position
+  );
+  const gpaText =
+    studentResult.overallGpa !== null && studentResult.overallGpa !== undefined
+      ? Number(studentResult.overallGpa).toFixed(2)
+      : '-';
+  const gradeText = studentResult.grade || studentResult.division || '-';
+  const totalFull = computeTotalFullMarks(studentResult, subjects);
+  const totalObtained = computeTotalObtainedMarks(studentResult);
+
+  const createRow = (
+    label: string,
+    fullVal: string | number,
+    highestVal: string | number,
+    obtainedVal: string | number,
+    isObtainedBold = true
+  ) => ({
+    mergeIndex: true,
+    cells: [
+      {
+        colSpan: 1,
+        content: label,
+        align: 'left' as const,
+        className: 'font-bold theme-text-primary',
+        style: { paddingLeft: '32px' },
+      },
+      {
+        colSpan: 1,
+        content: fullVal,
+        align: 'center' as const,
+        className: 'font-normal theme-text-secondary font-mono',
+      },
+      {
+        colSpan: 1,
+        content: highestVal,
+        align: 'center' as const,
+        className: 'font-normal theme-text-secondary font-mono',
+      },
+      {
+        colSpan: 1,
+        content: obtainedVal,
+        align: 'center' as const,
+        className: `${isObtainedBold ? 'font-bold theme-text-primary' : 'font-normal theme-text-secondary'} font-mono`,
+      },
+      {
+        colSpan: 2,
+        content: '',
+        borderless: true,
+        className: 'border-0 border-transparent bg-transparent',
+      },
+    ],
+  });
+
+  return [
+    { isSpacer: true },
+    createRow('Total Marks', totalFull > 0 ? totalFull : '-', classStats.highestTotal, totalObtained),
+    createRow('Average Marks', '100%', classStats.highestPercentage, `${studentResult.overallPercentage ?? 0}%`),
+    createRow('GPA', scaleMaxGpa, classStats.highestGpa !== '-' ? classStats.highestGpa : scaleMaxGpa, gpaText),
+    createRow('Grade', scaleTopGrade, classStats.highestGrade !== '-' ? classStats.highestGrade : scaleTopGrade, gradeText, true),
+    {
+      mergeIndex: true,
+      cells: [
+        {
+          colSpan: 1,
+          content: 'Result & Merit Status',
+          align: 'left' as const,
+          className: 'font-bold theme-text-primary',
+          style: { paddingLeft: '32px' },
+        },
+        {
+          colSpan: 3,
+          content: !studentResult.isOverallPass ? (
+            React.createElement('span', { className: 'font-bold theme-danger' }, 'FAILED')
+          ) : rankText && rankText !== '-' ? (
+            React.createElement(
+              'span',
+              { className: 'font-normal theme-text-primary' },
+              'Positioned ',
+              React.createElement(
+                'strong',
+                { className: 'font-bold theme-accent font-mono px-0.5' },
+                rankText
+              ),
+              ` out of ${totalStudents} Students`
+            )
+          ) : (
+            React.createElement('span', { className: 'font-medium theme-success' }, 'PASSED')
+          ),
+          align: 'center' as const,
+          className: 'tracking-tight theme-text-primary',
+        },
+        {
+          colSpan: 2,
+          content: '',
+          borderless: true,
+          className: 'border-0 border-transparent bg-transparent',
+        },
+      ],
+    },
+  ];
+}
+
+/**
+ * Builds structured summary metrics for top-level ribbon or metric displays.
+ */
+export function buildStudentSummaryMetrics(studentResult: StudentResult | null): any[] {
+  if (!studentResult) return [];
+  const rankText = formatRankOrdinal(
+    studentResult.classRank || studentResult.meritPosition || studentResult.rank || studentResult.position
+  );
+  return [
+    { label: 'Total Marks', value: studentResult.totalObtained ?? '-' },
+    {
+      label: 'GPA',
+      value:
+        studentResult.overallGpa !== null && studentResult.overallGpa !== undefined
+          ? Number(studentResult.overallGpa).toFixed(2)
+          : '-',
+    },
+    { label: 'Grade', value: studentResult.grade || studentResult.division || '-' },
+    { label: 'Merit Position', value: rankText || '-' },
+    {
+      label: 'Status',
+      value: studentResult.isOverallPass !== false ? 'PASSED' : 'FAILED',
+      highlight: studentResult.isOverallPass !== false,
+    },
+  ];
+}
+

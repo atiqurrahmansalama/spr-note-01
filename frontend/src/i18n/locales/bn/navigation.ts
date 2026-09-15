@@ -66,4 +66,6 @@ export const navigation = {
   routineCurriculum: 'রুটিন ও পাঠ্যক্রম',
   officialWebsite: 'অফিসিয়াল ওয়েবসাইট',
   publicPortalVerification: 'পাবলিক পোর্টাল ও যাচাইকরণ',
+  printStudio: 'প্রিন্ট স্টুডিও',
 };
+
