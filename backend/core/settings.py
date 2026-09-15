@@ -22,13 +22,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "insecure-de
 DEBUG = os.getenv("DEBUG", os.getenv("DJANGO_DEBUG", "False")).lower() in ("true", "1", "t")
 
 # Dynamic Allowed Hosts (Safe environment extraction)
-_raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")
+_raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "*")
 if _raw_allowed_hosts.strip() == "*":
-    ALLOWED_HOSTS = ["*"] if DEBUG else ["localhost", "127.0.0.1", "[::1]"]
+    ALLOWED_HOSTS = ["*"]
 else:
     ALLOWED_HOSTS = [h.strip() for h in _raw_allowed_hosts.split(",") if h.strip()]
-if "localhost" not in ALLOWED_HOSTS and DEBUG:
-    ALLOWED_HOSTS.extend(["localhost", "127.0.0.1", "[::1]"])
+
+for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app"]:
+    if default_host not in ALLOWED_HOSTS and "*" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(default_host)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "core.User"
@@ -375,8 +377,22 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", f"Suffah Hifz LMS <{EMAIL_HOST_USER or 'noreply@suffahhifz.com'}>")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
-GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
-GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+
+# CORS & CSRF Configuration for multi-platform Web / Mobile / Native apps
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1")
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://spr-note.vercel.app").split(",")
+    if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://spr-note.vercel.app").split(",")
+    if origin.strip()
+]
 
 # Reverse proxy SSL termination settings for Vercel / Railway
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
