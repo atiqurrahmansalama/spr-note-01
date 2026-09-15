@@ -20,11 +20,39 @@ export function AuthProvider({ children }) {
     const hashParams = hash ? new URLSearchParams(hash.replace('#', '?')) : null;
     const googleAccess = hashParams?.get('access_token');
     const googleId = hashParams?.get('id_token');
+    const googleError = urlParams.get('error') || hashParams?.get('error');
+
+    // 0. Handle Google error response (e.g. user cancelled prompt)
+    if (googleError) {
+      const errorDesc = urlParams.get('error_description') || hashParams?.get('error_description') || 'Google authentication was cancelled or encountered an error.';
+      try {
+        sessionStorage.setItem('spr_auth_error', errorDesc);
+      } catch {}
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+      return;
+    }
 
     // 1. IF RETURNING FROM GOOGLE VIA DIRECT SAME-WINDOW REDIRECT:
     if ((googleCode || googleAccess || googleId) && !isProcessingCode.current) {
+      const codeKey = googleCode || googleAccess || googleId;
+      const alreadyHandled = typeof sessionStorage !== 'undefined' && sessionStorage.getItem(`spr_code_handled_${codeKey}`);
+      if (alreadyHandled) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
       isProcessingCode.current = true;
+      try {
+        sessionStorage.setItem(`spr_code_handled_${codeKey}`, 'true');
+      } catch {}
+
       setIsLoading(true);
+      // Clean query params immediately to prevent double execution on StrictMode remounts
+      window.history.replaceState({}, document.title, window.location.pathname);
+
       const payload = googleCode
         ? { code: googleCode, redirect_uri: window.location.origin }
         : { access_token: googleAccess, id_token: googleId };
@@ -32,13 +60,20 @@ export function AuthProvider({ children }) {
       apiClient.post('/api/v1/auth/google/', payload)
         .then(res => {
           saveTokens(res.data);
-          window.history.replaceState({}, document.title, window.location.pathname);
-          window.location.href = '/';
+          try {
+            sessionStorage.removeItem('spr_auth_error');
+          } catch {}
+          window.location.href = '/dashboard';
         })
         .catch(err => {
           console.error('[AuthProvider] Direct Google Exchange Error:', err?.response?.data || err?.message);
-          window.history.replaceState({}, document.title, window.location.pathname);
-          window.location.href = '/login';
+          const errorMsg = err?.response?.data?.detail || err?.response?.data?.error || 'Google authentication failed. Please try again.';
+          try {
+            sessionStorage.setItem('spr_auth_error', errorMsg);
+          } catch {}
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
         })
         .finally(() => {
           isProcessingCode.current = false;
@@ -50,7 +85,7 @@ export function AuthProvider({ children }) {
     // 2. LISTEN FOR STORAGE SYNC EVENTS ACROSS TABS
     const handleStorageChange = (e) => {
       if (e.key === 'auth_sync_event') {
-        const token = authStore.getAccessToken() || localStorage.getItem('access_token');
+        const token = authStore.getAccessToken() || localStorage.getItem('accessToken') || localStorage.getItem('access_token');
         const userDataStr = localStorage.getItem('user');
         const userData = userDataStr ? JSON.parse(userDataStr) : null;
 
@@ -60,7 +95,7 @@ export function AuthProvider({ children }) {
             setUser(userData);
             authStore.saveUserProfile(userData);
           }
-          window.location.href = '/';
+          window.location.href = '/dashboard';
         }
       }
     };
@@ -100,12 +135,19 @@ export function AuthProvider({ children }) {
 
     if (access) {
       authStore.saveTokens(access, refresh);
+      authStore.saveAccessToken(access);
+      if (refresh) authStore.saveRefreshToken(refresh);
+      localStorage.setItem('accessToken', access);
       localStorage.setItem('access_token', access);
-      if (refresh) localStorage.setItem('refresh_token', refresh);
+      if (refresh) {
+        localStorage.setItem('refreshToken', refresh);
+        localStorage.setItem('refresh_token', refresh);
+      }
       setAccessToken(access);
     }
     if (userData) {
       authStore.saveUserProfile(userData);
+      authStore.saveUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       if (userData.institution_id && !localStorage.getItem('active_tenant_id')) {
@@ -184,16 +226,8 @@ export function AuthProvider({ children }) {
 
       const res = await apiClient.post('/api/v1/auth/google/', payload);
       if (res.data && res.data.access) {
-        const { access, refresh, user: userData } = res.data;
-        authStore.saveAccessToken(access);
-        authStore.saveRefreshToken(refresh);
-        setAccessToken(access);
-
-        setUser(userData);
-        authStore.saveUserProfile(userData);
-        // Signal FeatureControlContext to re-evaluate flags for this newly logged-in user
-        window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: userData?.id } }));
-        return { success: true, user: userData };
+        saveTokens(res.data);
+        return { success: true, user: res.data.user };
       }
       return { success: false, error: 'Google OAuth exchange failed' };
     } catch (err) {

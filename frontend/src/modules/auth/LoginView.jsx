@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import ForgotPasswordModal from './ForgotPasswordModal';
@@ -21,6 +22,47 @@ export default function LoginView() {
 
   const isGoogleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
+  useEffect(() => {
+    const savedError = sessionStorage.getItem('spr_auth_error');
+    if (savedError) {
+      setAuthErrorBanner(savedError);
+      showToast(savedError, 'error');
+      sessionStorage.removeItem('spr_auth_error');
+    }
+  }, []);
+
+  // Standard Google OAuth 2.0 Identity Services Popup
+  const handleGoogleSignIn = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      setAuthErrorBanner(null);
+      try {
+        const result = await loginWithGoogle(tokenResponse);
+        if (result.success) {
+          showToast('Signed in with Google successfully!', 'success');
+          navigate('/dashboard');
+        } else {
+          setAuthErrorBanner(result.error || 'Google authentication failed.');
+          showToast(result.error || 'Google authentication failed.', 'error');
+        }
+      } catch (err) {
+        const errorMsg = err?.response?.data?.detail || err?.response?.data?.error || 'Google sign-in failed.';
+        setAuthErrorBanner(errorMsg);
+        showToast(errorMsg, 'error');
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: (errorResponse) => {
+      console.warn('[GoogleAuth] Popup notice:', errorResponse);
+      const errorMsg = errorResponse?.error_description || errorResponse?.error || 'Google sign-in was closed or failed.';
+      if (errorResponse?.error !== 'popup_closed_by_user') {
+        setAuthErrorBanner(errorMsg);
+        showToast(errorMsg, 'error');
+      }
+    },
+  });
+
   // Email/Phone Form Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,27 +78,11 @@ export default function LoginView() {
 
     if (result.success) {
       showToast('Signed in successfully!', 'success');
-      navigate('/');
+      navigate('/dashboard');
     } else {
       setAuthErrorBanner(result.error || 'Authentication failed.');
       showToast(result.error || 'Authentication failed.', 'error');
     }
-  };
-
-
-
-  // Standard Google OAuth 2.0 direct authorization URL (Same-Window Anchor Navigation)
-  const getGoogleAuthUrl = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-    const redirectUri = window.location.origin;
-    const scope = encodeURIComponent('openid email profile');
-
-    return `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=code&` +
-      `scope=${scope}&` +
-      `prompt=select_account`;
   };
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -100,41 +126,53 @@ export default function LoginView() {
             <button
               type="button"
               onClick={() => setAuthErrorBanner(null)}
-              className="text-amber-400 hover:text-amber-200 transition-colors p-1"
+              className="text-amber-400 hover:text-amber-200 transition-colors p-1 cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Google Primary Social Link */}
+        {/* Google Primary Social Button */}
         <div className="space-y-3">
-          <a
-            href={getGoogleAuthUrl()}
-            target="_self"
-            rel="noopener noreferrer"
-            className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-100 border border-zinc-800 font-medium py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer"
+          <button
+            type="button"
+            onClick={() => handleGoogleSignIn()}
+            disabled={googleLoading || loading || !isGoogleConfigured}
+            className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-zinc-100 border border-zinc-800 font-medium py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-sm cursor-pointer disabled:cursor-not-allowed active:scale-98"
           >
-            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="#EA4335"
-                d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-              />
-              <path
-                fill="#4285F4"
-                d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
-              />
-            </svg>
-            <span className="text-xs sm:text-sm">Continue with Google</span>
-          </a>
+            {googleLoading ? (
+              <>
+                <svg className="animate-spin w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span className="text-xs sm:text-sm text-zinc-300">Connecting to Google...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
+                  />
+                </svg>
+                <span className="text-xs sm:text-sm">Continue with Google</span>
+              </>
+            )}
+          </button>
 
           {/* Divider */}
           <div className="relative flex items-center justify-center py-1">

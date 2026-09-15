@@ -80,7 +80,9 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        const refreshEndpoint = '/api/v1/auth/token/refresh/';
+        const refreshEndpoint = API_BASE_URL
+          ? `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/auth/token/refresh/`
+          : '/api/v1/auth/token/refresh/';
         const response = await axios.post(refreshEndpoint, { refresh: refreshToken });
 
         if (response.status === 200 && response.data.access) {

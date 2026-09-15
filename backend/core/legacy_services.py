@@ -303,19 +303,20 @@ def verify_google_token_or_code(id_token_input=None, access_token_input=None, co
     Returns:
         dict(sub, email, first_name, last_name, picture) or raises ValueError
     """
-    client_id = getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '') or os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
-    client_secret = getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '') or os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
-    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    client_id = (getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', '') or os.getenv('GOOGLE_OAUTH_CLIENT_ID', '') or '').strip()
+    client_secret = (getattr(settings, 'GOOGLE_OAUTH_CLIENT_SECRET', '') or os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '') or '').strip()
+    frontend_url = (getattr(settings, 'FRONTEND_URL', 'http://localhost:5173') or 'http://localhost:5173').strip().rstrip('/')
+    target_redirect_uri = (redirect_uri_input or frontend_url).strip().rstrip('/')
 
     # Step 0: Exchange Auth Code if provided
     if code_input:
         token_res = http_requests.post(
             'https://oauth2.googleapis.com/token',
             data={
-                'code': code_input,
+                'code': str(code_input).strip(),
                 'client_id': client_id,
                 'client_secret': client_secret,
-                'redirect_uri': redirect_uri_input or frontend_url,
+                'redirect_uri': target_redirect_uri,
                 'grant_type': 'authorization_code',
             },
             timeout=10
