@@ -1,11 +1,18 @@
 /**
- * SPR Note — Print Engine Store
- * ================================
+ * SPR Note — Print & DocLab Engine Store
  * Centralized store for print studio configurations, paper geometry,
  * typography density, watermark templates, signature presets, and persistence.
  */
 
 import { readJSON, writeJSON } from './coreStore';
+import {
+  PrintOptions,
+  PrintPageSize,
+  PrintOrientation,
+  PrintMargin,
+  PrintDensity,
+  PrintColorMode,
+} from '../components/print/types';
 
 // ─── Preset Constants ─────────────────────────────────────────────────────────
 
@@ -40,6 +47,7 @@ export const PRINT_PAPER_SIZE_OPTIONS = [
   { value: 'A4', label: 'A4 (210 × 297 mm)' },
   { value: 'LEGAL', label: 'Legal (216 × 356 mm)' },
   { value: 'LETTER', label: 'Letter (216 × 279 mm)' },
+  { value: 'ID_CARD', label: 'ID Card (85.6 × 54 mm)' },
 ];
 
 export const PRINT_MARGIN_OPTIONS = [
@@ -121,7 +129,7 @@ export const PRINT_SIGNATURE_PRESETS = [
   },
 ];
 
-export const DEFAULT_PRINT_OPTIONS = {
+export const DEFAULT_PRINT_OPTIONS: PrintOptions = {
   orientation: 'PORTRAIT',
   pageSize: 'A4',
   margin: 'NORMAL',
@@ -149,54 +157,29 @@ export const DEFAULT_PRINT_OPTIONS = {
   ],
 };
 
-// ─── Store API ────────────────────────────────────────────────────────────────
+const STORAGE_PREFIX = 'spr_print_preferences_';
 
 export const printStore = {
-  /** Get all stored print preferences with fallback to system defaults */
-  getPreferences: (tenantId = 'default') => {
-    const key = `spr_print_preferences_${tenantId}`;
+  getPreferences(tenantId = 'default'): PrintOptions {
+    const key = `${STORAGE_PREFIX}${tenantId}`;
     return readJSON(key, DEFAULT_PRINT_OPTIONS);
   },
 
-  /** Save print preferences to persistent storage and notify listeners */
-  savePreferences: (tenantId = 'default', preferences) => {
-    const key = `spr_print_preferences_${tenantId}`;
-    writeJSON(key, preferences);
+  updatePreferences(tenantId = 'default', updates: Partial<PrintOptions>): PrintOptions {
+    const key = `${STORAGE_PREFIX}${tenantId}`;
+    const current = this.getPreferences(tenantId);
+    const merged = { ...current, ...updates };
+    writeJSON(key, merged);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
-        new CustomEvent('spr_print_preferences_updated', { detail: preferences })
+        new CustomEvent('spr_print_preferences_updated', { detail: merged })
       );
     }
-    return preferences;
+    return merged;
   },
 
-  /** Get watermark template texts list */
-  getWatermarkTemplates: (tenantId = 'default') => {
-    const key = `spr_print_watermark_templates_${tenantId}`;
-    const raw = readJSON(key, null);
-    if (!raw || !Array.isArray(raw) || raw.length === 0) {
-      writeJSON(key, DEFAULT_WATERMARK_TEMPLATES);
-      return DEFAULT_WATERMARK_TEMPLATES;
-    }
-    return raw;
-  },
-
-  /** Save customized watermark template list */
-  saveWatermarkTemplates: (tenantId = 'default', templates) => {
-    const key = `spr_print_watermark_templates_${tenantId}`;
-    writeJSON(key, templates);
-    return templates;
-  },
-
-  /** Get signature presets list */
-  getSignaturePresets: (tenantId = 'default') => {
-    const key = `spr_print_signature_presets_${tenantId}`;
-    return readJSON(key, PRINT_SIGNATURE_PRESETS);
-  },
-
-  /** Reset all print settings back to default */
-  resetToDefaults: (tenantId = 'default') => {
-    const key = `spr_print_preferences_${tenantId}`;
+  resetPreferences(tenantId = 'default'): PrintOptions {
+    const key = `${STORAGE_PREFIX}${tenantId}`;
     writeJSON(key, DEFAULT_PRINT_OPTIONS);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(

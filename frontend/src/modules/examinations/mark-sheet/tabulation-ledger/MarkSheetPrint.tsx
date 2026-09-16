@@ -274,9 +274,9 @@ export default function MarkSheetPrint({
   // Default Print Options (Landscape for Tabulation Ledger)
   const defaultPrintOptions = useMemo(
     () => ({
-      orientation: 'LANDSCAPE',
-      pageSize: 'A4',
-      density: 'NORMAL',
+      orientation: 'LANDSCAPE' as const,
+      pageSize: 'A4' as const,
+      density: 'NORMAL' as const,
       showSignatures: true,
     }),
     []
@@ -325,12 +325,12 @@ export default function MarkSheetPrint({
           : `${exam?.name || 'Academic Examination'} — Academic Mark Sheet`
       }
       subtitle={printMode === 'bulk' ? 'All Classes Master Ledger' : `Class: ${selectedClassName} • Section: ${selectedSectionName}`}
-      documents={printMode === 'bulk' ? batchDocuments : undefined}
-      metaItems={printMode === 'single' ? singlePrintMetaItems : []}
-      columns={printMode === 'single' ? singlePrintColumns : []}
-      data={printMode === 'single' ? studentsData : []}
-      footerRow={printMode === 'single' ? singlePrintFooterRow : null}
-      summaryMetrics={printMode === 'single' ? singlePrintSummaryMetrics : []}
+      documents={isOpen && printMode === 'bulk' ? batchDocuments : undefined}
+      metaItems={isOpen && printMode === 'single' ? singlePrintMetaItems : []}
+      columns={isOpen && printMode === 'single' ? singlePrintColumns : []}
+      data={isOpen && printMode === 'single' ? studentsData : []}
+      footerRow={isOpen && printMode === 'single' ? singlePrintFooterRow : null}
+      summaryMetrics={isOpen && printMode === 'single' ? singlePrintSummaryMetrics : []}
       placeholderKeys={TABULATION_PLACEHOLDER_KEYS}
       defaultOptions={defaultPrintOptions}
       showRows={printMode === 'single'}

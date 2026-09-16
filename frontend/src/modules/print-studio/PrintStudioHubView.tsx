@@ -6,9 +6,9 @@ import { PrintStudioProps } from './types';
 import { TemplatePlaceholderKey } from '../../components/print/docxTemplateEngine';
 
 /**
- * Enterprise Print Studio Hub View
+ * Enterprise DocLab Studio Hub View
  * 
- * Directly mounts and orchestrates the Universal Print & Export Studio,
+ * Directly mounts and orchestrates the Universal DocLab Studio,
  * powered by DocxLiveRenderer, DocxTemplateModal, and UniversalPrintEngine.
  */
 export default function PrintStudioHubView({
@@ -126,7 +126,7 @@ export default function PrintStudioHubView({
       <UniversalPrintStudio
         isOpen={isOpen}
         onClose={handleClose}
-        title={t('printStudio', 'Print Studio')}
+        title="Universal Print & Document Studio"
         subtitle="Universal Document, Template & Report Publishing Studio"
         columns={initialColumns}
         data={initialData}

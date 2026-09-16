@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Modal, CustomButton, CustomInput } from '../ui';
 import {
   FileIcon,
@@ -6,6 +6,8 @@ import {
   SparklesIcon,
   UploadIcon,
   EditIcon,
+  CopyIcon,
+  CheckIcon,
 } from '../ui/Icons';
 import {
   parseDocxDocument,
@@ -13,8 +15,13 @@ import {
   DocxParseResult,
   CustomDocxTemplate,
   TemplatePlaceholderKey,
+  DocxPageProperties,
+  getDocxPaperDimensions,
+  getDocxPaperPadding,
 } from './docxTemplateEngine';
 import { ALL_DOCUMENT_SCOPES } from './scopeTemplateStore';
+import { PrintPageSize, PrintOrientation, PrintMargin } from './types';
+import DocxLiveRenderer from './DocxLiveRenderer';
 
 export interface DocxTemplateModalProps {
   isOpen: boolean;
@@ -28,6 +35,10 @@ export interface DocxTemplateModalProps {
     columns: Array<{ id: string; header: string; label: string }>;
     data: Array<Record<string, any>>;
     templateMeta?: CustomDocxTemplate;
+    pageSize?: PrintPageSize;
+    orientation?: PrintOrientation;
+    margin?: PrintMargin;
+    pageProperties?: DocxPageProperties;
   }) => void;
   sampleData?: Record<string, any>;
   columns?: Array<{ id: string; header: string; label: string }>;
@@ -57,8 +68,26 @@ export default function DocxTemplateModal({
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [previewTab, setPreviewTab] = useState<'preview' | 'html'>('preview');
+  const [isCopiedHtml, setIsCopiedHtml] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCopyHtml = () => {
+    if (!parseResult?.html) return;
+    navigator.clipboard.writeText(parseResult.html);
+    setIsCopiedHtml(true);
+    setTimeout(() => setIsCopiedHtml(false), 2000);
+  };
+
+  const paperDimensions = useMemo(() => {
+    if (!parseResult) return { width: '794px', minHeight: '520px', height: '1123px', maxWidth: '794px' };
+    return getDocxPaperDimensions(parseResult.pageSize, parseResult.orientation);
+  }, [parseResult]);
+
+  const previewPadding = useMemo(() => {
+    if (!parseResult) return '20mm';
+    return getDocxPaperPadding(parseResult.pageProperties, parseResult.margin);
+  }, [parseResult]);
 
   const handleFileSelected = async (selectedFile: File) => {
     if (!selectedFile || !/\.docx$/i.test(selectedFile.name)) {
@@ -104,6 +133,7 @@ export default function DocxTemplateModal({
     const templateId = `docx_upload_${Date.now()}`;
     const cleanName = templateName.trim() || file?.name?.replace(/\.[^/.]+$/, '') || 'Custom Word Template';
 
+    const now = new Date().toISOString();
     let savedTemplate: CustomDocxTemplate | undefined;
     if (saveAsTemplate) {
       const newTmpl: CustomDocxTemplate = {
@@ -115,6 +145,12 @@ export default function DocxTemplateModal({
         isTableDocument: parseResult.isTableDocument,
         sampleColumns: parseResult.extractedColumns,
         sampleData: parseResult.extractedRows,
+        pageSize: parseResult.pageSize,
+        orientation: parseResult.orientation,
+        margin: parseResult.margin,
+        pageProperties: parseResult.pageProperties,
+        createdAt: now,
+        updatedAt: now,
       };
       (newTmpl as any).scopeId = targetScopeId;
       savedTemplate = saveDocxTemplate(newTmpl);
@@ -129,6 +165,12 @@ export default function DocxTemplateModal({
       isTableDocument: parseResult.isTableDocument,
       sampleColumns: parseResult.extractedColumns,
       sampleData: parseResult.extractedRows,
+      pageSize: parseResult.pageSize,
+      orientation: parseResult.orientation,
+      margin: parseResult.margin,
+      pageProperties: parseResult.pageProperties,
+      createdAt: now,
+      updatedAt: now,
     };
 
     onApplyTemplate({
@@ -139,6 +181,10 @@ export default function DocxTemplateModal({
       isTableDocument: parseResult.isTableDocument,
       columns: parseResult.extractedColumns,
       data: parseResult.extractedRows,
+      pageSize: parseResult.pageSize,
+      orientation: parseResult.orientation,
+      margin: parseResult.margin,
+      pageProperties: parseResult.pageProperties,
       templateMeta: templateMeta,
     });
 
@@ -154,7 +200,27 @@ export default function DocxTemplateModal({
       zIndex={10000}
       title="Upload Word Document (.docx)"
       subtitle="Upload any Microsoft Word file to convert and design as a live document on canvas."
-      size={parseResult ? '3xl' : '2xl'}
+      showCloseButton={!parseResult}
+      headerActions={
+        parseResult ? (
+          <CustomButton
+            variant="outline"
+            size="sm"
+            onClick={handleResetFile}
+            icon={EditIcon}
+            className="text-xs"
+          >
+            Change File
+          </CustomButton>
+        ) : undefined
+      }
+      size={
+        parseResult
+          ? parseResult.orientation === 'LANDSCAPE' || parseResult.pageSize === 'LEGAL'
+            ? 'full'
+            : '5xl'
+          : '2xl'
+      }
       bodyClassName="p-5 sm:p-6 space-y-4"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -166,30 +232,16 @@ export default function DocxTemplateModal({
             Cancel
           </CustomButton>
 
-          <div className="flex items-center gap-2.5">
-            {parseResult && (
-              <CustomButton
-                variant="outline"
-                size="sm"
-                onClick={() => handleApply(true)}
-                icon={SparklesIcon}
-                className="theme-border text-xs"
-              >
-                Save as Reusable Template
-              </CustomButton>
-            )}
-
-            <CustomButton
-              variant="primary"
-              size="sm"
-              onClick={() => handleApply(false)}
-              disabled={!parseResult || isParsing}
-              icon={CheckCircleIcon}
-              className="shadow-xs"
-            >
-              Apply Document to Canvas
-            </CustomButton>
-          </div>
+          <CustomButton
+            variant="primary"
+            size="sm"
+            onClick={() => handleApply(false)}
+            disabled={!parseResult || isParsing}
+            icon={CheckCircleIcon}
+            className="shadow-xs"
+          >
+            Import Document to DocLab
+          </CustomButton>
         </div>
       }
     >
@@ -209,7 +261,7 @@ export default function DocxTemplateModal({
               className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[220px] ${
                 dragOver
                   ? 'border-[var(--accent-main)] bg-[var(--accent-main)]/5 scale-[1.01]'
-                  : 'theme-border hover:border-slate-400 theme-bg-sub/40 hover:theme-bg-sub/80'
+                  : 'theme-border hover:theme-border-accent/40 theme-bg-sub/40 hover:theme-bg-sub/80'
               }`}
             >
               <input
@@ -302,18 +354,9 @@ export default function DocxTemplateModal({
                     Source HTML
                   </button>
                 </div>
-
-                <CustomButton
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetFile}
-                  icon={EditIcon}
-                  className="text-xs"
-                >
-                  Change File
-                </CustomButton>
               </div>
             </div>
+
 
             {/* Template Info Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -321,29 +364,69 @@ export default function DocxTemplateModal({
                 label="Template Name"
                 placeholder="e.g. Official Student Admit Card"
                 value={templateName}
-                onChange={(e: any) => setTemplateName(e.target.value)}
+                onChange={(val: any) => setTemplateName(typeof val === 'string' ? val : val?.target?.value ?? '')}
               />
               <CustomInput
-                label="Description / Category (Optional)"
+                label="Description"
                 placeholder="e.g. Standard 2 per page exam slip"
                 value={templateDescription}
-                onChange={(e: any) => setTemplateDescription(e.target.value)}
+                onChange={(val: any) => setTemplateDescription(typeof val === 'string' ? val : val?.target?.value ?? '')}
               />
             </div>
 
-            {/* Document Live Preview Box (Pure White Paper in Light & Dark Modes) */}
+            {/* Document Live Preview Canvas (Workbench matching appearance theme) */}
             {previewTab === 'preview' ? (
-              <div className="max-h-[460px] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-slate-100 dark:bg-slate-900 border theme-border shadow-inner flex justify-center">
-                <div className="w-full max-w-2xl min-h-[380px] !bg-white !text-slate-900 p-6 sm:p-8 rounded-lg shadow-md border border-slate-200">
-                  <div
-                    className="docx-preview-content font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900"
-                    dangerouslySetInnerHTML={{ __html: parseResult.html }}
+              <div className="p-4 sm:p-8 rounded-2xl theme-bg-app border theme-border flex justify-center items-start shadow-inner overflow-x-auto">
+                <div
+                  className="paper-sheet docx-paper-sheet w-full !bg-white !text-slate-900 rounded-sm shadow-lg border theme-border transition-all box-border shrink-0 text-left"
+                  data-size={parseResult.pageSize}
+                  data-orientation={parseResult.orientation}
+                  data-margin={parseResult.margin}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    width: paperDimensions.width,
+                    maxWidth: paperDimensions.maxWidth,
+                    minHeight: paperDimensions.minHeight,
+                    padding: previewPadding,
+                    textAlign: 'left',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <DocxLiveRenderer
+                    htmlContent={parseResult.html}
+                    isEditable={false}
                   />
                 </div>
               </div>
             ) : (
-              <div className="max-h-[460px] overflow-y-auto p-4 rounded-2xl !bg-slate-950 !text-slate-100 border border-slate-800 font-mono text-xs">
-                <pre className="whitespace-pre-wrap">{parseResult.html}</pre>
+              <div className="rounded-2xl theme-bg-sub theme-text-primary border theme-border font-mono text-xs overflow-hidden flex flex-col">
+                <div className="sticky top-0 z-10 px-4 py-2.5 border-b theme-border theme-bg-sub/95 backdrop-blur-xs flex items-center justify-between gap-3 shadow-2xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
+                    Document Source HTML
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyHtml}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-surface border theme-border theme-text-primary hover:theme-bg-accent-soft hover:theme-accent shadow-xs transition-all cursor-pointer"
+                    title="Copy Source HTML to clipboard"
+                  >
+                    {isCopiedHtml ? (
+                      <>
+                        <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-emerald-500 font-bold">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <CopyIcon className="w-3.5 h-3.5 theme-text-secondary" />
+                        <span>Copy HTML</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="p-4 overflow-auto max-h-[550px]">
+                  <pre className="whitespace-pre-wrap leading-relaxed select-text">{parseResult.html}</pre>
+                </div>
               </div>
             )}
           </div>

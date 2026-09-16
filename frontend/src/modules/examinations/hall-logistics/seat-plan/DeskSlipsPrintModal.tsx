@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import UniversalPrintModal from '@/components/print/UniversalPrintModal';
+import UniversalPrintStudio from '@/components/print/UniversalPrintStudio';
 import { TemplatePlaceholderKey } from '@/components/print/docxTemplateEngine';
 import DeskSlipCard from './DeskSlipCard';
 import { DeskSlipItem, DeskSlipPrintLayout } from '../types';
@@ -119,11 +119,11 @@ export default function DeskSlipsPrintModal({
   }, [groupedSlips, pageSize]);
 
   const defaultPrintOptions = useMemo(() => ({
-    pageSize: 'A4',
-    orientation: 'PORTRAIT',
-    margin: 'NONE',
-    colorMode: 'FULL_COLOR',
-    density: 'NORMAL',
+    pageSize: 'A4' as const,
+    orientation: 'PORTRAIT' as const,
+    margin: 'NONE' as const,
+    colorMode: 'FULL_COLOR' as const,
+    density: 'NORMAL' as const,
     fontSize: 100,
     enablePageBreak: true,
   }), []);
@@ -131,7 +131,7 @@ export default function DeskSlipsPrintModal({
   if (!isOpen) return null;
 
   return (
-    <UniversalPrintModal
+    <UniversalPrintStudio
       isOpen={isOpen}
       onClose={onClose}
       title={`Seat Plan & Desk Slips (${liveSlips.length || slips.length} Slips)`}
@@ -139,23 +139,15 @@ export default function DeskSlipsPrintModal({
       customSheets={true}
       data={liveSlips.length > 0 ? liveSlips : slips}
       placeholderKeys={DESK_SLIPS_PLACEHOLDER_KEYS}
-      templates={printTemplates}
-      activeTemplateId={layout}
-      onTemplateChange={(tpl: any) => {
-        if (tpl?.id) setLayout(tpl.id as DeskSlipPrintLayout);
-      }}
+      scopeId="examinations_desk_slips"
+      scopeName="Seat Plan & Desk Slips"
+      scopeDescription="Exam hall seating cards and desk slip layout templates"
       defaultOptions={defaultPrintOptions}
-      scopeId="student_id_card"
-      urlSync={true}
-      urlParam="print"
-      urlParamValue="desk_slips"
+      enabledFormats={['pdf', 'word', 'png', 'jpg', 'print']}
     >
       <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
         {paginatedPages.map((page, pIdx) => (
-          <div
-            key={`${page.roomTitle}_${page.pageNumber}_${pIdx}`}
-            className="relative paper-sheet-wrapper group"
-          >
+          <div key={pIdx} className="relative paper-sheet-wrapper group">
             <div
               className="paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative"
               data-size="A4"
@@ -165,14 +157,13 @@ export default function DeskSlipsPrintModal({
               data-color-mode="FULL_COLOR"
               data-page-break="true"
             >
-              <div className="w-full h-full p-3.5 sm:p-4 flex flex-col justify-between print:p-2.5">
+              <div className="w-full h-full p-4 flex flex-col justify-between print:p-2.5">
+                {/* Optional Room Header bar at top of sheet */}
                 {groupByRoom && (
-                  <div className="mb-2 pb-1.5 border-b-2 border-slate-800 flex items-center justify-between shrink-0">
-                    <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-900">
-                      Hall Seat Plan — {page.roomTitle} {page.totalRoomPages > 1 ? `(Page ${page.pageNumber} of ${page.totalRoomPages})` : ''}
-                    </h3>
-                    <span className="text-[10.5px] font-semibold text-slate-600">
-                      Total Room Examinees: {page.totalRoomExaminees}
+                  <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-300 text-xs text-slate-700 select-none">
+                    <span className="font-bold text-slate-900">{page.roomTitle}</span>
+                    <span className="text-[10.5px] font-mono text-slate-500">
+                      Page {page.pageNumber} of {page.totalRoomPages} • {page.totalRoomExaminees} Examinees
                     </span>
                   </div>
                 )}
@@ -198,8 +189,6 @@ export default function DeskSlipsPrintModal({
           </div>
         ))}
       </div>
-    </UniversalPrintModal>
+    </UniversalPrintStudio>
   );
 }
-
-

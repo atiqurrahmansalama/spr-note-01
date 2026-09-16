@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import UniversalPrintModal from '@/components/print/UniversalPrintModal';
+import UniversalPrintStudio from '@/components/print/UniversalPrintStudio';
 import { TemplatePlaceholderKey } from '@/components/print/docxTemplateEngine';
 import AdmitCardCanvas from './AdmitCardCanvas';
 import { AdmitCardStudent, AdmitCardPrintLayout } from '../types';
@@ -139,11 +139,11 @@ export default function AdmitCardPrintModal({
   }, [liveCards, cards, cardsPerPage]);
 
   const defaultPrintOptions = useMemo(() => ({
-    pageSize: 'A4',
-    orientation: 'PORTRAIT',
-    margin: 'NARROW',
-    colorMode: 'FULL_COLOR',
-    density: 'NORMAL',
+    pageSize: 'A4' as const,
+    orientation: 'PORTRAIT' as const,
+    margin: 'NARROW' as const,
+    colorMode: 'FULL_COLOR' as const,
+    density: 'NORMAL' as const,
     fontSize: 100,
     enablePageBreak: true,
   }), []);
@@ -165,7 +165,7 @@ export default function AdmitCardPrintModal({
   if (!isOpen) return null;
 
   return (
-    <UniversalPrintModal
+    <UniversalPrintStudio
       isOpen={isOpen}
       onClose={onClose}
       title={modalTitle}
@@ -173,28 +173,23 @@ export default function AdmitCardPrintModal({
       customSheets={true}
       data={liveCards.length > 0 ? liveCards : cards}
       placeholderKeys={ADMIT_CARD_PLACEHOLDER_KEYS}
-      templates={printTemplates}
-      activeTemplateId={layout}
-      onTemplateChange={(tpl: any) => {
-        if (tpl?.id) setLayout(tpl.id as AdmitCardPrintLayout);
-      }}
+      scopeId="examinations_admit_card"
+      scopeName="Student Admit Cards"
+      scopeDescription="Admit card blueprints and examination entry passes"
       defaultOptions={defaultPrintOptions}
-      scopeId="exam_admit_card"
-      urlSync={true}
-      urlParam="print"
-      urlParamValue="admit_cards"
+      enabledFormats={['pdf', 'word', 'png', 'jpg', 'print']}
     >
       <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
         {pages.map((pageCards, pIdx) => (
           <div
-            key={pIdx}
+            key={`admit_page_${pIdx}`}
             className="relative paper-sheet-wrapper group"
           >
             <div
               className="paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative"
               data-size="A4"
               data-orientation="PORTRAIT"
-              data-margin="NONE"
+              data-margin="NARROW"
               data-density="NORMAL"
               data-color-mode="FULL_COLOR"
               data-page-break="true"
@@ -286,8 +281,6 @@ export default function AdmitCardPrintModal({
           </div>
         ))}
       </div>
-    </UniversalPrintModal>
+    </UniversalPrintStudio>
   );
 }
-
-

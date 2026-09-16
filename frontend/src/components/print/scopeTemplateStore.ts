@@ -14,9 +14,9 @@ export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
     iconName: 'ChartBarIcon',
     recommendedPaperSize: 'LEGAL',
     recommendedOrientation: 'LANDSCAPE',
-    requiredKeys: ['class_name', 'exam_name', 'student_name', 'roll_number', 'total_marks', 'obtained_marks', 'gpa', 'grade', 'institution_name'],
-    recommendedKeys: ['section_name', 'academic_session', 'merit_position', 'issue_date', 'principal_signature', 'exam_controller_signature'],
-    defaultKeys: ['class_name', 'section_name', 'exam_name', 'academic_session', 'student_name', 'roll_number', 'total_marks', 'obtained_marks', 'gpa', 'grade', 'institution_name', 'principal_signature', 'exam_controller_signature'],
+    requiredKeys: ['class_name', 'exam_name', 'student_name', 'roll_number', 'total_marks', 'obtained_marks', 'average_marks', 'gpa', 'grade', 'merit_position', 'result_status', 'institution_name'],
+    recommendedKeys: ['section_name', 'academic_session', 'merit_status', 'highest_marks', 'issue_date', 'principal_signature', 'exam_controller_signature'],
+    defaultKeys: ['class_name', 'section_name', 'exam_name', 'academic_session', 'student_name', 'roll_number', 'total_marks', 'obtained_marks', 'average_marks', 'gpa', 'grade', 'merit_position', 'result_status', 'institution_name', 'principal_signature', 'exam_controller_signature'],
   },
   {
     id: 'marksheet_transcript',
@@ -26,9 +26,9 @@ export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
     iconName: 'AcademicCapIcon',
     recommendedPaperSize: 'A4',
     recommendedOrientation: 'PORTRAIT',
-    requiredKeys: ['student_name', 'roll_number', 'student_id', 'class_name', 'section_name', 'academic_session', 'exam_name', 'total_marks', 'obtained_marks', 'highest_marks', 'gpa', 'grade'],
-    recommendedKeys: ['merit_position', 'division', 'student_photo', 'issue_date', 'principal_signature', 'class_teacher_signature', 'exam_controller_signature', 'guardian_signature'],
-    defaultKeys: ['student_name', 'roll_number', 'student_id', 'class_name', 'section_name', 'academic_session', 'exam_name', 'total_marks', 'obtained_marks', 'highest_marks', 'gpa', 'grade', 'merit_position', 'principal_signature'],
+    requiredKeys: ['student_name', 'roll_number', 'student_id', 'class_name', 'section_name', 'academic_session', 'exam_name', 'total_marks', 'obtained_marks', 'average_marks', 'highest_marks', 'gpa', 'grade', 'merit_position', 'result_status'],
+    recommendedKeys: ['merit_status', 'division', 'result_summary', 'student_photo', 'issue_date', 'principal_signature', 'class_teacher_signature', 'exam_controller_signature', 'guardian_signature'],
+    defaultKeys: ['student_name', 'roll_number', 'student_id', 'class_name', 'section_name', 'academic_session', 'exam_name', 'total_marks', 'obtained_marks', 'average_marks', 'highest_marks', 'gpa', 'grade', 'merit_position', 'merit_status', 'result_status', 'principal_signature'],
   },
   {
     id: 'exam_admit_card',
@@ -147,7 +147,7 @@ export function getScopeById(scopeId: string): DocumentScopeDefinition | undefin
  */
 export function extractTagsFromText(text: string): string[] {
   if (!text) return [];
-  const matches = text.match(/\{{1,2}\s*([a-zA-Z0-9_]+)\s*\}{1,2}/g) || [];
+  const matches: string[] = text.match(/\{{1,2}\s*([a-zA-Z0-9_]+)\s*\}{1,2}/g) || [];
   const tags = new Set<string>();
   matches.forEach((m) => {
     const clean = m.replace(/[\{\}\s]/g, '').toLowerCase();
@@ -207,11 +207,17 @@ export function validateTemplateForScope(
     section_name: ['sectionname', 'section', 'branch_name', 'branch'],
     academic_session: ['academicsession', 'session', 'academic_year', 'academicyear', 'session_year'],
     exam_name: ['examname', 'exam', 'examination', 'exam_title'],
-    total_marks: ['totalmarks', 'total_full_marks', 'totalfull', 'total_max_marks', 'total'],
-    obtained_marks: ['obtainedmarks', 'total_obtained', 'totalobtained', 'obtained'],
-    highest_marks: ['highestmarks', 'highest_total', 'highesttotal', 'highest', 'class_highest'],
-    gpa: ['gpa_score', 'overall_gpa', 'gp', 'grade_point_average'],
+    total_subjects: ['totalsubjects', 'total_subjects_count', 'subjects_count', 'subject_count'],
+    total_marks: ['totalmarks', 'total_full_marks', 'totalfull', 'total_max_marks', 'total', 'full_marks'],
+    obtained_marks: ['obtainedmarks', 'total_obtained', 'totalobtained', 'obtained', 'total_obtained_marks', 'got_marks'],
+    average_marks: ['averagemarks', 'avg_marks', 'avgmarks', 'average', 'mean_marks', 'avg', 'average_mark'],
+    highest_marks: ['highestmarks', 'highest_total', 'highesttotal', 'highest', 'class_highest', 'class_highest_marks'],
+    gpa: ['gpa_score', 'overall_gpa', 'gp', 'grade_point_average', 'cgpa', 'grade_point'],
     grade: ['letter_grade', 'overall_grade', 'final_grade', 'result_grade'],
+    merit_position: ['meritposition', 'merit', 'rank', 'class_rank', 'position', 'standing', 'merit_rank', 'merit_status', 'rank_ordinal'],
+    merit_status: ['meritstatus', 'merit_position', 'result_summary', 'result_merit', 'merit_result'],
+    result_status: ['resultstatus', 'status', 'exam_status', 'pass_status', 'result', 'qualification_status'],
+    result_summary: ['resultsummary', 'summary', 'result_overview', 'academic_summary'],
   };
 
   const isKeyPresent = (targetKey: string): boolean => {

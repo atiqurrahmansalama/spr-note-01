@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   CustomDocxTemplate,
   getSavedDocxTemplates,
@@ -9,6 +9,8 @@ import {
   mergeTabularTemplateWithData,
   isTabularTemplate,
   separateDocxStylesAndBody,
+  splitHtmlIntoPages,
+  joinPagesIntoHtml,
 } from '../docxTemplateEngine';
 import {
   getDefaultTemplateForScope,
@@ -38,6 +40,8 @@ interface UsePrintDocxEngineParams {
   templates?: any[];
   placeholderKeys?: any[];
   options: PrintOptions;
+  setOptions?: React.Dispatch<React.SetStateAction<PrintOptions>>;
+  updateOptionsWithHistory?: (updater: any) => void;
   liveData?: Array<Record<string, any>>;
   liveMetaItems?: PrintMetaItem[];
   liveColumns?: any[];
@@ -57,13 +61,15 @@ export function usePrintDocxEngine({
   templates = [],
   placeholderKeys = [],
   options,
+  setOptions,
+  updateOptionsWithHistory,
   liveData = [],
   liveMetaItems = [],
   liveColumns = [],
   setLiveColumns,
   setVisibleColumnKeys,
-  institutionName = 'SPR Note Academy',
-  institutionAddress = 'Central Campus & Academic Affairs',
+  institutionName = '',
+  institutionAddress = '',
   resolvedTitle = 'Official Document',
   resolvedSubtitle = '',
   onTemplateChange = null,
@@ -83,10 +89,18 @@ export function usePrintDocxEngine({
       const scopeDefault = getDefaultTemplateForScope(scopeId);
       if (scopeDefault) {
         const { styles, body } = separateDocxStylesAndBody(scopeDefault.rawHtml || '');
+        const isGen = scopeDefault.templateType === 'generated' || scopeDefault.id?.startsWith('gen_');
+        let srcBody = isGen ? undefined : (body || scopeDefault.rawHtml);
+        if (isGen && scopeDefault.sourceTemplateId) {
+          const all = getSavedDocxTemplates();
+          const src = all.find((t) => t.id === scopeDefault.sourceTemplateId);
+          if (src) srcBody = separateDocxStylesAndBody(src.rawHtml || '').body || src.rawHtml;
+        }
         return {
           id: scopeDefault.id,
           name: scopeDefault.name,
           styles: styles,
+          templateBody: srcBody || body || scopeDefault.rawHtml,
           body: body || scopeDefault.rawHtml,
           html: scopeDefault.rawHtml,
           rawHtml: scopeDefault.rawHtml,
@@ -94,8 +108,9 @@ export function usePrintDocxEngine({
           columns: scopeDefault.sampleColumns || [],
           data: scopeDefault.sampleData || [],
           templateMeta: scopeDefault,
-          templateType: scopeDefault.templateType || 'template',
+          templateType: scopeDefault.templateType || (isGen ? 'generated' : 'template'),
           recordsCount: scopeDefault.recordsCount,
+          sourceTemplateId: scopeDefault.sourceTemplateId,
         };
       }
     } catch (e) {
@@ -104,6 +119,54 @@ export function usePrintDocxEngine({
     return null;
   });
 
+  // Undo / Redo History Stack for Docx Templates and Live Canvas Edits
+  const docxPastStackRef = useRef<any[]>([]);
+  const docxFutureStackRef = useRef<any[]>([]);
+  const [, setDocxHistoryVersion] = useState<number>(0);
+
+  const docxCanUndo = docxPastStackRef.current.length > 0;
+  const docxCanRedo = docxFutureStackRef.current.length > 0;
+
+  const updateCustomDocxTemplateWithHistory = useCallback((updaterOrNew: any) => {
+    setCustomDocxTemplate((prev: any) => {
+      const next = typeof updaterOrNew === 'function' ? updaterOrNew(prev) : updaterOrNew;
+      if (prev && JSON.stringify(prev) !== JSON.stringify(next)) {
+        docxPastStackRef.current = [...docxPastStackRef.current, JSON.parse(JSON.stringify(prev))].slice(-40);
+        docxFutureStackRef.current = [];
+        setDocxHistoryVersion((v) => v + 1);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleDocxUndo = useCallback(() => {
+    if (docxPastStackRef.current.length === 0) return;
+    const previous = docxPastStackRef.current[docxPastStackRef.current.length - 1];
+    docxPastStackRef.current = docxPastStackRef.current.slice(0, -1);
+
+    setCustomDocxTemplate((current: any) => {
+      if (current) {
+        docxFutureStackRef.current = [JSON.parse(JSON.stringify(current)), ...docxFutureStackRef.current].slice(0, 40);
+      }
+      return previous;
+    });
+    setDocxHistoryVersion((v) => v + 1);
+  }, []);
+
+  const handleDocxRedo = useCallback(() => {
+    if (docxFutureStackRef.current.length === 0) return;
+    const next = docxFutureStackRef.current[0];
+    docxFutureStackRef.current = docxFutureStackRef.current.slice(1);
+
+    setCustomDocxTemplate((current: any) => {
+      if (current) {
+        docxPastStackRef.current = [...docxPastStackRef.current, JSON.parse(JSON.stringify(current))].slice(-40);
+      }
+      return next;
+    });
+    setDocxHistoryVersion((v) => v + 1);
+  }, []);
+
   // Re-sync default template for scope whenever modal opens or scopeId changes
   useEffect(() => {
     if (!isOpen) return;
@@ -111,10 +174,18 @@ export function usePrintDocxEngine({
       const scopeDefault = getDefaultTemplateForScope(scopeId);
       if (scopeDefault) {
         const { styles, body } = separateDocxStylesAndBody(scopeDefault.rawHtml || '');
+        const isGen = scopeDefault.templateType === 'generated' || scopeDefault.id?.startsWith('gen_');
+        let srcBody = isGen ? undefined : (body || scopeDefault.rawHtml);
+        if (isGen && scopeDefault.sourceTemplateId) {
+          const all = getSavedDocxTemplates();
+          const src = all.find((t) => t.id === scopeDefault.sourceTemplateId);
+          if (src) srcBody = separateDocxStylesAndBody(src.rawHtml || '').body || src.rawHtml;
+        }
         setCustomDocxTemplate({
           id: scopeDefault.id,
           name: scopeDefault.name,
           styles: styles,
+          templateBody: srcBody || body || scopeDefault.rawHtml,
           body: body || scopeDefault.rawHtml,
           html: scopeDefault.rawHtml,
           rawHtml: scopeDefault.rawHtml,
@@ -122,11 +193,18 @@ export function usePrintDocxEngine({
           columns: scopeDefault.sampleColumns || [],
           data: scopeDefault.sampleData || [],
           templateMeta: scopeDefault,
-          templateType: scopeDefault.templateType || 'template',
+          templateType: scopeDefault.templateType || (isGen ? 'generated' : 'template'),
           recordsCount: scopeDefault.recordsCount,
+          sourceTemplateId: scopeDefault.sourceTemplateId,
         });
+        if (isGen) {
+          setDocxRenderMode('all');
+        } else {
+          setDocxRenderMode('template');
+        }
       } else {
         setCustomDocxTemplate(null);
+        setDocxRenderMode('all');
       }
     } catch (e) {
       console.warn('Failed to sync default template for scope', e);
@@ -137,12 +215,6 @@ export function usePrintDocxEngine({
   const combinedTemplates = useMemo(() => {
     const list: any[] = [
       {
-        id: 'default_layout',
-        name: 'Default Print Layout',
-        description: 'Native High-Precision Table & Scoreboard Engine',
-        isDefaultNative: true,
-      },
-      {
         id: 'blank_document',
         name: 'Blank Page (Live Canvas)',
         description: 'Interactive In-Place Typing & Word Layout',
@@ -152,7 +224,7 @@ export function usePrintDocxEngine({
     ];
     if (Array.isArray(templates)) {
       templates.forEach((t) => {
-        if (!t.isTable && t.id !== 'default_table' && !list.some((existing) => existing.id === t.id)) {
+        if (!t.isTable && t.id !== 'default_table' && t.id !== 'default_layout' && !list.some((existing) => existing.id === t.id)) {
           list.push(t);
         }
       });
@@ -173,6 +245,7 @@ export function usePrintDocxEngine({
             templateMeta: wt,
             templateType: wt.templateType || (isGen ? 'generated' : 'template'),
             recordsCount: wt.recordsCount,
+            sourceTemplateId: wt.sourceTemplateId,
             detectedPlaceholders: wt.detectedPlaceholders || [],
             createdAt: wt.createdAt,
           });
@@ -191,7 +264,7 @@ export function usePrintDocxEngine({
   }, [customDocxTemplate?.styles, customDocxTemplate?.html, customDocxTemplate?.rawHtml]);
 
   // Docx & Live Canvas Render Mode: 'template' (Single page with placeholder keys) | 'sample' (1 record sample) | 'all' (Batch all records)
-  const [docxRenderMode, setDocxRenderMode] = useState<'template' | 'sample' | 'all'>('all');
+  const [docxRenderMode, setDocxRenderMode] = useState<'template' | 'sample' | 'all'>('template');
 
   // Context-enriched base record containing tenant, document metadata, header and option information
   const contextEnrichedBaseRecord = useMemo<Record<string, any>>(() => {
@@ -247,52 +320,75 @@ export function usePrintDocxEngine({
 
   // Memoized merged pages for Word (.docx) mode
   const mergedDocxPages = useMemo<string[]>(() => {
-    if (!customDocxTemplate?.html && !customDocxTemplate?.body) return [];
-    const contentToMerge = customDocxTemplate.body || separateDocxStylesAndBody(customDocxTemplate.html || '').body || customDocxTemplate.html;
+    if (!customDocxTemplate?.html && !customDocxTemplate?.body && !customDocxTemplate?.rawHtml) return [];
 
-    // 0. Pre-Generated Document: If it is already a saved generated document, split on page breaks or return directly
-    if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
-      if (contentToMerge.includes('<!-- spr-page-break -->')) {
-        const pages = contentToMerge.split('<!-- spr-page-break -->');
-        const styles = customDocxTemplate.styles;
-        return pages.map((p: string) => (styles ? `${styles}\n${p.trim()}` : p.trim()));
+    // Extract the original unmerged template body (containing {{tokens}})
+    let templateBodyContent =
+      customDocxTemplate.templateBody ||
+      (customDocxTemplate.templateType !== 'generated' && separateDocxStylesAndBody(customDocxTemplate.rawHtml || customDocxTemplate.html || '').body) ||
+      (customDocxTemplate.templateType !== 'generated' && customDocxTemplate.body) ||
+      BLANK_PAGE_HTML;
+
+    // If templateBodyContent is missing for a generated doc, try resolving from sourceTemplateId
+    if ((!templateBodyContent || templateBodyContent === BLANK_PAGE_HTML) && customDocxTemplate.sourceTemplateId) {
+      const src = (savedWordTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId) ||
+                  (combinedTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId);
+      if (src) {
+        const { body } = separateDocxStylesAndBody(src.rawHtml || src.html || '');
+        if (body) templateBodyContent = body;
       }
-      return [contentToMerge];
     }
 
-    // 1. Template Design Mode: Strictly 1 single template page with placeholder keys
+    // 1. Template Design Mode / Blank Document: Split by page breaks or sections
     if (docxRenderMode === 'template' || customDocxTemplate.id === 'blank_document') {
-      return [contentToMerge];
+      const pages = splitHtmlIntoPages(templateBodyContent);
+      return pages.length > 0 ? pages : [templateBodyContent];
+    }
+
+    // 0. Pre-Generated Document: If it is already a saved generated document in Batch view
+    if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
+      const genContent = customDocxTemplate.body || customDocxTemplate.rawHtml || customDocxTemplate.html || '';
+      const pages = splitHtmlIntoPages(genContent);
+      const styles = customDocxTemplate.styles;
+      return pages.map((p: string) => (styles && !p.includes('<style') ? `${styles}\n${p.trim()}` : p.trim()));
     }
 
     // Tabular check: Only true for multi-student master lists/ledgers (tabulation_sheet).
     // For single-student documents (marksheet_transcript, admit_card), each record is a distinct student page with its own subject table.
     const isMultiRecordSingleDocumentScope = scopeId === 'tabulation_sheet' || scopeId === 'attendance_sheet';
-    const isTabular = isMultiRecordSingleDocumentScope && (isTabularTemplate(contentToMerge) || Boolean(customDocxTemplate.isTableDocument));
+    const isTabular = isMultiRecordSingleDocumentScope && (isTabularTemplate(templateBodyContent) || Boolean(customDocxTemplate.isTableDocument));
 
     // 2. Sample Data Fill: 1 single page with enrichedRecords[0] or sample table rows
     if (docxRenderMode === 'sample') {
       if (isTabular) {
         const sampleRows = enrichedRecords.slice(0, Math.min(3, enrichedRecords.length));
-        return [mergeTabularTemplateWithData(contentToMerge, sampleRows, contextEnrichedBaseRecord)];
+        return [mergeTabularTemplateWithData(templateBodyContent, sampleRows, contextEnrichedBaseRecord)];
       }
       return [
         enrichedRecords.length > 0
-          ? mergeTemplateWithData(contentToMerge, enrichedRecords[0])
-          : contentToMerge,
+          ? mergeTemplateWithData(templateBodyContent, enrichedRecords[0])
+          : templateBodyContent,
       ];
     }
 
     // 3. Batch Data Generation: Tabular ledger table or Multi-page batch merged with all enrichedRecords
     if ((docxRenderMode === 'all' || !docxRenderMode) && enrichedRecords.length > 0) {
       if (isTabular) {
-        return [mergeTabularTemplateWithData(contentToMerge, enrichedRecords, contextEnrichedBaseRecord)];
+        return [mergeTabularTemplateWithData(templateBodyContent, enrichedRecords, contextEnrichedBaseRecord)];
       }
-      return bulkMergeTemplate(contentToMerge, enrichedRecords);
+      return bulkMergeTemplate(templateBodyContent, enrichedRecords);
     }
 
-    return [contentToMerge];
-  }, [customDocxTemplate?.body, customDocxTemplate?.html, customDocxTemplate?.id, customDocxTemplate?.isTableDocument, customDocxTemplate?.templateType, customDocxTemplate?.styles, docxRenderMode, enrichedRecords, contextEnrichedBaseRecord, scopeId]);
+    return [templateBodyContent];
+  }, [
+    customDocxTemplate,
+    docxRenderMode,
+    enrichedRecords,
+    contextEnrichedBaseRecord,
+    scopeId,
+    savedWordTemplates,
+    combinedTemplates,
+  ]);
 
   // Handle template selection
   const handleTemplateSelection = useCallback(
@@ -309,6 +405,7 @@ export function usePrintDocxEngine({
           id: 'blank_document',
           name: 'Blank Page (Live Canvas)',
           styles: '',
+          templateBody: BLANK_PAGE_HTML,
           body: BLANK_PAGE_HTML,
           html: BLANK_PAGE_HTML,
           rawHtml: BLANK_PAGE_HTML,
@@ -330,29 +427,76 @@ export function usePrintDocxEngine({
         onTemplateChange?.(templateIdOrObj);
         return;
       }
-      const foundWordTemplate = (savedWordTemplates || []).find((t) => t.id === tId);
+
+      // Robustly resolve target template from object, savedWordTemplates, combinedTemplates, or templates prop
+      const foundWordTemplate =
+        (typeof templateIdOrObj === 'object' && templateIdOrObj?.rawHtml ? templateIdOrObj : null) ||
+        (savedWordTemplates || []).find((t) => t.id === tId) ||
+        (combinedTemplates || []).find((t) => t.id === tId) ||
+        (templates || []).find((t: any) => t.id === tId);
+
       if (foundWordTemplate) {
-        const { styles, body } = separateDocxStylesAndBody(foundWordTemplate.rawHtml || '');
+        const rawHtmlContent = foundWordTemplate.rawHtml || foundWordTemplate.html || '';
+        const { styles, body } = separateDocxStylesAndBody(rawHtmlContent);
         const isGenerated = foundWordTemplate.templateType === 'generated' || foundWordTemplate.id?.startsWith('gen_');
+        
+        let sourceTmplBody = isGenerated ? foundWordTemplate.templateBody : (body || rawHtmlContent);
+        if (isGenerated && !sourceTmplBody && foundWordTemplate.sourceTemplateId) {
+          const srcTmpl = (savedWordTemplates || []).find((t) => t.id === foundWordTemplate.sourceTemplateId) ||
+                          (combinedTemplates || []).find((t) => t.id === foundWordTemplate.sourceTemplateId);
+          if (srcTmpl) {
+            sourceTmplBody = separateDocxStylesAndBody(srcTmpl.rawHtml || srcTmpl.html || '').body || srcTmpl.rawHtml;
+          }
+        }
+
+        const detectedPageSize = foundWordTemplate.pageSize || foundWordTemplate.pageProperties?.pageSize || foundWordTemplate.templateMeta?.pageSize || foundWordTemplate.templateMeta?.pageProperties?.pageSize;
+        const detectedOrientation = foundWordTemplate.orientation || foundWordTemplate.pageProperties?.orientation || foundWordTemplate.templateMeta?.orientation || foundWordTemplate.templateMeta?.pageProperties?.orientation;
+        const detectedMargin = foundWordTemplate.margin || foundWordTemplate.pageProperties?.margin || foundWordTemplate.templateMeta?.margin || foundWordTemplate.templateMeta?.pageProperties?.margin;
+
+        if (detectedPageSize || detectedOrientation || detectedMargin) {
+          const optionUpdater = (prev: PrintOptions) => ({
+            ...prev,
+            ...(detectedPageSize ? { pageSize: detectedPageSize } : {}),
+            ...(detectedOrientation ? { orientation: detectedOrientation } : {}),
+            ...(detectedMargin ? { margin: detectedMargin } : {}),
+          });
+          if (updateOptionsWithHistory) {
+            updateOptionsWithHistory(optionUpdater);
+          } else if (setOptions) {
+            setOptions(optionUpdater);
+          }
+        }
+
         setCustomDocxTemplate({
           id: foundWordTemplate.id,
           name: foundWordTemplate.name,
           styles: styles,
-          body: body || foundWordTemplate.rawHtml,
-          html: foundWordTemplate.rawHtml,
-          rawHtml: foundWordTemplate.rawHtml,
+          templateBody: sourceTmplBody || body || rawHtmlContent,
+          body: body || rawHtmlContent,
+          html: rawHtmlContent,
+          rawHtml: rawHtmlContent,
           isTableDocument: foundWordTemplate.isTableDocument,
-          columns: foundWordTemplate.sampleColumns || [],
-          data: foundWordTemplate.sampleData || [],
-          templateMeta: foundWordTemplate,
+          columns: foundWordTemplate.sampleColumns || foundWordTemplate.columns || [],
+          data: foundWordTemplate.sampleData || foundWordTemplate.data || [],
+          pageSize: detectedPageSize,
+          orientation: detectedOrientation,
+          margin: detectedMargin,
+          pageProperties: foundWordTemplate.pageProperties || foundWordTemplate.templateMeta?.pageProperties,
+          templateMeta: foundWordTemplate.templateMeta || foundWordTemplate,
           templateType: foundWordTemplate.templateType || (isGenerated ? 'generated' : 'template'),
           recordsCount: foundWordTemplate.recordsCount,
+          sourceTemplateId: foundWordTemplate.sourceTemplateId,
         });
-        setDocxRenderMode('all');
+
+        if (isGenerated) {
+          setDocxRenderMode('all');
+        } else {
+          setDocxRenderMode('template');
+        }
       }
       onTemplateChange?.(templateIdOrObj);
     },
-    [savedWordTemplates, onTemplateChange]
+    [savedWordTemplates, combinedTemplates, templates, onTemplateChange, updateOptionsWithHistory, setOptions]
   );
 
   const handleApplyDocxTemplate = useCallback((result: any) => {
@@ -366,16 +510,39 @@ export function usePrintDocxEngine({
 
     const { styles, body } = separateDocxStylesAndBody(htmlContent);
 
+    const detectedPageSize = result.pageSize || result.pageProperties?.pageSize || result.templateMeta?.pageSize || result.templateMeta?.pageProperties?.pageSize;
+    const detectedOrientation = result.orientation || result.pageProperties?.orientation || result.templateMeta?.orientation || result.templateMeta?.pageProperties?.orientation;
+    const detectedMargin = result.margin || result.pageProperties?.margin || result.templateMeta?.margin || result.templateMeta?.pageProperties?.margin;
+
+    if (detectedPageSize || detectedOrientation || detectedMargin) {
+      const optionUpdater = (prev: PrintOptions) => ({
+        ...prev,
+        pageSize: detectedPageSize || prev.pageSize || 'A4',
+        orientation: detectedOrientation || prev.orientation || 'PORTRAIT',
+        margin: detectedMargin || prev.margin || 'NORMAL',
+      });
+      if (updateOptionsWithHistory) {
+        updateOptionsWithHistory(optionUpdater);
+      } else if (setOptions) {
+        setOptions(optionUpdater);
+      }
+    }
+
     const normalizedTemplate = {
       id: templateId,
       name: templateName,
       styles: styles,
+      templateBody: body || htmlContent,
       body: body || htmlContent,
       html: htmlContent,
       rawHtml: htmlContent,
       isTableDocument: isTableDoc,
       columns: cols,
       data: rows,
+      pageSize: detectedPageSize,
+      orientation: detectedOrientation,
+      margin: detectedMargin,
+      pageProperties: result.pageProperties || result.templateMeta?.pageProperties,
       templateType: 'template' as const,
       templateMeta: result.templateMeta || {
         id: templateId,
@@ -385,6 +552,10 @@ export function usePrintDocxEngine({
         isTableDocument: isTableDoc,
         sampleColumns: cols,
         sampleData: rows,
+        pageSize: detectedPageSize,
+        orientation: detectedOrientation,
+        margin: detectedMargin,
+        pageProperties: result.pageProperties,
         templateType: 'template',
       },
     };
@@ -400,7 +571,7 @@ export function usePrintDocxEngine({
       setLiveColumns?.(cols);
       setVisibleColumnKeys?.(cols.map((c: any) => c.id || c.key || c.accessor || c.dataIndex));
     }
-  }, [setLiveColumns, setVisibleColumnKeys]);
+  }, [setLiveColumns, setVisibleColumnKeys, updateOptionsWithHistory, setOptions]);
 
   const handleDeleteDocxTemplate = useCallback((templateId: string) => {
     deleteDocxTemplate(templateId);
@@ -415,40 +586,59 @@ export function usePrintDocxEngine({
 
   const handleSaveCurrentTemplate = useCallback(
     (customName: string, saveType: 'template' | 'generated' = 'template') => {
-      let currentHtml = '';
-      const container = document.querySelector('.docx-live-container');
       const scopeDef = getScopeById(scopeId as any);
+      let baseTemplateBody =
+        customDocxTemplate?.templateBody ||
+        (customDocxTemplate?.templateType !== 'generated' && separateDocxStylesAndBody(customDocxTemplate?.rawHtml || customDocxTemplate?.html || '').body) ||
+        (customDocxTemplate?.templateType !== 'generated' && customDocxTemplate?.body);
+
+      if (!baseTemplateBody && customDocxTemplate?.sourceTemplateId) {
+        const src = (savedWordTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId) ||
+                    (combinedTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId);
+        if (src) {
+          baseTemplateBody = separateDocxStylesAndBody(src.rawHtml || src.html || '').body || src.rawHtml;
+        }
+      }
+
+      if (!baseTemplateBody) {
+        baseTemplateBody = BLANK_PAGE_HTML;
+      }
+
+      const styles =
+        customDocxTemplate?.styles ||
+        separateDocxStylesAndBody(customDocxTemplate?.rawHtml || customDocxTemplate?.html || '').styles ||
+        '';
 
       if (saveType === 'generated') {
-        const targetBody = customDocxTemplate?.body || separateDocxStylesAndBody(customDocxTemplate?.html || customDocxTemplate?.rawHtml || '').body || customDocxTemplate?.html || '';
-        const styles = customDocxTemplate?.styles || separateDocxStylesAndBody(customDocxTemplate?.html || customDocxTemplate?.rawHtml || '').styles || '';
-
         const recordsToMerge = enrichedRecords.length > 0 ? enrichedRecords : [contextEnrichedBaseRecord];
-        const isTabular = isTabularTemplate(targetBody) || Boolean(customDocxTemplate?.isTableDocument);
+        const isTabular = isTabularTemplate(baseTemplateBody) || Boolean(customDocxTemplate?.isTableDocument);
 
         let mergedFullHtml = '';
         if (isTabular) {
-          mergedFullHtml = mergeTabularTemplateWithData(targetBody, recordsToMerge, contextEnrichedBaseRecord);
+          mergedFullHtml = mergeTabularTemplateWithData(baseTemplateBody, recordsToMerge, contextEnrichedBaseRecord);
         } else {
-          const pages = bulkMergeTemplate(targetBody, recordsToMerge);
+          const pages = bulkMergeTemplate(baseTemplateBody, recordsToMerge);
           mergedFullHtml = pages.join('\n<!-- spr-page-break -->\n');
         }
 
-        currentHtml = styles ? `${styles}\n${mergedFullHtml}` : mergedFullHtml;
-
+        const currentHtml = styles ? `${styles}\n${mergedFullHtml}` : mergedFullHtml;
         const newId = 'gen_' + Date.now();
-        const docName = customName?.trim() || `${scopeDef?.name || 'Document'} — Generated (${recordsToMerge.length} Records)`;
+        const docName = customName?.trim() || `${scopeDef?.name || 'Document'} — Filled (${recordsToMerge.length} Records)`;
 
         const newGeneratedDoc: CustomDocxTemplate = {
           id: newId,
           name: docName,
-          description: `Generated Document with ${recordsToMerge.length} populated records (${new Date().toLocaleDateString()})`,
+          description: `Filled Document with ${recordsToMerge.length} populated records (${new Date().toLocaleDateString()})`,
           scopeId: scopeId,
           rawHtml: currentHtml,
           detectedPlaceholders: [],
           isTableDocument: isTabular,
           sampleColumns: [],
           sampleData: [],
+          pageSize: options.pageSize || customDocxTemplate?.pageSize,
+          orientation: options.orientation || customDocxTemplate?.orientation,
+          margin: options.margin || customDocxTemplate?.margin,
+          pageProperties: customDocxTemplate?.pageProperties,
           templateType: 'generated',
           recordsCount: recordsToMerge.length,
           sourceTemplateId: customDocxTemplate?.id || undefined,
@@ -457,37 +647,43 @@ export function usePrintDocxEngine({
         };
 
         saveDocxTemplate(newGeneratedDoc);
-        const updatedList = getSavedDocxTemplates();
-        setSavedWordTemplates(updatedList);
+        setSavedWordTemplates(getSavedDocxTemplates());
 
         const normalized = {
           id: newId,
           name: docName,
           styles: styles,
+          templateBody: baseTemplateBody,
           body: mergedFullHtml,
           html: currentHtml,
           rawHtml: currentHtml,
           isTableDocument: isTabular,
           columns: [],
           data: [],
+          pageSize: options.pageSize || customDocxTemplate?.pageSize,
+          orientation: options.orientation || customDocxTemplate?.orientation,
+          margin: options.margin || customDocxTemplate?.margin,
+          pageProperties: customDocxTemplate?.pageProperties,
           templateMeta: newGeneratedDoc,
           templateType: 'generated' as const,
           recordsCount: recordsToMerge.length,
+          sourceTemplateId: customDocxTemplate?.id || undefined,
         };
         setCustomDocxTemplate(normalized);
         setDocxRenderMode('all');
         return normalized;
       } else {
-        if (container && container.innerHTML) {
-          const rawBody = container.innerHTML;
-          const preservedStyles = customDocxTemplate?.styles || separateDocxStylesAndBody(customDocxTemplate?.html || customDocxTemplate?.rawHtml || '').styles;
-          currentHtml = preservedStyles ? `${preservedStyles}\n${rawBody}` : rawBody;
-        } else {
-          currentHtml = customDocxTemplate?.html || customDocxTemplate?.rawHtml || BLANK_PAGE_HTML;
+        // Saving as Template Blueprint (holding pure {{tokens}})
+        let templateBodyToSave = baseTemplateBody;
+        if (docxRenderMode === 'template') {
+          const container = document.querySelector('.docx-live-container');
+          if (container && container.innerHTML) {
+            templateBodyToSave = container.innerHTML;
+          }
         }
 
-        const { styles, body } = separateDocxStylesAndBody(currentHtml);
-        const detectedKeys = extractTagsFromText(currentHtml);
+        const fullHtml = styles ? `${styles}\n${templateBodyToSave}` : templateBodyToSave;
+        const detectedKeys = extractTagsFromText(fullHtml);
         const newId = 'tmpl_' + Date.now();
         const templateName = customName?.trim() || customDocxTemplate?.name || `${scopeDef?.name || 'Custom'} Template`;
 
@@ -496,30 +692,38 @@ export function usePrintDocxEngine({
           name: templateName,
           description: `Custom Template for ${scopeDef?.name || 'General Document'}`,
           scopeId: scopeId,
-          rawHtml: currentHtml,
+          rawHtml: fullHtml,
           detectedPlaceholders: detectedKeys,
-          isTableDocument: false,
-          sampleColumns: [],
-          sampleData: [],
+          isTableDocument: Boolean(customDocxTemplate?.isTableDocument),
+          sampleColumns: customDocxTemplate?.columns || [],
+          sampleData: customDocxTemplate?.data || [],
+          pageSize: options.pageSize || customDocxTemplate?.pageSize,
+          orientation: options.orientation || customDocxTemplate?.orientation,
+          margin: options.margin || customDocxTemplate?.margin,
+          pageProperties: customDocxTemplate?.pageProperties,
           templateType: 'template',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
 
         saveDocxTemplate(newTemplate);
-        const updatedList = getSavedDocxTemplates();
-        setSavedWordTemplates(updatedList);
+        setSavedWordTemplates(getSavedDocxTemplates());
 
         const normalized = {
           id: newId,
           name: templateName,
           styles: styles,
-          body: body || currentHtml,
-          html: currentHtml,
-          rawHtml: currentHtml,
-          isTableDocument: false,
-          columns: [],
-          data: [],
+          templateBody: templateBodyToSave,
+          body: templateBodyToSave,
+          html: fullHtml,
+          rawHtml: fullHtml,
+          isTableDocument: Boolean(customDocxTemplate?.isTableDocument),
+          columns: customDocxTemplate?.columns || [],
+          data: customDocxTemplate?.data || [],
+          pageSize: options.pageSize || customDocxTemplate?.pageSize,
+          orientation: options.orientation || customDocxTemplate?.orientation,
+          margin: options.margin || customDocxTemplate?.margin,
+          pageProperties: customDocxTemplate?.pageProperties,
           templateMeta: newTemplate,
           templateType: 'template' as const,
         };
@@ -528,7 +732,7 @@ export function usePrintDocxEngine({
         return normalized;
       }
     },
-    [customDocxTemplate, scopeId, enrichedRecords, contextEnrichedBaseRecord]
+    [customDocxTemplate, docxRenderMode, scopeId, enrichedRecords, contextEnrichedBaseRecord, savedWordTemplates, combinedTemplates, options.pageSize, options.orientation, options.margin]
   );
 
   const handleDuplicateDocxTemplate = useCallback((templateId: string) => {
@@ -591,5 +795,10 @@ export function usePrintDocxEngine({
     handleSaveCurrentTemplate,
     handleDuplicateDocxTemplate,
     handleSetScopeDefault,
+    docxCanUndo,
+    docxCanRedo,
+    handleDocxUndo,
+    handleDocxRedo,
+    updateCustomDocxTemplateWithHistory,
   };
 }

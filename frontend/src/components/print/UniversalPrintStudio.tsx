@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { useFullscreen, useResizablePanel } from '../../hooks';
 import { useTenant } from '../../context/TenantContext';
 import PanelResizer from '../ui/PanelResizer';
-import PrintConfigSidebar from './PrintConfigSidebar';
+import DocLabSidebar from './DocLabSidebar';
 import DocxTemplateModal from './DocxTemplateModal';
 import TemplateLibraryModal from './TemplateLibraryModal';
 import { insertTokenAtActiveCaret } from './caretInsertManager';
-import { getPageMarginCSS } from './printExportUtils';
+import { getPageMarginCSS } from './docLabExportUtils';
 import {
   getDefaultTemplateIdForScope,
   setDefaultTemplateForScope,
@@ -20,7 +20,7 @@ import {
   usePrintPagination,
   usePrintStudioShortcuts,
 } from './hooks';
-import { PrintStudioHeader, PrintStudioWorkbench } from './components';
+import { DocLabHeader, DocLabWorkbench } from './components';
 import { UniversalPrintStudioProps } from './types';
 import './printEngine.css';
 
@@ -173,6 +173,11 @@ export default function UniversalPrintStudio({
     handleSaveCurrentTemplate,
     handleDuplicateDocxTemplate,
     handleSetScopeDefault,
+    docxCanUndo,
+    docxCanRedo,
+    handleDocxUndo,
+    handleDocxRedo,
+    updateCustomDocxTemplateWithHistory,
   } = usePrintDocxEngine({
     isOpen,
     scopeId,
@@ -180,6 +185,8 @@ export default function UniversalPrintStudio({
     templates,
     placeholderKeys,
     options,
+    setOptions,
+    updateOptionsWithHistory,
     liveData,
     liveMetaItems,
     liveColumns,
@@ -191,6 +198,11 @@ export default function UniversalPrintStudio({
     resolvedSubtitle,
     onTemplateChange,
   });
+
+  const effectiveCanUndo = customDocxTemplate ? docxCanUndo : canUndo;
+  const effectiveCanRedo = customDocxTemplate ? docxCanRedo : canRedo;
+  const effectiveHandleUndo = customDocxTemplate ? handleDocxUndo : handleUndo;
+  const effectiveHandleRedo = customDocxTemplate ? handleDocxRedo : handleRedo;
 
   // 3. Dynamic Page Slicing & Pagination Hook
   const { paginationResult } = usePrintPagination({
@@ -213,8 +225,8 @@ export default function UniversalPrintStudio({
     options,
     title,
     onClose,
-    handleUndo,
-    handleRedo,
+    handleUndo: effectiveHandleUndo,
+    handleRedo: effectiveHandleRedo,
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
@@ -250,7 +262,7 @@ export default function UniversalPrintStudio({
       className={`universal-print-studio-root ${
         isFullscreen
           ? 'fixed inset-0 z-[9999] flex flex-col theme-bg-app theme-text-primary overflow-hidden select-none animate-fade-in w-screen h-screen'
-          : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs animate-fade-in text-left font-sans select-none'
+          : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 animate-fade-in text-left font-sans select-none'
       } print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:backdrop-filter-none print:shadow-none print:overflow-visible`}
     >
       {/* Dynamic @page Rules for Clean Browser Print Dialog */}
@@ -275,11 +287,13 @@ export default function UniversalPrintStudio({
         } print:static print:block print:w-full print:max-w-none print:h-auto print:rounded-none print:border-none print:shadow-none print:bg-white print:overflow-visible`}
       >
         {/* 1. Master Top Action Toolbar */}
-        <PrintStudioHeader
+        <DocLabHeader
           title={title}
           subtitle={subtitle}
           totalPages={
-            documents && documents.length > 0
+            customDocxTemplate
+              ? Math.max(1, mergedDocxPages.length)
+              : documents && documents.length > 0
               ? documents.length
               : batchDocuments && batchDocuments.length > 0
               ? batchDocuments.length
@@ -287,17 +301,8 @@ export default function UniversalPrintStudio({
           }
           pageSize={options.pageSize}
           orientation={options.orientation}
-          onOpenDocxModal={() => setIsDocxModalOpen(true)}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          zoomLevel={zoomLevel}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onResetZoom={handleResetZoom}
           isFullscreen={isFullscreen}
-          toggleFullscreen={toggleFullscreen}
+          toggleFullscreen={toggleFullscreen as () => void}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           onClose={onClose}
@@ -330,7 +335,7 @@ export default function UniversalPrintStudio({
         {/* 2. Main Studio Body: Workbench Canvas (Left/Center) + Right Configuration Sidebar */}
         <div className="flex-1 flex overflow-hidden relative print:static print:block print:w-full print:h-auto print:overflow-visible">
           {/* Main Live Paper Canvas Preview Area (Studio Workbench) */}
-          <PrintStudioWorkbench
+          <DocLabWorkbench
             options={options}
             updateOptionsWithHistory={updateOptionsWithHistory}
             title={title}
@@ -339,8 +344,8 @@ export default function UniversalPrintStudio({
             handleMetaItemsChange={handleMetaItemsChange}
             liveColumns={liveColumns}
             visibleColumnKeys={visibleColumnKeys}
-            isColumnMandatory={isColumnMandatory}
-            isColumnRequired={isColumnRequired}
+            isColumnMandatory={isColumnMandatory ? (col: any, idx?: number) => (isColumnMandatory as any)(col, idx ?? 0) : null}
+            isColumnRequired={isColumnRequired ? (col: any, idx?: number) => (isColumnRequired as any)(col, idx ?? 0) : null}
             requiredColumnKeys={requiredColumnKeys}
             visibleRowKeys={visibleRowKeys}
             isRowMandatory={isRowMandatory}
@@ -355,6 +360,7 @@ export default function UniversalPrintStudio({
             paginationResult={paginationResult}
             customDocxTemplate={customDocxTemplate}
             setCustomDocxTemplate={setCustomDocxTemplate}
+            updateCustomDocxTemplateWithHistory={updateCustomDocxTemplateWithHistory}
             docxStyles={docxStyles}
             mergedDocxPages={mergedDocxPages}
             docxRenderMode={docxRenderMode}
@@ -366,10 +372,10 @@ export default function UniversalPrintStudio({
             setZoomLevel={setZoomLevel}
             pointerMode={pointerMode}
             setPointerMode={setPointerMode}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            handleUndo={handleUndo}
-            handleRedo={handleRedo}
+            canUndo={effectiveCanUndo}
+            canRedo={effectiveCanRedo}
+            handleUndo={effectiveHandleUndo}
+            handleRedo={effectiveHandleRedo}
             handleCellChange={handleCellChange}
             handleRowDelete={handleRowDelete}
             handleRowInsert={handleRowInsert}
@@ -383,7 +389,7 @@ export default function UniversalPrintStudio({
               onClick={(e) => {
                 if (e.target === e.currentTarget) setIsSidebarOpen(false);
               }}
-              className="fixed md:relative inset-0 md:inset-auto z-40 md:z-auto flex h-full justify-end bg-black/40 md:bg-transparent backdrop-blur-xs md:backdrop-blur-none animate-fade-in print:hidden print-studio-no-print shrink-0 md:border-l theme-border shadow-2xl min-w-0"
+              className="fixed md:relative inset-0 md:inset-auto z-40 md:z-auto flex h-full justify-end bg-black/40 md:bg-transparent animate-fade-in print:hidden print-studio-no-print shrink-0 md:border-l theme-border shadow-2xl min-w-0"
               style={{
                 width: `${sidebarWidth || 580}px`,
                 maxWidth: 'min(1080px, 85vw)',
@@ -398,7 +404,7 @@ export default function UniversalPrintStudio({
                 position="left"
               />
               <div className="w-full h-full flex-1 overflow-hidden">
-                <PrintConfigSidebar
+                <DocLabSidebar
                   options={options}
                   onOptionsChange={updateOptionsWithHistory}
                   templates={combinedTemplates}
@@ -407,9 +413,9 @@ export default function UniversalPrintStudio({
                   onTemplateChange={handleTemplateSelection}
                   onOpenDocxModal={() => setIsDocxModalOpen(true)}
                   onOpenTemplateLibrary={() => setIsTemplateLibraryOpen(true)}
-                  onDeleteDocxTemplate={handleDeleteDocxTemplate}
+                  onDeleteDocxTemplate={(t: any) => handleDeleteDocxTemplate(t?.id || t)}
                   onSaveCurrentTemplate={handleSaveCurrentTemplate}
-                  onDuplicateDocxTemplate={handleDuplicateDocxTemplate}
+                  onDuplicateDocxTemplate={(t: any) => handleDuplicateDocxTemplate(t?.id || t)}
                   onSetScopeDefault={handleSetScopeDefault}
                   scopeId={scopeId}
                   scopeName={scopeName}
@@ -464,7 +470,7 @@ export default function UniversalPrintStudio({
           onApplyTemplate={handleApplyDocxTemplate}
           placeholderKeys={placeholderKeys}
           sampleData={liveData && liveData[0] ? { ...liveData[0], title, subtitle } : { title, subtitle }}
-          columns={liveColumns}
+          columns={liveColumns as any}
           metaItems={metaItems}
         />
       )}
@@ -496,6 +502,3 @@ export default function UniversalPrintStudio({
     ? createPortal(studioContent, document.body)
     : studioContent;
 }
-
-// Backward-compatible alias export for legacy consumers
-export { UniversalPrintStudio as UniversalPrintModal };

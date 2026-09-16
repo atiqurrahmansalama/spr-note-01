@@ -345,6 +345,13 @@ export const STUDENT_MARKSHEET_TAXONOMY_KEYS: KeyTaxonomyItem[] = [
     description: 'Total examinees enrolled in this class',
   },
   {
+    key: 'total_subjects',
+    label: 'Total Subjects Count',
+    category: 'exam',
+    example: '7',
+    description: 'Total number of subjects evaluated',
+  },
+  {
     key: 'total_marks',
     label: 'Total Full Marks',
     category: 'exam',
@@ -352,11 +359,123 @@ export const STUDENT_MARKSHEET_TAXONOMY_KEYS: KeyTaxonomyItem[] = [
     description: 'Aggregate full possible marks across all subjects',
   },
   {
+    key: 'total_full_marks',
+    label: 'Total Full Marks (Alias)',
+    category: 'exam',
+    example: '700',
+    description: 'Direct alias for total full marks',
+  },
+  {
     key: 'obtained_marks',
     label: 'Total Obtained Marks',
     category: 'exam',
     example: '642',
     description: 'Grand total marks secured by the student',
+  },
+  {
+    key: 'total_obtained_marks',
+    label: 'Total Obtained Marks (Alias)',
+    category: 'exam',
+    example: '642',
+    description: 'Direct alias for total obtained marks',
+  },
+  {
+    key: 'average_marks',
+    label: 'Average Marks',
+    category: 'exam',
+    example: '91.71',
+    description: 'Average marks obtained per subject',
+  },
+  {
+    key: 'avg_marks',
+    label: 'Average Marks (Alias)',
+    category: 'exam',
+    example: '91.71',
+    description: 'Direct shorthand alias for average marks',
+  },
+  {
+    key: 'percentage',
+    label: 'Overall Percentage',
+    category: 'exam',
+    example: '91.71%',
+    description: 'Calculated aggregate percentage score',
+  },
+  {
+    key: 'gpa',
+    label: 'GPA Score',
+    category: 'exam',
+    example: '5.00',
+    description: 'Grade Point Average derived from grading scale',
+  },
+  {
+    key: 'overall_gpa',
+    label: 'Overall GPA (Alias)',
+    category: 'exam',
+    example: '5.00',
+    description: 'Direct alias for student overall GPA score',
+  },
+  {
+    key: 'grade',
+    label: 'Letter Grade',
+    category: 'exam',
+    example: 'A+',
+    description: 'Consolidated final academic letter grade',
+  },
+  {
+    key: 'letter_grade',
+    label: 'Letter Grade (Alias)',
+    category: 'exam',
+    example: 'A+',
+    description: 'Direct alias for student final letter grade',
+  },
+  {
+    key: 'division',
+    label: 'Division / Standing',
+    category: 'exam',
+    example: 'First Division (Mumtaz)',
+    description: 'Islamic/National academic division standing',
+  },
+  {
+    key: 'merit_position',
+    label: 'Merit Position / Rank',
+    category: 'exam',
+    example: '1st',
+    description: 'Class rank with ordinal suffix (e.g. 1st, 2nd, 3rd)',
+  },
+  {
+    key: 'merit_status',
+    label: 'Merit & Result Status',
+    category: 'exam',
+    example: '1st (Mumtaz) • PASSED',
+    description: 'Comprehensive combination of merit standing and result status',
+  },
+  {
+    key: 'class_rank',
+    label: 'Class Rank Number',
+    category: 'exam',
+    example: '1',
+    description: 'Numerical class merit standing number',
+  },
+  {
+    key: 'section_rank',
+    label: 'Section Rank Number',
+    category: 'exam',
+    example: '1',
+    description: 'Numerical section merit standing number',
+  },
+  {
+    key: 'result_status',
+    label: 'Result Status (PASSED / FAILED)',
+    category: 'exam',
+    example: 'PASSED',
+    description: 'Overall pass/fail qualification status',
+  },
+  {
+    key: 'result_summary',
+    label: 'Full Result Summary',
+    category: 'exam',
+    example: 'PASSED • GPA: 5.00 • Grade: A+ • 1st Position',
+    description: 'One-line complete academic result summary string',
   },
   {
     key: 'highest_marks',
@@ -385,62 +504,6 @@ export const STUDENT_MARKSHEET_TAXONOMY_KEYS: KeyTaxonomyItem[] = [
     category: 'exam',
     example: 'A+',
     description: 'Highest grade achieved in class',
-  },
-  {
-    key: 'percentage',
-    label: 'Overall Percentage',
-    category: 'exam',
-    example: '91.71%',
-    description: 'Calculated aggregate percentage score',
-  },
-  {
-    key: 'gpa',
-    label: 'GPA Score',
-    category: 'exam',
-    example: '5.00',
-    description: 'Grade Point Average derived from scale',
-  },
-  {
-    key: 'grade',
-    label: 'Letter Grade',
-    category: 'exam',
-    example: 'A+',
-    description: 'Consolidated final academic letter grade',
-  },
-  {
-    key: 'division',
-    label: 'Division / Standing',
-    category: 'exam',
-    example: 'First Division (Mumtaz)',
-    description: 'Islamic/National academic division standing',
-  },
-  {
-    key: 'merit_position',
-    label: 'Merit Position / Rank',
-    category: 'exam',
-    example: '1st',
-    description: 'Class rank with ordinal suffix',
-  },
-  {
-    key: 'class_rank',
-    label: 'Rank Number',
-    category: 'exam',
-    example: '1',
-    description: 'Numerical class merit standing',
-  },
-  {
-    key: 'section_rank',
-    label: 'Section Rank Number',
-    category: 'exam',
-    example: '1',
-    description: 'Numerical section merit standing',
-  },
-  {
-    key: 'result_status',
-    label: 'Result Status (PASSED / FAILED)',
-    category: 'exam',
-    example: 'PASSED',
-    description: 'Overall pass/fail qualification status',
   },
   {
     key: 'passed_subjects_count',
@@ -851,20 +914,32 @@ export interface EnrichedStudentTranscriptRecord {
   exam_date: string;
   exam_term: string;
   total_students: number | string;
+  total_subjects: number;
+  total_subjects_count: number;
   total_marks: number;
+  total_full_marks?: number;
   obtained_marks: number | string;
+  total_obtained_marks?: number | string;
+  average_marks: string | number;
+  avg_marks?: string | number;
   highest_marks: number | string;
   highest_total: number | string;
   highest_gpa: string;
   highest_percentage: string;
   highest_grade: string;
   percentage: string;
+  overall_percentage?: string;
   gpa: string;
+  overall_gpa?: string;
   grade: string;
+  letter_grade?: string;
   division: string;
   merit_position: string;
+  merit_status: string;
+  result_summary: string;
   class_rank: string;
   section_rank: string;
+  rank?: string;
   result_status: string;
   passed_subjects_count: number;
   failed_subjects_count: number;
@@ -964,7 +1039,7 @@ export function buildSingleStudentTranscriptData({
   let classHighestGrade = 'A+';
 
   if (studentPool.length > 0) {
-    const obtainedScores = studentPool.map((s) => s.totalObtained ?? computeTotalObtainedMarks(s) ?? 0);
+    const obtainedScores = studentPool.map((s) => Number(s.totalObtained ?? computeTotalObtainedMarks(s) ?? 0));
     const maxTotal = Math.max(...obtainedScores);
     classHighestTotalMarks = maxTotal > 0 ? maxTotal : (totalObtained || '-');
 
@@ -1084,6 +1159,19 @@ export function buildSingleStudentTranscriptData({
     };
   });
 
+  // Compute subject counts and average marks per subject
+  const subjectCount = normalizedSubjectMarks.length || rawSubjectMarks.length || (subjects?.length || 1);
+  const numObtained = typeof totalObtained === 'number' ? totalObtained : parseFloat(String(totalObtained)) || 0;
+  const avgMarksValue = subjectCount > 0 ? (numObtained / subjectCount) : 0;
+  const averageMarksStr = avgMarksValue > 0 ? avgMarksValue.toFixed(2) : (percentage ? percentage.replace('%', '') : '0.00');
+
+  // Format rich Merit Status & Result Summary
+  const meritPositionStr = rankOrdinal || (rankNum !== '-' ? `${rankNum}` : '-');
+  const meritStatusStr = meritPositionStr !== '-'
+    ? `${meritPositionStr}${division && division !== '-' ? ` (${division})` : ''} • ${statusText}`
+    : `${statusText}${division && division !== '-' ? ` (${division})` : ''}`;
+  const resultSummaryStr = `${statusText} • GPA: ${gpa} • Grade: ${grade}${meritPositionStr !== '-' ? ` • Merit: ${meritPositionStr}` : ''}`;
+
   // Base enriched record
   const record: EnrichedStudentTranscriptRecord = {
     id: String(st?.studentId || 'st_1'),
@@ -1120,20 +1208,37 @@ export function buildSingleStudentTranscriptData({
     exam_date: examDate,
     exam_term: examTerm,
     total_students: totalStudentsCount,
+    total_subjects: subjectCount,
+    total_subjects_count: subjectCount,
     total_marks: totalFull,
+    total_full_marks: totalFull,
     obtained_marks: totalObtained,
+    total_obtained_marks: totalObtained,
+    total_obtained: totalObtained,
+    average_marks: averageMarksStr,
+    avg_marks: averageMarksStr,
     highest_marks: classHighestTotalMarks,
     highest_total: classHighestTotalMarks,
     highest_gpa: classHighestGpa,
     highest_percentage: classHighestPercentage,
     highest_grade: classHighestGrade,
     percentage: percentage,
+    overall_percentage: percentage,
     gpa: gpa,
+    overall_gpa: gpa,
+    gpa_score: gpa,
+    grade_point_average: gpa,
     grade: grade,
+    letter_grade: grade,
+    final_grade: grade,
     division: division,
-    merit_position: rankOrdinal || rankNum,
+    merit_position: meritPositionStr,
+    merit_status: meritStatusStr,
+    result_summary: resultSummaryStr,
     class_rank: rankNum,
     section_rank: sectionRankNum,
+    rank: rankNum,
+    merit_rank: rankNum,
     result_status: statusText,
     passed_subjects_count: rawSubjectMarks.filter((s) => s.isPassed).length,
     failed_subjects_count: rawSubjectMarks.filter((s) => !s.isPassed && !s.isAbsent).length,
@@ -1256,7 +1361,7 @@ export function buildBulkStudentTranscriptData({
 
 /**
  * Mandatory required placeholder keys for Student MarkSheet & Transcript scope templates.
- * Strict, minimal, and fully comprehensive. Notice institution_name is removed.
+ * Strict, minimal, and fully comprehensive.
  */
 export const STUDENT_MARKSHEET_REQUIRED_KEYS: string[] = [
   'student_name',
@@ -1268,7 +1373,9 @@ export const STUDENT_MARKSHEET_REQUIRED_KEYS: string[] = [
   'exam_name',
   'total_marks',
   'obtained_marks',
-  'highest_marks',
+  'average_marks',
   'gpa',
   'grade',
+  'merit_position',
+  'result_status',
 ];

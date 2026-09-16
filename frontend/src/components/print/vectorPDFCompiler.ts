@@ -1,25 +1,23 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 
-/**
- * Standard page dimensions in points (pt) for jsPDF
- * 1 pt = 1/72 inch = 0.3527 mm
- */
-const PAGE_DIMENSIONS_PT = {
+const PAGE_DIMENSIONS_PT: Record<string, { width: number; height: number }> = {
   a4: { width: 595.28, height: 841.89 },
   a3: { width: 841.89, height: 1190.55 },
   letter: { width: 612.0, height: 792.0 },
   legal: { width: 612.0, height: 1008.0 },
+  id_card: { width: 153.07, height: 242.65 },
 };
 
-const MARGIN_PT = {
-  NORMAL: 36, // ~12.7mm
-  NARROW: 24, // ~8.5mm
-  WIDE: 54, // ~19mm
+const MARGIN_PT: Record<string, number> = {
+  NORMAL: 36,
+  NARROW: 24,
+  WIDE: 54,
   NONE: 12,
 };
 
-const DENSITY_SETTINGS = {
+const DENSITY_SETTINGS: Record<string, { fontSize: number; headerFontSize: number; cellPadding: { top: number; bottom: number; left: number; right: number }; minRowHeight: number }> = {
   ULTRA_COMPACT: { fontSize: 7, headerFontSize: 7.5, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, minRowHeight: 12 },
   COMPACT: { fontSize: 7.5, headerFontSize: 8, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, minRowHeight: 14 },
   NORMAL: { fontSize: 8.5, headerFontSize: 9, cellPadding: { top: 4.5, bottom: 4.5, left: 5, right: 5 }, minRowHeight: 18 },
@@ -27,10 +25,7 @@ const DENSITY_SETTINGS = {
   SPACIOUS: { fontSize: 10.5, headerFontSize: 11, cellPadding: { top: 8, bottom: 8, left: 8, right: 8 }, minRowHeight: 26 },
 };
 
-/**
- * Helper to safely extract pure text from React nodes or mixed values
- */
-function extractPureText(node) {
+function extractPureText(node: any): string {
   if (node === null || node === undefined) return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(extractPureText).join('');
@@ -40,16 +35,25 @@ function extractPureText(node) {
   return '';
 }
 
-/**
- * Helper to format clean filename
- */
-export function getSafeFilename(title, ext = 'pdf') {
+export function getSafeFilename(title?: string, ext: string = 'pdf'): string {
   const safe = (title || 'Official_Document')
     .replace(/[/\\?%*:|"<>]/g, '_')
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
   return `${safe || 'Document'}.${ext}`;
+}
+
+export interface CompileVectorPDFProps {
+  title?: string;
+  subtitle?: string;
+  metaItems?: PrintMetaItem[];
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  data?: Array<Record<string, any>>;
+  extraBlankRows?: number | string;
+  summaryMetrics?: PrintSummaryMetric[];
+  options?: Partial<PrintOptions>;
 }
 
 /**
@@ -66,7 +70,7 @@ export function compileVectorPDFDocument({
   extraBlankRows = 0,
   summaryMetrics = [],
   options = {},
-}) {
+}: CompileVectorPDFProps): jsPDF {
   const {
     pageSize = 'A4',
     orientation = 'PORTRAIT',
@@ -114,46 +118,44 @@ export function compileVectorPDFDocument({
     compress: true,
   });
 
-  const institutionName = (customInstitutionName || 'SPR Note Academy').toUpperCase();
-  const institutionAddress = 'Central Campus & Academic Affairs';
+  const institutionName = (customInstitutionName || options.customInstitutionName || 'Institution Name').toUpperCase();
+  const institutionAddress = options.customCampusAddress || options.customInstitutionAddress || options.customAddress || '';
   const docTitle = (title || 'Official Document').toUpperCase();
   const docSubtitle = customSubtitle || subtitle || '';
 
   let cursorY = pageMargin;
 
-  // ── 1. Official Academy Branding Header ─────────────────────────────────
+  // 1. Official Academy Branding Header
   if (showHeader) {
     const headerStartY = cursorY;
     let textStartX = pageMargin;
 
     if (showLogo) {
-      // Vector Logo Badge Box
       const logoBoxSize = 34;
       doc.setFillColor(15, 23, 42); // slate-900
       doc.roundedRect(pageMargin, headerStartY, logoBoxSize, logoBoxSize, 4, 4, 'F');
 
-      // Vector SPR Monogram
+      const logoInitials = institutionName.split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 3).join('') || 'DOC';
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.text('SPR', pageMargin + logoBoxSize / 2, headerStartY + logoBoxSize / 2 + 3.5, { align: 'center' });
+      doc.text(logoInitials, pageMargin + logoBoxSize / 2, headerStartY + logoBoxSize / 2 + 3.5, { align: 'center' });
 
       textStartX += logoBoxSize + 10;
     }
 
-    // Institution Name
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.text(institutionName, textStartX, headerStartY + 14);
 
-    // Institution Subtitle / Address
-    doc.setTextColor(71, 85, 105); // slate-600
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.text(institutionAddress, textStartX, headerStartY + 27);
+    if (institutionAddress) {
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(institutionAddress, textStartX, headerStartY + 27);
+    }
 
-    // Right-Aligned Date & Official Record Badge
     const rightX = pageWidth - pageMargin;
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
@@ -167,14 +169,13 @@ export function compileVectorPDFDocument({
 
     cursorY = headerStartY + 38;
 
-    // Header Divider Line (1.5pt crisp vector stroke)
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(1.5);
     doc.line(pageMargin, cursorY, pageWidth - pageMargin, cursorY);
     cursorY += 14;
   }
 
-  // ── 2. Centered Document Header (Title & Subtitle) ──────────────────────
+  // 2. Centered Document Header
   if (showTitle !== false && (docTitle || docSubtitle)) {
     const centerX = pageWidth / 2;
     if (docTitle) {
@@ -212,7 +213,6 @@ export function compileVectorPDFDocument({
         doc.setLineDashPattern([], 0);
         cursorY += 5;
       } else {
-        // SOLID
         doc.setLineWidth(1);
         doc.line(pageMargin, cursorY + 2, pageWidth - pageMargin, cursorY + 2);
         cursorY += 5;
@@ -222,7 +222,7 @@ export function compileVectorPDFDocument({
     cursorY += 10;
   }
 
-  // ── 2. Structured Metadata Grid ──────────────────────────────────────────
+  // 3. Structured Metadata Grid
   if (showMeta && Array.isArray(metaItems) && metaItems.length > 0) {
     const validMeta = metaItems.filter((m) => m && (m.label || m.value));
     if (validMeta.length > 0) {
@@ -241,15 +241,14 @@ export function compileVectorPDFDocument({
       const metaBoxHeight = metaRows * rowHeight + 8;
 
       if (showMetaBox !== false) {
-        // Background rounded vector box
-        doc.setFillColor(248, 250, 252); // slate-50
-        doc.setDrawColor(203, 213, 225); // slate-300
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(203, 213, 225);
         doc.setLineWidth(0.5);
         doc.roundedRect(pageMargin, metaBoxY, contentWidth, metaBoxHeight, 4, 4, 'FD');
       }
 
-      let colOffsets = [];
-      let colWidths = [];
+      let colOffsets: number[] = [];
+      let colWidths: number[] = [];
 
       if (options.metaGridTemplate && typeof options.metaGridTemplate === 'string') {
         const parts = options.metaGridTemplate.trim().split(/\s+/).map((p) => parseFloat(p) || 1);
@@ -283,13 +282,11 @@ export function compileVectorPDFDocument({
         const cellX = pageMargin + (colOffsets[colIdx] ?? (colIdx * (contentWidth / metaCols))) + (showMetaBox !== false ? 8 : 2);
         const cellY = metaBoxY + rowIdx * rowHeight + 12;
 
-        // Label (bold slate-500)
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(labelFontSize);
         doc.setTextColor(100, 116, 139);
         doc.text(String(item.label || '').toUpperCase(), cellX, cellY);
 
-        // Value (bold slate-900)
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(valueFontSize);
         doc.setTextColor(15, 23, 42);
@@ -301,18 +298,18 @@ export function compileVectorPDFDocument({
     }
   }
 
-  // ── 3. High-Precision Vector Table Grid ──────────────────────────────────
+  // 4. High-Precision Vector Table Grid
   const activeCols = (columns || []).filter((c) => {
-    const key = c.id || c.key || c.accessor || c.dataIndex;
+    const key = String(c.id || c.key || c.accessor || c.dataIndex);
     return !visibleColumnKeys || visibleColumnKeys.length === 0 || visibleColumnKeys.includes(key);
   });
 
-  const tableHeaders = ['NO.', ...activeCols.map((c) => c.label || c.header || c.title || c.id || '')];
+  const tableHeaders = ['NO.', ...activeCols.map((c) => c.label || c.header || (c as any).title || c.id || '')];
 
   const tableRows = (data || []).map((row, rIdx) => {
     const rowValues = [String(rIdx + 1)];
     activeCols.forEach((col) => {
-      const colKey = col.id || col.key || col.accessor || col.dataIndex;
+      const colKey = String(col.id || col.key || col.accessor || col.dataIndex);
       let val = typeof col.accessor === 'function' ? col.accessor(row) : row[colKey];
       if (col.cell) {
         val = col.cell(val, row, rIdx);
@@ -324,16 +321,14 @@ export function compileVectorPDFDocument({
     return rowValues;
   });
 
-  // Extra Blank Rows
-  const blankCount = Math.max(0, parseInt(extraBlankRows, 10) || 0);
+  const blankCount = Math.max(0, parseInt(String(extraBlankRows), 10) || 0);
   for (let b = 0; b < blankCount; b++) {
     const blankRow = [String((data || []).length + b + 1)];
     activeCols.forEach(() => blankRow.push(''));
     tableRows.push(blankRow);
   }
 
-  // Calculate column styles and alignments
-  const columnStyles = {
+  const columnStyles: Record<number, any> = {
     0: { cellWidth: 28, halign: 'center', fontStyle: 'bold', textColor: [100, 116, 139] },
   };
 
@@ -346,7 +341,6 @@ export function compileVectorPDFDocument({
     };
   });
 
-  // Render Vector Table via autoTable
   autoTable(doc, {
     startY: cursorY,
     head: [tableHeaders],
@@ -357,7 +351,7 @@ export function compileVectorPDFDocument({
       fontSize: densityConfig.fontSize,
       font: 'helvetica',
       textColor: [15, 23, 42],
-      lineColor: [203, 213, 225], // slate-300
+      lineColor: [203, 213, 225],
       lineWidth: 0.5,
       cellPadding: densityConfig.cellPadding,
       minCellHeight: densityConfig.minRowHeight,
@@ -365,7 +359,7 @@ export function compileVectorPDFDocument({
       valign: 'middle',
     },
     headStyles: {
-      fillColor: [241, 245, 249], // slate-100
+      fillColor: [241, 245, 249],
       textColor: [15, 23, 42],
       fontStyle: 'bold',
       fontSize: densityConfig.headerFontSize,
@@ -377,13 +371,16 @@ export function compileVectorPDFDocument({
     },
     columnStyles,
     didDrawPage: () => {
-      // Background Watermark (Rendered per page)
       if (showWatermark && watermarkText) {
         doc.saveGraphicsState();
         doc.setTextColor(15, 23, 42);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(48);
-        doc.setGState(new doc.GState({ opacity: 0.04 }));
+        try {
+          doc.setGState(new (doc.GState as any)({ opacity: 0.04 }));
+        } catch {
+          // fallback
+        }
         doc.text(String(watermarkText).toUpperCase(), pageWidth / 2, pageHeight / 2, {
           align: 'center',
           angle: -30,
@@ -393,9 +390,9 @@ export function compileVectorPDFDocument({
     },
   });
 
-  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : cursorY + 40;
+  let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 12 : cursorY + 40;
 
-  // ── 4. Summary Metrics Box ───────────────────────────────────────────────
+  // 5. Summary Metrics Box
   if (showSummary && Array.isArray(summaryMetrics) && summaryMetrics.length > 0) {
     const validMetrics = summaryMetrics.filter((m) => m && m.label);
     if (validMetrics.length > 0) {
@@ -438,8 +435,8 @@ export function compileVectorPDFDocument({
     }
   }
 
-  // ── 5. Official Multi-Signatory Block ────────────────────────────────────
-  const activeSigs = (signatureLines || []).filter((s) => s && s.enabled !== false);
+  // 6. Official Multi-Signatory Block
+  const activeSigs = (signatureLines || []).filter((s: any) => s && s.enabled !== false);
   if (showSignatures && activeSigs.length > 0) {
     const sigBlockHeight = 50;
     if (finalY + sigBlockHeight > pageHeight - pageMargin - 30) {
@@ -452,14 +449,13 @@ export function compileVectorPDFDocument({
     const sigCount = activeSigs.length;
     const sigColWidth = contentWidth / sigCount;
 
-    activeSigs.forEach((sig, idx) => {
+    activeSigs.forEach((sig: any, idx: number) => {
       const sigCenterX = pageMargin + idx * sigColWidth + sigColWidth / 2;
       const sigLineWidth = Math.min(sigColWidth * 0.75, 120);
       const lineLeft = sigCenterX - sigLineWidth / 2;
       const lineRight = sigCenterX + sigLineWidth / 2;
       const lineY = finalY + 30;
 
-      // Underline Stroke
       doc.setDrawColor(15, 23, 42);
       doc.setLineWidth(0.6);
       if (signatureStyle === 'DASHED') {
@@ -470,15 +466,13 @@ export function compileVectorPDFDocument({
         doc.setLineDashPattern([], 0);
       }
       doc.line(lineLeft, lineY, lineRight, lineY);
-      doc.setLineDashPattern([], 0); // reset
+      doc.setLineDashPattern([], 0);
 
-      // Signatory Label
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
       doc.text(sig.label || 'Signatory', sigCenterX, lineY + 10, { align: 'center' });
 
-      // Signatory Subtitle
       if (sig.sub) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
@@ -488,7 +482,7 @@ export function compileVectorPDFDocument({
     });
   }
 
-  // ── 6. Running Footer & Page Numbers across All Pages ────────────────────
+  // 7. Running Footer & Page Numbers
   if (showFooter) {
     const totalPages = doc.getNumberOfPages();
     const printDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -498,18 +492,15 @@ export function compileVectorPDFDocument({
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
 
-      // Top divider line above footer
       doc.setDrawColor(203, 213, 225);
       doc.setLineWidth(0.5);
       doc.line(pageMargin, footerY - 8, pageWidth - pageMargin, footerY - 8);
 
-      // Left: Timestamp & branding
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
       doc.text(`Generated via SPR Note System • ${printDate}, ${printTime}`, pageMargin, footerY);
 
-      // Right: Pagination
       doc.text(`Page ${p} of ${totalPages}`, pageWidth - pageMargin, footerY, { align: 'right' });
     }
   }

@@ -1,26 +1,55 @@
 import React from 'react';
-import { TrashIcon, PlusIcon, ChevronUpIcon, ChevronDownIcon } from '../ui/Icons';
+import { PrintColumn, PrintSummaryMetric } from './types';
+
+export interface DocLabTableRendererProps {
+  columns?: PrintColumn[];
+  data?: Array<Record<string, any>>;
+  visibleColumnKeys?: string[] | null;
+  isColumnMandatory?: ((column: any, idx: number) => boolean) | null;
+  isColumnRequired?: ((column: any, idx: number) => boolean) | null;
+  requiredColumnKeys?: (string | number)[];
+  visibleRowKeys?: string[] | null;
+  isRowMandatory?: ((row: any, idx: number) => boolean) | null;
+  isRowRequired?: ((row: any, idx: number) => boolean) | null;
+  requiredRowKeys?: (string | number)[];
+  getRowKey?: ((row: any, idx: number) => string | number) | null;
+  extraBlankRows?: number | string;
+  summaryMetrics?: PrintSummaryMetric[];
+  showIndex?: boolean;
+  indexLabel?: string;
+  density?: 'ULTRA_COMPACT' | 'COMPACT' | 'NORMAL' | 'RELAXED' | 'SPACIOUS';
+  className?: string;
+  footerRow?: any;
+  footerRows?: any[];
+  startIndex?: number;
+  isEditable?: boolean;
+  onCellChange?: ((rowIndex: number, colKey: string, value: any) => void) | null;
+  onRowDelete?: ((rowIndex: number) => void) | null;
+  onRowInsert?: ((rowIndex: number, position?: 'above' | 'below') => void) | null;
+  onRowMove?: ((fromIndex: number, toIndex: number) => void) | null;
+  onColumnHeaderChange?: ((colKey: string, newHeader: string) => void) | null;
+  onAddRow?: (() => void) | null;
+}
 
 /**
- * PrintTableRenderer
+ * DocLabTableRenderer
  * Universal high-contrast, density-aware tabular grid for print documents.
  * Supports dynamic column filtering, custom renderers, metrics summary boxes, and extra blank rows.
- * Features full WYSIWYG Live Canvas Editing: Inline cell text edit, hover row delete/insert/move, and header renaming.
  */
-export default function PrintTableRenderer({
+export const DocLabTableRenderer: React.FC<DocLabTableRendererProps> = ({
   columns = [],
   data = [],
-  visibleColumnKeys = null, // array of keys or null to show all
+  visibleColumnKeys = null,
   isColumnMandatory = null,
   isColumnRequired = null,
   requiredColumnKeys = [],
-  visibleRowKeys = null, // array of row keys or null to show all
+  visibleRowKeys = null,
   isRowMandatory = null,
   isRowRequired = null,
   requiredRowKeys = [],
-  getRowKey = null, // custom function (row, idx) => key
+  getRowKey = null,
   extraBlankRows = 0,
-  summaryMetrics = [], // [{ label: 'Total Appeared', value: 45 }]
+  summaryMetrics = [],
   showIndex = true,
   indexLabel = 'No',
   density = 'NORMAL',
@@ -28,15 +57,7 @@ export default function PrintTableRenderer({
   footerRow = null,
   footerRows = [],
   startIndex = 0,
-  // WYSIWYG Live Document Canvas Editing Handlers
-  isEditable = false,
-  onCellChange = null, // (rowIndex, colKey, value) => void
-  onRowDelete = null, // (rowIndex) => void
-  onRowInsert = null, // (rowIndex, position) => void
-  onRowMove = null, // (fromIndex, toIndex) => void
-  onColumnHeaderChange = null, // (colKey, newHeader) => void
-  onAddRow = null, // () => void
-}) {
+}) => {
   // Filter visible columns
   const activeColumns = React.useMemo(() => {
     if (!visibleColumnKeys || !Array.isArray(visibleColumnKeys)) {
@@ -62,7 +83,7 @@ export default function PrintTableRenderer({
     }
     const visibleSet = new Set(visibleRowKeys.map(String));
     return data.filter((row, idx) => {
-      let key;
+      let key: string;
       if (typeof getRowKey === 'function') {
         key = String(getRowKey(row, idx));
       } else {
@@ -79,11 +100,11 @@ export default function PrintTableRenderer({
   }, [data, visibleRowKeys, getRowKey, isRowMandatory, isRowRequired, requiredRowKeys]);
 
   const blankRowsArray = React.useMemo(() => {
-    const count = Math.max(0, parseInt(extraBlankRows, 10) || 0);
+    const count = Math.max(0, parseInt(String(extraBlankRows), 10) || 0);
     return Array.from({ length: count });
   }, [extraBlankRows]);
 
-  const densityConfig = {
+  const densityConfig: Record<string, { fontSize: string; cellPad: string; headerPad: string; subText: string; blankHeight: string }> = {
     ULTRA_COMPACT: {
       fontSize: 'text-[9.5px]',
       cellPad: 'py-1 px-1.5',
@@ -135,8 +156,8 @@ export default function PrintTableRenderer({
               </th>
             )}
             {activeColumns.map((col, idx) => {
-              const headerTitle = col.header ?? col.label ?? col.title ?? '';
-              const colKey = col.id || col.key || col.accessor || col.dataIndex || idx;
+              const headerTitle = col.header ?? col.label ?? (col as any).title ?? '';
+              const colKey = String(col.id || col.key || col.accessor || col.dataIndex || idx);
               const isRotated = Boolean(col.rotate || col.vertical || col.rotatable || col.isVertical);
 
               return (
@@ -213,7 +234,7 @@ export default function PrintTableRenderer({
                   </td>
                 )}
                 {activeColumns.map((col, cIdx) => {
-                  const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                  const colKey = String(col.id || col.key || col.accessor || col.dataIndex);
                   const cellValue = typeof col.accessor === 'function' ? col.accessor(row) : row[colKey];
 
                   let content = cellValue;
@@ -252,7 +273,7 @@ export default function PrintTableRenderer({
             );
           })}
 
-          {/* Extra Blank Rows (e.g. for offline handwritten marks) */}
+          {/* Extra Blank Rows */}
           {blankRowsArray.map((_, bIdx) => (
             <tr key={`blank_${bIdx}`} className={`print-avoid-break bg-white ${currentDensity.blankHeight}`}>
               {showIndex && (
@@ -308,7 +329,7 @@ export default function PrintTableRenderer({
                         -
                       </td>
                     )}
-                    {fRow.cells.map((cell, cellIdx) => {
+                    {fRow.cells.map((cell: any, cellIdx: number) => {
                       let colSpan = 1;
                       if (typeof cell.colSpan === 'function') {
                         colSpan = cell.colSpan(activeColumns.length, showIndex);
@@ -384,7 +405,7 @@ export default function PrintTableRenderer({
                     </td>
                   )}
                   {activeColumns.map((col, cIdx) => {
-                    const colKey = col.id || col.key || col.accessor || col.dataIndex;
+                    const colKey = String(col.id || col.key || col.accessor || col.dataIndex);
                     const val = typeof fRow === 'function' ? fRow(col, cIdx) : fRow?.[colKey];
 
                     return (
@@ -409,7 +430,7 @@ export default function PrintTableRenderer({
         )}
       </table>
 
-      {/* Summary Metrics Box at bottom of table */}
+      {/* Summary Metrics Box */}
       {summaryMetrics && summaryMetrics.length > 0 && (
         <div className="print-summary-box text-[11px] print-avoid-break border border-slate-300 bg-slate-50 rounded-lg p-2.5 text-slate-900">
           <div
@@ -433,4 +454,6 @@ export default function PrintTableRenderer({
       )}
     </div>
   );
-}
+};
+
+export default DocLabTableRenderer;

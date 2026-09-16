@@ -16,6 +16,7 @@ export interface ModalProps {
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
+  headerActions?: React.ReactNode;
   className?: string;
   headerClassName?: string;
   bodyClassName?: string;
@@ -37,6 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   showCloseButton = true,
+  headerActions,
   className = '',
   headerClassName = '',
   bodyClassName = '',
@@ -85,7 +87,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className={`fixed inset-0 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-xs animate-fade-in text-left font-sans ${overlayClassName}`}
+      className={`fixed inset-0 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 dark:bg-black/80 animate-fade-in text-left font-sans ${overlayClassName}`}
       style={{ zIndex }}
       onClick={(e) => {
         if (closeOnOverlayClick && e.target === e.currentTarget) {
@@ -99,7 +101,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
       >
         {/* Header */}
-        {(title || Icon || showCloseButton) && (
+        {(title || Icon || showCloseButton || headerActions) && (
           <div
             className={`flex items-center justify-between px-5 sm:px-6 py-4 border-b theme-border theme-bg-sub shrink-0 ${headerClassName}`}
           >
@@ -126,15 +128,20 @@ export const Modal: React.FC<ModalProps> = ({
               </div>
             </div>
 
-            {showCloseButton && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-xl text-zinc-400 hover:theme-text-primary hover:theme-bg-elevated border border-transparent hover:theme-border transition-all cursor-pointer shrink-0"
-                aria-label="Close modal"
-              >
-                <CloseIcon className="w-5 h-5" />
-              </button>
+            {(headerActions || showCloseButton) && (
+              <div className="flex items-center gap-2 shrink-0">
+                {headerActions}
+                {showCloseButton && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1.5 rounded-xl text-zinc-400 hover:theme-text-primary hover:theme-bg-elevated border border-transparent hover:theme-border transition-all cursor-pointer shrink-0"
+                    aria-label="Close modal"
+                  >
+                    <CloseIcon className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

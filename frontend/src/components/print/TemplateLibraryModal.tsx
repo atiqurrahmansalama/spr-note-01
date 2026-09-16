@@ -226,7 +226,7 @@ export default function TemplateLibraryModal({
       onClose={onClose}
       title="Universal Template Library Hub"
       subtitle="Manage, upload, and assign default document templates across all modules"
-      maxWidth="6xl"
+      size="5xl"
     >
       <div className="space-y-5">
         {/* Category Tabs & Upload Action */}

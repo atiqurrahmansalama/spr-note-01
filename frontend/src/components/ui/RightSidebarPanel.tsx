@@ -1,15 +1,15 @@
-import React, { useEffect, useRef } from "react";
-import { CloseIcon, ChevronLeftIcon } from "./Icons";
-import PanelResizer from "./PanelResizer";
+import React, { useEffect, useRef } from 'react';
+import { CloseIcon, ChevronLeftIcon } from './Icons';
+import PanelResizer from './PanelResizer';
 
 /**
  * Standard Width Presets for Right Sidebar Drawer (in pixels)
  * - sm (Small): 440px -> Quick filters, lightweight forms, confirmation screens
- * - md (Medium): 600px -> Standard forms, event/schedule creation, entity profiles
- * - lg (Big / Large): 820px -> Multi-column forms, detailed logs, complex matrices
- * - xl (Extra Large / Full): 1080px -> Wide matrices, deep analytics
+ * - md (Medium): 580px -> Standard forms, event/schedule creation, entity profiles
+ * - lg (Big / Large): 760px -> Multi-column forms, detailed logs, complex matrices
+ * - xl (Extra Large / Full): 960px -> Wide matrices, deep analytics
  */
-export const RIGHT_SIDEBAR_SIZES = {
+export const RIGHT_SIDEBAR_SIZES: Record<string, number> = {
   sm: 440,
   small: 440,
   md: 580,
@@ -22,12 +22,10 @@ export const RIGHT_SIDEBAR_SIZES = {
 
 /**
  * Resolves a size string or numeric width to a pixel value
- * @param {string|number} sizeOrWidth 
- * @returns {number} Width in pixels
  */
-export function resolveSidebarWidth(sizeOrWidth) {
-  if (typeof sizeOrWidth === "number" && sizeOrWidth > 0) return sizeOrWidth;
-  if (typeof sizeOrWidth === "string") {
+export function resolveSidebarWidth(sizeOrWidth?: string | number): number {
+  if (typeof sizeOrWidth === 'number' && sizeOrWidth > 0) return sizeOrWidth;
+  if (typeof sizeOrWidth === 'string') {
     const key = sizeOrWidth.toLowerCase();
     if (RIGHT_SIDEBAR_SIZES[key]) {
       return RIGHT_SIDEBAR_SIZES[key];
@@ -38,6 +36,33 @@ export function resolveSidebarWidth(sizeOrWidth) {
   return RIGHT_SIDEBAR_SIZES.md;
 }
 
+export interface RightSidebarPanelProps {
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  category?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  size?: 'sm' | 'small' | 'md' | 'medium' | 'lg' | 'big' | 'large' | 'xl' | string;
+  width?: string | number;
+  isResizing?: boolean;
+  onStartResize?: (e: React.MouseEvent) => void;
+  onResetResize?: () => void;
+  onClose?: () => void;
+  onBack?: () => void;
+  showCloseButton?: boolean;
+  headerRight?: React.ReactNode;
+  footer?: React.ReactNode;
+  formId?: string;
+  onSave?: () => void;
+  onCancel?: () => void;
+  saveLabel?: string;
+  cancelLabel?: string;
+  isSubmitting?: boolean;
+  isSaveDisabled?: boolean;
+  children?: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}
+
 /**
  * Reusable RightSidebarPanel Component
  * Handles the complete right sidebar drawer with responsive header,
@@ -46,45 +71,46 @@ export function resolveSidebarWidth(sizeOrWidth) {
 export default function RightSidebarPanel({
   title,
   subtitle,
-  category = "Action Panel",
+  category,
   icon: Icon,
-  size = "md",
+  size = 'md',
   width,
   isResizing = false,
   onStartResize,
   onResetResize,
   onClose,
   onBack,
+  showCloseButton = true,
   headerRight,
   footer,
   formId,
   onSave,
   onCancel,
-  saveLabel = "SAVE",
-  cancelLabel = "Cancel",
+  saveLabel = 'SAVE',
+  cancelLabel = 'Cancel',
   isSubmitting = false,
   isSaveDisabled = false,
   children,
-  className = "",
-  bodyClassName = "",
-}) {
-  const touchStartXRef = useRef(null);
-  const touchStartYRef = useRef(null);
-  const touchStartTimeRef = useRef(null);
+  className = '',
+  bodyClassName = '',
+}: RightSidebarPanelProps) {
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const touchStartTimeRef = useRef<number | null>(null);
 
   // ESC key listener to close drawer
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape" && onClose) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onClose) {
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
   // Mobile Swipe-to-Back touch gesture handling (Swipe Left-to-Right to dismiss / go back)
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches && e.touches.length === 1) {
       const touch = e.touches[0];
       touchStartXRef.current = touch.clientX;
@@ -93,7 +119,7 @@ export default function RightSidebarPanel({
     }
   };
 
-  const handleTouchEnd = (e) => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartXRef.current === null || touchStartYRef.current === null) return;
     if (e.changedTouches && e.changedTouches.length === 1) {
       const touch = e.changedTouches[0];
@@ -124,28 +150,30 @@ export default function RightSidebarPanel({
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      style={width ? { width: typeof width === "number" ? `${width}px` : width } : undefined}
+      style={width ? { width: typeof width === 'number' ? `${width}px` : width } : undefined}
       className={`w-full h-full flex flex-col theme-bg-app text-left overflow-visible relative shrink-0 @container max-w-full ${className}`}
       role="region"
-      aria-label={typeof title === "string" ? title : "Right Sidebar Panel"}
+      aria-label={typeof title === 'string' ? title : 'Right Sidebar Panel'}
     >
       {/* Universal Left Drag Resizer Handle */}
-      <PanelResizer
-        onStartResize={onStartResize}
-        onResetResize={onResetResize}
-        isResizing={isResizing}
-        position="left"
-      />
+      {onStartResize && (
+        <PanelResizer
+          onStartResize={onStartResize}
+          onResetResize={onResetResize}
+          isResizing={isResizing}
+          position="left"
+        />
+      )}
+
       {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
-        
         {/* Left: Clean Icon Back Button + Icon + Title + Breadcrumbs */}
-        <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">
-          {/* Universal Clean Icon Back Button to Parent Page */}
-          {(onBack || onClose) && (
+        <div className="flex items-center gap-2 @sm:gap-2.5 min-w-0 flex-1">
+          {/* Back Button (Rendered only when multi-step onBack navigation is present) */}
+          {onBack && (
             <button
               type="button"
-              onClick={onBack || onClose}
+              onClick={onBack}
               className="p-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-xs group"
               title="Back to parent page"
               aria-label="Back to parent page"
@@ -160,15 +188,22 @@ export default function RightSidebarPanel({
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 min-w-0 truncate">
-            {category && (
-              <span className="text-[11px] @sm:text-xs font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
-                {category} /
+          <div className="flex flex-col min-w-0 truncate">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              {category && (
+                <span className="text-[11px] @sm:text-xs font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
+                  {category} /
+                </span>
+              )}
+              <span className="text-sm font-bold theme-text-primary truncate">
+                {title}
+              </span>
+            </div>
+            {subtitle && (
+              <span className="text-[10.5px] theme-text-secondary truncate leading-tight">
+                {subtitle}
               </span>
             )}
-            <span className="text-sm font-bold theme-text-primary truncate">
-              {title}
-            </span>
           </div>
         </div>
 
@@ -177,7 +212,7 @@ export default function RightSidebarPanel({
           {headerRight}
 
           {/* Close Button */}
-          {onClose && (
+          {onClose && showCloseButton && (
             <button
               type="button"
               onClick={onClose}
@@ -192,7 +227,9 @@ export default function RightSidebarPanel({
       </div>
 
       {/* ─── Main Scrollable Body ───────────────────────────────────── */}
-      <div className={`sidebar-screen-container flex-1 overflow-y-auto p-2 sm:p-3.5 @md:p-4 @lg:p-5 custom-scrollbar ${bodyClassName}`}>
+      <div
+        className={`sidebar-screen-container flex-1 overflow-y-auto p-2 sm:p-3.5 @md:p-4 @lg:p-5 custom-scrollbar ${bodyClassName}`}
+      >
         <div className="w-full max-w-full min-w-0 h-full flex flex-col flex-1 animate-fade-in">
           {children}
         </div>
@@ -215,13 +252,13 @@ export default function RightSidebarPanel({
                 </button>
               )}
               <button
-                type={formId ? "submit" : "button"}
+                type={formId ? 'submit' : 'button'}
                 form={formId}
                 onClick={!formId ? onSave : undefined}
                 disabled={isSaveDisabled || isSubmitting}
                 className="px-4 py-2 text-xs font-bold rounded-xl theme-bg-accent text-white hover:opacity-90 disabled:opacity-50 transition-all shadow-xs cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                {isSubmitting ? "Saving..." : saveLabel}
+                {isSubmitting ? 'Saving...' : saveLabel}
               </button>
             </div>
           )}

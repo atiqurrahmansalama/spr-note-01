@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { PrintPaginationResult, PrintPage } from '../types';
+import { PrintPaginationResult, PrintPaginationPage } from '../types';
 
 interface UsePrintPaginationParams {
   liveData: Array<Record<string, any>>;
@@ -102,7 +102,7 @@ export function usePrintPagination({
       };
     }
 
-    const pages: PrintPage[] = [];
+    const pages: PrintPaginationPage[] = [];
     const totalPages = Math.ceil(totalItems.length / effectiveRowsPerPage);
 
     for (let pIdx = 0; pIdx < totalPages; pIdx++) {

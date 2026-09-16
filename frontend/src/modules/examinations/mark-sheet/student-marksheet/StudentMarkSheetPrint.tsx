@@ -32,7 +32,7 @@ export default function StudentMarkSheetPrint({
 }: TranscriptPrintProps) {
   const { currentInstitution } = useTenant();
 
-  const isBulk = initialMode === 'bulk' || (!studentResult && studentsData.length > 0);
+  const isBulk = initialMode === 'bulk' || (Array.isArray(selectedStudentIds) && selectedStudentIds.length > 1);
 
   // Filter selected students if specified
   const filteredStudents = useMemo(() => {
@@ -45,11 +45,12 @@ export default function StudentMarkSheetPrint({
 
   // Active student for single mode
   const activeStudent = useMemo(() => {
-    return studentResult || filteredStudents[0] || null;
-  }, [studentResult, filteredStudents]);
+    return studentResult || filteredStudents[0] || (studentsData.length > 0 ? studentsData[0] : null);
+  }, [studentResult, filteredStudents, studentsData]);
 
   // Enriched student data records (Single or Bulk)
   const enrichedData = useMemo(() => {
+    if (!isOpen) return [];
     if (isBulk) {
       return buildBulkStudentTranscriptData({
         studentsData: filteredStudents,
@@ -78,7 +79,7 @@ export default function StudentMarkSheetPrint({
         gradingSystem,
       }),
     ];
-  }, [isBulk, filteredStudents, activeStudent, studentsData, exam, selectedClassName, selectedSectionName, currentInstitution, subjects, gradingSystem]);
+  }, [isOpen, isBulk, filteredStudents, activeStudent, studentsData, exam, selectedClassName, selectedSectionName, currentInstitution, subjects, gradingSystem]);
 
   return (
     <UniversalPrintStudio

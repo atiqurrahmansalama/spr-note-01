@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTenant } from '../../../context/TenantContext';
 import { useAcademicData } from '../../learning/useAcademicData';
 import { examStore } from '@/stores/examStore';
@@ -43,14 +43,17 @@ export default function useExamData() {
   const [gradingSystems, setGradingSystems] = useState(() => examStore.getGradingSystems(tenantId));
   const [examSubjects, setExamSubjects] = useState(() => examStore.getExamSubjects(tenantId));
 
+  const refetchAcademicRef = useRef(refetchAcademic);
+  refetchAcademicRef.current = refetchAcademic;
+
   const refreshExamData = useCallback(() => {
     setLocalAcademicYears(academicYearsStore.getAcademicYears(tenantId));
     setLocalCurriculumBooks(curriculumStore.getItems(tenantId));
     setExams(examStore.getExams(tenantId));
     setGradingSystems(examStore.getGradingSystems(tenantId));
     setExamSubjects(examStore.getExamSubjects(tenantId));
-    refetchAcademic?.();
-  }, [tenantId, refetchAcademic]);
+    refetchAcademicRef.current?.();
+  }, [tenantId]);
 
   useEffect(() => {
     refreshExamData();

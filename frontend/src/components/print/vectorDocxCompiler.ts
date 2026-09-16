@@ -1,4 +1,5 @@
 import React from 'react';
+import { getSafeFilename } from './vectorPDFCompiler';
 import {
   Document,
   Packer,
@@ -62,17 +63,6 @@ export function extractPureText(node: any): string {
   return '';
 }
 
-/**
- * Helper to extract clean safe filename
- */
-export function getSafeFilename(title: string, ext: string = 'docx'): string {
-  const safe = (title || 'Official_Document')
-    .replace(/[/\\?%*:|"<>]/g, '_')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  return `${safe || 'Document'}.${ext}`;
-}
 
 /**
  * Helper to extract tabular data from rendered DOM when custom DOM is present
@@ -154,8 +144,8 @@ export function compileNativeDocxDocument({
   const pageHeight = isLandscape ? rawDims.width : rawDims.height;
   const pageMargins = MARGIN_TWIP[String(margin || 'NORMAL').toUpperCase()] || MARGIN_TWIP.NORMAL;
 
-  const institutionName = customInstitutionName || options.customInstitutionName || 'SPR NOTE ACADEMY';
-  const institutionAddress = options.customInstitutionAddress || 'Central Campus & Academic Affairs';
+  const institutionName = customInstitutionName || options.customInstitutionName || 'Institution Name';
+  const institutionAddress = options.customCampusAddress || options.customInstitutionAddress || options.customAddress || '';
   const resolvedTitle = customTitle || title || 'OFFICIAL DOCUMENT';
   const resolvedSubtitle = customSubtitle || subtitle || '';
 

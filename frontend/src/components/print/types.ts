@@ -4,9 +4,14 @@ import { KeyTaxonomyItem, DocumentScopeId } from './keyLibrary/types';
 
 export type PrintPageSize = 'A4' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
 export type PrintOrientation = 'PORTRAIT' | 'LANDSCAPE';
-export type PrintMargin = 'NONE' | 'TIGHT' | 'NORMAL' | 'WIDE' | 'CUSTOM';
-export type PrintDensity = 'COMPACT' | 'NORMAL' | 'SPACIOUS';
-export type PrintColorMode = 'FULL_COLOR' | 'GRAYSCALE' | 'MONOCHROME' | 'HIGH_CONTRAST';
+export type PrintMargin = 'NONE' | 'TIGHT' | 'NARROW' | 'NORMAL' | 'WIDE' | 'CUSTOM';
+export type PrintDensity = 'ULTRA_COMPACT' | 'COMPACT' | 'NORMAL' | 'RELAXED' | 'SPACIOUS';
+export type PrintColorMode = 'FULL_COLOR' | 'INK_SAVER' | 'GRAYSCALE' | 'MONOCHROME' | 'HIGH_CONTRAST';
+
+export type DocxTemplate = CustomDocxTemplate;
+export type PrintSignatureLine = SignatureLineConfig;
+export type DocLabOptions = PrintOptions;
+export type DocLabStudioProps = UniversalPrintStudioProps;
 
 export interface SignatureLineConfig {
   id: string;
@@ -69,7 +74,7 @@ export interface PrintSummaryMetric {
 export interface PrintColumn {
   id?: string;
   key?: string;
-  accessor?: string;
+  accessor?: string | ((row: any) => any);
   dataIndex?: string;
   header?: string;
   label?: string;
@@ -77,6 +82,16 @@ export interface PrintColumn {
   align?: 'left' | 'center' | 'right';
   width?: string | number;
   colSpan?: number;
+  bold?: boolean | (() => boolean);
+  mono?: boolean;
+  nowrap?: boolean;
+  className?: string;
+  headerClassName?: string;
+  rotate?: boolean;
+  vertical?: boolean;
+  subLabel?: string;
+  cell?: (val: any, row?: any, rIdx?: number) => any;
+  render?: (row: any, rIdx?: number, val?: any) => any;
   [key: string]: any;
 }
 

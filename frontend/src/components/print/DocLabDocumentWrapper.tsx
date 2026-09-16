@@ -1,17 +1,33 @@
 import React, { useMemo } from 'react';
 import { useTenant } from '../../context/TenantContext';
-import { BuildingOfficeIcon, TrashIcon } from '../ui/Icons';
+import { BuildingOfficeIcon } from '../ui/Icons';
+import { PrintMetaItem, PrintOptions, PrintSignatureLine } from './types';
+
+export interface DocLabDocumentWrapperProps {
+  title?: string;
+  subtitle?: string;
+  metaItems?: PrintMetaItem[];
+  onMetaItemsChange?: ((newMetaItems: PrintMetaItem[]) => void) | null;
+  options?: Partial<PrintOptions>;
+  onOptionsChange?: ((newOptions: Partial<PrintOptions>) => void) | null;
+  isEditable?: boolean;
+  children?: React.ReactNode;
+  pageIndex?: number;
+  totalPages?: number;
+  isFirstPage?: boolean;
+  isLastPage?: boolean;
+  className?: string;
+}
 
 /**
- * PrintDocumentWrapper
+ * DocLabDocumentWrapper
  * Master institutional document frame providing automatic branding,
  * header, document metadata grid, watermark, signature block, and print footer.
  */
-export default function PrintDocumentWrapper({
+export const DocLabDocumentWrapper: React.FC<DocLabDocumentWrapperProps> = ({
   title = 'Official Document',
   subtitle = '',
-  metaItems = [], // [{ label: 'Class', value: 'Class 10' }, { label: 'Subject', value: 'Arabic' }]
-  onMetaItemsChange = null,
+  metaItems = [],
   options = {},
   onOptionsChange = null,
   isEditable = false,
@@ -21,7 +37,7 @@ export default function PrintDocumentWrapper({
   isFirstPage = true,
   isLastPage = true,
   className = '',
-}) {
+}) => {
   const { currentInstitution } = useTenant();
 
   const effectiveIsFirstPage = isFirstPage !== undefined ? isFirstPage : pageIndex === 0;
@@ -44,26 +60,26 @@ export default function PrintDocumentWrapper({
       { id: 'verified', label: 'Verified By', sub: 'Department Head', enabled: true },
       { id: 'approved', label: 'Approved By', sub: 'Controller of Examinations', enabled: true },
     ],
-    signatureStyle = 'SOLID', // 'SOLID' | 'DASHED' | 'DOTTED'
+    signatureStyle = 'SOLID',
     showFooter = true,
     customInstitutionName = '',
     customSubtitle = '',
   } = options;
 
-  const activeSignatureLines = useMemo(() => {
+  const activeSignatureLines: PrintSignatureLine[] = useMemo(() => {
     if (!signatureLines || !Array.isArray(signatureLines)) return [];
-    return signatureLines.filter((sig) => sig && sig.enabled !== false && sig.active !== false);
+    return signatureLines.filter((sig: any) => sig && sig.enabled !== false && sig.active !== false);
   }, [signatureLines]);
 
   const institutionName =
     options.customInstitutionName !== undefined && options.customInstitutionName !== ''
       ? options.customInstitutionName
-      : (customInstitutionName || currentInstitution?.name || 'SPR Note Academy');
+      : (customInstitutionName || currentInstitution?.name || 'Institution Name');
 
   const institutionAddress =
     options.customInstitutionAddress !== undefined && options.customInstitutionAddress !== ''
       ? options.customInstitutionAddress
-      : (options.customAddress || currentInstitution?.address || currentInstitution?.campus_address || 'Central Campus & Academic Affairs');
+      : (options.customAddress || currentInstitution?.address || currentInstitution?.campus_address || '');
 
   const resolvedTitle =
     options.customTitle !== undefined && options.customTitle !== ''
@@ -122,7 +138,6 @@ export default function PrintDocumentWrapper({
         {/* 1. Official Academy Branding Header (Page 1 or All Pages) */}
         {showHeader && (effectiveIsFirstPage || options.showHeaderOnAllPages) && (
           <header className="print-document-header pb-2.5 mb-2.5 sm:pb-3 sm:mb-3 border-b-2 border-slate-900 bg-transparent print:pb-2 print:mb-2">
-            {/* Top Row: Institution Logo & Academy Name Header */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 {showLogo && (
@@ -143,7 +158,7 @@ export default function PrintDocumentWrapper({
           </header>
         )}
 
-        {/* 2. Document Title & Subtitle Header (Centered with Balanced Spacing) */}
+        {/* 2. Document Title & Subtitle Header */}
         {showTitle !== false && (effectiveIsFirstPage || options.showTitleOnAllPages) && (resolvedTitle || resolvedSubtitle) && (
           <div
             className={`print-document-title-block text-center flex flex-col items-center justify-center space-y-0.5 mb-2.5 pb-1 sm:mb-3 sm:pb-1.5 print:mb-2 print:pb-1 ${
@@ -179,7 +194,7 @@ export default function PrintDocumentWrapper({
           </div>
         )}
 
-        {/* 3. Structured Metadata Grid Strip (Page 1 Only) */}
+        {/* 3. Structured Metadata Grid Strip */}
         {showMeta && effectiveIsFirstPage && metaItems && metaItems.length > 0 && (() => {
           const resolvedCols =
             options.metaCols ||
@@ -261,7 +276,7 @@ export default function PrintDocumentWrapper({
 
       {/* Bottom Area: Signatures and Footer */}
       <div className="print-signature-footer-container relative z-10 pt-3 sm:pt-4 mt-auto space-y-2.5 print-avoid-break print:block print:mt-4 print:pt-2 print:space-y-1.5">
-        {/* 5. Official Signatures Block (Bottom Anchored on Last Page) */}
+        {/* 5. Official Signatures Block */}
         {showSignatures && effectiveIsLastPage && activeSignatureLines.length > 0 && (
           <div
             className={`grid gap-4 text-center text-xs ${
@@ -290,7 +305,7 @@ export default function PrintDocumentWrapper({
                   )}
                 </div>
 
-                {/* Signature Underline (0.5px border, reduced width) */}
+                {/* Signature Underline */}
                 <div
                   className={`w-32 sm:w-36 max-w-full pt-1 space-y-0.5 text-center ${
                     signatureStyle === 'DASHED'
@@ -306,14 +321,14 @@ export default function PrintDocumentWrapper({
                     onBlur={(e) => {
                       if (!onOptionsChange) return;
                       const val = e.currentTarget.textContent?.trim();
-                      const updated = (options.signatureLines || signatureLines || []).map((s, sIdx) =>
+                      const updated = (options.signatureLines || signatureLines || []).map((s: any, sIdx: number) =>
                         (s.id === sig.id || sIdx === idx) ? { ...s, label: val } : s
                       );
                       onOptionsChange({ ...options, signatureLines: updated });
                     }}
                     className={`font-bold text-[10.5px] tracking-tight leading-tight text-slate-900 print:text-[10px] ${
                       isEditable
-                        ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
+                        ? 'focus:outline-hidden focus:ring-1 focus:ring-[var(--accent-main)]/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
                         : ''
                     }`}
                   >
@@ -326,14 +341,14 @@ export default function PrintDocumentWrapper({
                       onBlur={(e) => {
                         if (!onOptionsChange) return;
                         const val = e.currentTarget.textContent?.trim();
-                        const updated = (options.signatureLines || signatureLines || []).map((s, sIdx) =>
+                        const updated = (options.signatureLines || signatureLines || []).map((s: any, sIdx: number) =>
                           (s.id === sig.id || sIdx === idx) ? { ...s, sub: val } : s
                         );
                         onOptionsChange({ ...options, signatureLines: updated });
                       }}
                       className={`text-[9.5px] text-slate-600 font-medium leading-tight print:text-[9px] ${
                         isEditable
-                          ? 'focus:outline-hidden focus:ring-1 focus:ring-blue-500/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
+                          ? 'focus:outline-hidden focus:ring-1 focus:ring-[var(--accent-main)]/60 rounded px-1 -mx-1 hover:bg-slate-100/80 cursor-text transition-all'
                           : ''
                       }`}
                     >
@@ -360,4 +375,6 @@ export default function PrintDocumentWrapper({
       </div>
     </div>
   );
-}
+};
+
+export default DocLabDocumentWrapper;

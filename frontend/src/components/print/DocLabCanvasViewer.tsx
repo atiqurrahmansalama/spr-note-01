@@ -1,28 +1,43 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { CrosshairIcon, HandIcon, CursorPointerIcon, UndoIcon, RedoIcon } from '../ui/Icons';
+import {
+  CrosshairIcon,
+  HandIcon,
+  CursorPointerIcon,
+  UndoIcon,
+  RedoIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+  ZoomResetIcon,
+  ArrowsPointingOutIcon,
+} from '../ui/Icons';
+import { PrintPageSize, PrintOrientation, PrintMargin, PrintDensity, PrintColorMode } from './types';
+
+export interface DocLabCanvasViewerProps {
+  pageSize?: PrintPageSize;
+  orientation?: PrintOrientation;
+  margin?: PrintMargin;
+  density?: PrintDensity;
+  colorMode?: PrintColorMode;
+  zoomLevel?: number;
+  onZoomChange?: (updater: number | ((prev: number) => number)) => void;
+  pointerMode?: 'hand' | 'select';
+  onPointerModeChange?: (mode: 'hand' | 'select') => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: (() => void) | null;
+  onRedo?: (() => void) | null;
+  children?: React.ReactNode;
+  className?: string;
+}
 
 /**
- * PrintCanvasViewer
+ * DocLabCanvasViewer
  * Ultra-fluid physical paper simulation canvas with 100% Vector-sharp rendering and GPU-accelerated panning.
- *
- * Enterprise Workbench Navigation:
- * - 100% True Vector Clarity: Crisp text, lines, SVGs and tables at all zoom levels (30% to 250%)
- * - 360-Degree 2D Pan: Click & Drag with mouse (Grab / Grabbing hand tool) anywhere (60/120fps GPU)
- * - Touch Gestures: Smooth pinch-to-zoom and 1-finger canvas panning on touchscreens/tablets
- * - Ctrl + Scroll / Trackpad Pinch: Smooth vector-accurate scaling
- * - Shift + Scroll: Smooth bidirectional horizontal panning
- * - Mouse Wheel: Smooth vertical panning
- * - Double Click / Recenter Button: Instant center alignment
  */
-export default function PrintCanvasViewer({
-  pageSize = 'A4', // 'A4' | 'LEGAL' | 'LETTER'
-  orientation = 'PORTRAIT', // 'PORTRAIT' | 'LANDSCAPE'
-  margin = 'NORMAL', // 'NORMAL' | 'NARROW' | 'WIDE' | 'NONE'
-  density = 'NORMAL', // 'COMPACT' | 'NORMAL' | 'RELAXED'
-  colorMode = 'FULL_COLOR', // 'FULL_COLOR' | 'INK_SAVER' | 'MONOCHROME'
-  zoomLevel = 1, // 0.3 to 2.5
+export const DocLabCanvasViewer: React.FC<DocLabCanvasViewerProps> = ({
+  zoomLevel = 1,
   onZoomChange,
-  pointerMode = 'select', // 'hand' (Movable / Pan) | 'select' (Select text & Live Edit)
+  pointerMode = 'select',
   onPointerModeChange,
   canUndo = false,
   canRedo = false,
@@ -30,51 +45,42 @@ export default function PrintCanvasViewer({
   onRedo = null,
   children,
   className = '',
-}) {
-  const containerRef = useRef(null);
-  const contentRef = useRef(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+}) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
   const isDraggingRef = useRef(false);
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
   const wheelAccumulatorRef = useRef(0);
-  const rafIdRef = useRef(null);
-  const touchStartDistRef = useRef(null);
+  const rafIdRef = useRef<number | null>(null);
+  const touchStartDistRef = useRef<number | null>(null);
   const touchStartZoomRef = useRef(zoomLevel);
   const touchStartPanRef = useRef({ x: 0, y: 0, touchX: 0, touchY: 0 });
 
   // Professional Fluid Canvas Bounds Calculation
   const clampPan = useCallback(
-    (targetX, targetY) => {
+    (targetX: number, targetY: number) => {
       const container = containerRef.current;
       const portal = contentRef.current || (typeof document !== 'undefined' ? document.getElementById('universal-print-portal') : null);
 
       if (!container || !portal) {
-        return {
-          x: targetX,
-          y: targetY,
-        };
+        return { x: targetX, y: targetY };
       }
 
       const viewportWidth = container.clientWidth || 800;
       const viewportHeight = container.clientHeight || 600;
 
-      // Real layout dimensions unaffected by CSS translate matrix
       const contentHeight = (portal.scrollHeight || portal.offsetHeight || 1200) * (zoomLevel || 1);
       const contentWidth = (portal.scrollWidth || portal.offsetWidth || 800) * (zoomLevel || 1);
 
-      // Top bound: allow comfortable breathing space above paper
       const maxPanY = 120;
-
-      // Bottom bound: allow scrolling freely down to view the entire document, multi-page batches, and footers
       const maxScrollDown = Math.max(contentHeight + 300, viewportHeight + 400);
       const minPanY = -(maxScrollDown - viewportHeight + 100);
 
       const clampedY = Math.min(maxPanY, Math.max(minPanY, targetY));
-
-      // Horizontal clamping: allow smooth horizontal scrolling when zoomed or wide
       const maxScrollX = Math.max(200, (contentWidth - viewportWidth) / 2 + 200);
       const clampedX = Math.min(maxScrollX, Math.max(-maxScrollX, targetX));
 
@@ -83,7 +89,6 @@ export default function PrintCanvasViewer({
     [zoomLevel]
   );
 
-  // Re-clamp position on zoom change or window resize to prevent floating away
   useEffect(() => {
     setPan((prev) => clampPan(prev.x, prev.y));
   }, [zoomLevel, clampPan]);
@@ -96,23 +101,23 @@ export default function PrintCanvasViewer({
     return () => window.removeEventListener('resize', handleResize);
   }, [clampPan]);
 
-  // Spacebar Key Listener for temporary Hand/Pan Mode (like Photoshop / Figma / Canva)
+  // Spacebar Key Listener for temporary Hand/Pan Mode
   useEffect(() => {
-    const isNativeEditing = (el) => {
+    const isNativeEditing = (el: Element | null) => {
       if (!el) return false;
       const tag = el.tagName?.toUpperCase();
       if (tag === 'TEXTAREA' || tag === 'INPUT') return true;
-      return el.isContentEditable || el.getAttribute('contenteditable') === 'true';
+      return (el as HTMLElement).isContentEditable || el.getAttribute('contenteditable') === 'true';
     };
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !isNativeEditing(document.activeElement) && !e.repeat) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
     };
 
-    const handleKeyUp = (e) => {
+    const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         setIsSpacePressed(false);
       }
@@ -128,19 +133,17 @@ export default function PrintCanvasViewer({
 
   const effectivePointerMode = isSpacePressed ? 'hand' : pointerMode;
 
-  // 1. Mouse Wheel & Trackpad Handling (Ctrl+Wheel Zoom, Shift+Wheel Horizontal Pan, Wheel Vertical Pan with Canva-like Top Lock)
+  // 1. Mouse Wheel & Trackpad Handling
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheel = (e) => {
-      // 1. Ctrl + Wheel or Trackpad Pinch => Vector Zoom with Smooth Delta Accumulation
+    const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         if (!onZoomChange) return;
         e.preventDefault();
         e.stopPropagation();
 
-        // Accumulate delta for high-res trackpads and clicky wheels
         const delta = -e.deltaY;
         const normalizedFactor = Math.abs(e.deltaY) > 50 ? 0.0012 : 0.003;
         wheelAccumulatorRef.current += delta * normalizedFactor;
@@ -152,7 +155,7 @@ export default function PrintCanvasViewer({
             rafIdRef.current = null;
 
             if (Math.abs(acc) > 0.001) {
-              onZoomChange((prev) => {
+              onZoomChange((prev: number) => {
                 const current = typeof prev === 'number' ? prev : zoomLevel;
                 const factor = Math.exp(Math.min(Math.max(acc, -0.4), 0.4));
                 const target = Math.min(2.5, Math.max(0.3, current * factor));
@@ -164,64 +167,52 @@ export default function PrintCanvasViewer({
         return;
       }
 
-      // 2. Shift + Wheel => Smooth Horizontal Panning (Left & Right)
       if (e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         const delta = e.deltaY || e.deltaX;
-        setPan((prev) => {
-          const targetX = prev.x - delta * 1.0;
-          return clampPan(targetX, prev.y);
-        });
+        setPan((prev) => clampPan(prev.x - delta, prev.y));
         return;
       }
 
-      // 3. Normal Wheel => Smooth Vertical Panning with Top Lock like Canva
       e.preventDefault();
-      setPan((prev) => {
-        const targetY = prev.y - e.deltaY * 1.0;
-        return clampPan(prev.x, targetY);
-      });
+      setPan((prev) => clampPan(prev.x, prev.y - e.deltaY));
     };
 
-    const wheelOptions = { passive: false };
-    container.addEventListener('wheel', handleWheel, wheelOptions);
+    const wheelHandler = handleWheel as unknown as EventListener;
+    container.addEventListener('wheel', wheelHandler, { passive: false });
     return () => {
-      container.removeEventListener('wheel', handleWheel, wheelOptions);
+      container.removeEventListener('wheel', wheelHandler);
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
   }, [onZoomChange, zoomLevel, clampPan]);
 
-
-  // 2. Click & Drag Canvas Handlers (Pan in all 360-degree directions)
+  // 2. Click & Drag Canvas Handlers
   const handleMouseDown = useCallback(
-    (e) => {
+    (e: React.MouseEvent<HTMLDivElement>) => {
       const isLeftClick = e.button === 0;
       const isMiddleClick = e.button === 1;
 
       if (!isLeftClick && !isMiddleClick) return;
 
+      const target = e.target as HTMLElement;
       if (
-        e.target.closest('input') ||
-        e.target.closest('button') ||
-        e.target.closest('select') ||
-        e.target.closest('textarea') ||
-        e.target.closest('a') ||
-        e.target.isContentEditable ||
-        e.target.closest('[contenteditable="true"]')
+        target.closest('input') ||
+        target.closest('button') ||
+        target.closest('select') ||
+        target.closest('textarea') ||
+        target.closest('a') ||
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]')
       ) {
         return;
       }
 
-      const isInsidePaper = Boolean(e.target.closest('.paper-sheet'));
-
-      // If in 'select' mode and clicked inside paper with left click, let native text selection proceed
+      const isInsidePaper = Boolean(target.closest('.paper-sheet'));
       if (effectivePointerMode === 'select' && isLeftClick && isInsidePaper) {
         return;
       }
 
-      // In Movable (hand) mode, or clicking on canvas background, or middle clicking:
-      // Prevent browser default text selection to ensure zero text highlight
       e.preventDefault();
 
       isDraggingRef.current = true;
@@ -240,7 +231,7 @@ export default function PrintCanvasViewer({
   );
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isDraggingRef.current) return;
       const dx = e.clientX - panStartRef.current.mouseX;
       const dy = e.clientY - panStartRef.current.mouseY;
@@ -268,14 +259,15 @@ export default function PrintCanvasViewer({
     };
   }, [clampPan]);
 
-  // 3. Touch Pinch-to-Zoom & Touch Pan Support for Tablets & Mobile
+  // 3. Touch Pinch-to-Zoom & Touch Pan Support
   const handleTouchStart = useCallback(
-    (e) => {
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
       if (
-        e.target.closest('input') ||
-        e.target.closest('button') ||
-        e.target.closest('select') ||
-        e.target.closest('textarea')
+        target.closest('input') ||
+        target.closest('button') ||
+        target.closest('select') ||
+        target.closest('textarea')
       ) {
         return;
       }
@@ -300,7 +292,7 @@ export default function PrintCanvasViewer({
   );
 
   const handleTouchMove = useCallback(
-    (e) => {
+    (e: React.TouchEvent<HTMLDivElement>) => {
       if (e.touches.length === 2 && touchStartDistRef.current && onZoomChange) {
         e.preventDefault();
         const t1 = e.touches[0];
@@ -326,24 +318,68 @@ export default function PrintCanvasViewer({
     setIsPanning(false);
   }, []);
 
-  // 4. Double Click on Workbench to Recenter Canvas
-  const handleDoubleClick = useCallback((e) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
     if (
-      e.target.closest('input') ||
-      e.target.closest('button') ||
-      e.target.closest('select') ||
-      e.target.closest('textarea') ||
-      e.target.closest('a')
+      target.closest('input') ||
+      target.closest('button') ||
+      target.closest('select') ||
+      target.closest('textarea') ||
+      target.closest('a')
     ) {
       return;
     }
     setPan({ x: 0, y: 0 });
   }, []);
 
-  // Recenter Action
   const handleRecenter = useCallback(() => {
     setPan({ x: 0, y: 0 });
   }, []);
+
+  // Zoom Handlers
+  const handleZoomIn = useCallback(() => {
+    if (!onZoomChange) return;
+    onZoomChange((prev: number) => {
+      const current = typeof prev === 'number' ? prev : zoomLevel;
+      const next = Math.min(2.5, Math.round((current + 0.15) * 100) / 100);
+      return next;
+    });
+  }, [onZoomChange, zoomLevel]);
+
+  const handleZoomOut = useCallback(() => {
+    if (!onZoomChange) return;
+    onZoomChange((prev: number) => {
+      const current = typeof prev === 'number' ? prev : zoomLevel;
+      const next = Math.max(0.3, Math.round((current - 0.15) * 100) / 100);
+      return next;
+    });
+  }, [onZoomChange, zoomLevel]);
+
+  const handleResetZoom = useCallback(() => {
+    if (!onZoomChange) return;
+    onZoomChange(1.0);
+    setPan({ x: 0, y: 0 });
+  }, [onZoomChange]);
+
+  const handleFitToScreen = useCallback(() => {
+    const container = containerRef.current;
+    const portal =
+      contentRef.current ||
+      (typeof document !== 'undefined' ? document.getElementById('universal-print-portal') : null);
+    if (!container || !portal || !onZoomChange) return;
+
+    const containerWidth = container.clientWidth - 48;
+    const containerHeight = container.clientHeight - 48;
+    const portalWidth = portal.scrollWidth || 800;
+    const portalHeight = portal.scrollHeight || 1130;
+
+    const scaleX = containerWidth / portalWidth;
+    const scaleY = containerHeight / portalHeight;
+    const optimalScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.35), 2.0);
+
+    onZoomChange(Math.round(optimalScale * 100) / 100);
+    setPan({ x: 0, y: 0 });
+  }, [onZoomChange]);
 
   const isOffset = Math.abs(pan.x) > 15 || Math.abs(pan.y) > 15;
 
@@ -355,6 +391,12 @@ export default function PrintCanvasViewer({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onScroll={(e) => {
+        if (e.currentTarget.scrollTop !== 0 || e.currentTarget.scrollLeft !== 0) {
+          e.currentTarget.scrollTop = 0;
+          e.currentTarget.scrollLeft = 0;
+        }
+      }}
       className={`universal-print-canvas-wrapper mode-${effectivePointerMode} ${
         isPanning ? 'is-panning cursor-grabbing' : effectivePointerMode === 'hand' ? 'cursor-grab' : 'cursor-default'
       } w-full h-full overflow-hidden flex justify-center items-start pt-8 pb-16 relative print:p-0 print:m-0 print:overflow-visible print:block print:bg-white ${className}`}
@@ -364,16 +406,17 @@ export default function PrintCanvasViewer({
           : 'Select Mode: Click and drag on text to select/copy • Drag backdrop to pan • Hold Space to pan'
       }
     >
-      {/* 2D Pannable Artboard Layer (GPU Hardware Accelerated translate3d) */}
+      {/* 2D Pannable & Zoomable Artboard Layer (GPU Hardware Accelerated translate3d + scale) */}
       <div
         style={{
-          transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
+          transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoomLevel})`,
+          transformOrigin: 'top center',
           willChange: isPanning ? 'transform' : 'auto',
           transition: isPanning ? 'none' : 'transform 0.12s cubic-bezier(0, 0, 0.2, 1)',
         }}
         className="universal-print-transform-wrapper print:!transform-none print:p-0 print:m-0 print:w-full print:block print:bg-transparent"
       >
-        {/* Physical Paper Sheet Simulation Canvas with 100% Vector Sharp Zoom */}
+        {/* Physical Paper Sheet Simulation Canvas with 100% Vector Sharp Rendering */}
         <div
           ref={contentRef}
           id="universal-print-portal"
@@ -381,8 +424,6 @@ export default function PrintCanvasViewer({
             effectivePointerMode === 'hand' ? 'select-none' : 'select-text'
           }`}
           style={{
-            zoom: zoomLevel,
-
             userSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
             WebkitUserSelect: effectivePointerMode === 'hand' ? 'none' : 'text',
           }}
@@ -391,8 +432,12 @@ export default function PrintCanvasViewer({
         </div>
       </div>
 
-      {/* Floating Canvas Tool Dock (Select Mode, Move Mode, Undo/Redo, and Recenter View) */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 p-1 rounded-2xl theme-bg-elevated/95 theme-text-primary border theme-border shadow-xl backdrop-blur-md animate-fade-in print:hidden select-none">
+      {/* Floating Canvas Interactive Tool Dock */}
+      {/* Floating Canvas Interactive Tool Dock (Solid Opaque Background, Zero Blur, Pure Icon Buttons) */}
+      <nav
+        aria-label="Canvas Workbench Controls"
+        className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 p-1.5 rounded-2xl theme-bg-elevated theme-text-primary border theme-border shadow-xl animate-fade-in print:hidden select-none"
+      >
         {/* Undo Action */}
         {onUndo && (
           <button
@@ -402,10 +447,10 @@ export default function PrintCanvasViewer({
               onUndo();
             }}
             disabled={!canUndo}
-            className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
               canUndo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub border border-transparent'
-                : 'theme-text-muted/30 opacity-30 cursor-not-allowed border border-transparent'
+                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub active:scale-95 cursor-pointer'
+                : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
             }`}
             title="Undo last change (Ctrl + Z)"
             aria-label="Undo"
@@ -423,10 +468,10 @@ export default function PrintCanvasViewer({
               onRedo();
             }}
             disabled={!canRedo}
-            className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
               canRedo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub border border-transparent'
-                : 'theme-text-muted/30 opacity-30 cursor-not-allowed border border-transparent'
+                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub active:scale-95 cursor-pointer'
+                : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
             }`}
             title="Redo change (Ctrl + Y / Ctrl + Shift + Z)"
             aria-label="Redo"
@@ -435,65 +480,140 @@ export default function PrintCanvasViewer({
           </button>
         )}
 
-        {(onUndo || onRedo) && <div className="w-[1px] h-4 theme-border bg-current opacity-20 mx-0.5" />}
+        {(onUndo || onRedo) && <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />}
 
-        {/* Pointer Mode: Select Text & Edit */}
+        {/* Pointer Mode: Select Text & In-place Edit */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onPointerModeChange?.('select');
           }}
-          className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+          className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
             effectivePointerMode === 'select'
-              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
+              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/35 shadow-2xs'
               : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
           }`}
-          title="Select & Edit Mode (V) — Click anywhere on text to edit inline"
+          title="Select & Edit Mode (V) — Click directly on document text to edit inline"
           aria-label="Select Text Mode"
         >
           <CursorPointerIcon className="w-4 h-4" />
         </button>
 
-        {/* Pointer Mode: Move Canvas */}
+        {/* Pointer Mode: Move Canvas Hand */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onPointerModeChange?.('hand');
           }}
-          className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+          className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
             effectivePointerMode === 'hand'
-              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/40 shadow-2xs'
+              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/35 shadow-2xs'
               : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
           }`}
-          title="Movable Canvas Mode (H / Space) — Drag anywhere to pan paper"
-          aria-label="Movable Canvas Mode"
+          title="Pan Hand Tool (H / Space) — Drag anywhere to fluidly pan paper"
+          aria-label="Pan Hand Mode"
         >
           <HandIcon className="w-4 h-4" />
         </button>
 
         {/* Divider */}
-        <div className="w-[1px] h-4 theme-border bg-current opacity-20 mx-0.5" />
+        <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />
 
-        {/* Recenter View Action Button */}
+        {/* Zoom Out Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleZoomOut();
+          }}
+          disabled={zoomLevel <= 0.35}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            zoomLevel > 0.35
+              ? 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer'
+              : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
+          }`}
+          title="Zoom Out (Ctrl -)"
+          aria-label="Zoom Out"
+        >
+          <ZoomOutIcon className="w-4 h-4" />
+        </button>
+
+        {/* Zoom Reset to 100% Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleResetZoom();
+          }}
+          className="p-2 rounded-xl transition-all flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer border border-transparent"
+          title={`Reset Zoom to 100% (Current: ${Math.round(zoomLevel * 100)}% • Ctrl 0)`}
+          aria-label="Reset Zoom to 100%"
+        >
+          <ZoomResetIcon className="w-4 h-4" />
+        </button>
+
+        {/* Zoom In Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleZoomIn();
+          }}
+          disabled={zoomLevel >= 2.45}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            zoomLevel < 2.45
+              ? 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer'
+              : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
+          }`}
+          title="Zoom In (Ctrl +)"
+          aria-label="Zoom In"
+        >
+          <ZoomInIcon className="w-4 h-4" />
+        </button>
+
+        {/* Divider */}
+        <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />
+
+        {/* Fit to Screen / Window Action Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleFitToScreen();
+          }}
+          className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-transparent"
+          title="Fit Page to Window (F)"
+          aria-label="Fit Page to Window"
+        >
+          <ArrowsPointingOutIcon className="w-4 h-4" />
+        </button>
+
+        {/* Recenter Artboard Action Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             handleRecenter();
           }}
-          className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+          className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
             isOffset
-              ? 'theme-accent theme-bg-accent-soft/50 border border-[var(--accent-main)]/30 hover:theme-bg-sub'
+              ? 'theme-accent theme-bg-accent-soft border border-[var(--accent-main)]/35 animate-pulse'
               : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
           }`}
-          title="Recenter Artboard (Double-click anywhere on workbench)"
-          aria-label="Recenter View"
+          title={
+            isOffset
+              ? 'Recenter Artboard (Canvas is panned • Double-click canvas to center)'
+              : 'Recenter Artboard (Double-click canvas to center)'
+          }
+          aria-label="Recenter Artboard"
         >
           <CrosshairIcon className="w-4 h-4" />
         </button>
-      </div>
+      </nav>
     </div>
   );
-}
+};
+
+export default DocLabCanvasViewer;

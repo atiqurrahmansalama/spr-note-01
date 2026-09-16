@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import TabSwitcher from '@/components/ui/TabSwitcher';
 import MarkSheetFilterBar from './MarkSheetFilterBar';
@@ -177,7 +177,16 @@ export default function MarkSheetLedgerView({
   );
   const [selectedStudentIdsForPrint, setSelectedStudentIdsForPrint] = useState<(string | number)[]>([]);
 
-  const handleOpenStudentPrint = (
+  const handleCloseAcademicPrint = useCallback(() => {
+    setIsPrintStudioOpen(false);
+  }, []);
+
+  const handleCloseStudentPrint = useCallback(() => {
+    setIsStudentPrintOpen(false);
+    setSelectedStudentIdsForPrint([]);
+  }, []);
+
+  const handleOpenStudentPrint = useCallback((
     studentId?: string | number | null,
     mode: 'single' | 'bulk' = 'single',
     customIds?: (string | number)[]
@@ -192,14 +201,14 @@ export default function MarkSheetLedgerView({
       setSelectedStudentIdsForPrint([]);
     }
     setIsStudentPrintOpen(true);
-  };
+  }, []);
 
-  const handleViewStudentTranscript = (studentId: string | number) => {
+  const handleViewStudentTranscript = useCallback((studentId: string | number) => {
     if (studentId) {
       setSelectedStudentId(String(studentId));
     }
     setActiveSubTab('transcripts');
-  };
+  }, []);
 
   const hasInitializedClassRef = useRef(false);
   const hasInitializedExamRef = useRef(false);
@@ -748,7 +757,7 @@ export default function MarkSheetLedgerView({
       {/* Master Mark Sheet (Tabulation Ledger) Print Studio */}
       <MarkSheetPrint
         isOpen={isPrintStudioOpen}
-        onClose={() => setIsPrintStudioOpen(false)}
+        onClose={handleCloseAcademicPrint}
         exam={exam}
         selectedClassId={selectedClassId}
         selectedClassName={selectedClassName}
@@ -769,13 +778,10 @@ export default function MarkSheetLedgerView({
       {/* Student Mark Sheet (Transcripts) Print Studio */}
       <StudentMarkSheetPrint
         isOpen={isStudentPrintOpen}
-        onClose={() => {
-          setIsStudentPrintOpen(false);
-          setSelectedStudentIdsForPrint([]);
-        }}
+        onClose={handleCloseStudentPrint}
         exam={exam}
         studentResult={
-          selectedStudentId
+          selectedStudentId && Array.isArray(studentsData)
             ? studentsData.find((s) => String(s.studentId) === String(selectedStudentId)) || null
             : null
         }

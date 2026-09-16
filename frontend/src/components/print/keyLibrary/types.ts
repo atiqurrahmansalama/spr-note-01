@@ -10,6 +10,8 @@ export type KeyCategory =
   | 'system'
   | 'signatures'
   | 'general'
+  | 'subjects'
+  | 'grading_scale'
   | 'custom';
 
 export interface KeyTaxonomyItem {

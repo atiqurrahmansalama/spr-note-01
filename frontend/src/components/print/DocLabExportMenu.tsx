@@ -15,14 +15,48 @@ import {
   exportToPlainText,
   exportToWord,
   exportToImage,
-} from './printExportUtils';
+} from './docLabExportUtils';
+import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
+
+export interface DocLabExportMenuProps {
+  title?: string;
+  subtitle?: string;
+  metaItems?: PrintMetaItem[];
+  summaryMetrics?: PrintSummaryMetric[];
+  options?: Partial<PrintOptions>;
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  extraBlankRows?: number | string;
+  data?: Array<Record<string, any>>;
+  showPrint?: boolean;
+  showPDF?: boolean;
+  showExcel?: boolean;
+  showTxt?: boolean;
+  showWord?: boolean;
+  showImages?: boolean;
+  showPng?: boolean;
+  showJpg?: boolean;
+  enabledFormats?: string[] | null;
+  onPrint?: (() => void) | null;
+  onExportPDF?: (() => void) | null;
+  onExportExcel?: (() => void) | null;
+  onExportCsv?: (() => void) | null;
+  onExportTxt?: (() => void) | null;
+  onExportWord?: (() => void) | null;
+  onExportPng?: (() => void) | null;
+  onExportJpg?: (() => void) | null;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  showChevron?: boolean;
+  className?: string;
+}
 
 /**
- * PrintExportMenu
- * Master Universal Export Dropdown for SPR Note Print Studio.
+ * DocLabExportMenu
+ * Master Universal Export Dropdown for DocLab Studio.
  * Fully switchable format support (Print, PDF, Excel, Text, Word, PNG, JPG).
  */
-export default function PrintExportMenu({
+export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
   title = 'Official Document',
   subtitle = '',
   metaItems = [],
@@ -32,7 +66,6 @@ export default function PrintExportMenu({
   visibleColumnKeys = [],
   extraBlankRows = 0,
   data = [],
-  // ─── Format Visibility Switches (defaults to true) ───
   showPrint = true,
   showPDF = true,
   showExcel = true,
@@ -41,9 +74,7 @@ export default function PrintExportMenu({
   showImages = true,
   showPng = true,
   showJpg = true,
-  // Or pass a list of enabled formats e.g. ['print', 'pdf', 'excel', 'txt', 'word', 'png', 'jpg']
   enabledFormats = null,
-  // ─── Custom Action Overrides ───
   onPrint,
   onExportPDF,
   onExportExcel,
@@ -52,20 +83,17 @@ export default function PrintExportMenu({
   onExportWord,
   onExportPng,
   onExportJpg,
-  // ─── UI / Appearance ───
   size = 'sm',
   variant = 'primary',
   showChevron = true,
   className = '',
-}) {
+}) => {
   const { showToast } = useToast();
 
-  // Helper to check if a specific format is active/enabled
-  const isFormatEnabled = (formatKey) => {
+  const isFormatEnabled = (formatKey: string) => {
     if (Array.isArray(enabledFormats)) {
       return enabledFormats.includes(formatKey);
     }
-    // Check options-level flags or prop-level switches
     switch (formatKey) {
       case 'print':
         return options.showPrint !== false && showPrint !== false;
@@ -80,20 +108,10 @@ export default function PrintExportMenu({
       case 'doc':
         return options.showWord !== false && showWord !== false;
       case 'png':
-        return (
-          options.showImages !== false &&
-          showImages !== false &&
-          options.showPng !== false &&
-          showPng !== false
-        );
+        return options.showImages !== false && showImages !== false && options.showPng !== false && showPng !== false;
       case 'jpg':
       case 'jpeg':
-        return (
-          options.showImages !== false &&
-          showImages !== false &&
-          options.showJpg !== false &&
-          showJpg !== false
-        );
+        return options.showImages !== false && showImages !== false && options.showJpg !== false && showJpg !== false;
       default:
         return true;
     }
@@ -108,7 +126,7 @@ export default function PrintExportMenu({
   const isJpgActive = isFormatEnabled('jpg');
 
   const exportMenuItems = useMemo(() => {
-    const items = [];
+    const items: any[] = [];
 
     // Group 1: Print & PDF
     if (isPrintActive) {
@@ -117,7 +135,7 @@ export default function PrintExportMenu({
         label: 'Print Document',
         icon: PrinterIcon,
         badge: 'Ctrl+P',
-        onClick: () => (onPrint ? onPrint() : printDocument(options)),
+        onClick: () => (onPrint ? onPrint() : printDocument(options as any)),
         title: 'System printer & dialog',
       });
     }
@@ -149,7 +167,7 @@ export default function PrintExportMenu({
       });
     }
 
-    // Group 2: Tabular & Text Data (Excel, Plain Text, Word)
+    // Group 2: Tabular & Text Data
     const hasGroup2 = isExcelActive || isTxtActive || isWordActive;
     if (items.length > 0 && hasGroup2) {
       items.push({ divider: true });
@@ -224,7 +242,7 @@ export default function PrintExportMenu({
       });
     }
 
-    // Group 3: Image Exports (PNG, JPG)
+    // Group 3: Image Exports
     const hasGroup3 = isPngActive || isJpgActive;
     if (items.length > 0 && hasGroup3) {
       items.push({ divider: true });
@@ -277,14 +295,14 @@ export default function PrintExportMenu({
     subtitle,
     metaItems,
     summaryMetrics,
-    options.orientation,
-    options.pageSize,
+    options,
     showToast,
     onPrint,
     onExportPDF,
     columns,
     visibleColumnKeys,
     data,
+    extraBlankRows,
     onExportExcel,
     onExportCsv,
     onExportTxt,
@@ -308,4 +326,6 @@ export default function PrintExportMenu({
       ariaLabel="Export & Print Options"
     />
   );
-}
+};
+
+export default DocLabExportMenu;

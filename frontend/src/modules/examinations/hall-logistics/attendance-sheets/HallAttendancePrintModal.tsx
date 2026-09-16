@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import UniversalPrintModal from '@/components/print/UniversalPrintModal';
+import UniversalPrintStudio from '@/components/print/UniversalPrintStudio';
 import { TemplatePlaceholderKey } from '@/components/print/docxTemplateEngine';
 import HallAttendanceSheetCanvas from './HallAttendanceSheetCanvas';
 import { HallAttendanceSheetData } from '../types';
@@ -57,11 +57,11 @@ export default function HallAttendancePrintModal({
   }, []);
 
   const defaultPrintOptions = useMemo(() => ({
-    pageSize: 'A4',
-    orientation: 'PORTRAIT',
-    margin: 'NONE',
-    colorMode: 'FULL_COLOR',
-    density: 'NORMAL',
+    pageSize: 'A4' as const,
+    orientation: 'PORTRAIT' as const,
+    margin: 'NONE' as const,
+    colorMode: 'FULL_COLOR' as const,
+    density: 'NORMAL' as const,
     fontSize: 100,
     enablePageBreak: true,
   }), []);
@@ -86,7 +86,7 @@ export default function HallAttendancePrintModal({
   if (!isOpen) return null;
 
   return (
-    <UniversalPrintModal
+    <UniversalPrintStudio
       isOpen={isOpen}
       onClose={onClose}
       title="Examination Hall Attendance Sheet"
@@ -94,11 +94,11 @@ export default function HallAttendancePrintModal({
       customSheets={true}
       data={activeData.students || []}
       placeholderKeys={HALL_ATTENDANCE_PLACEHOLDER_KEYS}
+      scopeId="examinations_attendance_sheet"
+      scopeName="Hall Attendance Sheets"
+      scopeDescription="Examination hall student roll call and attendance registers"
       defaultOptions={defaultPrintOptions}
-      scopeId="attendance_register"
-      urlSync={true}
-      urlParam="print"
-      urlParamValue="hall_attendance"
+      enabledFormats={['pdf', 'word', 'png', 'jpg', 'print']}
     >
       <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
         {pages.map((pageStudents, pIdx) => (
@@ -133,8 +133,6 @@ export default function HallAttendancePrintModal({
           </div>
         ))}
       </div>
-    </UniversalPrintModal>
+    </UniversalPrintStudio>
   );
 }
-
-

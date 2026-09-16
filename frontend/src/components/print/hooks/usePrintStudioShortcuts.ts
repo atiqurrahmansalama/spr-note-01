@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { PrintOptions } from '../types';
-import { printDocument, updatePrintPageStyle } from '../printExportUtils';
+import { printDocument, updatePrintPageStyle } from '../docLabExportUtils';
 
 interface UsePrintStudioShortcutsParams {
   isOpen: boolean;
@@ -76,7 +76,7 @@ export function usePrintStudioShortcuts({
   useEffect(() => {
     if (!isOpen) return;
 
-    const isNativeEditing = (el: Element | null): boolean => {
+    const isSidebarInput = (el: Element | null): boolean => {
       if (!el) return false;
       const tag = el.tagName?.toUpperCase();
       if (tag === 'TEXTAREA') return true;
@@ -84,12 +84,12 @@ export function usePrintStudioShortcuts({
         const type = ((el as HTMLInputElement).type || 'text').toLowerCase();
         return ['text', 'search', 'password', 'email', 'number', 'tel', 'url'].includes(type);
       }
-      return (el as HTMLElement).isContentEditable || el.getAttribute('contenteditable') === 'true';
+      return false;
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
-      const inText = isNativeEditing(activeEl);
+      const inSidebar = isSidebarInput(activeEl);
 
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
@@ -110,7 +110,7 @@ export function usePrintStudioShortcuts({
         e.preventDefault();
         setIsSidebarOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        if (!inText) {
+        if (!inSidebar) {
           e.preventDefault();
           handleUndo();
         }
@@ -118,11 +118,11 @@ export function usePrintStudioShortcuts({
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.shiftKey)
       ) {
-        if (!inText) {
+        if (!inSidebar) {
           e.preventDefault();
           handleRedo();
         }
-      } else if (!inText && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (!inSidebar && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'm') {
           setPointerMode('hand');
         } else if (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 's') {
@@ -137,6 +137,8 @@ export function usePrintStudioShortcuts({
 
   // URL Synchronization & Browser History (Back/Forward button support)
   const wasOpenRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!urlSync || typeof window === 'undefined') return;
@@ -154,7 +156,7 @@ export function usePrintStudioShortcuts({
       const url = new URL(window.location.href);
       if (url.searchParams.get(urlParam) !== targetParamValue) {
         url.searchParams.set(urlParam, targetParamValue);
-        window.history.pushState(
+        window.history.replaceState(
           { printStudio: true, [urlParam]: targetParamValue },
           '',
           url.toString()
@@ -164,7 +166,7 @@ export function usePrintStudioShortcuts({
       const handlePopState = () => {
         const currentUrl = new URL(window.location.href);
         if (!currentUrl.searchParams.has(urlParam)) {
-          onClose?.();
+          onCloseRef.current?.();
         }
       };
 
@@ -181,7 +183,7 @@ export function usePrintStudioShortcuts({
         window.history.replaceState(null, '', url.toString());
       }
     }
-  }, [isOpen, urlSync, urlParam, urlParamValue, title, onClose]);
+  }, [isOpen, urlSync, urlParam, urlParamValue, title]);
 
   return {
     handlePrint,

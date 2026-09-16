@@ -104,8 +104,25 @@
   box-sizing: border-box;
   overflow: hidden;
 }
+.paper-sheet[data-size="ID_CARD" i][data-orientation="PORTRAIT" i],
+.paper-sheet[data-size="ID_CARD" i]:not([data-orientation="LANDSCAPE" i]) {
+  width: 324px;
+  min-height: 512px;
+  height: 512px;
+  max-height: 512px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.paper-sheet[data-size="ID_CARD" i][data-orientation="LANDSCAPE" i] {
+  width: 512px;
+  min-height: 324px;
+  height: 324px;
+  max-height: 324px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
 
-/* Continuous Sheet Mode (when Auto Page Break is switched OFF) */
+/* Continuous Sheet Mode (Only when Auto Page Break is explicitly switched OFF) */
 .paper-sheet[data-page-break="false"] {
   height: auto !important;
   max-height: none !important;
@@ -114,18 +131,18 @@
 }
 
 /* Screen Margins */
-.paper-sheet,
-.paper-sheet:not([data-margin]),
-.paper-sheet[data-margin="NORMAL" i] {
+.paper-sheet:not(.docx-paper-sheet),
+.paper-sheet:not(.docx-paper-sheet):not([data-margin]),
+.paper-sheet:not(.docx-paper-sheet)[data-margin="NORMAL" i] {
   padding: 38px 44px;
 }
-.paper-sheet[data-margin="NARROW" i] {
+.paper-sheet:not(.docx-paper-sheet)[data-margin="NARROW" i] {
   padding: 22px 26px;
 }
-.paper-sheet[data-margin="WIDE" i] {
+.paper-sheet:not(.docx-paper-sheet)[data-margin="WIDE" i] {
   padding: 56px 60px;
 }
-.paper-sheet[data-margin="NONE" i] {
+.paper-sheet:not(.docx-paper-sheet)[data-margin="NONE" i] {
   padding: 0 !important;
 }
 
@@ -146,9 +163,9 @@
   }
 }
 
-/* Density Settings */
-.paper-sheet[data-density="ULTRA_COMPACT"] th,
-.paper-sheet[data-density="ULTRA_COMPACT"] td {
+/* Density Settings for System Native Tables */
+.paper-sheet[data-density="ULTRA_COMPACT"] .print-table th,
+.paper-sheet[data-density="ULTRA_COMPACT"] .print-table td {
   padding-top: 2.5px !important;
   padding-bottom: 2.5px !important;
   padding-left: 4.5px !important;
@@ -157,8 +174,8 @@
   line-height: 1.2 !important;
 }
 
-.paper-sheet[data-density="COMPACT"] th,
-.paper-sheet[data-density="COMPACT"] td {
+.paper-sheet[data-density="COMPACT"] .print-table th,
+.paper-sheet[data-density="COMPACT"] .print-table td {
   padding-top: 4px !important;
   padding-bottom: 4px !important;
   padding-left: 6px !important;
@@ -167,8 +184,8 @@
   line-height: 1.25 !important;
 }
 
-.paper-sheet[data-density="NORMAL"] th,
-.paper-sheet[data-density="NORMAL"] td {
+.paper-sheet[data-density="NORMAL"] .print-table th,
+.paper-sheet[data-density="NORMAL"] .print-table td {
   padding-top: 6px !important;
   padding-bottom: 6px !important;
   padding-left: 8px !important;
@@ -177,8 +194,8 @@
   line-height: 1.35 !important;
 }
 
-.paper-sheet[data-density="RELAXED"] th,
-.paper-sheet[data-density="RELAXED"] td {
+.paper-sheet[data-density="RELAXED"] .print-table th,
+.paper-sheet[data-density="RELAXED"] .print-table td {
   padding-top: 9px !important;
   padding-bottom: 9px !important;
   padding-left: 10px !important;
@@ -187,8 +204,8 @@
   line-height: 1.4 !important;
 }
 
-.paper-sheet[data-density="SPACIOUS"] th,
-.paper-sheet[data-density="SPACIOUS"] td {
+.paper-sheet[data-density="SPACIOUS"] .print-table th,
+.paper-sheet[data-density="SPACIOUS"] .print-table td {
   padding-top: 13px !important;
   padding-bottom: 13px !important;
   padding-left: 12px !important;
@@ -732,59 +749,394 @@ body.spr-printing-in-progress .universal-export-menu-portal {
 
 /* Ensure empty paragraphs, blank lines, and newlines in Word docs never collapse to 0 height */
 .docx-live-container p,
-.docx-live-container div.docx_p {
-  min-height: 1.2em;
+.docx-live-container div.docx_p,
+.docx-parsed-body p,
+.docx-parsed-body div.docx_p,
+.docx-preview-content p,
+.docx-preview-content div.docx_p {
+  min-height: 1.25em;
+  line-height: 1.35;
 }
 
 .docx-live-container p:empty,
-.docx-live-container div.docx_p:empty {
-  min-height: 1.2em;
-  display: block;
+.docx-live-container div.docx_p:empty,
+.docx-parsed-body p:empty,
+.docx-parsed-body div.docx_p:empty,
+.docx-preview-content p:empty,
+.docx-preview-content div.docx_p:empty {
+  min-height: 1.25em !important;
+  display: block !important;
+  cursor: text !important;
 }
 
-.docx-live-container p:empty::before,
-.docx-live-container div.docx_p:empty::before {
-  content: "\00a0";
-  visibility: hidden;
-  display: inline-block;
+/* Ensure empty table cells are clickable and have adequate dimensions */
+.docx-live-container td:empty,
+.docx-live-container th:empty,
+.docx-parsed-body td:empty,
+.docx-parsed-body th:empty,
+.docx-preview-content td:empty,
+.docx-preview-content th:empty {
+  min-height: 1.5em !important;
+  min-width: 1.5em !important;
+  cursor: text !important;
 }
 
-.docx-live-container table {
-  border-collapse: collapse !important;
+/* --------------------------------------------------------------------------
+   High-Fidelity Word (.docx) & Custom Template Table Layout Engine
+   -------------------------------------------------------------------------- */
+.docx-live-container table,
+.docx-parsed-body table,
+.docx-preview-content table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  box-sizing: border-box;
 }
 
+.docx-live-container table tr,
+.docx-parsed-body table tr,
+.docx-preview-content table tr {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  text-align: left;
+}
+
+/* Ensure all vector shapes, line dividers, and SVG drawing overlays pass clicks straight through to text */
+.docx-live-container svg,
+.docx-live-container svg *,
+.docx-parsed-body svg,
+.docx-parsed-body svg *,
+.docx-preview-content svg,
+.docx-preview-content svg *,
+.docx-live-container [style*="position:absolute"] > svg,
+.docx-parsed-body [style*="position:absolute"] > svg,
+.docx-live-container div:has(> svg),
+.docx-parsed-body div:has(> svg) {
+  pointer-events: none !important;
+}
+
+.docx-live-container table th,
 .docx-live-container table td,
-.docx-live-container table th {
-  vertical-align: top;
+.docx-parsed-body table th,
+.docx-parsed-body table td,
+.docx-preview-content table th,
+.docx-preview-content table td {
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
-.docx-live-container img {
-  max-width: 100%;
-  height: auto;
+/* Eliminate bloated paragraph margins inside Word table cells while preserving cell & paragraph alignment */
+.docx-live-container table p,
+.docx-live-container table div.docx_p,
+.docx-parsed-body table p,
+.docx-parsed-body table div.docx_p,
+.docx-preview-content table p,
+.docx-preview-content table div.docx_p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.3 !important;
 }
 
-.docx-preview-content {
+/* Strict Text Alignment Enforcement for Word documents and tables across all variations */
+.docx-live-container table td,
+.docx-live-container table th,
+.docx-parsed-body table td,
+.docx-parsed-body table th,
+.docx-preview-content table td,
+.docx-preview-content table th {
+  text-align: left;
+}
+
+.docx-live-container table td p,
+.docx-live-container table th p,
+.docx-live-container table td div.docx_p,
+.docx-live-container table th div.docx_p,
+.docx-parsed-body table td p,
+.docx-parsed-body table th p,
+.docx-parsed-body table td div.docx_p,
+.docx-parsed-body table th div.docx_p,
+.docx-preview-content table td p,
+.docx-preview-content table th p,
+.docx-preview-content table td div.docx_p,
+.docx-preview-content table th div.docx_p {
+  text-align: inherit;
+}
+.docx-live-container .text-center,
+.docx-parsed-body .text-center,
+.docx-preview-content .text-center,
+.docx-live-container td.text-center,
+.docx-live-container th.text-center,
+.docx-live-container td[align="center" i],
+.docx-live-container th[align="center" i],
+.docx-live-container td[style*="text-align:center" i],
+.docx-live-container td[style*="text-align: center" i],
+.docx-live-container th[style*="text-align:center" i],
+.docx-live-container th[style*="text-align: center" i],
+.docx-live-container p[align="center" i],
+.docx-live-container p[style*="text-align:center" i],
+.docx-live-container p[style*="text-align: center" i],
+.docx-live-container .docx_p[align="center" i],
+.docx-live-container .docx_p[style*="text-align:center" i],
+.docx-live-container .docx_p[style*="text-align: center" i],
+.docx-parsed-body td[align="center" i],
+.docx-parsed-body th[align="center" i],
+.docx-parsed-body td[style*="text-align:center" i],
+.docx-parsed-body td[style*="text-align: center" i],
+.docx-parsed-body th[style*="text-align:center" i],
+.docx-parsed-body th[style*="text-align: center" i],
+.docx-parsed-body p[align="center" i],
+.docx-parsed-body p[style*="text-align:center" i],
+.docx-parsed-body p[style*="text-align: center" i],
+.docx-parsed-body .docx_p[align="center" i],
+.docx-parsed-body .docx_p[style*="text-align:center" i],
+.docx-parsed-body .docx_p[style*="text-align: center" i],
+.docx-preview-content td[align="center" i],
+.docx-preview-content th[align="center" i],
+.docx-preview-content td[style*="text-align:center" i],
+.docx-preview-content td[style*="text-align: center" i],
+.docx-preview-content th[style*="text-align:center" i],
+.docx-preview-content th[style*="text-align: center" i],
+.docx-preview-content p[align="center" i],
+.docx-preview-content p[style*="text-align:center" i],
+.docx-preview-content p[style*="text-align: center" i],
+.docx-preview-content .docx_p[align="center" i],
+.docx-preview-content .docx_p[style*="text-align:center" i],
+.docx-preview-content .docx_p[style*="text-align: center" i] {
+  text-align: center !important;
+}
+
+.docx-live-container .text-right,
+.docx-parsed-body .text-right,
+.docx-preview-content .text-right,
+.docx-live-container td.text-right,
+.docx-live-container th.text-right,
+.docx-live-container td[align="right" i],
+.docx-live-container th[align="right" i],
+.docx-live-container td[style*="text-align:right" i],
+.docx-live-container td[style*="text-align: right" i],
+.docx-live-container th[style*="text-align:right" i],
+.docx-live-container th[style*="text-align: right" i],
+.docx-live-container p[align="right" i],
+.docx-live-container p[style*="text-align:right" i],
+.docx-live-container p[style*="text-align: right" i],
+.docx-live-container .docx_p[align="right" i],
+.docx-live-container .docx_p[style*="text-align:right" i],
+.docx-live-container .docx_p[style*="text-align: right" i],
+.docx-parsed-body td[align="right" i],
+.docx-parsed-body th[align="right" i],
+.docx-parsed-body td[style*="text-align:right" i],
+.docx-parsed-body td[style*="text-align: right" i],
+.docx-parsed-body th[style*="text-align:right" i],
+.docx-parsed-body th[style*="text-align: right" i],
+.docx-parsed-body p[align="right" i],
+.docx-parsed-body p[style*="text-align:right" i],
+.docx-parsed-body p[style*="text-align: right" i],
+.docx-parsed-body .docx_p[align="right" i],
+.docx-parsed-body .docx_p[style*="text-align:right" i],
+.docx-parsed-body .docx_p[style*="text-align: right" i],
+.docx-preview-content td[align="right" i],
+.docx-preview-content th[align="right" i],
+.docx-preview-content td[style*="text-align:right" i],
+.docx-preview-content td[style*="text-align: right" i],
+.docx-preview-content th[style*="text-align:right" i],
+.docx-preview-content th[style*="text-align: right" i],
+.docx-preview-content p[align="right" i],
+.docx-preview-content p[style*="text-align:right" i],
+.docx-preview-content p[style*="text-align: right" i],
+.docx-preview-content .docx_p[align="right" i],
+.docx-preview-content .docx_p[style*="text-align:right" i],
+.docx-preview-content .docx_p[style*="text-align: right" i] {
+  text-align: right !important;
+}
+
+.docx-live-container .text-justify,
+.docx-parsed-body .text-justify,
+.docx-preview-content .text-justify,
+.docx-live-container td.text-justify,
+.docx-live-container th.text-justify,
+.docx-live-container td[align="justify" i],
+.docx-live-container th[align="justify" i],
+.docx-live-container td[style*="text-align:justify" i],
+.docx-live-container td[style*="text-align: justify" i],
+.docx-live-container th[style*="text-align:justify" i],
+.docx-live-container th[style*="text-align: justify" i],
+.docx-live-container p[align="justify" i],
+.docx-live-container p[style*="text-align:justify" i],
+.docx-live-container p[style*="text-align: justify" i],
+.docx-live-container .docx_p[align="justify" i],
+.docx-live-container .docx_p[style*="text-align:justify" i],
+.docx-live-container .docx_p[style*="text-align: justify" i],
+.docx-parsed-body td[align="justify" i],
+.docx-parsed-body th[align="justify" i],
+.docx-parsed-body td[style*="text-align:justify" i],
+.docx-parsed-body td[style*="text-align: justify" i],
+.docx-parsed-body th[style*="text-align:justify" i],
+.docx-parsed-body th[style*="text-align: justify" i],
+.docx-parsed-body p[align="justify" i],
+.docx-parsed-body p[style*="text-align:justify" i],
+.docx-parsed-body p[style*="text-align: justify" i],
+.docx-parsed-body .docx_p[align="justify" i],
+.docx-parsed-body .docx_p[style*="text-align:justify" i],
+.docx-parsed-body .docx_p[style*="text-align: justify" i],
+.docx-preview-content td[align="justify" i],
+.docx-preview-content th[align="justify" i],
+.docx-preview-content td[style*="text-align:justify" i],
+.docx-preview-content td[style*="text-align: justify" i],
+.docx-preview-content th[style*="text-align:justify" i],
+.docx-preview-content th[style*="text-align: justify" i],
+.docx-preview-content p[align="justify" i],
+.docx-preview-content p[style*="text-align:justify" i],
+.docx-preview-content p[style*="text-align: justify" i],
+.docx-preview-content .docx_p[align="justify" i],
+.docx-preview-content .docx_p[style*="text-align:justify" i],
+.docx-preview-content .docx_p[style*="text-align: justify" i] {
+  text-align: justify !important;
+}
+
+.docx-live-container .text-left,
+.docx-parsed-body .text-left,
+.docx-preview-content .text-left,
+.docx-live-container td.text-left,
+.docx-live-container th.text-left,
+.docx-live-container td[align="left" i],
+.docx-live-container th[align="left" i],
+.docx-live-container td[style*="text-align:left" i],
+.docx-live-container td[style*="text-align: left" i],
+.docx-live-container th[style*="text-align:left" i],
+.docx-live-container th[style*="text-align: left" i],
+.docx-live-container p[align="left" i],
+.docx-live-container p[style*="text-align:left" i],
+.docx-live-container p[style*="text-align: left" i],
+.docx-live-container .docx_p[align="left" i],
+.docx-live-container .docx_p[style*="text-align:left" i],
+.docx-live-container .docx_p[style*="text-align: left" i],
+.docx-parsed-body td[align="left" i],
+.docx-parsed-body th[align="left" i],
+.docx-parsed-body td[style*="text-align:left" i],
+.docx-parsed-body td[style*="text-align: left" i],
+.docx-parsed-body th[style*="text-align:left" i],
+.docx-parsed-body th[style*="text-align: left" i],
+.docx-parsed-body p[align="left" i],
+.docx-parsed-body p[style*="text-align:left" i],
+.docx-parsed-body p[style*="text-align: left" i],
+.docx-parsed-body .docx_p[align="left" i],
+.docx-parsed-body .docx_p[style*="text-align:left" i],
+.docx-parsed-body .docx_p[style*="text-align: left" i],
+.docx-preview-content td[align="left" i],
+.docx-preview-content th[align="left" i],
+.docx-preview-content td[style*="text-align:left" i],
+.docx-preview-content td[style*="text-align: left" i],
+.docx-preview-content th[style*="text-align:left" i],
+.docx-preview-content th[style*="text-align: left" i],
+.docx-preview-content p[align="left" i],
+.docx-preview-content p[style*="text-align:left" i],
+.docx-preview-content p[style*="text-align: left" i],
+.docx-preview-content .docx_p[align="left" i],
+.docx-preview-content .docx_p[style*="text-align:left" i],
+.docx-preview-content .docx_p[style*="text-align: left" i] {
+  text-align: left !important;
+}
+
+/* Respect explicitly borderless cells or layout tables */
+.docx-live-container table td[style*="border: none"],
+.docx-live-container table td[style*="border:none"],
+.docx-live-container table td[style*="border: 0"],
+.docx-live-container table td[style*="border:0"],
+.docx-live-container table.borderless td,
+.docx-live-container table.borderless th,
+.docx-parsed-body table.borderless td,
+.docx-parsed-body table.borderless th {
+  border: none !important;
+}
+
+/* Nested layout tables (e.g. photo/info/signature layout blocks) */
+.docx-live-container table table,
+.docx-parsed-body table table,
+.docx-preview-content table table {
+  width: 100% !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+.docx-live-container table table td,
+.docx-live-container table table th,
+.docx-parsed-body table table td,
+.docx-parsed-body table table th {
+  border: none !important;
+  padding: 2px 4px !important;
+}
+
+.docx-live-container img,
+.docx-parsed-body img,
+.docx-preview-content img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Scoped normalization for Word (.docx) Section & Article wrappers */
+.docx-live-container section.docx,
+.docx-live-container article,
+.docx-parsed-body section.docx,
+.docx-parsed-body article,
+.docx-preview-content section.docx,
+.docx-preview-content article {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
   background-color: #ffffff !important;
+  color: #0f172a !important;
+  overflow: visible !important;
+}
+
+.docx-live-container .docx_p,
+.docx-parsed-body .docx_p,
+.docx-preview-content .docx_p {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   color: #0f172a !important;
 }
 
-.docx-preview-content * {
+.docx-live-container span.docx_r,
+.docx-parsed-body span.docx_r,
+.docx-preview-content span.docx_r {
+  word-break: normal;
   color: inherit;
 }
 
-.docx-preview-content table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: #ffffff !important;
-}
-
-.docx-preview-content th,
-.docx-preview-content td {
-  padding: 4px 8px;
-  border: 1px solid #cbd5e1;
+.docx-preview-content,
+.docx-parsed-body,
+.docx-live-container {
+  width: 100% !important;
+  max-width: 100% !important;
   background-color: #ffffff !important;
   color: #0f172a !important;
+  box-sizing: border-box !important;
 }
 
+.docx-preview-content *,
+.docx-parsed-body *,
+.docx-live-container * {
+  color: inherit;
+}
+
+/* Page Break Divider & Multi-Page Split Rules */
+.spr-page-break,
+div.spr-page-break,
+hr.page-break {
+  display: block !important;
+  clear: both !important;
+  page-break-after: always !important;
+  break-after: page !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  visibility: hidden !important;
+}
 
 

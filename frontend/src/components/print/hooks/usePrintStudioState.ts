@@ -151,7 +151,7 @@ export function usePrintStudioState({
   );
 
   const dataSignature = useMemo(
-    () => (Array.isArray(data) ? `${data.length}_${data[0]?.id || data[0]?.key || ''}` : ''),
+    () => (Array.isArray(data) ? `${data.length}_${data[0]?.id || data[0]?.key || data[0]?.studentId || ''}` : ''),
     [data]
   );
   const prevDataSigRef = useRef(dataSignature);
@@ -163,21 +163,26 @@ export function usePrintStudioState({
     }
   }, [isOpen, dataSignature, data]);
 
-  const columnsSignature = useMemo(
-    () => (Array.isArray(columns) ? columns.map((c) => c.id || c.key || c.accessor || c.dataIndex).join(',') : ''),
-    [columns]
-  );
-  const prevColumnsSigRef = useRef(columnsSignature);
+  const activeColumnsSignature = useMemo(() => {
+    const list = Array.isArray(columns) && columns.length > 0
+      ? columns
+      : deriveColumnsFromDataOrKeys(data, placeholderKeys);
+    return list.map((c) => `${c.id || c.key || c.accessor || c.dataIndex}_${c.header || c.label || ''}`).join('||');
+  }, [columns, dataSignature, placeholderKeys]);
+
+  const prevActiveColumnsSigRef = useRef(activeColumnsSignature);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (activeColumnsSignature !== prevActiveColumnsSigRef.current) {
+      prevActiveColumnsSigRef.current = activeColumnsSignature;
       const cols =
         Array.isArray(columns) && columns.length > 0
           ? columns
           : deriveColumnsFromDataOrKeys(data, placeholderKeys);
       setLiveColumns(cols);
     }
-  }, [isOpen, columnsSignature, dataSignature, placeholderKeys, columns, data]);
+  }, [isOpen, activeColumnsSignature, columns, data, placeholderKeys]);
 
   const metaSignature = useMemo(
     () => (Array.isArray(metaItems) ? JSON.stringify(metaItems) : ''),
@@ -250,7 +255,7 @@ export function usePrintStudioState({
   });
 
   useEffect(() => {
-    if (!liveColumns || liveColumns.length === 0) return;
+    if (!isOpen || !liveColumns || liveColumns.length === 0) return;
     setVisibleColumnKeys((prev) => {
       if (!prev || prev.length === 0) {
         return liveColumns.map((c) => String(c.id || c.key || c.accessor || c.dataIndex));
@@ -262,7 +267,7 @@ export function usePrintStudioState({
       }
       return retained.length > 0 ? retained : liveColumns.map((c) => String(c.id || c.key || c.accessor || c.dataIndex));
     });
-  }, [columnKeySignature, liveColumns]);
+  }, [isOpen, columnKeySignature, liveColumns]);
 
   // Row Visibility State with localStorage Hydration
   const [visibleRowKeys, setVisibleRowKeys] = useState<string[]>(() => {
@@ -288,6 +293,7 @@ export function usePrintStudioState({
   });
 
   useEffect(() => {
+    if (!isOpen) return;
     if (propVisibleRowKeys && Array.isArray(propVisibleRowKeys)) {
       setVisibleRowKeys(propVisibleRowKeys.map(String));
       return;
@@ -302,7 +308,7 @@ export function usePrintStudioState({
       }
       return retained.length > 0 ? retained : allRowKeys;
     });
-  }, [rowKeySignature, propVisibleRowKeys, allRowKeys]);
+  }, [isOpen, rowKeySignature, propVisibleRowKeys, allRowKeys]);
 
   // Extra Blank Rows with localStorage Hydration
   const [extraBlankRows, setExtraBlankRows] = useState<number>(() => {
@@ -359,46 +365,45 @@ export function usePrintStudioState({
 
   // Persist Global & Document-Specific Options to localStorage
   useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') return;
     try {
-      if (typeof window !== 'undefined') {
-        const globalData = {
-          pageSize: options.pageSize,
-          orientation: options.orientation,
-          margin: options.margin,
-          density: options.density,
-          colorMode: options.colorMode,
-          showHeader: options.showHeader,
-          showLogo: options.showLogo,
-          showTitle: options.showTitle,
-          showTitleLine: options.showTitleLine,
-          titleLineStyle: options.titleLineStyle,
-          showMeta: options.showMeta,
-          showMetaBox: options.showMetaBox,
-          metaFontSize: options.metaFontSize,
-          showSummary: options.showSummary,
-          showFooter: options.showFooter,
-          showWatermark: options.showWatermark,
-          watermarkText: options.watermarkText,
-          showSignatures: options.showSignatures,
-          signatureStyle: options.signatureStyle,
-          zoomLevel,
-          isSidebarOpen,
-        };
-        localStorage.setItem(GLOBAL_PREFS_KEY, JSON.stringify(globalData));
+      const globalData = {
+        pageSize: options.pageSize,
+        orientation: options.orientation,
+        margin: options.margin,
+        density: options.density,
+        colorMode: options.colorMode,
+        showHeader: options.showHeader,
+        showLogo: options.showLogo,
+        showTitle: options.showTitle,
+        showTitleLine: options.showTitleLine,
+        titleLineStyle: options.titleLineStyle,
+        showMeta: options.showMeta,
+        showMetaBox: options.showMetaBox,
+        metaFontSize: options.metaFontSize,
+        showSummary: options.showSummary,
+        showFooter: options.showFooter,
+        showWatermark: options.showWatermark,
+        watermarkText: options.watermarkText,
+        showSignatures: options.showSignatures,
+        signatureStyle: options.signatureStyle,
+        zoomLevel,
+        isSidebarOpen,
+      };
+      localStorage.setItem(GLOBAL_PREFS_KEY, JSON.stringify(globalData));
 
-        const docData = {
-          ...options,
-          visibleColumnKeys,
-          visibleRowKeys,
-          extraBlankRows,
-          zoomLevel,
-        };
-        localStorage.setItem(docKey, JSON.stringify(docData));
-      }
+      const docData = {
+        ...options,
+        visibleColumnKeys,
+        visibleRowKeys,
+        extraBlankRows,
+        zoomLevel,
+      };
+      localStorage.setItem(docKey, JSON.stringify(docData));
     } catch (e) {
       console.warn('Failed to save print settings to localStorage', e);
     }
-  }, [options, visibleColumnKeys, visibleRowKeys, extraBlankRows, zoomLevel, isSidebarOpen, docKey]);
+  }, [isOpen, options, visibleColumnKeys, visibleRowKeys, extraBlankRows, zoomLevel, isSidebarOpen, docKey]);
 
   // ── Undo / Redo History Architecture ──────────────────────────────────────
   const pastStackRef = useRef<PrintHistorySnapshot[]>([]);
@@ -504,7 +509,7 @@ export function usePrintStudioState({
         setLiveData((prev) => {
           const newRow: Record<string, any> = { id: `row_custom_${Date.now()}` };
           (liveColumns || []).forEach((c) => {
-            const k = c.id || c.key || c.accessor || c.dataIndex;
+            const k = String(c.id || c.key || (typeof c.accessor === 'string' ? c.accessor : '') || c.dataIndex || '');
             if (k) newRow[k] = '';
           });
           const insertIdx = position === 'above' ? rowIndex : rowIndex + 1;

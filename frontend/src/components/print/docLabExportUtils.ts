@@ -1,110 +1,26 @@
 import React from 'react';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas-pro';
 import { exportToNativeDocx, compileNativeDocxDocument } from './vectorDocxCompiler';
+import { compileVectorPDFDocument, getSafeFilename } from './vectorPDFCompiler';
+import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 
-/**
- * Standard page dimensions in points (pt) for jsPDF
- * 1 in = 72 pt, 1 mm = 2.83465 pt
- */
-const PAGE_DIMENSIONS_PT = {
-  a4: { width: 595.28, height: 841.89 },
-  a3: { width: 841.89, height: 1190.55 },
-  letter: { width: 612.0, height: 792.0 },
-  legal: { width: 612.0, height: 1008.0 },
-};
-
-/**
- * Helper to generate clean, safe filenames for downloaded assets
- */
-export function getSafeFilename(title, ext) {
-  const safe = (title || 'Official_Document')
-    .replace(/[/\\?%*:|"<>]/g, '_')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  return `${safe || 'Document'}.${ext}`;
-}
-
-/**
- * Helper to safely extract pure text from React nodes / JSX elements
- */
-function extractTextFromReactNode(node) {
-  if (node === null || node === undefined) return '';
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(extractTextFromReactNode).join('');
-  if (React.isValidElement(node) && node.props && node.props.children) {
-    return extractTextFromReactNode(node.props.children);
-  }
-  return '';
-}
-
-/**
- * Helper to get clean string value for any column and row
- */
-function getCellValue(col, row, rIdx) {
-  const colKey = col.id || col.key || col.accessor || col.dataIndex;
-  let raw = typeof col.accessor === 'function' ? col.accessor(row) : row[colKey];
-
-  if (col.render) {
-    const rendered = col.render(row, rIdx, raw);
-    if (typeof rendered === 'string' || typeof rendered === 'number') {
-      return String(rendered);
-    }
-    if (React.isValidElement(rendered)) {
-      return extractTextFromReactNode(rendered);
-    }
-  }
-
-  if (col.cell) {
-    const celled = col.cell(raw, row, rIdx);
-    if (typeof celled === 'string' || typeof celled === 'number') {
-      return String(celled);
-    }
-    if (React.isValidElement(celled)) {
-      return extractTextFromReactNode(celled);
-    }
-  }
-
-  return raw !== undefined && raw !== null ? String(raw) : '-';
-}
-
-/**
- * Helper to extract tabular data from rendered DOM if data array is not provided
- */
-function extractTableDataFromDOM(portalEl) {
-  if (!portalEl) return { headers: [], rows: [] };
-  const table = portalEl.querySelector('table');
-  if (!table) return { headers: [], rows: [] };
-
-  const headers = Array.from(table.querySelectorAll('thead th, tr:first-child th')).map(
-    (th) => th.innerText.trim()
-  );
-
-  const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
-  const rows = bodyRows.map((tr) =>
-    Array.from(tr.querySelectorAll('td')).map((td) => td.innerText.trim())
-  );
-
-  return { headers, rows };
-}
+export { getSafeFilename };
 
 /**
  * Helper to get exact page margin CSS string for @page rule
  */
-export function getPageMarginCSS(margin) {
+export function getPageMarginCSS(margin?: string): string {
   const norm = String(margin || 'NORMAL').toUpperCase();
   if (norm === 'NARROW') return '5mm 6mm 5mm 6mm';
   if (norm === 'WIDE') return '14mm 16mm 14mm 16mm';
   if (norm === 'NONE') return '0';
-  return '8mm 10mm 8mm 10mm'; // NORMAL default
+  return '8mm 10mm 8mm 10mm';
 }
 
 /**
  * Injects or updates dynamic @page CSS rule for browser print dialog
  */
-export function updatePrintPageStyle(options = {}) {
+export function updatePrintPageStyle(options: Partial<PrintOptions> = {}): void {
   if (typeof document === 'undefined') return;
   const pageSize = String(options.pageSize || 'A4').toLowerCase();
   const orientation = String(options.orientation || 'PORTRAIT').toLowerCase();
@@ -129,7 +45,7 @@ export function updatePrintPageStyle(options = {}) {
 /**
  * 1. Native Print Dialog
  */
-export function printDocument(options = {}) {
+export function printDocument(options: Partial<PrintOptions> = {}): void {
   if (typeof document !== 'undefined') {
     document.body.classList.add('spr-printing-in-progress');
     if (options && (options.pageSize || options.orientation || options.margin)) {
@@ -153,8 +69,8 @@ export function printDocument(options = {}) {
 /**
  * Helper to collect all active CSS rules from the document stylesheets
  */
-function collectDocumentStyles() {
-  const styles = [];
+function collectDocumentStyles(): string {
+  const styles: string[] = [];
   if (typeof document === 'undefined') return '';
   try {
     for (let i = 0; i < document.styleSheets.length; i++) {
@@ -165,22 +81,36 @@ function collectDocumentStyles() {
             styles.push(sheet.cssRules[j].cssText);
           }
         }
-      } catch (e) {
-        // Cross-origin stylesheet rules might not be accessible directly; safely continue
+      } catch {
+        // safely ignore cross-origin rules
       }
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
   return styles.join('\n');
 }
 
-import { compileVectorPDFDocument } from './vectorPDFCompiler';
+export interface ExportToPDFParams {
+  targetId?: string;
+  title?: string;
+  subtitle?: string;
+  metaItems?: PrintMetaItem[];
+  summaryMetrics?: PrintSummaryMetric[];
+  options?: Partial<PrintOptions>;
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  extraBlankRows?: number | string;
+  data?: Array<Record<string, any>>;
+  orientation?: string;
+  pageSize?: string;
+  margin?: string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}
 
 /**
- * 2. Canva / Adobe-Grade Client-Side Vector PDF Exporter (100% True Vector PDF)
- * Compiles structured document model directly into a 100% Vector PDF in client RAM (~50ms).
- * Fully offline, zero network latency, with selectable text, infinite zoom, and multi-tier server fallback.
+ * 2. Client-Side Vector PDF Exporter (100% True Vector PDF)
  */
 export async function exportToPDF({
   targetId = 'universal-print-portal',
@@ -198,21 +128,20 @@ export async function exportToPDF({
   margin = 'NORMAL',
   showToast,
   onCustomExport,
-}) {
+}: ExportToPDFParams): Promise<void> {
   if (onCustomExport) {
     onCustomExport();
     return;
   }
 
-  showToast?.('Generating Canva/Adobe-Grade Vector PDF...', 'info');
+  showToast?.('Generating Vector PDF...', 'info');
 
   try {
-    // ── Tier 1: Client-Side Vector Compiler (Canva / Adobe Engine — 100% Offline & Instant) ──
     const effectiveOptions = {
       ...options,
-      orientation: orientation || options.orientation || 'PORTRAIT',
-      pageSize: pageSize || options.pageSize || 'A4',
-      margin: margin || options.margin || 'NORMAL',
+      orientation: (orientation || options.orientation || 'PORTRAIT') as any,
+      pageSize: (pageSize || options.pageSize || 'A4') as any,
+      margin: (margin || options.margin || 'NORMAL') as any,
     };
 
     const doc = compileVectorPDFDocument({
@@ -228,13 +157,13 @@ export async function exportToPDF({
     });
 
     doc.save(getSafeFilename(title, 'pdf'));
-    showToast?.('100% Vector PDF downloaded successfully!', 'success');
+    showToast?.('Vector PDF downloaded successfully!', 'success');
     return;
   } catch (clientCompilerErr) {
     console.warn('Client vector compiler fallback, attempting server-side engine:', clientCompilerErr);
   }
 
-  // ── Tier 2: Server-Side Headless Chromium Engine Fallback ──
+  // Tier 2: Server-Side Fallback
   const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
   if (portalEl) {
     try {
@@ -264,7 +193,7 @@ export async function exportToPDF({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        showToast?.('100% Vector PDF downloaded successfully!', 'success');
+        showToast?.('Vector PDF downloaded successfully!', 'success');
         return;
       }
     } catch (serverErr) {
@@ -272,7 +201,7 @@ export async function exportToPDF({
     }
   }
 
-  // ── Tier 3: Native Browser Vector Print Fallback ──
+  // Tier 3: Native Browser Print Fallback
   showToast?.('Switched to direct Vector Print dialog...', 'info');
   printDocument();
 }
@@ -291,7 +220,18 @@ export function exportToExcel({
   showToast,
   onCustomExport,
   onExportCsv,
-}) {
+}: {
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  data?: Array<Record<string, any>>;
+  summaryMetrics?: PrintSummaryMetric[];
+  metaItems?: PrintMetaItem[];
+  subtitle?: string;
+  title?: string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+  onExportCsv?: (() => void) | null;
+}): void {
   if (onCustomExport) {
     onCustomExport();
     return;
@@ -302,30 +242,24 @@ export function exportToExcel({
   }
 
   try {
-    let headers = [];
-    let rows = [];
+    let headers: string[] = [];
+    let rows: string[][] = [];
 
     const activeCols = (columns || []).filter((c) => {
-      const key = c.id || c.key || c.accessor || c.dataIndex;
-      return visibleColumnKeys.includes(key);
+      const key = String(c.id || c.key || c.accessor || c.dataIndex);
+      return !visibleColumnKeys || visibleColumnKeys.length === 0 || visibleColumnKeys.includes(key);
     });
 
     if (activeCols.length > 0 && Array.isArray(data) && data.length > 0) {
-      headers = activeCols.map((c) => c.label || c.header || c.title || c.id || '');
+      headers = activeCols.map((c) => String(c.label || c.header || (c as any).title || c.id || ''));
       rows = data.map((row) =>
         activeCols.map((col) => {
-          const key = col.id || col.key || col.accessor || col.dataIndex;
+          const key = String(col.id || col.key || col.accessor || col.dataIndex);
           let val = typeof col.accessor === 'function' ? col.accessor(row) : row[key];
           if (val === undefined || val === null) val = '';
           return String(val);
         })
       );
-    } else {
-      // Fallback: Extract from rendered DOM table
-      const portalEl = document.getElementById('universal-print-portal');
-      const domData = extractTableDataFromDOM(portalEl);
-      headers = domData.headers;
-      rows = domData.rows;
     }
 
     if (headers.length === 0 && rows.length === 0) {
@@ -333,9 +267,8 @@ export function exportToExcel({
       return;
     }
 
-    const csvLines = [];
+    const csvLines: string[] = [];
 
-    // Header banner info
     if (title) csvLines.push(`"${title.replace(/"/g, '""')}"`);
     if (subtitle) csvLines.push(`"${subtitle.replace(/"/g, '""')}"`);
 
@@ -348,15 +281,12 @@ export function exportToExcel({
       csvLines.push('');
     }
 
-    // Table Column Headers
     csvLines.push(headers.map((h) => `"${String(h).replace(/"/g, '""')}"`).join(','));
 
-    // Table Data Rows
     rows.forEach((row) => {
       csvLines.push(row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
     });
 
-    // Summary Metrics / Totals Block
     if (Array.isArray(summaryMetrics) && summaryMetrics.length > 0) {
       csvLines.push('');
       csvLines.push('"--- Summary Metrics ---"');
@@ -367,7 +297,6 @@ export function exportToExcel({
       });
     }
 
-    // Prepend UTF-8 BOM for flawless Excel language compatibility
     const csvContent = '\uFEFF' + csvLines.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -398,35 +327,40 @@ export function exportToPlainText({
   title = 'Document_Data',
   showToast,
   onCustomExport,
-}) {
+}: {
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  data?: Array<Record<string, any>>;
+  summaryMetrics?: PrintSummaryMetric[];
+  metaItems?: PrintMetaItem[];
+  subtitle?: string;
+  title?: string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}): void {
   if (onCustomExport) {
     onCustomExport();
     return;
   }
 
   try {
-    let headers = [];
-    let rows = [];
+    let headers: string[] = [];
+    let rows: string[][] = [];
 
     const activeCols = (columns || []).filter((c) => {
-      const key = c.id || c.key || c.accessor || c.dataIndex;
-      return visibleColumnKeys.includes(key);
+      const key = String(c.id || c.key || c.accessor || c.dataIndex);
+      return !visibleColumnKeys || visibleColumnKeys.length === 0 || visibleColumnKeys.includes(key);
     });
 
     if (activeCols.length > 0 && Array.isArray(data) && data.length > 0) {
-      headers = activeCols.map((c) => c.label || c.header || c.title || c.id || '');
+      headers = activeCols.map((c) => String(c.label || c.header || (c as any).title || c.id || ''));
       rows = data.map((row) =>
         activeCols.map((col) => {
-          const key = col.id || col.key || col.accessor || col.dataIndex;
-          const val = typeof col.accessor === 'function' ? col.accessor(row) : row[key];
+          const key = String(col.id || col.key || col.accessor || col.dataIndex);
+          let val = typeof col.accessor === 'function' ? col.accessor(row) : row[key];
           return val === undefined || val === null ? '' : String(val);
         })
       );
-    } else {
-      const portalEl = document.getElementById('universal-print-portal');
-      const domData = extractTableDataFromDOM(portalEl);
-      headers = domData.headers;
-      rows = domData.rows;
     }
 
     if (headers.length === 0 && rows.length === 0) {
@@ -487,7 +421,7 @@ export function exportToPlainText({
 /**
  * 5. Native OpenXML Word Document (.docx) Exporter
  */
-export async function exportToWord(params = {}) {
+export async function exportToWord(params: any = {}): Promise<void> {
   return exportToNativeDocx(params);
 }
 
@@ -499,11 +433,18 @@ export { exportToNativeDocx, compileNativeDocxDocument };
 export async function exportToImage({
   targetId = 'universal-print-portal',
   title = 'Official_Document',
-  format = 'png', // 'png' | 'jpg' | 'jpeg'
+  format = 'png',
   quality = 1.0,
   showToast,
   onCustomExport,
-}) {
+}: {
+  targetId?: string;
+  title?: string;
+  format?: 'png' | 'jpg' | 'jpeg';
+  quality?: number;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}): Promise<void> {
   if (onCustomExport) {
     onCustomExport();
     return;
@@ -520,7 +461,7 @@ export async function exportToImage({
 
   try {
     const canvas = await html2canvas(portalEl, {
-      scale: 4, // 300+ DPI Ultra-sharp rendering
+      scale: 4,
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -551,8 +492,8 @@ export async function exportToImage({
     link.click();
     document.body.removeChild(link);
     showToast?.(`High-resolution ${isPng ? 'PNG' : 'JPG'} downloaded successfully!`, 'success');
-  } catch (err) {
+  } catch (err: any) {
     console.error('Image export failed:', err);
-    showToast?.(`Failed to export ${isPng ? 'PNG' : 'JPG'}: ` + (err.message || 'Unknown error'), 'error');
+    showToast?.(`Failed to export ${isPng ? 'PNG' : 'JPG'}: ` + (err?.message || 'Unknown error'), 'error');
   }
 }

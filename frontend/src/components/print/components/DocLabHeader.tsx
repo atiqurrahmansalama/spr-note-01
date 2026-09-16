@@ -1,32 +1,18 @@
 import React from 'react';
 import FullscreenButton from '../../ui/FullscreenButton';
-import PrintExportMenu from '../PrintExportMenu';
+import DocLabExportMenu from '../DocLabExportMenu';
 import {
-  ZoomInIcon,
-  ZoomOutIcon,
   SidebarRightIcon,
-  UndoIcon,
-  RedoIcon,
   CloseIcon,
-  FileIcon,
 } from '../../ui/Icons';
 import { PrintOptions, PrintColumn, PrintMetaItem, PrintSummaryMetric } from '../types';
 
-interface PrintStudioHeaderProps {
+export interface DocLabHeaderProps {
   title: string;
   subtitle?: string;
   totalPages: number;
   pageSize?: string;
   orientation?: string;
-  onOpenDocxModal: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  zoomLevel: number;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onResetZoom: () => void;
   isFullscreen: boolean;
   toggleFullscreen: () => void;
   isSidebarOpen: boolean;
@@ -48,7 +34,7 @@ interface PrintStudioHeaderProps {
   showImages?: boolean;
   showPng?: boolean;
   showJpg?: boolean;
-  enabledFormats?: Record<string, boolean>;
+  enabledFormats?: string[] | null | any;
   onPrint?: () => void;
   onExportPDF?: () => void;
   onExportExcel?: () => void;
@@ -60,26 +46,17 @@ interface PrintStudioHeaderProps {
 }
 
 /**
- * PrintStudioHeader
- * Master Top Action Toolbar for Universal Print Studio.
+ * DocLabHeader
+ * Master Top Action Toolbar for DocLab (Universal Print & Document Studio).
  * Houses branding, document metadata badges, Word import, Undo/Redo,
  * Zoom controls, Universal Export menu, Fullscreen toggle, and Sidebar toggler.
  */
-export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
+export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
   title,
   subtitle,
   totalPages,
   pageSize = 'A4',
   orientation = 'PORTRAIT',
-  onOpenDocxModal,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
-  zoomLevel,
-  onZoomIn,
-  onZoomOut,
-  onResetZoom,
   isFullscreen,
   toggleFullscreen,
   isSidebarOpen,
@@ -115,12 +92,12 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
       {/* Left: Branding & Document Title */}
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-          SPR
+          DOC
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-extrabold theme-text-primary text-base tracking-tight truncate leading-tight">
-              Print Studio
+              DocLab
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold theme-bg-sub theme-text-secondary border theme-border uppercase">
               {totalPages > 1 ? `${totalPages} Pages • ` : ''}
@@ -136,78 +113,12 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Interactive Undo/Redo, Zoom Controller, and Word (.docx) Ingestion */}
+      {/* Center: Live Status / Info */}
       <div className="hidden sm:flex items-center gap-2">
-        {/* Import Word Template Action */}
-        <button
-          type="button"
-          onClick={onOpenDocxModal}
-          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl theme-bg-sub/80 border theme-border theme-text-primary hover:theme-accent hover:border-[var(--accent-main)]/50 transition-all cursor-pointer shadow-2xs text-xs font-bold"
-          title="Import Microsoft Word (.docx) Document or Template"
-        >
-          <FileIcon className="w-3.5 h-3.5 theme-accent" />
-          <span>Import Word (.docx)</span>
-        </button>
-
-        {/* Undo / Redo Actions */}
-        <div className="flex items-center gap-1 px-1.5 py-1 rounded-2xl theme-bg-sub/80 border theme-border shadow-2xl">
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={!canUndo}
-            title="Undo print setting change (Ctrl+Z)"
-            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-              canUndo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-elevated'
-                : 'theme-text-muted/40 opacity-40 cursor-not-allowed'
-            }`}
-          >
-            <UndoIcon className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRedo}
-            disabled={!canRedo}
-            title="Redo print setting change (Ctrl+Y / Ctrl+Shift+Z)"
-            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-              canRedo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-elevated'
-                : 'theme-text-muted/40 opacity-40 cursor-not-allowed'
-            }`}
-          >
-            <RedoIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-2xl theme-bg-sub/80 border theme-border shadow-2xs">
-          <button
-            type="button"
-            onClick={onZoomOut}
-            title="Zoom Out (Ctrl -)"
-            className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-          >
-            <ZoomOutIcon className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onResetZoom}
-            title="Reset Zoom to 100%"
-            className="px-2 py-0.5 text-xs font-mono font-bold theme-text-primary hover:theme-accent transition-colors cursor-pointer"
-          >
-            {Math.round(zoomLevel * 100)}%
-          </button>
-
-          <button
-            type="button"
-            onClick={onZoomIn}
-            title="Zoom In (Ctrl +)"
-            className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-          >
-            <ZoomInIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium theme-bg-sub/80 theme-text-secondary border theme-border">
+          <span className="w-1.5 h-1.5 rounded-full theme-bg-accent animate-pulse" />
+          Interactive Artboard
+        </span>
       </div>
 
       {/* Right: Actions (Export Dropdown Menu, Fullscreen, Sidebar Toggle, Close) */}
@@ -220,7 +131,7 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
         />
 
         {/* Master Universal Export Button & Dropdown Menu */}
-        <PrintExportMenu
+        <DocLabExportMenu
           title={title}
           subtitle={subtitle}
           metaItems={liveMetaItems}
@@ -247,9 +158,6 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
           onExportWord={onExportWord}
           onExportPng={onExportPng}
           onExportJpg={onExportJpg}
-          pageSize={options.pageSize}
-          orientation={options.orientation}
-          margin={options.margin}
         />
 
         {/* Right Sidebar Toggle Button */}
@@ -270,7 +178,7 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
         <button
           type="button"
           onClick={onClose}
-          title="Close Print Studio (Esc)"
+          title="Close DocLab (Esc)"
           className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer flex items-center justify-center text-sm font-bold ml-1"
         >
           <CloseIcon className="w-4 h-4" />
@@ -279,3 +187,5 @@ export const PrintStudioHeader: React.FC<PrintStudioHeaderProps> = ({
     </header>
   );
 };
+
+export default DocLabHeader;

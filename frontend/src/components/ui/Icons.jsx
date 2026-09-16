@@ -1268,6 +1268,15 @@ export function ZoomOutIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export function ZoomResetIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
+
 export function ArrowsPointingOutIcon({ className = "w-4 h-4" }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1497,6 +1506,98 @@ export function HeadingIcon({ className = "w-4 h-4" }) {
     </svg>
   );
 }
+
+export function StrikethroughIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+    </svg>
+  );
+}
+
+export function SubscriptIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m4 5 8 8" />
+      <path d="m12 5-8 8" />
+      <path d="M20 19h-4c0-1.5.44-2 1.5-2.5S20 15.33 20 14c0-.47-.17-.93-.48-1.29a2.11 2.11 0 0 0-2.62-.44c-.42.24-.74.62-.9 1.07" />
+    </svg>
+  );
+}
+
+export function SuperscriptIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m4 19 8-8" />
+      <path d="m12 19-8-8" />
+      <path d="M20 9h-4c0-1.5.44-2 1.5-2.5S20 5.33 20 4c0-.47-.17-.93-.48-1.29a2.11 2.11 0 0 0-2.62-.44c-.42.24-.74.62-.9 1.07" />
+    </svg>
+  );
+}
+
+export function TextColorIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20h16" strokeWidth="3" />
+      <path d="m6 16 6-12 6 12" />
+      <path d="M8 12h8" />
+    </svg>
+  );
+}
+
+export function HighlighterIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 11-6 6v3h3l6-6" />
+      <path d="m22 7-4.5-4.5a2.12 2.12 0 0 0-3 0L10.5 6.5 17.5 13.5 22 9a2.12 2.12 0 0 0 0-3z" />
+    </svg>
+  );
+}
+
+export function IndentIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="21" y1="6" x2="11" y2="6" />
+      <line x1="21" y1="12" x2="11" y2="12" />
+      <line x1="21" y1="18" x2="11" y2="18" />
+      <polyline points="3 8 7 12 3 16" />
+    </svg>
+  );
+}
+
+export function OutdentIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="21" y1="6" x2="11" y2="6" />
+      <line x1="21" y1="12" x2="11" y2="12" />
+      <line x1="21" y1="18" x2="11" y2="18" />
+      <polyline points="7 8 3 12 7 16" />
+    </svg>
+  );
+}
+
+export function DividerIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2" />
+    </svg>
+  );
+}
+
+export function PageBreakIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v4" />
+      <path d="M4 16v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+      <path d="M20 8V4a2 2 0 0 0-2-2h-4" />
+      <line x1="2" y1="12" x2="22" y2="12" strokeDasharray="3 3" />
+    </svg>
+  );
+}
+
+
+
 
 
 
