@@ -4,7 +4,7 @@ import { TimerIcon } from '../../../components/ui/Icons';
 export default function ClassPeriodSwitcherBar({
   title = 'CLASS ROUTINE PERIODS',
   allPeriodFilterOptions = [],
-  activePeriodId = 'ALL',
+  activePeriodId = '1',
   onPeriodChange,
   getSlotCount,
   getPeriodSubtitle,
@@ -56,7 +56,7 @@ export default function ClassPeriodSwitcherBar({
     periodScrollRef.current.scrollLeft = scrollLeftState - walk;
   };
 
-  const totalSlotsCount = allPeriodFilterOptions.length > 1 ? allPeriodFilterOptions.length - 1 : 0;
+  const totalSlotsCount = allPeriodFilterOptions.length;
 
   return (
     <div className="col-span-6 pt-1">

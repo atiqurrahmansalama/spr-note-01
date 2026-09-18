@@ -30,6 +30,7 @@ export const navigation = {
   generateReport: 'إنشاء تقرير',
   studentReports: 'تقارير الطلاب',
   dailyLessons: 'الدروس اليومية',
+  dailyProgress: 'التقدم اليومي',
   recitations: 'التسميع والتقييم',
   homework: 'الواجبات المنزلية',
   examinations: 'إدارة الاختبارات',
@@ -67,5 +68,11 @@ export const navigation = {
   officialWebsite: 'الموقع الرسمي',
   publicPortalVerification: 'البوابة العامة والتحقق',
   printStudio: 'استوديو الطباعة',
+  finance: 'المالية والحسابات',
+  financeOverview: 'نظرة عامة',
+  financeStudentBilling: 'رسوم الطلاب والفوترة',
+  financeStaffPayroll: 'رواتب الموظفين',
+  financeGeneralLedger: 'دفتر الأستاذ العام',
+  financeReports: 'القوائم المالية',
 };
 

@@ -123,6 +123,25 @@ from .views import (
     ManualBroadcastViewSet,
     VectorPDFExportAPIView,
     AuditLogViewSet,
+    FinanceDashboardKpiView,
+    InstitutionalFundViewSet,
+    FiscalYearViewSet,
+    ChartOfAccountViewSet,
+    FinancialVoucherViewSet,
+    FeeHeadViewSet,
+    FeeStructureViewSet,
+    StudentFeeWaiverViewSet,
+    StudentInvoiceViewSet,
+    MoneyReceiptViewSet,
+    PublicReceiptVerificationView,
+    StaffPayHeadViewSet,
+    StaffSalaryStructureItemViewSet,
+    StaffSalaryAdvanceViewSet,
+    StaffPayrollRunViewSet,
+    StaffPayslipViewSet,
+    DepartmentBudgetViewSet,
+    FinancialStatementReportsView,
+    FinancialAuditLogViewSet,
 )
 
 router = DefaultRouter()
@@ -197,6 +216,24 @@ router.register(r'learning/homeworks', HomeworkAssignmentViewSet, basename='lear
 router.register(r'learning/homework-submissions', HomeworkSubmissionViewSet, basename='learning-homework-submissions')
 router.register(r'learning/reports', AcademicReportViewSet, basename='learning-reports')
 
+# Enterprise Finance, Accounts, Billing & Payroll Routers
+router.register(r'finance/funds', InstitutionalFundViewSet, basename='finance-funds')
+router.register(r'finance/fiscal-years', FiscalYearViewSet, basename='finance-fiscal-years')
+router.register(r'finance/accounts', ChartOfAccountViewSet, basename='finance-accounts')
+router.register(r'finance/vouchers', FinancialVoucherViewSet, basename='finance-vouchers')
+router.register(r'finance/fee-heads', FeeHeadViewSet, basename='finance-fee-heads')
+router.register(r'finance/fee-structures', FeeStructureViewSet, basename='finance-fee-structures')
+router.register(r'finance/waivers', StudentFeeWaiverViewSet, basename='finance-waivers')
+router.register(r'finance/invoices', StudentInvoiceViewSet, basename='finance-invoices')
+router.register(r'finance/receipts', MoneyReceiptViewSet, basename='finance-receipts')
+router.register(r'finance/pay-heads', StaffPayHeadViewSet, basename='finance-pay-heads')
+router.register(r'finance/salary-structures', StaffSalaryStructureItemViewSet, basename='finance-salary-structures')
+router.register(r'finance/salary-advances', StaffSalaryAdvanceViewSet, basename='finance-salary-advances')
+router.register(r'finance/payroll-runs', StaffPayrollRunViewSet, basename='finance-payroll-runs')
+router.register(r'finance/payslips', StaffPayslipViewSet, basename='finance-payslips')
+router.register(r'finance/budgets', DepartmentBudgetViewSet, basename='finance-budgets')
+router.register(r'finance/audit-logs', FinancialAuditLogViewSet, basename='finance-audit-logs')
+
 
 from django.http import JsonResponse
 
@@ -261,6 +298,12 @@ urlpatterns = [
     path('api/v1/user/deactivate/', DeactivateAccountView.as_view(), name='user_deactivate'),
     path('api/v1/user/delete/', DeleteAccountView.as_view(), name='user_delete'),
 
+
+    # Finance & Accounts Specific Endpoints
+    path('api/v1/finance/dashboard/kpis/', FinanceDashboardKpiView.as_view(), name='finance_kpis'),
+    path('api/v1/finance/statements/<str:statement_type>/', FinancialStatementReportsView.as_view(), name='finance_statements'),
+    path('api/v1/public/finance/verify-receipt/<str:receipt_number>/', PublicReceiptVerificationView.as_view(), name='public_receipt_verify'),
+    path('public/finance/verify-receipt/<str:receipt_number>/', PublicReceiptVerificationView.as_view(), name='public_receipt_verify_legacy'),
 
     # Verification endpoint
     path('api/v1/hifz/verify-report/<str:report_id>/', VerifyReportView.as_view(), name='verify_report'),

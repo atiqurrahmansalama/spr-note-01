@@ -2,6 +2,7 @@ import React from 'react';
 
 // Shared label constants for consistent copy across cell renderers
 const NO_ASSIGNMENT_LABEL = 'No lesson assigned';
+const NO_BOOK_LABEL = 'No book assigned';
 
 /**
  * Format range units cleanly without repeating prefix words like "Page", "Pages", "Ayah", "Para"
@@ -39,22 +40,20 @@ export function formatRangeText(start, end) {
 export function renderCurriculumBookCell(row) {
   const bookName = row.curriculum_book_name;
   const subjectName = row.subject_name;
+  const hasBook = Boolean(bookName && bookName.trim() && bookName !== 'General Curriculum' && bookName !== NO_BOOK_LABEL);
 
   return (
     <div className="space-y-0.5 min-w-0 w-full text-left">
       <span
-        className="text-xs font-bold theme-text-primary block truncate"
-        title={bookName || subjectName || 'General Curriculum'}
+        className={`text-xs block truncate ${hasBook ? 'font-bold theme-text-primary' : 'font-medium theme-text-secondary/70 italic'}`}
+        title={hasBook ? bookName : NO_BOOK_LABEL}
       >
-        {bookName || subjectName || 'General Curriculum'}
+        {hasBook ? bookName : NO_BOOK_LABEL}
       </span>
-      {subjectName && bookName && subjectName !== bookName && (
-        <span
-          className="text-[11px] font-medium theme-text-secondary block truncate"
-          title={subjectName}
-        >
+      {subjectName && subjectName !== bookName && subjectName !== NO_BOOK_LABEL && (
+        <div className="text-[11px] font-medium theme-text-secondary truncate" title={subjectName}>
           {subjectName}
-        </span>
+        </div>
       )}
     </div>
   );
@@ -65,6 +64,18 @@ export function renderCurriculumBookCell(row) {
  * Used in Daily Lesson Delivery
  */
 export function renderLessonRangeCell(row) {
+  const hasAssignedLesson = Boolean(row.is_assigned || row.lesson_title || row.start_unit || row.end_unit);
+
+  if (!hasAssignedLesson) {
+    return (
+      <div className="space-y-0.5 min-w-0 w-full text-left">
+        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate">
+          {NO_ASSIGNMENT_LABEL}
+        </span>
+      </div>
+    );
+  }
+
   const title = row.lesson_title || row.lesson_covered || 'Daily Sabaq';
   const rangeText = formatRangeText(row.start_unit, row.end_unit);
 
@@ -76,9 +87,13 @@ export function renderLessonRangeCell(row) {
       >
         {title}
       </span>
-      {rangeText && (
-        <span className="text-[11px] font-bold theme-text-accent block truncate">
+      {rangeText ? (
+        <span className="text-[11px] font-bold theme-accent block truncate">
           {rangeText}
+        </span>
+      ) : (
+        <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate">
+          {NO_ASSIGNMENT_LABEL}
         </span>
       )}
     </div>
@@ -95,10 +110,11 @@ export function renderAssessmentCurriculumLessonCell(row) {
   const bookName = row.curriculum_book_name || row.subject_name;
   const title = row.lesson_title || row.lesson_covered;
   const rangeText = formatRangeText(row.start_unit, row.end_unit);
+  const hasBook = Boolean(bookName && bookName.trim() && bookName !== 'General Curriculum' && bookName !== 'Class Curriculum' && bookName !== NO_BOOK_LABEL);
 
   const hasAssignment = Boolean(
     row.has_assigned_lesson ||
-    bookName ||
+    hasBook ||
     title ||
     rangeText
   );
@@ -108,9 +124,9 @@ export function renderAssessmentCurriculumLessonCell(row) {
       <div className="space-y-0.5 min-w-0 w-full text-left">
         <span
           className="text-xs font-bold theme-text-primary block truncate"
-          title={row.student_class_name || 'Class Curriculum'}
+          title={row.student_class_name || 'Class Division'}
         >
-          {row.student_class_name || 'Class Curriculum'}
+          {row.student_class_name || 'Class Division'}
         </span>
         <span className="text-[11px] font-medium theme-text-secondary/70 italic block truncate">
           {NO_ASSIGNMENT_LABEL}
@@ -123,10 +139,10 @@ export function renderAssessmentCurriculumLessonCell(row) {
     <div className="space-y-0.5 min-w-0 w-full text-left">
       {/* Line 1: Book Name */}
       <span
-        className="text-xs font-bold theme-text-primary block truncate"
-        title={bookName || row.student_class_name || 'Curriculum Subject'}
+        className={`text-xs block truncate ${hasBook ? 'font-bold theme-text-primary' : 'font-medium theme-text-secondary/70 italic'}`}
+        title={hasBook ? bookName : NO_BOOK_LABEL}
       >
-        {bookName || row.student_class_name || 'Curriculum Subject'}
+        {hasBook ? bookName : NO_BOOK_LABEL}
       </span>
 
       {/* Line 2: Lesson Title */}

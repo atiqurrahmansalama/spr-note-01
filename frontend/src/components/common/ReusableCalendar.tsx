@@ -53,6 +53,13 @@ export interface ReusableCalendarProps {
   subLabel?: string;
   required?: boolean;
   optional?: boolean;
+  dateFormat?: string;
+  showHijri?: boolean;
+  headerAction?: React.ReactNode;
+  onManage?: () => void;
+  onActionClick?: () => void;
+  actionLabel?: string | null;
+  manageLabel?: string | null;
   badge?: React.ReactNode;
   error?: string | null;
   helperText?: string | null;
@@ -98,6 +105,13 @@ export default function ReusableCalendar({
   required = false,
   optional = false,
   badge = null,
+  headerAction = null,
+  onManage = null,
+  onActionClick = null,
+  actionLabel = null,
+  manageLabel = null,
+  dateFormat = '',
+  showHijri = false,
   error = null,
   helperText = null,
   disabled = false,
@@ -329,6 +343,13 @@ export default function ReusableCalendar({
     if (!dStr) return '';
     const [y, m, d] = dStr.split('-');
     if (!y || !m || !d) return dStr;
+    if (dateFormat) {
+      return dateFormat
+        .replace('YYYY', y)
+        .replace('YY', y.slice(2))
+        .replace('MM', m)
+        .replace('DD', d);
+    }
     return `${d}/${m}/${y.slice(2)}`;
   };
 
@@ -507,8 +528,8 @@ export default function ReusableCalendar({
                 <ChevronIcon isOpen={false} className="w-2.5 h-2.5 theme-accent group-hover:translate-y-0.5 transition-transform" />
               </button>
 
-              {/* Hijri Dynamic Subtitle */}
-              {(() => {
+              {/* Hijri Dynamic Subtitle (Optional) */}
+              {showHijri && (() => {
                 try {
                   const firstDayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
                   const d = getHijriDetails(new Date(firstDayStr));
@@ -656,6 +677,11 @@ export default function ReusableCalendar({
             required={required}
             optional={optional}
             badge={badge}
+            headerAction={headerAction}
+            onManage={onManage}
+            onActionClick={onActionClick}
+            actionLabel={actionLabel}
+            manageLabel={manageLabel}
             placeholder={placeholder}
             value={getLabel() === placeholder ? '' : getLabel()}
             readOnly={true}

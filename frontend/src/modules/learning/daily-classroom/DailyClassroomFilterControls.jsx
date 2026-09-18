@@ -21,29 +21,32 @@ export default function DailyClassroomFilterControls({
 
   // Department configuration
   hasDepartments = filterProps?.hasDepartments ?? false,
-  selectedDepartmentId = filterProps?.selectedDepartmentId ?? 'ALL',
+  selectedDepartmentId = filterProps?.selectedDepartmentId ?? '',
   onDepartmentChange = filterProps?.onDepartmentChange,
   departmentSelectOptions = filterProps?.departmentSelectOptions ?? [],
   departmentLabel = filterProps?.departmentLabel ?? 'Department',
+  departmentPlaceholder = filterProps?.departmentPlaceholder ?? 'Select Department...',
 
   // Class configuration
-  selectedClassId = filterProps?.selectedClassId ?? 'ALL',
+  selectedClassId = filterProps?.selectedClassId ?? '',
   onClassChange = filterProps?.onClassChange,
   classSelectOptions = filterProps?.classSelectOptions ?? [],
   classLabel = filterProps?.classLabel ?? 'Class',
+  classPlaceholder = filterProps?.classPlaceholder ?? 'Select Class...',
 
   // Section configuration
   hasSectionsForClass = filterProps?.hasSectionsForClass ?? false,
-  selectedSectionId = filterProps?.selectedSectionId ?? 'ALL',
+  selectedSectionId = filterProps?.selectedSectionId ?? '',
   onSectionChange = filterProps?.onSectionChange,
   sectionSelectOptions = filterProps?.sectionSelectOptions ?? [],
   sectionLabel = filterProps?.sectionLabel ?? 'Section',
+  sectionPlaceholder = filterProps?.sectionPlaceholder ?? 'Select Section...',
 
   // Period Switcher Bar configuration
   showPeriodSwitcher = filterProps?.showPeriodSwitcher ?? true,
   periodSwitcherTitle = filterProps?.periodSwitcherTitle ?? 'CLASS ROUTINE PERIODS',
   allPeriodFilterOptions = filterProps?.allPeriodFilterOptions ?? [],
-  activePeriodId = filterProps?.activePeriodId ?? 'ALL',
+  activePeriodId = filterProps?.activePeriodId ?? '1',
   onPeriodChange = filterProps?.onPeriodChange,
   getSlotCount = filterProps?.getSlotCount,
   getPeriodSubtitle = filterProps?.getPeriodSubtitle,
@@ -86,6 +89,7 @@ export default function DailyClassroomFilterControls({
         <div className={deptSpanClass}>
           <CustomSelect
             label={departmentLabel}
+            placeholder={departmentPlaceholder}
             options={departmentSelectOptions}
             value={selectedDepartmentId}
             onChange={onDepartmentChange}
@@ -98,6 +102,7 @@ export default function DailyClassroomFilterControls({
       <div className={classSpanClass}>
         <CustomSelect
           label={classLabel}
+          placeholder={classPlaceholder}
           options={classSelectOptions}
           value={selectedClassId}
           onChange={onClassChange}
@@ -110,6 +115,7 @@ export default function DailyClassroomFilterControls({
         <div className={sectionSpanClass}>
           <CustomSelect
             label={sectionLabel}
+            placeholder={sectionPlaceholder}
             options={sectionSelectOptions}
             value={selectedSectionId}
             onChange={onSectionChange}

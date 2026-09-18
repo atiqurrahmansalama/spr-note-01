@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronIcon } from './Icons';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronIcon, SleekCheckIcon } from './Icons';
 import { focusNextInput } from '../../utils/keyboardUtils';
 
 export interface AutocompleteOption {
@@ -7,7 +8,10 @@ export interface AutocompleteOption {
   name?: string;
   value?: any;
   sub?: string;
+  subLabel?: string;
   group_name?: string;
+  badge?: string;
+  typeLabel?: string;
   onEdit?: (item: any) => void;
   onDelete?: (item: any) => void;
   [key: string]: any;
@@ -20,19 +24,38 @@ export interface AutocompleteDropdownProps {
   onAddNew?: (val: string) => void;
   onNextFocus?: () => void;
   placeholder?: string;
+  label?: string;
+  subLabel?: string;
+  required?: boolean;
+  optional?: boolean;
+  badge?: React.ReactNode;
+  headerAction?: React.ReactNode;
+  onActionClick?: () => void;
+  actionLabel?: string | null;
+  manageLabel?: string | null;
   className?: string;
+  inputClassName?: string;
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'filled' | 'elevated' | 'sub';
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null> | null;
   disableSaveButton?: boolean;
   showAllOptionsOnFocus?: boolean;
   readOnly?: boolean;
+  disabled?: boolean;
+  icon?: React.ComponentType<{ className?: string }> | null;
+  error?: string | null;
   [key: string]: any;
 }
 
 /**
- * AutocompleteDropdown
- * Enterprise keyboard-navigable autocomplete dropdown with quick creation,
- * inline search filtering, and custom item actions.
+ * Enterprise AutocompleteDropdown Component
+ * Features:
+ * - 100% Design Token Parity with CustomSelect & CustomInput
+ * - Portal Positioning Engine with Screen Boundary Calculation & Scroll Listeners
+ * - Dual Search & Direct Keyboard Navigation (ArrowUp/Down, Enter, Shift++)
+ * - Subtitle & Badge Enrichment for Student Group / Section metadata
+ * - SleekCheckIcon & Project Standard Hover / Focus Ring Styling
  */
 export default function AutocompleteDropdown({
   options = [],
@@ -41,15 +64,30 @@ export default function AutocompleteDropdown({
   onAddNew,
   onNextFocus,
   placeholder = 'Search or type...',
+  label = '',
+  subLabel = '',
+  required = false,
+  optional = false,
+  badge = null,
+  headerAction = null,
+  onActionClick = null,
+  actionLabel = null,
+  manageLabel = null,
   className = '',
+  inputClassName = '',
+  size = 'md',
+  variant = 'sub',
   autoFocus = false,
   inputRef = null,
   disableSaveButton = false,
   showAllOptionsOnFocus = false,
   readOnly = false,
+  disabled = false,
+  icon: Icon = null,
+  error = null,
 }: AutocompleteDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const initialSearchTerm = typeof value === 'string' ? value : value?.label || '';
+  const initialSearchTerm = typeof value === 'string' ? value : value?.label || value?.name || '';
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [prevValue, setPrevValue] = useState(value);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -57,21 +95,76 @@ export default function AutocompleteDropdown({
   const localInputRef = useRef<HTMLInputElement>(null);
   const refToUse = (inputRef as React.RefObject<HTMLInputElement>) || localInputRef;
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [coords, setCoords] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    openUpward: false,
+    maxHeight: 240,
+  });
 
   if (value !== prevValue) {
     setPrevValue(value);
-    setSearchTerm(typeof value === 'string' ? value : value?.label || '');
+    setSearchTerm(typeof value === 'string' ? value : value?.label || value?.name || '');
   }
+
+  // Recalculate popup position accurately matching CustomSelect
+  const updatePosition = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const minRequiredSpace = 160;
+
+    const shouldOpenUpward = spaceBelow < minRequiredSpace && spaceAbove > spaceBelow;
+    const availableHeight = shouldOpenUpward
+      ? Math.max(120, spaceAbove - 16)
+      : Math.max(120, spaceBelow - 16);
+    const calculatedMaxHeight = Math.min(260, availableHeight);
+
+    setCoords({
+      left: rect.left,
+      width: rect.width,
+      top: shouldOpenUpward ? rect.top - 6 : rect.bottom + 6,
+      openUpward: shouldOpenUpward,
+      maxHeight: calculatedMaxHeight,
+    });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      const handleScroll = (e: Event) => {
+        if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
+        updatePosition();
+      };
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     if (autoFocus && refToUse.current) {
@@ -85,16 +178,16 @@ export default function AutocompleteDropdown({
 
   const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : (searchTerm as any)?.label || '';
 
-  const filteredOptions = (options || []).filter((item) => {
-    if (showAllOptionsOnFocus && isOpen) return true;
-    if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
-    const term = safeSearchTerm.trim().toLowerCase();
-    const label = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
-    const sub = (typeof item === 'object' ? item?.sub || item?.group_name || '' : '').toLowerCase();
-    return label.includes(term) || sub.includes(term);
-  });
-
-  const hasSearchTerm = safeSearchTerm.trim().length > 0;
+  const filteredOptions = useMemo(() => {
+    return (options || []).filter((item) => {
+      if (showAllOptionsOnFocus && isOpen) return true;
+      if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
+      const term = safeSearchTerm.trim().toLowerCase();
+      const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
+      const sub = (typeof item === 'object' ? item?.sub || item?.subLabel || item?.group_name || '' : '').toLowerCase();
+      return labelText.includes(term) || sub.includes(term);
+    });
+  }, [options, showAllOptionsOnFocus, isOpen, safeSearchTerm]);
 
   const triggerNextFocus = () => {
     if (onNextFocus) {
@@ -131,9 +224,8 @@ export default function AutocompleteDropdown({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // If user presses Shift + '+' (Shift + Plus) to trigger quick save
     if (e.shiftKey && (e.key === '+' || e.key === '=')) {
-      if (onAddNew) {
+      if (onAddNew && safeSearchTerm.trim()) {
         e.preventDefault();
         handleSaveClick();
         return;
@@ -158,6 +250,8 @@ export default function AutocompleteDropdown({
         const selected = filteredOptions[highlightedIndex];
         if (selected) {
           handleSelect(selected);
+        } else if (onAddNew && safeSearchTerm.trim()) {
+          handleSaveClick();
         } else {
           setIsOpen(false);
           triggerNextFocus();
@@ -173,120 +267,212 @@ export default function AutocompleteDropdown({
     }
   };
 
+  // Size classes matching CustomInput and CustomSelect
+  const sizeClasses = {
+    sm: 'min-h-[38px] px-3 py-1.5 text-xs rounded-xl',
+    md: 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl',
+    lg: 'min-h-[54px] px-5 py-3.5 text-sm sm:text-base rounded-2xl',
+  }[size] || 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl';
+
+  // Variant classes
+  let variantClasses = 'theme-bg-sub theme-border border';
+  if (variant === 'filled') {
+    variantClasses = 'theme-bg-elevated theme-border border';
+  } else if (variant === 'elevated') {
+    variantClasses = 'theme-bg-elevated theme-border border shadow-sm';
+  }
+
+  const dropdownMenu =
+    isOpen && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: 'fixed',
+              left: `${coords.left}px`,
+              top: coords.openUpward ? 'auto' : `${coords.top}px`,
+              bottom: coords.openUpward ? `${window.innerHeight - coords.top}px` : 'auto',
+              width: `${coords.width}px`,
+              zIndex: 99999,
+            }}
+            className="theme-bg-surface border theme-border shadow-2xl overflow-hidden animate-fade-in rounded-2xl p-1.5"
+          >
+            <div
+              style={{
+                maxHeight: `${Math.max(80, coords.maxHeight - 10)}px`,
+              }}
+              className="p-1 space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar"
+            >
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((item, index) => {
+                  const itemLabel = typeof item === 'string' ? item : item.label || item.name || '';
+                  const itemSub = typeof item === 'object' ? item.sub || item.subLabel || item.group_name : null;
+                  const itemBadge = typeof item === 'object' ? item.badge || item.typeLabel : null;
+                  const isHighlighted = index === highlightedIndex;
+                  const isSelected = itemLabel.toLowerCase() === safeSearchTerm.toLowerCase();
+
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleSelect(item)}
+                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer group/item ${
+                        isSelected || isHighlighted
+                          ? 'theme-bg-accent theme-accent-text font-bold shadow-xs'
+                          : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-medium">{itemLabel}</span>
+                            {itemBadge && (
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border ${
+                                  isSelected || isHighlighted
+                                    ? 'theme-bg-surface/80 border-[var(--accent-main)]/30 theme-accent font-semibold'
+                                    : 'theme-bg-sub theme-text-secondary border-current/10'
+                                }`}
+                              >
+                                {itemBadge}
+                              </span>
+                            )}
+                          </div>
+                          {itemSub && (
+                            <div
+                              className={`text-[10px] truncate mt-0.5 ${
+                                isSelected || isHighlighted ? 'opacity-80' : 'theme-text-secondary'
+                              }`}
+                            >
+                              {itemSub}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1.5" />}
+                    </button>
+                  );
+                })
+              ) : safeSearchTerm.trim() && onAddNew ? (
+                <button
+                  type="button"
+                  onClick={handleSaveClick}
+                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  <span className="truncate">Add &ldquo;{safeSearchTerm.trim()}&rdquo;</span>
+                  <span className="text-[10px] font-mono opacity-70">Shift + +</span>
+                </button>
+              ) : (
+                <div className="px-3 py-2 text-center text-xs theme-text-secondary">
+                  No matching options
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
-    <div ref={containerRef} className={`relative w-full ${className}`}>
-      <div className="flex items-center gap-2">
-        {/* Input field with chevron */}
-        <div className="relative flex items-center flex-1">
+    <div ref={containerRef} className={`relative w-full text-left font-sans ${className}`}>
+      {/* Top Bar: Label, Badge, and Action */}
+      {(label || subLabel || onActionClick || actionLabel || manageLabel || headerAction || badge) && (
+        <div className="flex items-center justify-between gap-2 mb-2 select-none">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {label && (
+              <label
+                onClick={() => refToUse.current?.focus()}
+                className="block text-xs font-bold theme-text-secondary uppercase tracking-wider cursor-pointer"
+              >
+                {label} {required && <span className="theme-danger">*</span>}
+              </label>
+            )}
+            {optional && (
+              <span className="text-[10px] font-semibold theme-text-secondary opacity-60 uppercase tracking-wider">
+                (Optional)
+              </span>
+            )}
+            {badge && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border">
+                {badge}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {headerAction ? (
+              headerAction
+            ) : onActionClick || actionLabel ? (
+              <button
+                type="button"
+                onClick={onActionClick || handleSaveClick}
+                className="text-xs font-semibold theme-accent hover:opacity-80 cursor-pointer flex items-center gap-1 transition-colors"
+              >
+                <span>{actionLabel || manageLabel || '+ Save'}</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {subLabel && (
+        <p className="text-[11px] theme-text-secondary mb-2 font-medium leading-tight">
+          {subLabel}
+        </p>
+      )}
+
+      {/* Input Box Trigger matching CustomInput & CustomSelect styling */}
+      <div
+        className={`w-full ${sizeClasses} ${variantClasses} transition-all duration-150 flex items-center justify-between font-medium cursor-text ${
+          disabled
+            ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
+            : isOpen
+            ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
+            : error
+            ? 'border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 theme-bg-sub theme-text-primary'
+            : 'hover:border-[var(--accent-main)]/40 focus-within:border-[var(--accent-main)] focus-within:ring-2 focus-within:ring-[var(--accent-main)]/20 theme-text-primary'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1 h-full">
+          {Icon && (
+            <div className="mr-1.5 shrink-0 flex items-center justify-center select-none pointer-events-none">
+              <Icon className="w-4 h-4 shrink-0 theme-accent opacity-90" />
+            </div>
+          )}
+
           <input
             ref={refToUse}
             type="text"
             readOnly={readOnly}
+            disabled={disabled}
             value={safeSearchTerm}
             onChange={readOnly ? undefined : handleInputChange}
             onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') setIsOpen(!isOpen); } : handleKeyDown}
-            onFocus={() => setIsOpen(true)}
-            onClick={() => setIsOpen(true)}
+            onFocus={() => !disabled && setIsOpen(true)}
+            onClick={() => !disabled && setIsOpen(true)}
             placeholder={placeholder}
-            className={`w-full theme-bg-sub rounded-xl px-4 py-2.5 theme-text-primary font-medium text-sm border theme-border focus:outline-none focus:border-[var(--accent-main)]/50 transition-colors pr-8 ${
+            className={`w-full bg-transparent border-0 outline-none p-0 font-medium theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 text-xs sm:text-sm ${
               readOnly ? 'cursor-pointer select-none' : ''
-            }`}
+            } ${inputClassName}`}
           />
-
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsOpen((prev) => !prev);
-            }}
-            className="absolute right-3 p-1 theme-text-secondary hover:theme-text-primary cursor-pointer select-none flex items-center justify-center"
-          >
-            <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
-          </div>
         </div>
 
-        {/* Save button - outside the input box on the right */}
-        {hasSearchTerm && !disableSaveButton && (
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            className="theme-bg-accent hover:opacity-90 theme-accent-text text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors shadow shrink-0 cursor-pointer"
-            title="Click or press Shift + + to save new record"
-          >
-            + Save
-          </button>
-        )}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!disabled) {
+              setIsOpen((prev) => !prev);
+              if (!isOpen) refToUse.current?.focus();
+            }
+          }}
+          className="shrink-0 ml-1.5 p-0.5 theme-text-secondary hover:theme-text-primary cursor-pointer select-none flex items-center justify-center"
+        >
+          <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary transition-transform duration-200" />
+        </div>
       </div>
 
-      {isOpen && (
-        <ul className="absolute z-50 left-0 right-0 mt-1.5 max-h-56 overflow-y-auto scrollbar-none no-scrollbar theme-bg-surface rounded-xl shadow-2xl space-y-0.5 p-1 text-sm border theme-border">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((item, index) => {
-              const label = typeof item === 'string' ? item : item.label || item.name || '';
-              const sub = typeof item === 'object' ? item.sub || item.group_name : null;
-              const hasActions = typeof item === 'object' && (item.onEdit || item.onDelete);
-              const isHighlighted = index === highlightedIndex;
-
-              return (
-                <li
-                  key={index}
-                  onClick={() => handleSelect(item)}
-                  className={`px-3.5 py-2 rounded-lg cursor-pointer transition-colors flex justify-between items-center group/item ${
-                    isHighlighted
-                      ? 'bg-[var(--accent-main)]/20 theme-accent font-semibold'
-                      : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="truncate">{label}</span>
-                    {sub && <span className="text-[11px] theme-text-secondary font-sans truncate">{sub}</span>}
-                  </div>
-
-                  {hasActions && typeof item === 'object' && (
-                    <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
-                      {item.onEdit && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsOpen(false);
-                            item.onEdit?.(item);
-                          }}
-                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-accent transition cursor-pointer"
-                          title="Edit"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.586 6a2 2 0 010 2.828L10 17.414l-4 1 1-4 10.414-10.414z" />
-                          </svg>
-                        </button>
-                      )}
-                      {item.onDelete && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsOpen(false);
-                            item.onDelete?.(item);
-                          }}
-                          className="p-1 rounded-md hover:theme-bg-surface text-xs theme-text-secondary hover:theme-danger transition cursor-pointer"
-                          title="Delete"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })
-          ) : (
-            <li className="px-3.5 py-2 theme-text-secondary text-xs italic">
-              No matching record found. Press &apos;+&apos; or &apos;Save&apos; to create new.
-            </li>
-          )}
-        </ul>
-      )}
+      {/* Portal Dropdown Menu */}
+      {dropdownMenu}
     </div>
   );
 }

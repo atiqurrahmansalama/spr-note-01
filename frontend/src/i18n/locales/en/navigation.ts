@@ -30,6 +30,7 @@ export const navigation = {
   generateReport: 'Generate Report',
   studentReports: 'Student Reports',
   dailyLessons: 'Daily Lessons',
+  dailyProgress: 'Daily Progress',
   recitations: 'Recitations',
   homework: 'Homework',
   examinations: 'Examinations',
@@ -67,5 +68,11 @@ export const navigation = {
   officialWebsite: 'Official Website',
   publicPortalVerification: 'Public Portal & Verification',
   printStudio: 'Print Studio',
+  finance: 'Finance & Accounts',
+  financeOverview: 'Finance Overview',
+  financeStudentBilling: 'Student Billing & Fees',
+  financeStaffPayroll: 'Staff Payroll',
+  financeGeneralLedger: 'General Ledger & Vouchers',
+  financeReports: 'Financial Statements',
+  logout: 'Log Out',
 };
-

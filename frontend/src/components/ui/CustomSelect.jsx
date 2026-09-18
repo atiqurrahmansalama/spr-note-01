@@ -23,7 +23,7 @@ export default function CustomSelect({
   multiple = false,
   isMulti = false,
   onManage = null,
-  manageLabel = 'Manage',
+  manageLabel = null,
   manageTitle = null,
   onActionClick = null,
   actionLabel = null,
@@ -340,7 +340,7 @@ export default function CustomSelect({
                 className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
                 title={manageTitle || `Manage ${label || 'options'}`}
               >
-                <span>{manageLabel || actionLabel || 'Manage'}</span>
+                <span>{actionLabel || manageLabel || 'Manage'}</span>
               </button>
             ) : null}
           </div>

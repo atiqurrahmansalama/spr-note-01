@@ -246,18 +246,6 @@ declare module '@/components/ui/DataCardGrid' {
   export default DataCardGrid;
 }
 
-declare module '@/components/common/QrCodeBadge' {
-  export interface QrCodeBadgeProps {
-    verificationUrl?: string;
-    reportId?: string;
-    size?: number;
-    showLabel?: boolean;
-    [key: string]: any;
-  }
-  const QrCodeBadge: React.ComponentType<QrCodeBadgeProps>;
-  export default QrCodeBadge;
-}
-
 declare module '@/components/layout/PageContainer' {
   export interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
     children?: React.ReactNode;

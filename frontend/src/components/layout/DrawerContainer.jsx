@@ -232,7 +232,7 @@ export function DrawerFooter({
   isSaveDisabled = false,
   autoSaveStatus = null,
   lastSavedAt = null,
-  showAutoSave = Boolean(autoSaveStatus || lastSavedAt),
+  showAutoSave = false,
   extraButtons,
   className = "",
   children,
@@ -258,14 +258,6 @@ export function DrawerFooter({
       className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border w-full ${className}`}
     >
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-        {showAutoSave && (
-          <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
-        )}
-        {extraButtons}
-        {children}
-      </div>
-
-      <div className="flex items-center gap-2 ml-auto shrink-0">
         {onCancel && (
           <CustomButton
             type="button"
@@ -277,7 +269,14 @@ export function DrawerFooter({
             {cancelLabel}
           </CustomButton>
         )}
+        {showAutoSave && (
+          <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
+        )}
+        {extraButtons}
+        {children}
+      </div>
 
+      <div className="flex items-center gap-2 ml-auto shrink-0">
         {(onSubmit || onSave) && (
           <CustomButton
             type={onSubmit ? "submit" : "button"}

@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react";
-import { doesLessonMatchClass, isLessonInSlot } from "../../dailyClassroomUtils";
+import { doesLessonMatchClass, isLessonInSlot, getClassId } from "../../dailyClassroomUtils";
 
 /**
  * useDailyClassroomAssessment
@@ -42,9 +42,7 @@ export default function useDailyClassroomAssessment({
 
         // 1. Period-aware eval match
         const matchedEval =
-          activePeriodId === "ALL"
-            ? evalsForStudent[0]
-            : evalsForStudent.find((e) => isLessonInSlot(e, activePeriodId));
+          evalsForStudent.find((e) => isLessonInSlot(e, activePeriodId)) || evalsForStudent[0];
 
         // 2. Parent lesson from evaluation
         const evalParentLesson = matchedEval?.lesson_plan
@@ -52,8 +50,7 @@ export default function useDailyClassroomAssessment({
           : null;
 
         // 3. Relevant lesson for student's class
-        const stCls = st.student_class !== undefined ? st.student_class : (st.class_id || st.class || st.student_class_id);
-        const stClsId = typeof stCls === "object" ? String(stCls?.id || "") : String(stCls || "");
+        const stClsId = getClassId(st);
         const stClsName = (st.student_class_name || st.class_name || "").toLowerCase().trim();
 
         const findClassLesson = (list) => {
@@ -68,7 +65,7 @@ export default function useDailyClassroomAssessment({
         const relevantLesson =
           evalParentLesson ||
           findClassLesson(filteredLessons) ||
-          (activePeriodId === "ALL" ? findClassLesson(baseFilteredLessons) : null);
+          findClassLesson(baseFilteredLessons);
 
         const hasAssignedLesson = Boolean(relevantLesson || matchedEval);
 
@@ -114,13 +111,6 @@ export default function useDailyClassroomAssessment({
 
   const getSlotAssessmentCount = useCallback((slotValue) => {
     const targetDate = String(selectedDate || "").split("T")[0];
-    if (slotValue === "ALL") {
-      return evaluations.filter(
-        (e) =>
-          String(e.evaluation_date || "").split("T")[0] === targetDate &&
-          enrolledStudents.some((s) => String(s.id) === String(e.student))
-      ).length;
-    }
     return evaluations.filter(
       (e) =>
         String(e.evaluation_date || "").split("T")[0] === targetDate &&

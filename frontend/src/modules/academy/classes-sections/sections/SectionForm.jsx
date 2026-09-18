@@ -5,7 +5,6 @@ import { createSection, updateSection } from '../../../../api/academy';
 import { fetchWithAuth } from '../../../../utils/authService';
 import {
   ClassIcon,
-  TeacherIcon,
   SectionIcon,
   GroupIcon,
 } from '../../../../components/ui/Icons';
@@ -13,7 +12,7 @@ import CustomSelect from '../../../../components/ui/CustomSelect';
 import CustomInput from '../../../../components/ui/CustomInput';
 import { TeacherSelect, ClassSelect } from '../../../../components/selectors';
 import CustomCheckbox from '../../../../components/ui/CustomCheckbox';
-import { DrawerContainer, DrawerFooter } from '../../../../components/layout';
+import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../../components/layout';
 import { useFormAutoSave } from '../../../../hooks';
 
 /**
@@ -201,14 +200,7 @@ export default function SectionForm({
         )}
 
         {/* ─── 1. Section Information ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <SectionIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Section Information
-            </h4>
-          </div>
-
+        <DrawerSection title="Section Information" icon={SectionIcon}>
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5 sm:gap-4">
             <div>
               <ClassSelect
@@ -262,16 +254,6 @@ export default function SectionForm({
               />
             </div>
           </div>
-        </div>
-
-        {/* ─── 2. Capacity & In-Charge ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <TeacherIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Capacity &amp; In-Charge
-            </h4>
-          </div>
 
           <div>
             <TeacherSelect
@@ -285,17 +267,10 @@ export default function SectionForm({
               disabled={loadingLookups}
             />
           </div>
-        </div>
+        </DrawerSection>
 
-        {/* ─── 3. Group Divisions Configuration ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <GroupIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Group Divisions
-            </h4>
-          </div>
-
+        {/* ─── 2. Group Divisions Configuration ─── */}
+        <DrawerSection title="Group Divisions" icon={GroupIcon}>
           <div className="pt-1">
             <CustomCheckbox
               id="section_has_groups_toggle"
@@ -323,7 +298,7 @@ export default function SectionForm({
               }
             />
           </div>
-        </div>
+        </DrawerSection>
 
         {/* Action Buttons */}
         <DrawerFooter

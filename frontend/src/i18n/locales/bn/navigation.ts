@@ -30,6 +30,7 @@ export const navigation = {
   generateReport: 'রিপোর্ট তৈরি করুন',
   studentReports: 'শিক্ষার্থী রিপোর্ট',
   dailyLessons: 'দৈনিক পাঠ',
+  dailyProgress: 'দৈনিক অগ্রগতি',
   recitations: 'তেলাওয়াত ও মূল্যায়ন',
   homework: 'গৃহকর্ম/টাস্ক',
   examinations: 'পরীক্ষা ব্যবস্থাপনা',
@@ -65,7 +66,12 @@ export const navigation = {
   about: 'পরিচিতি',
   routineCurriculum: 'রুটিন ও পাঠ্যক্রম',
   officialWebsite: 'অফিসিয়াল ওয়েবসাইট',
-  publicPortalVerification: 'পাবলিক পোর্টাল ও যাচাইকরণ',
   printStudio: 'প্রিন্ট স্টুডিও',
+  finance: 'অর্থ ও হিসাব',
+  financeOverview: 'সারসংক্ষেপ',
+  financeStudentBilling: 'শিক্ষার্থী বিলিং ও ফি',
+  financeStaffPayroll: 'স্টাফ পে-রোল',
+  financeGeneralLedger: 'সাধারণ খতিয়ান ও ভাউচার',
+  financeReports: 'আর্থিক বিবরণী',
 };
 

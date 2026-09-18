@@ -140,11 +140,7 @@ export default function SectionManagementView({
 
       return {
         title: mode === 'edit' ? 'Edit Section' : 'Create New Section',
-        subtitle:
-          mode === 'edit'
-            ? `Update settings for section ${foundSection?.section_name || foundSection?.name || ''}`
-            : 'Configure a new class section division',
-        width: 'lg',
+        width: 'SM',
         content: (
           <SectionForm
             key={sectionId ? `edit-sec-${sectionId}` : 'add-sec'}

@@ -10,3 +10,4 @@ from .staff import *
 from .attendance import *
 from .notifications import *
 from .templates import *
+from .finance import *

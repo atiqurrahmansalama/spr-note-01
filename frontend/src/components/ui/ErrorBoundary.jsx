@@ -1,13 +1,25 @@
 import React from 'react';
-import { RefreshIcon, CheckIcon } from './Icons';
+import { RefreshIcon, CheckIcon, CopyIcon, ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from './Icons';
 
 /**
  * Parses error and component stack details into structured diagnostic information.
  */
-function parseErrorDetails(error, errorInfo) {
-  const name = error?.name || 'RuntimeError';
-  const message = error?.message || (typeof error === 'string' ? error : 'An unexpected runtime error occurred.');
-  const stack = error?.stack || '';
+function parseErrorDetails(error, errorInfo = null, errorType = 'React Render Error') {
+  const name = error?.name || (error instanceof Error ? error.constructor.name : 'RuntimeError');
+  let message = '';
+  if (typeof error === 'string') {
+    message = error;
+  } else if (error?.message) {
+    message = error.message;
+  } else if (error?.reason?.message) {
+    message = error.reason.message;
+  } else if (typeof error?.reason === 'string') {
+    message = error.reason;
+  } else {
+    message = 'An unexpected runtime error occurred.';
+  }
+
+  const stack = error?.stack || error?.reason?.stack || '';
   const componentStack = errorInfo?.componentStack || '';
 
   // Clean URL helper: removes localhost, port, query params, hash, and bundler prefixes
@@ -76,7 +88,7 @@ function parseErrorDetails(error, errorInfo) {
       const match = rawLine.match(/at\s+([a-zA-Z0-9_$<>.]+)\s+\(?(.*?):(\d+):(\d+)\)?/);
       if (match) {
         const file = cleanPath(match[2]);
-        if (!file.includes('node_modules') && (file.includes('src/') || file.endsWith('.jsx') || file.endsWith('.js'))) {
+        if (!file.includes('node_modules') && (file.includes('src/') || file.endsWith('.jsx') || file.endsWith('.js') || file.endsWith('.tsx') || file.endsWith('.ts'))) {
           culpritFile = file;
           culpritLine = match[3];
           culpritColumn = match[4];
@@ -102,15 +114,21 @@ function parseErrorDetails(error, errorInfo) {
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
   const routePath = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}${window.location.hash}` : '';
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
-  const timestamp = new Date().toLocaleString();
+  const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  // Unique deduplication signature
+  const signature = `${name}_${message}_${culpritFile}_${culpritLine}`;
 
   return {
+    id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    signature,
     name,
     message,
+    errorType,
     culpritFile: culpritFile || 'Unknown Source File',
     culpritLine,
     culpritColumn,
-    culpritFunction: culpritFunction || 'Unknown Component',
+    culpritFunction: culpritFunction || 'Unknown Scope',
     locationString,
     parsedFrames,
     rawStack: stack,
@@ -123,42 +141,78 @@ function parseErrorDetails(error, errorInfo) {
 }
 
 /**
- * Formats a clean, highly concise Markdown diagnostic report ready for copying and instant debugging.
- * Strips away massive node_modules/internal bundler noise while keeping exact source locations.
+ * Builds a unified Markdown diagnostic report for all captured exceptions.
  */
-function buildMarkdownReport(diagnostics) {
-  // Extract only clean application frames (non-internal)
-  const appFrames = (diagnostics.parsedFrames || []).filter((f) => !f.isInternal && f.file);
-  const formattedAppStack = appFrames.length > 0
-    ? appFrames.map((f, i) => `  ${i + 1}. at <${f.fnName}> (${f.file}${f.line ? `:${f.line}:${f.column}` : ''})`).join('\n')
-    : null;
+function buildMultiMarkdownReport(diagnosticsList) {
+  if (!diagnosticsList || diagnosticsList.length === 0) return '# No Error Details';
 
-  // Extract top relevant component hierarchy from React Component Stack (up to 4 levels)
-  const compHierarchy = (diagnostics.componentStack || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith('at ') && !l.includes('node_modules') && !l.includes('div') && !l.includes('Suspense'))
-    .slice(0, 5)
-    .map((l) => `  - ${l}`)
-    .join('\n');
+  if (diagnosticsList.length === 1) {
+    const diag = diagnosticsList[0];
+    const appFrames = (diag.parsedFrames || []).filter((f) => !f.isInternal && f.file);
+    const formattedAppStack = appFrames.length > 0
+      ? appFrames.map((f, i) => `  ${i + 1}. at <${f.fnName}> (${f.file}${f.line ? `:${f.line}:${f.column}` : ''})`).join('\n')
+      : null;
 
-  const reportSections = [
-    `# Bug Report: ${diagnostics.name}`,
-    `**Message:** ${diagnostics.message}`,
-    `**File Location:** \`${diagnostics.locationString}\``,
-    `**Component Scope:** \`<${diagnostics.culpritFunction} />\``,
-    `**Route:** \`${diagnostics.routePath || '/'}\``,
+    const compHierarchy = (diag.componentStack || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('at ') && !l.includes('node_modules') && !l.includes('div') && !l.includes('Suspense'))
+      .slice(0, 5)
+      .map((l) => `  - ${l}`)
+      .join('\n');
+
+    const sections = [
+      `# Bug Report: ${diag.name}`,
+      `**Message:** ${diag.message}`,
+      `**Location:** \`${diag.locationString}\``,
+      `**Component Scope:** \`<${diag.culpritFunction} />\``,
+      `**Route:** \`${diag.routePath || '/'}\``,
+      `**Error Type:** ${diag.errorType}`,
+    ];
+
+    if (formattedAppStack) {
+      sections.push('', '## Application Call Stack', '```text', formattedAppStack, '```');
+    }
+    if (compHierarchy) {
+      sections.push('', '## Component Hierarchy', '```text', compHierarchy, '```');
+    }
+    return sections.join('\n');
+  }
+
+  // Multi-Error Unified Report
+  const headRoute = diagnosticsList[0]?.routePath || '/';
+  const reportLines = [
+    `# Bug Report: ${diagnosticsList.length} Application Exceptions Caught`,
+    `**Captured Route:** \`${headRoute}\``,
+    `**Total Exceptions:** ${diagnosticsList.length}`,
+    `**Captured At:** ${diagnosticsList[0]?.timestamp || new Date().toLocaleTimeString()}`,
+    '',
   ];
 
-  if (formattedAppStack) {
-    reportSections.push('', '## Application Call Stack', '```text', formattedAppStack, '```');
-  }
+  diagnosticsList.forEach((diag, index) => {
+    const num = index + 1;
+    reportLines.push(
+      `---`,
+      `### [Exception ${num}/${diagnosticsList.length}] ${diag.name}: ${diag.message}`,
+      `- **Location:** \`${diag.locationString}\``,
+      `- **Component Scope:** \`<${diag.culpritFunction} />\``,
+      `- **Error Type:** ${diag.errorType}`,
+      `- **Timestamp:** ${diag.timestamp}`
+    );
 
-  if (compHierarchy) {
-    reportSections.push('', '## Component Hierarchy', '```text', compHierarchy, '```');
-  }
+    const appFrames = (diag.parsedFrames || []).filter((f) => !f.isInternal && f.file);
+    if (appFrames.length > 0) {
+      reportLines.push(
+        '',
+        '```text',
+        appFrames.map((f, i) => `  ${i + 1}. at <${f.fnName}> (${f.file}${f.line ? `:${f.line}:${f.column}` : ''})`).join('\n'),
+        '```'
+      );
+    }
+    reportLines.push('');
+  });
 
-  return reportSections.join('\n');
+  return reportLines.join('\n');
 }
 
 export class ErrorBoundary extends React.Component {
@@ -166,21 +220,74 @@ export class ErrorBoundary extends React.Component {
     super(props);
     this.state = {
       hasError: false,
-      error: null,
-      errorInfo: null,
-      copyStatus: null, // null | 'full' | 'message' | 'location'
-      activeTab: 'stack', // 'stack' | 'components' | 'environment'
+      errors: [], // Array of parsed error diagnostics objects
+      selectedErrorIndex: 0, // 0 to errors.length - 1, or -1 for unified all view
+      activeTab: 'all', // 'all' | 'stack' | 'components' | 'environment'
+      copyStatus: null, // null | 'full' | 'summary' | 'location' | 'single'
       showRawStack: false,
+      expandedStacks: {}, // Map of error index to boolean for accordion in 'all' view
     };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { hasError: true };
   }
+
+  componentDidMount() {
+    // Listen for global window errors and unhandled rejections
+    window.addEventListener('error', this.handleWindowError);
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
+    window.addEventListener('spr_report_error', this.handleCustomReportedError);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('error', this.handleWindowError);
+    window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
+    window.removeEventListener('spr_report_error', this.handleCustomReportedError);
+  }
+
+  addErrorToState = (error, errorInfo, errorType) => {
+    const parsed = parseErrorDetails(error, errorInfo, errorType);
+    this.setState((prev) => {
+      // Deduplicate identical errors
+      const exists = prev.errors.some((e) => e.signature === parsed.signature);
+      if (exists) return { hasError: true };
+
+      const nextErrors = [...prev.errors, parsed];
+      return {
+        hasError: true,
+        errors: nextErrors,
+        activeTab: nextErrors.length > 1 ? 'all' : 'stack',
+      };
+    });
+  };
+
+  handleWindowError = (event) => {
+    if (event?.error) {
+      this.addErrorToState(event.error, null, 'Global Window Error');
+    } else if (event?.message) {
+      this.addErrorToState(
+        { name: 'GlobalError', message: event.message, filename: event.filename, lineno: event.lineno, colno: event.colno },
+        null,
+        'Global Window Error'
+      );
+    }
+  };
+
+  handleUnhandledRejection = (event) => {
+    const reason = event?.reason;
+    this.addErrorToState(reason || new Error('Unhandled Promise Rejection'), null, 'Unhandled Promise Rejection');
+  };
+
+  handleCustomReportedError = (event) => {
+    if (event?.detail?.error) {
+      this.addErrorToState(event.detail.error, event.detail.errorInfo || null, event.detail.errorType || 'Application Error');
+    }
+  };
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary] Captured unhandled error:', error, errorInfo);
-    this.setState({ errorInfo });
+    this.addErrorToState(error, errorInfo, 'React Render Error');
   }
 
   handleReload = () => {
@@ -194,11 +301,12 @@ export class ErrorBoundary extends React.Component {
   handleReset = () => {
     this.setState({
       hasError: false,
-      error: null,
-      errorInfo: null,
+      errors: [],
+      selectedErrorIndex: 0,
+      activeTab: 'all',
       copyStatus: null,
-      activeTab: 'stack',
       showRawStack: false,
+      expandedStacks: {},
     });
   };
 
@@ -215,10 +323,27 @@ export class ErrorBoundary extends React.Component {
       });
   };
 
+  toggleStackExpand = (idx) => {
+    this.setState((prev) => ({
+      expandedStacks: {
+        ...prev.expandedStacks,
+        [idx]: !prev.expandedStacks[idx],
+      },
+    }));
+  };
+
   render() {
-    if (this.state.hasError) {
-      const diagnostics = parseErrorDetails(this.state.error, this.state.errorInfo);
-      const markdownReport = buildMarkdownReport(diagnostics);
+    if (this.state.hasError && this.state.errors.length > 0) {
+      const errors = this.state.errors;
+      const isMultiError = errors.length > 1;
+      const selectedIndex = Math.min(Math.max(0, this.state.selectedErrorIndex), errors.length - 1);
+      const activeError = errors[selectedIndex] || errors[0];
+      const combinedMarkdown = buildMultiMarkdownReport(errors);
+
+      // Build short multi-error summary for clipboard
+      const shortSummary = errors
+        .map((e, i) => `[#${i + 1}] ${e.name}: ${e.message} (Location: ${e.locationString})`)
+        .join('\n');
 
       return (
         <div className="min-h-screen theme-bg-main flex items-center justify-center p-3 sm:p-6 theme-text-primary select-none overflow-y-auto">
@@ -239,34 +364,31 @@ export class ErrorBoundary extends React.Component {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg sm:text-xl font-black theme-text-primary tracking-tight">
-                      Application Exception Caught
+                      {isMultiError ? 'Application Exceptions Caught' : 'Application Exception Caught'}
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase theme-bg-danger-soft theme-danger border theme-border">
-                      {diagnostics.name}
+                      {isMultiError ? `${errors.length} Errors Caught` : activeError.name}
                     </span>
                   </div>
                   <p className="text-xs theme-text-secondary mt-0.5">
-                    A runtime error interrupted view rendering. File location and diagnostic insights are detailed below.
+                    {isMultiError
+                      ? `${errors.length} runtime exceptions occurred during execution. All diagnostic insights are listed below.`
+                      : 'A runtime error interrupted view rendering. File location and diagnostic insights are detailed below.'}
                   </p>
                 </div>
               </div>
 
-              {/* Quick Copy Report Buttons */}
+              {/* Top Quick Copy Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap shrink-0 self-stretch sm:self-auto justify-end">
                 <button
                   type="button"
-                  onClick={() =>
-                    this.handleCopy(
-                      'summary',
-                      `**${diagnostics.name}:** ${diagnostics.message}\n**Location:** \`${diagnostics.locationString}\``
-                    )
-                  }
+                  onClick={() => this.handleCopy('summary', shortSummary)}
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
                     this.state.copyStatus === 'summary'
                       ? 'theme-bg-accent theme-accent-text'
                       : 'theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
                   }`}
-                  title="Copy short 2-line summary for quick sharing"
+                  title="Copy short summary of all errors for quick sharing"
                 >
                   {this.state.copyStatus === 'summary' ? (
                     <>
@@ -280,250 +402,461 @@ export class ErrorBoundary extends React.Component {
 
                 <button
                   type="button"
-                  onClick={() => this.handleCopy('full', markdownReport)}
+                  onClick={() => this.handleCopy('full', combinedMarkdown)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
                     this.state.copyStatus === 'full'
                       ? 'theme-bg-accent theme-accent-text'
                       : 'theme-bg-accent theme-accent-text hover:opacity-90'
                   }`}
-                  title="Copy structured diagnostic report (concise, noise-free)"
+                  title="Copy clean structured markdown report containing all caught exceptions"
                 >
                   {this.state.copyStatus === 'full' ? (
                     <>
                       <CheckIcon className="w-3.5 h-3.5" />
-                      <span>Report Copied!</span>
+                      <span>{isMultiError ? 'All Errors Copied!' : 'Report Copied!'}</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <CopyIcon className="w-3.5 h-3.5" />
+                      <span>{isMultiError ? `Copy All (${errors.length}) Errors` : 'Copy Clean Report'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Error Switcher & Navigation Tabs (when multiple errors exist) */}
+            {isMultiError && (
+              <div className="space-y-2 p-3 rounded-2xl theme-bg-sub border theme-border">
+                <div className="flex items-center justify-between gap-2 flex-wrap pb-1 border-b theme-border">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full theme-bg-danger animate-pulse" />
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider theme-text-secondary">
+                      Caught Errors ({errors.length})
+                    </span>
+                  </div>
+
+                  {/* Previous / Next Controls */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={selectedIndex === 0}
+                      onClick={() =>
+                        this.setState((prev) => ({
+                          selectedErrorIndex: Math.max(0, prev.selectedErrorIndex - 1),
+                          activeTab: 'stack',
+                        }))
+                      }
+                      className="p-1.5 rounded-lg border theme-border theme-bg-surface hover:theme-bg-elevated disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer"
+                      title="Previous Error"
+                    >
+                      <ChevronLeftIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] font-mono font-bold px-2 theme-text-secondary">
+                      {selectedIndex + 1} of {errors.length}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={selectedIndex === errors.length - 1}
+                      onClick={() =>
+                        this.setState((prev) => ({
+                          selectedErrorIndex: Math.min(errors.length - 1, prev.selectedErrorIndex + 1),
+                          activeTab: 'stack',
+                        }))
+                      }
+                      className="p-1.5 rounded-lg border theme-border theme-bg-surface hover:theme-bg-elevated disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer"
+                      title="Next Error"
+                    >
+                      <ChevronRightIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Pills List */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => this.setState({ activeTab: 'all' })}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                      this.state.activeTab === 'all'
+                        ? 'theme-bg-accent theme-accent-text shadow-xs'
+                        : 'theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary'
+                    }`}
+                  >
+                    <span>All Errors (Unified View)</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black theme-bg-accent-soft theme-accent">
+                      {errors.length}
+                    </span>
+                  </button>
+
+                  {errors.map((err, idx) => {
+                    const isSelected = this.state.activeTab !== 'all' && selectedIndex === idx;
+                    return (
+                      <button
+                        key={err.id || idx}
+                        type="button"
+                        onClick={() =>
+                          this.setState({
+                            selectedErrorIndex: idx,
+                            activeTab: this.state.activeTab === 'all' ? 'stack' : this.state.activeTab,
+                          })
+                        }
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 max-w-[240px] truncate ${
+                          isSelected
+                            ? 'theme-bg-accent theme-accent-text shadow-xs'
+                            : 'theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary'
+                        }`}
+                        title={`${err.name}: ${err.message} (${err.locationString})`}
+                      >
+                        <span className="text-[10px] opacity-75 font-mono">#{idx + 1}</span>
+                        <span className="truncate">{err.name}: {err.message}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* VIEW MODE 1: UNIFIED ALL ERRORS LIST (Displays all errors simultaneously) */}
+            {isMultiError && this.state.activeTab === 'all' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2 pb-1 border-b theme-border">
+                  <span className="text-xs font-extrabold uppercase tracking-wider theme-text-secondary">
+                    All Detected Exceptions ({errors.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => this.handleCopy('full', combinedMarkdown)}
+                    className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <CopyIcon className="w-3 h-3" />
+                    <span>Copy All Details</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                  {errors.map((err, idx) => {
+                    const isExpanded = Boolean(this.state.expandedStacks[idx]);
+                    const appFrames = (err.parsedFrames || []).filter((f) => !f.isInternal && f.file);
+
+                    return (
+                      <div
+                        key={err.id || idx}
+                        className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-3 shadow-xs transition hover:border-theme-accent/40"
+                      >
+                        {/* Error Header & Scope */}
+                        <div className="flex items-start sm:items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="w-5 h-5 rounded-lg theme-bg-danger-soft theme-danger border theme-border text-[11px] font-black flex items-center justify-center font-mono">
+                              {idx + 1}
+                            </span>
+                            <span className="font-mono text-xs font-black theme-danger">
+                              {err.name}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-surface border theme-border theme-text-secondary">
+                              {err.errorType}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono theme-text-secondary">
+                              {err.timestamp}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => this.handleCopy(`err_${idx}`, `**${err.name}:** ${err.message}\n**Location:** \`${err.locationString}\``)}
+                              className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer ml-1"
+                              title="Copy this single error"
+                            >
+                              <CopyIcon className="w-3 h-3" />
+                              <span>{this.state.copyStatus === `err_${idx}` ? 'Copied!' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Culprit File Location */}
+                        <div className="p-2.5 rounded-xl theme-bg-surface border theme-border font-mono text-xs font-bold theme-text-primary break-all select-text flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5 theme-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                          </svg>
+                          <span className="truncate flex-1">{err.culpritFile}</span>
+                          {err.culpritLine && (
+                            <span className="px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent text-[10px] font-black shrink-0 border theme-border">
+                              Line {err.culpritLine}:{err.culpritColumn || '0'}
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-md theme-bg-sub border theme-border text-[10px] font-mono theme-text-secondary shrink-0">
+                            &lt;{err.culpritFunction}&gt;
+                          </span>
+                        </div>
+
+                        {/* Error Message Box */}
+                        <div className="p-3 rounded-xl theme-bg-surface border theme-border font-mono text-xs font-semibold theme-danger break-words select-text">
+                          {err.message}
+                        </div>
+
+                        {/* Expandable Stack Trace Accordion */}
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => this.toggleStackExpand(idx)}
+                            className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span>Call Stack Details</span>
+                              <span className="text-[10px] opacity-60 font-mono">({appFrames.length} application frames)</span>
+                            </span>
+                            <ChevronDownIcon
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-2 p-3 rounded-xl theme-bg-surface border theme-border font-mono text-[11px] max-h-44 overflow-y-auto space-y-1.5 select-text animate-fade-in">
+                              {appFrames.length > 0 ? (
+                                appFrames.map((frame, fIdx) => (
+                                  <div key={fIdx} className="flex items-start justify-between gap-2 p-1.5 rounded-lg theme-bg-sub border theme-border">
+                                    <div className="truncate">
+                                      <span className="theme-accent font-black">#{fIdx + 1} {frame.fnName}</span>
+                                      <span className="theme-text-secondary ml-1 font-normal">({frame.file})</span>
+                                    </div>
+                                    {frame.line && (
+                                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded theme-bg-surface border theme-border shrink-0">
+                                        L{frame.line}:{frame.column}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                <pre className="whitespace-pre-wrap theme-text-secondary text-[10px] leading-relaxed">
+                                  {err.rawStack || 'No parsed application frames.'}
+                                </pre>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* VIEW MODE 2: SINGLE ACTIVE ERROR DEEP DIAGNOSTICS */
+              <div className="space-y-4">
+                {/* Culprit File Origin Banner */}
+                <div className="p-4 sm:p-5 rounded-2xl theme-bg-sub border theme-border space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider theme-text-secondary">
+                        Source File Location {isMultiError ? `(Error #${selectedIndex + 1})` : ''}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => this.handleCopy('location', activeError.locationString)}
+                      className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Copy file path and line number"
+                    >
+                      <CopyIcon className="w-3 h-3" />
+                      <span>{this.state.copyStatus === 'location' ? 'Path Copied!' : 'Copy Path'}</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                    {/* File Path & Line */}
+                    <div className="sm:col-span-8 p-3 rounded-xl theme-bg-surface border theme-border font-mono text-xs font-bold theme-text-primary break-all select-text flex items-center gap-2.5">
+                      <svg className="w-4 h-4 theme-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
                         />
                       </svg>
-                      <span>Copy Clean Report</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+                      <span className="truncate">{activeError.culpritFile}</span>
+                      {activeError.culpritLine && (
+                        <span className="px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent text-[11px] font-black shrink-0 border theme-border">
+                          Line {activeError.culpritLine}
+                          {activeError.culpritColumn ? `:${activeError.culpritColumn}` : ''}
+                        </span>
+                      )}
+                    </div>
 
-            {/* Culprit File Origin Banner */}
-            <div className="p-4 sm:p-5 rounded-2xl theme-bg-sub border theme-border space-y-3 shadow-xs">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider theme-text-secondary">
-                    Source File Location
-                  </span>
+                    {/* Culprit Component / Scope */}
+                    <div className="sm:col-span-4 p-3 rounded-xl theme-bg-surface border theme-border text-xs font-mono theme-text-secondary truncate select-text flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider theme-text-secondary shrink-0">
+                        Scope:
+                      </span>
+                      <span className="font-bold theme-accent truncate">
+                        &lt;{activeError.culpritFunction}&gt;
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => this.handleCopy('location', diagnostics.locationString)}
-                  className="text-[11px] font-semibold theme-accent hover:underline flex items-center gap-1 cursor-pointer"
-                  title="Copy file path and line number"
-                >
-                  {this.state.copyStatus === 'location' ? (
-                    <span className="font-bold">Path Copied!</span>
-                  ) : (
-                    <span>Copy Path</span>
-                  )}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                {/* File Path & Line */}
-                <div className="sm:col-span-8 p-3 rounded-xl theme-bg-surface border theme-border font-mono text-xs font-bold theme-text-primary break-all select-text flex items-center gap-2.5">
-                  <svg className="w-4 h-4 theme-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                    />
-                  </svg>
-                  <span className="truncate">{diagnostics.culpritFile}</span>
-                  {diagnostics.culpritLine && (
-                    <span className="px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent text-[11px] font-black shrink-0 border theme-border">
-                      Line {diagnostics.culpritLine}
-                      {diagnostics.culpritColumn ? `:${diagnostics.culpritColumn}` : ''}
+                {/* Error Message Box */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
+                      Error Message
                     </span>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => this.handleCopy('message', `${activeError.name}: ${activeError.message}`)}
+                      className="text-[11px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <CopyIcon className="w-3 h-3" />
+                      <span>{this.state.copyStatus === 'message' ? 'Message Copied!' : 'Copy Message'}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub border theme-border font-mono text-xs font-semibold theme-danger break-words select-text overflow-x-auto">
+                    <span className="font-black underline mr-2">{activeError.name}:</span>
+                    <span>{activeError.message}</span>
+                  </div>
                 </div>
 
-                {/* Culprit Component / Function */}
-                <div className="sm:col-span-4 p-3 rounded-xl theme-bg-surface border theme-border text-xs font-mono theme-text-secondary truncate select-text flex items-center gap-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider theme-text-secondary shrink-0">
-                    Scope:
-                  </span>
-                  <span className="font-bold theme-accent truncate">
-                    &lt;{diagnostics.culpritFunction}&gt;
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Error Message Box */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
-                  Error Message
-                </span>
-                <button
-                  type="button"
-                  onClick={() => this.handleCopy('message', `${diagnostics.name}: ${diagnostics.message}`)}
-                  className="text-[11px] font-semibold theme-accent hover:underline cursor-pointer"
-                >
-                  {this.state.copyStatus === 'message' ? 'Message Copied!' : 'Copy Message'}
-                </button>
-              </div>
-
-              <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub border theme-border font-mono text-xs font-semibold theme-danger break-words select-text overflow-x-auto">
-                <span className="font-black underline mr-2">{diagnostics.name}:</span>
-                <span>{diagnostics.message}</span>
-              </div>
-            </div>
-
-            {/* Diagnostics Tabs & Content */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between border-b theme-border pb-2 gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => this.setState({ activeTab: 'stack' })}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      this.state.activeTab === 'stack'
-                        ? 'theme-bg-accent theme-accent-text shadow-xs'
-                        : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                    }`}
-                  >
-                    Call Stack Trace ({diagnostics.parsedFrames.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => this.setState({ activeTab: 'components' })}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      this.state.activeTab === 'components'
-                        ? 'theme-bg-accent theme-accent-text shadow-xs'
-                        : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                    }`}
-                  >
-                    Component Tree
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => this.setState({ activeTab: 'environment' })}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      this.state.activeTab === 'environment'
-                        ? 'theme-bg-accent theme-accent-text shadow-xs'
-                        : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
-                    }`}
-                  >
-                    Environment
-                  </button>
-                </div>
-
-                {this.state.activeTab === 'stack' && (
-                  <button
-                    type="button"
-                    onClick={() => this.setState((prev) => ({ showRawStack: !prev.showRawStack }))}
-                    className="text-[11px] font-semibold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
-                  >
-                    {this.state.showRawStack ? 'Show Parsed Frames' : 'Show Raw Stack'}
-                  </button>
-                )}
-              </div>
-
-              {/* Tab 1: Stack Trace */}
-              {this.state.activeTab === 'stack' && (
-                <div className="p-3 rounded-2xl theme-bg-sub border theme-border font-mono text-xs max-h-56 overflow-y-auto space-y-1.5 select-text">
-                  {this.state.showRawStack ? (
-                    <pre className="whitespace-pre-wrap theme-text-secondary text-[11px] leading-relaxed">
-                      {diagnostics.rawStack || 'No raw stack available'}
-                    </pre>
-                  ) : diagnostics.parsedFrames.length > 0 ? (
-                    diagnostics.parsedFrames.map((frame, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-2 rounded-xl flex items-start justify-between gap-3 text-[11px] border ${
-                          !frame.isInternal
-                            ? 'theme-bg-surface border theme-border font-bold theme-text-primary'
-                            : 'border-transparent theme-text-secondary opacity-75'
+                {/* Diagnostics Tabs & Content */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between border-b theme-border pb-2 gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => this.setState({ activeTab: 'stack' })}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          this.state.activeTab === 'stack'
+                            ? 'theme-bg-accent theme-accent-text shadow-xs'
+                            : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
                         }`}
                       >
-                        <div className="flex items-start gap-2 truncate">
-                          <span className="text-[10px] theme-text-secondary opacity-60 shrink-0">
-                            #{idx + 1}
-                          </span>
-                          <div className="truncate">
-                            <span className={!frame.isInternal ? 'theme-accent font-black' : ''}>
-                              {frame.fnName}
-                            </span>
-                            <span className="theme-text-secondary ml-1 font-normal truncate block sm:inline">
-                              ({frame.file})
-                            </span>
+                        Call Stack Trace ({activeError.parsedFrames.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => this.setState({ activeTab: 'components' })}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          this.state.activeTab === 'components'
+                            ? 'theme-bg-accent theme-accent-text shadow-xs'
+                            : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
+                        }`}
+                      >
+                        Component Tree
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => this.setState({ activeTab: 'environment' })}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          this.state.activeTab === 'environment'
+                            ? 'theme-bg-accent theme-accent-text shadow-xs'
+                            : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
+                        }`}
+                      >
+                        Environment
+                      </button>
+                    </div>
+
+                    {this.state.activeTab === 'stack' && (
+                      <button
+                        type="button"
+                        onClick={() => this.setState((prev) => ({ showRawStack: !prev.showRawStack }))}
+                        className="text-[11px] font-semibold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                      >
+                        {this.state.showRawStack ? 'Show Parsed Frames' : 'Show Raw Stack'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Tab 1: Stack Trace */}
+                  {this.state.activeTab === 'stack' && (
+                    <div className="p-3 rounded-2xl theme-bg-sub border theme-border font-mono text-xs max-h-56 overflow-y-auto space-y-1.5 select-text">
+                      {this.state.showRawStack ? (
+                        <pre className="whitespace-pre-wrap theme-text-secondary text-[11px] leading-relaxed">
+                          {activeError.rawStack || 'No raw stack available'}
+                        </pre>
+                      ) : activeError.parsedFrames.length > 0 ? (
+                        activeError.parsedFrames.map((frame, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-2 rounded-xl flex items-start justify-between gap-3 text-[11px] border ${
+                              !frame.isInternal
+                                ? 'theme-bg-surface border theme-border font-bold theme-text-primary'
+                                : 'border-transparent theme-text-secondary opacity-75'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2 truncate">
+                              <span className="text-[10px] theme-text-secondary opacity-60 shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <div className="truncate">
+                                <span className={!frame.isInternal ? 'theme-accent font-black' : ''}>
+                                  {frame.fnName}
+                                </span>
+                                <span className="theme-text-secondary ml-1 font-normal truncate block sm:inline">
+                                  ({frame.file})
+                                </span>
+                              </div>
+                            </div>
+                            {frame.line && (
+                              <span className="text-[10px] shrink-0 font-bold px-1.5 py-0.5 rounded theme-bg-sub border theme-border">
+                                L{frame.line}:{frame.column}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                        {frame.line && (
-                          <span className="text-[10px] shrink-0 font-bold px-1.5 py-0.5 rounded theme-bg-sub border theme-border">
-                            L{frame.line}:{frame.column}
+                        ))
+                      ) : (
+                        <p className="text-xs theme-text-secondary p-2">No stack trace parsed.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tab 2: React Component Hierarchy */}
+                  {this.state.activeTab === 'components' && (
+                    <div className="p-3 rounded-2xl theme-bg-sub border theme-border font-mono text-xs max-h-56 overflow-y-auto select-text">
+                      {activeError.componentStack ? (
+                        <pre className="whitespace-pre-wrap text-[11px] theme-text-primary leading-relaxed">
+                          {activeError.componentStack}
+                        </pre>
+                      ) : (
+                        <p className="text-xs theme-text-secondary p-2">No component stack captured.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tab 3: Environment & Context */}
+                  {this.state.activeTab === 'environment' && (
+                    <div className="p-3 rounded-2xl theme-bg-sub border theme-border text-xs space-y-2 select-text">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
+                          <span className="text-[10px] uppercase font-bold theme-text-secondary block">
+                            Captured Route
                           </span>
-                        )}
+                          <span className="font-mono font-bold theme-text-primary break-all">
+                            {activeError.routePath || '/'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
+                          <span className="text-[10px] uppercase font-bold theme-text-secondary block">
+                            Timestamp
+                          </span>
+                          <span className="font-medium theme-text-primary">{activeError.timestamp}</span>
+                        </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs theme-text-secondary p-2">No stack trace parsed.</p>
+
+                      <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
+                        <span className="text-[10px] uppercase font-bold theme-text-secondary block">
+                          User Agent
+                        </span>
+                        <span className="font-mono text-[11px] theme-text-secondary break-all">
+                          {activeError.userAgent}
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
-
-              {/* Tab 2: React Component Hierarchy */}
-              {this.state.activeTab === 'components' && (
-                <div className="p-3 rounded-2xl theme-bg-sub border theme-border font-mono text-xs max-h-56 overflow-y-auto select-text">
-                  {diagnostics.componentStack ? (
-                    <pre className="whitespace-pre-wrap text-[11px] theme-text-primary leading-relaxed">
-                      {diagnostics.componentStack}
-                    </pre>
-                  ) : (
-                    <p className="text-xs theme-text-secondary p-2">No component stack captured.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Tab 3: Environment & Context */}
-              {this.state.activeTab === 'environment' && (
-                <div className="p-3 rounded-2xl theme-bg-sub border theme-border text-xs space-y-2 select-text">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                      <span className="text-[10px] uppercase font-bold theme-text-secondary block">
-                        Captured Route
-                      </span>
-                      <span className="font-mono font-bold theme-text-primary break-all">
-                        {diagnostics.routePath || '/'}
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                      <span className="text-[10px] uppercase font-bold theme-text-secondary block">
-                        Timestamp
-                      </span>
-                      <span className="font-medium theme-text-primary">{diagnostics.timestamp}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                    <span className="text-[10px] uppercase font-bold theme-text-secondary block">
-                      User Agent
-                    </span>
-                    <span className="font-mono text-[11px] theme-text-secondary break-all">
-                      {diagnostics.userAgent}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Bottom Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t theme-border">

@@ -9,6 +9,8 @@ export interface PageRangeObject {
   [key: string]: any;
 }
 
+export type PageRange = PageRangeObject;
+
 export interface PageRangeChangeValue {
   start: number | string;
   end: number | string;
@@ -64,10 +66,11 @@ export default function PageRangeInput({
   max: propMax,
   juzValue,
   size = 'md',
+  variant = 'sub',
   className = '',
-  width = 'w-full @[480px]:w-[170px]',
-  placeholderStart = 'Start',
-  placeholderEnd = 'End',
+  width = 'w-28 sm:w-32',
+  placeholderStart = '--',
+  placeholderEnd = '--',
   disabled = false,
   required = false,
   idPrefix,
@@ -77,7 +80,7 @@ export default function PageRangeInput({
   onAddShift,
   onAddJuzRow,
   onEmptyBackspace,
-}: PageRangeInputProps) {
+}: PageRangeInputProps & { variant?: 'sub' | 'surface' | 'elevated' }) {
   // Determine effective max page from juzValue if provided
   const getMaxPage = (juzStr?: number | string) => {
     if (!juzStr) return propMax || 9999;
@@ -154,18 +157,20 @@ export default function PageRangeInput({
     [min, effectiveMax, startNum, effectiveStart, onEndChange, onChange, range]
   );
 
-  // Size styling map
+  // Size styling matching Juz input box (h-[38px] sm:h-10, rounded-lg)
   const sizeClasses = {
-    sm: 'min-h-[38px] h-[38px] rounded-xl text-xs',
-    md: 'min-h-[46px] h-[46px] rounded-2xl text-sm',
-    lg: 'min-h-[52px] h-[52px] rounded-2xl text-base',
-  }[size] || 'min-h-[46px] h-[46px] rounded-2xl text-sm';
+    sm: 'h-[36px] rounded-lg text-xs',
+    md: 'h-[38px] sm:h-10 rounded-lg text-xs sm:text-sm',
+    lg: 'h-[44px] rounded-xl text-sm sm:text-base',
+  }[size] || 'h-[38px] sm:h-10 rounded-lg text-xs sm:text-sm';
 
-  const dividerHeight = {
-    sm: 'h-4',
-    md: 'h-6',
-    lg: 'h-7',
-  }[size] || 'h-6';
+  // Variant classes (default theme-bg-sub matching Juz input)
+  let variantClasses = 'theme-bg-sub border theme-border shadow-sm';
+  if (variant === 'surface') {
+    variantClasses = 'theme-bg-surface border theme-border shadow-sm';
+  } else if (variant === 'elevated') {
+    variantClasses = 'theme-bg-elevated border theme-border shadow-sm';
+  }
 
   const handleBackspace = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (onEmptyBackspace) {
@@ -178,7 +183,7 @@ export default function PageRangeInput({
 
   return (
     <div
-      className={`flex items-center theme-bg-surface border theme-border overflow-hidden shadow-2xs transition-all focus-within:border-[var(--accent-main)] focus-within:ring-2 focus-within:ring-[var(--accent-main)]/20 ${sizeClasses} ${width} ${
+      className={`flex items-center overflow-hidden transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 ${variantClasses} ${sizeClasses} ${width} ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       } ${className}`}
     >
@@ -203,16 +208,14 @@ export default function PageRangeInput({
           required={required}
           className="w-full h-full p-0 min-h-0"
           wrapperClassName="w-full h-full"
-          inputClassName="w-full h-full text-center font-bold font-mono p-0"
+          inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
         />
       </div>
 
       {/* Linked Divider & Dash */}
-      <div className={`w-px ${dividerHeight} theme-border border-r shrink-0`} />
-      <span className="theme-text-secondary font-mono px-2 select-none font-bold text-center text-xs sm:text-sm shrink-0">
+      <span className="theme-text-secondary font-mono px-0.5 select-none font-semibold text-center text-xs sm:text-sm shrink-0">
         -
       </span>
-      <div className={`w-px ${dividerHeight} theme-border border-r shrink-0`} />
 
       {/* End Page Input */}
       <div className="flex-1 h-full flex items-center justify-center min-w-0">
@@ -237,7 +240,7 @@ export default function PageRangeInput({
           required={required}
           className="w-full h-full p-0 min-h-0"
           wrapperClassName="w-full h-full"
-          inputClassName="w-full h-full text-center font-bold font-mono p-0"
+          inputClassName="w-full h-full text-center text-xs sm:text-sm theme-text-primary font-semibold font-mono p-0"
         />
       </div>
     </div>

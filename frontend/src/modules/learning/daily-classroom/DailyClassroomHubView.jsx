@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
 import TabSwitcher from "../../../components/ui/TabSwitcher";
@@ -8,6 +8,7 @@ import {
   BookOpenIcon,
   ChecklistIcon,
   PlusIcon,
+  TrendingUpIcon,
 } from "../../../components/ui/Icons";
 import { useAcademicData } from "../useAcademicData";
 import { useTenant } from "../../../context/TenantContext";
@@ -21,32 +22,44 @@ import {
 } from "./assessment";
 import useDailyClassroomData from "./hooks/useDailyClassroomData";
 import useDailyClassroomFilters from "./hooks/useDailyClassroomFilters";
+import HifzReportBuilderModule from "../daily-progress/DailyProgressView";
 
 const TABS = [
-  { id: "LESSON", label: "Daily Lesson Delivery", icon: BookOpenIcon },
+  { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon },
+  { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon },
   { id: "ASSESSMENT", label: "Daily Student Assessment", icon: ChecklistIcon },
 ];
 
 export default function DailyClassroomHubView({
   hideHeader = false,
   isEmbedded = false,
+  defaultTab = "LESSON",
 }) {
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const tenantId = activeTenantId || "default";
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "LESSON");
+  const [activeTab, setActiveTab] = useState(
+    () => searchParams.get("tab") || defaultTab || "LESSON"
+  );
+
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams]);
   const { departments, classes, sections, students, periodSlots } = useAcademicData();
 
-  // ── Filter State ──────────────────────────────────────────────────────────────
+  // ── Filter State (No "ALL" Option Defaults) ──────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(
     () => searchParams.get("date") || new Date().toISOString().split("T")[0]
   );
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState("ALL");
-  const [selectedClassId, setSelectedClassId] = useState("ALL");
-  const [selectedSectionId, setSelectedSectionId] = useState("ALL");
-  const [activePeriodId, setActivePeriodId] = useState("ALL");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [activePeriodId, setActivePeriodId] = useState("1");
   const [lessonSearch, setLessonSearch] = useState("");
   const [assessmentSearch, setAssessmentSearch] = useState("");
 
@@ -84,6 +97,7 @@ export default function DailyClassroomHubView({
     selectedSectionId,
     activePeriodId,
     lessonSearch,
+    setSelectedDepartmentId,
     setSelectedClassId,
     setSelectedSectionId,
     setActivePeriodId,
@@ -107,14 +121,38 @@ export default function DailyClassroomHubView({
   // ── Lesson Metrics ────────────────────────────────────────────────────────────
 
   const lessonMetrics = useMemo(() => {
-    const activePeriods = new Set(filteredLessons.map((l) => l.period_slot || l.period_name).filter(Boolean)).size;
+    const assignedCount = filteredLessons.filter((l) => l.is_assigned).length;
+    const pendingCount = filteredLessons.filter((l) => !l.is_assigned).length;
+    const activePeriods = new Set(
+      filteredLessons
+        .filter((l) => l.is_assigned)
+        .map((l) => l.period_slot || l.period_name)
+        .filter(Boolean)
+    ).size;
+
     return [
-      { label: "Assigned Lessons", value: filteredLessons.length, subValue: "Delivered for selected date & period" },
-      { label: "Active Periods", value: activePeriods || filteredLessons.length, subValue: "Routine slots utilized" },
-      { label: "Enrolled Classes", value: classes.length, subValue: "Active divisions" },
-      { label: "Instructions Dispatched", value: filteredLessons.filter((l) => l.lesson_instructions).length, subValue: "Guidelines attached" },
+      {
+        label: "Assigned Lessons",
+        value: assignedCount,
+        subValue: `Delivered for ${selectedDate || "selected date"}`,
+      },
+      {
+        label: "Pending Routine Slots",
+        value: pendingCount,
+        subValue: `${filteredLessons.length} total scheduled slots`,
+      },
+      {
+        label: "Enrolled Classes",
+        value: classes.length,
+        subValue: "Active divisions",
+      },
+      {
+        label: "Instructions Dispatched",
+        value: filteredLessons.filter((l) => l.is_assigned && l.lesson_instructions).length,
+        subValue: "Guidelines attached",
+      },
     ];
-  }, [filteredLessons, classes]);
+  }, [filteredLessons, classes, selectedDate]);
 
   // ── Tab ───────────────────────────────────────────────────────────────────────
 
@@ -160,7 +198,50 @@ export default function DailyClassroomHubView({
           start_unit: nextStart,
           end_unit: nextEnd,
         };
+      } else if (mode === "add") {
+        const pBookId = params.get("bookId") || "";
+        const pBookName = params.get("bookName") || "";
+        const pSubjectName = params.get("subjectName") || "";
+        const pPeriodSlot = params.get("periodSlot") || params.get("periodId") || "";
+        const pPeriodName = params.get("periodName") || "";
+        const pClassId = params.get("classId") || "";
+        const pSectionId = params.get("sectionId") || "";
+        const pTeacherName = params.get("teacherName") || "";
+        const pTeacherId = params.get("teacherId") || "";
+
+        if (pBookId || pBookName || pPeriodSlot || pClassId || pTeacherName) {
+          effectiveLesson = {
+            curriculum_book_id: pBookId,
+            curriculum_book_name: pBookName,
+            subject_name: pSubjectName,
+            period_slot: pPeriodSlot,
+            period_slot_id: pPeriodSlot,
+            period_name: pPeriodName,
+            academic_class: pClassId,
+            academic_class_id: pClassId,
+            section: pSectionId,
+            section_id: pSectionId,
+            teacher: pTeacherId,
+            teacher_id: pTeacherId,
+            teacher_name: pTeacherName,
+            lesson_date: selectedDate,
+          };
+        }
       }
+
+      const targetClassId =
+        effectiveLesson?.academic_class_id ||
+        effectiveLesson?.academic_class ||
+        effectiveClassId || "";
+      const targetSectionId =
+        effectiveLesson?.section_id ||
+        effectiveLesson?.section ||
+        selectedSectionId || "";
+      const targetPeriodId =
+        effectiveLesson?.period_slot ||
+        effectiveLesson?.period_slot_id ||
+        activePeriodId || "1";
+      const targetDeptId = selectedDepartmentId || "";
 
       return {
         title:
@@ -176,16 +257,16 @@ export default function DailyClassroomHubView({
             ? `Duplicating from ${foundLesson?.curriculum_book_name || "Lesson"}`
             : "Define homework, instruction milestones, and target page span",
         category: "Academic Learning",
-        size: "lg",
-        width: "lg",
+        size: "md",
+        width: "md",
         content: (
           <LessonPlanDrawer
-            key={`lesson-plan-drawer-${mode}-${lessonId || "new"}-${selectedDepartmentId}-${effectiveClassId}-${selectedSectionId}-${activePeriodId}-${selectedDate}`}
+            key={`lesson-plan-drawer-${mode}-${lessonId || "new"}-${targetDeptId}-${targetClassId}-${targetSectionId}-${targetPeriodId}-${selectedDate}-${effectiveLesson?.curriculum_book_id || "none"}`}
             lesson={effectiveLesson}
-            defaultDepartmentId={selectedDepartmentId !== "ALL" ? selectedDepartmentId : ""}
-            defaultClassId={effectiveClassId !== "ALL" ? effectiveClassId : ""}
-            defaultSectionId={selectedSectionId !== "ALL" ? selectedSectionId : ""}
-            defaultPeriodId={activePeriodId !== "ALL" ? activePeriodId : ""}
+            defaultDepartmentId={targetDeptId}
+            defaultClassId={targetClassId}
+            defaultSectionId={targetSectionId}
+            defaultPeriodId={targetPeriodId}
             defaultDate={selectedDate}
             onSaveSuccess={() => { loadData(); closeDrawer(); }}
             onCancel={closeDrawer}
@@ -235,8 +316,8 @@ export default function DailyClassroomHubView({
           ? `${foundStudent.name_en || foundStudent.name} (${foundStudent.uniq_id || foundStudent.roll_number || "N/A"})`
           : "Evaluate performance, mistakes, stucks, and lesson scores",
         category: "Academic Learning",
-        size: "lg",
-        width: "lg",
+        size: "md",
+        width: "md",
         content: (
           <StudentAssessmentDrawer
             key={`assessment-drawer-${studentId}-${date}-${effectiveAssignedLesson?.curriculum_book_name || "none"}-${effectiveAssignedLesson?.lesson_title || "none"}`}
@@ -244,10 +325,10 @@ export default function DailyClassroomHubView({
             date={date}
             evaluation={foundEval}
             assignedLesson={effectiveAssignedLesson}
-            defaultDepartmentId={selectedDepartmentId !== "ALL" ? selectedDepartmentId : ""}
-            defaultClassId={effectiveClassId !== "ALL" ? effectiveClassId : ""}
-            defaultSectionId={selectedSectionId !== "ALL" ? selectedSectionId : ""}
-            defaultPeriodId={activePeriodId !== "ALL" ? activePeriodId : ""}
+            defaultDepartmentId={selectedDepartmentId || ""}
+            defaultClassId={effectiveClassId || ""}
+            defaultSectionId={selectedSectionId || ""}
+            defaultPeriodId={activePeriodId || "1"}
             onSaveSuccess={() => { loadData(); closeDrawer(); }}
             onCancel={closeDrawer}
           />
@@ -259,7 +340,24 @@ export default function DailyClassroomHubView({
 
   // ── Action Handlers ───────────────────────────────────────────────────────────
 
-  const handleOpenAddLesson = () => openDrawer("lesson_plan", { mode: "add" });
+  const handleOpenAddLesson = (rowDefaults = null) => {
+    if (rowDefaults && typeof rowDefaults === "object" && !rowDefaults.nativeEvent) {
+      openDrawer("lesson_plan", {
+        mode: "add",
+        bookId: rowDefaults.curriculum_book_id || "",
+        bookName: rowDefaults.curriculum_book_name || "",
+        subjectName: rowDefaults.subject_name || "",
+        periodSlot: rowDefaults.period_slot || rowDefaults.period_slot_id || "",
+        periodName: rowDefaults.period_name || "",
+        classId: rowDefaults.academic_class_id || rowDefaults.academic_class || rowDefaults.class_id || effectiveClassId || "",
+        sectionId: rowDefaults.section_id || rowDefaults.section || selectedSectionId || "",
+        teacherId: rowDefaults.teacher_id || rowDefaults.teacher || "",
+        teacherName: rowDefaults.teacher_name || "",
+      });
+    } else {
+      openDrawer("lesson_plan", { mode: "add" });
+    }
+  };
 
   const handleEditLesson = (lesson) => openDrawer("lesson_plan", { mode: "edit", id: lesson.id });
 
@@ -281,29 +379,25 @@ export default function DailyClassroomHubView({
     });
   };
 
-  // ── Filter Change Handlers ────────────────────────────────────────────────────
+  // ── Filter Change Handlers (Cascading Resets) ────────────────────────────────
 
   const handleDepartmentChange = (val) => {
     setSelectedDepartmentId(val);
-    setSelectedClassId("ALL");
-    setSelectedSectionId("ALL");
-    setActivePeriodId("ALL");
+    setSelectedClassId("");
+    setSelectedSectionId("");
   };
 
   const handleClassChange = (val) => {
     setSelectedClassId(val);
-    setSelectedSectionId("ALL");
-    setActivePeriodId("ALL");
+    setSelectedSectionId("");
   };
 
   const handleSectionChange = (val) => {
     setSelectedSectionId(val);
-    setActivePeriodId("ALL");
   };
 
   const handleDateChange = (val) => {
     setSelectedDate(val);
-    setActivePeriodId("ALL");
   };
 
   // ── Consolidated Filter Props for Sub-Views ──────────────────────────────────
@@ -347,19 +441,31 @@ export default function DailyClassroomHubView({
       {/* 1. Page Header */}
       {!hideHeader && (
         <PageHeader
-          title="Daily Classroom & Sabaq Delivery"
+          title="Daily Classroom"
           subtitle="Plan and monitor daily lesson assignments, homework dispatch, evaluation rubrics, and individual student diary assessments."
           icon={BookOpenIcon}
           actions={
-            <CustomButton
-              type="button"
-              variant="primary"
-              size="sm"
-              icon={PlusIcon}
-              onClick={activeTab === "LESSON" ? handleOpenAddLesson : () => handleOpenAssessmentDrawer("")}
-            >
-              {activeTab === "LESSON" ? "Add Daily Sabaq" : "Evaluate Student"}
-            </CustomButton>
+            activeTab === "LESSON" ? (
+              <CustomButton
+                type="button"
+                variant="primary"
+                size="sm"
+                icon={PlusIcon}
+                onClick={handleOpenAddLesson}
+              >
+                Add Lesson
+              </CustomButton>
+            ) : activeTab === "ASSESSMENT" ? (
+              <CustomButton
+                type="button"
+                variant="primary"
+                size="sm"
+                icon={PlusIcon}
+                onClick={() => handleOpenAssessmentDrawer("")}
+              >
+                Evaluate Student
+              </CustomButton>
+            ) : null
           }
         />
       )}
@@ -367,7 +473,7 @@ export default function DailyClassroomHubView({
       {/* 2. Tab Switcher */}
       <TabSwitcher tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
 
-      {/* 3. Tab 1: Daily Lesson Delivery */}
+      {/* 3. Tab 1: Daily Lessons */}
       {activeTab === "LESSON" && (
         <LessonDeliveryManagementView
           filterProps={sharedFilterProps}
@@ -387,7 +493,14 @@ export default function DailyClassroomHubView({
         />
       )}
 
-      {/* 4. Tab 2: Daily Student Assessment */}
+      {/* 4. Tab 2: Daily Progress */}
+      {activeTab === "PROGRESS" && (
+        <div className="w-full pt-1">
+          <HifzReportBuilderModule filterProps={sharedFilterProps} />
+        </div>
+      )}
+
+      {/* 5. Tab 3: Daily Student Assessment */}
       {activeTab === "ASSESSMENT" && (
         <StudentAssessmentManagementView
           filterProps={sharedFilterProps}

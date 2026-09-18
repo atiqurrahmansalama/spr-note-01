@@ -2,16 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore, getBranchDisplayName } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
-import HifzReportForm from "../../modules/report-builder/HifzReportBuilderModule";
+import HifzReportForm from "../../modules/learning/daily-progress/DailyProgressView";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
 import PanelResizer from "../ui/PanelResizer";
 import InstitutionSwitcher from "./InstitutionSwitcher";
 import InstitutionSwitchModal from "./InstitutionSwitchModal";
-import { useTheme } from "../../context/useTheme";
-import { useToast } from "../../context/ToastContext";
-import { useRightSidebar } from "../../context/RightSidebarContext";
+import { useRightSidebar, saveDrawerWidthToStorage } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
@@ -20,6 +18,8 @@ import NotificationBellDropdown from "./NotificationBellDropdown";
 import LanguageSelectorDropdown from "./LanguageSelectorDropdown";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useUndoRedo } from "../../context/useUndoRedo";
+import { useToast } from "../../context/ToastContext";
+import { useTheme } from "../../context/useTheme";
 import { UndoIcon, RedoIcon } from "../ui/Icons";
 
 // Route details mapping for titles and path lookup
@@ -52,6 +52,15 @@ export const ROUTE_TITLE_MAP = {
   "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
   "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
   "/print-studio": { title: "Print Studio", category: "Print Studio" },
+  "/finance": { title: "Finance & Accounts", category: "Finance" },
+  "/finance/overview": { title: "Finance Overview", category: "Finance" },
+  "/finance/student-billing": { title: "Student Billing & Fees", category: "Finance" },
+  "/finance/staff-payroll": { title: "Staff Payroll", category: "Finance" },
+  "/finance/general-ledger": { title: "General Ledger & Vouchers", category: "Finance" },
+  "/finance/reports": { title: "Financial Statements", category: "Finance" },
+  "/student-billing": { title: "Student Billing & Fees", category: "Finance" },
+  "/staff-payroll": { title: "Staff Payroll", category: "Finance" },
+  "/general-ledger": { title: "General Ledger & Vouchers", category: "Finance" },
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },
 
@@ -125,8 +134,8 @@ export const ROUTE_TITLE_MAP = {
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const themeContext = useTheme();
+  const { showToast } = useToast();
   const { canUndo, canRedo, undoTitle, redoTitle, undo, redo } = useUndoRedo();
   const {
     isRightSidebarOpen,
@@ -255,9 +264,9 @@ export default function AppLayout() {
         document.body.style.cursor = "";
       }
       setDrawerWidth(latestWidth);
-      try {
-        localStorage.setItem("spr_right_drawer_width", String(latestWidth));
-      } catch {}
+      const currentKey = rightSidebarConfig?.drawerKey;
+      saveDrawerWidthToStorage(currentKey, latestWidth);
+
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("touchmove", handleMouseMove);
@@ -276,9 +285,8 @@ export default function AppLayout() {
     if (drawerContainerRef.current) {
       drawerContainerRef.current.style.width = `${nextWidth}px`;
     }
-    try {
-      localStorage.setItem("spr_right_drawer_width", String(nextWidth));
-    } catch {}
+    const currentKey = rightSidebarConfig?.drawerKey;
+    saveDrawerWidthToStorage(currentKey, nextWidth);
   };
 
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
@@ -449,14 +457,17 @@ export default function AppLayout() {
     };
   }, []);
 
-  // Auto-close right sidebar drawer on route navigation
+  // Auto-close right sidebar drawer on route navigation if new URL does not specify a drawer
   const prevPathRef = useRef(location.pathname);
   useEffect(() => {
     if (prevPathRef.current !== location.pathname) {
       prevPathRef.current = location.pathname;
-      closeRightSidebar();
+      const searchParams = new URLSearchParams(location.search);
+      if (!searchParams.get("drawer")) {
+        closeRightSidebar();
+      }
     }
-  }, [location.pathname, closeRightSidebar]);
+  }, [location.pathname, location.search, closeRightSidebar]);
 
   const lastBackTimeRef = useRef(0);
 

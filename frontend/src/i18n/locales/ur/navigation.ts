@@ -30,6 +30,7 @@ export const navigation = {
   generateReport: 'رپورٹ بنائیں',
   studentReports: 'طلباء رپورٹس',
   dailyLessons: 'روزانہ کے اسباق',
+  dailyProgress: 'روزانہ کی پیشرفت',
   recitations: 'تلاوت اور جانچ',
   homework: 'گھریلو کام',
   examinations: 'امتحانات مینجمنٹ',
@@ -67,5 +68,11 @@ export const navigation = {
   officialWebsite: 'سرکاری ویب سائٹ',
   publicPortalVerification: 'عوامی پورٹل اور تصدیق',
   printStudio: 'پرنٹ اسٹوڈیو',
+  finance: 'مالیات اور اکاؤنٹس',
+  financeOverview: 'خلاصہ',
+  financeStudentBilling: 'طلباء بلنگ اور فیس',
+  financeStaffPayroll: 'عملہ پے رول',
+  financeGeneralLedger: 'جنرل لیجر اور واؤچرز',
+  financeReports: 'مالیاتی گوشوارے',
 };
 

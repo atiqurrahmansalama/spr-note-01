@@ -47,6 +47,10 @@ import {
   EditIcon,
   IdentificationIcon,
   PrinterIcon,
+  BanknotesIcon,
+  ScaleIcon,
+  CalculatorIcon,
+  InvoiceIcon,
 } from "../ui/Icons";
 
 
@@ -72,6 +76,7 @@ export default function SidebarContainer({
     "Examination & Results": true,
     "Student": true,
     "Staff Management": false,
+    "Finance & Accounts": true,
     "Settings & Devices": false,
     "App Management": false,
     Settings: false,
@@ -112,8 +117,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/recitations", "/studies/homework", "/daily-lessons", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
-        { id: "Generate Report", name: "Generate Report", i18nKey: "generateReport", path: "/report-builder", matchPaths: ["/report-builder"], Icon: SavedMessagesIcon, key: "report_builder" },
+        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/daily-progress", "/studies/recitations", "/studies/homework", "/daily-lessons", "/daily-progress", "/recitations", "/homework-tasks", "/report-builder"], Icon: BookOpenIcon, key: "daily_classroom" },
         { id: "Student Reports", name: "Student Recitation Log", i18nKey: "studentReports", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
       ]
     },
@@ -218,6 +222,21 @@ export default function SidebarContainer({
       ]
     },
     { id: "Print Studio", name: "Print Studio", i18nKey: "printStudio", path: "/print-studio", matchPaths: ["/print-studio"], Icon: PrinterIcon, key: "nav_print_studio" },
+    {
+      id: "Finance & Accounts",
+      name: "Finance & Accounts",
+      i18nKey: "finance",
+      Icon: BanknotesIcon,
+      hasSub: true,
+      key: "nav_finance",
+      subItems: [
+        { id: "Finance Overview", name: "Overview", i18nKey: "financeOverview", path: "/finance", matchPaths: ["/finance", "/finance/overview"], Icon: BanknotesIcon, key: "finance_dashboard" },
+        { id: "Student Billing & Fees", name: "Student Billing & Fees", i18nKey: "financeStudentBilling", path: "/finance/student-billing", matchPaths: ["/finance/student-billing", "/student-billing"], Icon: InvoiceIcon, key: "finance_student_billing" },
+        { id: "Staff Payroll", name: "Staff Payroll", i18nKey: "financeStaffPayroll", path: "/finance/staff-payroll", matchPaths: ["/finance/staff-payroll", "/staff-payroll"], Icon: CalculatorIcon, key: "finance_staff_payroll" },
+        { id: "General Ledger", name: "General Ledger & Vouchers", i18nKey: "financeGeneralLedger", path: "/finance/general-ledger", matchPaths: ["/finance/general-ledger", "/general-ledger"], Icon: ScaleIcon, key: "finance_general_ledger" },
+        { id: "Financial Statements", name: "Financial Statements", i18nKey: "financeReports", path: "/finance/reports", matchPaths: ["/finance/reports"], Icon: ChartBarIcon, key: "finance_reports" },
+      ]
+    },
     {
       id: "App Management",
       name: "App Management",

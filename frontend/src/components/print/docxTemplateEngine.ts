@@ -271,8 +271,8 @@ export function autoPaginateHtmlSection(htmlSection: string, maxPageHeightPx: nu
           let dataTrs: HTMLTableRowElement[] = [];
 
           if (thead) {
-            headerTrs = Array.from(thead.querySelectorAll('tr'));
-            dataTrs = Array.from(tableEl.querySelectorAll('tbody tr, :scope > tr')).filter(
+            headerTrs = Array.from(thead.querySelectorAll('tr')) as HTMLTableRowElement[];
+            dataTrs = (Array.from(tableEl.querySelectorAll('tbody tr, :scope > tr')) as HTMLTableRowElement[]).filter(
               (r) => !headerTrs.includes(r)
             );
           } else {

@@ -28,6 +28,41 @@ export function resolveDrawerWidth(sizeOrWidth) {
   return DRAWER_SIZES.md;
 }
 
+/**
+ * Retrieves per-drawer customized width from localStorage with graceful fallback
+ */
+export function getSavedDrawerWidth(drawerKey, defaultSizeOrWidth = 'md') {
+  if (typeof window === 'undefined') return resolveDrawerWidth(defaultSizeOrWidth);
+  try {
+    if (drawerKey) {
+      const keySaved = localStorage.getItem(`spr_drawer_width_${drawerKey}`);
+      if (keySaved) {
+        const parsed = parseInt(keySaved, 10);
+        if (!isNaN(parsed) && parsed >= 360 && parsed <= 1200) {
+          return parsed;
+        }
+      }
+    }
+  } catch {}
+  return resolveDrawerWidth(defaultSizeOrWidth);
+}
+
+/**
+ * Saves per-drawer customized width to localStorage
+ */
+export function saveDrawerWidthToStorage(drawerKey, width) {
+  if (typeof window === 'undefined' || !width) return;
+  try {
+    const num = typeof width === 'number' ? width : parseInt(String(width), 10);
+    if (!isNaN(num) && num >= 360 && num <= 1200) {
+      if (drawerKey) {
+        localStorage.setItem(`spr_drawer_width_${drawerKey}`, String(num));
+      }
+      localStorage.setItem('spr_right_drawer_width', String(num));
+    }
+  } catch {}
+}
+
 // Global registry for drawer renderers
 const drawerRegistry = new Map();
 
@@ -79,7 +114,8 @@ export function RightSidebarProvider({ children }) {
 
   const setDrawerWidth = useCallback((widthOrFn) => {
     setDrawerWidthState((prev) => {
-      return typeof widthOrFn === 'function' ? widthOrFn(prev) : widthOrFn;
+      const nextVal = typeof widthOrFn === 'function' ? widthOrFn(prev) : widthOrFn;
+      return nextVal;
     });
   }, []);
 
@@ -117,7 +153,8 @@ export function RightSidebarProvider({ children }) {
     }
     const { title, content, size = 'md', width, onClose, ownerId, drawerKey, ...restConfig } = config;
 
-    const resolvedWidth = resolveDrawerWidth(width || size);
+    // Retrieve per-drawer customized saved width from localStorage if available
+    const resolvedWidth = getSavedDrawerWidth(drawerKey, width || size || 'md');
     setDrawerWidth(resolvedWidth);
 
     if (drawerKey) {
@@ -288,7 +325,7 @@ export function useScopedRightSidebar() {
   };
 }
 
-export function useDrawerRegistration(drawerKey, rendererFn, _dependencies = []) {
+export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) {
   const { openRightSidebar } = useRightSidebar();
   const rendererRef = useRef(rendererFn);
   rendererRef.current = rendererFn;
@@ -324,4 +361,20 @@ export function useDrawerRegistration(drawerKey, rendererFn, _dependencies = [])
       drawerRegistry.delete(drawerKey);
     };
   }, [drawerKey, openRightSidebar]);
+
+  // Update open drawer content when asynchronous dependencies (e.g. classes/teachers) resolve
+  useEffect(() => {
+    if (!drawerKey) return;
+    const currentParams = getUrlParams();
+    if (currentParams.get('drawer') === drawerKey) {
+      const config = rendererRef.current ? rendererRef.current(currentParams) : null;
+      if (config) {
+        openRightSidebar({
+          ...config,
+          drawerKey,
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, dependencies);
 }

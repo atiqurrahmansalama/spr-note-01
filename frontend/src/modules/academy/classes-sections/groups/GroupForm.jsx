@@ -9,7 +9,7 @@ import {
 } from "../../../../components/ui/Icons";
 import CustomInput from "../../../../components/ui/CustomInput";
 import { ClassSelect, SectionSelect, TeacherSelect } from "../../../../components/selectors";
-import { DrawerContainer, DrawerFooter } from "../../../../components/layout";
+import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../components/layout";
 import { useFormAutoSave } from "../../../../hooks";
 
 /**
@@ -169,14 +169,7 @@ export default function GroupForm({
     <DrawerContainer padding="none" spacing="normal">
       <form onSubmit={handleSubmit} className="@container space-y-6 pt-2 text-left">
         {/* ─── 1. Group Information ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <GroupIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Group Information
-            </h4>
-          </div>
-
+        <DrawerSection title="Group Information" icon={GroupIcon}>
           {/* Complementary Row: Target Class & Target Section */}
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5 sm:gap-4">
             <div>
@@ -216,17 +209,10 @@ export default function GroupForm({
               onChange={(val) => setFormData({ ...formData, name: val })}
             />
           </div>
-        </div>
+        </DrawerSection>
 
         {/* ─── 2. Mentorship & Supervision ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <TeacherIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Mentorship &amp; Supervision
-            </h4>
-          </div>
-
+        <DrawerSection title="Mentorship & Supervision" icon={TeacherIcon}>
           <div>
             <TeacherSelect
               label="Assigned Mentor"
@@ -240,7 +226,7 @@ export default function GroupForm({
               disabled={loadingLookups}
             />
           </div>
-        </div>
+        </DrawerSection>
 
         {/* Bottom Action Buttons */}
         <DrawerFooter

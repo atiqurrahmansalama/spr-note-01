@@ -12,3 +12,4 @@ export { useFormAutoSave as useFormAutoSaveNamed } from './useFormAutoSave';
 export { default as useTemplateStore, useTemplateStore as useTemplateStoreNamed } from './useTemplateStore';
 export { useResizablePanel, useResizablePanel as default } from './useResizablePanel';
 export { default as useUndoableState } from './useUndoableState';
+export { useRowReorder, default as useRowReorderDefault } from './useRowReorder';

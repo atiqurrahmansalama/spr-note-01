@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import FullAdmissionWizard from './FullAdmissionWizard';
+import QuickAdmissionForm from './QuickAdmissionForm';
 import AdmissionSuccessModal from './AdmissionSuccessModal';
 import AdmissionInviteDrawerForm from './AdmissionInviteDrawerForm';
 import AdmissionQRCodeCardModal from './AdmissionQRCodeCardModal';
@@ -15,6 +16,7 @@ import {
   AlertTriangleIcon,
   DownloadIcon,
   MoreVerticalIcon,
+  SparklesIcon,
 } from '../../../components/ui/Icons';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
@@ -36,7 +38,7 @@ export default function StudentAdmissionView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const activeTab = searchParams.get('tab') || 'direct'; // 'direct' | 'online_qr'
+  const activeTab = searchParams.get('tab') || 'quick'; // 'quick' | 'direct' | 'online_qr'
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [admittedStudent, setAdmittedStudent] = useState(null);
 
@@ -243,7 +245,8 @@ export default function StudentAdmissionView() {
         activeTab={activeTab}
         onChange={handleTabChange}
         tabs={[
-          { id: 'direct', label: 'Direct Enrollment', icon: AcademicCapIcon },
+          { id: 'quick', label: 'Quick Admission', icon: SparklesIcon },
+          { id: 'direct', label: 'Full Admission Wizard', icon: AcademicCapIcon },
           { id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon },
         ]}
         rightContent={
@@ -261,6 +264,29 @@ export default function StudentAdmissionView() {
       />
 
       {/* 3. Main Container Body */}
+      {/* TAB 1: Quick Admission */}
+      {activeTab === 'quick' && (
+        <div className="pt-2">
+          {admittedStudent ? (
+            <div className="p-8 rounded-3xl theme-bg-surface border theme-border shadow-md max-w-xl mx-auto text-center space-y-5 animate-zoom-in">
+              <AdmissionSuccessModal
+                student={admittedStudent}
+                onReset={handleReset}
+                onClose={handleClose}
+              />
+            </div>
+          ) : (
+            <QuickAdmissionForm
+              onCancel={handleClose}
+              onSuccess={(stu) => {
+                setAdmittedStudent(stu);
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: Full Admission Wizard */}
       {activeTab === 'direct' && (
         <div className="pt-2">
           {admittedStudent ? (

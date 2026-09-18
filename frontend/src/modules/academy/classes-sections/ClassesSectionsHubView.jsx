@@ -166,8 +166,10 @@ export default function ClassesSectionsHubView() {
   }, [loadAllMetrics]);
 
   // Determine whether 'Sections' and 'Groups' tabs should be shown
-  const showSectionsTab = hasSectionsEnabledInClasses || (sectionMetrics.total_sections > 0);
-  const showGroupsTab = hasGroupsEnabledInClasses || (groupMetrics.total_groups > 0);
+  const isSectionDrawer = searchParams.get('drawer') === 'section';
+  const isGroupDrawer = searchParams.get('drawer') === 'group';
+  const showSectionsTab = rawTab === 'sections' || isSectionDrawer || hasSectionsEnabledInClasses || (sectionMetrics.total_sections > 0);
+  const showGroupsTab = rawTab === 'groups' || isGroupDrawer || hasGroupsEnabledInClasses || (groupMetrics.total_groups > 0);
 
   // Fallback if current tab query parameter is hidden
   useEffect(() => {
@@ -183,10 +185,10 @@ export default function ClassesSectionsHubView() {
   }, [showSectionsTab, showGroupsTab, rawTab, searchParams, setSearchParams]);
 
   const activeTab = useMemo(() => {
-    if (rawTab === 'sections' && showSectionsTab) return 'sections';
-    if (rawTab === 'groups' && showGroupsTab) return 'groups';
+    if ((rawTab === 'sections' || isSectionDrawer) && showSectionsTab) return 'sections';
+    if ((rawTab === 'groups' || isGroupDrawer) && showGroupsTab) return 'groups';
     return 'classes';
-  }, [rawTab, showSectionsTab, showGroupsTab]);
+  }, [rawTab, isSectionDrawer, isGroupDrawer, showSectionsTab, showGroupsTab]);
 
   const handleTabChange = (tabId) => {
     const nextParams = new URLSearchParams(searchParams);

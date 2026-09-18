@@ -24,6 +24,7 @@ import {
 
 export interface DocxFormattingRibbonProps {
   onCommand?: (cmd: string, val?: string) => void;
+  onInsertToken?: (token: string) => void;
   className?: string;
 }
 

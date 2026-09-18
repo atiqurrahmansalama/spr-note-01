@@ -19,7 +19,7 @@ const PublicOnlineAdmissionView = lazy(() => import("./modules/student-directory
 const PublicStaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/PublicStaffOnboardingView"));
 
 // ─── Protected Student & Reports Views (Lazy Loaded) ────────────────────────
-const HifzReportBuilderModule = lazy(() => import("./modules/report-builder/HifzReportBuilderModule"));
+const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-progress/DailyProgressView"));
 const StudentReportsView = lazy(() => import("./modules/reports-history/components/StudentReportsView"));
 const StudentDirectoryView = lazy(() => import("./modules/student-directory/StudentDirectoryView"));
 const StudentAdmissionView = lazy(() => import("./modules/student-directory/admission/StudentAdmissionView"));
@@ -85,6 +85,8 @@ const NotificationManagementView = lazy(() => import("./modules/app-management/n
 const InstitutionListView = lazy(() => import("./modules/academy/campus-structure/academies/InstitutionListView"));
 const DeveloperToolsHubView = lazy(() => import("./modules/app-management/developer-tools/DeveloperToolsHubView"));
 const DashboardHubView = lazy(() => import("./modules/dashboard/DashboardHubView"));
+const FinanceHubView = lazy(() => import("./modules/finance/FinanceHubView"));
+const PublicVerifyReceiptView = lazy(() => import("./modules/finance/components/public-verification/PublicVerifyReceiptView"));
 
 function ProtectedRoute({ children }) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -124,6 +126,8 @@ export default function App() {
               <Route path="/reset-password/:token" element={<ResetPasswordView />} />
               <Route path="/verify-report/:report_id" element={<PublicVerifyReportView />} />
               <Route path="/api/v1/hifz/verify-report/:report_id" element={<PublicVerifyReportView />} />
+              <Route path="/verify-receipt/:receiptNumber" element={<PublicVerifyReceiptView />} />
+              <Route path="/api/v1/public/finance/verify-receipt/:receiptNumber" element={<PublicVerifyReceiptView />} />
               <Route path="/join" element={<JoinWithInviteView />} />
               <Route path="/apply" element={<PublicOnlineAdmissionView />} />
               <Route path="/admission/apply" element={<PublicOnlineAdmissionView />} />
@@ -138,7 +142,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/report-builder" element={<FeatureGuard sectionKey="report_builder" fallback={<Navigate to="/dashboard" replace />}><HifzReportBuilderModule /></FeatureGuard>} />
+                <Route path="/report-builder" element={<Navigate to="/studies/daily-classroom?tab=PROGRESS" replace />} />
                 <Route path="/student-reports" element={<FeatureGuard sectionKey="report_history" fallback={<Navigate to="/dashboard" replace />}><StudentReportsView /></FeatureGuard>} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
                 <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
@@ -198,11 +202,13 @@ export default function App() {
                 <Route path="/studies/daily-classroom" element={<DailyClassroomHubView />} />
 
                 {/* Sub-item Direct Routes & Aliases */}
-                <Route path="/studies/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
+                <Route path="/studies/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSON" />} />
+                <Route path="/studies/daily-progress" element={<DailyClassroomHubView defaultTab="PROGRESS" />} />
                 <Route path="/studies/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
                 <Route path="/studies/homework" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
                 
-                <Route path="/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSONS" />} />
+                <Route path="/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSON" />} />
+                <Route path="/daily-progress" element={<DailyClassroomHubView defaultTab="PROGRESS" />} />
                 <Route path="/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
                 <Route path="/homework-tasks" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
 
@@ -272,6 +278,13 @@ export default function App() {
                 <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
                 <Route path="/app-management/notifications" element={<NotificationManagementView />} />
                 <Route path="/notifications" element={<NotificationManagementView />} />
+                {/* Enterprise Finance, Accounts, Billing & Payroll Hub Routes */}
+                <Route path="/finance" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />
+                <Route path="/finance/:tab" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />
+                <Route path="/student-billing" element={<FeatureGuard sectionKey="finance_student_billing" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
+                <Route path="/staff-payroll" element={<FeatureGuard sectionKey="finance_staff_payroll" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
+                <Route path="/general-ledger" element={<FeatureGuard sectionKey="finance_general_ledger" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
+
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

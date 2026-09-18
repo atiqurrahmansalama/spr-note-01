@@ -32,7 +32,12 @@ export type TranslationNamespace =
   | 'attendance'
   | 'studies'
   | 'examinations'
-  | 'notifications';
+  | 'notifications'
+  | 'finance'
+  | 'learning'
+  | 'print'
+  | 'residential'
+  | (string & {});
 
 export type TranslationDictionary = Record<string, any>;
 

@@ -1,0 +1,158 @@
+import React from "react";
+import DetailRow from "./DetailRow";
+import { SectionHeaderBar, AddMoreSectionButton } from "./QuranRowUI";
+import { DetailRowData } from "../../types";
+
+export interface DetailSectionProps {
+  title: string;
+  listType: "mistake" | "stuck" | string;
+  data: DetailRowData[];
+  onChange: (updater: DetailRowData[] | ((prevData: DetailRowData[]) => DetailRowData[])) => void;
+  availableJuzs?: (string | number)[];
+  juzPageData?: any[];
+  onDragStart?: (e: React.DragEvent, listType: string, index: number) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent, listType: string, index?: number) => void;
+  onReset?: () => void;
+}
+
+export default function DetailSection({
+  title,
+  listType,
+  data,
+  onChange,
+  availableJuzs,
+  juzPageData,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onReset,
+}: DetailSectionProps) {
+  const addRow = () => {
+    const newId = crypto.randomUUID();
+    onChange((prevData) => {
+      const lastJuz = prevData.length > 0 ? prevData[prevData.length - 1].juz : (availableJuzs?.[0] || "");
+      return [
+        ...prevData,
+        {
+          id: newId,
+          juz: lastJuz,
+          page: "",
+          ayahs: [{ id: crypto.randomUUID(), value: "" }],
+        },
+      ];
+    });
+
+    // Auto-focus new row's page box
+    setTimeout(() => {
+      const el = document.getElementById(`page-${newId}`);
+      if (el) {
+        el.focus();
+        if (typeof (el as HTMLInputElement).select === "function") (el as HTMLInputElement).select();
+      }
+    }, 60);
+  };
+
+  const handleRemoveRow = (index: number) => {
+    onChange((prevData) => {
+      if (prevData.length > 1) {
+        return prevData.filter((_, idx) => idx !== index);
+      }
+      return prevData;
+    });
+  };
+
+  const handleRowChange = (index: number, newRow: DetailRowData | ((prevRow: DetailRowData) => DetailRowData)) => {
+    onChange((prevData) => {
+      const newData = [...prevData];
+      newData[index] = typeof newRow === "function" ? newRow(newData[index]) : newRow;
+      return newData;
+    });
+  };
+
+  const handleNextSection = () => {
+    if (listType === "mistake") {
+      const stuckInputs = Array.from(document.querySelectorAll('input[id^="page-"]')) as HTMLInputElement[];
+      const stuckPageInput = stuckInputs.find((el) => {
+        const parent = el.closest('[data-list-type="stuck"]');
+        return parent !== null;
+      }) || document.querySelector<HTMLInputElement>('[data-list-type="stuck"] input');
+
+      if (stuckPageInput) {
+        stuckPageInput.focus();
+        if (stuckPageInput.select) stuckPageInput.select();
+        return;
+      }
+    }
+
+    const commentEl = (document.getElementById("comment-textarea") || document.querySelector("textarea")) as HTMLElement | null;
+    if (commentEl) {
+      commentEl.focus();
+    }
+  };
+
+  const calculateTotalCount = () => {
+    if (!data || !Array.isArray(data)) return 0;
+    let count = 0;
+    data.forEach((row) => {
+      const hasPage = row.page && String(row.page).trim() !== "";
+      if (hasPage) {
+        const filledAyahs = row.ayahs?.filter((a) => a.value && String(a.value).trim() !== "") || [];
+        count += filledAyahs.length;
+      }
+    });
+    return count;
+  };
+
+  const totalCount = calculateTotalCount();
+
+  const hasContent = data && data.length > 0 && data.some((row, idx) => {
+    if (idx > 0) return true;
+    if (row.page && String(row.page).trim() !== "") return true;
+    if (row.ayahs && row.ayahs.length > 1) return true;
+    if (row.ayahs && row.ayahs.some((a) => a.value && String(a.value).trim() !== "")) return true;
+    return false;
+  });
+
+  return (
+    <div
+      data-list-type={listType}
+      className="relative"
+      onDragOver={onDragOver}
+      onDrop={(e) => onDrop && onDrop(e, listType)}
+    >
+      {/* Reusable Section Header Bar */}
+      <SectionHeaderBar
+        title={title}
+        count={totalCount}
+        showReset={Boolean(onReset && hasContent)}
+        onReset={onReset}
+        resetTitle={`Reset ${title}`}
+      />
+
+      <div className="space-y-0">
+        {(data || []).map((row, idx) => (
+          <DetailRow
+            key={row.id}
+            index={idx}
+            isLastRow={idx === data.length - 1}
+            listType={listType}
+            rowData={row}
+            onChange={(newR) => handleRowChange(idx, newR)}
+            onRemoveRow={data.length > 1 ? () => handleRemoveRow(idx) : undefined}
+            onAddNewRow={addRow}
+            onNextSection={handleNextSection}
+            availableJuzs={availableJuzs}
+            juzPageData={juzPageData}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+          />
+        ))}
+      </div>
+
+      {/* Reusable + Add More Button */}
+      <AddMoreSectionButton onClick={addRow} label="+ Add More" />
+    </div>
+  );
+}
