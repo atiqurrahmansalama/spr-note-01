@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../../../context/ToastContext";
+import { useTenant } from "../../../../context/TenantContext";
 import {
   DepartmentIcon,
   ClassIcon,
@@ -16,6 +17,7 @@ import ActionMenu from "../../../../components/ui/ActionMenu";
 import CustomButton from "../../../../components/ui/CustomButton";
 import DataTable from "../../../../components/ui/DataTable";
 import DataCardGrid from "../../../../components/ui/DataCardGrid";
+import { ConfirmModal } from "../../../../components/ui";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
 import { getDepartments, updateDepartment, deleteDepartment } from "../../../../api/academy";
 import { useRowReorder } from "../../../../hooks";
@@ -26,6 +28,7 @@ export default function DepartmentManagementView({
   hideHeader = false,
 }: DepartmentManagementViewProps) {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
   const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
 
@@ -51,23 +54,35 @@ export default function DepartmentManagementView({
   const loadDepartments = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getDepartments();
+      const params: Record<string, any> = { all: true };
+      if (activeTenantId && activeTenantId !== "ALL") {
+        params.institution = activeTenantId;
+      }
+      const data = await getDepartments(params);
       setDepartments(Array.isArray(data) ? data : data.results || []);
     } catch (e: any) {
       showToast(e?.message || "Failed to load departments.", "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [activeTenantId, showToast]);
 
   useEffect(() => {
     loadDepartments();
 
+    const handleDepartmentsUpdated = () => {
+      loadDepartments();
+    };
     const handleTenantChanged = () => {
       loadDepartments();
     };
+
+    window.addEventListener("spr_departments_updated", handleDepartmentsUpdated);
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
-    return () => window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+    return () => {
+      window.removeEventListener("spr_departments_updated", handleDepartmentsUpdated);
+      window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+    };
   }, [loadDepartments]);
 
   // Drawer Registration
@@ -114,6 +129,7 @@ export default function DepartmentManagementView({
       await deleteDepartment(deletingDept.id);
       showToast(`Department "${deletingDept.name}" deleted successfully.`, "success");
       setDeletingDept(null);
+      window.dispatchEvent(new CustomEvent("spr_departments_updated"));
       loadDepartments();
     } catch (err: any) {
       showToast(err?.message || "Failed to delete department.", "error");
@@ -373,38 +389,75 @@ export default function DepartmentManagementView({
         />
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deletingDept && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="theme-bg-surface border theme-border rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
-            <h3 className="text-base font-bold theme-text-primary">Delete Department</h3>
-            <p className="text-xs theme-text-secondary">
-              Are you sure you want to delete <span className="font-semibold theme-text-primary">"{deletingDept.name}"</span>? This action cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t theme-border">
-              <CustomButton
-                type="button"
-                variant="sub"
-                size="md"
-                onClick={() => setDeletingDept(null)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </CustomButton>
-              <CustomButton
-                type="button"
-                variant="danger-solid"
-                size="md"
-                onClick={confirmDelete}
-                loading={isDeleting}
-                loadingText="Deleting..."
-              >
-                Confirm Delete
-              </CustomButton>
+      {/* Delete Confirmation Modal with High-Impact Warning & Live Linked Stats */}
+      {(() => {
+        const deletingClassesCount = deletingDept ? (deletingDept.classes_count ?? deletingDept.class_count ?? 0) : 0;
+        const deletingSectionsCount = deletingDept ? (deletingDept.sections_count ?? 0) : 0;
+        const deletingStudentsCount = deletingDept ? (deletingDept.students_count ?? deletingDept.student_count ?? 0) : 0;
+        const hasActiveAcademicData = deletingClassesCount > 0 || deletingStudentsCount > 0 || deletingSectionsCount > 0;
+
+        return (
+          <ConfirmModal
+            isOpen={Boolean(deletingDept)}
+            onClose={() => setDeletingDept(null)}
+            onConfirm={confirmDelete}
+            title="Delete Academic Department"
+            subtitle="Critical Destructive Action"
+            icon={TrashIcon}
+            confirmText="Confirm Permanent Delete"
+            confirmVariant="danger-solid"
+            confirmIcon={TrashIcon}
+            confirmLoading={isDeleting}
+            confirmLoadingText="Deleting Department..."
+            size="md"
+            callout={
+              hasActiveAcademicData
+                ? {
+                    type: "danger",
+                    title: "Active Academic Records Linked",
+                    message: `This department currently governs ${deletingClassesCount} academic class(es), ${deletingSectionsCount} section(s), and ${deletingStudentsCount} student(s). Deleting it will irrevocably disrupt related curriculum, attendance, and exam reporting.`,
+                  }
+                : {
+                    type: "warning",
+                    title: "Irreversible Action",
+                    message: `You are about to delete "${deletingDept?.name}". This action cannot be rolled back.`,
+                  }
+            }
+            consequences={[
+              <span key="c_classes">
+                <strong className="font-bold theme-text-primary">{deletingClassesCount} Academic Class(es)</strong> and assigned course subjects will lose their departmental affiliation.
+              </span>,
+              <span key="c_sections">
+                <strong className="font-bold theme-text-primary">{deletingSectionsCount} Class Section(s)</strong>, timetable routines, and period slots will become orphaned.
+              </span>,
+              <span key="c_students">
+                <strong className="font-bold theme-text-primary">{deletingStudentsCount} Enrolled Student(s)</strong> will no longer be mapped to this department in transcripts and report cards.
+              </span>,
+              <span key="c_eval">
+                Historical attendance logs, examination marksheets, and{" "}
+                {deletingDept?.has_quran_tracker
+                  ? "Quran Hifz milestone progress records"
+                  : "classroom lesson evaluations"}{" "}
+                tied to this department will be impacted.
+              </span>,
+            ]}
+          >
+            <div className="space-y-2 pt-0.5">
+              <p className="text-xs font-semibold theme-text-primary">
+                Are you sure you want to permanently delete{" "}
+                <span className="font-bold underline decoration-[var(--color-danger)]/50">
+                  "{deletingDept?.name}"
+                </span>
+                {deletingDept?.code ? ` [${deletingDept.code}]` : ""}?
+              </p>
+
+              <p className="text-[11px] theme-text-secondary leading-relaxed">
+                Please ensure all active classes and enrolled students have been migrated or re-assigned before completing this deletion.
+              </p>
             </div>
-          </div>
-        </div>
-      )}
+          </ConfirmModal>
+        );
+      })()}
     </div>
   );
 }

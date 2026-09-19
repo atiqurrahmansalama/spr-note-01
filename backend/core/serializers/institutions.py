@@ -400,6 +400,7 @@ class AcademicDepartmentSerializer(serializers.ModelSerializer):
     department_head_name = serializers.CharField(source='department_head.name', read_only=True, default='')
     department_head_phone = serializers.CharField(source='department_head.phone_number', read_only=True, default='')
     classes_count = serializers.SerializerMethodField()
+    sections_count = serializers.SerializerMethodField()
     students_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -408,10 +409,10 @@ class AcademicDepartmentSerializer(serializers.ModelSerializer):
             'id', 'institution', 'institution_name', 'branch', 'branch_name', 'name', 'code', 'department_head',
             'department_head_name', 'department_head_phone',
             'has_quran_tracker', 'order_rank', 'is_active', 'is_deleted',
-            'classes_count', 'students_count',
+            'classes_count', 'sections_count', 'students_count',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'classes_count', 'students_count', 'institution_name', 'branch_name']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'classes_count', 'sections_count', 'students_count', 'institution_name', 'branch_name']
 
     def validate(self, attrs):
         inst = attrs.get('institution') or getattr(self.instance, 'institution', None)
@@ -425,6 +426,11 @@ class AcademicDepartmentSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.INT)
     def get_classes_count(self, obj):
         return obj.classes.filter(is_deleted=False).count()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_sections_count(self, obj):
+        from core.models import ClassSection
+        return ClassSection.objects.filter(student_class__department=obj, is_deleted=False).count()
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_students_count(self, obj):

@@ -281,14 +281,19 @@ class AcademicBranchViewSet(viewsets.ModelViewSet):
         if not target_inst:
             raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a branch."})
 
-        # Enforce maximum branches limit
+        # Enforce maximum branches limit with Super Admin / Owner auto-allocation
         current_branches_count = AcademicBranch.objects.filter(institution=target_inst, is_deleted=False).count()
+        is_super = self.request.user.is_superuser or getattr(self.request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
         if current_branches_count >= target_inst.max_branches:
-            raise serializers.ValidationError({
-                "non_field_errors": [
-                    f"Branch quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_branches} branch(es)."
-                ]
-            })
+            if not is_super:
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        f"Branch quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_branches} branch(es)."
+                    ]
+                })
+            else:
+                target_inst.max_branches = current_branches_count + 1
+                target_inst.save(update_fields=['max_branches'])
 
         serializer.save(institution=target_inst)
 
@@ -373,6 +378,22 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.none()
 
+        inst_param = self.request.query_params.get('institution') or self.request.query_params.get('institution_id')
+        if inst_param and inst_param.upper() not in ['ALL', 'NONE', 'NULL', 'UNDEFINED', '']:
+            qs = qs.filter(institution_id=inst_param)
+
+        branch_param = self.request.query_params.get('branch') or self.request.query_params.get('branch_id')
+        if branch_param and branch_param.upper() not in ['ALL', 'NONE', 'NULL', 'UNDEFINED', '']:
+            qs = qs.filter(Q(branch_id=branch_param) | Q(branch__isnull=True))
+
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None and is_active != '' and is_active.upper() != 'ALL':
+            qs = qs.filter(is_active=(is_active.lower() in ['true', '1']))
+
+        has_tracker = self.request.query_params.get('has_quran_tracker')
+        if has_tracker is not None and has_tracker != '' and has_tracker.upper() != 'ALL':
+            qs = qs.filter(has_quran_tracker=(has_tracker.lower() in ['true', '1']))
+
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search))
@@ -393,14 +414,26 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
         if not target_inst:
             raise serializers.ValidationError({"institution": "An Academy/Institution is required before creating a department."})
 
-        # Enforce maximum departments quota limit
-        current_departments_count = AcademicDepartment.objects.filter(institution=target_inst, is_deleted=False).count()
-        if current_departments_count >= target_inst.max_departments:
+        # Validate branch belongs to target institution if provided
+        branch = serializer.validated_data.get('branch')
+        if branch and branch.institution_id != target_inst.id:
             raise serializers.ValidationError({
-                "non_field_errors": [
-                    f"Department quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_departments} department(s)."
-                ]
+                "branch": f"The selected branch '{branch.branch_name}' does not belong to {target_inst.name}."
             })
+
+        # Enforce maximum departments quota limit with Super Admin / Owner auto-allocation
+        current_departments_count = AcademicDepartment.objects.filter(institution=target_inst, is_deleted=False).count()
+        is_super = self.request.user.is_superuser or getattr(self.request.user, 'user_type', '').upper() == 'SUPER_ADMIN'
+        if current_departments_count >= target_inst.max_departments:
+            if not is_super:
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        f"Department quota limit reached for {target_inst.name}. Current allocation is {target_inst.max_departments} department(s)."
+                    ]
+                })
+            else:
+                target_inst.max_departments = current_departments_count + 1
+                target_inst.save(update_fields=['max_departments'])
 
         serializer.save(institution=target_inst)
 

@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useToast } from "../../../../context/ToastContext";
 import { useTenant } from "../../../../context/TenantContext";
+import { useAcademicSession } from "../../../../context/AcademicSessionContext";
 import { fetchWithAuth } from "../../../../utils/authService";
-import { BookOpenIcon, DepartmentIcon, TrendingUpIcon } from "../../../../components/ui/Icons";
+import {
+  BookOpenIcon,
+  BuildingIcon,
+  DepartmentIcon,
+  TrendingUpIcon,
+} from "../../../../components/ui/Icons";
 import CustomInput from "../../../../components/ui/CustomInput";
+import { RadioCard } from "../../../../components/ui";
 import { TeacherSelect } from "../../../../components/selectors";
 import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../components/layout";
 import { createDepartment, updateDepartment } from "../../../../api/academy";
@@ -19,18 +26,28 @@ export default function DepartmentForm({
   const activeDept = department || editingDepartment;
   const { showToast } = useToast();
   const { activeTenantId, institutions, isMultiTenantAdmin, currentInstitution } = useTenant();
+  const { activeBranch, branches } = useAcademicSession();
   const isEdit = Boolean(activeDept?.id);
 
   const initialValues: DepartmentFormData = useMemo(() => {
+    const activeSelectedInstId =
+      (activeTenantId && activeTenantId !== "ALL" ? String(activeTenantId) : "") ||
+      (currentInstitution?.id ? String(currentInstitution.id) : "");
+
     const defaultInstId =
       activeDept?.institution ||
-      (activeTenantId !== "ALL" ? activeTenantId : "") ||
-      (currentInstitution?.id || "");
+      activeSelectedInstId ||
+      (institutions?.[0]?.id ? String(institutions[0].id) : "");
+
+    const defaultBranchId =
+      activeDept?.branch !== undefined && activeDept?.branch !== null
+        ? String(activeDept.branch || "")
+        : (activeBranch?.id && String(activeBranch.id) !== "ALL" ? String(activeBranch.id) : "");
 
     if (activeDept) {
       return {
         institution: String(defaultInstId),
-        branch: String(activeDept.branch || ""),
+        branch: defaultBranchId,
         name: activeDept.name || "",
         code: activeDept.code || "",
         department_head: activeDept.department_head || "",
@@ -41,7 +58,7 @@ export default function DepartmentForm({
     }
     return {
       institution: String(defaultInstId),
-      branch: "",
+      branch: defaultBranchId,
       name: "",
       code: "",
       department_head: "",
@@ -49,7 +66,7 @@ export default function DepartmentForm({
       order_rank: 1,
       is_active: true,
     };
-  }, [activeDept, activeTenantId, currentInstitution]);
+  }, [activeDept, activeTenantId, activeBranch, currentInstitution, institutions]);
 
   const [formData, setFormData] = useState<DepartmentFormData>(initialValues);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -85,25 +102,49 @@ export default function DepartmentForm({
         setTeachers(userList);
       }
     } catch {
-      showToast("Could not load faculty teachers.", "error");
+      // Graceful fallback
     } finally {
       setLoadingLookups(false);
     }
   };
 
   const selectedInst = useMemo(() => {
-    if (formData.institution) {
+    const activeSelectedInstId =
+      (activeTenantId && activeTenantId !== "ALL" ? String(activeTenantId) : "") ||
+      (currentInstitution?.id ? String(currentInstitution.id) : "");
+
+    const targetId = activeSelectedInstId || formData.institution;
+    if (targetId) {
       return (
-        institutions.find((i: any) => String(i.id) === String(formData.institution)) ||
+        institutions.find((i: any) => String(i.id) === String(targetId)) ||
         currentInstitution
       );
     }
     return currentInstitution;
-  }, [formData.institution, institutions, currentInstitution]);
+  }, [activeTenantId, currentInstitution, formData.institution, institutions]);
 
-  const deptQuotaLimit = selectedInst?.max_departments || 1;
+  const deptQuotaLimit = selectedInst?.max_departments || 10;
   const currentDeptCount = selectedInst?.total_departments_count || 0;
   const isQuotaReached = !isEdit && currentDeptCount >= deptQuotaLimit && !isMultiTenantAdmin;
+
+  const resolvedBranchName = useMemo(() => {
+    const targetBranchId =
+      formData.branch && formData.branch !== "ALL"
+        ? String(formData.branch)
+        : (activeBranch?.id && String(activeBranch.id) !== "ALL" ? String(activeBranch.id) : "");
+    if (!targetBranchId) {
+      return "All Campuses (Institution-wide)";
+    }
+    const matched = branches?.find((b: any) => String(b.id) === String(targetBranchId));
+    return (
+      matched?.branch_name ||
+      matched?.name ||
+      (activeBranch && String(activeBranch.id) === String(targetBranchId)
+        ? (activeBranch.branch_name || activeBranch.name)
+        : "") ||
+      "Assigned Campus"
+    );
+  }, [formData.branch, activeBranch, branches]);
 
   // Determine if form has been modified by the user
   const isDirty = useMemo(() => {
@@ -112,9 +153,7 @@ export default function DepartmentForm({
     );
   }, [formData, initialValues]);
 
-  const isFormValid =
-    formData.name.trim().length > 0 &&
-    Boolean(formData.institution || activeTenantId !== "ALL");
+  const isFormValid = formData.name.trim().length > 0;
   const canSave = isDirty && isFormValid && !submitting && !isQuotaReached;
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -127,19 +166,27 @@ export default function DepartmentForm({
       showToast("Department name is required.", "warning");
       return;
     }
-    const targetInstId = formData.institution || (activeTenantId !== "ALL" ? activeTenantId : "");
-    if (!targetInstId && institutions.length > 0) {
-      showToast("Please select a parent Academy/Institution for this department.", "warning");
-      return;
-    }
+
+    // Strictly resolve target institution to the currently selected active academy
+    const targetInstId =
+      (activeTenantId && activeTenantId !== "ALL" ? String(activeTenantId) : "") ||
+      (currentInstitution?.id ? String(currentInstitution.id) : "") ||
+      formData.institution ||
+      (institutions?.[0]?.id ? String(institutions[0].id) : undefined);
+
+    // Strictly resolve branch: prioritize activeBranch context for new creation if not explicitly bound
+    const targetBranchId =
+      formData.branch && formData.branch !== "ALL"
+        ? formData.branch
+        : (activeBranch?.id && String(activeBranch.id) !== "ALL" ? String(activeBranch.id) : null);
 
     setSubmitting(true);
     const payload = {
       institution: targetInstId || undefined,
-      branch: formData.branch || null,
+      branch: targetBranchId,
       name: formData.name.trim(),
       code: (formData.code || "").trim().toUpperCase(),
-      department_head: formData.department_head || null,
+      department_head: formData.department_head && formData.department_head !== "ALL" ? formData.department_head : null,
       has_quran_tracker: formData.has_quran_tracker,
       order_rank: Number(formData.order_rank) || 1,
       is_active: formData.is_active,
@@ -148,12 +195,13 @@ export default function DepartmentForm({
     try {
       if (isEdit && activeDept?.id) {
         await updateDepartment(activeDept.id, payload);
-        showToast("Department updated successfully!", "success");
+        showToast("Department updated successfully.", "success");
       } else {
         await createDepartment(payload);
-        showToast("Department created successfully!", "success");
+        showToast("Department created successfully.", "success");
       }
       clearDraft();
+      window.dispatchEvent(new CustomEvent("spr_departments_updated"));
       onSaved?.();
     } catch (err: any) {
       showToast(err?.message || "Failed to save department.", "error");
@@ -165,41 +213,88 @@ export default function DepartmentForm({
   return (
     <DrawerContainer padding="none" spacing="normal">
       <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+        {/* Context Scope Indicator */}
+        <div className="@container">
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 p-3 rounded-xl theme-bg-surface-secondary border theme-border-subtle text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg theme-bg-surface-highlight flex items-center justify-center shrink-0">
+                <BuildingIcon className="w-3.5 h-3.5 theme-text-secondary" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase font-semibold tracking-wider theme-text-muted leading-tight">
+                  Academy
+                </div>
+                <div className="font-semibold theme-text-primary truncate text-xs">
+                  {selectedInst?.name || "Current Academy"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg theme-bg-surface-highlight flex items-center justify-center shrink-0">
+                <DepartmentIcon className="w-3.5 h-3.5 theme-text-secondary" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase font-semibold tracking-wider theme-text-muted leading-tight">
+                  Campus Scope
+                </div>
+                <div className="font-semibold theme-text-primary truncate text-xs">
+                  {resolvedBranchName}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Quota Limit Notice */}
         {isQuotaReached && (
-          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-start gap-2.5 animate-fade-in">
+          <div className="p-3.5 rounded-2xl theme-bg-warning-soft border theme-border-warning theme-text-warning text-xs flex items-start gap-2.5 animate-fade-in">
             <DepartmentIcon className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold">Department Quota Limit Reached ({currentDeptCount}/{deptQuotaLimit})</p>
+              <p className="font-bold">
+                Department Quota Limit Reached ({currentDeptCount}/{deptQuotaLimit})
+              </p>
               <p className="opacity-90 text-[11px] mt-0.5">
-                This academy has reached its allowed limit of {deptQuotaLimit} departments. Update the institution's department quota to add more.
+                This academy has allocated all {deptQuotaLimit} allowed departments. Update the institution's department quota limit to add more.
               </p>
             </div>
           </div>
         )}
 
         {/* Section 1: Department Information */}
-        <DrawerSection title="Department Information" icon={DepartmentIcon} className="pt-1">
+        <DrawerSection title="Department Information" icon={DepartmentIcon}>
           <div className="@container">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
+            <div className="space-y-3.5">
+              {/* Department Name & Code */}
+              <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
                 <CustomInput
                   label="Department Name"
                   required
-                  placeholder="e.g. Hifzul Quran or Islamic Studies"
+                  placeholder="e.g. Hifzul Quran or General Studies"
                   value={formData.name}
                   onChange={(val: string) => setFormData({ ...formData, name: val })}
                 />
+                <CustomInput
+                  label="Department Code"
+                  placeholder="e.g. HIFZ or GEN"
+                  value={formData.code}
+                  onChange={(val: string) =>
+                    setFormData({ ...formData, code: val.toUpperCase() })
+                  }
+                />
               </div>
 
+              {/* Department Head */}
               <div>
                 <TeacherSelect
                   label="Department Head"
                   value={formData.department_head}
-                  onChange={(val: string | number) => setFormData({ ...formData, department_head: val })}
+                  onChange={(val: string | number) =>
+                    setFormData({ ...formData, department_head: val === "ALL" ? "" : val })
+                  }
                   teachers={teachers}
                   allowAll={true}
-                  allLabel="No Department Head Assigned"
+                  allLabel="No Head Assigned"
                   placeholder="Select Department Head..."
                   searchable={false}
                   disabled={loadingLookups}
@@ -209,113 +304,24 @@ export default function DepartmentForm({
           </div>
         </DrawerSection>
 
-        {/* Section 2: Academic Tracking Presets */}
+        {/* Section 2: Curriculum & Assessment Presets */}
         <DrawerSection title="Curriculum & Tracking Presets" icon={BookOpenIcon}>
           <div className="@container">
             <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
-              {/* Option 1: Class Assessment */}
-              <div
-                role="radio"
-                aria-checked={!formData.has_quran_tracker}
-                tabIndex={0}
+              <RadioCard
+                title="Class Assessment"
+                description="Standard subject-based syllabus coverage, daily lesson plans, homework dispatch and classroom evaluation."
+                icon={BookOpenIcon}
+                selected={!formData.has_quran_tracker}
                 onClick={() => setFormData((prev) => ({ ...prev, has_quran_tracker: false }))}
-                onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") {
-                    e.preventDefault();
-                    setFormData((prev) => ({ ...prev, has_quran_tracker: false }));
-                  }
-                }}
-                className={`p-3.5 rounded-2xl border theme-border transition-all cursor-pointer flex flex-col justify-between gap-3 select-none outline-none focus:outline-none ${
-                  !formData.has_quran_tracker
-                    ? "theme-bg-accent-soft/35 shadow-xs"
-                    : "theme-bg-surface hover:theme-bg-sub/30 opacity-75 hover:opacity-100"
-                }`}
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
-                          !formData.has_quran_tracker
-                            ? "theme-bg-accent theme-accent-text"
-                            : "theme-bg-sub theme-text-secondary"
-                        }`}
-                      >
-                        <BookOpenIcon className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-bold theme-text-primary">
-                        Class Assessment
-                      </span>
-                    </div>
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                        !formData.has_quran_tracker
-                          ? "border-[var(--accent-main)] bg-[var(--accent-main)] text-white"
-                          : "theme-border bg-transparent"
-                      }`}
-                    >
-                      {!formData.has_quran_tracker && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[11px] theme-text-secondary leading-relaxed">
-                    Standard subject-based syllabus coverage, daily lesson plans, homework dispatch, and classroom evaluation.
-                  </p>
-                </div>
-              </div>
-
-              {/* Option 2: Progress Assessment */}
-              <div
-                role="radio"
-                aria-checked={formData.has_quran_tracker}
-                tabIndex={0}
+              />
+              <RadioCard
+                title="Progress Assessment"
+                description="Individual student milestone tracking, daily progress logs and retention metrics."
+                icon={TrendingUpIcon}
+                selected={formData.has_quran_tracker}
                 onClick={() => setFormData((prev) => ({ ...prev, has_quran_tracker: true }))}
-                onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") {
-                    e.preventDefault();
-                    setFormData((prev) => ({ ...prev, has_quran_tracker: true }));
-                  }
-                }}
-                className={`p-3.5 rounded-2xl border theme-border transition-all cursor-pointer flex flex-col justify-between gap-3 select-none outline-none focus:outline-none ${
-                  formData.has_quran_tracker
-                    ? "theme-bg-accent-soft/35 shadow-xs"
-                    : "theme-border theme-bg-surface hover:theme-bg-sub/30 opacity-75 hover:opacity-100"
-                }`}
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
-                          formData.has_quran_tracker
-                            ? "theme-bg-accent theme-accent-text"
-                            : "theme-bg-sub theme-text-secondary"
-                        }`}
-                      >
-                        <TrendingUpIcon className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-bold theme-text-primary">
-                        Progress Assessment
-                      </span>
-                    </div>
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                        formData.has_quran_tracker
-                          ? "border-[var(--accent-main)] bg-[var(--accent-main)] text-white"
-                          : "theme-border bg-transparent"
-                      }`}
-                    >
-                      {formData.has_quran_tracker && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[11px] theme-text-secondary leading-relaxed">
-                    Individual student milestone tracking, daily progress logs (Sabaq, Sabqi, Daur), and retention metrics.
-                  </p>
-                </div>
-              </div>
+              />
             </div>
           </div>
         </DrawerSection>

@@ -4,6 +4,51 @@ import { fetchWithAuth } from '../utils/authService';
  * Enterprise Academy Multi-Branch, Section & Period API Client
  */
 
+/**
+ * Universal error extractor for DRF API responses, custom exception wrappers, and field errors.
+ */
+export const extractApiErrorMessage = (err, fallback = 'Operation failed') => {
+  if (!err) return fallback;
+  if (typeof err === 'string' && err.trim()) return err;
+
+  const extractFromObject = (obj) => {
+    if (!obj || typeof obj !== 'object') return null;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const msg = extractFromObject(item);
+        if (msg) return msg;
+      }
+      return null;
+    }
+    if (obj.non_field_errors && Array.isArray(obj.non_field_errors) && obj.non_field_errors[0]) {
+      return String(obj.non_field_errors[0]);
+    }
+    if (obj.error && typeof obj.error === 'string' && obj.error.trim()) return obj.error;
+    if (obj.detail && typeof obj.detail === 'string' && obj.detail.trim()) return obj.detail;
+    if (obj.message && typeof obj.message === 'string' && obj.message.trim()) return obj.message;
+
+    // Check field-level errors (e.g. { institution: [...], name: [...] })
+    for (const key of Object.keys(obj)) {
+      if (['status_code', 'success', 'request_id', 'error_type'].includes(key)) continue;
+      const val = obj[key];
+      if (Array.isArray(val) && val[0]) {
+        return key === 'details' ? extractFromObject(val) : `${key}: ${String(val[0])}`;
+      }
+      if (typeof val === 'string' && val.trim()) {
+        return key === 'details' ? val : `${key}: ${val}`;
+      }
+      if (typeof val === 'object' && val !== null) {
+        const nested = extractFromObject(val);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+
+  const extracted = (err.details ? extractFromObject(err.details) : null) || extractFromObject(err);
+  return extracted || err.error || err.detail || err.message || fallback;
+};
+
 // ==========================================
 // 1. ACADEMIC BRANCHES
 // ==========================================
@@ -55,7 +100,7 @@ export const createBranch = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to create branch');
+    throw new Error(extractApiErrorMessage(err, 'Failed to create branch'));
   }
   return await response.json();
 };
@@ -67,7 +112,7 @@ export const updateBranch = async (id, data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to update branch');
+    throw new Error(extractApiErrorMessage(err, 'Failed to update branch'));
   }
   return await response.json();
 };
@@ -78,7 +123,7 @@ export const deleteBranch = async (id) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to delete branch');
+    throw new Error(extractApiErrorMessage(err, 'Failed to delete branch'));
   }
   return await response.json().catch(() => ({ status: 'success' }));
 };
@@ -127,7 +172,7 @@ export const createSection = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to create section');
+    throw new Error(extractApiErrorMessage(err, 'Failed to create section'));
   }
   return await response.json();
 };
@@ -139,7 +184,7 @@ export const updateSection = async (id, data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to update section');
+    throw new Error(extractApiErrorMessage(err, 'Failed to update section'));
   }
   return await response.json();
 };
@@ -150,7 +195,7 @@ export const deleteSection = async (id) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to delete section');
+    throw new Error(extractApiErrorMessage(err, 'Failed to delete section'));
   }
   return await response.json().catch(() => ({ status: 'success' }));
 };
@@ -192,7 +237,7 @@ export const createPeriodSlot = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to create period slot');
+    throw new Error(extractApiErrorMessage(err, 'Failed to create period slot'));
   }
   return await response.json();
 };
@@ -204,7 +249,7 @@ export const updatePeriodSlot = async (id, data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to update period slot');
+    throw new Error(extractApiErrorMessage(err, 'Failed to update period slot'));
   }
   return await response.json();
 };
@@ -215,7 +260,7 @@ export const deletePeriodSlot = async (id) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to delete period slot');
+    throw new Error(extractApiErrorMessage(err, 'Failed to delete period slot'));
   }
   return await response.json().catch(() => ({ status: 'success' }));
 };
@@ -227,7 +272,7 @@ export const reorderPeriodSlots = async (slots) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to reorder period slots');
+    throw new Error(extractApiErrorMessage(err, 'Failed to reorder period slots'));
   }
   return await response.json();
 };
@@ -278,7 +323,7 @@ export const createDepartment = async (data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.non_field_errors?.[0] || err.name?.[0] || err.branch?.[0] || err.error || err.detail || 'Failed to create department');
+    throw new Error(extractApiErrorMessage(err, 'Failed to create department'));
   }
   return await response.json();
 };
@@ -291,7 +336,7 @@ export const updateDepartment = async (id, data) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.non_field_errors?.[0] || err.name?.[0] || err.branch?.[0] || err.error || err.detail || 'Failed to update department');
+    throw new Error(extractApiErrorMessage(err, 'Failed to update department'));
   }
   return await response.json();
 };
@@ -302,7 +347,7 @@ export const deleteDepartment = async (id) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Failed to delete department');
+    throw new Error(extractApiErrorMessage(err, 'Failed to delete department'));
   }
   return await response.json().catch(() => ({ status: 'success' }));
 };

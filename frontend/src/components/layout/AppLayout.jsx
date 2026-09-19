@@ -475,7 +475,7 @@ export default function AppLayout() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      const key = e.key.toLowerCase();
+      const key = (e.key || "").toLowerCase();
 
       if ((e.altKey || (isCmdOrCtrl && e.shiftKey)) && key === "l") {
         e.preventDefault();
@@ -663,15 +663,21 @@ export default function AppLayout() {
               <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
                 {currentInstitution.name}
               </span>
-              {getBranchDisplayName(activeBranch) &&
-                getBranchDisplayName(activeBranch).toLowerCase() !== currentInstitution.name.toLowerCase() && (
-                <>
-                  <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
-                  <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[240px]">
-                    {getBranchDisplayName(activeBranch)}
-                  </span>
-                </>
-              )}
+              {(() => {
+                const branchName = getBranchDisplayName(activeBranch);
+                const instName = currentInstitution?.name || "";
+                if (branchName && instName && String(branchName).toLowerCase() !== String(instName).toLowerCase()) {
+                  return (
+                    <>
+                      <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                      <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[240px]">
+                        {branchName}
+                      </span>
+                    </>
+                  );
+                }
+                return null;
+              })()}
               {activeYear?.name && (
                 <>
                   <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import RouteLoadingFallback from "./components/ui/RouteLoadingFallback";
@@ -6,8 +6,9 @@ import { auth as authStore } from "./utils/localStore";
 import { FeatureGuard } from "./components/common/FeatureGuard";
 import { UndoRedoProvider } from "./context/UndoRedoContext";
 import { I18nProvider } from "./i18n";
+import { lazyWithRetry as lazy } from "./utils/lazyWithRetry";
 
-// ─── Public & Auth Views (Lazy Loaded) ──────────────────────────────────────
+// ─── Public & Auth Views (Lazy Loaded with Auto-Retry) ────────────────────────
 const LandingPageView = lazy(() => import("./modules/landing/LandingPageView"));
 const LoginView = lazy(() => import("./modules/auth/LoginView"));
 const RegisterView = lazy(() => import("./modules/auth/RegisterView"));
@@ -18,7 +19,7 @@ const JoinWithInviteView = lazy(() => import("./modules/auth/JoinWithInviteView"
 const PublicOnlineAdmissionView = lazy(() => import("./modules/student-directory/admission/PublicOnlineAdmissionView"));
 const PublicStaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/PublicStaffOnboardingView"));
 
-// ─── Protected Student & Reports Views (Lazy Loaded) ────────────────────────
+// ─── Protected Student & Reports Views (Lazy Loaded with Auto-Retry) ──────────
 const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-progress/DailyProgressView"));
 const StudentReportsView = lazy(() => import("./modules/reports-history/components/StudentReportsView"));
 const StudentDirectoryView = lazy(() => import("./modules/student-directory/StudentDirectoryView"));
@@ -37,13 +38,13 @@ const StaffProfileDetailView = lazy(() => import("./modules/staff-management/Sta
 const PrintStudioHubView = lazy(() => import("./modules/print-studio/PrintStudioHubView"));
 
 
-// ─── Protected Attendance Views (Lazy Loaded) ───────────────────────────────
+// ─── Protected Attendance Views (Lazy Loaded with Auto-Retry) ─────────────────
 const ClassAttendanceView = lazy(() => import("./modules/attendance/ClassAttendanceView"));
 const AttendanceSettingsView = lazy(() => import("./modules/attendance/AttendanceSettingsView"));
 const ResidentialAttendanceView = lazy(() => import("./modules/attendance/ResidentialAttendanceView"));
 const AdHocHeadcountView = lazy(() => import("./modules/attendance/AdHocHeadcountView"));
 
-// ─── Protected Academy & Campus Structure Views (Lazy Loaded) ───────────────
+// ─── Protected Academy & Campus Structure Views (Lazy Loaded with Auto-Retry) ─
 const DepartmentManagementView = lazy(() => import("./modules/academy/campus-structure/departments/DepartmentManagementView"));
 const ClassManagementView = lazy(() => import("./modules/academy/classes-sections/classes/ClassManagementView"));
 const GroupManagementView = lazy(() => import("./modules/academy/classes-sections/groups/GroupManagementView"));

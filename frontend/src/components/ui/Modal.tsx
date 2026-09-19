@@ -191,6 +191,13 @@ export interface ConfirmModalProps {
     message: React.ReactNode;
     icon?: React.ComponentType<{ className?: string }>;
   };
+  consequences?:
+    | {
+        title?: string;
+        type?: 'danger' | 'warning' | 'info';
+        items: Array<React.ReactNode>;
+      }
+    | Array<React.ReactNode>;
   summaryItems?: Array<{
     label: string;
     value: React.ReactNode;
@@ -220,16 +227,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   showCancelButton = true,
   size = 'md',
   callout,
+  consequences,
   summaryItems,
   note,
   children,
   className = '',
 }) => {
-  const calloutStyles: Record<string, string> = {
-    info: 'border-blue-500/20 bg-blue-500/10 text-blue-800 dark:text-blue-300',
-    warning: 'border-[var(--accent-main)]/30 theme-bg-accent-soft theme-text-secondary',
-    danger: 'border-red-500/20 bg-red-500/10 text-red-800 dark:text-red-300',
-    success: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+  const calloutStyles: Record<string, { border: string; bg: string; text: string; icon: string }> = {
+    info: { border: 'theme-border-info', bg: 'theme-bg-info-soft', text: 'theme-text-primary', icon: 'theme-text-info' },
+    warning: { border: 'theme-border-warning', bg: 'theme-bg-warning-soft', text: 'theme-text-primary', icon: 'theme-text-warning' },
+    danger: { border: 'theme-border-danger', bg: 'theme-bg-danger-soft', text: 'theme-text-primary', icon: 'theme-text-danger' },
+    success: { border: 'theme-border-success', bg: 'theme-bg-success-soft', text: 'theme-text-primary', icon: 'theme-text-success' },
   };
 
   const footerActions = (
@@ -258,6 +266,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     </div>
   );
 
+  const activeCalloutStyle = callout
+    ? calloutStyles[callout.type || 'warning'] || calloutStyles.warning
+    : null;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -272,16 +284,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     >
       <div className="p-4 sm:p-6 space-y-4 text-xs">
         {/* Callout Box */}
-        {callout && (
+        {callout && activeCalloutStyle && (
           <div
-            className={`flex items-start gap-3 p-3.5 rounded-2xl border ${
-              calloutStyles[callout.type || 'warning'] || calloutStyles.warning
-            }`}
+            className={`flex items-start gap-3 p-3.5 rounded-2xl border ${activeCalloutStyle.border} ${activeCalloutStyle.bg}`}
           >
             {callout.icon ? (
-              <callout.icon className="w-5 h-5 theme-accent shrink-0 mt-0.5" />
+              <callout.icon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
             ) : (
-              <AlertCircleIcon className="w-5 h-5 theme-accent shrink-0 mt-0.5" />
+              <AlertCircleIcon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
             )}
             <div className="space-y-1 min-w-0 flex-1">
               {callout.title && (
@@ -290,7 +300,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 </p>
               )}
               {callout.message && (
-                <div className="text-[11px] leading-relaxed opacity-90">
+                <div className="text-[11px] theme-text-secondary leading-relaxed">
                   {callout.message}
                 </div>
               )}
@@ -338,6 +348,41 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Consequences & Impact Warning List */}
+        {consequences && (() => {
+          const consequenceType =
+            typeof consequences === 'object' && !Array.isArray(consequences) && consequences.type
+              ? consequences.type
+              : 'danger';
+
+          const consequenceStyleMap = {
+            warning: { border: 'theme-border-warning', bg: 'theme-bg-warning-soft', title: 'theme-text-warning' },
+            info: { border: 'theme-border-info', bg: 'theme-bg-info-soft', title: 'theme-text-info' },
+            danger: { border: 'theme-border-danger', bg: 'theme-bg-danger-soft', title: 'theme-text-danger' },
+          }[consequenceType] || { border: 'theme-border-danger', bg: 'theme-bg-danger-soft', title: 'theme-text-danger' };
+
+          return (
+            <div
+              className={`p-3.5 rounded-2xl border ${consequenceStyleMap.border} ${consequenceStyleMap.bg} text-xs space-y-2 leading-relaxed`}
+            >
+              <p className={`font-bold text-[11px] uppercase tracking-wider ${consequenceStyleMap.title}`}>
+                {Array.isArray(consequences)
+                  ? 'Direct Consequences of This Action:'
+                  : consequences.title || 'Direct Consequences of This Action:'}
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 text-[11px] theme-text-secondary leading-relaxed">
+                {(Array.isArray(consequences) ? consequences : consequences.items || []).map(
+                  (item, idx) => (
+                    <li key={`consequence_${idx}`} className="theme-text-secondary leading-relaxed">
+                      {item}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          );
+        })()}
 
         {/* Custom Input / Nested Form Content */}
         {children && <div className="space-y-3">{children}</div>}

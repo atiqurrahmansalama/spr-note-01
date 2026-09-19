@@ -188,11 +188,22 @@ export default function CampusProfileHubView() {
     const handleYearsUpdated = () => {
       loadAllMetrics();
     };
+    const handleDeptsUpdated = () => {
+      loadAllMetrics();
+    };
+    const handleBranchesUpdated = () => {
+      loadAllMetrics();
+    };
+
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
     window.addEventListener('spr_academic_years_updated', handleYearsUpdated);
+    window.addEventListener('spr_departments_updated', handleDeptsUpdated);
+    window.addEventListener('spr_branches_updated', handleBranchesUpdated);
     return () => {
       window.removeEventListener('spr_tenant_changed', handleTenantChanged);
       window.removeEventListener('spr_academic_years_updated', handleYearsUpdated);
+      window.removeEventListener('spr_departments_updated', handleDeptsUpdated);
+      window.removeEventListener('spr_branches_updated', handleBranchesUpdated);
     };
   }, [loadAllMetrics]);
 

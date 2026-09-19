@@ -17,6 +17,7 @@ export interface AcademicDepartment {
   description?: string;
   class_count?: number;
   classes_count?: number;
+  sections_count?: number;
   student_count?: number;
   students_count?: number;
   created_at?: string;

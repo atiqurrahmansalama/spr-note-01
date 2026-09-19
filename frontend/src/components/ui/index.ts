@@ -23,4 +23,6 @@ export { default as PageRangeInput } from './PageRangeInput';
 export type { PageRangeInputProps, PageRangeObject, PageRangeChangeValue } from './PageRangeInput';
 export { default as MetricsGrid } from './MetricsGrid';
 export { default as AutocompleteDropdown } from './AutocompleteDropdown';
+export { default as RadioCard } from './RadioCard';
+export type { RadioCardProps } from './RadioCard';
 export * from './Icons';
