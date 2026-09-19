@@ -24,10 +24,20 @@ import {
 } from "../../../components/ui/Icons";
 import CustomSelect from "../../../components/ui/CustomSelect";
 
+export interface PolicySectionCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  badgeLabel?: string;
+  badgeValue?: string;
+  badgeVariant?: "accent" | "sub" | "success" | "warning" | "danger";
+  children: React.ReactNode;
+}
+
 /**
  * Reusable Section Wrapper Card with standard Header, Icon, Title, Description, and Policy Badge.
  */
-function PolicySectionCard({
+export const PolicySectionCard: React.FC<PolicySectionCardProps> = ({
   icon: Icon,
   title,
   description,
@@ -35,7 +45,7 @@ function PolicySectionCard({
   badgeValue,
   badgeVariant = "accent",
   children,
-}) {
+}) => {
   return (
     <div className="theme-bg-surface border theme-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b theme-border">
@@ -70,18 +80,33 @@ function PolicySectionCard({
       {children}
     </div>
   );
+};
+
+export interface CardContentResult {
+  subtitle?: string;
+  badgeText?: string;
+  badgeVariant?: "accent" | "success" | "warning" | "danger" | "sub";
+  onClickOverride?: () => void;
+}
+
+export interface BranchSummaryGridProps {
+  title?: string;
+  branches?: any[];
+  activeBranchId?: string | number | null;
+  onSelectBranch?: (branchId: any) => void;
+  renderCardContent: (branch: any, isSelected: boolean) => CardContentResult;
 }
 
 /**
  * Reusable Branch Configuration Summary Cards Grid.
  */
-function BranchSummaryGrid({
+export const BranchSummaryGrid: React.FC<BranchSummaryGridProps> = ({
   title,
   branches = [],
   activeBranchId,
   onSelectBranch,
   renderCardContent,
-}) {
+}) => {
   if (!branches || branches.length === 0) return null;
 
   return (
@@ -93,7 +118,7 @@ function BranchSummaryGrid({
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
         {branches.map((b) => {
-          const isSelected = activeBranchId && String(activeBranchId) === String(b.id);
+          const isSelected = Boolean(activeBranchId && String(activeBranchId) === String(b.id));
           const { subtitle, badgeText, badgeVariant = "accent", onClickOverride } = renderCardContent(b, isSelected);
 
           return (
@@ -137,30 +162,31 @@ function BranchSummaryGrid({
       </div>
     </div>
   );
+};
+
+export interface AdmissionSettingsPanelProps {
+  activeTenantId?: string | null;
 }
 
 /**
- * Admission Policies & Controls Panel
- * Fully reusable, modular architecture adhering to zero-hardcoding enterprise design guidelines.
+ * Admission Policies & Field Controls Configuration Panel
+ * Configures open academic sessions, branch campus permissions, department offerings, class availability, campus gender locks, and applicant field visibility.
  */
-export default function AdmissionSettingsPanel() {
-  const { showToast } = useToast();
-  const { activeTenantId } = useTenant();
+export const AdmissionSettingsPanel: React.FC<AdmissionSettingsPanelProps> = ({ activeTenantId: propTenantId }) => {
+  const { showToast } = useToast() as any;
+  const { activeTenantId: contextTenantId } = useTenant() as any;
+  const activeTenantId = propTenantId || contextTenantId;
 
-  const [settings, setSettings] = useState(() => admissionSettingsStore.getSettings(activeTenantId));
-  const [academicYears, setAcademicYears] = useState(() => academicYearsStore.getAcademicYears(activeTenantId));
-  const [branches, setBranches] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [loadingBranches, setLoadingBranches] = useState(false);
-  const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [settings, setSettings] = useState<any>(() => admissionSettingsStore.getSettings(activeTenantId));
+  const [academicYears, setAcademicYears] = useState<any[]>(() => academicYearsStore.getAcademicYears(activeTenantId));
+  const [branches, setBranches] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
 
   // Load Branches, Departments & Classes
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      setLoadingBranches(true);
-      setLoadingMetadata(true);
       try {
         const [branchData, deptRes, classRes] = await Promise.all([
           getBranches().catch(() => []),
@@ -169,26 +195,21 @@ export default function AdmissionSettingsPanel() {
         ]);
 
         if (isMounted) {
-          const bList = Array.isArray(branchData) ? branchData : branchData.results || [];
+          const bList = Array.isArray(branchData) ? branchData : (branchData as any)?.results || [];
           setBranches(bList);
 
-          if (deptRes && deptRes.ok) {
-            const dData = await deptRes.json();
+          if (deptRes && (deptRes as any).ok) {
+            const dData = await (deptRes as any).json();
             setDepartments(Array.isArray(dData) ? dData : dData.results || []);
           }
 
-          if (classRes && classRes.ok) {
-            const cData = await classRes.json();
+          if (classRes && (classRes as any).ok) {
+            const cData = await (classRes as any).json();
             setClasses(Array.isArray(cData) ? cData : cData.results || []);
           }
         }
       } catch (err) {
         console.warn("Failed to load metadata for admission settings:", err);
-      } finally {
-        if (isMounted) {
-          setLoadingBranches(false);
-          setLoadingMetadata(false);
-        }
       }
     };
     loadData();
@@ -220,7 +241,7 @@ export default function AdmissionSettingsPanel() {
 
   // Options for academic years dropdown
   const academicYearOptions = useMemo(() => {
-    const opts = [
+    const opts: Array<{ label: string; value: any }> = [
       {
         label: `Active Academic Year (Auto: ${currentActiveAcademicYear?.name || "Active Session"})`,
         value: "ACTIVE_YEAR",
@@ -239,9 +260,7 @@ export default function AdmissionSettingsPanel() {
     return opts;
   }, [academicYears, currentActiveAcademicYear]);
 
-  // -------------------------------------------------------------
-  // OPEN BRANCHES FILTERING (Respects Section 2 Open Branches Policy)
-  // -------------------------------------------------------------
+  // Open Branches Filtering
   const openBranches = useMemo(() => {
     if (settings.branch_admission_mode === "SPECIFIC") {
       const allowed = (settings.allowed_admission_branches || []).map(String);
@@ -253,7 +272,7 @@ export default function AdmissionSettingsPanel() {
     return branches;
   }, [branches, settings.branch_admission_mode, settings.allowed_admission_branches]);
 
-  // All Branches Options (specifically for Section 2: Allowed Branches selector)
+  // All Branches Options
   const allBranchOptions = useMemo(() => {
     return branches.map((b) => {
       const bName = getBranchDisplayName(b);
@@ -265,7 +284,7 @@ export default function AdmissionSettingsPanel() {
     });
   }, [branches]);
 
-  // Open Branch Options (specifically for Section 3, 4, 5, 6: Select Branch selector)
+  // Open Branch Options
   const openBranchOptions = useMemo(() => {
     return openBranches.map((b) => {
       const bName = getBranchDisplayName(b);
@@ -277,13 +296,11 @@ export default function AdmissionSettingsPanel() {
     });
   }, [openBranches]);
 
-  // -------------------------------------------------------------
-  // BRANCH SPECIFIC SELECTORS STATE
-  // -------------------------------------------------------------
-  const [selectedGenderBranchId, setSelectedGenderBranchId] = useState(null);
-  const [selectedMotherConfigBranchId, setSelectedMotherConfigBranchId] = useState(null);
-  const [selectedDeptConfigBranchId, setSelectedDeptConfigBranchId] = useState(null);
-  const [selectedClassConfigBranchId, setSelectedClassConfigBranchId] = useState(null);
+  // Branch Specific Selectors State
+  const [selectedGenderBranchId, setSelectedGenderBranchId] = useState<any>(null);
+  const [selectedMotherConfigBranchId, setSelectedMotherConfigBranchId] = useState<any>(null);
+  const [selectedDeptConfigBranchId, setSelectedDeptConfigBranchId] = useState<any>(null);
+  const [selectedClassConfigBranchId, setSelectedClassConfigBranchId] = useState<any>(null);
 
   useEffect(() => {
     if (openBranches.length > 0) {
@@ -324,7 +341,7 @@ export default function AdmissionSettingsPanel() {
       : openBranches[0]?.id;
 
   // Helper to extract department ID from class
-  const getDeptIdFromClass = (c) => {
+  const getDeptIdFromClass = (c: any) => {
     if (!c) return null;
     const val = c.department !== undefined && c.department !== null ? c.department : c.department_id;
     return val && typeof val === "object" ? val.id : val;
@@ -398,7 +415,7 @@ export default function AdmissionSettingsPanel() {
   }, [classes, departments, settings.department_admission_mode, settings.branch_department_rules, activeClassBranchId]);
 
   // Handle Save Settings
-  const handleSave = (updated) => {
+  const handleSave = (updated: any) => {
     const nextSettings = { ...settings, ...updated };
     setSettings(nextSettings);
     admissionSettingsStore.saveSettings(activeTenantId, nextSettings);
@@ -408,7 +425,7 @@ export default function AdmissionSettingsPanel() {
   const selectedYearIds = Array.isArray(settings.allowed_admission_years) ? settings.allowed_admission_years : [];
 
   // Branch Rule Handlers
-  const handleBranchDepartmentChange = (branchId, selectedDeptIds) => {
+  const handleBranchDepartmentChange = (branchId: any, selectedDeptIds: any) => {
     const nextBranchRules = {
       ...(settings.branch_department_rules || {}),
       [branchId]: Array.isArray(selectedDeptIds) ? selectedDeptIds : [selectedDeptIds],
@@ -416,7 +433,7 @@ export default function AdmissionSettingsPanel() {
     handleSave({ branch_department_rules: nextBranchRules });
   };
 
-  const handleBranchClassChange = (branchId, selectedClassIds) => {
+  const handleBranchClassChange = (branchId: any, selectedClassIds: any) => {
     const nextBranchRules = {
       ...(settings.branch_class_rules || {}),
       [branchId]: Array.isArray(selectedClassIds) ? selectedClassIds : [selectedClassIds],
@@ -424,7 +441,7 @@ export default function AdmissionSettingsPanel() {
     handleSave({ branch_class_rules: nextBranchRules });
   };
 
-  const handleBranchGenderChange = (branchId, genderRule) => {
+  const handleBranchGenderChange = (branchId: any, genderRule: string) => {
     const nextBranchRules = {
       ...(settings.branch_gender_rules || {}),
       [branchId]: genderRule,
@@ -432,7 +449,7 @@ export default function AdmissionSettingsPanel() {
     handleSave({ branch_gender_rules: nextBranchRules });
   };
 
-  const handleBranchMotherInfoChange = (branchId, visibility) => {
+  const handleBranchMotherInfoChange = (branchId: any, visibility: string) => {
     const nextRules = {
       ...(settings.branch_mother_info_rules || {}),
       [branchId]: visibility,
@@ -449,7 +466,7 @@ export default function AdmissionSettingsPanel() {
       showToast("Please enter a valid class name", "warning");
       return;
     }
-    const currentList = settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES;
+    const currentList: string[] = settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES;
     if (currentList.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
       showToast("This class already exists in the roster", "warning");
       return;
@@ -460,8 +477,8 @@ export default function AdmissionSettingsPanel() {
     showToast(`Added "${trimmed}" to previous classes roster`, "success");
   };
 
-  const handleRemovePreviousClass = (clsName) => {
-    const currentList = settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES;
+  const handleRemovePreviousClass = (clsName: string) => {
+    const currentList: string[] = settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES;
     const updated = currentList.filter((c) => c !== clsName);
     handleSave({ previous_classes_list: updated });
     showToast(`Removed "${clsName}" from previous classes roster`, "info");
@@ -532,7 +549,7 @@ export default function AdmissionSettingsPanel() {
             multiple={true}
             options={academicYearOptions}
             value={selectedYearIds}
-            onChange={(val) => {
+            onChange={(val: any) => {
               const updated = Array.isArray(val) ? val : [val];
               handleSave({ allowed_admission_years: updated });
             }}
@@ -569,7 +586,7 @@ export default function AdmissionSettingsPanel() {
                   { label: "Specific Branches Only", value: "SPECIFIC" },
                 ]}
                 value={settings.branch_admission_mode || "ALL"}
-                onChange={(val) => handleSave({ branch_admission_mode: val })}
+                onChange={(val: any) => handleSave({ branch_admission_mode: val })}
                 searchable={false}
               />
             </div>
@@ -581,7 +598,7 @@ export default function AdmissionSettingsPanel() {
                   multiple={true}
                   options={allBranchOptions}
                   value={settings.allowed_admission_branches || []}
-                  onChange={(val) => {
+                  onChange={(val: any) => {
                     const updated = Array.isArray(val) ? val : [val];
                     handleSave({ allowed_admission_branches: updated });
                   }}
@@ -597,7 +614,7 @@ export default function AdmissionSettingsPanel() {
             <BranchSummaryGrid
               title="Configured Branches Admission Status"
               branches={branches}
-              renderCardContent={(b) => {
+              renderCardContent={(b: any) => {
                 const isAllowed = (settings.allowed_admission_branches || []).map(String).includes(String(b.id));
                 return {
                   subtitle: isAllowed ? "Open for Admissions" : "Admissions Closed",
@@ -645,7 +662,7 @@ export default function AdmissionSettingsPanel() {
                   { label: "Branch-Specific Rules", value: "BRANCH_SPECIFIC" },
                 ]}
                 value={settings.department_admission_mode === "ALL" ? "ALL" : "BRANCH_SPECIFIC"}
-                onChange={(val) => handleSave({ department_admission_mode: val })}
+                onChange={(val: any) => handleSave({ department_admission_mode: val })}
                 searchable={false}
               />
             </div>
@@ -657,7 +674,7 @@ export default function AdmissionSettingsPanel() {
                     label="Select Branch"
                     options={openBranchOptions}
                     value={activeDeptBranchId}
-                    onChange={(val) => setSelectedDeptConfigBranchId(val)}
+                    onChange={(val: any) => setSelectedDeptConfigBranchId(val)}
                     placeholder={openBranchOptions.length === 0 ? "No Open Branches..." : "Select Branch..."}
                     searchable={false}
                     disabled={openBranchOptions.length === 0}
@@ -669,7 +686,7 @@ export default function AdmissionSettingsPanel() {
                     multiple={true}
                     options={branchDepartmentOptions}
                     value={settings.branch_department_rules?.[activeDeptBranchId] || []}
-                    onChange={(val) => handleBranchDepartmentChange(activeDeptBranchId, val)}
+                    onChange={(val: any) => handleBranchDepartmentChange(activeDeptBranchId, val)}
                     placeholder="Select departments..."
                     searchable={true}
                     disabled={!activeDeptBranchId || openBranchOptions.length === 0}
@@ -684,8 +701,8 @@ export default function AdmissionSettingsPanel() {
               title="Configured Branch Departments Summary (Open Branches)"
               branches={openBranches}
               activeBranchId={activeDeptBranchId}
-              onSelectBranch={(bId) => setSelectedDeptConfigBranchId(bId)}
-              renderCardContent={(b) => {
+              onSelectBranch={(bId: any) => setSelectedDeptConfigBranchId(bId)}
+              renderCardContent={(b: any) => {
                 const allowedDepts = settings.branch_department_rules?.[b.id] || [];
                 return {
                   subtitle: allowedDepts.length === 0 ? "All Departments Open" : `${allowedDepts.length} Department(s)`,
@@ -726,7 +743,7 @@ export default function AdmissionSettingsPanel() {
                   { label: "Branch-Specific Rules", value: "BRANCH_SPECIFIC" },
                 ]}
                 value={settings.class_admission_mode === "ALL" ? "ALL" : "BRANCH_SPECIFIC"}
-                onChange={(val) => handleSave({ class_admission_mode: val })}
+                onChange={(val: any) => handleSave({ class_admission_mode: val })}
                 searchable={false}
               />
             </div>
@@ -738,7 +755,7 @@ export default function AdmissionSettingsPanel() {
                     label="Select Branch"
                     options={openBranchOptions}
                     value={activeClassBranchId}
-                    onChange={(val) => setSelectedClassConfigBranchId(val)}
+                    onChange={(val: any) => setSelectedClassConfigBranchId(val)}
                     placeholder={openBranchOptions.length === 0 ? "No Open Branches..." : "Select Branch..."}
                     searchable={false}
                     disabled={openBranchOptions.length === 0}
@@ -750,7 +767,7 @@ export default function AdmissionSettingsPanel() {
                     multiple={true}
                     options={branchClassOptions}
                     value={settings.branch_class_rules?.[activeClassBranchId] || []}
-                    onChange={(val) => handleBranchClassChange(activeClassBranchId, val)}
+                    onChange={(val: any) => handleBranchClassChange(activeClassBranchId, val)}
                     placeholder="Select classes..."
                     searchable={true}
                     disabled={!activeClassBranchId || openBranchOptions.length === 0}
@@ -765,8 +782,8 @@ export default function AdmissionSettingsPanel() {
               title="Configured Branch Classes Summary (Open Branches)"
               branches={openBranches}
               activeBranchId={activeClassBranchId}
-              onSelectBranch={(bId) => setSelectedClassConfigBranchId(bId)}
-              renderCardContent={(b) => {
+              onSelectBranch={(bId: any) => setSelectedClassConfigBranchId(bId)}
+              renderCardContent={(b: any) => {
                 const allowedCls = settings.branch_class_rules?.[b.id] || [];
                 return {
                   subtitle: allowedCls.length === 0 ? "All Classes Open" : `${allowedCls.length} Class(es)`,
@@ -814,7 +831,7 @@ export default function AdmissionSettingsPanel() {
                     ? "BRANCH_SPECIFIC"
                     : settings.gender_policy
                 }
-                onChange={(val) => handleSave({ gender_policy: val })}
+                onChange={(val: any) => handleSave({ gender_policy: val })}
                 searchable={false}
               />
             </div>
@@ -826,7 +843,7 @@ export default function AdmissionSettingsPanel() {
                     label="Select Branch"
                     options={openBranchOptions}
                     value={activeGenderBranchId}
-                    onChange={(val) => setSelectedGenderBranchId(val)}
+                    onChange={(val: any) => setSelectedGenderBranchId(val)}
                     placeholder={openBranchOptions.length === 0 ? "No Open Branches..." : "Select Branch..."}
                     searchable={false}
                     disabled={openBranchOptions.length === 0}
@@ -837,7 +854,7 @@ export default function AdmissionSettingsPanel() {
                     label="Allowed Gender"
                     options={branchGenderOptions}
                     value={settings.branch_gender_rules?.[activeGenderBranchId] || "MALE_ONLY"}
-                    onChange={(val) => handleBranchGenderChange(activeGenderBranchId, val)}
+                    onChange={(val: any) => handleBranchGenderChange(activeGenderBranchId, val)}
                     searchable={false}
                     disabled={!activeGenderBranchId || openBranchOptions.length === 0}
                   />
@@ -851,8 +868,8 @@ export default function AdmissionSettingsPanel() {
               title="Configured Branch Policies Summary (Open Branches)"
               branches={openBranches}
               activeBranchId={activeGenderBranchId}
-              onSelectBranch={(bId) => setSelectedGenderBranchId(bId)}
-              renderCardContent={(b) => {
+              onSelectBranch={(bId: any) => setSelectedGenderBranchId(bId)}
+              renderCardContent={(b: any) => {
                 const rule = settings.branch_gender_rules?.[b.id] || "MALE_ONLY";
                 return {
                   subtitle: rule === "FEMALE_ONLY" ? "Girls Only" : "Boys Only",
@@ -896,7 +913,7 @@ export default function AdmissionSettingsPanel() {
                   { label: "Branch-Specific Rules", value: "BRANCH_SPECIFIC" },
                 ]}
                 value={settings.mother_info_visibility || "VISIBLE"}
-                onChange={(val) => handleSave({ mother_info_visibility: val })}
+                onChange={(val: any) => handleSave({ mother_info_visibility: val })}
                 searchable={false}
               />
             </div>
@@ -908,7 +925,7 @@ export default function AdmissionSettingsPanel() {
                     label="Select Branch"
                     options={openBranchOptions}
                     value={activeMotherBranchId}
-                    onChange={(val) => setSelectedMotherConfigBranchId(val)}
+                    onChange={(val: any) => setSelectedMotherConfigBranchId(val)}
                     placeholder={openBranchOptions.length === 0 ? "No Open Branches..." : "Select Branch..."}
                     searchable={false}
                     disabled={openBranchOptions.length === 0}
@@ -919,7 +936,7 @@ export default function AdmissionSettingsPanel() {
                     label="Mother Info Status"
                     options={motherVisibilityOptions}
                     value={settings.branch_mother_info_rules?.[activeMotherBranchId] || "VISIBLE"}
-                    onChange={(val) => handleBranchMotherInfoChange(activeMotherBranchId, val)}
+                    onChange={(val: any) => handleBranchMotherInfoChange(activeMotherBranchId, val)}
                     searchable={false}
                     disabled={!activeMotherBranchId || openBranchOptions.length === 0}
                   />
@@ -933,8 +950,8 @@ export default function AdmissionSettingsPanel() {
               title="Configured Branch Mother Info Summary (Open Branches)"
               branches={openBranches}
               activeBranchId={activeMotherBranchId}
-              onSelectBranch={(bId) => setSelectedMotherConfigBranchId(bId)}
-              renderCardContent={(b) => {
+              onSelectBranch={(bId: any) => setSelectedMotherConfigBranchId(bId)}
+              renderCardContent={(b: any) => {
                 const isVisible = (settings.branch_mother_info_rules?.[b.id] || "VISIBLE") !== "HIDDEN";
                 return {
                   subtitle: isVisible ? "Mother Info Visible" : "Mother Info Hidden",
@@ -947,9 +964,7 @@ export default function AdmissionSettingsPanel() {
         </div>
       </PolicySectionCard>
 
-      {/* ================================================================================================= */}
-      {/* SECTION 7: PREVIOUS CLASSES / PRIOR EDUCATION ROSTER (পূর্ববর্তী শ্রেণির তালিকা) */}
-      {/* ================================================================================================= */}
+      {/* ────────────────── SECTION 7: PREVIOUS CLASSES / PRIOR EDUCATION ROSTER ────────────────── */}
       <PolicySectionCard
         icon={BookOpenIcon}
         title="Previous Classes / Prior Education Roster"
@@ -996,14 +1011,14 @@ export default function AdmissionSettingsPanel() {
             </div>
           </div>
 
-          {/* Active Previous Classes Tags / Pills Matrix */}
+          {/* Active Previous Classes Tags Matrix */}
           <div className="p-4 rounded-2xl theme-bg-sub/40 border theme-border space-y-3">
             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider theme-text-secondary">
               <span>Active Previous Classes List</span>
               <span className="font-mono text-[11px] lowercase opacity-75">click ✕ to remove</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES).map((clsName, idx) => (
+              {(settings.previous_classes_list || DEFAULT_PREVIOUS_CLASSES).map((clsName: string, idx: number) => (
                 <div
                   key={`${clsName}-${idx}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl theme-bg-surface border theme-border text-xs font-semibold theme-text-primary shadow-2xs hover:border-[var(--border-hover)] transition-all group"
@@ -1025,4 +1040,6 @@ export default function AdmissionSettingsPanel() {
       </PolicySectionCard>
     </div>
   );
-}
+};
+
+export default AdmissionSettingsPanel;

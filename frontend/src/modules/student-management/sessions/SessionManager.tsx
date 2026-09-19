@@ -1,16 +1,23 @@
 import React, { useCallback } from "react";
-import CompactTaxonomyManager from "../../components/common/CompactTaxonomyManager";
-import { SessionsIcon } from "../../components/ui/Icons";
-import { fetchWithAuth } from "../../utils/authService";
+import CompactTaxonomyManager from "../../../components/common/CompactTaxonomyManager";
+import { SessionsIcon } from "../../../components/ui/Icons";
+import { fetchWithAuth } from "../../../utils/authService";
 import { 
   sessions as sessionStore, 
   isOnline, 
   mergeSessions 
-} from "../../utils/localStore";
-import { syncSessionsAndComments } from "../../utils/syncEngine";
+} from "../../../utils/localStore";
+import { syncSessionsAndComments } from "../../../utils/syncEngine";
+
+export interface SessionItem {
+  id: string | number;
+  name: string;
+  _local?: boolean;
+  is_active?: boolean;
+}
 
 // Helper to normalize session list
-function normalizeSessionList(rawList) {
+function normalizeSessionList(rawList: any[]): SessionItem[] {
   if (!Array.isArray(rawList)) return [];
   return rawList.map((s, idx) => ({
     id: typeof s === "object" && s !== null ? (s.id || `sess-${idx}`) : `sess-${idx}`,
@@ -25,7 +32,7 @@ function normalizeSessionList(rawList) {
  * Manages pre-configured report session topics and lesson progress categories.
  * Powered by CompactTaxonomyManager with real-time local cache and server synchronization.
  */
-export default function SessionManager() {
+export const SessionManager: React.FC = () => {
   const fetchSessions = useCallback(async () => {
     const localList = sessionStore.getAll();
     if (isOnline()) {
@@ -41,7 +48,7 @@ export default function SessionManager() {
           const normalizedServer = normalizeSessionList(serverList);
           const merged = mergeSessions(localList, normalizedServer);
           sessionStore.saveAll(merged);
-          return merged.map((s) => ({
+          return merged.map((s: any) => ({
             id: s.id,
             name: s.name,
             is_active: true,
@@ -58,7 +65,7 @@ export default function SessionManager() {
     }));
   }, []);
 
-  const createSessionItem = useCallback(async (payload) => {
+  const createSessionItem = useCallback(async (payload: any) => {
     const name = (payload.name || "").trim();
     if (!name) throw new Error("Session name is required");
 
@@ -82,7 +89,7 @@ export default function SessionManager() {
     return result.newSession || { id: crypto.randomUUID(), name, is_active: true };
   }, []);
 
-  const updateSessionItem = useCallback(async (id, payload) => {
+  const updateSessionItem = useCallback(async (id: any, payload: any) => {
     const name = (payload.name || "").trim();
     if (!name) throw new Error("Session name is required");
 
@@ -94,7 +101,7 @@ export default function SessionManager() {
         });
         if (res.ok) {
           const updated = await res.json();
-          const all = sessionStore.getAll().map((s) => (s.id === id ? { ...s, name } : s));
+          const all = sessionStore.getAll().map((s: any) => (s.id === id ? { ...s, name } : s));
           sessionStore.saveAll(all);
           syncSessionsAndComments().catch(() => {});
           return { id: updated.id || id, name, is_active: true };
@@ -103,12 +110,12 @@ export default function SessionManager() {
         console.warn("[SessionManager] Online session update failed:", err);
       }
     }
-    const all = sessionStore.getAll().map((s) => (s.id === id ? { ...s, name } : s));
+    const all = sessionStore.getAll().map((s: any) => (s.id === id ? { ...s, name } : s));
     sessionStore.saveAll(all);
     return { id, name, is_active: true };
   }, []);
 
-  const deleteSessionItem = useCallback(async (id) => {
+  const deleteSessionItem = useCallback(async (id: any) => {
     if (isOnline()) {
       try {
         await fetchWithAuth(`/sessions/${id}/`, { method: "DELETE" });
@@ -136,4 +143,6 @@ export default function SessionManager() {
       />
     </div>
   );
-}
+};
+
+export default SessionManager;

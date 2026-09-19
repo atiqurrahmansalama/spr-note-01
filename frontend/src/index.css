@@ -292,6 +292,35 @@ tr:hover > .theme-sticky-cell-surface.is-selected {
   background-color: color-mix(in srgb, var(--accent-main) 16%, var(--bg-surface));
 }
 
+/* Universal Row & Card Highlight Pulse Animation */
+@keyframes rowHighlightPulse {
+  0% {
+    background-color: color-mix(in srgb, var(--accent-main) 28%, var(--bg-surface));
+    box-shadow: inset 0 0 0 2px var(--accent-main);
+  }
+  30% {
+    background-color: color-mix(in srgb, var(--accent-main) 22%, var(--bg-surface));
+    box-shadow: inset 0 0 0 2px var(--accent-main);
+  }
+  60% {
+    background-color: color-mix(in srgb, var(--accent-main) 10%, var(--bg-surface));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent-main) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+.theme-row-highlight {
+  animation: rowHighlightPulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.theme-sticky-cell-app.is-highlighted,
+.theme-sticky-cell-surface.is-highlighted {
+  animation: rowHighlightPulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
 /* 1. Enterprise Slate Theme */
 html[data-theme="slate"][data-mode="dark"] {
   --bg-app: #121315;

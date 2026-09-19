@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import FullAdmissionWizard from './FullAdmissionWizard';
 import QuickAdmissionForm from './QuickAdmissionForm';
@@ -17,13 +17,18 @@ import {
   DownloadIcon,
   MoreVerticalIcon,
   SparklesIcon,
+  EditIcon,
+  CloseIcon,
 } from '../../../components/ui/Icons';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
+import CustomButton from '../../../components/ui/CustomButton';
 import { PageContainer } from '../../../components/layout';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useToast } from '../../../context/ToastContext';
 import { useTenant } from '../../../context/TenantContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
+import { fetchWithAuth } from '../../../utils/authService';
 import { academicYearsStore, admissionSettingsStore } from '../../../utils/localStore';
 import {
   getAdmissionTokens,
@@ -35,12 +40,60 @@ export default function StudentAdmissionView() {
   const { showToast } = useToast();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
+  const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const activeTab = searchParams.get('tab') || 'quick'; // 'quick' | 'direct' | 'online_qr'
+  // Dynamic feature checks with graceful fallback
+  const isQuickEnabled = isSectionEnabled('student_quick_admission');
+  const isFullEnabled = isSectionEnabled('student_admission');
+
+  // If neither is explicitly enabled (or both are), both remain accessible for admin/roster editing
+  const canUseQuick = isQuickEnabled || (!isQuickEnabled && !isFullEnabled);
+  const canUseFull = isFullEnabled || (!isQuickEnabled && !isFullEnabled);
+
+  const editId = searchParams.get('edit') || searchParams.get('student_id') || searchParams.get('id');
+  const rawUrlTab = searchParams.get('tab');
+
+  // Compute active tab dynamically based on URL and enabled features
+  const activeTab = useMemo(() => {
+    if (rawUrlTab === 'online_qr') return 'online_qr';
+    if (rawUrlTab === 'quick') {
+      if (canUseQuick) return 'quick';
+      if (canUseFull) return 'direct';
+    }
+    if (rawUrlTab === 'direct') {
+      if (canUseFull) return 'direct';
+      if (canUseQuick) return 'quick';
+    }
+    // No tab specified in URL
+    if (editId) {
+      if (canUseFull) return 'direct';
+      if (canUseQuick) return 'quick';
+      return 'direct';
+    }
+    // Normal registration mode
+    if (canUseQuick) return 'quick';
+    if (canUseFull) return 'direct';
+    return 'quick';
+  }, [rawUrlTab, editId, canUseQuick, canUseFull]);
+
+  // Tab list dynamically filtered
+  const tabsList = useMemo(() => {
+    const list = [];
+    if (canUseQuick) {
+      list.push({ id: 'quick', label: 'Quick Admission', icon: SparklesIcon });
+    }
+    if (canUseFull) {
+      list.push({ id: 'direct', label: 'Full Admission Wizard', icon: AcademicCapIcon });
+    }
+    list.push({ id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon });
+    return list;
+  }, [canUseQuick, canUseFull]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [admittedStudent, setAdmittedStudent] = useState(null);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [loadingEditData, setLoadingEditData] = useState(false);
 
   const ongoingYear = admissionSettingsStore.getActiveAdmissionYear(activeTenantId);
 
@@ -48,6 +101,18 @@ export default function StudentAdmissionView() {
   const [tokens, setTokens] = useState([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [selectedTokenForQR, setSelectedTokenForQR] = useState(null);
+
+  const loadTokens = useCallback(async () => {
+    try {
+      setLoadingTokens(true);
+      const data = await getAdmissionTokens();
+      setTokens(Array.isArray(data) ? data : data?.results || []);
+    } catch (err) {
+      console.error('Failed to load admission tokens:', err);
+    } finally {
+      setLoadingTokens(false);
+    }
+  }, []);
 
   // Shared Direct Form Data
   const [sharedData, setSharedData] = useState({
@@ -59,7 +124,9 @@ export default function StudentAdmissionView() {
     blood_group: '',
     birth_certificate_no: '',
     session_year: ongoingYear?.name || '',
+    department: '',
     student_class: '',
+    student_section: '',
     education_status: '',
     roll_number: '',
     admission_date: new Date().toISOString().split('T')[0],
@@ -87,17 +154,100 @@ export default function StudentAdmissionView() {
     perm_division: '',
   });
 
-  const loadTokens = useCallback(async () => {
-    setLoadingTokens(true);
-    try {
-      const data = await getAdmissionTokens();
-      setTokens(data);
-    } catch (err) {
-      console.error('Failed to load admission tokens', err);
-    } finally {
-      setLoadingTokens(false);
+  // Load existing student full profile for editing and auto-fill
+  useEffect(() => {
+    if (!editId) {
+      setEditingStudent(null);
+      return;
     }
-  }, []);
+
+    let isMounted = true;
+    setLoadingEditData(true);
+    fetchWithAuth(`/api/v1/students/${editId}/full-profile/`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((stu) => {
+        if (!isMounted || !stu) return;
+        setEditingStudent(stu);
+
+        const g = stu.guardian_detail || (Array.isArray(stu.guardians) && stu.guardians[0]) || stu.details || {};
+        const a = stu.academic_detail || {};
+        const pAddr = stu.present_address || {};
+        const permAddr = stu.permanent_address || {};
+
+        setSharedData((prev) => ({
+          ...prev,
+          is_editing: true,
+          edit_student_id: stu.id,
+          student_type: "EXISTING",
+          name: stu.name_en || stu.name || '',
+          bangla_name: stu.bangla_name || stu.details?.name_bn || '',
+          student_id_card_number: stu.student_id_card_number || '',
+          gender: stu.gender || 'MALE',
+          dob: stu.dob || stu.details?.date_of_birth || '',
+          blood_group: stu.blood_group || stu.details?.blood_group || '',
+          birth_certificate_no: stu.birth_certificate_no || '',
+          nid_no: stu.nid_no || '',
+          session_year: a.session_year || stu.session_year || ongoingYear?.name || '2026-2027',
+          department: stu.department || a.department || '',
+          student_class: stu.student_class != null ? String(stu.student_class) : (a.student_class != null ? String(a.student_class) : ''),
+          student_section: stu.student_section != null ? String(stu.student_section) : (stu.student_group != null ? String(stu.student_group) : (a.student_section != null ? String(a.student_section) : '')),
+          education_status: stu.education_status || stu.student_class_name || '',
+          roll_number: stu.roll_number || '',
+          admission_date: stu.admission_date || a.admission_date || new Date().toISOString().split('T')[0],
+          target_status: stu.target_status || 'NON_RESIDENTIAL',
+          branch_id: stu.branch || '',
+          photo: stu.photo || '',
+          previous_school_name: a.previous_school_name || '',
+          previous_school_address: a.previous_school_address || '',
+          previous_class: a.previous_class || '',
+          previous_grade: a.previous_grade || '',
+          previous_average: a.previous_average || '',
+          previous_passing_year: a.previous_passing_year || '',
+          previous_study_details: a.previous_study_details || '',
+          tc_number: a.tc_number || '',
+          father_name: g.father_name || stu.details?.father_name || stu.father_name || '',
+          father_phone: g.father_phone || stu.details?.father_phone || '',
+          father_occupation: g.father_occupation || stu.details?.father_occupation || '',
+          mother_name: g.mother_name || stu.details?.mother_name || '',
+          mother_phone: g.mother_phone || '',
+          mother_occupation: g.mother_occupation || '',
+          primary_guardian_name: g.primary_guardian_name || stu.details?.guardian_name || stu.guardian_name || '',
+          guardian_phone: g.primary_guardian_phone || g.guardian_phone || stu.guardian_phone || stu.details?.guardian_phone || stu.details?.emergency_phone || stu.details?.father_phone || '',
+          guardian_relation: g.guardian_relation || stu.details?.guardian_relation || 'Father',
+          guardian_nid: g.guardian_nid || '',
+          emergency_contact_phone: g.emergency_contact_phone || stu.details?.emergency_phone || '',
+          street_address: pAddr.street_address || pAddr.address_line1 || '',
+          post_code: pAddr.post_code || '',
+          thana_or_upazila: pAddr.thana_or_upazila || pAddr.thana || '',
+          district: pAddr.district || '',
+          division: pAddr.division || '',
+          perm_street: permAddr.street_address || permAddr.address_line1 || '',
+          perm_post_code: permAddr.post_code || '',
+          perm_thana: permAddr.thana_or_upazila || permAddr.thana || '',
+          perm_district: permAddr.district || '',
+          perm_division: permAddr.division || '',
+        }));
+
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          if (!next.get('tab')) {
+            next.set('tab', 'direct');
+          }
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load student for editing", err);
+        showToast("Failed to load student details for editing", "error");
+      })
+      .finally(() => {
+        if (isMounted) setLoadingEditData(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [editId]);
 
   useEffect(() => {
     if (activeTab === 'online_qr') {
@@ -227,38 +377,88 @@ export default function StudentAdmissionView() {
     });
   };
 
-  const handleClose = () => {
-    navigate('/groups-students');
+  const handleClose = (studentToHighlight) => {
+    const targetStudent = studentToHighlight || admittedStudent || editingStudent;
+    if (targetStudent?.id) {
+      navigate(`/groups-students?highlight=${targetStudent.id}`);
+    } else {
+      navigate('/groups-students');
+    }
   };
 
   return (
     <PageContainer>
       {/* 1. Standard Page Header */}
       <PageHeader
-        icon={AcademicCapIcon}
-        title="Student Admission & Registration"
-        subtitle="Enroll new students directly or generate online QR codes and public links for remote registration."
+        icon={editingStudent && activeTab !== 'online_qr' ? EditIcon : AcademicCapIcon}
+        title={
+          editingStudent && activeTab !== 'online_qr'
+            ? `Edit Student: ${editingStudent.name_en || editingStudent.name}`
+            : "Student Admission & Registration"
+        }
+        subtitle={
+          editingStudent && activeTab !== 'online_qr'
+            ? `Updating institutional profile and enrollment records for ${editingStudent.name_en || editingStudent.name}`
+            : "Enroll new students directly or generate online QR codes and public links for remote registration."
+        }
       />
+
+      {/* Edit Mode Notice Banner */}
+      {editingStudent && activeTab !== 'online_qr' && (
+        <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl theme-bg-accent-soft border theme-border shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center shrink-0 shadow-xs">
+              <EditIcon className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-normal theme-text-secondary">
+                  Editing Student Profile: <span className="font-bold theme-text-primary">{editingStudent.name_en || editingStudent.name}</span>
+                </span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-sub border theme-border">
+                  {editingStudent.uniq_id || `ID: ${editingStudent.id}`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <CustomButton
+            type="button"
+            variant="secondary"
+            size="xs"
+            icon={CloseIcon}
+            onClick={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('edit');
+                next.delete('student_id');
+                next.delete('id');
+                return next;
+              });
+              handleReset();
+            }}
+          >
+            Cancel
+          </CustomButton>
+        </div>
+      )}
 
       {/* 2. Mode Tab Switcher */}
       <TabSwitcher
         activeTab={activeTab}
         onChange={handleTabChange}
-        tabs={[
-          { id: 'quick', label: 'Quick Admission', icon: SparklesIcon },
-          { id: 'direct', label: 'Full Admission Wizard', icon: AcademicCapIcon },
-          { id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon },
-        ]}
+        tabs={tabsList}
         rightContent={
           activeTab === 'online_qr' ? (
-            <button
+            <CustomButton
               type="button"
+              variant="primary"
+              size="sm"
+              icon={PlusIcon}
               onClick={handleOpenCreateDrawer}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-sm shrink-0"
             >
-              <PlusIcon className="w-4 h-4" />
-              <span>Generate Link &amp; QR</span>
-            </button>
+              Generate Link &amp; QR
+            </CustomButton>
           ) : null
         }
       />
@@ -271,6 +471,7 @@ export default function StudentAdmissionView() {
             <div className="p-8 rounded-3xl theme-bg-surface border theme-border shadow-md max-w-xl mx-auto text-center space-y-5 animate-zoom-in">
               <AdmissionSuccessModal
                 student={admittedStudent}
+                isEditing={Boolean(editingStudent || sharedData?.is_editing)}
                 onReset={handleReset}
                 onClose={handleClose}
               />
@@ -281,6 +482,9 @@ export default function StudentAdmissionView() {
               onSuccess={(stu) => {
                 setAdmittedStudent(stu);
               }}
+              sharedData={sharedData}
+              setSharedData={setSharedData}
+              editingStudent={editingStudent}
             />
           )}
         </div>
@@ -293,6 +497,7 @@ export default function StudentAdmissionView() {
             <div className="p-8 rounded-3xl theme-bg-surface border theme-border shadow-md max-w-xl mx-auto text-center space-y-5 animate-zoom-in">
               <AdmissionSuccessModal
                 student={admittedStudent}
+                isEditing={Boolean(editingStudent || sharedData?.is_editing)}
                 onReset={handleReset}
                 onClose={handleClose}
               />

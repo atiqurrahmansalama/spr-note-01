@@ -16,16 +16,16 @@ const VerifyEmailView = lazy(() => import("./modules/auth/VerifyEmailView"));
 const ResetPasswordView = lazy(() => import("./modules/auth/ResetPasswordView"));
 const PublicVerifyReportView = lazy(() => import("./modules/verification/PublicVerifyReportView"));
 const JoinWithInviteView = lazy(() => import("./modules/auth/JoinWithInviteView"));
-const PublicOnlineAdmissionView = lazy(() => import("./modules/student-directory/admission/PublicOnlineAdmissionView"));
+const PublicOnlineAdmissionView = lazy(() => import("./modules/student-management/admission/PublicOnlineAdmissionView"));
 const PublicStaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/PublicStaffOnboardingView"));
 
 // ─── Protected Student & Reports Views (Lazy Loaded with Auto-Retry) ──────────
 const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-progress/DailyProgressView"));
 const StudentReportsView = lazy(() => import("./modules/reports-history/components/StudentReportsView"));
-const StudentDirectoryView = lazy(() => import("./modules/student-directory/StudentDirectoryView"));
-const StudentAdmissionView = lazy(() => import("./modules/student-directory/admission/StudentAdmissionView"));
-const SessionManager = lazy(() => import("./modules/student-directory/SessionManager"));
-const StudentProfileHubView = lazy(() => import("./modules/student-directory/StudentProfileHubView"));
+const StudentDirectoryView = lazy(() => import("./modules/student-management/directory/StudentDirectoryView"));
+const StudentAdmissionView = lazy(() => import("./modules/student-management/admission/StudentAdmissionView"));
+const SessionManager = lazy(() => import("./modules/student-management/sessions/SessionManager"));
+const StudentProfileHubView = lazy(() => import("./modules/student-management/directory/StudentProfileHubView"));
 
 // ─── Protected Staff Management Views (TypeScript Views) ──────────────────────
 const TeacherStaffRosterView = lazy(() => import("./modules/staff-management/TeacherStaffRosterView"));
@@ -174,7 +174,7 @@ export default function App() {
                 <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
                 <Route path="/short-admission" element={<Navigate to="/admission" replace />} />
                 <Route path="/admission/short" element={<Navigate to="/admission" replace />} />
-                <Route path="/admission" element={<FeatureGuard sectionKey="student_admission" fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView /></FeatureGuard>} />
+                <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]} fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView /></FeatureGuard>} />
                 <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentProfileHubView /></FeatureGuard>} />
                 <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments" fallback={<Navigate to="/dashboard" replace />}><SessionManager /></FeatureGuard>} />
                 <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management" fallback={<Navigate to="/dashboard" replace />}><UserManagementModule /></FeatureGuard>} />

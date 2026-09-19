@@ -82,14 +82,17 @@ class StudentAcademicHistorySerializer(serializers.ModelSerializer):
 
 
 class StudentTransferAcademicSerializer(serializers.Serializer):
-    target_class_id = serializers.UUIDField(required=False, allow_null=True)
-    target_group_id = serializers.IntegerField(required=False, allow_null=True)
+    target_department_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    target_class_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    target_section_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    target_group_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    target_room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     transition_date = serializers.DateField(required=False, allow_null=True)
     transition_reason = serializers.CharField(required=False, allow_blank=True, max_length=255)
 
     def validate(self, attrs):
-        if not attrs.get('target_class_id') and not attrs.get('target_group_id'):
-            raise serializers.ValidationError("At least one destination (target_class_id or target_group_id) must be specified.")
+        if not attrs.get('target_class_id') and not attrs.get('target_section_id') and not attrs.get('target_group_id') and not attrs.get('target_department_id'):
+            raise serializers.ValidationError("At least one destination (target_class_id, target_section_id, or target_group_id) must be specified.")
         return attrs
 
 
@@ -453,6 +456,9 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
     branch_name = serializers.CharField(source='branch.name', read_only=True, default='')
+    section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
+    department_id = serializers.CharField(source='student_class.department.id', read_only=True, default='')
 
     completed_juz_count = serializers.SerializerMethodField()
     active_juz = serializers.SerializerMethodField()
@@ -473,7 +479,8 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
             'latitude', 'longitude', 'map_place_id', 'branch', 'branch_name',
             'academic_detail', 'guardian_detail', 'details', 'documents', 'academic_history', 'admission_mode', 
-            'status', 'student_class', 'student_class_name', 'student_group', 'student_group_name',
+            'status', 'student_class', 'student_class_name', 'section', 'section_name', 'student_group', 'student_group_name',
+            'department_id', 'department_name',
             'group_name', 'created_at', 'updated_at', 'education_status',
             'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data',
             'completed_juz_count', 'active_juz', 'recent_error_average', 'quran_progress', 'department_type'

@@ -128,14 +128,14 @@ function getStickyHeaderClass(col, bgClass = 'theme-bg-sub') {
 /**
  * Calculates sticky cell classes for table body rows
  */
-function getStickyCellClass(col, itemSelected, isTransparentBg) {
+function getStickyCellClass(col, itemSelected, isTransparentBg, isRowHighlight = false) {
   const isRight = isStickyCol(col, 'right');
   const isLeft = isStickyCol(col, 'left');
   if (!isRight && !isLeft) return '';
 
   const posClass = isRight ? 'sticky right-0 z-10' : 'sticky left-0 z-10';
   const bgClass = isTransparentBg ? 'theme-sticky-cell-app' : 'theme-sticky-cell-surface';
-  const selectedClass = itemSelected ? 'is-selected' : '';
+  const selectedClass = isRowHighlight ? 'is-highlighted' : itemSelected ? 'is-selected' : '';
 
   return `${posClass} ${bgClass} ${selectedClass} transition-colors`;
 }
@@ -231,6 +231,8 @@ export default function DataTable({
   tableTitle = null,
   tableTitleIcon: TableTitleIcon = null,
   headerActions = null,
+  // --- Highlighting Props ---
+  highlightId = null,
 }) {
   const isTransparentBg = isTransparent !== undefined ? Boolean(isTransparent) : Boolean(transparent);
   const shouldShowSerial = Boolean(showIndex || showSerial);
@@ -910,6 +912,12 @@ export default function DataTable({
             {processedData.map((item, rowIdx) => {
               const rowKey = keyExtractor(item, rowIdx);
               const itemSelected = isSelected(item, rowIdx);
+              const itemId = getItemId(item, rowIdx);
+              const isRowHighlight =
+                highlightId !== null &&
+                highlightId !== undefined &&
+                highlightId !== '' &&
+                (String(rowKey) === String(highlightId) || String(itemId) === String(highlightId));
               const customRowClass =
                 typeof rowClassName === 'function'
                   ? rowClassName(item, rowIdx, itemSelected)
@@ -918,6 +926,8 @@ export default function DataTable({
               return (
                 <tr
                   key={rowKey}
+                  id={`row-${rowKey}`}
+                  data-row-id={rowKey}
                   onClick={(e) => {
                     if (
                       e.target.closest('input') ||
@@ -931,7 +941,11 @@ export default function DataTable({
                     onRowClick?.(item);
                   }}
                   className={`group/row border-b theme-border hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors ${
-                    itemSelected ? 'theme-bg-accent-soft/10' : ''
+                    isRowHighlight
+                      ? 'theme-row-highlight font-semibold'
+                      : itemSelected
+                      ? 'theme-bg-accent-soft/10'
+                      : ''
                   } ${onRowClick ? 'cursor-pointer' : ''} ${customRowClass}`}
                 >
                   {selectable && (
@@ -962,7 +976,7 @@ export default function DataTable({
                   )}
                   {columns.map((col, colIdx) => {
                     const alignClass = getAlignClass(col.align);
-                    const stickyCellClass = getStickyCellClass(col, itemSelected, isTransparentBg);
+                    const stickyCellClass = getStickyCellClass(col, itemSelected, isTransparentBg, isRowHighlight);
                     const customCellClass =
                       typeof col.cellClassName === 'function'
                         ? col.cellClassName(item, rowIdx)

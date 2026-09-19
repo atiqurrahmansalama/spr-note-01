@@ -114,7 +114,9 @@ export default function ActionMenu({
       : 'px-3.5 py-2 text-xs gap-2 rounded-xl';
 
   const variantClasses =
-    variant === 'primary'
+    variant === 'ghost'
+      ? 'bg-transparent border-transparent hover:bg-transparent shadow-none font-bold theme-accent hover:opacity-85'
+      : variant === 'primary'
       ? 'theme-bg-accent theme-accent-text hover:opacity-95 shadow-xs border-transparent font-bold'
       : variant === 'surface'
       ? 'theme-bg-surface hover:theme-bg-sub/60 theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
@@ -141,6 +143,8 @@ export default function ActionMenu({
           isOpen
             ? variant === 'primary'
               ? 'opacity-95 ring-2 ring-[var(--accent-main)]/40'
+              : variant === 'ghost'
+              ? 'opacity-85'
               : 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
             : ''
         } ${buttonClassName}`}
@@ -155,7 +159,7 @@ export default function ActionMenu({
         {label && showChevron && (
           <ChevronIcon
             isOpen={isOpen}
-            className={`w-3 h-3 ml-0.5 shrink-0 ${variant === 'primary' ? 'opacity-90' : 'opacity-70'}`}
+            className={`w-3 h-3 ml-0.5 shrink-0 ${variant === 'primary' ? 'opacity-90' : variant === 'ghost' ? 'theme-accent opacity-90' : 'opacity-70'}`}
           />
         )}
       </button>
@@ -185,7 +189,7 @@ export default function ActionMenu({
                 return <div key={`divider-${index}`} className="my-1 border-t theme-border-subtle mx-1" />;
               }
 
-              const isDanger = item.danger;
+              const isDanger = item.danger || item.variant === 'danger' || item.variant === 'destructive';
               const isDisabled = item.disabled;
 
               return (

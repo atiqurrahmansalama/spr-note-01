@@ -2,7 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { useFeatureControl } from '../../context/FeatureControlContext';
 
 export interface FeatureGuardProps {
-  sectionKey: string;
+  sectionKey: string | string[];
   children: ReactNode;
   fallback?: ReactNode;
 }
@@ -38,9 +38,6 @@ class FeatureErrorBoundary extends Component<FeatureErrorBoundaryProps, FeatureE
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
       return (
         <div className="w-full max-w-lg mx-auto p-6 my-8 rounded-2xl theme-bg-surface border theme-border shadow-xl text-center space-y-4">
           <div className="w-12 h-12 rounded-full theme-bg-accent-soft mx-auto flex items-center justify-center text-amber-500">
@@ -75,9 +72,18 @@ export const FeatureGuard: React.FC<FeatureGuardProps> = ({
 }) => {
   const { isSectionEnabled, loading } = useFeatureControl();
   if (loading) return null;
+
+  const isEnabled = Array.isArray(sectionKey)
+    ? sectionKey.some((k) => isSectionEnabled(k))
+    : isSectionEnabled(sectionKey);
+
+  if (!isEnabled) {
+    return <>{fallback}</>;
+  }
+
   return (
-    <FeatureErrorBoundary fallback={fallback}>
-      {isSectionEnabled(sectionKey) ? children : fallback}
+    <FeatureErrorBoundary>
+      {children}
     </FeatureErrorBoundary>
   );
 };

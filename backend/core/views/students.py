@@ -182,6 +182,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         result = transfer_student_academic(
             student_id=pk,
             target_class_id=serializer.validated_data.get('target_class_id'),
+            target_section_id=serializer.validated_data.get('target_section_id'),
             target_group_id=serializer.validated_data.get('target_group_id'),
             transition_date=serializer.validated_data.get('transition_date'),
             transition_reason=serializer.validated_data.get('transition_reason', ''),
@@ -277,6 +278,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 if action_type == 'transfer':
                     target_class_id = request.data.get('target_class_id')
+                    target_section_id = request.data.get('target_section_id')
                     target_group_id = request.data.get('target_group_id')
                     transition_date = request.data.get('transition_date')
                     transition_reason = request.data.get('transition_reason', 'Bulk Academic Transfer')
@@ -286,6 +288,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                             transfer_student_academic(
                                 student_id=s_id,
                                 target_class_id=target_class_id,
+                                target_section_id=target_section_id,
                                 target_group_id=target_group_id,
                                 transition_date=transition_date,
                                 transition_reason=transition_reason,

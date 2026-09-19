@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomInput from "../../../components/ui/CustomInput";
 import CustomSelect from "../../../components/ui/CustomSelect";
+import CustomButton from "../../../components/ui/CustomButton";
 import {
   CheckCircleIcon,
   CalendarIcon,
@@ -16,6 +17,7 @@ import {
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { students as studentStore } from "../../../utils/localStore";
+import { validateBDPhone } from "../../../utils/inputValidators";
 
 export interface QuickAdmissionFormProps {
   onCancel?: () => void;
@@ -25,7 +27,12 @@ export interface QuickAdmissionFormProps {
     department?: string;
     student_class?: string;
     student_section?: string;
+    guardian_phone?: string;
+    admission_date?: string;
   };
+  sharedData?: any;
+  setSharedData?: React.Dispatch<React.SetStateAction<any>>;
+  editingStudent?: any;
 }
 
 /**
@@ -38,10 +45,16 @@ export default function QuickAdmissionForm({
   onCancel,
   onSuccess,
   initialValues,
+  sharedData,
+  setSharedData,
+  editingStudent,
 }: QuickAdmissionFormProps) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const isEditing = Boolean(sharedData?.is_editing || editingStudent || sharedData?.edit_student_id);
+  const editStudentId = sharedData?.edit_student_id || editingStudent?.id;
 
   const returnTo = searchParams.get("returnTo") || "";
   const paramName = searchParams.get("name") || initialValues?.name || "";
@@ -57,26 +70,45 @@ export default function QuickAdmissionForm({
     refetch: refetchAcademicData,
   } = academicData || {};
 
-  // Form State
+  // Form State initialized from sharedData, initialValues, or URL params
   const [formData, setFormData] = useState({
-    name: paramName,
-    department: paramDept,
-    student_class: paramClass,
-    student_section: paramSection,
-    admission_date: new Date().toISOString().split("T")[0],
-    guardian_phone: "",
+    name: sharedData?.name || paramName,
+    department: sharedData?.department || paramDept,
+    student_class: sharedData?.student_class || paramClass,
+    student_section: sharedData?.student_section || paramSection,
+    admission_date: sharedData?.admission_date || new Date().toISOString().split("T")[0],
+    guardian_phone: sharedData?.guardian_phone || sharedData?.father_phone || initialValues?.guardian_phone || "",
   });
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync if query parameters change
+  // Sync if sharedData or query parameters change
   useEffect(() => {
-    if (paramName && !formData.name) {
+    if (sharedData) {
+      setFormData((prev) => ({
+        ...prev,
+        name: sharedData.name != null && sharedData.name !== "" ? sharedData.name : prev.name,
+        department: sharedData.department != null && sharedData.department !== "" ? String(sharedData.department) : prev.department,
+        student_class: sharedData.student_class != null && sharedData.student_class !== "" ? String(sharedData.student_class) : prev.student_class,
+        student_section: sharedData.student_section != null && sharedData.student_section !== "" ? String(sharedData.student_section) : prev.student_section,
+        admission_date: sharedData.admission_date || prev.admission_date,
+        guardian_phone: sharedData.guardian_phone || sharedData.father_phone || prev.guardian_phone,
+      }));
+    } else if (paramName && !formData.name) {
       setFormData((prev) => ({ ...prev, name: paramName }));
     }
-  }, [paramName]);
+  }, [
+    sharedData?.name,
+    sharedData?.department,
+    sharedData?.student_class,
+    sharedData?.student_section,
+    sharedData?.admission_date,
+    sharedData?.guardian_phone,
+    sharedData?.father_phone,
+    paramName,
+  ]);
 
   // Handle outside click for date picker popover
   useEffect(() => {
@@ -109,6 +141,20 @@ export default function QuickAdmissionForm({
       }
       return next;
     });
+
+    if (setSharedData) {
+      setSharedData((prev: any) => {
+        if (!prev) return prev;
+        const next = { ...prev, [field]: value ?? "" };
+        if (field === "department") {
+          next.student_class = "";
+          next.student_section = "";
+        } else if (field === "student_class") {
+          next.student_section = "";
+        }
+        return next;
+      });
+    }
   };
 
   // Cascading Select Options
@@ -156,9 +202,11 @@ export default function QuickAdmissionForm({
     }
 
     if (formData.guardian_phone && formData.guardian_phone.trim().length > 0) {
-      const cleanPhone = formData.guardian_phone.replace(/\D/g, "");
-      if (cleanPhone.length !== 11 && cleanPhone.length !== 10) {
-        showToast("Please enter a valid 11-digit phone number", "warning");
+      const phoneStr = formData.guardian_phone.trim();
+      const cleanDigits = phoneStr.replace(/\D/g, "");
+      const isValid = validateBDPhone(phoneStr) || (cleanDigits.length >= 10 && cleanDigits.length <= 15);
+      if (!isValid) {
+        showToast("Please enter a valid phone number (e.g. 01XXXXXXXXX)", "warning");
         return;
       }
     }
@@ -171,6 +219,94 @@ export default function QuickAdmissionForm({
     const sectionName = selectedSectionObj?.section_name || selectedSectionObj?.name || "";
     const className = selectedClassObj?.name || selectedClassObj?.class_name || "";
 
+    // ─── 1. EDIT MODE SUBMISSION (PATCH) ──────────────────────────────────
+    if (isEditing && editStudentId) {
+      const updatePayload = {
+        name: formData.name.trim(),
+        student_class: formData.student_class || null,
+        department: formData.department || null,
+        student_section: formData.student_section || null,
+        education_status: className,
+        admission_date: formData.admission_date,
+        academic_data: {
+          department: formData.department || null,
+          student_class: formData.student_class || null,
+          student_section: formData.student_section || null,
+          admission_date: formData.admission_date,
+        },
+        guardian_data: {
+          primary_guardian_phone: formData.guardian_phone.trim(),
+          guardian_phone: formData.guardian_phone.trim(),
+          emergency_contact_phone: formData.guardian_phone.trim(),
+        },
+      };
+
+      try {
+        const res = await fetchWithAuth(`/api/v1/students/${editStudentId}/full-profile/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatePayload),
+        });
+
+        if (res.ok) {
+          const updatedStu = await res.json().catch(() => ({}));
+          studentStore.update(String(editStudentId), {
+            name: formData.name.trim(),
+            name_en: formData.name.trim(),
+            student_class: formData.student_class,
+            department: formData.department,
+            student_section: formData.student_section,
+            guardian_phone: formData.guardian_phone.trim(),
+          });
+          showToast(`Student "${formData.name}" updated successfully!`, "success");
+          window.dispatchEvent(new CustomEvent("spr_students_updated"));
+          window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
+          refetchAcademicData?.();
+
+          if (onSuccess) {
+            onSuccess(updatedStu);
+          } else if (returnTo) {
+            const delimiter = returnTo.includes("?") ? "&" : "?";
+            const redirectUrl = `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(formData.name)}&selectedStudentId=${encodeURIComponent(editStudentId)}`;
+            navigate(redirectUrl, { replace: true });
+          } else {
+            navigate("/groups-students");
+          }
+          return;
+        } else {
+          // Fallback basic patch
+          const fallbackRes = await fetchWithAuth(`/api/v1/students/${editStudentId}/`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: formData.name.trim(),
+              name_en: formData.name.trim(),
+              student_class: formData.student_class || null,
+              department: formData.department || null,
+              student_section: formData.student_section || null,
+            }),
+          });
+          if (fallbackRes.ok) {
+            showToast(`Student "${formData.name}" updated successfully!`, "success");
+            window.dispatchEvent(new CustomEvent("spr_students_updated"));
+            refetchAcademicData?.();
+            if (onSuccess) onSuccess({ id: editStudentId, name: formData.name });
+            else navigate("/groups-students");
+            return;
+          }
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData?.detail || errData?.message || "Failed to update student profile", "error");
+        }
+      } catch (err) {
+        console.error("Quick admission edit error:", err);
+        showToast("Failed to update student profile", "error");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // ─── 2. NEW ADMISSION SUBMISSION (POST) ────────────────────────────────
     const localStudentId = `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
     const newStudentProfile = {
@@ -377,21 +513,22 @@ export default function QuickAdmissionForm({
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-3 pt-5 border-t theme-border">
-          <button
+          <CustomButton
             type="button"
+            variant="secondary"
             onClick={handleBack}
-            className="px-5 py-2.5 rounded-xl border theme-border text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer"
           >
-            Cancel &amp; Return
-          </button>
-          <button
+            Cancel
+          </CustomButton>
+          <CustomButton
             type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl theme-bg-accent hover:opacity-90 theme-accent-text text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50 active:scale-95"
+            variant="primary"
+            loading={isSubmitting}
+            loadingText={isEditing ? "Updating Profile..." : "Completing Admission..."}
+            icon={CheckCircleIcon}
           >
-            <CheckCircleIcon className="w-4 h-4" />
-            <span>{isSubmitting ? "Completing Admission..." : "Save & Return to Classroom"}</span>
-          </button>
+            {isEditing ? "Update Profile" : "Save & Return to Classroom"}
+          </CustomButton>
         </div>
       </form>
     </div>

@@ -2,6 +2,35 @@ import React from 'react';
 import CustomInput from './CustomInput';
 import { TableIcon, Squares2X2Icon, RefreshIcon, CloseIcon } from './Icons';
 
+export interface DataViewToolbarProps {
+  searchLabel?: string | null;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
+  searchPlaceholder?: string;
+  searchSpanClassName?: string;
+  filterGridClassName?: string | null;
+  filterElement?: React.ReactNode;
+  customFilters?: React.ReactNode;
+  viewMode?: 'grid' | 'table';
+  onToggleViewMode?: (mode: 'grid' | 'table') => void;
+  onViewModeChange?: (mode: 'grid' | 'table') => void;
+  onRefresh?: () => void;
+  loading?: boolean;
+  actions?: React.ReactNode;
+  stackedSwitcher?: boolean;
+  hasActiveFilters?: boolean;
+  onResetFilters?: () => void;
+  activeFilterCount?: number;
+  filteredCount?: number | null;
+  totalCount?: number | null;
+  itemLabel?: string;
+  selectedCount?: number;
+  selectedLabel?: string;
+  onClearSelection?: () => void;
+  selectionActions?: React.ReactNode;
+  className?: string;
+}
+
 /**
  * Enterprise Reusable Data View Toolbar & Filter Bar
  * 
@@ -9,28 +38,6 @@ import { TableIcon, Squares2X2Icon, RefreshIcon, CloseIcon } from './Icons';
  * - 'inline' Mode (default): Search + Filters on left, View Switcher + Refresh on right (single row).
  * - 'stacked' Mode: Search + Filters in a single uniform responsive grid (1 row on desktop), View Switcher + Refresh on bottom sub-row.
  * - Single-click Cards/Table toggle button.
- * 
- * @param {Object} props
- * @param {string} [props.searchLabel=null]
- * @param {string} [props.searchQuery='']
- * @param {Function} [props.onSearchChange]
- * @param {string} [props.searchPlaceholder='Search...']
- * @param {React.ReactNode} [props.filterElement]
- * @param {React.ReactNode} [props.customFilters]
- * @param {string} [props.viewMode='table'] - 'grid' | 'table'
- * @param {Function} [props.onToggleViewMode] - (mode) => void
- * @param {Function} [props.onViewModeChange] - (mode) => void
- * @param {Function} [props.onRefresh]
- * @param {boolean} [props.loading=false]
- * @param {React.ReactNode} [props.actions]
- * @param {boolean} [props.stackedSwitcher=false] - Whether to place switcher on a dedicated bottom row
- * @param {boolean} [props.hasActiveFilters=false]
- * @param {Function} [props.onResetFilters]
- * @param {number} [props.activeFilterCount=0]
- * @param {number} [props.filteredCount]
- * @param {number} [props.totalCount]
- * @param {string} [props.itemLabel='records']
- * @param {string} [props.className='']
  */
 export default function DataViewToolbar({
   searchLabel = null,
@@ -54,9 +61,13 @@ export default function DataViewToolbar({
   filteredCount = null,
   totalCount = null,
   itemLabel = 'records',
+  selectedCount = 0,
+  selectedLabel = 'Record',
+  onClearSelection = null,
+  selectionActions = null,
   className = '',
-}) {
-  const handleModeChange = (mode) => {
+}: DataViewToolbarProps) {
+  const handleModeChange = (mode: 'grid' | 'table') => {
     if (onViewModeChange) onViewModeChange(mode);
     else if (onToggleViewMode) onToggleViewMode(mode);
   };
@@ -68,6 +79,7 @@ export default function DataViewToolbar({
 
   const hasViewToggle = Boolean(onToggleViewMode || onViewModeChange);
   const activeFilters = filterElement || customFilters;
+  const isSelected = selectedCount > 0;
 
   // View Switcher & Refresh Buttons Component
   const renderControls = () => (
@@ -137,14 +149,15 @@ export default function DataViewToolbar({
           {activeFilters}
         </div>
 
-        {/* Bottom Row: Showing Count & Reset (Left) + View Switcher & Refresh (Right) */}
+        {/* Bottom Row: Showing Count (Left) + Center Selection Cluster (Desktop) + Controls (Right) */}
         <div className="pt-2.5 border-t theme-border flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2.5">
+          {/* Left: Showing count & Reset filter */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs font-semibold theme-text-secondary">
-              {filteredCount !== null ? (
+              {filteredCount !== null && filteredCount !== undefined ? (
                 <>
                   Showing <span className="theme-text-primary font-bold">{filteredCount}</span>
-                  {totalCount !== null && totalCount !== filteredCount && (
+                  {totalCount !== null && totalCount !== undefined && totalCount !== filteredCount && (
                     <> of <span className="theme-text-primary font-bold">{totalCount}</span></>
                   )}{' '}
                   {itemLabel}
@@ -170,7 +183,43 @@ export default function DataViewToolbar({
             )}
           </div>
 
-          <div className="ml-auto">
+          {/* Center (Desktop) or Next Line (Mobile): Selection Cluster inside a Single Bordered Pill */}
+          {isSelected && (
+            <div className="order-last sm:order-2 @[640px]:order-2 w-full sm:w-auto @[640px]:w-auto flex items-center justify-center animate-fade-in pt-2 sm:pt-0 @[640px]:pt-0 border-t sm:border-t-0 @[640px]:border-t-0 theme-border">
+              <div className="flex items-center gap-2.5 px-3 py-1 rounded-xl theme-bg-sub/50 border theme-border shadow-2xs">
+                {/* Selected Count Indicator */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
+                  <span className="text-xs font-bold theme-text-primary whitespace-nowrap">
+                    {selectedCount} {selectedCount === 1 ? selectedLabel : `${selectedLabel}s`} Selected
+                  </span>
+                </div>
+
+                {/* Subtle Divider */}
+                <span className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700/70 shrink-0" />
+
+                {/* Actions Group: Bulk Actions + Close Icon Button */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {selectionActions}
+
+                  {onClearSelection && (
+                    <button
+                      type="button"
+                      onClick={onClearSelection}
+                      className="p-1 text-zinc-400 hover:theme-text-primary hover:theme-accent transition-colors cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-90"
+                      title="Clear selection"
+                      aria-label="Clear selection"
+                    >
+                      <CloseIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Right Side: View Switcher & Refresh Controls */}
+          <div className="order-2 sm:order-3 @[640px]:order-3 ml-auto sm:ml-0 @[640px]:ml-0 flex items-center gap-2 shrink-0">
             {renderControls()}
           </div>
         </div>
@@ -205,6 +254,41 @@ export default function DataViewToolbar({
           </div>
         )}
       </div>
+
+      {/* Center (Desktop) or Next Line (Mobile): Selection Cluster in Inline Mode */}
+      {isSelected && (
+        <div className="order-last sm:order-2 @[720px]:order-2 w-full sm:w-auto @[720px]:w-auto flex items-center justify-center animate-fade-in pt-1.5 sm:pt-0 @[720px]:pt-0 border-t sm:border-t-0 @[720px]:border-t-0 theme-border">
+          <div className="flex items-center gap-2.5 px-3 py-1 rounded-xl theme-bg-sub/50 border theme-border shadow-2xs">
+            {/* Selected Count Indicator */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
+              <span className="text-xs font-bold theme-text-primary whitespace-nowrap">
+                {selectedCount} {selectedCount === 1 ? selectedLabel : `${selectedLabel}s`} Selected
+              </span>
+            </div>
+
+            {/* Subtle Divider */}
+            <span className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700/70 shrink-0" />
+
+            {/* Actions Group: Bulk Actions + Close Icon Button */}
+            <div className="flex items-center gap-1 shrink-0">
+              {selectionActions}
+
+              {onClearSelection && (
+                <button
+                  type="button"
+                  onClick={onClearSelection}
+                  className="p-1 text-zinc-400 hover:theme-text-primary hover:theme-accent transition-colors cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-90"
+                  title="Clear selection"
+                  aria-label="Clear selection"
+                >
+                  <CloseIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Right Side: Refresh + View Switcher + Action Buttons */}
       <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 theme-border sm:border-transparent pb-0.5">

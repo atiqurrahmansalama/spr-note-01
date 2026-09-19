@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { fetchWithAuth } from "../../utils/authService";
-import { useToast } from "../../context/ToastContext";
-import { useFeatureControl } from "../../context/FeatureControlContext";
+import { fetchWithAuth } from "../../../utils/authService";
+import { useToast } from "../../../context/ToastContext";
+import { useFeatureControl } from "../../../context/FeatureControlContext";
 import {
   StudentIcon,
   ClassIcon,
@@ -33,11 +33,11 @@ import {
   AcademicCapIcon,
   SparklesIcon,
   CalendarIcon,
-} from "../../components/ui/Icons";
-import { getBranchDisplayName } from "../../utils/localStore";
-import ActionMenu from "../../components/ui/ActionMenu";
-import StatusBadge from "../../components/ui/StatusBadge";
-import Modal from "../../components/ui/Modal";
+} from "../../../components/ui/Icons";
+import { getBranchDisplayName } from "../../../utils/localStore";
+import ActionMenu from "../../../components/ui/ActionMenu";
+import StatusBadge from "../../../components/ui/StatusBadge";
+import Modal from "../../../components/ui/Modal";
 import StudentTransferModal from "./StudentTransferModal";
 
 // Bulletproof file type checkers
@@ -427,6 +427,11 @@ export default function StudentProfileHubView() {
       label: "Print ID Card",
       icon: PrintIcon,
       onClick: () => window.print(),
+    },
+    {
+      label: "Edit Student Profile",
+      icon: EditIcon,
+      onClick: () => navigate(`/admission?edit=${student.id}`),
     },
     {
       label: "Transfer Class / Group",
@@ -1401,12 +1406,22 @@ export default function StudentProfileHubView() {
                         <span className="font-mono text-xs font-bold theme-accent px-2 py-0.5 rounded-md theme-bg-accent-soft border theme-border shrink-0">
                           {student.admission_date || "Current Session"}
                         </span>
+                        {student.department_name && (
+                          <span className="px-2 py-0.5 rounded-md text-xs font-semibold theme-bg-surface border theme-border theme-text-primary shrink-0">
+                            {student.department_name}
+                          </span>
+                        )}
                         <span className="font-bold text-xs sm:text-sm theme-text-primary">
                           {student.student_class_name || student.education_status || "General Class"}
                         </span>
+                        {student.section_name && (
+                          <span className="theme-text-secondary font-medium">
+                            • Section: {student.section_name}
+                          </span>
+                        )}
                         {(student.group_name || student.student_group_name) && (
                           <span className="theme-text-secondary font-medium">
-                            • {student.group_name || student.student_group_name}
+                            • Group: {student.group_name || student.student_group_name}
                           </span>
                         )}
                         <span className="theme-text-secondary">
@@ -1443,12 +1458,17 @@ export default function StudentProfileHubView() {
                           <span className="font-mono text-xs font-semibold theme-text-secondary px-2 py-0.5 rounded-md theme-bg-surface border theme-border shrink-0">
                             {record.start_date || "--"} &rarr; {record.end_date || "Completed"}
                           </span>
+                          {record.department_name && (
+                            <span className="px-1.5 py-0.5 rounded text-[11px] font-medium theme-bg-surface border theme-border theme-text-secondary shrink-0">
+                              {record.department_name}
+                            </span>
+                          )}
                           <span className="font-semibold text-xs sm:text-sm theme-text-primary">
                             Class Transfer: {record.student_class_name || record.class_name || "General Class"}
                           </span>
                           {(record.student_group_name || record.group_name) && (
                             <span className="theme-text-secondary font-medium">
-                              • {record.student_group_name || record.group_name}
+                              • Group: {record.student_group_name || record.group_name}
                             </span>
                           )}
                           <span className="theme-text-secondary">

@@ -5,7 +5,7 @@ import {
   weeklyHolidaysStore,
   WEEKDAY_OPTIONS,
   DEFAULT_WEEKLY_HOLIDAYS_CONFIG,
-} from "@/stores/calendarStore";
+} from "../../../stores/calendarStore";
 import {
   CalendarIcon,
   RefreshIcon,
@@ -15,25 +15,38 @@ import {
 } from "../../../components/ui/Icons";
 import CustomCheckbox from "../../../components/ui/CustomCheckbox";
 
+export interface WeeklyHolidayConfig {
+  weekendDays: string[];
+  affectsTimetable?: boolean;
+  affectsAttendance?: boolean;
+  [key: string]: any;
+}
+
+export interface WeeklyHolidaySettingsPanelProps {
+  activeTenantId?: string | null;
+}
+
 /**
  * Enterprise Weekly Institutional Holiday & Weekend Configuration Panel
- * Standalone section in Admin / Developer Tools.
+ * Configures weekly institutional holiday(s), non-academic recess days, class routine rules, and attendance auto-excuse policies.
  */
-export default function WeeklyHolidaySettingsPanel({ activeTenantId }) {
-  const { showToast } = useToast();
-  const { activeTenant } = useTenant();
+export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProps> = ({
+  activeTenantId,
+}) => {
+  const { showToast } = useToast() as any;
+  const { activeTenant } = useTenant() as any;
   const effectiveTenantId = activeTenantId || activeTenant?.id || "default";
 
-  const [savedConfig, setSavedConfig] = useState(() =>
+  const [savedConfig, setSavedConfig] = useState<WeeklyHolidayConfig>(() =>
     weeklyHolidaysStore.getHolidays(effectiveTenantId)
   );
-  const [config, setConfig] = useState(() =>
+  const [config, setConfig] = useState<WeeklyHolidayConfig>(() =>
     weeklyHolidaysStore.getHolidays(effectiveTenantId)
   );
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleUpdated = (e) => {
+    const handleUpdated = (e: any) => {
       const next = e.detail || weeklyHolidaysStore.getHolidays(effectiveTenantId);
       setSavedConfig(next);
       setConfig(next);
@@ -50,7 +63,7 @@ export default function WeeklyHolidaySettingsPanel({ activeTenantId }) {
   }, [config, savedConfig]);
 
   // Toggle Day
-  const handleToggleDay = (dayCode) => {
+  const handleToggleDay = (dayCode: string) => {
     setConfig((prev) => {
       const exists = prev.weekendDays.includes(dayCode);
       if (exists && prev.weekendDays.length === 1) {
@@ -220,7 +233,7 @@ export default function WeeklyHolidaySettingsPanel({ activeTenantId }) {
             <CustomCheckbox
               label="Affects Class Timetables & Daily Routines"
               checked={Boolean(config.affectsTimetable)}
-              onChange={(checked) =>
+              onChange={(checked: boolean) =>
                 setConfig((prev) => ({ ...prev, affectsTimetable: checked }))
               }
             />
@@ -233,7 +246,7 @@ export default function WeeklyHolidaySettingsPanel({ activeTenantId }) {
             <CustomCheckbox
               label="Auto-Excuse in Class & Staff Attendance (Event Calendar Sync)"
               checked={Boolean(config.affectsAttendance)}
-              onChange={(checked) =>
+              onChange={(checked: boolean) =>
                 setConfig((prev) => ({ ...prev, affectsAttendance: checked }))
               }
             />
@@ -272,4 +285,6 @@ export default function WeeklyHolidaySettingsPanel({ activeTenantId }) {
       </div>
     </div>
   );
-}
+};
+
+export default WeeklyHolidaySettingsPanel;

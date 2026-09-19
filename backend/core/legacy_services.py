@@ -696,14 +696,14 @@ def delete_section_with_migration(source_section_id, target_section_id=None, per
     }
 
 
-def transfer_student_academic(student_id, target_class_id=None, target_group_id=None, transition_date=None, transition_reason="", performed_by=None):
+def transfer_student_academic(student_id, target_class_id=None, target_section_id=None, target_group_id=None, transition_date=None, transition_reason="", performed_by=None):
     """
-    Transfers a single student between classes and groups with custom transition date
+    Transfers a single student between classes, sections, and groups with custom transition date
     and audit reason, maintaining chronological lifecycle timelines and auto-syncing classes.
     """
     from django.db import transaction
     from rest_framework.exceptions import ValidationError, NotFound
-    from core.models import Student, StudentClass, StudentGroup, StudentAcademicHistory
+    from core.models import Student, StudentClass, ClassSection, StudentGroup, StudentAcademicHistory
 
     try:
         student = Student.objects.get(id=student_id, is_deleted=False)
@@ -711,21 +711,32 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
         raise NotFound("Student not found.")
 
     target_class = None
-    if target_class_id:
+    if target_class_id and str(target_class_id).lower() not in ('none', 'null', '', '0'):
         try:
             target_class = StudentClass.objects.get(id=target_class_id, is_deleted=False)
-        except StudentClass.DoesNotExist:
+        except (StudentClass.DoesNotExist, ValueError):
             raise ValidationError({"target_class_id": "Target class not found or inactive."})
 
+    target_section = None
+    if target_section_id and str(target_section_id).lower() not in ('none', 'null', '', '0'):
+        try:
+            target_section = ClassSection.objects.get(id=target_section_id, is_deleted=False)
+        except (ClassSection.DoesNotExist, ValueError):
+            raise ValidationError({"target_section_id": "Target section not found or inactive."})
+
     target_group = None
-    if target_group_id:
+    if target_group_id and str(target_group_id).lower() not in ('none', 'null', '', '0'):
         try:
             target_group = StudentGroup.objects.get(id=target_group_id, is_deleted=False)
-        except StudentGroup.DoesNotExist:
+        except (StudentGroup.DoesNotExist, ValueError):
             raise ValidationError({"target_group_id": "Target group not found or inactive."})
 
-    if not target_class and not target_group:
-        raise ValidationError("At least one destination (target class or target group) must be specified.")
+    if not target_class and not target_section and not target_group:
+        raise ValidationError("At least one destination (target class, section, or group) must be specified.")
+
+    # Guardrail 1: If section specified has a parent class, auto-sync target class if not explicitly specified
+    if target_section and target_section.student_class and not target_class:
+        target_class = target_section.student_class
 
     # Guardrail 2: If group specified has a parent class, auto-sync target class
     if target_group and target_group.student_class and not target_class:
@@ -735,8 +746,12 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
     reason = transition_reason.strip() or "Academic Reassignment / Level Promotion"
 
     before_state = {
+        "department_id": str(student.student_class.department_id) if (student.student_class and student.student_class.department_id) else None,
+        "department_name": student.student_class.department.name if (student.student_class and student.student_class.department) else None,
         "class_id": str(student.student_class_id) if student.student_class_id else None,
         "class_name": student.student_class.name if student.student_class else None,
+        "section_id": str(student.section_id) if student.section_id else None,
+        "section_name": student.section.section_name if student.section else None,
         "group_id": student.student_group_id if student.student_group_id else None,
         "group_name": student.group_name
     }
@@ -748,16 +763,29 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
             is_current=False
         )
 
-        # Update student class and group
+        # Update student class, section, and group
         if target_class:
             student.student_class = target_class
-        if target_group:
+            # If changing class and target_section was not passed, reset section if old section belonged to previous class
+            if student.section and target_section is None and target_section_id is None:
+                if student.section.student_class_id != target_class.id:
+                    student.section = None
+
+        if target_section is not None:
+            student.section = target_section
+        elif target_section_id is not None and str(target_section_id).strip() in ('', '0'):
+            student.section = None
+
+        if target_group is not None:
             student.student_group = target_group
             student.group_name = target_group.name
+        elif target_group_id is not None and str(target_group_id).strip() in ('', '0'):
+            student.student_group = None
+            student.group_name = ''
 
         student.save()
 
-        # Create new active academic progression log
+        # Create new active academic progression log in lifecycle timeline
         new_history = StudentAcademicHistory.objects.create(
             student=student,
             student_class=student.student_class,
@@ -769,8 +797,12 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
         )
 
         after_state = {
+            "department_id": str(student.student_class.department_id) if (student.student_class and student.student_class.department_id) else None,
+            "department_name": student.student_class.department.name if (student.student_class and student.student_class.department) else None,
             "class_id": str(student.student_class_id) if student.student_class_id else None,
             "class_name": student.student_class.name if student.student_class else None,
+            "section_id": str(student.section_id) if student.section_id else None,
+            "section_name": student.section.section_name if student.section else None,
             "group_id": student.student_group_id if student.student_group_id else None,
             "group_name": student.group_name
         }
@@ -786,7 +818,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
                 resource_name=student.name_en or getattr(student, 'name', 'Student'),
                 before_state=before_state,
                 after_state=after_state,
-                changes_summary=f"Changed Student #{student.id} Class: {before_state.get('class_name')} -> {after_state.get('class_name')}",
+                changes_summary=f"Changed Student #{student.id} Academic Placement: {before_state.get('class_name')} -> {after_state.get('class_name')}",
                 reason=reason,
                 actor=actor_user,
                 institution=student.institution
@@ -799,6 +831,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_group_id=
         "message": f"Student '{student.name_en or student.name}' successfully transferred.",
         "student_id": student.id,
         "student_class": student.student_class.name if student.student_class else None,
+        "section": student.section.section_name if student.section else None,
         "student_group": student.student_group.name if student.student_group else student.group_name,
         "transition_date": str(effective_date),
         "transition_reason": reason,

@@ -4,6 +4,7 @@ import { useToast } from "../../../context/ToastContext";
 import CustomInput from "../../../components/ui/CustomInput";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import CustomCheckbox from "../../../components/ui/CustomCheckbox";
+import CustomButton from "../../../components/ui/CustomButton";
 import { ClassSelect } from "../../../components/selectors";
 import Stepper from "../../../components/ui/Stepper";
 import ReusableCalendar from "../../../components/common/ReusableCalendar";
@@ -287,7 +288,7 @@ export default function FullAdmissionWizard({
     formData: sharedData,
     setFormData: setSharedData,
     storageKey,
-    enabled: true,
+    enabled: !token && !sharedData?.is_editing && !sharedData?.edit_student_id,
   });
 
   // Institutional Branches
@@ -876,7 +877,84 @@ export default function FullAdmissionWizard({
     }
 
     try {
-      // 1. Submit admission base record
+      if (sharedData.is_editing && sharedData.edit_student_id) {
+        // ── 1. Submit update for existing student ──
+        const editRes = await fetchWithAuth(`/api/v1/students/${sharedData.edit_student_id}/full-profile/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!editRes.ok) {
+          const errorData = await editRes.json().catch(() => ({}));
+          console.error("Student profile update error:", errorData);
+          let errorMsg = "Failed to update student profile. Please review inputs.";
+          if (errorData && typeof errorData === "object") {
+            if (typeof errorData.detail === "string") {
+              errorMsg = errorData.detail;
+            } else if (typeof errorData.message === "string") {
+              errorMsg = errorData.message;
+            } else {
+              const firstVal = Object.values(errorData)[0];
+              if (typeof firstVal === "string") errorMsg = firstVal;
+              else if (Array.isArray(firstVal) && firstVal.length > 0) errorMsg = String(firstVal[0]);
+            }
+          }
+          showToast(errorMsg, "error");
+          setLoading(false);
+          return;
+        }
+
+        const resData = await editRes.json();
+        const studentId = resData.id;
+
+        // 2. Upload photo if selected
+        if (photoFile && studentId) {
+          const photoFormData = new FormData();
+          photoFormData.append("photo", photoFile);
+          await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`, {
+            method: "PATCH",
+            body: photoFormData,
+          }).catch((e) => console.warn("Photo upload warning:", e));
+        }
+
+        // 3. Upload new attached documents
+        if (Array.isArray(studentDocuments)) {
+          for (const doc of studentDocuments) {
+            if (doc.file_url && !doc.id) {
+              try {
+                const docType = (doc.title || "STUDENT_DOCUMENT").toUpperCase().replace(/\s+/g, '_').slice(0, 30);
+                const docFormData = new FormData();
+                docFormData.append("doc_type", docType);
+                docFormData.append("title", doc.title || `Document of ${sharedData.name}`);
+                if (doc.file) {
+                  docFormData.append("file", doc.file);
+                } else if (doc.file_url.startsWith("data:")) {
+                  const blob = await fetch(doc.file_url).then(r => r.blob());
+                  docFormData.append("file", blob, doc.file_name || "document.pdf");
+                }
+                await fetchWithAuth(`/api/v1/students/${studentId}/upload-document/`, {
+                  method: "POST",
+                  body: docFormData,
+                }).catch((e) => console.warn("Document upload warning:", e));
+              } catch (docErr) {
+                console.warn("Document upload error:", docErr);
+              }
+            }
+          }
+        }
+
+        showToast("Student profile updated successfully!", "success");
+        if (onSuccess) {
+          const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);
+          const fullData = profileRes.ok ? await profileRes.json() : resData;
+          onSuccess(fullData);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // ── 2. Standard New Student Admission ──
       const res = await fetchWithAuth("/api/v1/students/admission/", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -1714,23 +1792,23 @@ export default function FullAdmissionWizard({
       <div className="flex items-center justify-between pt-6 border-t theme-border gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           {currentStep > 1 ? (
-            <button
+            <CustomButton
               type="button"
+              variant="secondary"
               onClick={prevStep}
               disabled={loading}
-              className="px-5 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub text-xs font-bold theme-text-primary transition cursor-pointer disabled:opacity-50"
             >
               Back
-            </button>
+            </CustomButton>
           ) : onCancel ? (
-            <button
+            <CustomButton
               type="button"
+              variant="secondary"
               onClick={onCancel}
               disabled={loading}
-              className="px-5 py-2.5 rounded-2xl border theme-border hover:theme-bg-sub text-xs font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer"
             >
               Cancel
-            </button>
+            </CustomButton>
           ) : <div />}
 
           <AutoSaveBadge status={autoSaveStatus} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
@@ -1738,32 +1816,24 @@ export default function FullAdmissionWizard({
 
         <div>
           {currentStep < 4 ? (
-            <button
+            <CustomButton
               type="button"
+              variant="primary"
               onClick={nextStep}
-              className="px-6 py-2.5 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-sm flex items-center gap-1.5"
             >
-              <span>Next</span>
-            </button>
+              Next
+            </CustomButton>
           ) : (
-            <button
+            <CustomButton
               type="button"
+              variant="primary"
               onClick={handleSubmit}
-              disabled={loading}
-              className="px-7 py-3 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-md flex items-center gap-2 disabled:opacity-50"
+              loading={loading}
+              loadingText={sharedData.is_editing ? "Updating Profile..." : "Enrolling Student..."}
+              icon={CheckCircleIcon}
             >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent border-white animate-spin" />
-                  <span>Enrolling Student...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon className="w-4 h-4" />
-                  <span>Confirm &amp; Complete Admission</span>
-                </>
-              )}
-            </button>
+              {sharedData.is_editing ? "Save Changes & Update Profile" : "Confirm & Complete Admission"}
+            </CustomButton>
           )}
         </div>
       </div>

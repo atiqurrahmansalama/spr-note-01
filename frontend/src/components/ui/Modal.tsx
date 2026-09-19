@@ -6,7 +6,7 @@ import CustomButton from './CustomButton';
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: React.ReactNode;
   subtitle?: string;
   icon?: React.ComponentType<{ className?: string }>;
   badge?: React.ReactNode;
