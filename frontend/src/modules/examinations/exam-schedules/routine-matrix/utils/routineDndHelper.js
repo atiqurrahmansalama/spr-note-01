@@ -78,11 +78,14 @@ export function swapRoutineScopedAttributes(sourceItem, targetItem, scope = LENS
 
   // ─── 1. FULL CARD SWAP (ALL SCOPE) ───
   if (scope === LENS_MODES.ALL || !scope) {
+    const targetDept = typeof targetRow?.sub === 'string' ? targetRow.sub : targetItem?.departmentName || sourceItem?.departmentName;
+    const sourceDept = typeof sourceRow?.sub === 'string' ? sourceRow.sub : sourceItem?.departmentName || targetItem?.departmentName;
+
     const updatedSource = {
       ...sourceItem,
       classId: targetRow?.id || targetItem.classId || sourceItem.classId,
       className: targetRow?.label || targetItem.className || sourceItem.className,
-      departmentName: targetRow?.sub || targetItem.departmentName || sourceItem.departmentName,
+      departmentName: targetDept,
       examDate: targetCol?.date || targetItem.examDate || sourceItem.examDate,
       shiftId: targetCol?.shiftId || targetItem.shiftId || sourceItem.shiftId || 'shift_1',
       shiftName: targetCol?.shiftName || targetItem.shiftName || sourceItem.shiftName || 'Shift 1',
@@ -95,7 +98,7 @@ export function swapRoutineScopedAttributes(sourceItem, targetItem, scope = LENS
       ...targetItem,
       classId: sourceRow?.id || sourceItem.classId || targetItem.classId,
       className: sourceRow?.label || sourceItem.className || targetItem.className,
-      departmentName: sourceRow?.sub || sourceItem.departmentName || targetItem.departmentName,
+      departmentName: sourceDept,
       examDate: sourceCol?.date || sourceItem.examDate || targetItem.examDate,
       shiftId: sourceCol?.shiftId || sourceItem.shiftId || targetItem.shiftId || 'shift_1',
       shiftName: sourceCol?.shiftName || sourceItem.shiftName || targetItem.shiftName || 'Shift 1',
@@ -133,12 +136,13 @@ export function copyRoutineScopedAttributes(sourceItem, targetItem, scope = LENS
 
   // ─── 1. FULL CARD COPY (ALL SCOPE) ───
   if (scope === LENS_MODES.ALL || !scope) {
+    const targetDept = typeof targetRow?.sub === 'string' ? targetRow.sub : targetItem?.departmentName || sourceItem.departmentName;
     return {
       ...sourceItem,
-      id: `row_copy_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      id: `row_copy_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       classId: targetRow?.id || targetItem?.classId || sourceItem.classId,
       className: targetRow?.label || targetItem?.className || sourceItem.className,
-      departmentName: targetRow?.sub || targetItem?.departmentName || sourceItem.departmentName,
+      departmentName: targetDept,
       examDate: targetCol?.date || targetItem?.examDate || sourceItem.examDate,
       shiftId: targetCol?.shiftId || targetItem?.shiftId || sourceItem.shiftId || 'shift_1',
       shiftName: targetCol?.shiftName || targetItem?.shiftName || sourceItem.shiftName || 'Shift 1',
@@ -165,12 +169,13 @@ export function copyRoutineScopedAttributes(sourceItem, targetItem, scope = LENS
   // ─── 3. GRANULAR ATTRIBUTE COPY INTO EMPTY TARGET ───
   // If target is empty and copying a Subject, create a new item in target slot
   if (scope === LENS_MODES.SUBJECT) {
+    const targetDept = typeof targetRow?.sub === 'string' ? targetRow.sub : sourceItem.departmentName;
     return {
       ...sourceItem,
-      id: `row_copy_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      id: `row_copy_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       classId: targetRow?.id || sourceItem.classId,
       className: targetRow?.label || sourceItem.className,
-      departmentName: targetRow?.sub || sourceItem.departmentName,
+      departmentName: targetDept,
       examDate: targetCol?.date || sourceItem.examDate,
       shiftId: targetCol?.shiftId || sourceItem.shiftId || 'shift_1',
       shiftName: targetCol?.shiftName || sourceItem.shiftName || 'Shift 1',

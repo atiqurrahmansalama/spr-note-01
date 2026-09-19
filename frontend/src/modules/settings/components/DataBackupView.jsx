@@ -85,9 +85,14 @@ async function syncImportedDataToBackend(data) {
         await fetchWithAuth("/students/", {
           method: "POST",
           body: JSON.stringify({
-            name: student.label || student.name,
-            group: student.sub || student.group || student.group_name || "General Group",
-            roll: student.roll || 1,
+            name: typeof student === "object" ? student.label || student.name : String(student || ""),
+            group:
+              typeof student === "object" && typeof student?.sub === "string"
+                ? student.sub
+                : typeof student === "object" && (student?.group || student?.group_name)
+                ? String(student.group || student.group_name)
+                : "General Group",
+            roll: (typeof student === "object" && student.roll) || 1,
           }),
         });
       } catch (err) {

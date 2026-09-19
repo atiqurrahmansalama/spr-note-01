@@ -135,11 +135,19 @@ export const syncLocalStudentsToBackend = async () => {
     const res = await fetchWithAuth("/students/");
     if (res.ok) {
       const raw = await res.json();
-      const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => ({
-        id: s.id,
-        label: s.name || s.student_name || s.label || String(s),
-        sub: s.group_name || s.group || s.sub || "General Group",
-      }));
+      const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => {
+        const subVal =
+          typeof s === "object" && typeof s?.sub === "string"
+            ? s.sub
+            : typeof s === "object" && (s?.group_name || s?.group)
+            ? String(s.group_name || s.group)
+            : "General Group";
+        return {
+          id: typeof s === "object" ? s?.id : null,
+          label: typeof s === "object" ? s?.name || s?.student_name || s?.label || "" : String(s || ""),
+          sub: subVal,
+        };
+      });
       const apiKeys = new Set(
         apiStudents.map((s) => `${(s.label || "").toLowerCase().trim()}___${(s.sub || "General Group").toLowerCase().trim()}`)
       );
@@ -149,14 +157,25 @@ export const syncLocalStudentsToBackend = async () => {
         (s) => {
           if (!s || (!s.label && !s.name)) return false;
           if (!s._local) return false;
-          const key = `${(s.label || s.name || "").toLowerCase().trim()}___${(s.sub || s.group || "General Group").toLowerCase().trim()}`;
+          const sSub =
+            typeof s === "object" && typeof s?.sub === "string"
+              ? s.sub
+              : typeof s === "object" && (s?.group || s?.group_name)
+              ? String(s.group || s.group_name)
+              : "General Group";
+          const key = `${(s.label || s.name || "").toLowerCase().trim()}___${sSub.toLowerCase().trim()}`;
           return !apiKeys.has(key);
         }
       );
 
       for (const stu of unsyncedLocal) {
-        const name = stu.label || stu.name;
-        const group = stu.sub || stu.group || "General Group";
+        const name = typeof stu === "object" ? stu.label || stu.name : String(stu || "");
+        const group =
+          typeof stu === "object" && typeof stu?.sub === "string"
+            ? stu.sub
+            : typeof stu === "object" && (stu?.group || stu?.group_name)
+            ? String(stu.group || stu.group_name)
+            : "General Group";
         if (!name || !name.trim()) continue;
 
         try {

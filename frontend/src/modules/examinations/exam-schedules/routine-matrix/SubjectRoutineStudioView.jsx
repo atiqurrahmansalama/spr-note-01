@@ -325,11 +325,12 @@ export default function SubjectRoutineStudioView({
         return;
       }
 
+      const targetDepartment = typeof targetRow?.sub === 'string' ? targetRow.sub : draggedItem.departmentName;
       const updatedItem = {
         ...draggedItem,
-        classId: targetRow.id,
-        className: targetRow.label,
-        departmentName: targetRow.sub || draggedItem.departmentName,
+        classId: targetRow?.id || draggedItem.classId,
+        className: targetRow?.label || targetRow?.name || draggedItem.className,
+        departmentName: targetDepartment,
         examDate: targetCol.date,
         shiftId: targetCol.shiftId || draggedItem.shiftId || 'shift_1',
         shiftName: targetCol.shiftName || draggedItem.shiftName || 'Shift 1 (Morning)',

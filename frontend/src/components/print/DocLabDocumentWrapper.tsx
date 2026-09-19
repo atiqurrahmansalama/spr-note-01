@@ -334,13 +334,13 @@ export const DocLabDocumentWrapper: React.FC<DocLabDocumentWrapperProps> = ({
                   >
                     {sig.label}
                   </p>
-                  {sig.sub && (
+                  {typeof sig.sub === 'string' && sig.sub.trim() && (
                     <p
                       contentEditable={isEditable}
                       suppressContentEditableWarning
                       onBlur={(e) => {
                         if (!onOptionsChange) return;
-                        const val = e.currentTarget.textContent?.trim();
+                        const val = e.currentTarget.textContent?.trim() || '';
                         const updated = (options.signatureLines || signatureLines || []).map((s: any, sIdx: number) =>
                           (s.id === sig.id || sIdx === idx) ? { ...s, sub: val } : s
                         );

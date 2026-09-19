@@ -63,9 +63,11 @@ export default function BroadcastAudienceSelector({
                 >
                   {item.label}
                 </span>
-                <span className="text-[10px] theme-text-secondary block mt-0.5 leading-tight">
-                  {item.sub}
-                </span>
+                {typeof item.sub === 'string' && item.sub.trim() && (
+                  <span className="text-[10px] theme-text-secondary block mt-0.5 leading-tight">
+                    {item.sub}
+                  </span>
+                )}
               </div>
             </button>
           );

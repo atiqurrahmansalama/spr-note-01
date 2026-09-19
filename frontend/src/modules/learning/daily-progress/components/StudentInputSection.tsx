@@ -40,24 +40,34 @@ export default function StudentInputSection({
   onStudentSelect,
 }: StudentInputSectionProps) {
   const options: AutocompleteOption[] = useMemo(() => {
-    return studentDatabase.map((s) => ({
-      id: s.id ? String(s.id) : undefined,
-      label: s.label || s.name_en || s.name || "",
-      sub: s.sub || s.group_name || s.section_name || s.student_class_name || undefined,
-      department: s.department || s.department_id ? String(s.department || s.department_id) : undefined,
-      student_class: s.student_class || s.class_id ? String(s.student_class || s.class_id) : undefined,
-      student_section: s.student_section || s.section_id ? String(s.student_section || s.section_id) : undefined,
-    }));
+    return (studentDatabase || []).map((s: any) => {
+      const subVal =
+        typeof s === "object" && typeof s?.sub === "string"
+          ? s.sub
+          : typeof s === "object" && (s?.group_name || s?.section_name || s?.student_class_name || s?.group)
+          ? String(s.group_name || s.section_name || s.student_class_name || s.group)
+          : undefined;
+
+      return {
+        id: typeof s === "object" && s?.id ? String(s.id) : undefined,
+        label: typeof s === "object" ? s.label || s.name_en || s.name || "" : String(s || ""),
+        sub: subVal,
+        department: typeof s === "object" && (s.department || s.department_id) ? String(s.department || s.department_id) : undefined,
+        student_class: typeof s === "object" && (s.student_class || s.class_id) ? String(s.student_class || s.class_id) : undefined,
+        student_section: typeof s === "object" && (s.student_section || s.section_id) ? String(s.student_section || s.section_id) : undefined,
+      };
+    });
   }, [studentDatabase]);
 
   const handleSelect = (option: AutocompleteOption) => {
     if (onStudentSelect) {
+      const safeSub = typeof option?.sub === "string" ? option.sub : undefined;
       onStudentSelect({
         id: option.id,
-        label: option.label,
-        name: option.label,
-        sub: option.sub,
-        group_name: option.sub,
+        label: typeof option.label === "string" ? option.label : String(option.label || ""),
+        name: typeof option.label === "string" ? option.label : String(option.label || ""),
+        sub: safeSub,
+        group_name: safeSub,
         department: option.department,
         student_class: option.student_class,
         student_section: option.student_section,

@@ -197,7 +197,7 @@ export const DocLabSignaturesTab: React.FC<DocLabSignaturesTabProps> = ({
                             Secondary Designation
                           </label>
                           <CustomInput
-                            value={sig.sub || ''}
+                            value={typeof sig.sub === 'string' ? sig.sub : ''}
                             onChange={(val: any) => updateSignatureItem(sig.id, 'sub', typeof val === 'string' ? val : val?.target?.value ?? '')}
                             placeholder="e.g. Course Teacher / Controller"
                           />

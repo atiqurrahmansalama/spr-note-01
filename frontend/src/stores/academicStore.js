@@ -18,13 +18,20 @@ export const students = {
   /** Add new student (with unique ID support). */
   add: (student) => {
     const list = students.getAll();
-    const newId = student.id || `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const newId = (typeof student === "object" && student?.id) || `stu_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const studentSub =
+      typeof student === "object" && typeof student?.sub === "string"
+        ? student.sub
+        : typeof student === "object" && (student?.group || student?.group_name)
+        ? String(student.group || student.group_name)
+        : "General Group";
+
     const newStudentItem = {
       id: newId,
-      label: student.label || student.name || "",
-      sub: student.sub || student.group || student.group_name || "General Group",
+      label: typeof student === "object" ? student.label || student.name || "" : String(student || ""),
+      sub: studentSub,
       _local: true,
-      ...student,
+      ...(typeof student === "object" ? student : {}),
     };
 
     const isExactDuplicate = list.some(
@@ -52,9 +59,11 @@ export const students = {
   /** Update group name across all associated students. */
   updateGroupName: (oldGroupName, newGroupName) => {
     const list = students.getAll();
+    const targetOld = String(oldGroupName || "General Group").toLowerCase();
     const updated = list.map((s) => {
-      if ((s.sub || "General Group").toLowerCase() === oldGroupName.toLowerCase()) {
-        return { ...s, sub: newGroupName, _local: true };
+      const currentSub = typeof s?.sub === "string" ? s.sub : typeof s?.group === "string" ? s.group : "General Group";
+      if (currentSub.toLowerCase() === targetOld) {
+        return { ...s, sub: String(newGroupName || "General Group"), _local: true };
       }
       return s;
     });
@@ -65,9 +74,11 @@ export const students = {
   /** Remove all students in a specified group. */
   removeGroup: (groupName) => {
     const list = students.getAll();
-    const updated = list.filter(
-      (s) => (s.sub || "General Group").toLowerCase() !== groupName.toLowerCase()
-    );
+    const targetGroup = String(groupName || "General Group").toLowerCase();
+    const updated = list.filter((s) => {
+      const currentSub = typeof s?.sub === "string" ? s.sub : typeof s?.group === "string" ? s.group : "General Group";
+      return currentSub.toLowerCase() !== targetGroup;
+    });
     writeJSON(KEYS.STUDENTS, updated);
     return updated;
   },
@@ -88,11 +99,20 @@ export const students = {
  * mergeStudents — Merges API data with LocalStorage data.
  */
 export function mergeStudents(apiStudents, localStudents) {
-  const apiList = (Array.isArray(apiStudents) ? apiStudents : []).map((s) => ({
-    id: s.id ?? null,
-    label: s.label || s.name || s.student_name || String(s),
-    sub: s.sub || s.group_name || s.group || "General Group",
-  }));
+  const apiList = (Array.isArray(apiStudents) ? apiStudents : []).map((s) => {
+    const subVal =
+      typeof s === "object" && typeof s?.sub === "string"
+        ? s.sub
+        : typeof s === "object" && (s?.group_name || s?.group)
+        ? String(s.group_name || s.group)
+        : "General Group";
+
+    return {
+      id: typeof s === "object" ? s?.id ?? null : null,
+      label: typeof s === "object" ? s?.label || s?.name || s?.student_name || "" : String(s || ""),
+      sub: subVal,
+    };
+  });
 
   const apiIds = new Set(apiList.map((s) => String(s.id)).filter((id) => id && id !== "null" && id !== "undefined"));
   const apiKeys = new Set(apiList.map((s) => `${(s.label || "").trim().toLowerCase()}_${(s.sub || "").trim().toLowerCase()}`));
@@ -101,7 +121,13 @@ export function mergeStudents(apiStudents, localStudents) {
     .filter((s) => {
       if (!s || (!s.label && !s.name)) return false;
       const sId = s.id ? String(s.id) : null;
-      const sKey = `${(s.label || s.name || "").trim().toLowerCase()}_${(s.sub || s.group || s.group_name || "General Group").trim().toLowerCase()}`;
+      const sSub =
+        typeof s === "object" && typeof s?.sub === "string"
+          ? s.sub
+          : typeof s === "object" && (s?.group || s?.group_name)
+          ? String(s.group || s.group_name)
+          : "General Group";
+      const sKey = `${(s.label || s.name || "").trim().toLowerCase()}_${sSub.trim().toLowerCase()}`;
       
       if (sId && apiIds.has(sId)) return false;
       if (apiKeys.has(sKey)) return false;
@@ -114,12 +140,13 @@ export function mergeStudents(apiStudents, localStudents) {
   const merged = [];
 
   for (const s of [...apiList, ...localOnly]) {
+    const sSub = typeof s?.sub === "string" ? s.sub : "General Group";
     const key = s.id
       ? `id_${s.id}`
-      : `key_${(s.label || "").trim().toLowerCase()}_${(s.sub || "").trim().toLowerCase()}`;
+      : `key_${(s.label || "").trim().toLowerCase()}_${sSub.trim().toLowerCase()}`;
     if (!seenKeys.has(key)) {
       seenKeys.add(key);
-      merged.push(s);
+      merged.push({ ...s, sub: sSub });
     }
   }
 

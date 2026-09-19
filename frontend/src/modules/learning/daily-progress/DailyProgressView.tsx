@@ -233,11 +233,11 @@ export default function DailyProgressView({
     let matchedStudent: any = null;
 
     if (typeof sel === "object" && sel !== null) {
-      chosenName = sel.label || sel.name || "";
-      chosenSub = sel.sub || sel.group_name || "";
+      chosenName = typeof sel.label === "string" ? sel.label : typeof sel.name === "string" ? sel.name : "";
+      chosenSub = typeof sel.sub === "string" ? sel.sub : typeof sel.group_name === "string" ? sel.group_name : "";
       matchedStudent = sel;
     } else {
-      chosenName = sel || "";
+      chosenName = typeof sel === "string" ? sel : "";
     }
 
     setStudentName(chosenName);
@@ -271,7 +271,7 @@ export default function DailyProgressView({
         if (matchedSec) {
           onSectionChange(String(matchedSec.id));
         } else {
-          setGroupName(chosenSub);
+          setGroupName(String(chosenSub));
         }
       }
     } else if (chosenSub) {
@@ -281,7 +281,7 @@ export default function DailyProgressView({
       if (matchedSec) {
         onSectionChange(String(matchedSec.id));
       } else {
-        setGroupName(chosenSub);
+        setGroupName(String(chosenSub));
       }
     }
   };

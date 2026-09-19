@@ -516,7 +516,7 @@ export function doesStudentMatchClass(student, targetClassId, classes = []) {
     typeof student.academic_class === 'string' ? student.academic_class : '',
     typeof student.class === 'string' ? student.class : '',
     student.education_status,
-    student.sub,
+    typeof student?.sub === 'string' ? student.sub : '',
   ].filter(Boolean).map((s) => String(s).toLowerCase().trim());
 
   if (tName && candidateNames.some((n) => n === tName)) {
@@ -603,7 +603,8 @@ export function doesStudentMatchSection(student, targetSectionId, sections = [])
     }
   }
 
-  const rawStuSecName = student.section_name || (typeof student.section === 'string' && isNaN(Number(student.section)) ? student.section : '') || student.sub || '';
+  const stuSub = typeof student?.sub === 'string' ? student.sub : '';
+  const rawStuSecName = student.section_name || (typeof student.section === 'string' && isNaN(Number(student.section)) ? student.section : '') || stuSub || '';
   const stSecName = String(rawStuSecName || '').toLowerCase().trim();
   if (tSecName && stSecName && tSecName === stSecName) {
     return true;

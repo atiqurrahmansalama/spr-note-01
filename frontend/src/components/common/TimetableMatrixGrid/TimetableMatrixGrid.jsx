@@ -150,11 +150,11 @@ export default function TimetableMatrixGrid({
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows;
     const q = searchQuery.toLowerCase();
-    return rows.filter(
+    return (rows || []).filter(
       (r) =>
-        r.label?.toLowerCase().includes(q) ||
-        r.sub?.toLowerCase().includes(q) ||
-        r.code?.toLowerCase().includes(q)
+        r?.label?.toLowerCase().includes(q) ||
+        (typeof r?.sub === 'string' && r.sub.toLowerCase().includes(q)) ||
+        r?.code?.toLowerCase().includes(q)
     );
   }, [rows, searchQuery]);
 
@@ -446,7 +446,7 @@ export default function TimetableMatrixGrid({
                         <div className="font-black text-xs sm:text-sm theme-text-primary tracking-tight">
                           {rowItem.label || rowItem.name || 'Class'}
                         </div>
-                        {rowItem.sub && (
+                        {typeof rowItem?.sub === 'string' && rowItem.sub.trim() && (
                           <div className="text-[11px] theme-text-secondary font-medium truncate">
                             {rowItem.sub}
                           </div>

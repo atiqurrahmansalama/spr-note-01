@@ -184,7 +184,11 @@ export default function AutocompleteDropdown({
       if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
       const term = safeSearchTerm.trim().toLowerCase();
       const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
-      const sub = (typeof item === 'object' ? item?.sub || item?.subLabel || item?.group_name || '' : '').toLowerCase();
+      const sub = (
+        typeof item === 'object' && item !== null
+          ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : '')
+          : ''
+      ).toLowerCase();
       return labelText.includes(term) || sub.includes(term);
     });
   }, [options, showAllOptionsOnFocus, isOpen, safeSearchTerm]);
@@ -305,9 +309,12 @@ export default function AutocompleteDropdown({
             >
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((item, index) => {
-                  const itemLabel = typeof item === 'string' ? item : item.label || item.name || '';
-                  const itemSub = typeof item === 'object' ? item.sub || item.subLabel || item.group_name : null;
-                  const itemBadge = typeof item === 'object' ? item.badge || item.typeLabel : null;
+                  const itemLabel = typeof item === 'string' ? item : item?.label || item?.name || '';
+                  const itemSub =
+                    typeof item === 'object' && item !== null
+                      ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : null)
+                      : null;
+                  const itemBadge = typeof item === 'object' && item !== null ? item.badge || item.typeLabel : null;
                   const isHighlighted = index === highlightedIndex;
                   const isSelected = itemLabel.toLowerCase() === safeSearchTerm.toLowerCase();
 

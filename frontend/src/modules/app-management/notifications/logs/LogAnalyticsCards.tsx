@@ -70,7 +70,7 @@ export default function LogAnalyticsCards({ analytics }: LogAnalyticsCardsProps)
               <span className="text-lg font-black theme-text-primary block leading-tight">
                 {s.value}
               </span>
-              {s.sub && (
+              {typeof s?.sub === 'string' && s.sub.trim() && (
                 <span className="text-[10px] theme-text-secondary block mt-0.5 truncate">
                   {s.sub}
                 </span>

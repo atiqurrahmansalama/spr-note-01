@@ -404,7 +404,22 @@ export function useReportForm() {
 
     if (cachedStudents.length > 0) {
       setStudentDatabase(cachedStudents);
-      setAvailableGroups(Array.from(new Set(cachedStudents.map((s: any) => s.sub))).filter(Boolean) as string[]);
+      const safeCachedGroups = Array.from(
+        new Set(
+          cachedStudents
+            .map((s: any) =>
+              typeof s === "object" && typeof s?.sub === "string"
+                ? s.sub
+                : typeof s === "object" && (s?.group || s?.group_name)
+                ? String(s.group || s.group_name)
+                : typeof s === "string"
+                ? s
+                : ""
+            )
+            .filter((g: any) => typeof g === "string" && g.trim() !== "")
+        )
+      ) as string[];
+      setAvailableGroups(safeCachedGroups);
     }
     if (cachedSessions.length > 0) {
       setSessionList(cachedSessions);
@@ -430,16 +445,40 @@ export function useReportForm() {
 
       if (studentsRes.ok) {
         const rawStudents = await studentsRes.json();
-        const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => ({
-          id: typeof s === "object" ? s.id : null,
-          label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
-          sub: typeof s === "object" ? (s.group_name || s.group || s.sub || "General Group") : "General Group",
-        }));
+        const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => {
+          const subVal =
+            typeof s === "object" && typeof s?.sub === "string"
+              ? s.sub
+              : typeof s === "object" && (s?.group_name || s?.group)
+              ? String(s.group_name || s.group)
+              : "General Group";
+
+          return {
+            id: typeof s === "object" ? s.id : null,
+            label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
+            sub: subVal,
+          };
+        });
 
         const localStudents = studentStore.getAll();
         const merged = mergeStudents(apiStudents, localStudents);
         setStudentDatabase(merged);
-        setAvailableGroups(Array.from(new Set(merged.map((s: any) => s.sub))).filter(Boolean) as string[]);
+        const safeMergedGroups = Array.from(
+          new Set(
+            merged
+              .map((s: any) =>
+                typeof s === "object" && typeof s?.sub === "string"
+                  ? s.sub
+                  : typeof s === "object" && (s?.group || s?.group_name)
+                  ? String(s.group || s.group_name)
+                  : typeof s === "string"
+                  ? s
+                  : ""
+              )
+              .filter((g: any) => typeof g === "string" && g.trim() !== "")
+          )
+        ) as string[];
+        setAvailableGroups(safeMergedGroups);
       }
 
       if (sessionsRes.ok) {
@@ -533,7 +572,22 @@ export function useReportForm() {
       updatedList = studentStore.add(newStudent);
     }
     setStudentDatabase(updatedList);
-    setAvailableGroups(Array.from(new Set(updatedList.map((s: any) => s.sub))).filter(Boolean) as string[]);
+    const safeUpdatedGroups = Array.from(
+      new Set(
+        (updatedList || [])
+          .map((s: any) =>
+            typeof s === "object" && typeof s?.sub === "string"
+              ? s.sub
+              : typeof s === "object" && (s?.group || s?.group_name)
+              ? String(s.group || s.group_name)
+              : typeof s === "string"
+              ? s
+              : ""
+          )
+          .filter((g: any) => typeof g === "string" && g.trim() !== "")
+      )
+    ) as string[];
+    setAvailableGroups(safeUpdatedGroups);
     setStudentName(result.name);
     setGroupName(result.group || "General Group");
 

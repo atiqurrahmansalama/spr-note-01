@@ -74,9 +74,11 @@ export default function BroadcastChannelSelector({
                     className="w-3.5 h-3.5 rounded border theme-border theme-text-primary"
                   />
                 </div>
-                <span className="text-[10px] theme-text-secondary block mt-0.5 leading-tight">
-                  {item.sub}
-                </span>
+                {typeof item.sub === 'string' && item.sub.trim() && (
+                  <span className="text-[10px] theme-text-secondary block mt-0.5 leading-tight">
+                    {item.sub}
+                  </span>
+                )}
               </div>
             </button>
           );

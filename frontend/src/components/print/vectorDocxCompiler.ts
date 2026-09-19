@@ -571,13 +571,13 @@ export function compileNativeDocxDocument({
                 }),
               ],
             }),
-            ...(sig.sub
+            ...(typeof sig.sub === 'string' && sig.sub.trim()
               ? [
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     children: [
                       new TextRun({
-                        text: sig.sub,
+                        text: sig.sub.trim(),
                         size: 17, // 8.5pt
                         font: FONT_PRIMARY,
                         color: '64748B',

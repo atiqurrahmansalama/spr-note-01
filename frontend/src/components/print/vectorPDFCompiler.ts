@@ -473,11 +473,11 @@ export function compileVectorPDFDocument({
       doc.setTextColor(15, 23, 42);
       doc.text(sig.label || 'Signatory', sigCenterX, lineY + 10, { align: 'center' });
 
-      if (sig.sub) {
+      if (typeof sig.sub === 'string' && sig.sub.trim()) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(71, 85, 105);
-        doc.text(sig.sub, sigCenterX, lineY + 18, { align: 'center' });
+        doc.text(sig.sub.trim(), sigCenterX, lineY + 18, { align: 'center' });
       }
     });
   }
