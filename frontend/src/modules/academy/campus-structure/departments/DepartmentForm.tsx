@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useToast } from "../../../../context/ToastContext";
 import { useTenant } from "../../../../context/TenantContext";
 import { useAcademicSession } from "../../../../context/AcademicSessionContext";
-import { fetchWithAuth } from "../../../../utils/authService";
 import {
   BookOpenIcon,
   BuildingIcon,
@@ -69,8 +68,6 @@ export default function DepartmentForm({
   }, [activeDept, activeTenantId, activeBranch, currentInstitution, institutions]);
 
   const [formData, setFormData] = useState<DepartmentFormData>(initialValues);
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [loadingLookups, setLoadingLookups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Auto-Save / Draft Persistence
@@ -87,26 +84,6 @@ export default function DepartmentForm({
   useEffect(() => {
     setFormData(initialValues);
   }, [initialValues]);
-
-  useEffect(() => {
-    loadTeachers();
-  }, []);
-
-  const loadTeachers = async () => {
-    setLoadingLookups(true);
-    try {
-      const res = await fetchWithAuth("/api/v1/users/");
-      if (res.ok) {
-        const data = await res.json();
-        const userList = Array.isArray(data) ? data : data.results || [];
-        setTeachers(userList);
-      }
-    } catch {
-      // Graceful fallback
-    } finally {
-      setLoadingLookups(false);
-    }
-  };
 
   const selectedInst = useMemo(() => {
     const activeSelectedInstId =
@@ -127,13 +104,18 @@ export default function DepartmentForm({
   const currentDeptCount = selectedInst?.total_departments_count || 0;
   const isQuotaReached = !isEdit && currentDeptCount >= deptQuotaLimit && !isMultiTenantAdmin;
 
+  const hasMultipleBranches = useMemo(() => {
+    const branchCount = (branches && Array.isArray(branches) ? branches.length : 0) || (selectedInst?.total_branches_count ?? 0);
+    return branchCount > 1;
+  }, [selectedInst, branches]);
+
   const resolvedBranchName = useMemo(() => {
     const targetBranchId =
       formData.branch && formData.branch !== "ALL"
         ? String(formData.branch)
         : (activeBranch?.id && String(activeBranch.id) !== "ALL" ? String(activeBranch.id) : "");
     if (!targetBranchId) {
-      return "All Campuses (Institution-wide)";
+      return "All Campuses";
     }
     const matched = branches?.find((b: any) => String(b.id) === String(targetBranchId));
     return (
@@ -215,7 +197,13 @@ export default function DepartmentForm({
       <form onSubmit={handleSubmit} className="space-y-6 pt-2">
         {/* Context Scope Indicator */}
         <div className="@container">
-          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 p-3 rounded-xl theme-bg-surface-secondary border theme-border-subtle text-xs">
+          <div
+            className={`p-3 rounded-xl theme-bg-surface-secondary border theme-border-subtle text-xs ${
+              hasMultipleBranches
+                ? "grid grid-cols-1 @[480px]:grid-cols-2 gap-3"
+                : "flex items-center gap-2.5"
+            }`}
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg theme-bg-surface-highlight flex items-center justify-center shrink-0">
                 <BuildingIcon className="w-3.5 h-3.5 theme-text-secondary" />
@@ -230,19 +218,21 @@ export default function DepartmentForm({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg theme-bg-surface-highlight flex items-center justify-center shrink-0">
-                <DepartmentIcon className="w-3.5 h-3.5 theme-text-secondary" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase font-semibold tracking-wider theme-text-muted leading-tight">
-                  Campus Scope
+            {hasMultipleBranches && (
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg theme-bg-surface-highlight flex items-center justify-center shrink-0">
+                  <DepartmentIcon className="w-3.5 h-3.5 theme-text-secondary" />
                 </div>
-                <div className="font-semibold theme-text-primary truncate text-xs">
-                  {resolvedBranchName}
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider theme-text-muted leading-tight">
+                    Campus Scope
+                  </div>
+                  <div className="font-semibold theme-text-primary truncate text-xs">
+                    {resolvedBranchName}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -292,12 +282,12 @@ export default function DepartmentForm({
                   onChange={(val: string | number) =>
                     setFormData({ ...formData, department_head: val === "ALL" ? "" : val })
                   }
-                  teachers={teachers}
+                  onlyTeachers={true}
+                  valueKey="user"
                   allowAll={true}
                   allLabel="No Head Assigned"
                   placeholder="Select Department Head..."
-                  searchable={false}
-                  disabled={loadingLookups}
+                  searchable={true}
                 />
               </div>
             </div>

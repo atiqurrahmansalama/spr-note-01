@@ -31,6 +31,7 @@ export type { GroupSelectProps, GroupItem } from './GroupSelect';
 
 export { default as TeacherSelect } from './TeacherSelect';
 export { default as TeacherSelector } from './TeacherSelect';
+export type { TeacherSelectProps, TeacherItem } from './TeacherSelect';
 
 export { default as RoleSelect } from './RoleSelect';
 export { default as RoleSelector } from './RoleSelect';

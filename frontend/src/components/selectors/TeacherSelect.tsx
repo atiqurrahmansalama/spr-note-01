@@ -4,35 +4,62 @@ import { TeacherIcon } from '../ui/Icons';
 import { fetchWithAuth } from '../../utils/authService';
 import { useTenant } from '../../context/TenantContext';
 
+export interface TeacherItem {
+  id: string | number;
+  user?: string | number;
+  user_name?: string;
+  name?: string;
+  name_en?: string;
+  full_name?: string;
+  bangla_name?: string;
+  user_phone?: string;
+  user_email?: string;
+  user_type?: string;
+  staff_type?: string;
+  type?: string;
+  designation?: string;
+  employee_id?: string;
+  is_active?: boolean;
+  is_deleted?: boolean;
+  [key: string]: any;
+}
+
+export interface TeacherSelectProps {
+  value?: string | number | null;
+  onChange: (value: any, item?: any) => void;
+  teachers?: TeacherItem[];
+  onlyTeachers?: boolean;
+  valueKey?: 'user' | 'id';
+  label?: string;
+  placeholder?: string;
+  allowAll?: boolean;
+  allLabel?: string;
+  allValue?: string | number;
+  required?: boolean;
+  disabled?: boolean;
+  searchable?: boolean;
+  showBadge?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  compactMode?: boolean;
+  error?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  onTeachersLoaded?: (teachers: TeacherItem[]) => void;
+  [key: string]: any;
+}
+
 /**
  * Enterprise Reusable Teacher / Staff Selector Component
  * 
- * Automatically loads teachers/staff if not provided via props, supports tenant isolation,
- * filters by teaching staff, provides "All Teachers" mode, search, and design token integration.
- * 
- * @param {Object} props
- * @param {string|number} props.value - Selected teacher ID
- * @param {Function} props.onChange - Callback `(selectedVal, selectedTeacherObj) => void`
- * @param {Array} [props.teachers] - Optional pre-loaded teachers/staff array
- * @param {boolean} [props.onlyTeachers=false] - Only show teaching staff
- * @param {string} [props.label='Select Teacher'] - Label text
- * @param {string} [props.placeholder='Select Teacher...'] - Placeholder text
- * @param {boolean} [props.allowAll=true] - Whether to include an "All Teachers" option
- * @param {string} [props.allLabel='All Teachers'] - Label for the "All Teachers" option
- * @param {boolean} [props.required=false] - Required indicator
- * @param {boolean} [props.disabled=false] - Disabled state
- * @param {boolean} [props.searchable=true] - Enable search filter
- * @param {'sm'|'md'|'lg'} [props.size='md'] - Selector size
- * @param {boolean} [props.compactMode=false] - Compact mode
- * @param {string} [props.error] - Error message
- * @param {React.ComponentType} [props.icon] - Optional leading icon (defaults to TeacherIcon)
- * @param {Function} [props.onTeachersLoaded] - Callback when teachers are loaded via API
+ * Automatically loads teachers/staff from `/api/v1/staff/` if not provided via props,
+ * supports tenant isolation, filters by teaching staff, provides "All Teachers" mode,
+ * search, and design token integration.
  */
 export default function TeacherSelect({
   value,
   onChange,
   teachers: propTeachers,
   onlyTeachers = false,
+  valueKey = 'user',
   label = 'Select Teacher',
   placeholder = 'Select Teacher...',
   allowAll = true,
@@ -48,9 +75,9 @@ export default function TeacherSelect({
   icon = TeacherIcon,
   onTeachersLoaded,
   ...rest
-}) {
+}: TeacherSelectProps) {
   const { activeTenantId } = useTenant();
-  const [internalTeachers, setInternalTeachers] = useState([]);
+  const [internalTeachers, setInternalTeachers] = useState<TeacherItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch staff/teachers if propTeachers is not supplied
@@ -65,13 +92,16 @@ export default function TeacherSelect({
     const loadTeachers = async () => {
       setLoading(true);
       try {
-        const res = await fetchWithAuth('/api/v1/staff/?page_size=500');
+        const tenantQuery = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+        const typeQuery = onlyTeachers ? '&staff_type=TEACHING' : '';
+        const res = await fetchWithAuth(`/api/v1/staff/?page_size=500${tenantQuery}${typeQuery}`);
         if (res.ok && isMounted) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.results || [];
-          setInternalTeachers(list);
+          const activeList = list.filter((s: TeacherItem) => !s.is_deleted && s.is_active);
+          setInternalTeachers(activeList);
           if (onTeachersLoaded) {
-            onTeachersLoaded(list);
+            onTeachersLoaded(activeList);
           }
         }
       } catch (err) {
@@ -85,7 +115,7 @@ export default function TeacherSelect({
     return () => {
       isMounted = false;
     };
-  }, [propTeachers, activeTenantId]);
+  }, [propTeachers, activeTenantId, onlyTeachers]);
 
   const rawTeachers = propTeachers && Array.isArray(propTeachers) && propTeachers.length > 0 ? propTeachers : internalTeachers;
 
@@ -93,17 +123,17 @@ export default function TeacherSelect({
   const filteredTeachers = useMemo(() => {
     if (!onlyTeachers) return rawTeachers;
     return rawTeachers.filter((t) => {
-      const type = t.staff_type || t.type;
-      return !type || type === 'TEACHING';
+      const type = (t.staff_type || t.type || t.user_type || '').toUpperCase();
+      return !type || type === 'TEACHING' || type === 'TEACHER';
     });
   }, [rawTeachers, onlyTeachers]);
 
   // Format options for CustomSelect
   const options = useMemo(() => {
-    const list = [];
+    const list: Array<{ value: string; label: string; typeLabel?: string; badge?: string; raw: TeacherItem | null }> = [];
     if (allowAll) {
       list.push({
-        value: allValue !== undefined ? allValue : 'ALL',
+        value: allValue !== undefined ? String(allValue) : 'ALL',
         label: allLabel,
         raw: null,
       });
@@ -118,9 +148,10 @@ export default function TeacherSelect({
         t.employee_id ||
         (t.user_phone ? `Teacher (${t.user_phone})` : `Teacher #${t.id}`);
       const designationStr = t.designation || (t.staff_type === 'TEACHING' ? 'Teacher' : '');
+      const itemValue = valueKey === 'user' ? String(t.user || t.id) : String(t.id || t.user);
 
       list.push({
-        value: String(t.id),
+        value: itemValue,
         label: designationStr ? `${nameStr} (${designationStr})` : nameStr,
         typeLabel: showBadge ? (designationStr || 'Staff') : undefined,
         badge: showBadge ? (designationStr || 'Staff') : undefined,
@@ -129,18 +160,21 @@ export default function TeacherSelect({
     });
 
     return list;
-  }, [filteredTeachers, allowAll, allLabel, allValue, showBadge]);
+  }, [filteredTeachers, allowAll, allLabel, allValue, showBadge, valueKey]);
 
-  const handleChange = (selectedVal) => {
-    const foundObj = filteredTeachers.find((t) => String(t.id) === String(selectedVal)) || null;
+  const handleChange = (selectedVal: string | number) => {
+    const foundObj = filteredTeachers.find((t) => {
+      const itemVal = valueKey === 'user' ? String(t.user || t.id) : String(t.id || t.user);
+      return itemVal === String(selectedVal) || String(t.id) === String(selectedVal) || String(t.user) === String(selectedVal);
+    }) || null;
     onChange(selectedVal, foundObj);
   };
 
   const normalizedValue = useMemo(() => {
-    if (value === undefined || value === null) return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
+    if (value === undefined || value === null) return allowAll ? (allValue !== undefined ? String(allValue) : 'ALL') : '';
     const strVal = String(value);
     if (strVal === '' || strVal === 'ALL') {
-      return allowAll ? (allValue !== undefined ? allValue : 'ALL') : '';
+      return allowAll ? (allValue !== undefined ? String(allValue) : 'ALL') : '';
     }
     return strVal;
   }, [value, allowAll, allValue]);
