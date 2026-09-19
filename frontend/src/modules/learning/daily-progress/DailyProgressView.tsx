@@ -176,12 +176,21 @@ export default function DailyProgressView({
       const stName = (st.name_en || st.name || "").trim();
       if (stName && !existingNames.has(stName.toLowerCase())) {
         existingNames.add(stName.toLowerCase());
+        const secSub =
+          st.section_name ||
+          st.student_section_name ||
+          (st.section && typeof st.section === "object" ? st.section.section_name : null) ||
+          st.sub ||
+          st.student_class_name ||
+          "";
+
         fullList.push({
           id: String(st.id),
           label: stName,
-          sub: st.group_name || st.section_name || st.student_class_name || "General Group",
+          sub: secSub,
+          section_name: secSub,
           student_class: st.student_class || st.class_id,
-          student_section: st.student_section || st.section_id,
+          student_section: st.student_section || st.section_id || (typeof st.section === "object" ? st.section?.id : st.section),
           department: st.department || st.department_id,
         });
       }

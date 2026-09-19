@@ -73,7 +73,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(is_deleted=False).select_related('details', 'student_class', 'student_group').distinct().order_by('roll_number', 'name_en')
+    queryset = Student.objects.filter(is_deleted=False).select_related('details', 'student_class', 'section', 'student_group').distinct().order_by('roll_number', 'name_en')
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrSuperAdmin, HasSectionAccess]
     required_section_key = 'student_roster'
@@ -85,7 +85,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         show_trash = self.request.query_params.get('trash') == 'true'
         base_qs = Student.objects.filter(is_deleted=True) if show_trash else Student.objects.filter(is_deleted=False)
-        base_qs = base_qs.select_related('details', 'student_class', 'student_group', 'institution').distinct()
+        base_qs = base_qs.select_related('details', 'student_class', 'section', 'student_group', 'institution').distinct()
 
         tenant_id = get_scoped_tenant_id(self.request)
         if tenant_id:

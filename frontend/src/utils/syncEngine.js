@@ -137,19 +137,23 @@ export const syncLocalStudentsToBackend = async () => {
       const raw = await res.json();
       const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => {
         const subVal =
-          typeof s === "object" && typeof s?.sub === "string"
+          typeof s === "object" && typeof s?.section_name === "string" && s.section_name
+            ? s.section_name
+            : typeof s === "object" && typeof s?.student_section_name === "string" && s.student_section_name
+            ? s.student_section_name
+            : typeof s === "object" && typeof s?.sub === "string" && s.sub
             ? s.sub
             : typeof s === "object" && (s?.group_name || s?.group)
             ? String(s.group_name || s.group)
-            : "General Group";
+            : "";
         return {
           id: typeof s === "object" ? s?.id : null,
-          label: typeof s === "object" ? s?.name || s?.student_name || s?.label || "" : String(s || ""),
+          label: typeof s === "object" ? s?.name_en || s?.name || s?.student_name || s?.label || "" : String(s || ""),
           sub: subVal,
         };
       });
       const apiKeys = new Set(
-        apiStudents.map((s) => `${(s.label || "").toLowerCase().trim()}___${(s.sub || "General Group").toLowerCase().trim()}`)
+        apiStudents.map((s) => `${(s.label || "").toLowerCase().trim()}___${(s.sub || "").toLowerCase().trim()}`)
       );
 
       const localStudents = studentStore.getAll();
@@ -158,11 +162,15 @@ export const syncLocalStudentsToBackend = async () => {
           if (!s || (!s.label && !s.name)) return false;
           if (!s._local) return false;
           const sSub =
-            typeof s === "object" && typeof s?.sub === "string"
+            typeof s === "object" && typeof s?.section_name === "string" && s.section_name
+              ? s.section_name
+              : typeof s === "object" && typeof s?.student_section_name === "string" && s.student_section_name
+              ? s.student_section_name
+              : typeof s === "object" && typeof s?.sub === "string" && s.sub
               ? s.sub
               : typeof s === "object" && (s?.group || s?.group_name)
               ? String(s.group || s.group_name)
-              : "General Group";
+              : "";
           const key = `${(s.label || s.name || "").toLowerCase().trim()}___${sSub.toLowerCase().trim()}`;
           return !apiKeys.has(key);
         }
@@ -171,11 +179,15 @@ export const syncLocalStudentsToBackend = async () => {
       for (const stu of unsyncedLocal) {
         const name = typeof stu === "object" ? stu.label || stu.name : String(stu || "");
         const group =
-          typeof stu === "object" && typeof stu?.sub === "string"
+          typeof stu === "object" && typeof stu?.section_name === "string" && stu.section_name
+            ? stu.section_name
+            : typeof stu === "object" && typeof stu?.student_section_name === "string" && stu.student_section_name
+            ? stu.student_section_name
+            : typeof stu === "object" && typeof stu?.sub === "string" && stu.sub
             ? stu.sub
             : typeof stu === "object" && (stu?.group || stu?.group_name)
             ? String(stu.group || stu.group_name)
-            : "General Group";
+            : "";
         if (!name || !name.trim()) continue;
 
         try {

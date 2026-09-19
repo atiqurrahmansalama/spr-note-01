@@ -97,38 +97,28 @@ class Student(models.Model):
             elif self.created_by and self.created_by.institution:
                 self.institution = self.created_by.institution
 
-        # ── Guardrail 2 & 3: Group, Section & Class Auto-Sync and Backward Compatibility ──
+        # ── Section & Class Auto-Sync ──
+        if self.section and self.section.student_class_id and not self.student_class_id:
+            self.student_class = self.section.student_class
+
         if self.student_group:
             self.group_name = self.student_group.name
             if self.student_group.section_id and not self.section_id:
                 self.section = self.student_group.section
             if self.student_group.student_class_id and not self.student_class_id:
                 self.student_class = self.student_group.student_class
-        elif self.group_name and str(self.group_name).strip():
-            from django.apps import apps
-            StudentGroup = apps.get_model('core', 'StudentGroup')
-            grp, _ = StudentGroup.objects.get_or_create(
-                name=self.group_name.strip(),
-                defaults={'created_by': self.created_by}
-            )
-            self.student_group = grp
-            if grp.section_id and not self.section_id:
-                self.section = grp.section
-            if grp.student_class_id and not self.student_class_id:
-                self.student_class = grp.student_class
-        else:
-            self.group_name = "General Group"
-
-        if self.section and self.section.student_class_id and not self.student_class_id:
-            self.student_class = self.section.student_class
 
         if not self.name_en or not str(self.name_en).strip():
             self.name_en = "Unnamed Student"
 
         if not self.roll_number or self.roll_number <= 0:
-            filter_kwargs = {'group_name': self.group_name}
+            filter_kwargs = {}
             if self.student_class_id:
-                filter_kwargs = {'student_class_id': self.student_class_id}
+                filter_kwargs['student_class_id'] = self.student_class_id
+            elif self.section_id:
+                filter_kwargs['section_id'] = self.section_id
+            elif self.group_name:
+                filter_kwargs['group_name'] = self.group_name
             max_roll = Student.objects.filter(**filter_kwargs).aggregate(Max('roll_number'))['roll_number__max'] or 0
             self.roll_number = max_roll + 1
 

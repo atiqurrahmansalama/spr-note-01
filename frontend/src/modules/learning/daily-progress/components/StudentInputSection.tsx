@@ -42,10 +42,14 @@ export default function StudentInputSection({
   const options: AutocompleteOption[] = useMemo(() => {
     return (studentDatabase || []).map((s: any) => {
       const subVal =
-        typeof s === "object" && typeof s?.sub === "string"
+        typeof s === "object" && typeof s?.section_name === "string" && s.section_name
+          ? s.section_name
+          : typeof s === "object" && typeof s?.student_section_name === "string" && s.student_section_name
+          ? s.student_section_name
+          : typeof s === "object" && typeof s?.sub === "string" && s.sub
           ? s.sub
-          : typeof s === "object" && (s?.group_name || s?.section_name || s?.student_class_name || s?.group)
-          ? String(s.group_name || s.section_name || s.student_class_name || s.group)
+          : typeof s === "object" && (s?.group_name || s?.student_class_name || s?.group)
+          ? String(s.group_name || s.student_class_name || s.group)
           : undefined;
 
       return {
@@ -54,7 +58,7 @@ export default function StudentInputSection({
         sub: subVal,
         department: typeof s === "object" && (s.department || s.department_id) ? String(s.department || s.department_id) : undefined,
         student_class: typeof s === "object" && (s.student_class || s.class_id) ? String(s.student_class || s.class_id) : undefined,
-        student_section: typeof s === "object" && (s.student_section || s.section_id) ? String(s.student_section || s.section_id) : undefined,
+        student_section: typeof s === "object" && (s.student_section || s.section_id || s.section) ? String(s.student_section || s.section_id || s.section) : undefined,
       };
     });
   }, [studentDatabase]);

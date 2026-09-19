@@ -447,16 +447,23 @@ export function useReportForm() {
         const rawStudents = await studentsRes.json();
         const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => {
           const subVal =
-            typeof s === "object" && typeof s?.sub === "string"
+            typeof s === "object" && typeof s?.section_name === "string" && s.section_name
+              ? s.section_name
+              : typeof s === "object" && typeof s?.student_section_name === "string" && s.student_section_name
+              ? s.student_section_name
+              : typeof s === "object" && typeof s?.sub === "string" && s.sub
               ? s.sub
-              : typeof s === "object" && (s?.group_name || s?.group)
-              ? String(s.group_name || s.group)
-              : "General Group";
+              : typeof s === "object" && (s?.group_name || s?.group || s?.student_class_name)
+              ? String(s.group_name || s.group || s.student_class_name)
+              : "";
 
           return {
             id: typeof s === "object" ? s.id : null,
-            label: typeof s === "object" ? (s.name || s.student_name || s.label || String(s)) : String(s),
+            label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
             sub: subVal,
+            section_name: subVal,
+            student_section: typeof s === "object" ? (s.student_section || s.section_id || s.section) : null,
+            student_class: typeof s === "object" ? (s.student_class || s.class_id) : null,
           };
         });
 
@@ -467,7 +474,9 @@ export function useReportForm() {
           new Set(
             merged
               .map((s: any) =>
-                typeof s === "object" && typeof s?.sub === "string"
+                typeof s === "object" && (s?.section_name || s?.student_section_name)
+                  ? String(s.section_name || s.student_section_name)
+                  : typeof s === "object" && typeof s?.sub === "string"
                   ? s.sub
                   : typeof s === "object" && (s?.group || s?.group_name)
                   ? String(s.group || s.group_name)

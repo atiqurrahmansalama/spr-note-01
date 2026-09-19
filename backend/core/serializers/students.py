@@ -116,10 +116,14 @@ class StudentSerializer(serializers.ModelSerializer):
     # Nested detail serializer
     details = StudentDetailSerializer(required=False, allow_null=True)
 
-    # Class & Group relationships
+    # Class, Section & Group relationships
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
+    section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    student_section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    student_section = serializers.PrimaryKeyRelatedField(source='section', read_only=True)
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    sub = serializers.SerializerMethodField()
 
     # Backward compatibility aliases for legacy API consumers & frontend
     name = serializers.CharField(source='name_en', required=False, allow_blank=True, allow_null=True)
@@ -128,6 +132,13 @@ class StudentSerializer(serializers.ModelSerializer):
     group = serializers.CharField(source='group_name', required=False, allow_blank=True, allow_null=True)
     is_active = serializers.BooleanField(read_only=True)
 
+    def get_sub(self, obj):
+        if obj.section:
+            return obj.section.section_name
+        if obj.student_class:
+            return obj.student_class.name
+        return obj.group_name or ""
+
     class Meta:
         model = Student
         fields = [
@@ -135,8 +146,9 @@ class StudentSerializer(serializers.ModelSerializer):
             'roll_number', 'roll',
             'name_en', 'name',
             'student_class', 'student_class_name',
+            'section', 'section_name', 'student_section', 'student_section_name',
             'student_group', 'student_group_name',
-            'group_name', 'group',
+            'group_name', 'group', 'sub',
             'admission_date', 'status', 'is_active', 'is_deleted',
             'education_status', 'target_status',
             'details',
@@ -147,6 +159,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'roll_number': {'required': False, 'allow_null': True},
             'name_en': {'required': False, 'allow_null': True},
             'student_class': {'required': False, 'allow_null': True},
+            'section': {'required': False, 'allow_null': True},
             'student_group': {'required': False, 'allow_null': True},
             'group_name': {'required': False, 'allow_null': True},
             'status': {'required': False, 'allow_null': True},

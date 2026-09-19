@@ -101,6 +101,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     student_details = StudentSerializer(source='student', read_only=True)
     student_name = serializers.CharField(required=False, allow_blank=True)
     student_group = serializers.CharField(source='student.group_name', read_only=True)
+    student_section = serializers.CharField(source='student.section.section_name', read_only=True, default='')
+    student_section_name = serializers.CharField(source='student.section.section_name', read_only=True, default='')
     date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False)
     student = serializers.PrimaryKeyRelatedField(
         queryset=Student.objects.all(), required=False, allow_null=True
@@ -120,7 +122,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'report_unique_id', 'date', 'date_time', 'report_date', 'generate_date',
             'formattedDate', 'formattedTime',
-            'student', 'student_name', 'student_group', 'student_details',
+            'student', 'student_name', 'student_group', 'student_section', 'student_section_name', 'student_details',
             'session_name',
             'total_page',
             'total_mistake', 'total_stuck',
