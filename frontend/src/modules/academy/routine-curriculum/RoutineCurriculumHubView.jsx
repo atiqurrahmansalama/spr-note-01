@@ -4,8 +4,7 @@ import {
   PlusIcon,
   BookOpenIcon,
 } from '../../../components/ui/Icons';
-import PageHeader from '../../../components/ui/PageHeader';
-import TabSwitcher from '../../../components/ui/TabSwitcher';
+import { CollapsiblePageHeader } from '../../../components/ui';
 import CustomButton from '../../../components/ui/CustomButton';
 import { PageContainer } from '../../../components/layout';
 import { PeriodSlotsManagementView, PeriodSlotForm } from './periods';
@@ -220,31 +219,27 @@ export default function RoutineCurriculumHubView({
 
   return (
     <PageContainer isEmbedded={isEmbedded} className="space-y-4">
-      {/* 1. Header */}
-      {!hideHeader && (
-        <PageHeader
-          title="Period Schedules & Curriculum Console"
-          subtitle="Configure dynamic class period slots, break intervals, daily routines, and institutional kitab syllabi."
-          icon={TimerIcon}
-          actions={
-            <CustomButton
-              type="button"
-              variant="primary"
-              size="sm"
-              icon={PlusIcon}
-              onClick={activeTab === 'periods' ? handleOpenAddSlot : handleOpenAddSyllabus}
-            >
-              {activeTab === 'periods' ? 'Add Period' : 'Add Book'}
-            </CustomButton>
-          }
-        />
-      )}
-
-      {/* 2. Tab Switcher */}
-      <TabSwitcher
+      {/* 1. Collapsible Header & Tab Switcher */}
+      <CollapsiblePageHeader
+        hideHeader={hideHeader}
+        title="Period Schedules & Curriculum Console"
+        icon={TimerIcon}
+        storageKey="routine_curriculum_header"
         tabs={TABS}
         activeTab={activeTab}
         onChange={setActiveTab}
+        actionsPlacement="tabs"
+        actions={
+          <CustomButton
+            type="button"
+            variant="primary"
+            size="sm"
+            icon={PlusIcon}
+            onClick={activeTab === 'periods' ? handleOpenAddSlot : handleOpenAddSyllabus}
+          >
+            {activeTab === 'periods' ? 'Add Period' : 'Add Book'}
+          </CustomButton>
+        }
       />
 
       {/* 3. Tab 1: Daily Period Slots */}

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import AutocompleteDropdown, { AutocompleteOption } from "../../../../components/ui/AutocompleteDropdown";
+import AutocompleteDropdown, { AutocompleteOption } from "../../../../../components/ui/AutocompleteDropdown";
 
 export interface StudentProfileOption {
   id?: string | number;
@@ -12,10 +12,12 @@ export interface StudentProfileOption {
   student_class_name?: string;
   department?: string | number;
   department_id?: string | number;
+  department_name?: string;
   student_class?: string | number;
   class_id?: string | number;
   student_section?: string | number;
   section_id?: string | number;
+  originalData?: any;
 }
 
 export interface StudentInputSectionProps {
@@ -52,19 +54,41 @@ export default function StudentInputSection({
           ? String(s.group_name || s.student_class_name || s.group)
           : undefined;
 
+      const deptVal =
+        typeof s === "object" && (s.department || s.department_id)
+          ? String(s.department || s.department_id)
+          : undefined;
+      const classVal =
+        typeof s === "object" && (s.student_class || s.class_id || s.class)
+          ? String(s.student_class || s.class_id || s.class)
+          : undefined;
+      const secVal =
+        typeof s === "object" && (s.student_section || s.section_id || s.section)
+          ? String(s.student_section || s.section_id || s.section)
+          : undefined;
+
       return {
         id: typeof s === "object" && s?.id ? String(s.id) : undefined,
         label: typeof s === "object" ? s.label || s.name_en || s.name || "" : String(s || ""),
         sub: subVal,
-        department: typeof s === "object" && (s.department || s.department_id) ? String(s.department || s.department_id) : undefined,
-        student_class: typeof s === "object" && (s.student_class || s.class_id) ? String(s.student_class || s.class_id) : undefined,
-        student_section: typeof s === "object" && (s.student_section || s.section_id || s.section) ? String(s.student_section || s.section_id || s.section) : undefined,
+        department: deptVal,
+        department_name: typeof s === "object" ? s.department_name : undefined,
+        student_class: classVal,
+        student_class_name: typeof s === "object" ? s.student_class_name || s.class_name : undefined,
+        student_section: secVal,
+        section_name: typeof s === "object" ? s.section_name || s.student_section_name : undefined,
+        originalData: s,
       };
     });
   }, [studentDatabase]);
 
-  const handleSelect = (option: AutocompleteOption) => {
-    if (onStudentSelect) {
+  const handleSelect = (option: any) => {
+    if (!onStudentSelect) return;
+    if (typeof option === "string") {
+      onStudentSelect(option);
+      return;
+    }
+    if (typeof option === "object" && option !== null) {
       const safeSub = typeof option?.sub === "string" ? option.sub : undefined;
       onStudentSelect({
         id: option.id,
@@ -73,8 +97,12 @@ export default function StudentInputSection({
         sub: safeSub,
         group_name: safeSub,
         department: option.department,
+        department_name: option.department_name,
         student_class: option.student_class,
+        student_class_name: option.student_class_name,
         student_section: option.student_section,
+        section_name: option.section_name,
+        originalData: option.originalData || option,
       });
     }
   };
@@ -99,3 +127,4 @@ export default function StudentInputSection({
     </div>
   );
 }
+

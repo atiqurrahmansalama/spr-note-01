@@ -1,4 +1,54 @@
+export const getSystemTimezone = () => {
+  try {
+    if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) return tz;
+    }
+  } catch (e) {
+    // fallback
+  }
+  return "UTC";
+};
+
+export const getTimezoneOffsetString = (timeZone) => {
+  try {
+    const targetTz = timeZone || getSystemTimezone();
+    const date = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: targetTz,
+      timeZoneName: "shortOffset",
+    });
+    const parts = formatter.formatToParts(date);
+    const tzPart = parts.find((p) => p.type === "timeZoneName");
+    if (tzPart && tzPart.value) {
+      const val = tzPart.value.replace("GMT", "UTC");
+      if (val === "UTC") return "UTC+00:00";
+      const match = val.match(/UTC([+-])(\d+)(?::(\d+))?/);
+      if (match) {
+        const sign = match[1];
+        const hours = match[2].padStart(2, "0");
+        const minutes = (match[3] || "00").padStart(2, "0");
+        return `UTC${sign}${hours}:${minutes}`;
+      }
+      return val;
+    }
+  } catch (e) {
+    // Fallback using local device offset
+    try {
+      const offsetMin = -new Date().getTimezoneOffset();
+      const sign = offsetMin >= 0 ? "+" : "-";
+      const hrs = String(Math.floor(Math.abs(offsetMin) / 60)).padStart(2, "0");
+      const mins = String(Math.abs(offsetMin) % 60).padStart(2, "0");
+      return `UTC${sign}${hrs}:${mins}`;
+    } catch {
+      // ignore
+    }
+  }
+  return "UTC+00:00";
+};
+
 export const TIMEZONE_LIST = [
+  { id: "UTC", name: "UTC (International Standard)", city: "Universal Coordinated Time (GMT)", offset: "UTC+00:00" },
   { id: "Asia/Dhaka", name: "Asia / Dhaka", city: "Dhaka, Bangladesh", offset: "UTC+06:00" },
   { id: "Asia/Riyadh", name: "Asia / Riyadh", city: "Riyadh & Makkah, Saudi Arabia", offset: "UTC+03:00" },
   { id: "Asia/Dubai", name: "Asia / Dubai", city: "Dubai, United Arab Emirates", offset: "UTC+04:00" },
@@ -13,8 +63,27 @@ export const TIMEZONE_LIST = [
   { id: "America/Los_Angeles", name: "America / Los Angeles", city: "Los Angeles, USA", offset: "UTC-07:00" },
   { id: "America/Toronto", name: "America / Toronto", city: "Toronto, Canada", offset: "UTC-04:00" },
   { id: "Australia/Sydney", name: "Australia / Sydney", city: "Sydney, Australia", offset: "UTC+10:00" },
-  { id: "UTC", name: "UTC Standard", city: "Universal Coordinated Time", offset: "UTC+00:00" },
 ];
+
+export const getEnrichedTimezoneList = () => {
+  const systemTz = getSystemTimezone();
+  const exists = TIMEZONE_LIST.some((tz) => tz.id === systemTz);
+  if (!exists && systemTz && systemTz !== "UTC") {
+    const formattedName = systemTz.replace(/_/g, " ");
+    const offset = getTimezoneOffsetString(systemTz);
+    return [
+      {
+        id: systemTz,
+        name: formattedName,
+        city: "Detected Device Timezone",
+        offset,
+        isSystem: true,
+      },
+      ...TIMEZONE_LIST,
+    ];
+  }
+  return TIMEZONE_LIST;
+};
 
 export const DATE_FORMAT_LIST = [
   { id: "DD/MM/YYYY", name: "DD/MM/YYYY", sample: "05/08/2026", label: "Day / Month / Year (UK / Asia / International Standard)" },

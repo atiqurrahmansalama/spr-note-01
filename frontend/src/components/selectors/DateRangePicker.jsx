@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronIcon, CalendarIcon, CheckIcon } from "../ui/Icons";
 import ReusableCalendar from "../common/ReusableCalendar";
@@ -62,13 +62,23 @@ export default function DateRangePicker({
   const updatePosition = () => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+
+    // Auto-close if trigger is scrolled out of viewport or under top header
+    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
+      setIsDropdownOpen(false);
+      setShowCustomCalendar(false);
+      setIsCustomPicking(false);
+      return;
+    }
+
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const requiredHeight = showCustomCalendar ? 370 : 270;
 
     const shouldOpenUpward = spaceBelow < requiredHeight && spaceAbove > spaceBelow;
     const availableHeight = shouldOpenUpward
-      ? Math.max(120, spaceAbove - 16)
+      ? Math.max(120, spaceAbove - 60)
       : Math.max(120, spaceBelow - 16);
 
     const minPopupW = showCustomCalendar ? 320 : 230;
@@ -94,12 +104,34 @@ export default function DateRangePicker({
     });
   };
 
-  useEffect(() => {
+  const handleTriggerClick = () => {
+    if (showCustomCalendar) {
+      setShowCustomCalendar(false);
+      setIsCustomPicking(false);
+    } else {
+      if (!isDropdownOpen) {
+        updatePosition();
+        setIsDropdownOpen(true);
+      } else {
+        setIsDropdownOpen(false);
+      }
+    }
+  };
+
+  // Synchronously measure and place dropdown before browser paint
+  useLayoutEffect(() => {
     if (isDropdownOpen || showCustomCalendar) {
       updatePosition();
+    }
+  }, [isDropdownOpen, showCustomCalendar]);
+
+  useEffect(() => {
+    if (isDropdownOpen || showCustomCalendar) {
       const handleScroll = (e) => {
         if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
-        updatePosition();
+        setIsDropdownOpen(false);
+        setShowCustomCalendar(false);
+        setIsCustomPicking(false);
       };
       window.addEventListener("scroll", handleScroll, true);
       window.addEventListener("resize", updatePosition);
@@ -299,7 +331,7 @@ export default function DateRangePicker({
 
   // Dropdown Portal Menu Component
   const dropdownPortal =
-    isDropdownOpen && typeof document !== "undefined"
+    isDropdownOpen && coords.width > 0 && typeof document !== "undefined"
       ? createPortal(
           <div
             ref={dropdownRef}
@@ -348,7 +380,7 @@ export default function DateRangePicker({
 
   // Custom Calendar Portal Component
   const calendarPortal =
-    showCustomCalendar && typeof document !== "undefined"
+    showCustomCalendar && coords.width > 0 && typeof document !== "undefined"
       ? createPortal(
           <div
             ref={dropdownRef}
@@ -412,14 +444,7 @@ export default function DateRangePicker({
       {/* Main Select Dropdown Trigger Button */}
       <button
         type="button"
-        onClick={() => {
-          if (showCustomCalendar) {
-            setShowCustomCalendar(false);
-            setIsCustomPicking(false);
-          } else {
-            setIsDropdownOpen((prev) => !prev);
-          }
-        }}
+        onClick={handleTriggerClick}
         className={`w-full ${heightClass} flex items-center justify-between px-3.5 rounded-xl theme-bg-sub border theme-border theme-text-primary font-semibold hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1 text-left">

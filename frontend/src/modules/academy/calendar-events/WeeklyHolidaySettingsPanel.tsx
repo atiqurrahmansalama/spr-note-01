@@ -26,6 +26,14 @@ export interface WeeklyHolidaySettingsPanelProps {
   activeTenantId?: string | null;
 }
 
+export const weeklyHolidaysSectionConfig = {
+  id: "weekly-holidays",
+  group: "Calendar & Schedules",
+  title: "Weekly Holidays & Weekends",
+  description: "Configure official weekly institutional holiday(s), non-academic recess days, and attendance excuse rules",
+  icon: CalendarIcon,
+};
+
 /**
  * Enterprise Weekly Institutional Holiday & Weekend Configuration Panel
  * Configures weekly institutional holiday(s), non-academic recess days, class routine rules, and attendance auto-excuse policies.

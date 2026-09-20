@@ -9,6 +9,8 @@ import {
 } from "../../../components/ui/Icons";
 import { 
   TIMEZONE_LIST, 
+  getEnrichedTimezoneList,
+  getSystemTimezone,
   DATE_FORMAT_LIST, 
   FIRST_DAY_LIST 
 } from "../../../constants/calendarConstants";
@@ -33,6 +35,8 @@ export default function CalendarSettings({
 
 
   const [currentTime, setCurrentTime] = useState(new Date());
+  const systemTimezone = getSystemTimezone();
+  const timezoneList = getEnrichedTimezoneList();
 
   // Live ticking clock
   useEffect(() => {
@@ -53,15 +57,16 @@ export default function CalendarSettings({
   };
 
   const handleResetDefaults = () => {
-    setTimeZone("Asia/Dhaka");
+    const defaultTz = getSystemTimezone();
+    setTimeZone(defaultTz);
     setDateFormat("DD/MM/YYYY");
     setFirstDay("Saturday");
     setEnableHijri(false);
-    calStore.saveTimezone("Asia/Dhaka");
+    calStore.saveTimezone(defaultTz);
     calStore.saveDateFormat("DD/MM/YYYY");
     calStore.saveFirstDay("Saturday");
     calStore.saveHijriEnabled(false);
-    window.dispatchEvent(new CustomEvent("spr_calendar_settings_updated", { detail: { enableHijri: false, dateFormat: "DD/MM/YYYY" } }));
+    window.dispatchEvent(new CustomEvent("spr_calendar_settings_updated", { detail: { timezone: defaultTz, enableHijri: false, dateFormat: "DD/MM/YYYY" } }));
   };
 
   const getFormattedSampleDate = (fmt) => {
@@ -127,8 +132,9 @@ export default function CalendarSettings({
 
         {/* Vertical list without inner borders */}
         <div className="flex flex-col space-y-1.5 max-h-72 overflow-y-auto pr-1" style={{ scrollbarGutter: "stable" }}>
-          {TIMEZONE_LIST.map((tz) => {
+          {timezoneList.map((tz) => {
             const isSelected = tz.id === timeZone;
+            const isSystemTz = tz.id === systemTimezone;
             return (
               <button
                 key={tz.id}
@@ -142,7 +148,14 @@ export default function CalendarSettings({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <GlobeIcon className={`w-4 h-4 shrink-0 ${isSelected ? "theme-accent" : "theme-text-secondary"}`} />
-                  <span className="text-xs font-bold theme-text-primary truncate">{tz.name}</span>
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-xs font-bold theme-text-primary truncate">{tz.name}</span>
+                    {isSystemTz && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent shrink-0">
+                        System Local
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] theme-text-secondary truncate hidden sm:inline">({tz.city})</span>
                 </div>
 

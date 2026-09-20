@@ -1,7 +1,7 @@
 import React, { forwardRef } from "react";
-import { formatDate } from "../../../../utils/reportGenerator";
-import QrCodeBadge from "../../../../components/common/QrCodeBadge";
-import { useFeatureControl } from "../../../../context/FeatureControlContext";
+import { formatDate } from "../../../../../utils/reportGenerator";
+import QrCodeBadge from "../../../../../components/common/QrCodeBadge";
+import { useFeatureControl } from "../../../../../context/FeatureControlContext";
 import { DailyProgressData, DetailRowData, JuzRowData } from "../types";
 
 export interface PdfReportPreviewProps {

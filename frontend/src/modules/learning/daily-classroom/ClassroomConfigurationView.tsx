@@ -1,71 +1,123 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  CopyIcon,
   GroupsIcon,
   TeacherIcon,
   CalendarIcon,
-  CheckIcon,
-  SparklesIcon,
-  CheckCircleIcon,
-} from "../../components/ui/Icons";
-import AutocompleteDropdown from "../../components/ui/AutocompleteDropdown";
-import { DATE_FORMAT_LIST } from "../../constants/calendarConstants";
-import { copyReportSettings as copyStore, calendarSettings } from "../../utils/localStore";
-import { generateReportText } from "../../utils/reportGenerator";
-import { useToast } from "../../context/ToastContext";
+  ClockIcon,
+  GlobeIcon,
+  SettingsIcon,
+} from "../../../components/ui/Icons";
+import CustomSelect from "../../../components/ui/CustomSelect";
+import { DATE_FORMAT_LIST, getEnrichedTimezoneList, getSystemTimezone } from "../../../constants/calendarConstants";
+import { classroomSettings as copyStore, calendarSettings } from "../../../utils/localStore";
+import { useToast } from "../../../context/ToastContext";
 
 /**
- * Enterprise Report Settings View
- * Configures default report copy formats, evaluator teacher attribution tags, student group suffix, and date standards.
+ * Enterprise Classroom Configuration View
+ * Located under Daily Classroom module.
+ * Configures classroom timezone display & specific timezone offset, default report copy formats, evaluator teacher attribution tags, student group suffix, and date standards.
  */
-export default function ReportSettingsView() {
+export const classroomConfigSectionConfig = {
+  id: "classroom-config",
+  group: "Classroom Configuration",
+  title: "Classroom Configuration",
+  icon: SettingsIcon,
+};
+
+export default function ClassroomConfigurationView() {
   const { showToast } = useToast();
+  const [timezoneEnabled, setTimezoneEnabled] = useState(() => copyStore.getTimezoneEnabled());
+  const [timezoneId, setTimezoneId] = useState(() => (copyStore.getTimezone ? copyStore.getTimezone() : "APP_DEFAULT"));
   const [includeGroup, setIncludeGroup] = useState(() => copyStore.getIncludeGroup());
   const [includeTeacher, setIncludeTeacher] = useState(() => copyStore.getIncludeTeacher());
   const [teacherName, setTeacherName] = useState(() => copyStore.getTeacherName());
   const [dateFormat, setDateFormat] = useState(() => copyStore.getDateFormat());
-  const [copied, setCopied] = useState(false);
 
-  // Read app-level date format
-  const appDateFormat = calendarSettings.getDateFormat ? calendarSettings.getDateFormat() : "DD/MM/YYYY";
+  const [appTimezone, setAppTimezone] = useState(() => (calendarSettings.getTimezone ? calendarSettings.getTimezone() : getSystemTimezone()));
+  const [appDateFormat, setAppDateFormat] = useState(() => (calendarSettings.getDateFormat ? calendarSettings.getDateFormat() : "DD/MM/YYYY"));
+
+  const timezoneList = getEnrichedTimezoneList();
+
+  useEffect(() => {
+    const handleCalendarUpdate = (e: any) => {
+      if (e?.detail?.timezone) {
+        setAppTimezone(e.detail.timezone);
+      } else if (calendarSettings.getTimezone) {
+        setAppTimezone(calendarSettings.getTimezone());
+      }
+      if (e?.detail?.dateFormat) {
+        setAppDateFormat(e.detail.dateFormat);
+      } else if (calendarSettings.getDateFormat) {
+        setAppDateFormat(calendarSettings.getDateFormat());
+      }
+    };
+
+    window.addEventListener("spr_calendar_settings_updated", handleCalendarUpdate);
+    window.addEventListener("spr_date_time_updated", handleCalendarUpdate);
+    return () => {
+      window.removeEventListener("spr_calendar_settings_updated", handleCalendarUpdate);
+      window.removeEventListener("spr_date_time_updated", handleCalendarUpdate);
+    };
+  }, []);
+
+  const appTimezoneEntry = timezoneList.find((t) => t.id === appTimezone);
+  const appTzLabel = appTimezoneEntry ? `${appTimezoneEntry.name} (${appTimezoneEntry.offset})` : appTimezone;
+
+  const timezoneOptions = [
+    { label: `App's Default (${appTzLabel})`, value: "APP_DEFAULT" },
+    ...timezoneList.map((tz) => ({
+      label: `${tz.name} (${tz.offset}) — ${tz.city}${tz.isSystem ? " (Local System)" : ""}`,
+      value: tz.id,
+    })),
+  ];
+
   const appDateFormatEntry = DATE_FORMAT_LIST.find((f) => f.id === appDateFormat);
   const appDateLabel = appDateFormatEntry
     ? `${appDateFormatEntry.name} (${appDateFormatEntry.sample})`
     : appDateFormat;
 
   const dateFormatOptions = [
-    { label: `App's Default — ${appDateLabel}`, value: "APP_DEFAULT" },
+    { label: `App's Default (${appDateLabel})`, value: "APP_DEFAULT" },
     ...DATE_FORMAT_LIST.map((fmt) => ({
       label: `${fmt.name} (${fmt.sample})`,
       value: fmt.id,
     })),
   ];
 
-  const resolvedDateFormat = dateFormat === "APP_DEFAULT" ? appDateFormat : dateFormat;
-  const resolvedEntry = DATE_FORMAT_LIST.find((f) => f.id === resolvedDateFormat);
+  const resolvedTimezone = timezoneId === "APP_DEFAULT" ? appTimezone : timezoneId;
+  const resolvedTzEntry = timezoneList.find((t) => t.id === resolvedTimezone);
 
-  const handleDateFormatChange = (val) => {
-    const selectedVal = typeof val === "object" ? val.value : val;
-    if (selectedVal) {
-      if (selectedVal === "APP_DEFAULT") {
-        setDateFormat("APP_DEFAULT");
-        copyStore.saveDateFormat("APP_DEFAULT");
-        window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { dateFormat: "APP_DEFAULT" } }));
-        return;
-      }
-      const matched = DATE_FORMAT_LIST.find((f) => f.id === selectedVal || `${f.name} (${f.sample})` === selectedVal);
-      const targetId = matched ? matched.id : selectedVal;
+  const handleTimezoneChange = (val: any) => {
+    const targetId = typeof val === "object" ? val.value : val;
+    if (targetId) {
+      setTimezoneId(targetId);
+      copyStore.saveTimezone(targetId);
+      window.dispatchEvent(new CustomEvent("spr_classroom_settings_updated", { detail: { timezone: targetId, timezoneEnabled: true } }));
+    }
+  };
+
+  const handleDateFormatChange = (val: any) => {
+    const targetId = typeof val === "object" ? val.value : val;
+    if (targetId) {
       setDateFormat(targetId);
       copyStore.saveDateFormat(targetId);
       window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { dateFormat: targetId } }));
     }
   };
 
-  const handleTeacherNameChange = (e) => {
+  const handleTeacherNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setTeacherName(val);
     copyStore.saveTeacherName(val);
     window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { teacherName: val } }));
+  };
+
+  const toggleTimezone = () => {
+    const val = !timezoneEnabled;
+    setTimezoneEnabled(val);
+    copyStore.saveTimezoneEnabled(val);
+    window.dispatchEvent(new CustomEvent("spr_classroom_settings_updated", { detail: { timezoneEnabled: val, timezone: timezoneId } }));
+    showToast(val ? "Classroom date timezone enabled" : "Classroom date timezone disabled", "info");
   };
 
   const toggleGroup = () => {
@@ -82,58 +134,25 @@ export default function ReportSettingsView() {
     window.dispatchEvent(new CustomEvent("spr_copy_settings_updated", { detail: { includeTeacher: val } }));
   };
 
-  // Generate real modal text dynamically based on actual settings
-  const sampleReportText = useMemo(() => {
-    return generateReportText({
-      studentName: "Muhammad Abdullah",
-      groupName: "Ml Saqib's Group",
-      selectedSession: "Sabaq",
-      selectedDate: new Date().toISOString(),
-      juzPageData: [
-        { juz: "1", ranges: [{ start: "15", end: "20" }] },
-        { juz: "2", ranges: [{ start: "25", end: "28" }] },
-      ],
-      mistakeData: [
-        { juz: "1", page: "15", ayahs: [{ value: "3" }] },
-        { juz: "1", page: "18", ayahs: [{ value: "7" }] },
-      ],
-      stuckData: [
-        { juz: "2", page: "25", ayahs: [{ value: "12" }] },
-      ],
-      comment: "MashaAllah! Excellent recitation and memorization progress. Consistent revision is recommended.",
-      includeGroup,
-      includeTeacher,
-    });
-  }, [includeGroup, includeTeacher, teacherName, dateFormat, appDateFormat]);
-
-  const handleCopyPreview = () => {
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(sampleReportText);
-      setCopied(true);
-      showToast("Report text copied to clipboard!", "success");
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
   return (
     <div className="w-full space-y-4 animate-fade-in text-left">
       {/* ─── Header Card (Exact match to CompactTaxonomyManager header) ─── */}
       <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
         <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
           <div className="p-2.5 rounded-xl theme-bg-accent-soft theme-accent shrink-0 mt-0.5 sm:mt-0">
-            <CopyIcon className="w-5 h-5" />
+            <SettingsIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
-                Report Settings
+                Classroom Configuration
               </h2>
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
                 Configuration
               </span>
             </div>
             <p className="text-xs theme-text-secondary mt-1 max-w-2xl leading-relaxed">
-              Configure default report card copy formats, teacher attribution tags, student group mentions, and date format standards.
+              Configure classroom date timezone indicators, default report copy formats, evaluator teacher attribution tags, student group mentions, and date standards.
             </p>
           </div>
         </div>
@@ -149,7 +168,61 @@ export default function ReportSettingsView() {
 
       {/* ─── 1. Main Setting Items (Full Width Stack) ─── */}
       <div className="space-y-3">
-        {/* 1. Student Group Tag Setting */}
+        {/* 1. Classroom Date Timezone Setting */}
+        <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold theme-text-primary flex items-center gap-2">
+                <ClockIcon className="w-4 h-4 theme-accent" />
+                <span>Classroom Date Timezone Indicator</span>
+              </div>
+              <p className="text-[11px] theme-text-secondary">
+                Display classroom timezone badge (e.g. {resolvedTzEntry ? resolvedTzEntry.offset : "UTC+06:00"}) on Date pickers across Daily Classroom
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={timezoneEnabled}
+              onClick={toggleTimezone}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                timezoneEnabled ? "theme-bg-accent" : "theme-bg-elevated border theme-border"
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full theme-bg-surface shadow-xs transition-transform absolute top-1 ${
+                  timezoneEnabled ? "right-1" : "left-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Timezone Picker Dropdown (shown only when timezoneEnabled is true) */}
+          {timezoneEnabled && (
+            <div className="pt-3 border-t theme-border animate-fade-in flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold theme-text-primary flex items-center gap-2">
+                  <GlobeIcon className="w-4 h-4 theme-accent" />
+                  <span>Classroom Specific Timezone</span>
+                </div>
+                <p className="text-[11px] theme-text-secondary">
+                  Choose specific timezone for classroom modules or inherit from App's Default ({appTzLabel})
+                </p>
+              </div>
+              <div className="w-full sm:w-80 shrink-0">
+                <CustomSelect
+                  options={timezoneOptions}
+                  value={timezoneId}
+                  onChange={handleTimezoneChange}
+                  searchable={true}
+                  placeholder="Select classroom timezone..."
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Student Group Tag Setting */}
         <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <div className="text-xs font-bold theme-text-primary flex items-center gap-2">
@@ -177,7 +250,7 @@ export default function ReportSettingsView() {
           </button>
         </div>
 
-        {/* 2. Teacher Attribution Setting */}
+        {/* 3. Teacher Attribution Setting */}
         <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
@@ -227,7 +300,7 @@ export default function ReportSettingsView() {
           )}
         </div>
 
-        {/* 3. Report Date Standard Setting */}
+        {/* 4. Report Date Standard Setting */}
         <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
             <div className="text-xs font-bold theme-text-primary flex items-center gap-2">
@@ -238,62 +311,15 @@ export default function ReportSettingsView() {
               Standard date representation used in clipboard copies, text exports, and modals
             </p>
           </div>
-          <div className="w-full sm:w-64 shrink-0">
-            <AutocompleteDropdown
-              readOnly={true}
-              disableSaveButton={true}
-              showAllOptionsOnFocus={true}
-              onNextFocus={() => {}}
+          <div className="w-full sm:w-80 shrink-0">
+            <CustomSelect
               options={dateFormatOptions}
-              value={
-                dateFormat === "APP_DEFAULT"
-                  ? `App's Default — ${appDateLabel}`
-                  : resolvedEntry
-                  ? `${resolvedEntry.name} (${resolvedEntry.sample})`
-                  : dateFormat
-              }
+              value={dateFormat}
               onChange={handleDateFormatChange}
+              searchable={true}
               placeholder="Select date format..."
             />
           </div>
-        </div>
-      </div>
-
-      {/* ─── 2. Live Modal Text Output Preview (Full height without internal scroll) ─── */}
-      <div className="p-4 sm:p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 flex flex-col">
-        <div className="flex items-center justify-between pb-2 border-b theme-border">
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="w-4 h-4 theme-accent" />
-            <h4 className="text-sm font-bold theme-text-primary">Modal Preview</h4>
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyPreview}
-            className="px-2.5 py-1 rounded-lg theme-bg-sub border theme-border hover:theme-bg-elevated text-[11px] font-semibold theme-text-primary flex items-center gap-1.5 transition cursor-pointer"
-            title="Copy sample text"
-          >
-            {copied ? (
-              <>
-                <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
-                <span className="theme-accent">Copied!</span>
-              </>
-            ) : (
-              <>
-                <CopyIcon className="w-3.5 h-3.5 theme-text-secondary" />
-                <span>Copy Text</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Exact Modal Monospace Text Preview (Fully expanded height) */}
-        <pre className="w-full p-4 rounded-xl theme-bg-sub border theme-border theme-text-primary text-xs font-mono whitespace-pre-wrap select-all leading-relaxed shadow-inner">
-          {sampleReportText}
-        </pre>
-
-        <div className="pt-2 border-t theme-border text-[11px] theme-text-secondary flex items-start gap-1.5">
-          <CheckIcon className="w-3.5 h-3.5 theme-accent shrink-0 mt-0.5" />
-          <span>Real-time preview of text output generated and copied by the Report Modal.</span>
         </div>
       </div>
     </div>

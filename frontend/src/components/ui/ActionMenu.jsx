@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { DotsVerticalIcon, ChevronIcon } from './Icons';
 
@@ -51,6 +51,13 @@ export default function ActionMenu({
       setIsOpen(false);
     }
   };
+
+  // Synchronously measure and place menu before browser paint
+  useLayoutEffect(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  }, [isOpen, updatePosition]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -164,7 +171,7 @@ export default function ActionMenu({
         )}
       </button>
 
-      {isOpen &&
+      {isOpen && coords.top > 0 && typeof document !== 'undefined' &&
         createPortal(
           <div
             ref={menuPortalRef}

@@ -9,6 +9,14 @@ export interface SystemEnvironmentPanelProps {
   onClearCache?: () => void;
 }
 
+export const systemEnvironmentSectionConfig = {
+  id: "system",
+  group: "System & Runtime",
+  title: "System & Environment",
+  description: "Platform version, environment diagnostics, and local cache manager",
+  icon: SparklesIcon,
+};
+
 /**
  * System Environment, Health Diagnostics, and Cache Management Panel
  */

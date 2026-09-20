@@ -25,4 +25,6 @@ export { default as MetricsGrid } from './MetricsGrid';
 export { default as AutocompleteDropdown } from './AutocompleteDropdown';
 export { default as RadioCard } from './RadioCard';
 export type { RadioCardProps } from './RadioCard';
+export { default as CollapsiblePageHeader } from './CollapsiblePageHeader';
+export type { CollapsiblePageHeaderProps, TabItem } from './CollapsiblePageHeader';
 export * from './Icons';

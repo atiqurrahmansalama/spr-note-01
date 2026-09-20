@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SleekCheckIcon, SearchIcon, AlertCircleIcon } from './Icons';
 import CustomInput from './CustomInput';
@@ -49,6 +49,14 @@ export default function CustomSelect({
   const updatePosition = () => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+
+    // Auto-close if trigger is scrolled out of viewport or under top header
+    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
+      setIsOpen(false);
+      return;
+    }
+
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const minRequiredSpace = compactMode ? 100 : 200;
@@ -63,7 +71,7 @@ export default function CustomSelect({
     }
 
     const availableHeight = shouldOpenUpward
-      ? Math.max(120, spaceAbove - 16)
+      ? Math.max(120, spaceAbove - 60)
       : Math.max(120, spaceBelow - 16);
     const calculatedMaxHeight = Math.min(260, availableHeight);
 
@@ -76,12 +84,29 @@ export default function CustomSelect({
     });
   };
 
-  useEffect(() => {
+  const handleToggle = (e) => {
+    if (e) e.stopPropagation();
+    if (disabled) return;
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  // Synchronously measure and place dropdown before browser paint
+  useLayoutEffect(() => {
     if (isOpen) {
       updatePosition();
+    }
+  }, [isOpen, direction, compactMode]);
+
+  useEffect(() => {
+    if (isOpen) {
       const handleScroll = (e) => {
         if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
-        updatePosition();
+        setIsOpen(false);
       };
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', updatePosition);
@@ -175,7 +200,7 @@ export default function CustomSelect({
   }[size] || 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl';
 
   const dropdownMenu =
-    isOpen && typeof document !== 'undefined'
+    isOpen && coords.width > 0 && typeof document !== 'undefined'
       ? createPortal(
           <div
             ref={dropdownRef}
@@ -358,7 +383,7 @@ export default function CustomSelect({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          onClick={handleToggle}
           className={`w-full h-full theme-bg-sub rounded-lg border overflow-hidden relative flex items-center justify-center cursor-pointer shadow-xs transition-all hover:theme-bg-elevated focus:outline-none ${
             isOpen
               ? 'border-[var(--accent-main)]/60 ring-1 ring-[var(--accent-main)]/20 shadow-xs'
@@ -385,7 +410,7 @@ export default function CustomSelect({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          onClick={handleToggle}
           className={`w-full ${sizeClasses} border transition-all duration-150 flex items-center justify-between font-medium cursor-pointer ${
             disabled
               ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'

@@ -419,7 +419,7 @@ export default function TemplateActionToolbar({
       )}
 
       {/* Saved Templates Dropdown Popover (Rendered in Portal outside table/overflow boundaries) */}
-      {isOpen && typeof document !== "undefined" && createPortal(
+      {isOpen && coords.top > 0 && typeof document !== "undefined" && createPortal(
         <div
           ref={popoverRef}
           style={{

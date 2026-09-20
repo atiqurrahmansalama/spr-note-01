@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { TimerIcon, SleekCheckIcon, ChevronIcon } from './Icons';
 
@@ -126,6 +126,14 @@ export default function CustomTimePicker({
   const updatePosition = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+
+    // Auto-close if trigger is scrolled out of viewport or under top header
+    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
+      setIsOpen(false);
+      return;
+    }
+
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const popoverHeight = 220;
@@ -153,12 +161,29 @@ export default function CustomTimePicker({
     });
   }, [direction]);
 
-  useEffect(() => {
+  const handleToggle = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (disabled || readOnly) return;
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  // Synchronously measure and position popover before browser paint
+  useLayoutEffect(() => {
     if (isOpen) {
       updatePosition();
+    }
+  }, [isOpen, updatePosition]);
+
+  useEffect(() => {
+    if (isOpen) {
       const handleScroll = (e: Event) => {
         if (popoverRef.current && popoverRef.current.contains(e.target as Node)) return;
-        updatePosition();
+        setIsOpen(false);
       };
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', updatePosition);
@@ -236,7 +261,7 @@ export default function CustomTimePicker({
       : 'px-3.5 py-2.5 min-h-[40px] text-xs font-medium';
 
   const popoverMenu =
-    isOpen && typeof document !== 'undefined'
+    isOpen && coords.top > 0 && typeof document !== 'undefined'
       ? createPortal(
           <div
             ref={popoverRef}
@@ -376,12 +401,12 @@ export default function CustomTimePicker({
         </div>
       )}
 
-      {/* Trigger Button */}
+      {/* Input Trigger Button */}
       <button
         id={id}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && !readOnly && setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         className={`w-full ${sizeClasses} rounded-xl border transition-all duration-150 flex items-center justify-between font-mono ${
           disabled
             ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'

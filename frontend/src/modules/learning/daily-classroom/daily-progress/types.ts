@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import type { PageRange } from "../../../components/ui/PageRangeInput";
+import type { PageRange } from "../../../../components/ui/PageRangeInput";
 
 export interface DetailAyahItem {
   id: string;
@@ -74,10 +74,16 @@ export interface DailyProgressFilterProps {
   onSectionChange?: (val: string) => void;
   sectionSelectOptions?: Array<{ label: string; value: string }>;
   hasSectionsForClass?: boolean;
+  onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
+  setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
 }
 
 export interface DailyProgressViewProps {
   timeZone?: string;
   dateFormat?: string;
   filterProps?: DailyProgressFilterProps | null;
+  isEmbedded?: boolean;
+  maxWidth?: "full" | "7xl" | "6xl" | "5xl" | "4xl" | "3xl";
+  className?: string;
 }
+

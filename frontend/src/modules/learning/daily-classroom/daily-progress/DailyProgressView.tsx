@@ -7,28 +7,34 @@ import {
   DetailSection,
 } from "./components";
 import { ReportModal } from "./modals";
-import SkeletonLoader from "../../../components/common/SkeletonLoader";
+import SkeletonLoader from "../../../../components/common/SkeletonLoader";
+import { PageContainer } from "../../../../components/layout";
 import { useReportForm } from "./hooks";
-import { useToast } from "../../../context/ToastContext";
-import { useFont } from "../../../context/useFont";
-import { useUndoRedo } from "../../../context/useUndoRedo";
-import { ClockIcon, CloseIcon, EditIcon } from "../../../components/ui/Icons";
-import { useFeatureControl } from "../../../context/FeatureControlContext";
-import CustomSelect from "../../../components/ui/CustomSelect";
-import ReusableCalendar from "../../../components/common/ReusableCalendar";
-import { TIMEZONE_LIST } from "../../../constants/calendarConstants";
-import { useAcademicData } from "../useAcademicData";
+import { useToast } from "../../../../context/ToastContext";
+import { useFont } from "../../../../context/useFont";
+import { useUndoRedo } from "../../../../context/useUndoRedo";
+import { ClockIcon, CloseIcon, EditIcon } from "../../../../components/ui/Icons";
+import { useFeatureControl } from "../../../../context/FeatureControlContext";
+import DailyClassroomFilterControls from "../DailyClassroomFilterControls";
+import { useAcademicData } from "../../useAcademicData";
 import {
   doesStudentMatchDepartment,
   doesStudentMatchClass,
   doesStudentMatchSection,
-} from "../daily-classroom/dailyClassroomUtils";
+  getDepartmentId,
+  getClassId,
+  getSectionId,
+} from "../dailyClassroomUtils";
+import { sortStudentsByUsage, recordStudentUsage } from "../../../../utils/studentUsageTracker";
 import { DailyProgressViewProps, SectionVisibilityConfig } from "./types";
 
 export default function DailyProgressView({
   timeZone,
   dateFormat,
   filterProps = null,
+  isEmbedded = false,
+  maxWidth = "7xl",
+  className = "",
 }: DailyProgressViewProps) {
   const { showToast } = useToast();
   const { activeFont, activeFontSize } = useFont();
@@ -102,7 +108,7 @@ export default function DailyProgressView({
 
   const selectedDepartmentId =
     filterProps?.selectedDepartmentId !== undefined ? filterProps.selectedDepartmentId : localDeptId;
-  const onDepartmentChange =
+  const rawOnDepartmentChange =
     filterProps?.onDepartmentChange ||
     ((val: string) => {
       setLocalDeptId(val);
@@ -120,7 +126,7 @@ export default function DailyProgressView({
 
   const selectedClassId =
     filterProps?.selectedClassId !== undefined ? filterProps.selectedClassId : localClassId;
-  const onClassChange =
+  const rawOnClassChange =
     filterProps?.onClassChange ||
     ((val: string) => {
       setLocalClassId(val);
@@ -138,17 +144,93 @@ export default function DailyProgressView({
   const selectedSectionId =
     filterProps?.selectedSectionId !== undefined ? filterProps.selectedSectionId : localSectionId;
   const rawOnSectionChange = filterProps?.onSectionChange || setLocalSectionId;
-  const onSectionChange = (val: string) => {
-    rawOnSectionChange(val);
-    if (val) {
-      const secObj = (sections || []).find((s: any) => String(s.id) === String(val));
+
+  // ── Unified Batch Hierarchy Updater ─────────────────────────────────────────
+  const updateHierarchy = (deptId: string, clsId: string, secId: string) => {
+    if (filterProps?.onBatchHierarchyChange) {
+      filterProps.onBatchHierarchyChange({
+        departmentId: deptId,
+        classId: clsId,
+        sectionId: secId,
+      });
+    } else if (filterProps?.setAcademicFilters) {
+      filterProps.setAcademicFilters({
+        departmentId: deptId,
+        classId: clsId,
+        sectionId: secId,
+      });
+    } else {
+      setLocalDeptId(deptId);
+      setLocalClassId(clsId);
+      setLocalSectionId(secId);
+    }
+  };
+
+  // ── Cascading Filter Handlers with Student Reset Validation ──────────────────
+  const handleDepartmentChange = (newDeptId: string) => {
+    rawOnDepartmentChange(newDeptId);
+    const safeStudent = (studentName || "").trim();
+    if (safeStudent) {
+      const currentStudent = (academicStudents || []).find(
+        (a: any) =>
+          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
+          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
+      );
+      if (newDeptId && currentStudent && !doesStudentMatchDepartment(currentStudent, newDeptId, departments, classes)) {
+        setStudentName("");
+        setGroupName("");
+      } else if (!currentStudent && newDeptId) {
+        setStudentName("");
+        setGroupName("");
+      }
+    }
+  };
+
+  const handleClassChange = (newClassId: string) => {
+    rawOnClassChange(newClassId);
+    const safeStudent = (studentName || "").trim();
+    if (safeStudent) {
+      const currentStudent = (academicStudents || []).find(
+        (a: any) =>
+          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
+          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
+      );
+      if (newClassId && currentStudent && !doesStudentMatchClass(currentStudent, newClassId, classes)) {
+        setStudentName("");
+        setGroupName("");
+      } else if (!currentStudent && newClassId) {
+        setStudentName("");
+        setGroupName("");
+      }
+    }
+  };
+
+  const handleSectionChange = (newSecId: string) => {
+    rawOnSectionChange(newSecId);
+    if (newSecId) {
+      const secObj = (sections || []).find((s: any) => String(s.id) === String(newSecId));
       if (secObj) {
         setGroupName(secObj.section_name || secObj.name || "");
       }
     } else {
       setGroupName("");
     }
+
+    const safeStudent = (studentName || "").trim();
+    if (safeStudent) {
+      const currentStudent = (academicStudents || []).find(
+        (a: any) =>
+          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
+          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
+      );
+      if (newSecId && currentStudent && !doesStudentMatchSection(currentStudent, newSecId, sections)) {
+        setStudentName("");
+      } else if (!currentStudent && newSecId) {
+        setStudentName("");
+      }
+    }
   };
+
   const sectionSelectOptions =
     filterProps?.sectionSelectOptions ||
     (sections || [])
@@ -162,15 +244,10 @@ export default function DailyProgressView({
       ? filterProps.hasSectionsForClass
       : (sections || []).filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes)).length > 0;
 
-  // Timezone calculation
-  const activeTimeZone = timeZone || "Asia/Dhaka";
-  const tzObj = TIMEZONE_LIST.find((t) => t.id === activeTimeZone);
-  const tzAbbr = tzObj ? tzObj.offset : "(UTC+06:00)";
-
-  // Filter student database based on Department, Class, Section
-  const filteredStudentDatabase = useMemo(() => {
-    const fullList = [...studentDatabase];
-    const existingNames = new Set(fullList.map((s) => (s.label || s.name || "").toLowerCase().trim()));
+  // Complete student roster sorted by usage frequency (highest used students first)
+  const allStudentDatabase = useMemo(() => {
+    const fullList: any[] = [];
+    const existingNames = new Set<string>();
 
     (academicStudents || []).forEach((st: any) => {
       const stName = (st.name_en || st.name || "").trim();
@@ -187,56 +264,54 @@ export default function DailyProgressView({
         fullList.push({
           id: String(st.id),
           label: stName,
+          name: stName,
+          name_en: st.name_en || stName,
           sub: secSub,
           section_name: secSub,
           student_class: st.student_class || st.class_id,
+          student_class_name: st.student_class_name,
           student_section: st.student_section || st.section_id || (typeof st.section === "object" ? st.section?.id : st.section),
           department: st.department || st.department_id,
+          department_name: st.department_name,
+          originalData: st,
         });
       }
     });
 
-    if (!selectedDepartmentId && !selectedClassId && !selectedSectionId) {
-      return fullList;
+    (studentDatabase || []).forEach((st: any) => {
+      const stName = (typeof st === "object" ? st.label || st.name_en || st.name : String(st || "")).trim();
+      if (stName && !existingNames.has(stName.toLowerCase())) {
+        existingNames.add(stName.toLowerCase());
+        const secSub =
+          typeof st === "object"
+            ? st.section_name || st.sub || st.group_name || ""
+            : "";
+
+        fullList.push({
+          id: typeof st === "object" && st.id ? String(st.id) : undefined,
+          label: stName,
+          name: stName,
+          name_en: stName,
+          sub: secSub,
+          section_name: secSub,
+          student_class: typeof st === "object" ? st.student_class || st.class_id : undefined,
+          student_section: typeof st === "object" ? st.student_section || st.section_id : undefined,
+          department: typeof st === "object" ? st.department || st.department_id : undefined,
+          originalData: st,
+        });
+      }
+    });
+
+    return sortStudentsByUsage(fullList);
+  }, [studentDatabase, academicStudents]);
+
+  // ── Student Selection with Mutual Auto-Population of Hierarchy ───────────────
+  const handleStudentSelect = (sel: any) => {
+    if (!sel) {
+      setStudentName("");
+      return;
     }
 
-    return fullList.filter((st) => {
-      const matchedProfile = (academicStudents || []).find(
-        (a: any) =>
-          String(a.id) === String(st.id) ||
-          (a.name_en || a.name || "").toLowerCase().trim() === (st.label || st.name || "").toLowerCase().trim()
-      );
-      const studentCandidate = matchedProfile || st;
-
-      if (selectedDepartmentId) {
-        if (!doesStudentMatchDepartment(studentCandidate, selectedDepartmentId, departments, classes)) {
-          return false;
-        }
-      }
-      if (selectedClassId) {
-        if (!doesStudentMatchClass(studentCandidate, selectedClassId, classes)) {
-          return false;
-        }
-      }
-      if (selectedSectionId) {
-        if (!doesStudentMatchSection(studentCandidate, selectedSectionId, sections)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [
-    studentDatabase,
-    academicStudents,
-    selectedDepartmentId,
-    selectedClassId,
-    selectedSectionId,
-    departments,
-    classes,
-    sections,
-  ]);
-
-  const handleStudentSelect = (sel: any) => {
     let chosenName = "";
     let chosenSub = "";
     let matchedStudent: any = null;
@@ -244,56 +319,126 @@ export default function DailyProgressView({
     if (typeof sel === "object" && sel !== null) {
       chosenName = typeof sel.label === "string" ? sel.label : typeof sel.name === "string" ? sel.name : "";
       chosenSub = typeof sel.sub === "string" ? sel.sub : typeof sel.group_name === "string" ? sel.group_name : "";
-      matchedStudent = sel;
+      matchedStudent = sel.originalData || sel;
     } else {
       chosenName = typeof sel === "string" ? sel : "";
     }
 
     setStudentName(chosenName);
 
+    if (!chosenName.trim()) {
+      return;
+    }
+
     const academicProfile = (academicStudents || []).find(
       (a: any) =>
-        (matchedStudent && String(a.id) === String(matchedStudent.id)) ||
+        (matchedStudent && matchedStudent.id && String(a.id) === String(matchedStudent.id)) ||
         (a.name_en || a.name || "").toLowerCase().trim() === chosenName.toLowerCase().trim()
     );
 
     const candidate = academicProfile || matchedStudent;
 
     if (candidate) {
-      const candDeptId = candidate.department || candidate.department_id;
-      if (candDeptId && !selectedDepartmentId) {
-        onDepartmentChange(String(candDeptId));
-      }
+      // Record student usage for frequency ranking
+      recordStudentUsage(candidate);
 
-      const candClassId = candidate.student_class || candidate.class_id;
-      if (candClassId && !selectedClassId) {
-        onClassChange(String(candClassId));
-      }
-
-      const candSecId = candidate.student_section || candidate.section_id;
-      if (candSecId) {
-        onSectionChange(String(candSecId));
-      } else if (chosenSub) {
+      // 1. Resolve Section ID & Section Object
+      let candSecId = getSectionId(candidate) || "";
+      if (!candSecId && chosenSub) {
         const matchedSec = (sections || []).find(
           (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
         );
-        if (matchedSec) {
-          onSectionChange(String(matchedSec.id));
-        } else {
-          setGroupName(String(chosenSub));
-        }
+        if (matchedSec) candSecId = String(matchedSec.id);
       }
+      const secObj = candSecId ? (sections || []).find((s: any) => String(s.id) === String(candSecId)) : null;
+
+      // 2. Resolve Class ID & Class Object
+      let candClassId = getClassId(candidate) || (secObj ? getClassId(secObj) : "");
+      if (!candClassId && candidate.student_class_name) {
+        const matchedCls = (classes || []).find(
+          (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === candidate.student_class_name.toLowerCase().trim()
+        );
+        if (matchedCls) candClassId = String(matchedCls.id);
+      }
+      const classObj = candClassId ? (classes || []).find((c: any) => String(c.id) === String(candClassId)) : null;
+
+      // 3. Resolve Department ID & Department Object
+      let candDeptId =
+        getDepartmentId(candidate) ||
+        (classObj ? getDepartmentId(classObj) : "") ||
+        (secObj ? getDepartmentId(secObj) : "");
+      if (!candDeptId && candidate.department_name) {
+        const matchedDept = (departments || []).find(
+          (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === candidate.department_name.toLowerCase().trim()
+        );
+        if (matchedDept) candDeptId = String(matchedDept.id);
+      }
+
+      // 4. Update section / group display name
+      const effectiveGroupName =
+        secObj?.section_name || secObj?.name || candidate.section_name || candidate.sub || chosenSub || "";
+      if (effectiveGroupName) {
+        setGroupName(effectiveGroupName);
+      }
+
+      // 5. Seamlessly sync the entire academic hierarchy selectors
+      const targetDept = candDeptId || selectedDepartmentId || "";
+      const targetClass = candClassId || selectedClassId || "";
+      const targetSec = candSecId || selectedSectionId || "";
+
+      updateHierarchy(targetDept, targetClass, targetSec);
     } else if (chosenSub) {
       const matchedSec = (sections || []).find(
         (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
       );
       if (matchedSec) {
-        onSectionChange(String(matchedSec.id));
+        const secClassId = getClassId(matchedSec);
+        const classObj = secClassId ? (classes || []).find((c: any) => String(c.id) === String(secClassId)) : null;
+        const deptId = classObj ? getDepartmentId(classObj) : "";
+        setGroupName(matchedSec.section_name || matchedSec.name || chosenSub);
+        updateHierarchy(deptId || selectedDepartmentId || "", secClassId || selectedClassId || "", String(matchedSec.id));
       } else {
-        setGroupName(String(chosenSub));
+        setGroupName(chosenSub);
       }
     }
   };
+
+  // ── Synchronization Guard for External Hierarchy Changes ───────────────────
+  useEffect(() => {
+    if (!studentName.trim()) return;
+
+    const currentStudent = (academicStudents || []).find(
+      (a: any) =>
+        (a.name_en || a.name || "").toLowerCase().trim() === studentName.toLowerCase().trim() ||
+        (a.label || "").toLowerCase().trim() === studentName.toLowerCase().trim()
+    );
+
+    if (currentStudent) {
+      if (selectedDepartmentId && !doesStudentMatchDepartment(currentStudent, selectedDepartmentId, departments, classes)) {
+        setStudentName("");
+        setGroupName("");
+        return;
+      }
+      if (selectedClassId && !doesStudentMatchClass(currentStudent, selectedClassId, classes)) {
+        setStudentName("");
+        setGroupName("");
+        return;
+      }
+      if (selectedSectionId && !doesStudentMatchSection(currentStudent, selectedSectionId, sections)) {
+        setStudentName("");
+        return;
+      }
+    }
+  }, [
+    selectedDepartmentId,
+    selectedClassId,
+    selectedSectionId,
+    studentName,
+    academicStudents,
+    departments,
+    classes,
+    sections,
+  ]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -351,11 +496,14 @@ export default function DailyProgressView({
   }, [isLoading, featureLoading]);
 
   const handleMakeReportClick = () => {
-    if (sectionConfig.studentSelect?.enabled && !studentName.trim()) {
+    const safeStudent = (studentName || "").trim();
+    const safeSession = (selectedSession || "").trim();
+
+    if (sectionConfig.studentSelect?.enabled && !safeStudent) {
       showToast("Please specify a student name first", "warning");
       return;
     }
-    if (sectionConfig.sessionSelect?.enabled && !selectedSession.trim()) {
+    if (sectionConfig.sessionSelect?.enabled && !safeSession) {
       showToast("Please select a session first", "warning");
       return;
     }
@@ -402,9 +550,20 @@ export default function DailyProgressView({
 
   const [draggedItem, setDraggedItem] = useState<{ listType: string; index: number } | null>(null);
 
-  const handleDragStart = (e: React.DragEvent, listType: string, index: number) => {
+  const handleDragStart = (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => {
     setDraggedItem({ listType, index });
-    e.dataTransfer.effectAllowed = "copyMove";
+    if ("dataTransfer" in e && e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "copyMove";
+      try {
+        e.dataTransfer.setData("text/plain", JSON.stringify({ listType, index }));
+      } catch {
+        // Ignore if dataTransfer is restricted
+      }
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -416,13 +575,13 @@ export default function DailyProgressView({
     }
   };
 
-  const handleDrop = (e: React.DragEvent, targetListType: string, targetIndex?: number) => {
-    e.preventDefault();
-    if (!draggedItem) return;
-
-    const { listType: sourceListType, index: sourceIndex } = draggedItem;
-    const isCopy = e.ctrlKey || e.altKey;
-
+  const handleReorderRows = (
+    sourceListType: string,
+    sourceIndex: number,
+    targetListType: string,
+    targetIndex?: number,
+    isCopy: boolean = false
+  ) => {
     let newMistake = [...mistakeData];
     let newStuck = [...stuckData];
 
@@ -436,7 +595,7 @@ export default function DailyProgressView({
       const itemCopy = {
         ...sourceItem,
         id: crypto.randomUUID(),
-        ayahs: sourceItem.ayahs.map((a) => ({ ...a, id: crypto.randomUUID() })),
+        ayahs: (sourceItem.ayahs || []).map((a) => ({ ...a, id: crypto.randomUUID() })),
       };
 
       if (targetIndex !== undefined && targetIndex >= 0) {
@@ -450,11 +609,13 @@ export default function DailyProgressView({
           targetIndex !== undefined &&
           targetIndex >= 0 &&
           sourceIndex >= 0 &&
-          sourceIndex < targetList.length &&
-          sourceIndex !== targetIndex
+          sourceIndex < targetList.length
         ) {
-          const [movedItem] = targetList.splice(sourceIndex, 1);
-          targetList.splice(targetIndex, 0, movedItem);
+          const adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+          if (adjustedTarget !== sourceIndex) {
+            const [movedItem] = targetList.splice(sourceIndex, 1);
+            targetList.splice(adjustedTarget, 0, movedItem);
+          }
         }
       } else {
         if (sourceIndex >= 0 && sourceIndex < sourceList.length) {
@@ -476,6 +637,15 @@ export default function DailyProgressView({
     setDraggedItem(null);
   };
 
+  const handleDrop = (e: React.DragEvent, targetListType: string, targetIndex?: number) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    const { listType: sourceListType, index: sourceIndex } = draggedItem;
+    const isCopy = e.ctrlKey || e.altKey;
+    handleReorderRows(sourceListType, sourceIndex, targetListType, targetIndex, isCopy);
+  };
+
   const availableJuzs = Array.from(
     new Set(
       juzPageData
@@ -489,10 +659,13 @@ export default function DailyProgressView({
   }
 
   return (
-    <div
-      style={{ fontFamily: activeFont.css, fontSize: activeFontSize.px }}
-      className="w-full max-w-xl mx-auto space-y-5 pb-12 theme-text-primary relative transition-all"
+    <PageContainer
+      isEmbedded={isEmbedded || Boolean(filterProps)}
+      maxWidth={maxWidth}
+      style={{ fontFamily: activeFont?.css, fontSize: activeFontSize?.px }}
+      className={`space-y-6 pb-12 transition-all ${className}`}
     >
+
       {/* 0a. Edit Mode Banner */}
       {isEditMode && (
         <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-md flex items-center justify-between gap-2.5 animate-fade-in select-none">
@@ -581,73 +754,31 @@ export default function DailyProgressView({
         </div>
       )}
 
-      {/* 1. Card 1: Student & Session Information with Academic Hierarchy & Date */}
-      {(sectionConfig.studentSelect?.enabled ||
-        sectionConfig.sessionSelect?.enabled ||
-        sectionConfig.headerDate?.enabled) && (
-        <div className="theme-bg-surface rounded-2xl p-4 sm:p-6 shadow-xl border theme-border space-y-5">
-          <div className="space-y-2">
-            <div
-              className={`grid grid-cols-1 ${
-                hasDepartments && hasSectionsForClass
-                  ? "@[480px]:grid-cols-2 @[800px]:grid-cols-4"
-                  : hasDepartments || hasSectionsForClass
-                  ? "@[480px]:grid-cols-2 @[720px]:grid-cols-3"
-                  : "@[480px]:grid-cols-2"
-              } gap-3`}
-            >
-              {/* 1. Date Picker */}
-              {sectionConfig.headerDate?.enabled !== false && (
-                <ReusableCalendar
-                  label="Date"
-                  headerAction={<span className="text-xs font-semibold theme-accent">{tzAbbr}</span>}
-                  dateFormat={dateFormat || "DD/MM/YYYY"}
-                  showHijri={false}
-                  selectedDate={selectedDate || new Date().toISOString().split("T")[0]}
-                  onSelectDate={(dateStr) => setSelectedDate(dateStr)}
-                  placeholder="Select Date"
-                  size="md"
-                />
-              )}
+      {/* 1. Classroom Filter Controls Box (Reused Enterprise Standard Background Box) */}
+      <DailyClassroomFilterControls
+        showCardWrapper={true}
+        showDate={sectionConfig.headerDate?.enabled !== false}
+        dateLabel="Date"
+        selectedDate={selectedDate || new Date().toISOString().split("T")[0]}
+        onDateChange={(dateStr: string) => setSelectedDate(dateStr)}
+        dateFormat={dateFormat || "DD/MM/YYYY"}
+        hasDepartments={hasDepartments}
+        selectedDepartmentId={selectedDepartmentId}
+        onDepartmentChange={handleDepartmentChange}
+        departmentSelectOptions={departmentSelectOptions}
+        selectedClassId={selectedClassId}
+        onClassChange={handleClassChange}
+        classSelectOptions={classSelectOptions}
+        hasSectionsForClass={hasSectionsForClass}
+        selectedSectionId={selectedSectionId}
+        onSectionChange={handleSectionChange}
+        sectionSelectOptions={sectionSelectOptions}
+        showPeriodSwitcher={false}
+      />
 
-              {/* 2. Department */}
-              {hasDepartments && (
-                <CustomSelect
-                  label="Department"
-                  placeholder="Select Department..."
-                  options={departmentSelectOptions}
-                  value={selectedDepartmentId}
-                  onChange={onDepartmentChange}
-                  size="md"
-                />
-              )}
-
-              {/* 3. Class */}
-              <CustomSelect
-                label="Class"
-                placeholder="Select Class..."
-                options={classSelectOptions}
-                value={selectedClassId}
-                onChange={onClassChange}
-                size="md"
-              />
-
-              {/* 4. Section */}
-              {hasSectionsForClass && (
-                <CustomSelect
-                  label="Section"
-                  placeholder="Select Section..."
-                  options={sectionSelectOptions}
-                  value={selectedSectionId}
-                  onChange={onSectionChange}
-                  size="md"
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="border-t theme-border border-opacity-40" />
-
+      {/* 2. Card: Student & Session Information */}
+      {(sectionConfig.studentSelect?.enabled || sectionConfig.sessionSelect?.enabled) && (
+        <div className="theme-bg-surface rounded-2xl p-4 sm:p-6 shadow-xl border theme-border space-y-4">
           <div
             className={`grid grid-cols-1 ${
               sectionConfig.studentSelect?.enabled && sectionConfig.sessionSelect?.enabled
@@ -657,7 +788,7 @@ export default function DailyProgressView({
           >
             {sectionConfig.studentSelect?.enabled && (
               <StudentInputSection
-                studentDatabase={filteredStudentDatabase}
+                studentDatabase={allStudentDatabase}
                 studentName={studentName}
                 departmentId={selectedDepartmentId}
                 classId={selectedClassId}
@@ -693,7 +824,7 @@ export default function DailyProgressView({
 
           {sectionConfig.juzPageInput?.enabled &&
             (sectionConfig.mistakeTracker?.enabled || sectionConfig.stuckTracker?.enabled) && (
-              <div className="border-t theme-border border-opacity-30 my-2" />
+              <div className="border-t theme-border border-opacity-30 my-4 sm:my-5" />
             )}
 
           {sectionConfig.mistakeTracker?.enabled && (
@@ -704,15 +835,18 @@ export default function DailyProgressView({
               onChange={setMistakeData}
               availableJuzs={availableJuzs}
               juzPageData={juzPageData}
+              draggedItem={draggedItem}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
               onReset={handleMistakeRefresh}
             />
           )}
 
           {sectionConfig.mistakeTracker?.enabled && sectionConfig.stuckTracker?.enabled && (
-            <div className="border-t theme-border border-opacity-30 my-2" />
+            <div className="border-t theme-border border-opacity-30 my-4 sm:my-5" />
           )}
 
           {sectionConfig.stuckTracker?.enabled && (
@@ -723,9 +857,12 @@ export default function DailyProgressView({
               onChange={setStuckData}
               availableJuzs={availableJuzs}
               juzPageData={juzPageData}
+              draggedItem={draggedItem}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
               onReset={handleStuckRefresh}
             />
           )}
@@ -762,6 +899,6 @@ export default function DailyProgressView({
           comment,
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

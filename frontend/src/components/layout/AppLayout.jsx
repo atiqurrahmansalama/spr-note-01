@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore, getBranchDisplayName } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
-import HifzReportForm from "../../modules/learning/daily-progress/DailyProgressView";
+import HifzReportForm from "../../modules/learning/daily-classroom/daily-progress/DailyProgressView";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
@@ -26,11 +26,24 @@ import { UndoIcon, RedoIcon } from "../ui/Icons";
 export const ROUTE_TITLE_MAP = {
   "/": { title: "Dashboard", category: "Navigation", isDashboard: true },
   "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
+  "/studies": { title: "Daily Classroom", category: "Academic Studies" },
+  "/studies/daily-classroom": { title: "Daily Classroom", category: "Academic Studies" },
+  "/studies/daily-lessons": { title: "Daily Lessons", category: "Academic Studies" },
+  "/studies/daily-progress": { title: "Daily Progress", category: "Academic Studies" },
+  "/studies/recitations": { title: "Daily Assessment", category: "Academic Studies" },
+  "/studies/homework": { title: "Daily Homework", category: "Academic Studies" },
+  "/daily-lessons": { title: "Daily Lessons", category: "Academic Studies" },
+  "/daily-progress": { title: "Daily Progress", category: "Academic Studies" },
+  "/recitations": { title: "Daily Assessment", category: "Academic Studies" },
+  "/homework-tasks": { title: "Daily Homework", category: "Academic Studies" },
   "/report-builder": { title: "Generate Report", category: "Academic Studies" },
   "/student-reports": { title: "Student Reports", category: "Academic Studies" },
-  "/copy-report": { title: "Report Settings", category: "Admin Tools" },
-  "/sessions-comments": { title: "Report Sessions", category: "Admin Tools" },
-  "/report-sessions": { title: "Report Sessions", category: "Admin Tools" },
+  "/classroom-config": { title: "Classroom Configuration", category: "Admin Tools" },
+  "/classroom-settings": { title: "Classroom Configuration", category: "Admin Tools" },
+  "/copy-report": { title: "Classroom Configuration", category: "Admin Tools" },
+  "/report-settings": { title: "Classroom Configuration", category: "Admin Tools" },
+  "/sessions-comments": { title: "Classroom Sessions", category: "Admin Tools" },
+  "/report-sessions": { title: "Classroom Sessions", category: "Admin Tools" },
 
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
   "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Student" },

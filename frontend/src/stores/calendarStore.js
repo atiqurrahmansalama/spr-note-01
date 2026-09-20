@@ -6,11 +6,12 @@
  */
 
 import { KEYS, readJSON, writeJSON, readString, writeString } from "./coreStore";
+import { getSystemTimezone } from "../constants/calendarConstants";
 
 // ─── Calendar / Date-Time Settings ──────────────────────────────────────────
 
 export const calendarSettings = {
-  getTimezone:    () => readString(KEYS.TIMEZONE, "Asia/Dhaka"),
+  getTimezone:    () => readString(KEYS.TIMEZONE, getSystemTimezone()),
   saveTimezone:   (v) => writeString(KEYS.TIMEZONE, v),
 
   getDateFormat:  () => readString(KEYS.DATE_FORMAT, "DD/MM/YYYY"),
@@ -57,7 +58,7 @@ export const DEFAULT_CALENDAR_EVENTS = [
     audience: "STAFF",
     startTime: "09:00",
     endTime: "12:30",
-    timezone: "GMT+06:00",
+    timezone: "UTC",
     repeats: true,
     repeatDays: [0, 1, 2, 3, 4], // Sun, Mon, Tue, Wed, Thu
     frequency: "WEEKLY",
@@ -74,7 +75,7 @@ export const DEFAULT_CALENDAR_EVENTS = [
     audience: "STAFF",
     startTime: "13:30",
     endTime: "17:00",
-    timezone: "GMT+06:00",
+    timezone: "UTC",
     repeats: true,
     repeatDays: [0, 1, 2, 3, 4],
     frequency: "WEEKLY",
@@ -91,7 +92,7 @@ export const DEFAULT_CALENDAR_EVENTS = [
     audience: "STAFF",
     startTime: "19:15",
     endTime: "20:00",
-    timezone: "GMT+06:00",
+    timezone: "UTC",
     repeats: true,
     repeatDays: [1, 2, 3], // Mon, Tue, Wed
     frequency: "WEEKLY",

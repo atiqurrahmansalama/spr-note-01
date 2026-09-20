@@ -12,6 +12,22 @@ export interface StaffTaxonomyProps {
   availableDocTitles?: Array<{ value: string; label: string }>;
 }
 
+export const staffRanksSectionConfig = {
+  id: "staff-ranks",
+  group: "Academic Structure",
+  title: "Staff Ranks & Designations",
+  description: "Institutional hierarchy, designations, and faculty rank priorities (Principal, Professor, Senior Faculty, etc.)",
+  icon: TeacherIcon,
+};
+
+export const staffRecruitmentRulesSectionConfig = {
+  id: "staff-recruitment-rules",
+  group: "Admissions & Recruitment",
+  title: "Staff Recruitment Rules",
+  description: "Configure mandatory verification and credential documents required for onboarding different staff categories (Teaching Faculty, Administrative Staff, Finance, Support)",
+  icon: ChecklistIcon,
+};
+
 /**
  * Staff Ranks & Designations Taxonomy Panel
  */

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useToast } from "../../../../context/ToastContext";
+import { useToast } from "../../../../../context/ToastContext";
 import { jsPDF } from "jspdf";
-import { generateReportText, formatDate } from "../../../../utils/reportGenerator";
-import { useFeatureControl } from "../../../../context/FeatureControlContext";
+import { generateReportText, formatDate } from "../../../../../utils/reportGenerator";
+import { useFeatureControl } from "../../../../../context/FeatureControlContext";
 import { DailyProgressData, DetailRowData } from "../types";
 
 export interface UseReportActionsProps {

@@ -1,5 +1,5 @@
 import React from "react";
-import { ShareIcon, DownloadIcon, ImageIcon, DocumentIcon } from "../../../../components/ui/Icons";
+import { ShareIcon, DownloadIcon, ImageIcon, DocumentIcon } from "../../../../../components/ui/Icons";
 
 export interface ShareDropdownProps {
   handleShareText: () => void;

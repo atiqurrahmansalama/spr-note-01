@@ -16,6 +16,30 @@ export interface CalendarTaxonomyProps {
   eventKinds?: any[];
 }
 
+export const workingSchedulesSectionConfig = {
+  id: "working-schedules",
+  group: "Calendar & Schedules",
+  title: "Working Hours & Shifts",
+  description: "Manage pre-configured operational shifts, duty hours, and faculty sessions",
+  icon: ClockIcon,
+};
+
+export const eventTypesSectionConfig = {
+  id: "event-types",
+  group: "Calendar & Schedules",
+  title: "Schedule & Event Types",
+  description: "Manage pre-configured schedule titles, exam types, and calendar events",
+  icon: CalendarIcon,
+};
+
+export const impactScopesSectionConfig = {
+  id: "impact-scopes",
+  group: "Calendar & Schedules",
+  title: "System Impact Scopes",
+  description: "Configure system modules affected by calendar events (Attendance, Notifications, etc.)",
+  icon: ChecklistIcon,
+};
+
 /**
  * Working Hours & Operational Shifts Taxonomy Panel
  */

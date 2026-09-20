@@ -7,6 +7,14 @@ import { TrashIcon, RefreshIcon, CheckCircleIcon, AlertTriangleIcon } from "../.
  * Enterprise Trash & Restoration View
  * Inspect soft-deleted reports and records with instant one-click restoration.
  */
+export const trashRestorationSectionConfig = {
+  id: "trash",
+  group: "System & Runtime",
+  title: "Trash & Restoration",
+  description: "Inspect soft-deleted records and restore them back to system history",
+  icon: TrashIcon,
+};
+
 export default function TrashRestorationView() {
   const { showToast } = useToast();
 

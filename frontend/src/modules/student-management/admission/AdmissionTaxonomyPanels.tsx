@@ -15,6 +15,22 @@ export interface AdmissionTaxonomyProps {
   availableDocTitles?: Array<{ value: string; label: string }>;
 }
 
+export const documentTypesSectionConfig = {
+  id: "document-types",
+  group: "Admissions & Recruitment",
+  title: "Document Titles",
+  description: "Manage pre-configured document titles, sanads, certificates, and identity credentials for staff and students",
+  icon: SessionsIcon,
+};
+
+export const admissionDocRequirementsSectionConfig = {
+  id: "admission-doc-requirements",
+  group: "Admissions & Recruitment",
+  title: "Admission Requirements",
+  description: "Configure mandatory admission document requirements by class level (e.g. Play-5th, Hifz, 6th-10th, Dawra-e Hadith)",
+  icon: ChecklistIcon,
+};
+
 /**
  * Pre-configured Document Titles, Sanads, and Credentials Taxonomy Panel
  */

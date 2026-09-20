@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchWithAuth } from "../../../../utils/authService";
-import { useToast } from "../../../../context/ToastContext";
+import { fetchWithAuth } from "../../../../../utils/authService";
+import { useToast } from "../../../../../context/ToastContext";
 import {
   students as studentStore,
   sessions as sessionStore,
@@ -11,9 +11,10 @@ import {
   mergeComments,
   draftReport,
   saveStatusStore,
-} from "../../../../utils/localStore";
-import { saveReportLocally, syncSessionsAndComments } from "../../../../utils/syncEngine";
-import { createReport } from "../../../../api/reports";
+} from "../../../../../utils/localStore";
+import { saveReportLocally, syncSessionsAndComments } from "../../../../../utils/syncEngine";
+import { createReport } from "../../../../../api/reports";
+import { recordStudentUsage } from "../../../../../utils/studentUsageTracker";
 import { DetailRowData, JuzRowData, DailyProgressDraft, DailyProgressData } from "../types";
 
 export function useReportForm() {
@@ -693,6 +694,9 @@ export function useReportForm() {
         (s) => (s.label || s.name || "").trim().toLowerCase() === studentName.trim().toLowerCase()
       );
       const studentId = selectedStudent && !String(selectedStudent.id).startsWith("stu_") ? selectedStudent.id : null;
+
+      // Track student usage count
+      recordStudentUsage(selectedStudent || studentName.trim());
 
       const payload = {
         student: studentId || studentName.trim(),

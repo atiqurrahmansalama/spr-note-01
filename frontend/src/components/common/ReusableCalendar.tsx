@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronIcon,
@@ -191,6 +191,14 @@ export default function ReusableCalendar({
   const updatePosition = () => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+
+    // Auto-close if trigger is scrolled out of viewport or under top header
+    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
+      setIsOpen(false);
+      return;
+    }
+
     const popupWidth = 320;
     const popupHeight = 360;
     const spaceBelow = window.innerHeight - rect.bottom;
@@ -216,15 +224,34 @@ export default function ReusableCalendar({
     });
   };
 
-  useEffect(() => {
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  // Synchronously measure and place calendar before browser paint
+  useLayoutEffect(() => {
     if (isOpen && !isInline) {
       updatePosition();
-      const handleScrollOrResize = () => updatePosition();
-      window.addEventListener('scroll', handleScrollOrResize, true);
-      window.addEventListener('resize', handleScrollOrResize);
+    }
+  }, [isOpen, isInline, alignRight]);
+
+  useEffect(() => {
+    if (isOpen && !isInline) {
+      const handleScroll = (e: Event) => {
+        if (popupRef.current && popupRef.current.contains(e.target as Node)) return;
+        setIsOpen(false);
+      };
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', updatePosition);
       return () => {
-        window.removeEventListener('scroll', handleScrollOrResize, true);
-        window.removeEventListener('resize', handleScrollOrResize);
+        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener('resize', updatePosition);
       };
     }
   }, [isOpen, isInline, alignRight]);
@@ -666,7 +693,7 @@ export default function ReusableCalendar({
     <div ref={containerRef} className={`relative w-full ${className}`}>
       {!isInline && (
         <div
-          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          onClick={handleToggle}
           className="w-full cursor-pointer select-none"
         >
           <CustomInput
@@ -726,7 +753,7 @@ export default function ReusableCalendar({
 
       {isInline
         ? calendarDropdown
-        : isOpen && typeof document !== 'undefined'
+        : isOpen && coords.top > 0 && typeof document !== 'undefined'
         ? createPortal(calendarDropdown, document.body)
         : null}
     </div>

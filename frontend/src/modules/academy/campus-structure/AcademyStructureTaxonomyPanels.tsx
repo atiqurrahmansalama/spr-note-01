@@ -13,6 +13,14 @@ export interface AcademyStructureTaxonomyProps {
   activeTenantId?: string | null;
 }
 
+export const academyCategoriesSectionConfig = {
+  id: "categories",
+  group: "Academic Structure",
+  title: "Academy Categories",
+  description: "Manage institution types, curriculum categories, and taxonomies",
+  icon: BuildingOfficeIcon,
+};
+
 /**
  * Academy Categories and Branch Categories Taxonomy Panels
  */

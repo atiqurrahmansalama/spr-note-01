@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import CustomSelect from "../ui/CustomSelect";
-import { TIMEZONE_LIST } from "../../constants/calendarConstants";
+import { getEnrichedTimezoneList, getSystemTimezone, TIMEZONE_LIST } from "../../constants/calendarConstants";
 
 export default function TimezoneSelect({
   value,
@@ -12,20 +12,22 @@ export default function TimezoneSelect({
   error = "",
 }) {
   const options = useMemo(() => {
-    return TIMEZONE_LIST.map((tz) => ({
+    const list = getEnrichedTimezoneList();
+    return list.map((tz) => ({
       value: tz.id,
-      label: `(${tz.offset}) ${tz.name} - ${tz.city}`,
+      label: `(${tz.offset}) ${tz.name} - ${tz.city}${tz.isSystem ? " (Local System)" : ""}`,
     }));
   }, []);
 
   // Standardize value if passed as GMT offset or raw timezone ID
   const selectedValue = useMemo(() => {
-    if (!value) return "Asia/Dhaka";
-    const directMatch = TIMEZONE_LIST.find((tz) => tz.id === value);
+    const list = getEnrichedTimezoneList();
+    if (!value) return getSystemTimezone();
+    const directMatch = list.find((tz) => tz.id === value);
     if (directMatch) return directMatch.id;
 
     // Check if value is formatted like "GMT+06:00" or "UTC+06:00"
-    const offsetMatch = TIMEZONE_LIST.find(
+    const offsetMatch = list.find(
       (tz) => tz.offset.replace("UTC", "GMT") === value || tz.offset === value
     );
     if (offsetMatch) return offsetMatch.id;

@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import AutocompleteDropdown, { AutocompleteOption } from "../../../../components/ui/AutocompleteDropdown";
+import { Link } from "react-router-dom";
+import AutocompleteDropdown, { AutocompleteOption } from "../../../../../components/ui/AutocompleteDropdown";
 
 export interface SessionItem {
   name?: string;
@@ -16,13 +17,12 @@ export interface SessionInputSectionProps {
 
 /**
  * Enterprise Reusable Session Input Section with Project Design Standard,
- * inline autocomplete, and top-right header save action.
+ * inline autocomplete, and top-right header action with Add Session link.
  */
 export default function SessionInputSection({
   sessionList = [],
   selectedSession = "",
   onSessionChange,
-  onSaveSession,
 }: SessionInputSectionProps) {
   const sessionOptions: AutocompleteOption[] = useMemo(() => {
     return sessionList.map((s) => ({
@@ -31,46 +31,30 @@ export default function SessionInputSection({
     }));
   }, [sessionList]);
 
-  const trimmedSession = (selectedSession || "").trim();
-  const isExistingSession = useMemo(() => {
-    if (!trimmedSession) return false;
-    const lower = trimmedSession.toLowerCase();
-    return sessionList.some((s) => {
-      const name = (typeof s === "object" ? (s.name || s.label || "") : String(s)).toLowerCase();
-      return name === lower;
-    });
-  }, [trimmedSession, sessionList]);
-
-  const handleSelectOption = (option: AutocompleteOption) => {
-    if (onSessionChange) {
-      onSessionChange(option.value || option.label);
+  const handleSelectOption = (option: any) => {
+    if (!onSessionChange) return;
+    if (typeof option === "string") {
+      onSessionChange(option);
+    } else if (typeof option === "object" && option !== null) {
+      onSessionChange(option.value || option.label || "");
     }
   };
 
   const handleQueryChange = (val: string) => {
     if (onSessionChange) {
-      onSessionChange(val);
+      onSessionChange(val || "");
     }
   };
 
-  const handleSaveClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (trimmedSession && !isExistingSession && onSaveSession) {
-      onSaveSession(trimmedSession);
-    }
-  };
-
-  const headerAction = trimmedSession && !isExistingSession && onSaveSession ? (
-    <button
-      type="button"
-      onClick={handleSaveClick}
-      className="text-xs font-semibold theme-accent hover:underline cursor-pointer transition-colors"
-      title="Save new session"
+  const headerAction = (
+    <Link
+      to="/admin-tools?tab=report-sessions"
+      className="text-xs font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
+      title="Add or manage sessions"
     >
-      + Save
-    </button>
-  ) : undefined;
+      <span>+ Add Session</span>
+    </Link>
+  );
 
   return (
     <div className="w-full">

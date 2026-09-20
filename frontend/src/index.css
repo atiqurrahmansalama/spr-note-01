@@ -502,6 +502,51 @@ html[data-theme="amber"][data-mode="light"] {
   animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes dropdownSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dropdownSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes itemFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-dropdown-down {
+  animation: dropdownSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-dropdown-up {
+  animation: dropdownSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-item-slide {
+  animation: itemFadeSlide 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Universal Reusable Sidebar Content Density Optimizer (Left & Right Sidebars)
    Automatically removes wasteful horizontal gaps, double-nested paddings, and max-width clipping */
 .sidebar-screen-container {

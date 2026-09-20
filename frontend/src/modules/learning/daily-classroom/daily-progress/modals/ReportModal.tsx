@@ -3,9 +3,9 @@ import { useReportActions } from "./useReportActions";
 import { PdfReportPreview } from "./PdfReportPreview";
 import { ShareDropdown } from "./ShareDropdown";
 import { DiscardAlertModal } from "./DiscardAlertModal";
-import CustomCheckbox from "../../../../components/ui/CustomCheckbox";
-import { CloseIcon, EditIcon, CopyIcon, SleekCheckIcon, ShareIcon } from "../../../../components/ui/Icons";
-import { copyReportSettings as copyStore } from "../../../../utils/localStore";
+import CustomCheckbox from "../../../../../components/ui/CustomCheckbox";
+import { CloseIcon, EditIcon, CopyIcon, SleekCheckIcon, ShareIcon } from "../../../../../components/ui/Icons";
+import { copyReportSettings as copyStore } from "../../../../../utils/localStore";
 import { DailyProgressData } from "../types";
 
 export interface ReportModalProps {

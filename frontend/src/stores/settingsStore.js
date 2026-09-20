@@ -22,9 +22,15 @@ export const appearanceSettings = {
   saveFontSize: (v) => writeString(KEYS.FONT_SIZE, v),
 };
 
-// ─── Copy Report Settings ────────────────────────────────────────────────────
+// ─── Classroom & Report Settings ──────────────────────────────────────────────
 
-export const copyReportSettings = {
+export const classroomSettings = {
+  getTimezoneEnabled: () => readString("spr_classroom_timezone_enabled", "true") === "true",
+  saveTimezoneEnabled:(v) => writeString("spr_classroom_timezone_enabled", v.toString()),
+
+  getTimezone:        () => readString("spr_classroom_timezone", "APP_DEFAULT"),
+  saveTimezone:       (v) => writeString("spr_classroom_timezone", v),
+
   getIncludeGroup:   () => readString(KEYS.COPY_GROUP, "true") !== "false",
   saveIncludeGroup:  (v) => writeString(KEYS.COPY_GROUP, v.toString()),
 
@@ -40,6 +46,8 @@ export const copyReportSettings = {
   getDateFormat:     () => readString(KEYS.COPY_DATE_FORMAT, "DD/MM/YYYY"),
   saveDateFormat:    (v) => writeString(KEYS.COPY_DATE_FORMAT, v),
 };
+
+export const copyReportSettings = classroomSettings;
 
 // ─── Sidebar Display Mode Settings ─────────────────────────────────────────
 

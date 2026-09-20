@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertCircleIcon } from "../../../../components/ui/Icons";
+import { AlertCircleIcon } from "../../../../../components/ui/Icons";
 
 export interface DiscardAlertModalProps {
   showDiscardAlert: boolean;

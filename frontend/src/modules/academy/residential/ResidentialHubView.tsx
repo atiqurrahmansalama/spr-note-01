@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import PageHeader from '@/components/ui/PageHeader';
-import TabSwitcher from '@/components/ui/TabSwitcher';
+import { CollapsiblePageHeader } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
 import { PageContainer } from '@/components/layout';
 import DeleteImpactModal from '@/components/common/DeleteImpactModal';
@@ -229,22 +228,16 @@ export default function ResidentialHubView() {
 
   return (
     <PageContainer>
-      {/* ─── 1. Header Overview ────────────────────────────────────────────── */}
+      {/* ─── 1. Collapsible Header & Top Tab Switcher with Quick Add Action ─── */}
       <div className="print:hidden">
-        <PageHeader
+        <CollapsiblePageHeader
           icon={HomeIcon}
           title="Residential Quarters & Dormitory"
-          subtitle="Master console for managing campus buildings, dormitory rooms, bed capacity, student room allocations, and faculty quarters."
-        />
-      </div>
-
-      {/* ─── 2. Top Tab Switcher with Quick Add Action ─────────────────────── */}
-      <div className="print:hidden">
-        <TabSwitcher
+          storageKey="residential_hub_header"
           tabs={TABS}
           activeTab={activeTab}
           onChange={setActiveTab}
-          rightContent={
+          tabsRightContent={
             activeTab === 'ROOMS' ? (
               <CustomButton
                 type="button"

@@ -1,5 +1,5 @@
 import React from "react";
-import { CloseIcon, RefreshIcon } from "../../../../../components/ui/Icons";
+import { CloseIcon, RefreshIcon } from "../../../../../../components/ui/Icons";
 
 export interface RowRemoveButtonProps {
   onRemove?: () => void;
@@ -74,7 +74,7 @@ export function SectionHeaderBar({
   resetTitle = "Reset",
 }: SectionHeaderBarProps) {
   return (
-    <div className="flex items-center justify-between mb-2 select-none">
+    <div className="flex items-center justify-between min-h-[34px] sm:min-h-[38px] mb-2 sm:mb-2.5 select-none">
       <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary flex items-center gap-2">
         {title}
         {count > 0 && (
@@ -83,15 +83,17 @@ export function SectionHeaderBar({
           </span>
         )}
       </h3>
-      {showReset && onReset && (
+      {showReset && onReset ? (
         <button
           type="button"
           onClick={onReset}
-          className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm"
+          className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
           title={resetTitle}
         >
-          <RefreshIcon className="w-4 h-4 text-inherit transition-colors" />
+          <RefreshIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-inherit transition-colors" />
         </button>
+      ) : (
+        <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 pointer-events-none opacity-0" />
       )}
     </div>
   );

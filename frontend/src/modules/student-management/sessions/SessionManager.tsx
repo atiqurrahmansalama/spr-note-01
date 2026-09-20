@@ -16,6 +16,14 @@ export interface SessionItem {
   is_active?: boolean;
 }
 
+export const classroomSessionsSectionConfig = {
+  id: "report-sessions",
+  group: "Classroom Configuration",
+  title: "Classroom Sessions",
+  description: "Manage pre-configured classroom session topics and lesson progress categories (e.g. Sabaq, Saat Sabaq, Amukta, Hifz Revision, Nazira)",
+  icon: SessionsIcon,
+};
+
 // Helper to normalize session list
 function normalizeSessionList(rawList: any[]): SessionItem[] {
   if (!Array.isArray(rawList)) return [];

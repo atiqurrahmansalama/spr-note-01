@@ -24,8 +24,6 @@ export default function LessonDeliveryManagementView({
   filterProps = null,
   filteredLessons = [],
   lessonMetrics = [],
-  lessonSearch = '',
-  onSearchChange,
   getSlotLessonsCount,
   selectedClassObj,
   classes = [],
@@ -271,12 +269,7 @@ export default function LessonDeliveryManagementView({
         defaultViewMode="table"
         stackedSwitcher={true}
         metrics={lessonMetrics}
-        searchLabel="Search Lessons"
-        searchQuery={lessonSearch}
-        onSearchChange={onSearchChange}
-        searchPlaceholder="Search lesson title, kitab, teacher, topic..."
-        filterGridClassName="grid-cols-6 gap-2.5"
-        searchSpanClassName="col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"
+        filterGridClassName="grid-cols-1 @[480px]:grid-cols-2 @[800px]:grid-cols-4 gap-2.5"
         filters={
           <DailyClassroomFilterControls
             dateLabel="Delivery Date"

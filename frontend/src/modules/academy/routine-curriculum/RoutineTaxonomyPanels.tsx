@@ -12,6 +12,30 @@ export interface RoutineTaxonomyProps {
   activeTenantId?: string | null;
 }
 
+export const periodSequencesSectionConfig = {
+  id: "period-sequences",
+  group: "Academic Structure",
+  title: "Period Sequences & Numbers",
+  description: "Manage configurable daily timetable period sequences, ordinal names (1st Period, 2nd Period, etc.), and slot rank orders",
+  icon: TimerIcon,
+};
+
+export const periodCategoriesSectionConfig = {
+  id: "period-categories",
+  group: "Academic Structure",
+  title: "Period Categories",
+  description: "Manage pre-configured lecture slots, break intervals, prayer times, and study session types",
+  icon: ClockIcon,
+};
+
+export const academicSubjectsSectionConfig = {
+  id: "academic-subjects",
+  group: "Academic Structure",
+  title: "Curriculum Subjects",
+  description: "Manage textbook subjects, Islamic sciences (Fiqh, Hadith, Tafsir, Nahw), and academic disciplines across syllabus tracking",
+  icon: BookOpenIcon,
+};
+
 /**
  * Period Sequences & Number Ordering Taxonomy Panel
  */

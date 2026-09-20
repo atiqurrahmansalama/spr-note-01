@@ -22,8 +22,6 @@ export default function StudentAssessmentManagementView({
   filterProps = null,
   assessmentRows = [],
   assessmentMetrics = [],
-  assessmentSearch = '',
-  onSearchChange,
   getSlotAssessmentCount,
   onOpenAssessmentDrawer,
   tenantId,
@@ -214,12 +212,7 @@ export default function StudentAssessmentManagementView({
         defaultViewMode="table"
         stackedSwitcher={true}
         metrics={assessmentMetrics}
-        searchLabel="Search Students"
-        searchQuery={assessmentSearch}
-        onSearchChange={onSearchChange}
-        searchPlaceholder="Search student name, ID, roll number..."
-        filterGridClassName="grid-cols-6 gap-2.5"
-        searchSpanClassName="col-span-6 @[540px]:col-span-3 @[900px]:col-span-2"
+        filterGridClassName="grid-cols-1 @[480px]:grid-cols-2 @[800px]:grid-cols-4 gap-2.5"
         filters={
           <DailyClassroomFilterControls
             dateLabel="Evaluation Date"

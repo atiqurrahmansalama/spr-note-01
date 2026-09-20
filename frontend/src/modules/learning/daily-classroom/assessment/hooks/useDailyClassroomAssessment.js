@@ -17,24 +17,13 @@ export default function useDailyClassroomAssessment({
   activePeriodId,
   filteredLessons,
   baseFilteredLessons,
-  assessmentSearch,
 }) {
   // ── Assessment Rows (Student × Evaluation join) ─────────────────────────────
 
   const assessmentRows = useMemo(() => {
     const targetDate = String(selectedDate || "").split("T")[0];
 
-    return enrolledStudents
-      .filter((st) => {
-        const name = (st.name_en || st.name || "").toLowerCase();
-        const id = (st.uniq_id || st.roll_number || "").toLowerCase();
-        return (
-          assessmentSearch === "" ||
-          name.includes(assessmentSearch.toLowerCase()) ||
-          id.includes(assessmentSearch.toLowerCase())
-        );
-      })
-      .map((st) => {
+    return (enrolledStudents || []).map((st) => {
         const evalsForStudent = evaluations.filter((e) => {
           const eDate = String(e.evaluation_date || "").split("T")[0];
           return String(e.student) === String(st.id) && eDate === targetDate;
@@ -105,7 +94,7 @@ export default function useDailyClassroomAssessment({
           teacher_remarks: matchedEval?.teacher_remarks || "—",
         };
       });
-  }, [enrolledStudents, assessmentSearch, evaluations, selectedDate, activePeriodId, filteredLessons, baseFilteredLessons, lessons, classes]);
+  }, [enrolledStudents, evaluations, selectedDate, activePeriodId, filteredLessons, baseFilteredLessons, lessons, classes]);
 
   // ── Per-Slot Assessment Count ───────────────────────────────────────────────
 

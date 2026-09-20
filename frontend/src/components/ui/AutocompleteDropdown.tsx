@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronIcon, SleekCheckIcon } from './Icons';
 import { focusNextInput } from '../../utils/keyboardUtils';
@@ -96,6 +96,7 @@ export default function AutocompleteDropdown({
   const refToUse = (inputRef as React.RefObject<HTMLInputElement>) || localInputRef;
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const optionsListRef = useRef<HTMLDivElement>(null);
 
   const [coords, setCoords] = useState({
     top: 0,
@@ -110,17 +111,37 @@ export default function AutocompleteDropdown({
     setSearchTerm(typeof value === 'string' ? value : value?.label || value?.name || '');
   }
 
+  // Auto-scroll highlighted item into view during keyboard navigation (ArrowUp / ArrowDown)
+  useEffect(() => {
+    if (!isOpen || !optionsListRef.current) return;
+    const container = optionsListRef.current;
+    const items = container.querySelectorAll<HTMLElement>('[data-dropdown-item="true"]');
+    const highlightedEl = items[highlightedIndex];
+
+    if (highlightedEl) {
+      highlightedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [highlightedIndex, isOpen]);
+
   // Recalculate popup position accurately matching CustomSelect
   const updatePosition = () => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+
+    // Auto-close if trigger is scrolled out of viewport or under top header
+    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
+      setIsOpen(false);
+      return;
+    }
+
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const minRequiredSpace = 160;
 
     const shouldOpenUpward = spaceBelow < minRequiredSpace && spaceAbove > spaceBelow;
     const availableHeight = shouldOpenUpward
-      ? Math.max(120, spaceAbove - 16)
+      ? Math.max(120, spaceAbove - 60)
       : Math.max(120, spaceBelow - 16);
     const calculatedMaxHeight = Math.min(260, availableHeight);
 
@@ -133,12 +154,18 @@ export default function AutocompleteDropdown({
     });
   };
 
-  useEffect(() => {
+  // Synchronously measure and place dropdown before browser paint
+  useLayoutEffect(() => {
     if (isOpen) {
       updatePosition();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
       const handleScroll = (e: Event) => {
         if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
-        updatePosition();
+        setIsOpen(false);
       };
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', updatePosition);
@@ -213,11 +240,33 @@ export default function AutocompleteDropdown({
     triggerNextFocus();
   };
 
+  const handleOpen = () => {
+    if (disabled) return;
+    updatePosition();
+    setIsOpen(true);
+  };
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+      refToUse.current?.focus();
+    } else {
+      setIsOpen(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchTerm(val);
+    updatePosition();
     setIsOpen(true);
     setHighlightedIndex(0);
+    if (optionsListRef.current) {
+      optionsListRef.current.scrollTop = 0;
+    }
     if (onChange) onChange(val);
   };
 
@@ -287,7 +336,7 @@ export default function AutocompleteDropdown({
   }
 
   const dropdownMenu =
-    isOpen && typeof document !== 'undefined'
+    isOpen && coords.width > 0 && typeof document !== 'undefined'
       ? createPortal(
           <div
             ref={dropdownRef}
@@ -299,13 +348,16 @@ export default function AutocompleteDropdown({
               width: `${coords.width}px`,
               zIndex: 99999,
             }}
-            className="theme-bg-surface border theme-border shadow-2xl overflow-hidden animate-fade-in rounded-2xl p-1.5"
+            className={`theme-bg-surface border theme-border shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),0_6px_16px_rgba(0,0,0,0.15)] overflow-hidden rounded-2xl p-1.5 backdrop-blur-2xl transition-all duration-200 ease-out ${
+              coords.openUpward ? 'origin-bottom animate-dropdown-up' : 'origin-top animate-dropdown-down'
+            }`}
           >
             <div
+              ref={optionsListRef}
               style={{
                 maxHeight: `${Math.max(80, coords.maxHeight - 10)}px`,
               }}
-              className="p-1 space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar"
+              className="p-1 space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar scroll-smooth"
             >
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((item, index) => {
@@ -321,12 +373,13 @@ export default function AutocompleteDropdown({
                   return (
                     <button
                       key={index}
+                      data-dropdown-item="true"
                       type="button"
                       onClick={() => handleSelect(item)}
-                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer group/item ${
+                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-all duration-150 ease-out flex items-center justify-between cursor-pointer group/item active:scale-[0.985] ${
                         isSelected || isHighlighted
-                          ? 'theme-bg-accent theme-accent-text font-bold shadow-xs'
-                          : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
+                          ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs translate-x-1'
+                          : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary hover:translate-x-0.5'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
@@ -335,10 +388,10 @@ export default function AutocompleteDropdown({
                             <span className="truncate font-medium">{itemLabel}</span>
                             {itemBadge && (
                               <span
-                                className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border ${
+                                className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border transition-all duration-150 ${
                                   isSelected || isHighlighted
-                                    ? 'theme-bg-surface/80 border-[var(--accent-main)]/30 theme-accent font-semibold'
-                                    : 'theme-bg-sub theme-text-secondary border-current/10'
+                                    ? 'theme-bg-surface/85 border-[var(--accent-main)]/40 theme-accent font-semibold shadow-2xs'
+                                    : 'theme-bg-sub theme-text-secondary border-current/10 group-hover/item:border-[var(--accent-main)]/20'
                                 }`}
                               >
                                 {itemBadge}
@@ -347,8 +400,8 @@ export default function AutocompleteDropdown({
                           </div>
                           {itemSub && (
                             <div
-                              className={`text-[10px] truncate mt-0.5 ${
-                                isSelected || isHighlighted ? 'opacity-80' : 'theme-text-secondary'
+                              className={`text-[10px] truncate mt-0.5 transition-opacity duration-150 ${
+                                isSelected || isHighlighted ? 'opacity-90' : 'theme-text-secondary'
                               }`}
                             >
                               {itemSub}
@@ -356,7 +409,11 @@ export default function AutocompleteDropdown({
                           )}
                         </div>
                       </div>
-                      {isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1.5" />}
+                      {isSelected && (
+                        <span className="shrink-0 ml-1.5 transform transition-transform duration-200 scale-100">
+                          <SleekCheckIcon className="w-3.5 h-3.5" />
+                        </span>
+                      )}
                     </button>
                   );
                 })
@@ -364,7 +421,7 @@ export default function AutocompleteDropdown({
                 <button
                   type="button"
                   onClick={handleSaveClick}
-                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-all duration-150 flex items-center justify-between cursor-pointer active:scale-[0.985] animate-item-slide"
                 >
                   <span className="truncate">Add &ldquo;{safeSearchTerm.trim()}&rdquo;</span>
                   <span className="text-[10px] font-mono opacity-70">Shift + +</span>
@@ -454,9 +511,9 @@ export default function AutocompleteDropdown({
             disabled={disabled}
             value={safeSearchTerm}
             onChange={readOnly ? undefined : handleInputChange}
-            onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') setIsOpen(!isOpen); } : handleKeyDown}
-            onFocus={() => !disabled && setIsOpen(true)}
-            onClick={() => !disabled && setIsOpen(true)}
+            onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') handleToggle(e as any); } : handleKeyDown}
+            onFocus={handleOpen}
+            onClick={handleOpen}
             placeholder={placeholder}
             className={`w-full bg-transparent border-0 outline-none p-0 font-medium theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 text-xs sm:text-sm ${
               readOnly ? 'cursor-pointer select-none' : ''
@@ -465,13 +522,7 @@ export default function AutocompleteDropdown({
         </div>
 
         <div
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!disabled) {
-              setIsOpen((prev) => !prev);
-              if (!isOpen) refToUse.current?.focus();
-            }
-          }}
+          onClick={handleToggle}
           className="shrink-0 ml-1.5 p-0.5 theme-text-secondary hover:theme-text-primary cursor-pointer select-none flex items-center justify-center"
         >
           <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary transition-transform duration-200" />

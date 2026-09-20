@@ -25,7 +25,7 @@ export default function PageHeader({
 
   return (
     <div
-      className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-3 @md:pb-4 border-b theme-border w-full min-w-0 ${className}`}
+      className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-1.5 sm:pb-2.5 w-full min-w-0 ${className}`}
     >
       {/* Left: Icon & Title Metadata */}
       <div className="flex items-center gap-3 @sm:gap-3.5 min-w-0 flex-1">
@@ -43,11 +43,6 @@ export default function PageHeader({
               <span className="shrink-0">{badge}</span>
             )}
           </div>
-          {subtitle && (
-            <p className="text-[11px] @sm:text-xs theme-text-secondary mt-0.5 leading-relaxed line-clamp-2 @sm:line-clamp-none">
-              {subtitle}
-            </p>
-          )}
         </div>
       </div>
 

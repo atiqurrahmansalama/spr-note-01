@@ -16,6 +16,14 @@ import { examStore } from '@/stores/examStore';
 import useExamData from '../hooks/useExamData';
 import { GradingSystemPolicy, GradingTierRule } from './types';
 
+export const gradingPoliciesSectionConfig = {
+  id: "grading-policies",
+  group: "Academic Structure",
+  title: "Grading Policies & GPA Scales",
+  description: "Universal grading scale builder, GPA thresholds, letter marks, and division honors across Dars-e-Nizami, National 5.0 GPA, and University 4.0 scales",
+  icon: AcademicCapIcon,
+};
+
 /**
  * GradingRulesView
  * Universal Grading Policy Builder & Evaluation Rules Console.

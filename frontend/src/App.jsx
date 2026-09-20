@@ -20,7 +20,7 @@ const PublicOnlineAdmissionView = lazy(() => import("./modules/student-managemen
 const PublicStaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/PublicStaffOnboardingView"));
 
 // ─── Protected Student & Reports Views (Lazy Loaded with Auto-Retry) ──────────
-const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-progress/DailyProgressView"));
+const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-classroom/daily-progress/DailyProgressView"));
 const StudentReportsView = lazy(() => import("./modules/reports-history/components/StudentReportsView"));
 const StudentDirectoryView = lazy(() => import("./modules/student-management/directory/StudentDirectoryView"));
 const StudentAdmissionView = lazy(() => import("./modules/student-management/admission/StudentAdmissionView"));
@@ -71,9 +71,10 @@ const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestoration
 
 // ─── Protected Settings & Personalization Views (Lazy Loaded) ───────────────
 const ProfileSettingsView = lazy(() => import("./modules/settings/ProfileSettingsView"));
-const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
 const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/PersonalizeSettingsHubView"));
-const ReportSettingsView = lazy(() => import("./modules/settings/ReportSettingsView"));
+const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
+const ClassroomConfigurationView = lazy(() => import("./modules/learning/daily-classroom/ClassroomConfigurationView"));
+const ReportSettingsView = ClassroomConfigurationView;
 const DataBackupView = lazy(() => import("./modules/settings/components/DataBackupView"));
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));
 const AppGuideView = lazy(() => import("./modules/settings/components/AppGuideView"));
@@ -260,9 +261,10 @@ export default function App() {
                 <Route path="/personalize" element={<PersonalizeSettingsHubView />} />
                 <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
                 <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
-                <Route path="/language" element={<PersonalizeSettingsHubView />} />
-                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ReportSettingsView /></FeatureGuard>} />
-                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ReportSettingsView /></FeatureGuard>} />
+                <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
                 <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup" fallback={<Navigate to="/dashboard" replace />}><DataBackupView /></FeatureGuard>} />
                 <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts" fallback={<Navigate to="/dashboard" replace />}><ShortcutsGuide /></FeatureGuard>} />
                 <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide" fallback={<Navigate to="/dashboard" replace />}><AppGuideView /></FeatureGuard>} />

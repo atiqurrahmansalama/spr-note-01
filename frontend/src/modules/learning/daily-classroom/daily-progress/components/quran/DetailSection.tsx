@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import DetailRow from "./DetailRow";
 import { SectionHeaderBar, AddMoreSectionButton } from "./QuranRowUI";
 import { DetailRowData } from "../../types";
@@ -10,9 +10,12 @@ export interface DetailSectionProps {
   onChange: (updater: DetailRowData[] | ((prevData: DetailRowData[]) => DetailRowData[])) => void;
   availableJuzs?: (string | number)[];
   juzPageData?: any[];
-  onDragStart?: (e: React.DragEvent, listType: string, index: number) => void;
+  draggedItem?: { listType: string; index: number } | null;
+  onDragStart?: (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => void;
+  onDragEnd?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, listType: string, index?: number) => void;
+  onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number) => void;
   onReset?: () => void;
 }
 
@@ -23,11 +26,18 @@ export default function DetailSection({
   onChange,
   availableJuzs,
   juzPageData,
+  draggedItem,
   onDragStart,
+  onDragEnd,
   onDragOver,
   onDrop,
+  onReorderRows,
   onReset,
 }: DetailSectionProps) {
+  const [isSectionDragOver, setIsSectionDragOver] = useState(false);
+
+  const isOtherListDragging = Boolean(draggedItem && draggedItem.listType !== listType);
+
   const addRow = () => {
     const newId = crypto.randomUUID();
     onChange((prevData) => {
@@ -114,12 +124,37 @@ export default function DetailSection({
     return false;
   });
 
+  const handleSectionDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (onDragOver) onDragOver(e);
+    setIsSectionDragOver(true);
+  };
+
+  const handleSectionDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsSectionDragOver(false);
+    }
+  };
+
+  const handleSectionDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsSectionDragOver(false);
+    if (onDrop) {
+      onDrop(e, listType, data.length);
+    }
+  };
+
   return (
     <div
       data-list-type={listType}
-      className="relative"
-      onDragOver={onDragOver}
-      onDrop={(e) => onDrop && onDrop(e, listType)}
+      className={`relative transition-all duration-200 rounded-2xl p-1.5 -m-1.5 ${
+        isSectionDragOver && isOtherListDragging
+          ? "ring-2 ring-dashed ring-[var(--accent-main)]/60 bg-[var(--accent-main)]/5"
+          : ""
+      }`}
+      onDragOver={handleSectionDragOver}
+      onDragLeave={handleSectionDragLeave}
+      onDrop={handleSectionDrop}
     >
       {/* Reusable Section Header Bar */}
       <SectionHeaderBar
@@ -144,9 +179,12 @@ export default function DetailSection({
             onNextSection={handleNextSection}
             availableJuzs={availableJuzs}
             juzPageData={juzPageData}
+            draggedItem={draggedItem}
             onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             onDragOver={onDragOver}
             onDrop={onDrop}
+            onReorderRows={onReorderRows}
           />
         ))}
       </div>

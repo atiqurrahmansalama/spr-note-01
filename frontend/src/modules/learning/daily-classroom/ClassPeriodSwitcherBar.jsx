@@ -59,7 +59,7 @@ export default function ClassPeriodSwitcherBar({
   const totalSlotsCount = allPeriodFilterOptions.length;
 
   return (
-    <div className="col-span-6 pt-1">
+    <div className="col-span-full pt-1">
       <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
         <div className="flex items-center gap-1.5 text-xs font-bold theme-text-accent uppercase tracking-wider">
           <TimerIcon className="w-4 h-4 shrink-0" />

@@ -21,6 +21,7 @@ import {
   BookOpenIcon,
   CloseIcon,
   RefreshIcon,
+  ChecklistIcon,
 } from "../../../components/ui/Icons";
 import CustomSelect from "../../../components/ui/CustomSelect";
 
@@ -167,6 +168,14 @@ export const BranchSummaryGrid: React.FC<BranchSummaryGridProps> = ({
 export interface AdmissionSettingsPanelProps {
   activeTenantId?: string | null;
 }
+
+export const admissionSettingsSectionConfig = {
+  id: "admission-settings",
+  group: "Admissions & Recruitment",
+  title: "Admission Policies & Fields",
+  description: "Configure ongoing admission academic year, branch gender locking, and mother/emergency field visibility controls",
+  icon: ChecklistIcon,
+};
 
 /**
  * Admission Policies & Field Controls Configuration Panel

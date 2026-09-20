@@ -15,16 +15,7 @@ import {
   isLessonInSlot,
 } from "../dailyClassroomUtils";
 
-const DEFAULT_ROUTINE_PERIOD_SLOTS = [
-  { id: "slot_1", period_name: "1st Period", period_order: 1, order_rank: 1, start_time: "06:30", end_time: "07:30" },
-  { id: "slot_2", period_name: "2nd Period", period_order: 2, order_rank: 2, start_time: "07:30", end_time: "08:30" },
-  { id: "slot_3", period_name: "3rd Period", period_order: 3, order_rank: 3, start_time: "09:00", end_time: "10:00" },
-  { id: "slot_4", period_name: "4th Period", period_order: 4, order_rank: 4, start_time: "10:00", end_time: "11:00" },
-  { id: "slot_5", period_name: "5th Period", period_order: 5, order_rank: 5, start_time: "11:15", end_time: "12:15" },
-  { id: "slot_6", period_name: "6th Period", period_order: 6, order_rank: 6, start_time: "14:00", end_time: "15:00" },
-  { id: "slot_7", period_name: "7th Period", period_order: 7, order_rank: 7, start_time: "15:15", end_time: "16:15" },
-  { id: "slot_8", period_name: "8th Period", period_order: 8, order_rank: 8, start_time: "16:30", end_time: "17:30" },
-];
+
 
 /**
  * useDailyClassroomFilters
@@ -51,7 +42,6 @@ export default function useDailyClassroomFilters({
   selectedClassId,
   selectedSectionId,
   activePeriodId,
-  lessonSearch,
   setSelectedDepartmentId,
   setSelectedClassId,
   setSelectedSectionId,
@@ -138,56 +128,97 @@ export default function useDailyClassroomFilters({
     }));
   }, [filteredSectionsForClass]);
 
-  // ── Guaranteed 8-Period Routine Slots ──────────────────────────────────────
-
-  // ── Guaranteed 8-Period Routine Slots ──────────────────────────────────────
+  // ── Dynamic Routine Period Slots (100% Dynamic from Academic Store & Lessons) ──
 
   const filteredPeriodsForClass = useMemo(() => {
     const allCustomSlots = Array.isArray(periodSlots) ? periodSlots : [];
 
-    return DEFAULT_ROUTINE_PERIOD_SLOTS.map((defSlot) => {
-      const order = defSlot.period_order;
+    if (allCustomSlots.length === 0) {
+      // If no routine period slots configured yet, dynamically infer from active lessons
+      const lessonSlots = new Map();
+      (lessons || []).forEach((l) => {
+        const order = extractPeriodOrder(l);
+        if (order && !lessonSlots.has(order)) {
+          lessonSlots.set(order, {
+            id: l.period_slot || l.period_slot_id || `slot_${order}`,
+            period_name: l.period_name || getOrdinalPeriodLabel(order),
+            period_order: order,
+            order_rank: order,
+            start_time: l.start_time || "",
+            end_time: l.end_time || "",
+          });
+        }
+      });
+      if (lessonSlots.size > 0) {
+        return Array.from(lessonSlots.values()).sort(
+          (a, b) => (Number(a.period_order) || 0) - (Number(b.period_order) || 0)
+        );
+      }
 
-      // 1. Match class-specific slot
-      let matched = null;
+      // Default standard fallback period slots (1 to 7) when neither custom slots nor lessons exist yet
+      return [1, 2, 3, 4, 5, 6, 7].map((num) => ({
+        id: String(num),
+        period_name: getOrdinalPeriodLabel(num),
+        period_order: num,
+        order_rank: num,
+        start_time: "",
+        end_time: "",
+      }));
+    }
+
+    // Filter slots matching selected class or department
+    const scopedSlots = allCustomSlots.filter((p) => {
       if (effectiveClassId) {
-        matched = allCustomSlots.find(
-          (p) => extractPeriodOrder(p) === order && doesLessonMatchClass(p, effectiveClassId, classes)
-        );
+        return doesLessonMatchClass(p, effectiveClassId, classes);
       }
-
-      // 2. Match department-specific slot
-      if (!matched && selectedDepartmentId) {
-        matched = allCustomSlots.find(
-          (p) => extractPeriodOrder(p) === order && doesLessonMatchDepartment(p, selectedDepartmentId, departments, classes)
-        );
+      if (selectedDepartmentId) {
+        return doesLessonMatchDepartment(p, selectedDepartmentId, departments, classes);
       }
-
-      // 3. Match generic custom slot by order
-      if (!matched) {
-        matched = allCustomSlots.find((p) => extractPeriodOrder(p) === order);
-      }
-
-      if (matched) {
-        const isClassSpecific = effectiveClassId && doesLessonMatchClass(matched, effectiveClassId, classes);
-        return {
-          ...defSlot,
-          id: matched.id || defSlot.id,
-          period_name: matched.period_name || defSlot.period_name,
-          period_order: order,
-          order_rank: order,
-          start_time: matched.start_time ? String(matched.start_time).slice(0, 5) : defSlot.start_time,
-          end_time: matched.end_time ? String(matched.end_time).slice(0, 5) : defSlot.end_time,
-          curriculum_book_name: isClassSpecific ? matched.curriculum_book_name : null,
-          book_id: isClassSpecific ? matched.book_id : null,
-          teacher_name: isClassSpecific ? matched.teacher_name : null,
-          teacher_id: isClassSpecific ? matched.teacher_id : null,
-        };
-      }
-
-      return defSlot;
+      return true;
     });
-  }, [periodSlots, effectiveClassId, selectedDepartmentId, classes, departments]);
+
+    const targetSlots = scopedSlots.length > 0 ? scopedSlots : allCustomSlots;
+    if (targetSlots.length === 0) {
+      return [1, 2, 3, 4, 5, 6, 7].map((num) => ({
+        id: String(num),
+        period_name: getOrdinalPeriodLabel(num),
+        period_order: num,
+        order_rank: num,
+        start_time: "",
+        end_time: "",
+      }));
+    }
+
+    // Deduplicate and resolve clean slot objects
+    const slotMap = new Map();
+    targetSlots.forEach((slot) => {
+      const order = extractPeriodOrder(slot) || slot.order_rank || slot.period_order;
+      const key = order ? String(order) : String(slot.id);
+
+      const isClassSpecific = effectiveClassId && doesLessonMatchClass(slot, effectiveClassId, classes);
+      const existing = slotMap.get(key);
+
+      if (!existing || isClassSpecific) {
+        slotMap.set(key, {
+          ...slot,
+          id: slot.id,
+          period_name: slot.period_name || slot.name || (order ? getOrdinalPeriodLabel(order) : "Period Slot"),
+          period_order: order || 1,
+          order_rank: order || 1,
+          start_time: slot.start_time ? String(slot.start_time).slice(0, 5) : "",
+          end_time: slot.end_time ? String(slot.end_time).slice(0, 5) : "",
+          curriculum_book_name: isClassSpecific ? slot.curriculum_book_name : slot.curriculum_book_name || null,
+          book_id: isClassSpecific ? slot.book_id : slot.book_id || null,
+          teacher_name: isClassSpecific ? slot.teacher_name : slot.teacher_name || null,
+          teacher_id: isClassSpecific ? slot.teacher_id : slot.teacher_id || null,
+        });
+      }
+    });
+
+    return Array.from(slotMap.values()).sort(
+      (a, b) => (Number(a.period_order) || 0) - (Number(b.period_order) || 0)
+    );
+  }, [periodSlots, lessons, effectiveClassId, selectedDepartmentId, classes, departments]);
 
   // ── Cascade Validity Sync (No Forced Auto-Selects — Preserves "Select..." Placeholders) ──────
 
@@ -282,20 +313,9 @@ export default function useDailyClassroomFilters({
       if (selectedSectionId) {
         if (!doesLessonMatchSection(l, selectedSectionId, sections)) return false;
       }
-      if (lessonSearch && lessonSearch.trim()) {
-        const q = lessonSearch.toLowerCase().trim();
-        return (
-          (l.lesson_title || "").toLowerCase().includes(q) ||
-          (l.curriculum_book_name || "").toLowerCase().includes(q) ||
-          (l.teacher_name || "").toLowerCase().includes(q) ||
-          (l.lesson_instructions || "").toLowerCase().includes(q) ||
-          (l.homework_task || "").toLowerCase().includes(q) ||
-          (l.subject_name || "").toLowerCase().includes(q)
-        );
-      }
       return true;
     });
-  }, [lessons, selectedDate, selectedDepartmentId, effectiveClassId, selectedSectionId, lessonSearch, departments, classes, sections]);
+  }, [lessons, selectedDate, selectedDepartmentId, effectiveClassId, selectedSectionId, departments, classes, sections]);
 
   // ── Delivery Rows Computation (Routine Periods × Curriculum Books × Lessons Matrix) ────
 
@@ -424,21 +444,6 @@ export default function useDailyClassroomFilters({
       });
     }
 
-    if (lessonSearch && lessonSearch.trim()) {
-      const q = lessonSearch.toLowerCase().trim();
-      finalRows = finalRows.filter((r) => {
-        return (
-          (r.lesson_title || "").toLowerCase().includes(q) ||
-          (r.curriculum_book_name || "").toLowerCase().includes(q) ||
-          (r.subject_name || "").toLowerCase().includes(q) ||
-          (r.teacher_name || "").toLowerCase().includes(q) ||
-          (r.period_name || "").toLowerCase().includes(q) ||
-          (r.class_name || "").toLowerCase().includes(q) ||
-          (r.homework_task || "").toLowerCase().includes(q)
-        );
-      });
-    }
-
     return finalRows;
   }, [
     filteredPeriodsForClass,
@@ -454,7 +459,6 @@ export default function useDailyClassroomFilters({
     selectedSectionId,
     sectionSelectOptions,
     activePeriodId,
-    lessonSearch,
   ]);
 
   // ── Period Utility Callbacks ────────────────────────────────────────────────

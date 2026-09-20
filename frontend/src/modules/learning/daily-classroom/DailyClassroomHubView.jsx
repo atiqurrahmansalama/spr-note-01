@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import PageHeader from "../../../components/ui/PageHeader";
-import TabSwitcher from "../../../components/ui/TabSwitcher";
+import { CollapsiblePageHeader } from "../../../components/ui";
 import CustomButton from "../../../components/ui/CustomButton";
 import { PageContainer } from "../../../components/layout";
 import {
@@ -22,12 +21,12 @@ import {
 } from "./assessment";
 import useDailyClassroomData from "./hooks/useDailyClassroomData";
 import useDailyClassroomFilters from "./hooks/useDailyClassroomFilters";
-import HifzReportBuilderModule from "../daily-progress/DailyProgressView";
+import HifzReportBuilderModule from "./daily-progress/DailyProgressView";
 
 const TABS = [
   { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon },
   { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon },
-  { id: "ASSESSMENT", label: "Daily Student Assessment", icon: ChecklistIcon },
+  { id: "ASSESSMENT", label: "Daily Assessment", icon: ChecklistIcon },
 ];
 
 export default function DailyClassroomHubView({
@@ -46,10 +45,14 @@ export default function DailyClassroomHubView({
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
-    if (urlTab && urlTab !== activeTab) {
-      setActiveTab(urlTab);
+    if (urlTab) {
+      if (urlTab !== activeTab) {
+        setActiveTab(urlTab);
+      }
+    } else if (defaultTab && defaultTab !== activeTab) {
+      setActiveTab(defaultTab);
     }
-  }, [searchParams]);
+  }, [searchParams, defaultTab]);
   const { departments, classes, sections, students, periodSlots } = useAcademicData();
 
   // ── Filter State (No "ALL" Option Defaults) ──────────────────────────────────
@@ -60,8 +63,6 @@ export default function DailyClassroomHubView({
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [activePeriodId, setActivePeriodId] = useState("1");
-  const [lessonSearch, setLessonSearch] = useState("");
-  const [assessmentSearch, setAssessmentSearch] = useState("");
 
   // ── Custom Hooks ─────────────────────────────────────────────────────────────
 
@@ -96,7 +97,6 @@ export default function DailyClassroomHubView({
     selectedClassId,
     selectedSectionId,
     activePeriodId,
-    lessonSearch,
     setSelectedDepartmentId,
     setSelectedClassId,
     setSelectedSectionId,
@@ -115,7 +115,6 @@ export default function DailyClassroomHubView({
     activePeriodId,
     filteredLessons,
     baseFilteredLessons,
-    assessmentSearch,
   });
 
   // ── Lesson Metrics ────────────────────────────────────────────────────────────
@@ -396,6 +395,12 @@ export default function DailyClassroomHubView({
     setSelectedSectionId(val);
   };
 
+  const handleBatchHierarchyChange = ({ departmentId, classId, sectionId }) => {
+    if (departmentId !== undefined) setSelectedDepartmentId(departmentId);
+    if (classId !== undefined) setSelectedClassId(classId);
+    if (sectionId !== undefined) setSelectedSectionId(sectionId);
+  };
+
   const handleDateChange = (val) => {
     setSelectedDate(val);
   };
@@ -419,6 +424,8 @@ export default function DailyClassroomHubView({
     activePeriodId,
     onPeriodChange: setActivePeriodId,
     getPeriodSubtitle: getPeriodTimeForSlot,
+    onBatchHierarchyChange: handleBatchHierarchyChange,
+    setAcademicFilters: handleBatchHierarchyChange,
   }), [
     selectedDate,
     hasDepartments,
@@ -438,40 +445,40 @@ export default function DailyClassroomHubView({
 
   return (
     <PageContainer isEmbedded={isEmbedded} className="space-y-4">
-      {/* 1. Page Header */}
-      {!hideHeader && (
-        <PageHeader
-          title="Daily Classroom"
-          subtitle="Plan and monitor daily lesson assignments, homework dispatch, evaluation rubrics, and individual student diary assessments."
-          icon={BookOpenIcon}
-          actions={
-            activeTab === "LESSON" ? (
-              <CustomButton
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={handleOpenAddLesson}
-              >
-                Add Lesson
-              </CustomButton>
-            ) : activeTab === "ASSESSMENT" ? (
-              <CustomButton
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={() => handleOpenAssessmentDrawer("")}
-              >
-                Evaluate Student
-              </CustomButton>
-            ) : null
-          }
-        />
-      )}
-
-      {/* 2. Tab Switcher */}
-      <TabSwitcher tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
+      {/* 1. Collapsible Header & Tab Switcher */}
+      <CollapsiblePageHeader
+        hideHeader={hideHeader}
+        title="Daily Classroom"
+        icon={BookOpenIcon}
+        storageKey="daily_classroom_header"
+        tabs={TABS}
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        actionsPlacement="tabs"
+        actions={
+          activeTab === "LESSON" ? (
+            <CustomButton
+              type="button"
+              variant="primary"
+              size="sm"
+              icon={PlusIcon}
+              onClick={handleOpenAddLesson}
+            >
+              Add Lesson
+            </CustomButton>
+          ) : activeTab === "ASSESSMENT" ? (
+            <CustomButton
+              type="button"
+              variant="primary"
+              size="sm"
+              icon={PlusIcon}
+              onClick={() => handleOpenAssessmentDrawer("")}
+            >
+              Evaluate Student
+            </CustomButton>
+          ) : null
+        }
+      />
 
       {/* 3. Tab 1: Daily Lessons */}
       {activeTab === "LESSON" && (
@@ -479,8 +486,6 @@ export default function DailyClassroomHubView({
           filterProps={sharedFilterProps}
           filteredLessons={filteredLessons}
           lessonMetrics={lessonMetrics}
-          lessonSearch={lessonSearch}
-          onSearchChange={setLessonSearch}
           getSlotLessonsCount={getSlotLessonsCount}
           getBookNamesForPeriod={getBookNamesForPeriod}
           selectedClassObj={selectedClassObj}
@@ -496,7 +501,7 @@ export default function DailyClassroomHubView({
       {/* 4. Tab 2: Daily Progress */}
       {activeTab === "PROGRESS" && (
         <div className="w-full pt-1">
-          <HifzReportBuilderModule filterProps={sharedFilterProps} />
+          <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
         </div>
       )}
 
@@ -506,8 +511,6 @@ export default function DailyClassroomHubView({
           filterProps={sharedFilterProps}
           assessmentRows={assessmentRows}
           assessmentMetrics={assessmentMetrics}
-          assessmentSearch={assessmentSearch}
-          onSearchChange={setAssessmentSearch}
           getSlotAssessmentCount={getSlotAssessmentCount}
           onOpenAssessmentDrawer={handleOpenAssessmentDrawer}
           tenantId={tenantId}
