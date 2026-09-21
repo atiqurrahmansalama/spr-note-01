@@ -113,6 +113,26 @@ export default function StudentInputSection({
     }
   };
 
+  const getActionUrl = (searchTerm: string) => {
+    const effectiveName = (searchTerm || studentName || "").trim();
+    const params = new URLSearchParams();
+    params.set("tab", "quick");
+    if (effectiveName) {
+      params.set("name", effectiveName);
+    }
+    if (departmentId) {
+      params.set("dept", String(departmentId));
+    }
+    if (classId) {
+      params.set("class", String(classId));
+    }
+    if (sectionId) {
+      params.set("section", String(sectionId));
+    }
+    params.set("returnTo", "/daily-progress");
+    return `/admission?${params.toString()}`;
+  };
+
   return (
     <div className="w-full">
       <AutocompleteDropdown
@@ -123,7 +143,7 @@ export default function StudentInputSection({
         placeholder="Enter student name..."
         label="STUDENT"
         actionLabel="+ Add Student"
-        actionTo="/admission?tab=quick"
+        actionTo={getActionUrl}
         actionTitle="Add new student (Quick Admission)"
         size="md"
       />

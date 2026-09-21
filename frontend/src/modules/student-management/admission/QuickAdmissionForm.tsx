@@ -89,15 +89,21 @@ export default function QuickAdmissionForm({
     if (sharedData) {
       setFormData((prev) => ({
         ...prev,
-        name: sharedData.name != null && sharedData.name !== "" ? sharedData.name : prev.name,
-        department: sharedData.department != null && sharedData.department !== "" ? String(sharedData.department) : prev.department,
-        student_class: sharedData.student_class != null && sharedData.student_class !== "" ? String(sharedData.student_class) : prev.student_class,
-        student_section: sharedData.student_section != null && sharedData.student_section !== "" ? String(sharedData.student_section) : prev.student_section,
+        name: sharedData.name != null && sharedData.name !== "" ? sharedData.name : (paramName || prev.name),
+        department: sharedData.department != null && sharedData.department !== "" ? String(sharedData.department) : (paramDept || prev.department),
+        student_class: sharedData.student_class != null && sharedData.student_class !== "" ? String(sharedData.student_class) : (paramClass || prev.student_class),
+        student_section: sharedData.student_section != null && sharedData.student_section !== "" ? String(sharedData.student_section) : (paramSection || prev.student_section),
         admission_date: sharedData.admission_date || prev.admission_date,
         guardian_phone: sharedData.guardian_phone || sharedData.father_phone || prev.guardian_phone,
       }));
-    } else if (paramName && !formData.name) {
-      setFormData((prev) => ({ ...prev, name: paramName }));
+    } else if (paramName || paramDept || paramClass || paramSection) {
+      setFormData((prev) => ({
+        ...prev,
+        name: paramName || prev.name,
+        department: paramDept || prev.department,
+        student_class: paramClass || prev.student_class,
+        student_section: paramSection || prev.student_section,
+      }));
     }
   }, [
     sharedData?.name,
@@ -108,6 +114,9 @@ export default function QuickAdmissionForm({
     sharedData?.guardian_phone,
     sharedData?.father_phone,
     paramName,
+    paramDept,
+    paramClass,
+    paramSection,
   ]);
 
   // Handle outside click for date picker popover

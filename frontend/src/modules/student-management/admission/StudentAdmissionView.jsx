@@ -116,7 +116,7 @@ export default function StudentAdmissionView() {
 
   // Shared Direct Form Data
   const [sharedData, setSharedData] = useState({
-    name: '',
+    name: searchParams.get('name') || '',
     bangla_name: '',
     student_id_card_number: '',
     gender: 'MALE',
@@ -124,9 +124,9 @@ export default function StudentAdmissionView() {
     blood_group: '',
     birth_certificate_no: '',
     session_year: ongoingYear?.name || '',
-    department: '',
-    student_class: '',
-    student_section: '',
+    department: searchParams.get('dept') || searchParams.get('department') || '',
+    student_class: searchParams.get('class') || searchParams.get('student_class') || '',
+    student_section: searchParams.get('section') || searchParams.get('student_section') || '',
     education_status: '',
     roll_number: '',
     admission_date: new Date().toISOString().split('T')[0],
@@ -248,6 +248,25 @@ export default function StudentAdmissionView() {
       isMounted = false;
     };
   }, [editId]);
+
+  // Sync sharedData from search parameters if not in edit mode
+  useEffect(() => {
+    if (!editId) {
+      const qName = searchParams.get('name');
+      const qDept = searchParams.get('dept') || searchParams.get('department');
+      const qClass = searchParams.get('class') || searchParams.get('student_class');
+      const qSection = searchParams.get('section') || searchParams.get('student_section');
+      if (qName || qDept || qClass || qSection) {
+        setSharedData((prev) => ({
+          ...prev,
+          name: qName != null && qName !== '' ? qName : prev.name,
+          department: qDept != null && qDept !== '' ? qDept : prev.department,
+          student_class: qClass != null && qClass !== '' ? qClass : prev.student_class,
+          student_section: qSection != null && qSection !== '' ? qSection : prev.student_section,
+        }));
+      }
+    }
+  }, [searchParams, editId]);
 
   useEffect(() => {
     if (activeTab === 'online_qr') {
@@ -378,7 +397,16 @@ export default function StudentAdmissionView() {
   };
 
   const handleClose = (studentToHighlight) => {
+    const returnTo = searchParams.get('returnTo');
     const targetStudent = studentToHighlight || admittedStudent || editingStudent;
+    if (returnTo) {
+      const delimiter = returnTo.includes('?') ? '&' : '?';
+      const redirectUrl = targetStudent?.name
+        ? `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(targetStudent.name)}&selectedStudentId=${encodeURIComponent(targetStudent.id || '')}`
+        : returnTo;
+      navigate(redirectUrl, { replace: true });
+      return;
+    }
     if (targetStudent?.id) {
       navigate(`/groups-students?highlight=${targetStudent.id}`);
     } else {
@@ -478,7 +506,14 @@ export default function StudentAdmissionView() {
             </div>
           ) : (
             <QuickAdmissionForm
-              onCancel={handleClose}
+              onCancel={() => {
+                const returnTo = searchParams.get('returnTo');
+                if (returnTo) {
+                  navigate(returnTo, { replace: true });
+                } else {
+                  handleClose();
+                }
+              }}
               onSuccess={(stu) => {
                 setAdmittedStudent(stu);
               }}

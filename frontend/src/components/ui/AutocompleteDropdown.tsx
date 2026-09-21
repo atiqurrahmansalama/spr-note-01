@@ -35,7 +35,7 @@ export interface AutocompleteDropdownProps {
   headerAction?: React.ReactNode;
   onActionClick?: () => void;
   actionLabel?: string | null;
-  actionTo?: string | null;
+  actionTo?: string | ((searchTerm: string) => string) | null;
   actionTitle?: string | null;
   manageLabel?: string | null;
   className?: string;
@@ -113,6 +113,7 @@ export default function AutocompleteDropdown({
   });
 
   const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : (searchTerm as any)?.label || '';
+  const resolvedActionTo = typeof actionTo === 'function' ? actionTo(safeSearchTerm) : actionTo;
 
   const filteredOptions = useMemo(() => {
     return (options || []).filter((item) => {
@@ -254,9 +255,9 @@ export default function AutocompleteDropdown({
           <div className="flex items-center gap-2">
             {headerAction ? (
               headerAction
-            ) : actionTo ? (
+            ) : resolvedActionTo ? (
               <Link
-                to={actionTo}
+                to={resolvedActionTo}
                 className="text-xs font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
                 title={actionTitle || (typeof actionLabel === 'string' ? actionLabel : undefined)}
               >
