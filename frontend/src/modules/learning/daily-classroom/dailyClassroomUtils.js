@@ -1,4 +1,11 @@
 import { getOrdinalPeriodLabel } from '../../../utils/localStore.js';
+import {
+  getClassroomTodayDate,
+  getTodayInTimezone,
+  getClassroomEffectiveTimezone,
+} from '../../../constants/calendarConstants.js';
+
+export { getClassroomTodayDate, getTodayInTimezone, getClassroomEffectiveTimezone };
 
 /**
  * Helper to resolve period slot by ID, Order number, or Name from periodSlots list.
@@ -708,9 +715,13 @@ export function filterCurriculumBooks(curriculumBooks = [], classId, classes = [
  */
 export function getYesterdayDate(baseDate) {
   try {
-    const d = baseDate ? new Date(baseDate) : new Date();
+    const base = baseDate || getClassroomTodayDate();
+    const d = new Date(base + 'T12:00:00');
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${day}`;
   } catch {
     return '';
   }
@@ -721,9 +732,13 @@ export function getYesterdayDate(baseDate) {
  */
 export function getTomorrowDate(baseDate) {
   try {
-    const d = baseDate ? new Date(baseDate) : new Date();
+    const base = baseDate || getClassroomTodayDate();
+    const d = new Date(base + 'T12:00:00');
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${day}`;
   } catch {
     return '';
   }

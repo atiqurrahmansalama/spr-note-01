@@ -12,15 +12,21 @@ import {
   draftReport,
   saveStatusStore,
 } from "../../../../../utils/localStore";
-import { saveReportLocally, syncSessionsAndComments } from "../../../../../utils/syncEngine";
+import {
+  saveReportLocally,
+  syncSessionsAndComments,
+  scheduleGracePeriodSync,
+  clearGracePeriodTimer,
+} from "../../../../../utils/syncEngine";
 import { createReport } from "../../../../../api/reports";
 import { recordStudentUsage } from "../../../../../utils/studentUsageTracker";
+import { getClassroomTodayDate } from "../../../../../constants/calendarConstants";
 import { DetailRowData, JuzRowData, DailyProgressDraft, DailyProgressData } from "../types";
 
 export function useReportForm() {
   const { showToast } = useToast();
 
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getClassroomTodayDate());
   const [studentName, setStudentName] = useState<string>("");
   const [groupName, setGroupName] = useState<string>("");
   const [selectedSession, setSelectedSession] = useState<string>("");
@@ -53,6 +59,8 @@ export function useReportForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [editingReport, setEditingReport] = useState<any | null>(null);
+
   const historyStackRef = useRef<string[]>([]);
   const redoStackRef = useRef<string[]>([]);
   const isRestoringRef = useRef(false);
@@ -63,12 +71,16 @@ export function useReportForm() {
       studentName,
       groupName,
       selectedSession,
+      selectedDate,
       juzPageData,
       mistakeData,
       stuckData,
       comment,
+      savedReportId: editingReport?.id,
+      savedReportKey: editingReport?.report_unique_id,
+      isGracePeriod: editingReport?.isGracePeriod,
     });
-  }, [studentName, groupName, selectedSession, juzPageData, mistakeData, stuckData, comment]);
+  }, [studentName, groupName, selectedSession, selectedDate, juzPageData, mistakeData, stuckData, comment, editingReport]);
 
   useEffect(() => {
     if (isRestoringRef.current) {
@@ -105,11 +117,28 @@ export function useReportForm() {
         setStudentName(data.studentName || "");
         setGroupName(data.groupName || "");
         setSelectedSession(data.selectedSession || "");
+        if (data.selectedDate) setSelectedDate(data.selectedDate);
         if (data.juzPageData) setJuzPageData(data.juzPageData);
         if (data.mistakeData) setMistakeData(data.mistakeData);
         if (data.stuckData) setStuckData(data.stuckData);
         setComment(data.comment || "");
-        showToast("Undo: Restored previous draft state", "info");
+
+        // If snapshot captured an active or just-saved report, restore in editing mode with the same key
+        if (data.savedReportId || data.savedReportKey) {
+          if (data.savedReportId) {
+            clearGracePeriodTimer(data.savedReportId);
+          }
+          setEditingReport({
+            id: data.savedReportId,
+            report_unique_id: data.savedReportKey,
+            student_name: data.studentName,
+            isGracePeriod: data.isGracePeriod ?? true,
+          });
+          showToast(`Restored report #${data.savedReportKey || ""}. You can edit and confirm changes.`, "info");
+        } else {
+          setEditingReport(null);
+          showToast("Undo: Restored previous draft state", "info");
+        }
       } catch (err) {
         console.error("Undo restore failed", err);
       }
@@ -133,10 +162,25 @@ export function useReportForm() {
       setStudentName(data.studentName || "");
       setGroupName(data.groupName || "");
       setSelectedSession(data.selectedSession || "");
+      if (data.selectedDate) setSelectedDate(data.selectedDate);
       if (data.juzPageData) setJuzPageData(data.juzPageData);
       if (data.mistakeData) setMistakeData(data.mistakeData);
       if (data.stuckData) setStuckData(data.stuckData);
       setComment(data.comment || "");
+
+      if (data.savedReportId || data.savedReportKey) {
+        if (data.savedReportId) {
+          clearGracePeriodTimer(data.savedReportId);
+        }
+        setEditingReport({
+          id: data.savedReportId,
+          report_unique_id: data.savedReportKey,
+          student_name: data.studentName,
+          isGracePeriod: data.isGracePeriod ?? true,
+        });
+      } else {
+        setEditingReport(null);
+      }
       showToast("Redo: Restored next draft state", "info");
     } catch (err) {
       console.error("Redo restore failed", err);
@@ -152,8 +196,6 @@ export function useReportForm() {
     const params = new URLSearchParams(window.location.search);
     return params.get("recover_draft_id") || "active_report_draft";
   });
-
-  const [editingReport, setEditingReport] = useState<any | null>(null);
 
   const applyReportToForm = useCallback((rep: any) => {
     if (!rep) return;
@@ -539,12 +581,24 @@ export function useReportForm() {
       }
     };
 
+    const handleTimezoneSettingsUpdate = () => {
+      if (isMounted && !editingReport) {
+        setSelectedDate(getClassroomTodayDate());
+      }
+    };
+
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    window.addEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
+    window.addEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
+    window.addEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
     return () => {
       isMounted = false;
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+      window.removeEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
+      window.removeEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
+      window.removeEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
     };
-  }, []);
+  }, [editingReport]);
 
   const handleSaveResult = async (result: any) => {
     const newStudent = {
@@ -660,6 +714,7 @@ export function useReportForm() {
     setStudentName("");
     setGroupName("");
     setSelectedSession("");
+    setSelectedDate(getClassroomTodayDate());
     setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
     setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
     setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
@@ -670,6 +725,9 @@ export function useReportForm() {
   };
 
   const cancelEditMode = () => {
+    if (editingReport?.id && editingReport.isGracePeriod) {
+      scheduleGracePeriodSync(editingReport.id, 10 * 60 * 1000);
+    }
     resetForm();
     showToast("Edit cancelled. Form cleared.", "info");
   };
@@ -701,7 +759,7 @@ export function useReportForm() {
       const payload = {
         student: studentId || studentName.trim(),
         session: selectedSession.trim(),
-        report_date: selectedDate || new Date().toISOString().split("T")[0],
+        report_date: selectedDate || getClassroomTodayDate(),
         subject_course: groupName || "General Group",
         juz_and_pages: juzPageData,
         mistakes: cleanMistakes,
@@ -714,40 +772,93 @@ export function useReportForm() {
 
       if (isEditing) {
         const repId = editingReport.id || editingReport.report_unique_id;
-        const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
-        const updatedReports = allReports.map((r: any) => {
-          const rId = r.id || r.report_unique_id;
-          if (rId && String(rId) === String(repId)) {
-            return { ...r, ...payload, id: r.id, report_unique_id: r.report_unique_id };
-          }
-          return r;
-        });
-        localStorage.setItem("spr_reports_local_v1", JSON.stringify(updatedReports));
+        const repUniqueId = editingReport.report_unique_id || (typeof repId === "string" && repId.startsWith("REP-") ? repId : `REP-${String(repId).slice(0, 8)}`);
 
-        if (isOnline() && editingReport.id) {
+        const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+        const existingRepIndex = allReports.findIndex((r: any) => {
+          const rId = r.id || r.report_unique_id;
+          return rId && String(rId) === String(repId);
+        });
+
+        const existingRep = existingRepIndex > -1 ? allReports[existingRepIndex] : null;
+        const isGracePeriod = editingReport.isGracePeriod || existingRep?.sync_status === "GRACE_PERIOD" || !existingRep?.server_id;
+
+        const updatedRecord = {
+          ...(existingRep || {}),
+          ...payload,
+          id: editingReport.id || existingRep?.id || crypto.randomUUID(),
+          report_unique_id: repUniqueId,
+          client_updated_at: editedAt,
+          studentId,
+          studentName: studentName.trim(),
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData: cleanMistakes,
+          stuckData: cleanStucks,
+        };
+
+        if (isGracePeriod) {
+          // Keep in grace period, update in-place without generating a new key
+          saveReportLocally(updatedRecord, { graceMinutes: 10, syncStatus: "GRACE_PERIOD" });
+          scheduleGracePeriodSync(updatedRecord.id, 10 * 60 * 1000);
+          showToast(`Report #${repUniqueId} for "${studentName}" updated!`, "success");
+          saveStatusStore.set("local", "Saved (Local)");
+          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+        } else if (isOnline() && (editingReport.server_id || editingReport.id)) {
+          const targetId = editingReport.server_id || editingReport.id;
           try {
-            const response = await fetchWithAuth(`/reports/${editingReport.id}/`, {
+            const response = await fetchWithAuth(`/reports/${targetId}/`, {
               method: "PATCH",
               body: JSON.stringify(payload),
             });
             if (response.ok) {
-              showToast(`Report for "${studentName}" updated in Database!`, "success");
+              const resData = await response.json();
+              saveReportLocally({ ...updatedRecord, ...resData, sync_status: "SYNCED" }, { skipGrace: true, syncStatus: "SYNCED" });
+              showToast(`Report #${repUniqueId} for "${studentName}" updated in Database!`, "success");
               saveStatusStore.set("database", "Database Synced");
+              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: resData } }));
             } else {
+              saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
               showToast(`Report updated locally. Will sync when possible.`, "info");
               saveStatusStore.set("local", "Saved (Local)");
+              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
             }
           } catch (error: any) {
+            saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
             showToast("Updated locally. Server connection issue: " + error.message, "info");
             saveStatusStore.set("local", "Saved (Local)");
+            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
           }
         } else {
-          showToast(`Report for "${studentName}" updated locally!`, "success");
+          saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+          showToast(`Report #${repUniqueId} for "${studentName}" updated locally!`, "success");
           saveStatusStore.set("local", "Saved (Local)");
+          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
         }
 
-        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: isOnline() ? "database" : "local" } }));
+        // Record history snapshot with savedReportId and savedReportKey
+        const savedSnapshot = JSON.stringify({
+          studentName: studentName.trim(),
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData: cleanMistakes,
+          stuckData: cleanStucks,
+          comment,
+          savedReportId: updatedRecord.id,
+          savedReportKey: repUniqueId,
+          isGracePeriod,
+        });
+        if (historyStackRef.current.length > 0) {
+          historyStackRef.current[historyStackRef.current.length - 1] = savedSnapshot;
+        } else {
+          historyStackRef.current.push(savedSnapshot);
+        }
       } else {
+        // NEW RECORD: Grace period active (10 minutes buffer before posting to database)
         const localSavedReport = saveReportLocally({
           ...payload,
           studentId,
@@ -758,74 +869,33 @@ export function useReportForm() {
           juzPageData,
           mistakeData: cleanMistakes,
           stuckData: cleanStucks,
+        }, { graceMinutes: 10 });
+
+        // Schedule delayed cloud sync for 10 minutes
+        scheduleGracePeriodSync(localSavedReport.id, 10 * 60 * 1000);
+
+        showToast(`Report #${localSavedReport.report_unique_id} for "${studentName}" added to record!`, "success");
+        saveStatusStore.set("local", "Saved (Local)");
+        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: localSavedReport } }));
+
+        // Record history snapshot before reset so undo restores this exact report
+        const savedSnapshot = JSON.stringify({
+          studentName: studentName.trim(),
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData: cleanMistakes,
+          stuckData: cleanStucks,
+          comment,
+          savedReportId: localSavedReport.id,
+          savedReportKey: localSavedReport.report_unique_id,
+          isGracePeriod: true,
         });
-
-        if (isOnline()) {
-          try {
-            const apiResult = await createReport({
-              studentId,
-              studentName: studentName.trim(),
-              groupName: groupName || "General Group",
-              selectedSession: selectedSession.trim(),
-              selectedDate,
-              juzPageData,
-              mistakeData: cleanMistakes,
-              stuckData: cleanStucks,
-              comment,
-            });
-
-            if (apiResult.success) {
-              const createdData = apiResult.data;
-
-              try {
-                const allLocal = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
-                const syncedLocal = allLocal.map((r: any) => {
-                  if (
-                    r.id === localSavedReport.id ||
-                    r.report_unique_id === localSavedReport.report_unique_id ||
-                    (createdData.report_unique_id && r.report_unique_id === createdData.report_unique_id)
-                  ) {
-                    return {
-                      ...r,
-                      ...createdData,
-                      id: createdData.id,
-                      report_unique_id: createdData.report_unique_id || r.report_unique_id,
-                      sync_status: "SYNCED",
-                    };
-                  }
-                  return r;
-                });
-                localStorage.setItem("spr_reports_local_v1", JSON.stringify(syncedLocal));
-
-                const pendingQ = JSON.parse(localStorage.getItem("spr_reports_pending_queue") || "[]");
-                const cleanedQ = pendingQ.filter((id: any) => id !== localSavedReport.id && id !== createdData.id);
-                localStorage.setItem("spr_reports_pending_queue", JSON.stringify(cleanedQ));
-              } catch (storageErr) {
-                console.warn("[useReportForm] Error updating local sync status:", storageErr);
-              }
-
-              showToast(`Report #${createdData.report_unique_id || createdData.id || ""} for "${studentName}" recorded to Database!`, "success");
-              saveStatusStore.set("database", "Database Synced");
-              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: createdData } }));
-            } else if (apiResult.isOffline) {
-              showToast(`Report for "${studentName}" saved locally (Server offline).`, "info");
-              saveStatusStore.set("local", "Saved (Local)");
-              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
-            } else {
-              const errData = apiResult.errors || {};
-              const targetError = errData.details || errData;
-              showToast(targetError, "error");
-              return;
-            }
-          } catch (error: any) {
-            showToast("Saved locally. Server connection issue: " + error.message, "info");
-            saveStatusStore.set("local", "Saved (Local)");
-            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
-          }
+        if (historyStackRef.current.length > 0) {
+          historyStackRef.current[historyStackRef.current.length - 1] = savedSnapshot;
         } else {
-          showToast(`Report for "${studentName}" saved locally (offline).`, "info");
-          saveStatusStore.set("local", "Saved (Local)");
-          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local" } }));
+          historyStackRef.current.push(savedSnapshot);
         }
       }
 

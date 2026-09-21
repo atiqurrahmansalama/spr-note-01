@@ -7,6 +7,7 @@ import {
   resolveBookTeacher,
   filterCurriculumBooks,
 } from "../../dailyClassroomUtils";
+import { getClassroomTodayDate } from "../../../../../constants/calendarConstants";
 import { useFormAutoSave } from "../../../../../hooks";
 
 /**
@@ -38,7 +39,7 @@ export default function useLessonPlanForm({
   // ── Form State ──────────────────────────────────────────────────────────────
 
   const [lessonDate, setLessonDate] = useState(
-    date || defaultDate || lesson?.lesson_date || new Date().toISOString().split("T")[0]
+    date || defaultDate || lesson?.lesson_date || getClassroomTodayDate()
   );
 
   const [departmentId, setDepartmentId] = useState(() => {
@@ -92,7 +93,7 @@ export default function useLessonPlanForm({
 
   // ── Auto-save draft setup ──────────────────────────────────────────────────
   const initialFormSnapshot = useMemo(() => ({
-    lessonDate: date || defaultDate || lesson?.lesson_date || new Date().toISOString().split("T")[0],
+    lessonDate: date || defaultDate || lesson?.lesson_date || getClassroomTodayDate(),
     departmentId: lesson?.department_id ? String(lesson.department_id) : (defaultDepartmentId && defaultDepartmentId !== "ALL" ? String(defaultDepartmentId) : ""),
     classId: lesson?.academic_class ? (typeof lesson.academic_class === "object" ? String(lesson.academic_class?.id || "") : String(lesson.academic_class)) : (defaultClassId && defaultClassId !== "ALL" ? String(defaultClassId) : ""),
     sectionId: lesson?.section ? (typeof lesson.section === "object" ? String(lesson.section?.id || "") : String(lesson.section)) : (defaultSectionId && defaultSectionId !== "ALL" ? String(defaultSectionId) : ""),

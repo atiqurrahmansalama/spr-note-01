@@ -220,8 +220,8 @@ export default function RecordReportsList({
                     <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate tracking-tight">
                       {rep.student_name}
                     </h4>
-                    {rep.sync_status === "PENDING" && (
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Pending Sync" />
+                    {(rep.sync_status === "PENDING" || rep.sync_status === "GRACE_PERIOD") && (
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title={rep.sync_status === "GRACE_PERIOD" ? "Grace Period (Local)" : "Pending Sync"} />
                     )}
                   </div>
                   <p className="text-[11px] theme-text-secondary mt-0.5 truncate font-sans">

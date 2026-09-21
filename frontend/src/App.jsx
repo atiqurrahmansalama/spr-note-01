@@ -207,20 +207,24 @@ export default function App() {
                 <Route path="/academy/dormitory" element={<ResidentialHubView />} />
                 <Route path="/residential-quarters" element={<ResidentialHubView />} />
 
-                {/* Academic Learning, Daily Lessons & Reporting Hub Routes */}
-                <Route path="/studies" element={<DailyClassroomHubView />} />
-                <Route path="/studies/daily-classroom" element={<DailyClassroomHubView />} />
+                {/* Academic Studies — Lesson Management Routes */}
+                <Route path="/studies" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/studies/daily-classroom" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/studies/lesson-management" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/studies/daily-lessons" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/studies/lesson-assessments" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
+                <Route path="/daily-lessons" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/studies/recitations" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
+                <Route path="/recitations" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
+                <Route path="/studies/homework" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="HOMEWORK" />} />
+                <Route path="/homework-tasks" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="HOMEWORK" />} />
 
-                {/* Sub-item Direct Routes & Aliases */}
-                <Route path="/studies/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSON" />} />
-                <Route path="/studies/daily-progress" element={<DailyClassroomHubView defaultTab="PROGRESS" />} />
-                <Route path="/studies/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
-                <Route path="/studies/homework" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
-                
-                <Route path="/daily-lessons" element={<DailyClassroomHubView defaultTab="LESSON" />} />
-                <Route path="/daily-progress" element={<DailyClassroomHubView defaultTab="PROGRESS" />} />
-                <Route path="/recitations" element={<DailyClassroomHubView defaultTab="ASSESSMENT" />} />
-                <Route path="/homework-tasks" element={<DailyClassroomHubView defaultTab="HOMEWORK" />} />
+                {/* Academic Studies — Progress Management Routes */}
+                <Route path="/studies/progress-management" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
+                <Route path="/studies/daily-progress" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
+                <Route path="/studies/progress-assessments" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
+                <Route path="/daily-progress" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
+                <Route path="/progress-assessments" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
 
                 {/* Examination & Result Management Hub Routes */}
                 <Route path="/examinations" element={<ExaminationsHubView />} />

@@ -203,6 +203,7 @@ export default function DailyClassroomFilterControls({
             label={dateLabel}
             headerAction={isTimezoneEnabled ? <span className="text-xs font-semibold theme-accent">{tzAbbr}</span> : undefined}
             dateFormat={dateFormat}
+            timeZone={effectiveTimezone}
             showHijri={false}
             selectedDate={selectedDate}
             onSelectDate={onDateChange}

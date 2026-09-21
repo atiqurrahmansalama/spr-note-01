@@ -28,6 +28,7 @@ import {
   getSectionId,
 } from "../dailyClassroomUtils";
 import { sortStudentsByUsage, recordStudentUsage } from "../../../../utils/studentUsageTracker";
+import { getClassroomTodayDate } from "../../../../constants/calendarConstants";
 import { DailyProgressViewProps, SectionVisibilityConfig } from "./types";
 
 export default function DailyProgressView({
@@ -103,6 +104,13 @@ export default function DailyProgressView({
     sections = [],
     students: academicStudents = [],
   } = academicData || {};
+
+  // Sync selectedDate with filterProps if supplied
+  useEffect(() => {
+    if (filterProps?.selectedDate && filterProps.selectedDate !== selectedDate) {
+      setSelectedDate(filterProps.selectedDate);
+    }
+  }, [filterProps?.selectedDate, selectedDate, setSelectedDate]);
 
   const [localDeptId, setLocalDeptId] = useState("");
   const [localClassId, setLocalClassId] = useState("");
@@ -822,8 +830,13 @@ export default function DailyProgressView({
         showCardWrapper={true}
         showDate={sectionConfig.headerDate?.enabled !== false}
         dateLabel="Date"
-        selectedDate={selectedDate || new Date().toISOString().split("T")[0]}
-        onDateChange={(dateStr: string) => setSelectedDate(dateStr)}
+        selectedDate={selectedDate || getClassroomTodayDate()}
+        onDateChange={(dateStr: string) => {
+          setSelectedDate(dateStr);
+          if (filterProps?.onDateChange) {
+            filterProps.onDateChange(dateStr);
+          }
+        }}
         dateFormat={dateFormat || "DD/MM/YYYY"}
         hasDepartments={hasDepartments}
         selectedDepartmentId={selectedDepartmentId}

@@ -20,25 +20,71 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// 1. Save Report Locally (Offline-First)
-export const saveReportLocally = (reportData) => {
+// Active in-memory timers for delayed grace period sync
+const activeGraceTimers = new Map();
+
+export const scheduleGracePeriodSync = (reportId, delayMs = 10 * 60 * 1000, onComplete) => {
+  if (activeGraceTimers.has(reportId)) {
+    clearTimeout(activeGraceTimers.get(reportId));
+    activeGraceTimers.delete(reportId);
+  }
+
+  const timer = setTimeout(async () => {
+    activeGraceTimers.delete(reportId);
+    try {
+      await commitReportToCloud(reportId);
+      if (onComplete) onComplete();
+    } catch (err) {
+      console.warn("[SyncEngine] Auto grace sync failed for", reportId, err);
+    }
+  }, delayMs);
+
+  activeGraceTimers.set(reportId, timer);
+  return timer;
+};
+
+export const clearGracePeriodTimer = (reportId) => {
+  if (activeGraceTimers.has(reportId)) {
+    clearTimeout(activeGraceTimers.get(reportId));
+    activeGraceTimers.delete(reportId);
+  }
+};
+
+// 1. Save Report Locally (Offline-First with configurable Grace Period)
+export const saveReportLocally = (reportData, options = {}) => {
   const reports = getLocalReports();
   const pendingQueue = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
 
   const now = new Date().toISOString();
   const report_unique_id = reportData.report_unique_id || `REP-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
+  const graceMinutes = options.graceMinutes !== undefined ? options.graceMinutes : 10;
+  const graceExpiresAt = options.skipGrace
+    ? null
+    : (reportData.grace_expires_at || (graceMinutes > 0 ? Date.now() + graceMinutes * 60 * 1000 : null));
+
+  const initialStatus = options.syncStatus || (graceExpiresAt ? "GRACE_PERIOD" : "PENDING");
+
   const updatedReport = {
     ...reportData,
     id: reportData.id || crypto.randomUUID(),
     report_unique_id,
     client_updated_at: now,
-    sync_status: "PENDING",
+    grace_expires_at: graceExpiresAt,
+    sync_status: initialStatus,
   };
 
-  const existingIndex = reports.findIndex((r) => r.id === updatedReport.id);
+  const existingIndex = reports.findIndex(
+    (r) => (r.id && r.id === updatedReport.id) || (r.report_unique_id && r.report_unique_id === updatedReport.report_unique_id)
+  );
+
   if (existingIndex > -1) {
-    reports[existingIndex] = updatedReport;
+    reports[existingIndex] = {
+      ...reports[existingIndex],
+      ...updatedReport,
+      id: reports[existingIndex].id,
+      report_unique_id: reports[existingIndex].report_unique_id || updatedReport.report_unique_id,
+    };
   } else {
     reports.unshift(updatedReport);
   }
@@ -50,7 +96,7 @@ export const saveReportLocally = (reportData) => {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
   localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingQueue));
 
-  return updatedReport;
+  return existingIndex > -1 ? reports[existingIndex] : updatedReport;
 };
 
 // 2. Fetch All Local Reports
@@ -64,7 +110,53 @@ export const getLocalReports = () => {
   }
 };
 
-// 3. Trigger Delta Cloud Sync with DRF Backend API
+// 3. Commit a Specific Report to Cloud Immediately
+export const commitReportToCloud = async (reportId) => {
+  if (!navigator.onLine) {
+    return { success: false, isOffline: true };
+  }
+
+  const reports = getLocalReports();
+  const reportIndex = reports.findIndex((r) => r.id === reportId || r.report_unique_id === reportId);
+  if (reportIndex === -1) {
+    return { success: false, error: "Report not found" };
+  }
+
+  const item = reports[reportIndex];
+  if (item.sync_status === "SYNCED" && item.server_id) {
+    return { success: true, data: item };
+  }
+
+  try {
+    const apiResult = await createReport(item);
+    if (apiResult.success && apiResult.data) {
+      const serverReport = apiResult.data;
+      reports[reportIndex] = {
+        ...reports[reportIndex],
+        ...serverReport,
+        id: serverReport.id || reports[reportIndex].id,
+        server_id: serverReport.id,
+        report_unique_id: serverReport.report_unique_id || reports[reportIndex].report_unique_id,
+        sync_status: "SYNCED",
+        grace_expires_at: null,
+      };
+
+      const pendingQueue = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
+      const updatedQueue = pendingQueue.filter((id) => id !== reportId && id !== serverReport.id);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedQueue));
+
+      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: serverReport } }));
+      return { success: true, data: serverReport };
+    }
+    return apiResult;
+  } catch (err) {
+    console.warn("[SyncEngine] commitReportToCloud failed:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+// 4. Trigger Delta Cloud Sync with DRF Backend API
 export const triggerCloudSync = async () => {
   if (!navigator.onLine) {
     console.warn("[SyncEngine] Network offline. Sync postponed.");
@@ -83,6 +175,11 @@ export const triggerCloudSync = async () => {
   let updatedIds = [...pendingIds];
 
   for (const item of pendingItems) {
+    // Grace Period check: if report is currently within its 10-minute buffer, postpone cloud sync
+    if (item.grace_expires_at && Date.now() < item.grace_expires_at) {
+      continue;
+    }
+
     // Safety check: skip completely blank or default empty reports (student is N/A/empty and no pages/errors)
     const isBlank = (
       (!item.student || item.student === "N/A") &&
@@ -114,6 +211,7 @@ export const triggerCloudSync = async () => {
             id: serverReport.id,
             report_unique_id: serverReport.report_unique_id || reports[itemIdx].report_unique_id,
             sync_status: "SYNCED",
+            grace_expires_at: null,
           };
         }
         updatedIds = updatedIds.filter((id) => id !== item.id && id !== serverReport.id);
@@ -127,6 +225,31 @@ export const triggerCloudSync = async () => {
   localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedIds));
   window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "sync" } }));
 };
+
+// 5. Periodic check for grace period expiry and background sync
+export const checkGracePeriodReports = async () => {
+  if (!navigator.onLine) return;
+  const reports = getLocalReports();
+  const now = Date.now();
+
+  for (const rep of reports) {
+    if (rep.sync_status === "GRACE_PERIOD" && rep.grace_expires_at) {
+      if (now >= rep.grace_expires_at) {
+        await commitReportToCloud(rep.id);
+      } else {
+        const remainingMs = rep.grace_expires_at - now;
+        scheduleGracePeriodSync(rep.id, remainingMs);
+      }
+    }
+  }
+};
+
+if (typeof window !== "undefined") {
+  setTimeout(() => checkGracePeriodReports(), 2000);
+  setInterval(() => {
+    checkGracePeriodReports();
+  }, 60 * 1000);
+}
 
 // 4. Sync local students, sessions & comment templates to the database
 export const syncLocalStudentsToBackend = async () => {

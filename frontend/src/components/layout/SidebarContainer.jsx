@@ -39,6 +39,7 @@ import {
   BellIcon,
   HomeIcon,
   BookOpenIcon,
+  TrendingUpIcon,
   TargetIcon,
   ClipboardDocumentCheckIcon,
   AcademicCapIcon,
@@ -72,6 +73,8 @@ export default function SidebarContainer({
   const [openSubMenus, setOpenSubMenus] = useState({
     "Academy": true,
     "Academic Institution": true,
+    "Daily Classroom": true,
+    "Academic Activities": true,
     "Academic Studies": true,
     "Examination & Results": true,
     "Student": true,
@@ -110,15 +113,59 @@ export default function SidebarContainer({
       ]
     },
     {
-      id: "Academic Studies",
-      name: "Academic Studies",
-      i18nKey: "academicStudies",
+      id: "Academic Activities",
+      name: "Academic Activities",
+      i18nKey: "academicActivities",
       Icon: BookOpenIcon,
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/daily-progress", "/studies/recitations", "/studies/homework", "/daily-lessons", "/daily-progress", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
-        { id: "Student Reports", name: "Student Recitation Log", i18nKey: "studentReports", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
+        {
+          id: "Class Attendance",
+          name: "Class Attendance",
+          i18nKey: "classAttendance",
+          path: "/attendance/students/monthly-matrix",
+          matchPaths: [
+            "/attendance/students/monthly-matrix",
+            "/attendance/student",
+            "/attendance/monthly-register"
+          ],
+          Icon: MatrixIcon,
+          key: "monthly_attendance_matrix"
+        },
+        {
+          id: "Lesson Management",
+          name: "Lesson Management",
+          i18nKey: "lessonManagement",
+          path: "/studies/lesson-management",
+          matchPaths: [
+            "/studies/lesson-management",
+            "/studies/daily-lessons",
+            "/studies/lesson-assessments",
+            "/studies/recitations",
+            "/daily-lessons",
+            "/recitations",
+            "/studies",
+            "/studies/daily-classroom"
+          ],
+          Icon: BookOpenIcon,
+          key: "lesson_management"
+        },
+        {
+          id: "Progress Management",
+          name: "Progress Management",
+          i18nKey: "progressManagement",
+          path: "/studies/progress-management",
+          matchPaths: [
+            "/studies/progress-management",
+            "/studies/daily-progress",
+            "/studies/progress-assessments",
+            "/daily-progress",
+            "/progress-assessments"
+          ],
+          Icon: TrendingUpIcon,
+          key: "progress_management"
+        },
       ]
     },
     {
@@ -202,7 +249,6 @@ export default function SidebarContainer({
       key: "nav_student_management",
       subItems: [
         { id: "Student Roster", name: "Student Roster", i18nKey: "studentDirectory", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
-        { id: "Class Attendance", name: "Class Attendance", i18nKey: "classAttendance", path: "/attendance/students/monthly-matrix", matchPaths: ["/attendance/students/monthly-matrix", "/attendance/student", "/attendance/monthly-register"], Icon: MatrixIcon, key: "monthly_attendance_matrix" },
         { id: "Residential Attendance", name: "Residential Attendance", i18nKey: "residentialAttendance", path: "/attendance/students/residential", matchPaths: ["/attendance/students/residential"], Icon: TimerIcon, key: "residential_attendance" },
         { id: "Admission", name: "Admission", i18nKey: "admission", path: "/admission", matchPaths: ["/admission", "/short-admission", "/admission/short"], Icon: AdmissionIcon, key: "student_admission" },
       ]

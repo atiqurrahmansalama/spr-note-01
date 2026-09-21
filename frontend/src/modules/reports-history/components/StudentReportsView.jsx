@@ -20,7 +20,7 @@ import ReportsAnalytics from "./ReportsAnalytics";
 import ReportContextMenu from "./ReportContextMenu";
 import SkeletonLoader from "../../../components/common/SkeletonLoader";
 
-export default function StudentReportsView() {
+export default function StudentReportsView({ hideHeader = false, isEmbedded = false } = {}) {
   const { showToast } = useToast();
   const containerRef = useRef(null);
 
@@ -650,32 +650,34 @@ export default function StudentReportsView() {
   return (
     <div
       ref={containerRef}
-      className="w-full max-w-6xl mx-auto space-y-5 theme-text-primary animate-fade-in flex flex-col items-center justify-start py-4 px-3 sm:px-6"
+      className={`w-full ${isEmbedded ? "" : "max-w-6xl mx-auto"} space-y-4 theme-text-primary animate-fade-in flex flex-col items-center justify-start ${isEmbedded ? "py-1 px-0" : "py-4 px-3 sm:px-6"}`}
     >
       
       {/* 1. Dedicated Top Header Card */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-3 sm:gap-3.5">
-          <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
-            <CloudIcon className="w-5 h-5" />
+      {!hideHeader && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
+              <CloudIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold theme-text-primary tracking-tight">
+                Student Progress & Daily Reports
+              </h2>
+              <p className="text-[11px] theme-text-secondary mt-0.5 leading-snug">
+                Explore reports list, student-wise grouped logs, and professional analytics.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold theme-text-primary tracking-tight">
-              Student Progress & Daily Reports
-            </h2>
-            <p className="text-[11px] theme-text-secondary mt-0.5 leading-snug">
-              Explore reports list, student-wise grouped logs, and professional analytics.
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-          <span className="px-3.5 py-1.5 text-xs font-semibold theme-text-primary theme-bg-sub border theme-border rounded-xl flex items-center gap-2 shadow-sm">
-            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
-            <span>{reportsList.length} Total Reports</span>
-          </span>
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+            <span className="px-3.5 py-1.5 text-xs font-semibold theme-text-primary theme-bg-sub border theme-border rounded-xl flex items-center gap-2 shadow-sm">
+              <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+              <span>{reportsList.length} Total Reports</span>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 2. Filter & View Controls Section Card */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 sm:space-y-5">

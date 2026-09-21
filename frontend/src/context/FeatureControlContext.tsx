@@ -45,8 +45,13 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   // Academic Studies Features
   nav_academic_studies: true,
   academic_studies: true,
-  daily_classroom: true,
+  lesson_management: true,
   daily_lessons: true,
+  lesson_assessments: true,
+  progress_management: true,
+  daily_progress: true,
+  progress_assessments: true,
+  daily_classroom: true,
   recitation_adai: true,
   homework_tasks: true,
 

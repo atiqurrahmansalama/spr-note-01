@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { CollapsiblePageHeader } from "../../../components/ui";
 import CustomButton from "../../../components/ui/CustomButton";
 import { PageContainer } from "../../../components/layout";
@@ -21,48 +21,122 @@ import {
 } from "./assessment";
 import useDailyClassroomData from "./hooks/useDailyClassroomData";
 import useDailyClassroomFilters from "./hooks/useDailyClassroomFilters";
+import { getClassroomTodayDate } from "../../../constants/calendarConstants";
 import HifzReportBuilderModule from "./daily-progress/DailyProgressView";
+import StudentReportsView from "../../reports-history/components/StudentReportsView";
 
-const TABS = [
+const LESSON_MANAGEMENT_TABS = [
   { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon },
-  { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon },
-  { id: "ASSESSMENT", label: "Daily Assessment", icon: ChecklistIcon },
+  { id: "LESSON_ASSESSMENT", label: "Lesson Assessments", icon: ChecklistIcon },
 ];
+
+const PROGRESS_MANAGEMENT_TABS = [
+  { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon },
+  { id: "PROGRESS_ASSESSMENT", label: "Progress Reports", icon: TrendingUpIcon },
+];
+
+const normalizeTabId = (tab, isProgress) => {
+  if (!tab) return isProgress ? "PROGRESS" : "LESSON";
+  const upper = String(tab).toUpperCase();
+  if (upper === "ASSESSMENT" || upper === "LESSON_ASSESSMENTS" || upper === "RECITATIONS") {
+    return "LESSON_ASSESSMENT";
+  }
+  if (
+    upper === "PROGRESS_ASSESSMENT" ||
+    upper === "PROGRESS_ASSESSMENTS" ||
+    upper === "STUDENT_REPORTS" ||
+    upper === "REPORTS"
+  ) {
+    return "PROGRESS_ASSESSMENT";
+  }
+  if (isProgress && (upper === "LESSON" || upper === "LESSON_ASSESSMENT")) {
+    return "PROGRESS";
+  }
+  if (!isProgress && (upper === "PROGRESS" || upper === "PROGRESS_ASSESSMENT")) {
+    return "LESSON";
+  }
+  return upper;
+};
 
 export default function DailyClassroomHubView({
   hideHeader = false,
   isEmbedded = false,
-  defaultTab = "LESSON",
+  hubType = "AUTO",
+  defaultTab = null,
 }) {
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const tenantId = activeTenantId || "default";
 
+  const location = useLocation();
+  const path = location.pathname.toLowerCase();
+
+  const isProgressHub = useMemo(() => {
+    if (hubType === "PROGRESS_MANAGEMENT") return true;
+    if (hubType === "LESSON_MANAGEMENT") return false;
+    return (
+      path.includes("/progress-management") ||
+      path.includes("/daily-progress") ||
+      path.includes("/progress-assessments") ||
+      defaultTab === "PROGRESS" ||
+      defaultTab === "PROGRESS_ASSESSMENT"
+    );
+  }, [hubType, path, defaultTab]);
+
+  const activeTabs = isProgressHub ? PROGRESS_MANAGEMENT_TABS : LESSON_MANAGEMENT_TABS;
+  const hubTitle = isProgressHub ? "Progress Management" : "Lesson Management";
+  const HubIcon = isProgressHub ? TrendingUpIcon : BookOpenIcon;
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(
-    () => searchParams.get("tab") || defaultTab || "LESSON"
+    () => normalizeTabId(searchParams.get("tab") || defaultTab, isProgressHub)
   );
 
   useEffect(() => {
     const urlTab = searchParams.get("tab");
     if (urlTab) {
-      if (urlTab !== activeTab) {
-        setActiveTab(urlTab);
+      const normalized = normalizeTabId(urlTab, isProgressHub);
+      if (normalized !== activeTab) {
+        setActiveTab(normalized);
       }
-    } else if (defaultTab && defaultTab !== activeTab) {
-      setActiveTab(defaultTab);
+    } else if (defaultTab) {
+      const normalized = normalizeTabId(defaultTab, isProgressHub);
+      if (normalized !== activeTab) {
+        setActiveTab(normalized);
+      }
+    } else {
+      setActiveTab(isProgressHub ? "PROGRESS" : "LESSON");
     }
-  }, [searchParams, defaultTab]);
+  }, [searchParams, defaultTab, isProgressHub]);
+
   const { departments, classes, sections, students, periodSlots } = useAcademicData();
 
   // ── Filter State (No "ALL" Option Defaults) ──────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(
-    () => searchParams.get("date") || new Date().toISOString().split("T")[0]
+    () => searchParams.get("date") || getClassroomTodayDate()
   );
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [activePeriodId, setActivePeriodId] = useState("1");
+
+  // Keep selectedDate dynamically matched to the classroom timezone when settings update
+  useEffect(() => {
+    const handleTimezoneSettingsUpdate = () => {
+      if (!searchParams.get("date")) {
+        setSelectedDate(getClassroomTodayDate());
+      }
+    };
+
+    window.addEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
+    window.addEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
+    window.addEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
+    return () => {
+      window.removeEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
+      window.removeEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
+      window.removeEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
+    };
+  }, [searchParams]);
 
   // ── Custom Hooks ─────────────────────────────────────────────────────────────
 
@@ -448,15 +522,15 @@ export default function DailyClassroomHubView({
       {/* 1. Collapsible Header & Tab Switcher */}
       <CollapsiblePageHeader
         hideHeader={hideHeader}
-        title="Daily Classroom"
-        icon={BookOpenIcon}
-        storageKey="daily_classroom_header"
-        tabs={TABS}
+        title={hubTitle}
+        icon={HubIcon}
+        storageKey={isProgressHub ? "progress_management_header" : "lesson_management_header"}
+        tabs={activeTabs}
         activeTab={activeTab}
         onChange={handleTabChange}
         actionsPlacement="tabs"
         actions={
-          activeTab === "LESSON" ? (
+          !isProgressHub && activeTab === "LESSON" ? (
             <CustomButton
               type="button"
               variant="primary"
@@ -466,7 +540,7 @@ export default function DailyClassroomHubView({
             >
               Add Lesson
             </CustomButton>
-          ) : activeTab === "ASSESSMENT" ? (
+          ) : !isProgressHub && (activeTab === "LESSON_ASSESSMENT" || activeTab === "ASSESSMENT") ? (
             <CustomButton
               type="button"
               variant="primary"
@@ -480,8 +554,8 @@ export default function DailyClassroomHubView({
         }
       />
 
-      {/* 3. Tab 1: Daily Lessons */}
-      {activeTab === "LESSON" && (
+      {/* Lesson Management — Tab 1: Daily Lessons */}
+      {!isProgressHub && activeTab === "LESSON" && (
         <LessonDeliveryManagementView
           filterProps={sharedFilterProps}
           filteredLessons={filteredLessons}
@@ -498,15 +572,8 @@ export default function DailyClassroomHubView({
         />
       )}
 
-      {/* 4. Tab 2: Daily Progress */}
-      {activeTab === "PROGRESS" && (
-        <div className="w-full pt-1">
-          <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
-        </div>
-      )}
-
-      {/* 5. Tab 3: Daily Student Assessment */}
-      {activeTab === "ASSESSMENT" && (
+      {/* Lesson Management — Tab 2: Lesson Assessments */}
+      {!isProgressHub && (activeTab === "LESSON_ASSESSMENT" || activeTab === "ASSESSMENT") && (
         <StudentAssessmentManagementView
           filterProps={sharedFilterProps}
           assessmentRows={assessmentRows}
@@ -516,6 +583,20 @@ export default function DailyClassroomHubView({
           tenantId={tenantId}
           loadData={loadData}
         />
+      )}
+
+      {/* Progress Management — Tab 1: Daily Progress */}
+      {isProgressHub && activeTab === "PROGRESS" && (
+        <div className="w-full pt-1">
+          <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
+        </div>
+      )}
+
+      {/* Progress Management — Tab 2: Progress Assessments (Student Reports) */}
+      {isProgressHub && (activeTab === "PROGRESS_ASSESSMENT" || activeTab === "PROGRESS_ASSESSMENTS") && (
+        <div className="w-full pt-1">
+          <StudentReportsView isEmbedded={true} />
+        </div>
       )}
     </PageContainer>
   );

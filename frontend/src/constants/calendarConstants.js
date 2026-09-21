@@ -47,6 +47,52 @@ export const getTimezoneOffsetString = (timeZone) => {
   return "UTC+00:00";
 };
 
+export const getTodayInTimezone = (timeZone) => {
+  try {
+    const tz = timeZone || getSystemTimezone();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    if (year && month && day) {
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+  } catch (e) {
+    console.warn("[calendarConstants] Failed to format date in timezone:", timeZone, e);
+  }
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export const getClassroomEffectiveTimezone = () => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const classroomTz = localStorage.getItem("spr_classroom_timezone");
+      if (classroomTz && classroomTz !== "APP_DEFAULT") {
+        return classroomTz;
+      }
+      const appTz = localStorage.getItem("spr_timezone") || localStorage.getItem("spr_calendar_timezone");
+      if (appTz) return appTz;
+    }
+  } catch (e) {
+    // fallback
+  }
+  return getSystemTimezone();
+};
+
+export const getClassroomTodayDate = () => {
+  return getTodayInTimezone(getClassroomEffectiveTimezone());
+};
+
 export const TIMEZONE_LIST = [
   { id: "UTC", name: "UTC (International Standard)", city: "Universal Coordinated Time (GMT)", offset: "UTC+00:00" },
   { id: "Asia/Dhaka", name: "Asia / Dhaka", city: "Dhaka, Bangladesh", offset: "UTC+06:00" },

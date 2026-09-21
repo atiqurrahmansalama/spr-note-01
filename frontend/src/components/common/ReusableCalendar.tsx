@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronIcon,
@@ -12,6 +12,7 @@ import IconButton from '../ui/IconButton';
 import CustomInput from '../ui/CustomInput';
 import { getHijriDetails } from '../../utils/hijriUtils';
 import { useTranslation } from '../../i18n';
+import { getTodayInTimezone } from '../../constants/calendarConstants';
 
 // ─── LOCALIZED MONTH & WEEKDAY DICTIONARIES ──────────────────────────────────
 const LOCALIZED_MONTHS: Record<string, { full: string[]; short: string[] }> = {
@@ -68,6 +69,7 @@ export interface ReusableCalendarProps {
   required?: boolean;
   optional?: boolean;
   dateFormat?: string;
+  timeZone?: string;
   showHijri?: boolean;
   headerAction?: React.ReactNode;
   onManage?: () => void;
@@ -127,6 +129,7 @@ export default function ReusableCalendar({
   actionLabel = null,
   manageLabel = null,
   dateFormat = '',
+  timeZone = '',
   showHijri = false,
   error = null,
   helperText = null,
@@ -151,7 +154,14 @@ export default function ReusableCalendar({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
-  const activeDate = selectedDate || startDate || new Date().toISOString().split('T')[0];
+  const todayStr = useMemo(() => {
+    return timeZone ? getTodayInTimezone(timeZone) : (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+  }, [timeZone]);
+
+  const activeDate = selectedDate || startDate || todayStr;
   const initDate = new Date(activeDate);
   const [viewYear, setViewYear] = useState<number>(
     isNaN(initDate.getFullYear()) ? new Date().getFullYear() : initDate.getFullYear()
@@ -376,10 +386,11 @@ export default function ReusableCalendar({
 
   const handleSelectToday = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    setViewYear(today.getFullYear());
-    setViewMonth(today.getMonth());
+    const parts = todayStr.split('-');
+    const tYear = parseInt(parts[0], 10);
+    const tMonth = parseInt(parts[1], 10) - 1;
+    setViewYear(isNaN(tYear) ? new Date().getFullYear() : tYear);
+    setViewMonth(isNaN(tMonth) ? new Date().getMonth() : tMonth);
     setViewMode('days');
 
     if (!isRange) {
@@ -714,8 +725,6 @@ export default function ReusableCalendar({
               const effectiveEnd = tempEnd || (tempStart && hoverDate && hoverDate >= tempStart ? hoverDate : '');
               const isInRange = isRange && tempStart && effectiveEnd && currDateStr >= tempStart && currDateStr <= effectiveEnd;
 
-              const todayObj = new Date();
-              const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
               const isToday = currDateStr === todayStr;
 
               // Date Guard checks
@@ -766,9 +775,7 @@ export default function ReusableCalendar({
       {/* ────────────────── BOTTOM ACTION BAR ────────────────── */}
       <div className="pt-2 border-t theme-border flex items-center justify-between">
         {(() => {
-          const tDate = new Date();
-          const tStr = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}-${String(tDate.getDate()).padStart(2, '0')}`;
-          const isTodayDisabled = Boolean((minDate && tStr < minDate) || (maxDate && tStr > maxDate));
+          const isTodayDisabled = Boolean((minDate && todayStr < minDate) || (maxDate && todayStr > maxDate));
           return (
             <button
               type="button"
