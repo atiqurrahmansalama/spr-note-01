@@ -59,4 +59,12 @@ export const common = {
   showing: 'دکھایا جا رہا ہے',
   of: 'میں سے',
   results: 'نتائج',
+  today: 'آج',
+  yesterday: 'کل',
+  thisWeek: 'اس ہفتے',
+  thisMonth: 'اس مہینے',
+  pastMonth: 'گزشتہ ۱ ماہ',
+  month: 'مہینہ',
+  year: 'سال',
+  done: 'مکمل',
 };

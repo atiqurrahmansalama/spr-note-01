@@ -59,4 +59,12 @@ export const common = {
   showing: 'প্রদর্শন করা হচ্ছে',
   of: 'এর মধ্যে',
   results: 'ফলাফল',
+  today: 'আজ',
+  yesterday: 'গতকাল',
+  thisWeek: 'এই সপ্তাহ',
+  thisMonth: 'এই মাস',
+  pastMonth: 'বিগত ১ মাস',
+  month: 'মাস',
+  year: 'বছর',
+  done: 'সম্পন্ন',
 };

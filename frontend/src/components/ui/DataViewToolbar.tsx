@@ -1,6 +1,7 @@
 import React from 'react';
 import CustomInput from './CustomInput';
 import { TableIcon, Squares2X2Icon, RefreshIcon, CloseIcon } from './Icons';
+import IconButton from './IconButton';
 
 export interface DataViewToolbarProps {
   searchLabel?: string | null;
@@ -89,15 +90,17 @@ export default function DataViewToolbar({
 
       {/* Refresh button */}
       {onRefresh && (
-        <button
-          type="button"
-          onClick={onRefresh}
+        <IconButton
+          icon={RefreshIcon}
+          size="md"
+          variant="sub"
+          loading={loading}
           disabled={loading}
-          className="p-2 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer disabled:opacity-50 shrink-0"
+          onClick={onRefresh}
           title="Refresh Data"
-        >
-          <RefreshIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin theme-accent' : ''}`} />
-        </button>
+          ariaLabel="Refresh Data"
+          className="shrink-0"
+        />
       )}
 
       {/* Single Toggle Button for Cards / Table View */}
@@ -203,15 +206,14 @@ export default function DataViewToolbar({
                   {selectionActions}
 
                   {onClearSelection && (
-                    <button
-                      type="button"
+                    <IconButton
+                      icon={CloseIcon}
+                      size="xs"
+                      variant="ghost"
                       onClick={onClearSelection}
-                      className="p-1 text-zinc-400 hover:theme-text-primary hover:theme-accent transition-colors cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-90"
                       title="Clear selection"
-                      aria-label="Clear selection"
-                    >
-                      <CloseIcon className="w-3.5 h-3.5" />
-                    </button>
+                      ariaLabel="Clear selection"
+                    />
                   )}
                 </div>
               </div>
@@ -275,15 +277,14 @@ export default function DataViewToolbar({
               {selectionActions}
 
               {onClearSelection && (
-                <button
-                  type="button"
+                <IconButton
+                  icon={CloseIcon}
+                  size="xs"
+                  variant="ghost"
                   onClick={onClearSelection}
-                  className="p-1 text-zinc-400 hover:theme-text-primary hover:theme-accent transition-colors cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-90"
                   title="Clear selection"
-                  aria-label="Clear selection"
-                >
-                  <CloseIcon className="w-3.5 h-3.5" />
-                </button>
+                  ariaLabel="Clear selection"
+                />
               )}
             </div>
           </div>

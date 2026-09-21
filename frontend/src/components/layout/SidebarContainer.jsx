@@ -117,7 +117,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_academic_studies",
       subItems: [
-        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/daily-progress", "/studies/recitations", "/studies/homework", "/daily-lessons", "/daily-progress", "/recitations", "/homework-tasks", "/report-builder"], Icon: BookOpenIcon, key: "daily_classroom" },
+        { id: "Daily Classroom", name: "Daily Classroom", i18nKey: "dailyClassroom", path: "/studies/daily-classroom", exactMatchPaths: ["/studies"], matchPaths: ["/studies/daily-classroom", "/studies/daily-lessons", "/studies/daily-progress", "/studies/recitations", "/studies/homework", "/daily-lessons", "/daily-progress", "/recitations", "/homework-tasks"], Icon: BookOpenIcon, key: "daily_classroom" },
         { id: "Student Reports", name: "Student Recitation Log", i18nKey: "studentReports", path: "/student-reports", matchPaths: ["/student-reports"], Icon: SavedMessagesIcon, key: "report_history" },
       ]
     },

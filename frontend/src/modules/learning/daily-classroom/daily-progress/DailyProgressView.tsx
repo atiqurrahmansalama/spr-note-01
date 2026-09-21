@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
   StudentInputSection,
   SessionInputSection,
@@ -14,6 +15,7 @@ import { useToast } from "../../../../context/ToastContext";
 import { useFont } from "../../../../context/useFont";
 import { useUndoRedo } from "../../../../context/useUndoRedo";
 import { ClockIcon, CloseIcon, EditIcon } from "../../../../components/ui/Icons";
+import IconButton from "../../../../components/ui/IconButton";
 import { useFeatureControl } from "../../../../context/FeatureControlContext";
 import DailyClassroomFilterControls from "../DailyClassroomFilterControls";
 import { useAcademicData } from "../../useAcademicData";
@@ -468,19 +470,29 @@ export default function DailyProgressView({
   }, [academicStudents]);
 
   const { registerScopeHandler } = useUndoRedo();
+  const location = useLocation();
   const isEditMode = Boolean(editingReport);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
-    return registerScopeHandler("/report-builder", {
-      undo: handleUndo,
-      redo: handleRedo,
-      canUndo: canUndoDraft,
-      canRedo: canRedoDraft,
-      undoTitle: "Restore previous draft state",
-      redoTitle: "Restore next draft state",
-    });
-  }, [registerScopeHandler, handleUndo, handleRedo, canUndoDraft, canRedoDraft]);
+    return registerScopeHandler(
+      [
+        "/studies/daily-classroom",
+        "/studies",
+        "/studies/daily-progress",
+        "/daily-progress",
+        location.pathname,
+      ],
+      {
+        undo: handleUndo,
+        redo: handleRedo,
+        canUndo: canUndoDraft,
+        canRedo: canRedoDraft,
+        undoTitle: "Restore previous draft state",
+        redoTitle: "Restore next draft state",
+      }
+    );
+  }, [registerScopeHandler, handleUndo, handleRedo, canUndoDraft, canRedoDraft, location.pathname]);
 
   useEffect(() => {
     if (!isLoading && !featureLoading) {
@@ -738,14 +750,14 @@ export default function DailyProgressView({
                     >
                       Open in New Tab
                     </button>
-                    <button
-                      type="button"
+                    <IconButton
+                      icon={CloseIcon}
+                      size="xs"
+                      variant="ghost"
                       onClick={() => discardDraft(draft)}
-                      className="p-1 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
                       title="Discard Draft"
-                    >
-                      <CloseIcon className="w-3.5 h-3.5" />
-                    </button>
+                      ariaLabel="Discard Draft"
+                    />
                   </div>
                 </div>
               );

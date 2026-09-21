@@ -88,8 +88,8 @@ export default function TeacherUstadhDashboardView() {
       description: 'Record recitation marks',
       icon: SavedMessagesIcon,
       color: 'purple',
-      path: '/report-builder',
-      onClick: () => navigate('/report-builder'),
+      path: '/studies/daily-classroom?tab=PROGRESS',
+      onClick: () => navigate('/studies/daily-classroom?tab=PROGRESS'),
     },
     {
       id: 'my_routine',

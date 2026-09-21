@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore, getBranchDisplayName } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
-import HifzReportForm from "../../modules/learning/daily-classroom/daily-progress/DailyProgressView";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
@@ -20,7 +19,8 @@ import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useUndoRedo } from "../../context/useUndoRedo";
 import { useToast } from "../../context/ToastContext";
 import { useTheme } from "../../context/useTheme";
-import { UndoIcon, RedoIcon } from "../ui/Icons";
+import { UndoIcon, RedoIcon, SunIcon, MoonIcon, MenuIcon } from "../ui/Icons";
+import IconButton from "../ui/IconButton";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
@@ -36,7 +36,6 @@ export const ROUTE_TITLE_MAP = {
   "/daily-progress": { title: "Daily Progress", category: "Academic Studies" },
   "/recitations": { title: "Daily Assessment", category: "Academic Studies" },
   "/homework-tasks": { title: "Daily Homework", category: "Academic Studies" },
-  "/report-builder": { title: "Generate Report", category: "Academic Studies" },
   "/student-reports": { title: "Student Reports", category: "Academic Studies" },
   "/classroom-config": { title: "Classroom Configuration", category: "Admin Tools" },
   "/classroom-settings": { title: "Classroom Configuration", category: "Admin Tools" },
@@ -375,7 +374,6 @@ export default function AppLayout() {
 
   const { currentInstitution, activeTenantId } = useTenant();
   const { activeBranch, activeYear } = useAcademicSession();
-  const isRightDock = location.pathname === "/report-builder" && panelDockPosition === "right" && !isMobile && !isRightSidebarOpen;
 
   // 📱 Mobile Touch Edge-Swipe gesture to open sidebar (and swipe left to close)
   useEffect(() => {
@@ -434,7 +432,7 @@ export default function AppLayout() {
 
   // Programmatic navigation event listener (e.g. from Edit button)
   useEffect(() => {
-    const handleNavDashboard = () => navigate("/report-builder");
+    const handleNavDashboard = () => navigate("/dashboard");
     window.addEventListener("spr_navigate_dashboard", handleNavDashboard);
     return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, [navigate]);
@@ -548,8 +546,8 @@ export default function AppLayout() {
           setIsProfileOpen(false);
         } else if (isSidebarOpen) {
           setIsSidebarOpen(false);
-        } else if (location.pathname !== "/" && location.pathname !== "/dashboard" && location.pathname !== "/report-builder") {
-          navigate("/report-builder");
+        } else if (location.pathname !== "/" && location.pathname !== "/dashboard") {
+          navigate("/dashboard");
         }
       }
     };
@@ -577,10 +575,8 @@ export default function AppLayout() {
 
 
   const currentPath = location.pathname;
-  const isDashboardRoute = currentPath === "/dashboard";
-  const isReportBuilderRoute = currentPath === "/report-builder";
-  const isMainFormView = isReportBuilderRoute;
-  const showRoutePanel = !isDashboardRoute && !isReportBuilderRoute;
+  const isDashboardRoute = currentPath === "/dashboard" || currentPath === "/";
+  const showRoutePanel = !isDashboardRoute;
   let routeMeta = ROUTE_TITLE_MAP[currentPath];
   if (currentPath === "/academy/campus-profile") {
     const searchParams = new URLSearchParams(location.search);
@@ -650,18 +646,18 @@ export default function AppLayout() {
       {/* Global Top Navigation Bar */}
       <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 relative">
         <div className="flex items-center gap-3 z-10 shrink-0">
-          <button 
-            type="button"
+          <IconButton
+            icon={MenuIcon}
+            size="md"
+            variant="ghost"
             onClick={handleToggleMenu}
-            className="p-1.5 theme-text-primary hover:theme-accent text-xl font-bold transition-colors bg-transparent border-0 flex items-center justify-center cursor-pointer active:scale-95"
-            title="Toggle Navigation Menu"
-          >
-            <span>☰</span>
-          </button>
+            title="Toggle Navigation Menu (Ctrl+M)"
+            ariaLabel="Toggle Navigation Menu"
+          />
           
           <button 
             type="button"
-            onClick={() => navigate("/studies/daily-classroom")}
+            onClick={() => navigate("/dashboard")}
             className="flex items-center gap-2 cursor-pointer text-left group"
             title="SPR Note"
           >
@@ -706,56 +702,40 @@ export default function AppLayout() {
         <div className="flex items-center gap-3 z-10 shrink-0 ml-auto">
           <SaveStatusBadge />
 
-          {/* Universal Route-Aware Undo / Redo Widget */}
-          <div className="flex items-center gap-1 theme-bg-sub border theme-border rounded-xl p-0.5 shadow-inner">
-            <button
-              type="button"
-              onClick={undo}
-              disabled={!canUndo}
-              className={`p-1.5 rounded-lg transition flex items-center justify-center bg-transparent border-0 ${
-                canUndo
-                  ? "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer active:scale-95"
-                  : "theme-text-muted opacity-35 cursor-not-allowed"
-              }`}
-              title={canUndo ? `Undo: ${undoTitle || 'Last action'} (Ctrl+Z)` : "Nothing to undo (Ctrl+Z)"}
-            >
-              <UndoIcon className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={redo}
-              disabled={!canRedo}
-              className={`p-1.5 rounded-lg transition flex items-center justify-center bg-transparent border-0 ${
-                canRedo
-                  ? "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer active:scale-95"
-                  : "theme-text-muted opacity-35 cursor-not-allowed"
-              }`}
-              title={canRedo ? `Redo: ${redoTitle || 'Last action'} (Ctrl+Y)` : "Nothing to redo (Ctrl+Y)"}
-            >
-              <RedoIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {/* Universal Route-Aware Undo / Redo Widget (Only visible when undo/redo is available and not on dashboard) */}
+          {(!location.pathname || (location.pathname !== "/" && location.pathname !== "/dashboard" && !ROUTE_TITLE_MAP[location.pathname]?.isDashboard)) && (canUndo || canRedo) && (
+            <div className="flex items-center gap-0.5 animate-fade-in">
+              <IconButton
+                icon={UndoIcon}
+                size="sm"
+                variant="ghost"
+                onClick={undo}
+                disabled={!canUndo}
+                title={canUndo ? `Undo: ${undoTitle || 'Last action'} (Ctrl+Z)` : "Nothing to undo (Ctrl+Z)"}
+              />
+              <IconButton
+                icon={RedoIcon}
+                size="sm"
+                variant="ghost"
+                onClick={redo}
+                disabled={!canRedo}
+                title={canRedo ? `Redo: ${redoTitle || 'Last action'} (Ctrl+Y)` : "Nothing to redo (Ctrl+Y)"}
+              />
+            </div>
+          )}
 
           {/* Dark / Light Mode Toggle Button */}
-          <button
-            type="button"
+          <IconButton
+            icon={themeContext.modeId === "dark" ? SunIcon : MoonIcon}
+            size="sm"
+            variant="ghost"
             onClick={() => {
               const nextMode = themeContext.modeId === "dark" ? "light" : "dark";
               themeContext.setModeId(nextMode);
             }}
-            className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent flex items-center justify-center cursor-pointer active:scale-95"
             title={themeContext.modeId === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {themeContext.modeId === "dark" ? (
-              <svg className="w-4 h-4 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
+            className="theme-accent"
+          />
 
           {/* Multi-Language & RTL Switcher */}
           <LanguageSelectorDropdown />
@@ -803,38 +783,9 @@ export default function AppLayout() {
           </main>
         )}
 
-
-        {isMainFormView && (
-          <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 transition-all duration-300 flex justify-center items-start min-w-0">
-            <div className="w-full max-w-xl mx-auto min-w-0">
-              <HifzReportForm timeZone={timeZone} dateFormat={dateFormat} />
-            </div>
-          </main>
-        )}
-
         {/* Route Content Panel */}
         {showRoutePanel && (
-          <div 
-            className={
-              isRightDock
-                ? "h-full shrink-0 z-20 shadow-2xl relative border-l theme-border flex max-w-full theme-bg-app min-w-0"
-                : "flex-1 h-full overflow-hidden relative min-w-0"
-            }
-            style={
-              isRightDock
-                ? { width: `${rightPanelWidth}px`, transition: isResizing ? "none" : "width 0.15s ease-out" }
-                : undefined
-            }
-          >
-            {isRightDock && (
-              <PanelResizer
-                onStartResize={startResizing}
-                isResizing={isResizing}
-                position="left"
-                title="Drag left or right to resize sidebar width"
-              />
-            )}
-
+          <div className="flex-1 h-full overflow-hidden relative min-w-0">
             <div className="w-full h-full flex-1 overflow-hidden min-w-0">
               <SidebarScreenBlockView
                 title={routeMeta.title}
@@ -842,12 +793,9 @@ export default function AppLayout() {
                 subCategory={routeMeta.subCategory}
                 onClose={() => {
                   closeRightSidebar();
-                  navigate("/report-builder");
+                  navigate("/dashboard");
                 }}
-                dockPosition={isRightDock ? "right" : "left"}
-                onToggleDock={!isMobile ? togglePanelDock : undefined}
-                isDockDisabled={isRightSidebarOpen}
-                dockDisabledReason="Right sidebar is currently occupied by active action panel"
+                dockPosition="left"
               >
                 <Outlet context={{ timeZone, setTimeZone, dateFormat, setDateFormat }} />
               </SidebarScreenBlockView>

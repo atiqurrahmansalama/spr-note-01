@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, CloseIcon, InfoIcon, AlertCircleIcon } from '../components/ui/Icons';
+import IconButton from '../components/ui/IconButton';
 
 const ToastContext = createContext(null);
 
@@ -155,19 +156,19 @@ export function ToastProvider({ children }) {
             </div>
 
             {/* Close Button */}
-            <button
-              type="button"
+            <IconButton
+              icon={CloseIcon}
+              size="xs"
+              variant="ghost"
               data-toast-close="true"
               onClick={(e) => {
                 e.stopPropagation();
                 removeToast(toast.id);
               }}
-              className="p-1 rounded-lg hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition shrink-0 cursor-pointer ml-1"
+              className="ml-1 shrink-0"
               title="Dismiss notification"
-              aria-label="Dismiss notification"
-            >
-              <CloseIcon className="w-3.5 h-3.5" />
-            </button>
+              ariaLabel="Dismiss notification"
+            />
           </div>
         );
       })}

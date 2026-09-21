@@ -48,7 +48,7 @@ export interface UndoRedoContextType {
   clearHistory: (targetScope?: string) => void;
   activeScope: string;
   setActiveScopeOverride: (scope: string | null) => void;
-  registerScopeHandler: (scope: string, handler: ScopeHandler) => () => void;
+  registerScopeHandler: (scope: string | string[], handler: ScopeHandler) => () => void;
 }
 
 const defaultContextValue: UndoRedoContextType = {
@@ -90,6 +90,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
 
   // Active custom scope handlers: { [scopeKey]: Handler }
   const scopeHandlersRef = useRef<Map<string, ScopeHandler>>(new Map());
+  const [scopeHandlersVersion, setScopeHandlersVersion] = useState<number>(0);
 
   // Keep a ref of the latest historyMap and activeScope for keydown event listener
   const historyMapRef = useRef(historyMap);
@@ -107,8 +108,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   const globalPastStack = globalScopeHistory.past || [];
   const globalFutureStack = globalScopeHistory.future || [];
 
-  // Check if a registered scope handler is present
-  const activeHandler = scopeHandlersRef.current.get(activeScope);
+  // Check if a registered scope handler is present (reacts to scopeHandlersVersion)
+  const activeHandler = scopeHandlersRef.current.get(activeScope) || scopeHandlersRef.current.get('global');
 
   const canUndo = Boolean(activeHandler?.canUndo ?? (pastStack.length > 0 || globalPastStack.length > 0));
   const canRedo = Boolean(activeHandler?.canRedo ?? (futureStack.length > 0 || globalFutureStack.length > 0));
@@ -271,14 +272,22 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   /**
    * Registers a specialized scope handler for high-frequency or complex components
    */
-  const registerScopeHandler = useCallback((scope: string, handler: ScopeHandler) => {
-    const cleanScope = normalizeScopeKey(scope);
-    scopeHandlersRef.current.set(cleanScope, handler);
+  const registerScopeHandler = useCallback((scope: string | string[], handler: ScopeHandler) => {
+    const scopes = Array.isArray(scope) ? scope : [scope];
+    scopes.forEach((s) => {
+      const cleanScope = normalizeScopeKey(s);
+      scopeHandlersRef.current.set(cleanScope, handler);
+    });
+    setScopeHandlersVersion((v) => v + 1);
 
     return () => {
-      if (scopeHandlersRef.current.get(cleanScope) === handler) {
-        scopeHandlersRef.current.delete(cleanScope);
-      }
+      scopes.forEach((s) => {
+        const cleanScope = normalizeScopeKey(s);
+        if (scopeHandlersRef.current.get(cleanScope) === handler) {
+          scopeHandlersRef.current.delete(cleanScope);
+        }
+      });
+      setScopeHandlersVersion((v) => v + 1);
     };
   }, []);
 

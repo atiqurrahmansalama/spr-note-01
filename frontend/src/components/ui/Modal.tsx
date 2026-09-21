@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon, CheckIcon, AlertCircleIcon } from './Icons';
 import CustomButton from './CustomButton';
+import IconButton from './IconButton';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -132,14 +133,14 @@ export const Modal: React.FC<ModalProps> = ({
               <div className="flex items-center gap-2 shrink-0">
                 {headerActions}
                 {showCloseButton && (
-                  <button
-                    type="button"
+                  <IconButton
+                    icon={CloseIcon}
+                    size="sm"
+                    variant="ghost"
                     onClick={onClose}
-                    className="p-1.5 rounded-xl text-zinc-400 hover:theme-text-primary hover:theme-bg-elevated border border-transparent hover:theme-border transition-all cursor-pointer shrink-0"
-                    aria-label="Close modal"
-                  >
-                    <CloseIcon className="w-5 h-5" />
-                  </button>
+                    ariaLabel="Close modal"
+                    title="Close (Esc)"
+                  />
                 )}
               </div>
             )}

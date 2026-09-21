@@ -21,6 +21,7 @@ import {
   PlusIcon,
   MinusIcon,
 } from "./Icons";
+import IconButton from "./IconButton";
 import {
   INPUT_TYPE_CONFIGS,
   validateBDPhone,
@@ -817,61 +818,58 @@ const CustomInput = forwardRef(function CustomInput(
             {/* Stepper Buttons for Number mode */}
             {normalizedType === "number" && stepper && !disabled && !readOnly && (
               <div className="flex flex-col items-center gap-0.5 shrink-0">
-                <button
-                  type="button"
+                <IconButton
+                  icon={PlusIcon}
+                  size="2xs"
+                  variant="ghost"
                   tabIndex={-1}
                   onClick={() => {
                     const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
                     updateNumberValue(numericStep);
                   }}
-                  className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
                   title="Increase value"
-                >
-                  <PlusIcon className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
+                  ariaLabel="Increase value"
+                />
+                <IconButton
+                  icon={MinusIcon}
+                  size="2xs"
+                  variant="ghost"
                   tabIndex={-1}
                   onClick={() => {
                     const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
                     updateNumberValue(-numericStep);
                   }}
-                  className="p-1 rounded-md hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
                   title="Decrease value"
-                >
-                  <MinusIcon className="w-3 h-3" />
-                </button>
+                  ariaLabel="Decrease value"
+                />
               </div>
             )}
 
             {/* Password Show/Hide Toggle */}
             {normalizedType === "password" && showPasswordToggle && !disabled && (
-              <button
-                type="button"
+              <IconButton
+                icon={showPassword ? EyeOffIcon : EyeIcon}
+                size="xs"
+                variant="ghost"
                 tabIndex={-1}
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition cursor-pointer focus:outline-none"
                 title={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? (
-                  <EyeOffIcon className="w-4 h-4" />
-                ) : (
-                  <EyeIcon className="w-4 h-4" />
-                )}
-              </button>
+                ariaLabel={showPassword ? "Hide password" : "Show password"}
+              />
             )}
 
             {/* Instant Clear Button */}
             {clearable && stringValue.length > 0 && !disabled && !readOnly && (
-              <button
-                type="button"
+              <IconButton
+                icon={CloseIcon}
+                size="2xs"
+                variant="ghost"
                 tabIndex={-1}
                 onClick={handleClear}
-                className="p-1 rounded-full theme-bg-elevated theme-text-secondary hover:theme-text-primary hover:theme-danger transition cursor-pointer"
                 title="Clear input"
-              >
-                <CloseIcon className="w-3 h-3" />
-              </button>
+                ariaLabel="Clear input"
+                className="hover:!text-rose-500"
+              />
             )}
 
             {/* Valid Success Check Icon */}

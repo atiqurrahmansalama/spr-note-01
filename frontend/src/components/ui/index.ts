@@ -27,4 +27,6 @@ export { default as RadioCard } from './RadioCard';
 export type { RadioCardProps } from './RadioCard';
 export { default as CollapsiblePageHeader } from './CollapsiblePageHeader';
 export type { CollapsiblePageHeaderProps, TabItem } from './CollapsiblePageHeader';
+export { default as IconButton, IconButton as NamedIconButton } from './IconButton';
+export type { IconButtonProps, IconButtonVariant, IconButtonSize, IconButtonShape } from './IconButton';
 export * from './Icons';

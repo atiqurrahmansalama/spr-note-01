@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { CloseIcon, ChevronLeftIcon } from './Icons';
 import PanelResizer from './PanelResizer';
+import IconButton from './IconButton';
 
 /**
  * Standard Width Presets for Right Sidebar Drawer (in pixels)
@@ -213,15 +214,15 @@ export default function RightSidebarPanel({
 
           {/* Close Button */}
           {onClose && showCloseButton && (
-            <button
-              type="button"
+            <IconButton
+              icon={CloseIcon}
+              size="sm"
+              variant="sub"
               onClick={onClose}
-              className="p-1.5 rounded-xl border theme-border theme-bg-sub theme-text-secondary hover:text-rose-500 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all cursor-pointer flex items-center justify-center shadow-xs active:scale-95"
+              ariaLabel="Close Panel"
               title="Close Panel (Esc)"
-              aria-label="Close Panel"
-            >
-              <CloseIcon className="w-4 h-4" />
-            </button>
+              className="hover:!text-rose-500 hover:!border-rose-500/30 hover:!bg-rose-500/10"
+            />
           )}
         </div>
       </div>

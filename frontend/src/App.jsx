@@ -113,6 +113,13 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function RootRoute() {
+  if (authStore.isLoggedIn()) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <LandingPageView />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -121,7 +128,7 @@ export default function App() {
           <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
               {/* Standalone Public Auth & Verification Routes */}
-              <Route path="/" element={<LandingPageView />} />
+              <Route path="/" element={<RootRoute />} />
               <Route path="/login" element={<LoginView />} />
               <Route path="/register" element={<RegisterView />} />
               <Route path="/verify-email/:token" element={<VerifyEmailView />} />
@@ -144,7 +151,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/report-builder" element={<Navigate to="/studies/daily-classroom?tab=PROGRESS" replace />} />
+                <Route path="/dashboard" element={<DashboardHubView />} />
+                <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/student-reports" element={<FeatureGuard sectionKey="report_history" fallback={<Navigate to="/dashboard" replace />}><StudentReportsView /></FeatureGuard>} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
                 <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />

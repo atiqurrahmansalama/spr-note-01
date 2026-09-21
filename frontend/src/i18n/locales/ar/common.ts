@@ -59,4 +59,12 @@ export const common = {
   showing: 'عرض',
   of: 'من',
   results: 'النتائج',
+  today: 'اليوم',
+  yesterday: 'أمس',
+  thisWeek: 'هذا الأسبوع',
+  thisMonth: 'هذا الشهر',
+  pastMonth: 'الشهر الماضي',
+  month: 'شهر',
+  year: 'سنة',
+  done: 'تم',
 };

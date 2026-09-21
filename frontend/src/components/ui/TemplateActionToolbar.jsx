@@ -13,6 +13,7 @@ import {
 import { useTemplateStore } from "../../hooks/useTemplateStore";
 import { useToast } from "../../context/ToastContext";
 import { useUndoRedo } from "../../context/useUndoRedo";
+import IconButton from "./IconButton";
 
 /**
  * Enterprise Reusable Template Action Toolbar
@@ -372,28 +373,28 @@ export default function TemplateActionToolbar({
     >
       {/* Clear Button */}
       {showClear && (value || "").length > 0 && (
-        <button
-          type="button"
+        <IconButton
+          icon={RefreshIcon}
+          size={size}
+          variant="sub"
           onClick={handleClear}
-          className={`${currentSizeClass} theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated active:scale-95 transition-all cursor-pointer shadow-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]/30`}
           title="Clear text"
-          aria-label="Clear text"
-        >
-          <RefreshIcon className={currentIconSize} />
-        </button>
+          ariaLabel="Clear text"
+          className="hover:!text-rose-500"
+        />
       )}
 
       {/* Save Template Button */}
       {isSaveVisible && (
-        <button
-          type="button"
+        <IconButton
+          icon={SaveIcon}
+          size={size}
+          variant="sub"
           onClick={handleSave}
-          className={`${currentSizeClass} theme-bg-sub border theme-border theme-text-secondary hover:theme-accent hover:theme-bg-elevated active:scale-95 transition-all cursor-pointer shadow-xs animate-fade-in focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]/30`}
           title="Save as reusable template"
-          aria-label="Save as template"
-        >
-          <SaveIcon className={currentIconSize} />
-        </button>
+          ariaLabel="Save as template"
+          className="hover:!text-[var(--accent-main)] animate-fade-in"
+        />
       )}
 
       {/* Saved Messages / Templates Toggle Button */}
@@ -444,18 +445,17 @@ export default function TemplateActionToolbar({
                 {count}
               </span>
             </div>
-            <button
-              type="button"
+            <IconButton
+              icon={CloseIcon}
+              size="xs"
+              variant="ghost"
               onClick={() => {
                 setIsOpen(false);
                 setEditingItemId(null);
               }}
-              className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
               title="Close"
-              aria-label="Close"
-            >
-              <CloseIcon className="w-3.5 h-3.5" />
-            </button>
+              ariaLabel="Close"
+            />
           </div>
 
           {/* Search bar when enabled and templates count >= 3 */}
@@ -506,24 +506,22 @@ export default function TemplateActionToolbar({
                         placeholder="Edit template..."
                       />
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
+                        <IconButton
+                          icon={CloseIcon}
+                          size="xs"
+                          variant="ghost"
                           onClick={(e) => handleCancelEdit(e)}
-                          className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition cursor-pointer"
                           title="Cancel"
-                          aria-label="Cancel"
-                        >
-                          <CloseIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
+                          ariaLabel="Cancel"
+                        />
+                        <IconButton
+                          icon={CheckIcon}
+                          size="xs"
+                          variant="accent"
                           onClick={(e) => handleSaveEdit(e, item)}
-                          className="p-1 rounded-lg theme-bg-accent theme-accent-text hover:opacity-90 transition cursor-pointer shadow-xs"
                           title="Save"
-                          aria-label="Save"
-                        >
-                          <CheckIcon className="w-3.5 h-3.5" />
-                        </button>
+                          ariaLabel="Save"
+                        />
                       </div>
                     </div>
                   );
@@ -546,26 +544,25 @@ export default function TemplateActionToolbar({
                     {(shouldAllowEdit || shouldAllowDelete) && (
                       <div className="flex items-center gap-0.5 shrink-0 mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
                         {shouldAllowEdit && (
-                          <button
-                            type="button"
+                          <IconButton
+                            icon={EditIcon}
+                            size="2xs"
+                            variant="ghost"
                             onClick={(e) => handleStartEdit(e, item)}
-                            className="p-1 rounded-lg theme-text-secondary hover:theme-accent transition-colors cursor-pointer hover:theme-bg-sub"
                             title="Edit template"
-                            aria-label="Edit template"
-                          >
-                            <EditIcon className="w-3.5 h-3.5" />
-                          </button>
+                            ariaLabel="Edit template"
+                          />
                         )}
                         {shouldAllowDelete && (
-                          <button
-                            type="button"
+                          <IconButton
+                            icon={TrashIcon}
+                            size="2xs"
+                            variant="ghost"
                             onClick={(e) => handleDelete(e, item)}
-                            className="p-1 rounded-lg theme-text-secondary hover:theme-danger transition-colors cursor-pointer hover:theme-bg-sub"
                             title="Delete template"
-                            aria-label="Delete template"
-                          >
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
+                            ariaLabel="Delete template"
+                            className="hover:!text-rose-500"
+                          />
                         )}
                       </div>
                     )}
