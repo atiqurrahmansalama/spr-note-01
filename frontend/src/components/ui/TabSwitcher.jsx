@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { useHorizontalScroll } from '../../hooks';
 
 /**
  * Reusable Theme-Aware Tab Switcher Component
@@ -20,64 +21,8 @@ export default function TabSwitcher({
   rightContent = null,
   className = '',
 }) {
-  const tabsContainerRef = useRef(null);
+  const tabsContainerRef = useHorizontalScroll();
   const handleTabSelect = onChange || onTabChange;
-
-  // Setup horizontal mouse wheel and drag scrolling on tabs
-  useEffect(() => {
-    const el = tabsContainerRef.current;
-    if (!el) return;
-
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    const handleWheel = (e) => {
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (delta !== 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        el.scrollLeft += delta;
-      }
-    };
-
-    const handleMouseDown = (e) => {
-      if (e.button !== 0) return;
-      isDown = true;
-      startX = e.pageX - el.offsetLeft;
-      scrollLeft = el.scrollLeft;
-    };
-
-    const handleMouseLeave = () => {
-      isDown = false;
-    };
-
-    const handleMouseUp = () => {
-      isDown = false;
-    };
-
-    const handleMouseMove = (e) => {
-      if (!isDown) return;
-      e.preventDefault();
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX) * 1.5;
-      el.scrollLeft = scrollLeft - walk;
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    el.addEventListener('mousedown', handleMouseDown);
-    el.addEventListener('mouseleave', handleMouseLeave);
-    el.addEventListener('mouseup', handleMouseUp);
-    el.addEventListener('mousemove', handleMouseMove);
-
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-      el.removeEventListener('mousedown', handleMouseDown);
-      el.removeEventListener('mouseleave', handleMouseLeave);
-      el.removeEventListener('mouseup', handleMouseUp);
-      el.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, []);
 
   // Auto-scroll active tab into view
   useEffect(() => {
@@ -91,18 +36,12 @@ export default function TabSwitcher({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pb-0.5 border-b theme-border w-full min-w-0 ${className}`}
+      className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-b theme-border w-full min-w-0 ${className}`}
     >
       {/* Tabs List with Wheel & Drag Scrolling */}
       <div
         ref={tabsContainerRef}
-        onWheel={(e) => {
-          const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-          if (delta !== 0) {
-            e.currentTarget.scrollLeft += delta;
-          }
-        }}
-        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none shrink-0 min-w-0 cursor-grab active:cursor-grabbing"
+        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1.5"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

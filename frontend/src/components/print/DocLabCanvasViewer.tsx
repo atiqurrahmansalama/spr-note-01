@@ -9,7 +9,10 @@ import {
   ZoomOutIcon,
   ZoomResetIcon,
   ArrowsPointingOutIcon,
+  GripVerticalIcon,
 } from '../ui/Icons';
+import IconButton from '../ui/IconButton';
+import { useDraggable } from '../../hooks/useDraggable';
 import { PrintPageSize, PrintOrientation, PrintMargin, PrintDensity, PrintColorMode } from './types';
 
 export interface DocLabCanvasViewerProps {
@@ -381,6 +384,19 @@ export const DocLabCanvasViewer: React.FC<DocLabCanvasViewerProps> = ({
     setPan({ x: 0, y: 0 });
   }, [onZoomChange]);
 
+  const {
+    targetRef: dockRef,
+    handleProps: dockHandleProps,
+    containerProps: dockContainerProps,
+    isDragging: isDockDragging,
+    style: dockStyle,
+  } = useDraggable({
+    storageKey: 'spr_doclab_canvas_dock_pos',
+    defaultPosition: 'bottom-center',
+    defaultOffset: { bottom: 20 },
+    zIndex: 30,
+  });
+
   const isOffset = Math.abs(pan.x) > 15 || Math.abs(pan.y) > 15;
 
   return (
@@ -432,185 +448,164 @@ export const DocLabCanvasViewer: React.FC<DocLabCanvasViewerProps> = ({
         </div>
       </div>
 
-      {/* Floating Canvas Interactive Tool Dock */}
-      {/* Floating Canvas Interactive Tool Dock (Solid Opaque Background, Zero Blur, Pure Icon Buttons) */}
+      {/* Floating Canvas Interactive Tool Dock (Draggable & Sticky Workbench) */}
       <nav
+        ref={dockRef}
         aria-label="Canvas Workbench Controls"
-        className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 p-1.5 rounded-2xl theme-bg-elevated theme-text-primary border theme-border shadow-xl animate-fade-in print:hidden select-none"
+        style={dockStyle}
+        {...dockContainerProps}
+        className={`fixed z-30 flex items-center gap-1 p-1.5 rounded-2xl theme-bg-elevated theme-text-primary border theme-border shadow-xl select-none transition-shadow animate-fade-in print:hidden ${
+          isDockDragging ? 'cursor-grabbing shadow-2xl scale-102 ring-2 ring-[var(--accent-main)]/30' : 'cursor-grab'
+        }`}
       >
+        {/* Subtle Drag Grip Handle */}
+        <div
+          {...dockHandleProps}
+          className="px-1 py-1 theme-text-secondary/50 hover:theme-text-primary transition-colors flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
+          title="Drag to reposition toolbar • Double-click to reset"
+          aria-label="Drag toolbar"
+        >
+          <GripVerticalIcon className="w-3.5 h-3.5" />
+        </div>
+
+        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700/60 shrink-0 mx-0.5" />
+
         {/* Undo Action */}
         {onUndo && (
-          <button
-            type="button"
+          <IconButton
+            icon={UndoIcon}
+            size="sm"
+            variant="ghost"
+            disabled={!canUndo}
             onClick={(e) => {
               e.stopPropagation();
               onUndo();
             }}
-            disabled={!canUndo}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-              canUndo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub active:scale-95 cursor-pointer'
-                : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
-            }`}
             title="Undo last change (Ctrl + Z)"
-            aria-label="Undo"
-          >
-            <UndoIcon className="w-4 h-4" />
-          </button>
+            ariaLabel="Undo"
+          />
         )}
 
         {/* Redo Action */}
         {onRedo && (
-          <button
-            type="button"
+          <IconButton
+            icon={RedoIcon}
+            size="sm"
+            variant="ghost"
+            disabled={!canRedo}
             onClick={(e) => {
               e.stopPropagation();
               onRedo();
             }}
-            disabled={!canRedo}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-              canRedo
-                ? 'theme-text-primary hover:theme-accent hover:theme-bg-sub active:scale-95 cursor-pointer'
-                : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
-            }`}
             title="Redo change (Ctrl + Y / Ctrl + Shift + Z)"
-            aria-label="Redo"
-          >
-            <RedoIcon className="w-4 h-4" />
-          </button>
+            ariaLabel="Redo"
+          />
         )}
 
-        {(onUndo || onRedo) && <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />}
+        {(onUndo || onRedo) && <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700/60 shrink-0 mx-0.5" />}
 
         {/* Pointer Mode: Select Text & In-place Edit */}
-        <button
-          type="button"
+        <IconButton
+          icon={CursorPointerIcon}
+          size="sm"
+          variant={effectivePointerMode === 'select' ? 'accent-soft' : 'ghost'}
           onClick={(e) => {
             e.stopPropagation();
             onPointerModeChange?.('select');
           }}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
-            effectivePointerMode === 'select'
-              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/35 shadow-2xs'
-              : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
-          }`}
           title="Select & Edit Mode (V) — Click directly on document text to edit inline"
-          aria-label="Select Text Mode"
-        >
-          <CursorPointerIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Select Text Mode"
+        />
 
         {/* Pointer Mode: Move Canvas Hand */}
-        <button
-          type="button"
+        <IconButton
+          icon={HandIcon}
+          size="sm"
+          variant={effectivePointerMode === 'hand' ? 'accent-soft' : 'ghost'}
           onClick={(e) => {
             e.stopPropagation();
             onPointerModeChange?.('hand');
           }}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
-            effectivePointerMode === 'hand'
-              ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/35 shadow-2xs'
-              : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
-          }`}
           title="Pan Hand Tool (H / Space) — Drag anywhere to fluidly pan paper"
-          aria-label="Pan Hand Mode"
-        >
-          <HandIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Pan Hand Mode"
+        />
 
         {/* Divider */}
-        <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />
+        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700/60 shrink-0 mx-0.5" />
 
         {/* Zoom Out Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={ZoomOutIcon}
+          size="sm"
+          variant="ghost"
+          disabled={zoomLevel <= 0.35}
           onClick={(e) => {
             e.stopPropagation();
             handleZoomOut();
           }}
-          disabled={zoomLevel <= 0.35}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            zoomLevel > 0.35
-              ? 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer'
-              : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
-          }`}
           title="Zoom Out (Ctrl -)"
-          aria-label="Zoom Out"
-        >
-          <ZoomOutIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Zoom Out"
+        />
 
         {/* Zoom Reset to 100% Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={ZoomResetIcon}
+          size="sm"
+          variant="ghost"
           onClick={(e) => {
             e.stopPropagation();
             handleResetZoom();
           }}
-          className="p-2 rounded-xl transition-all flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer border border-transparent"
           title={`Reset Zoom to 100% (Current: ${Math.round(zoomLevel * 100)}% • Ctrl 0)`}
-          aria-label="Reset Zoom to 100%"
-        >
-          <ZoomResetIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Reset Zoom to 100%"
+        />
 
         {/* Zoom In Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={ZoomInIcon}
+          size="sm"
+          variant="ghost"
+          disabled={zoomLevel >= 2.45}
           onClick={(e) => {
             e.stopPropagation();
             handleZoomIn();
           }}
-          disabled={zoomLevel >= 2.45}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            zoomLevel < 2.45
-              ? 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 cursor-pointer'
-              : 'theme-text-muted/30 opacity-30 cursor-not-allowed'
-          }`}
           title="Zoom In (Ctrl +)"
-          aria-label="Zoom In"
-        >
-          <ZoomInIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Zoom In"
+        />
 
         {/* Divider */}
-        <div className="w-px h-5 theme-border bg-current opacity-20 mx-0.5" />
+        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700/60 shrink-0 mx-0.5" />
 
         {/* Fit to Screen / Window Action Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={ArrowsPointingOutIcon}
+          size="sm"
+          variant="ghost"
           onClick={(e) => {
             e.stopPropagation();
             handleFitToScreen();
           }}
-          className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-transparent"
           title="Fit Page to Window (F)"
-          aria-label="Fit Page to Window"
-        >
-          <ArrowsPointingOutIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Fit Page to Window"
+        />
 
         {/* Recenter Artboard Action Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={CrosshairIcon}
+          size="sm"
+          variant={isOffset ? 'accent-soft' : 'ghost'}
           onClick={(e) => {
             e.stopPropagation();
             handleRecenter();
           }}
-          className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-            isOffset
-              ? 'theme-accent theme-bg-accent-soft border border-[var(--accent-main)]/35 animate-pulse'
-              : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border border-transparent'
-          }`}
           title={
             isOffset
               ? 'Recenter Artboard (Canvas is panned • Double-click canvas to center)'
               : 'Recenter Artboard (Double-click canvas to center)'
           }
-          aria-label="Recenter Artboard"
-        >
-          <CrosshairIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Recenter Artboard"
+        />
       </nav>
     </div>
   );

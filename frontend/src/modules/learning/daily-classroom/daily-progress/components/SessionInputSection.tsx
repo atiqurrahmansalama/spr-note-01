@@ -1,5 +1,4 @@
 import React, { useMemo } from "react";
-import { Link } from "react-router-dom";
 import AutocompleteDropdown, { AutocompleteOption } from "../../../../../components/ui/AutocompleteDropdown";
 
 export interface SessionItem {
@@ -46,16 +45,6 @@ export default function SessionInputSection({
     }
   };
 
-  const headerAction = (
-    <Link
-      to="/admin-tools?tab=report-sessions"
-      className="text-xs font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
-      title="Add or manage sessions"
-    >
-      <span>+ Add Session</span>
-    </Link>
-  );
-
   return (
     <div className="w-full">
       <AutocompleteDropdown
@@ -65,7 +54,9 @@ export default function SessionInputSection({
         onQueryChange={handleQueryChange}
         placeholder="e.g. Sobok, Dour..."
         label="SESSION"
-        headerAction={headerAction}
+        actionLabel="+ Add Session"
+        actionTo="/admin-tools?tab=report-sessions"
+        actionTitle="Add or manage sessions"
         size="md"
       />
     </div>

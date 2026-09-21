@@ -6,6 +6,7 @@ import React, {
   useId,
   useImperativeHandle,
 } from "react";
+import { Link } from "react-router-dom";
 import {
   EyeIcon,
   EyeOffIcon,
@@ -136,6 +137,8 @@ const CustomInput = forwardRef(function CustomInput(
     manageTitle = null,
     onActionClick = null,
     actionLabel = null,
+    actionTo = null,
+    actionTitle = null,
     headerAction = null,
     ...restProps
   },
@@ -673,7 +676,7 @@ const CustomInput = forwardRef(function CustomInput(
   return (
     <div className={`text-left font-sans ${isBorderless && !label && !subLabel && !badge && !optional ? (wrapperClassName || "w-full h-full") : `w-full ${wrapperClassName}`}`}>
       {/* Top Bar: Label, Optional Sublabel, and Badges */}
-      {(label || subLabel || badge || optional || enableTemplates) && (
+      {(label || subLabel || badge || optional || enableTemplates || headerAction || onManage || onActionClick || actionTo || actionLabel) && (
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {label && (
@@ -696,12 +699,20 @@ const CustomInput = forwardRef(function CustomInput(
           <div className="flex items-center gap-1.5">
             {headerAction ? (
               headerAction
+            ) : actionTo ? (
+              <Link
+                to={actionTo}
+                className="text-[10px] font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
+                title={actionTitle || manageTitle || (typeof actionLabel === "string" ? actionLabel : undefined)}
+              >
+                <span>{actionLabel || manageLabel || "+ Add"}</span>
+              </Link>
             ) : (onManage || onActionClick) ? (
               <button
                 type="button"
                 onClick={onManage || onActionClick}
                 className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
-                title={manageTitle || `Manage ${label || 'options'}`}
+                title={actionTitle || manageTitle || `Manage ${label || 'options'}`}
               >
                 <span>{manageLabel || actionLabel || 'Manage'}</span>
               </button>

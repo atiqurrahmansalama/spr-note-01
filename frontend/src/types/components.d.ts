@@ -63,36 +63,6 @@ declare module '@/components/ui/CustomInput' {
   export default CustomInput;
 }
 
-declare module '@/components/ui/CustomSelect' {
-  export interface Option {
-    value?: string | number;
-    label?: string;
-    [key: string]: any;
-  }
-  export interface CustomSelectProps {
-    label?: React.ReactNode;
-    value?: any;
-    onChange?: (value: any) => void;
-    options?: Option[] | any[];
-    placeholder?: string;
-    error?: string;
-    required?: boolean;
-    searchable?: boolean;
-    disabled?: boolean;
-    direction?: 'top' | 'bottom' | 'up' | 'down' | 'auto';
-    icon?: React.ComponentType<{ className?: string }>;
-    size?: 'sm' | 'md' | 'lg' | string;
-    compactMode?: boolean;
-    showDescription?: boolean;
-    showBadge?: boolean;
-    multiple?: boolean;
-    isMulti?: boolean;
-    className?: string;
-    [key: string]: any;
-  }
-  const CustomSelect: React.ComponentType<CustomSelectProps>;
-  export default CustomSelect;
-}
 
 declare module '@/components/ui/DataTable' {
   export interface Column<T = any> {
@@ -360,20 +330,5 @@ declare module '@/context/RightSidebarContext' {
   ): void;
 }
 
-declare module '@/components/ui/PanelResizer' {
-  export interface PanelResizerProps {
-    onStartResize?: (e: React.MouseEvent | React.TouchEvent) => void;
-    onResetResize?: () => void;
-    position?: 'left' | 'right' | 'top' | 'bottom';
-    orientation?: 'vertical' | 'horizontal';
-    isResizing?: boolean;
-    title?: string;
-    className?: string;
-    indicatorClassName?: string;
-    [key: string]: any;
-  }
-  const PanelResizer: React.ComponentType<PanelResizerProps>;
-  export default PanelResizer;
-}
 
 

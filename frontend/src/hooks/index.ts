@@ -1,5 +1,6 @@
 export { useFullscreen } from './useFullscreen';
-export { useHorizontalScroll } from './useHorizontalScroll';
+export { useHorizontalScroll, default as useHorizontalScrollDefault } from './useHorizontalScroll';
+export type { UseHorizontalScrollOptions } from './useHorizontalScroll';
 export { useAcademicHierarchy } from './useAcademicHierarchy';
 export { useAcademicData, default as useAcademicDataDefault } from './useAcademicData';
 export { default as useAutoPopulate } from './useAutoPopulate';
@@ -11,5 +12,13 @@ export { default as useFormAutoSave } from './useFormAutoSave';
 export { useFormAutoSave as useFormAutoSaveNamed } from './useFormAutoSave';
 export { default as useTemplateStore, useTemplateStore as useTemplateStoreNamed } from './useTemplateStore';
 export { useResizablePanel, useResizablePanel as default } from './useResizablePanel';
+export type { UseResizablePanelOptions, UseResizablePanelReturn, ResizerProps } from './useResizablePanel';
 export { default as useUndoableState } from './useUndoableState';
 export { useRowReorder, default as useRowReorderDefault } from './useRowReorder';
+export { useDraggable, default as useDraggableDefault } from './useDraggable';
+export type { UseDraggableOptions, UseDraggableReturn, DraggableDefaultPosition } from './useDraggable';
+export { usePortalPosition, default as usePortalPositionDefault } from './usePortalPosition';
+export type { PortalCoords, UsePortalPositionOptions, UsePortalPositionReturn } from './usePortalPosition';
+export { useDropdownKeyboard, default as useDropdownKeyboardDefault } from './useDropdownKeyboard';
+export type { UseDropdownKeyboardOptions, UseDropdownKeyboardReturn } from './useDropdownKeyboard';
+

@@ -16,11 +16,11 @@ import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 import LanguageSelectorDropdown from "./LanguageSelectorDropdown";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
-import { useUndoRedo } from "../../context/useUndoRedo";
 import { useToast } from "../../context/ToastContext";
 import { useTheme } from "../../context/useTheme";
-import { UndoIcon, RedoIcon, SunIcon, MoonIcon, MenuIcon } from "../ui/Icons";
+import { SunIcon, MoonIcon, MenuIcon } from "../ui/Icons";
 import IconButton from "../ui/IconButton";
+import { FloatingUndoRedoDock } from "../common";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
@@ -148,7 +148,6 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const themeContext = useTheme();
   const { showToast } = useToast();
-  const { canUndo, canRedo, undoTitle, redoTitle, undo, redo } = useUndoRedo();
   const {
     isRightSidebarOpen,
     rightSidebarConfig,
@@ -702,28 +701,6 @@ export default function AppLayout() {
         <div className="flex items-center gap-3 z-10 shrink-0 ml-auto">
           <SaveStatusBadge />
 
-          {/* Universal Route-Aware Undo / Redo Widget (Only visible when undo/redo is available and not on dashboard) */}
-          {(!location.pathname || (location.pathname !== "/" && location.pathname !== "/dashboard" && !ROUTE_TITLE_MAP[location.pathname]?.isDashboard)) && (canUndo || canRedo) && (
-            <div className="flex items-center gap-0.5 animate-fade-in">
-              <IconButton
-                icon={UndoIcon}
-                size="sm"
-                variant="ghost"
-                onClick={undo}
-                disabled={!canUndo}
-                title={canUndo ? `Undo: ${undoTitle || 'Last action'} (Ctrl+Z)` : "Nothing to undo (Ctrl+Z)"}
-              />
-              <IconButton
-                icon={RedoIcon}
-                size="sm"
-                variant="ghost"
-                onClick={redo}
-                disabled={!canRedo}
-                title={canRedo ? `Redo: ${redoTitle || 'Last action'} (Ctrl+Y)` : "Nothing to redo (Ctrl+Y)"}
-              />
-            </div>
-          )}
-
           {/* Dark / Light Mode Toggle Button */}
           <IconButton
             icon={themeContext.modeId === "dark" ? SunIcon : MoonIcon}
@@ -902,6 +879,9 @@ export default function AppLayout() {
 
       {/* Global Institution Workspace Switch Alert Modal */}
       <InstitutionSwitchModal />
+
+      {/* Draggable Floating Undo / Redo Action Dock */}
+      <FloatingUndoRedoDock />
     </div>
   );
 }

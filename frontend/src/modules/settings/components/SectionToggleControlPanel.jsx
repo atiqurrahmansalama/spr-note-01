@@ -5,6 +5,7 @@ import { useFeatureControl } from "../../../context/FeatureControlContext";
 import { getSectionConfig, saveSectionConfig } from "../../../config/defaultSectionConfig";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import TabSwitcher from "../../../components/ui/TabSwitcher";
+import { useHorizontalScroll } from "../../../hooks";
 import {
   GlobeIcon,
   DepartmentIcon,
@@ -106,43 +107,7 @@ export default function SectionToggleControlPanel() {
 
   const [dbRoles, setDbRoles] = useState([]);
 
-  const tabsRef = useRef(null);
-  const rolesRef = useRef(null);
-
-  // Enable horizontal scrolling with vertical mouse wheel on Scope Selector Tabs
-  useEffect(() => {
-    const el = tabsRef.current;
-    if (!el) return;
-    const handleWheel = (e) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, []);
-
-  // Callback ref to attach wheel listener to conditionally rendered roles list
-  const rolesRefCallback = useCallback((node) => {
-    if (rolesRef.current && rolesRef.current._cleanupWheel) {
-      rolesRef.current._cleanupWheel();
-      rolesRef.current._cleanupWheel = null;
-    }
-    rolesRef.current = node;
-    if (node) {
-      const handleWheel = (e) => {
-        if (e.deltaY !== 0) {
-          e.preventDefault();
-          node.scrollLeft += e.deltaY;
-        }
-      };
-      node.addEventListener("wheel", handleWheel, { passive: false });
-      node._cleanupWheel = () => {
-        node.removeEventListener("wheel", handleWheel);
-      };
-    }
-  }, []);
+  const rolesRef = useHorizontalScroll();
 
   // 1. Fetch available Student Groups & Dynamic Roles for Scope Selectors
   useEffect(() => {
@@ -532,7 +497,7 @@ export default function SectionToggleControlPanel() {
       </div>
 
       {/* 2. 4-TIER SCOPE SELECTOR TABS */}
-      <div ref={tabsRef} className="w-full">
+      <div className="w-full">
         <TabSwitcher
           tabs={[
             { id: "global", label: "Global Defaults", Icon: GlobeIcon },
@@ -567,7 +532,7 @@ export default function SectionToggleControlPanel() {
         <div className="p-4 theme-bg-surface border theme-border rounded-xl flex items-center gap-3">
           <span className="text-xs font-semibold theme-text-secondary shrink-0">Target Role:</span>
           <div
-            ref={rolesRefCallback}
+            ref={rolesRef}
             className="flex items-center gap-2 overflow-x-auto min-w-0 flex-1 scrollbar-none"
           >
             {(dbRoles.length > 0

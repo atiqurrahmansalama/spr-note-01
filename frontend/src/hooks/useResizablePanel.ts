@@ -1,24 +1,53 @@
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+
+export interface UseResizablePanelOptions {
+  /** LocalStorage key for persisting width across sessions */
+  storageKey?: string;
+  /** Default width in pixels (default: 384) */
+  defaultWidth?: number;
+  /** Minimum width in pixels (default: 320) */
+  minWidth?: number;
+  /** Maximum width in pixels (default: 800) */
+  maxWidth?: number;
+  /** Maximum viewport width ratio (0 - 1, default: 0.65) */
+  maxRatio?: number;
+  /** Edge attachment side: 'right' (default) or 'left' */
+  side?: 'right' | 'left';
+  /** Width when double-click toggles to compact mode (default: 384) */
+  toggleCompactWidth?: number;
+  /** Width when double-click toggles to expanded mode (default: 540) */
+  toggleExpandedWidth?: number;
+}
+
+export interface ResizerProps {
+  onStartResize: (e: React.MouseEvent | React.TouchEvent | any) => void;
+  onResetResize: () => void;
+  isResizing: boolean;
+  position: 'left' | 'right';
+}
+
+export interface UseResizablePanelReturn {
+  /** Current clamped width in pixels */
+  width: number;
+  /** Whether the panel is currently being resized by drag */
+  isResizing: boolean;
+  /** MouseDown / TouchStart drag initializer */
+  startResizing: (e: React.MouseEvent | React.TouchEvent | any) => void;
+  /** Double-click toggle between compact and expanded widths */
+  toggleWidth: () => void;
+  /** Set width programmatically (number or updater function) */
+  setWidth: (widthOrFn: number | ((prev: number) => number)) => void;
+  /** Reset width back to default */
+  resetWidth: () => void;
+  /** Pre-configured props ready to spread onto <PanelResizer {...resizerProps} /> */
+  resizerProps: ResizerProps;
+}
 
 /**
- * useResizablePanel
- * Enterprise-grade reusable hook for drag-resizable panels, sidebars, and split layouts.
- * Features:
- * - LocalStorage state persistence
- * - Mouse & Touch drag support with passive listeners
- * - Safe clamping with viewport ratio constraints
- * - Double-click toggle between compact and expanded widths
- * - Document cursor & text selection locking during drag
- *
- * @param {Object} options
- * @param {string} options.storageKey - Key used for localStorage persistence
- * @param {number} [options.defaultWidth=384] - Default width in pixels
- * @param {number} [options.minWidth=320] - Minimum width in pixels
- * @param {number} [options.maxWidth=800] - Maximum width in pixels
- * @param {number} [options.maxRatio=0.65] - Maximum viewport width ratio (0 - 1)
- * @param {'right'|'left'} [options.side='right'] - Dock side ('right' or 'left')
- * @param {number} [options.toggleCompactWidth=384] - Compact width for double-click toggle
- * @param {number} [options.toggleExpandedWidth=540] - Expanded width for double-click toggle
+ * Enterprise Reusable `useResizablePanel` Hook
+ * --------------------------------------------
+ * Manages drag-resizing, touch interactions, safe clamping, localStorage persistence,
+ * and double-click toggling for drawers, sidebars, and split layouts.
  */
 export function useResizablePanel({
   storageKey,
@@ -29,9 +58,9 @@ export function useResizablePanel({
   side = 'right',
   toggleCompactWidth = 384,
   toggleExpandedWidth = 540,
-}) {
-  // 1. Hydrate width from localStorage or default
-  const [width, setWidthState] = useState(() => {
+}: UseResizablePanelOptions = {}): UseResizablePanelReturn {
+  // 1. Hydrate width from localStorage or fallback default
+  const [width, setWidthState] = useState<number>(() => {
     try {
       if (typeof window !== 'undefined' && storageKey) {
         const saved = localStorage.getItem(storageKey);
@@ -54,7 +83,7 @@ export function useResizablePanel({
 
   // 2. Set width programmatically and persist
   const setWidth = useCallback(
-    (widthOrFn) => {
+    (widthOrFn: number | ((prev: number) => number)) => {
       setWidthState((prev) => {
         const next = typeof widthOrFn === 'function' ? widthOrFn(prev) : widthOrFn;
         const maxAllowed = Math.min(maxWidth, Math.floor(window.innerWidth * maxRatio));
@@ -74,9 +103,9 @@ export function useResizablePanel({
 
   // 3. Mouse / Touch Drag Resizing Handlers
   const startResizing = useCallback(
-    (e) => {
+    (e: React.MouseEvent | React.TouchEvent | any) => {
       if (e.button !== undefined && e.button !== 0) return; // Only primary mouse button
-      e.preventDefault();
+      if (e.preventDefault) e.preventDefault();
       setIsResizing(true);
 
       if (typeof document !== 'undefined') {
@@ -84,8 +113,10 @@ export function useResizablePanel({
         document.body.style.cursor = 'col-resize';
       }
 
-      const handleMouseMove = (moveEvent) => {
-        const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+        const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
+        if (typeof clientX !== 'number' || isNaN(clientX)) return;
+
         const calculatedWidth = side === 'right' ? window.innerWidth - clientX : clientX;
         const maxAllowed = Math.min(maxWidth, Math.floor(window.innerWidth * maxRatio));
         const clamped = Math.max(minWidth, Math.min(maxAllowed, calculatedWidth));
@@ -137,6 +168,17 @@ export function useResizablePanel({
     setWidth(defaultWidth);
   }, [setWidth, defaultWidth]);
 
+  // 6. Pre-configured props for PanelResizer component
+  const resizerProps: ResizerProps = useMemo(
+    () => ({
+      onStartResize: startResizing,
+      onResetResize: toggleWidth,
+      isResizing,
+      position: side === 'right' ? 'left' : 'right',
+    }),
+    [startResizing, toggleWidth, isResizing, side]
+  );
+
   return {
     width,
     isResizing,
@@ -144,6 +186,7 @@ export function useResizablePanel({
     toggleWidth,
     setWidth,
     resetWidth,
+    resizerProps,
   };
 }
 

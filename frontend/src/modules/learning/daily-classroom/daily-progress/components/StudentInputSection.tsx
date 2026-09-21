@@ -122,6 +122,9 @@ export default function StudentInputSection({
         onQueryChange={handleQueryChange}
         placeholder="Enter student name..."
         label="STUDENT"
+        actionLabel="+ Add Student"
+        actionTo="/admission?tab=quick"
+        actionTitle="Add new student (Quick Admission)"
         size="md"
       />
     </div>

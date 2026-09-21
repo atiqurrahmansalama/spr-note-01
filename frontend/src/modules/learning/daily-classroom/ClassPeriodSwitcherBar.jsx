@@ -1,5 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React from 'react';
 import { TimerIcon } from '../../../components/ui/Icons';
+import { useHorizontalScroll } from '../../../hooks';
 
 export default function ClassPeriodSwitcherBar({
   title = 'CLASS ROUTINE PERIODS',
@@ -9,53 +10,7 @@ export default function ClassPeriodSwitcherBar({
   getSlotCount,
   getPeriodSubtitle,
 }) {
-  const periodScrollRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeftState, setScrollLeftState] = useState(0);
-  const [hasDragged, setHasDragged] = useState(false);
-
-  // Attach non-passive wheel listener to prevent vertical page scroll while mouse wheeling horizontally
-  useEffect(() => {
-    const el = periodScrollRef.current;
-    if (!el) return;
-
-    const handleWheel = (e) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) || e.deltaY !== 0) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-    };
-  }, []);
-
-  const handleMouseDown = (e) => {
-    if (!periodScrollRef.current) return;
-    setIsDragging(true);
-    setHasDragged(false);
-    setStartX(e.pageX - periodScrollRef.current.offsetLeft);
-    setScrollLeftState(periodScrollRef.current.scrollLeft);
-  };
-
-  const handleMouseLeaveOrUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging || !periodScrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - periodScrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5;
-    if (Math.abs(walk) > 4) {
-      setHasDragged(true);
-    }
-    periodScrollRef.current.scrollLeft = scrollLeftState - walk;
-  };
-
+  const periodScrollRef = useHorizontalScroll();
   const totalSlotsCount = allPeriodFilterOptions.length;
 
   return (
@@ -71,13 +26,7 @@ export default function ClassPeriodSwitcherBar({
 
       <div
         ref={periodScrollRef}
-        onMouseDown={handleMouseDown}
-        onMouseLeave={handleMouseLeaveOrUp}
-        onMouseUp={handleMouseLeaveOrUp}
-        onMouseMove={handleMouseMove}
-        className={`flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar flex-nowrap cursor-grab active:cursor-grabbing select-none ${
-          isDragging ? 'cursor-grabbing select-none' : ''
-        }`}
+        className="flex items-center gap-2 overflow-x-auto pt-1 pb-2 no-scrollbar flex-nowrap cursor-grab active:cursor-grabbing select-none"
       >
         {allPeriodFilterOptions.map((opt) => {
           const isSelected = activePeriodId === opt.value;
@@ -88,11 +37,7 @@ export default function ClassPeriodSwitcherBar({
             <button
               key={opt.value}
               type="button"
-              onClick={() => {
-                if (!hasDragged) {
-                  onPeriodChange(opt.value);
-                }
-              }}
+              onClick={() => onPeriodChange(opt.value)}
               className={`px-2.5 py-1.5 rounded-xl border transition-all text-left cursor-pointer w-[115px] min-w-[115px] max-w-[115px] shrink-0 select-none ${
                 isSelected
                   ? 'theme-bg-accent text-white border-transparent shadow-sm'

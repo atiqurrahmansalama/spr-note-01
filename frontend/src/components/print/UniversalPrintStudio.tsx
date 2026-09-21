@@ -242,8 +242,7 @@ export default function UniversalPrintStudio({
   const {
     width: sidebarWidth,
     isResizing: isSidebarResizing,
-    startResizing: startSidebarResizing,
-    toggleWidth: handleSidebarResizerDoubleClick,
+    resizerProps: sidebarResizerProps,
   } = useResizablePanel({
     storageKey: 'spr_print_sidebar_width',
     defaultWidth: 580,
@@ -398,9 +397,7 @@ export default function UniversalPrintStudio({
               }}
             >
               <PanelResizer
-                onStartResize={startSidebarResizing}
-                onResetResize={handleSidebarResizerDoubleClick}
-                isResizing={isSidebarResizing}
+                {...sidebarResizerProps}
                 position="left"
               />
               <div className="w-full h-full flex-1 overflow-hidden">

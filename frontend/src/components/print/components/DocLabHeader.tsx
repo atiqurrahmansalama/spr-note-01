@@ -1,5 +1,6 @@
 import React from 'react';
 import FullscreenButton from '../../ui/FullscreenButton';
+import IconButton from '../../ui/IconButton';
 import DocLabExportMenu from '../DocLabExportMenu';
 import {
   SidebarRightIcon,
@@ -161,28 +162,25 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
         />
 
         {/* Right Sidebar Toggle Button */}
-        <button
-          type="button"
+        <IconButton
+          icon={SidebarRightIcon}
+          size="md"
+          variant={isSidebarOpen ? 'accent-soft' : 'sub'}
           onClick={onToggleSidebar}
-          className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center border ${
-            isSidebarOpen
-              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/40 shadow-xs'
-              : 'theme-bg-sub theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
-          }`}
           title={isSidebarOpen ? 'Hide Settings Sidebar (Ctrl + B)' : 'Show Settings Sidebar (Ctrl + B)'}
-          aria-label="Toggle Settings Sidebar"
-        >
-          <SidebarRightIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Toggle Settings Sidebar"
+        />
 
-        <button
-          type="button"
+        {/* Close Button */}
+        <IconButton
+          icon={CloseIcon}
+          size="md"
+          variant="ghost"
           onClick={onClose}
           title="Close DocLab (Esc)"
-          className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer flex items-center justify-center text-sm font-bold ml-1"
-        >
-          <CloseIcon className="w-4 h-4" />
-        </button>
+          ariaLabel="Close DocLab"
+          className="ml-1"
+        />
       </div>
     </header>
   );

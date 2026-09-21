@@ -1,7 +1,10 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronIcon, SleekCheckIcon } from './Icons';
 import { focusNextInput } from '../../utils/keyboardUtils';
+import { usePortalPosition } from '../../hooks/usePortalPosition';
+import { useDropdownKeyboard } from '../../hooks/useDropdownKeyboard';
+import PortalDropdownMenu from './PortalDropdownMenu';
 
 export interface AutocompleteOption {
   label?: string;
@@ -32,6 +35,8 @@ export interface AutocompleteDropdownProps {
   headerAction?: React.ReactNode;
   onActionClick?: () => void;
   actionLabel?: string | null;
+  actionTo?: string | null;
+  actionTitle?: string | null;
   manageLabel?: string | null;
   className?: string;
   inputClassName?: string;
@@ -50,12 +55,9 @@ export interface AutocompleteDropdownProps {
 
 /**
  * Enterprise AutocompleteDropdown Component
- * Features:
- * - 100% Design Token Parity with CustomSelect & CustomInput
- * - Portal Positioning Engine with Screen Boundary Calculation & Scroll Listeners
- * - Dual Search & Direct Keyboard Navigation (ArrowUp/Down, Enter, Shift++)
- * - Subtitle & Badge Enrichment for Student Group / Section metadata
- * - SleekCheckIcon & Project Standard Hover / Focus Ring Styling
+ * 
+ * Reusable input with headless positioning, keyboard navigation,
+ * and design-token compliant portal rendering.
  */
 export default function AutocompleteDropdown({
   options = [],
@@ -72,6 +74,8 @@ export default function AutocompleteDropdown({
   headerAction = null,
   onActionClick = null,
   actionLabel = null,
+  actionTo = null,
+  actionTitle = null,
   manageLabel = null,
   className = '',
   inputClassName = '',
@@ -90,118 +94,23 @@ export default function AutocompleteDropdown({
   const initialSearchTerm = typeof value === 'string' ? value : value?.label || value?.name || '';
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [prevValue, setPrevValue] = useState(value);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   const localInputRef = useRef<HTMLInputElement>(null);
   const refToUse = (inputRef as React.RefObject<HTMLInputElement>) || localInputRef;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const optionsListRef = useRef<HTMLDivElement>(null);
-
-  const [coords, setCoords] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-    openUpward: false,
-    maxHeight: 240,
-  });
 
   if (value !== prevValue) {
     setPrevValue(value);
     setSearchTerm(typeof value === 'string' ? value : value?.label || value?.name || '');
   }
 
-  // Auto-scroll highlighted item into view during keyboard navigation (ArrowUp / ArrowDown)
-  useEffect(() => {
-    if (!isOpen || !optionsListRef.current) return;
-    const container = optionsListRef.current;
-    const items = container.querySelectorAll<HTMLElement>('[data-dropdown-item="true"]');
-    const highlightedEl = items[highlightedIndex];
-
-    if (highlightedEl) {
-      highlightedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [highlightedIndex, isOpen]);
-
-  // Recalculate popup position accurately matching CustomSelect
-  const updatePosition = () => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    if (!rect.width) return;
-
-    // Auto-close if trigger is scrolled out of viewport or under top header
-    if (rect.bottom < 50 || rect.top > window.innerHeight - 20) {
-      setIsOpen(false);
-      return;
-    }
-
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const minRequiredSpace = 160;
-
-    const shouldOpenUpward = spaceBelow < minRequiredSpace && spaceAbove > spaceBelow;
-    const availableHeight = shouldOpenUpward
-      ? Math.max(120, spaceAbove - 60)
-      : Math.max(120, spaceBelow - 16);
-    const calculatedMaxHeight = Math.min(260, availableHeight);
-
-    setCoords({
-      left: rect.left,
-      width: rect.width,
-      top: shouldOpenUpward ? rect.top - 6 : rect.bottom + 6,
-      openUpward: shouldOpenUpward,
-      maxHeight: calculatedMaxHeight,
-    });
-  };
-
-  // Synchronously measure and place dropdown before browser paint
-  useLayoutEffect(() => {
-    if (isOpen) {
-      updatePosition();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      const handleScroll = (e: Event) => {
-        if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
-        setIsOpen(false);
-      };
-      window.addEventListener('scroll', handleScroll, true);
-      window.addEventListener('resize', updatePosition);
-      return () => {
-        window.removeEventListener('scroll', handleScroll, true);
-        window.removeEventListener('resize', updatePosition);
-      };
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (autoFocus && refToUse.current) {
-      setTimeout(() => {
-        if (refToUse.current) {
-          refToUse.current.focus();
-        }
-      }, 100);
-    }
-  }, [autoFocus, refToUse]);
+  // Headless Positioning Engine
+  const { coords, updatePosition, containerRef, dropdownRef } = usePortalPosition({
+    isOpen,
+    setIsOpen,
+    minRequiredSpace: 160,
+    maxDropdownHeight: 260,
+    offset: 6,
+  });
 
   const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : (searchTerm as any)?.label || '';
 
@@ -240,6 +149,40 @@ export default function AutocompleteDropdown({
     triggerNextFocus();
   };
 
+  const handleSaveClick = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsOpen(false);
+    if (onAddNew) onAddNew(safeSearchTerm);
+  };
+
+  // Headless Keyboard Navigation Engine
+  const {
+    highlightedIndex,
+    handleKeyDown,
+    optionsListRef,
+    resetHighlight,
+  } = useDropdownKeyboard({
+    isOpen,
+    setIsOpen,
+    itemCount: filteredOptions.length,
+    onSelectIndex: (idx) => {
+      const selected = filteredOptions[idx];
+      if (selected) handleSelect(selected);
+    },
+    onAddNew: safeSearchTerm.trim() && onAddNew ? () => handleSaveClick() : undefined,
+    onNextFocus: triggerNextFocus,
+  });
+
+  useEffect(() => {
+    if (autoFocus && refToUse.current) {
+      setTimeout(() => {
+        if (refToUse.current) {
+          refToUse.current.focus();
+        }
+      }, 100);
+    }
+  }, [autoFocus, refToUse]);
+
   const handleOpen = () => {
     if (disabled) return;
     updatePosition();
@@ -263,61 +206,8 @@ export default function AutocompleteDropdown({
     setSearchTerm(val);
     updatePosition();
     setIsOpen(true);
-    setHighlightedIndex(0);
-    if (optionsListRef.current) {
-      optionsListRef.current.scrollTop = 0;
-    }
+    resetHighlight();
     if (onChange) onChange(val);
-  };
-
-  const handleSaveClick = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setIsOpen(false);
-    if (onAddNew) onAddNew(safeSearchTerm);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.shiftKey && (e.key === '+' || e.key === '=')) {
-      if (onAddNew && safeSearchTerm.trim()) {
-        e.preventDefault();
-        handleSaveClick();
-        return;
-      }
-    }
-
-    if (isOpen && filteredOptions.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setHighlightedIndex((prev) => (prev + 1) % filteredOptions.length);
-        return;
-      }
-
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setHighlightedIndex((prev) => (prev - 1 + filteredOptions.length) % filteredOptions.length);
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const selected = filteredOptions[highlightedIndex];
-        if (selected) {
-          handleSelect(selected);
-        } else if (onAddNew && safeSearchTerm.trim()) {
-          handleSaveClick();
-        } else {
-          setIsOpen(false);
-          triggerNextFocus();
-        }
-        return;
-      }
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      setIsOpen(false);
-      triggerNextFocus();
-    }
   };
 
   // Size classes matching CustomInput and CustomSelect
@@ -335,112 +225,10 @@ export default function AutocompleteDropdown({
     variantClasses = 'theme-bg-elevated theme-border border shadow-sm';
   }
 
-  const dropdownMenu =
-    isOpen && coords.width > 0 && typeof document !== 'undefined'
-      ? createPortal(
-          <div
-            ref={dropdownRef}
-            style={{
-              position: 'fixed',
-              left: `${coords.left}px`,
-              top: coords.openUpward ? 'auto' : `${coords.top}px`,
-              bottom: coords.openUpward ? `${window.innerHeight - coords.top}px` : 'auto',
-              width: `${coords.width}px`,
-              zIndex: 99999,
-            }}
-            className={`theme-bg-surface border theme-border shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),0_6px_16px_rgba(0,0,0,0.15)] overflow-hidden rounded-2xl p-1.5 backdrop-blur-2xl transition-all duration-200 ease-out ${
-              coords.openUpward ? 'origin-bottom animate-dropdown-up' : 'origin-top animate-dropdown-down'
-            }`}
-          >
-            <div
-              ref={optionsListRef}
-              style={{
-                maxHeight: `${Math.max(80, coords.maxHeight - 10)}px`,
-              }}
-              className="p-1 space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar scroll-smooth"
-            >
-              {filteredOptions.length > 0 ? (
-                filteredOptions.map((item, index) => {
-                  const itemLabel = typeof item === 'string' ? item : item?.label || item?.name || '';
-                  const itemSub =
-                    typeof item === 'object' && item !== null
-                      ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : null)
-                      : null;
-                  const itemBadge = typeof item === 'object' && item !== null ? item.badge || item.typeLabel : null;
-                  const isHighlighted = index === highlightedIndex;
-                  const isSelected = itemLabel.toLowerCase() === safeSearchTerm.toLowerCase();
-
-                  return (
-                    <button
-                      key={index}
-                      data-dropdown-item="true"
-                      type="button"
-                      onClick={() => handleSelect(item)}
-                      className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-all duration-150 ease-out flex items-center justify-between cursor-pointer group/item active:scale-[0.985] ${
-                        isSelected || isHighlighted
-                          ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs translate-x-1'
-                          : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary hover:translate-x-0.5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-medium">{itemLabel}</span>
-                            {itemBadge && (
-                              <span
-                                className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border transition-all duration-150 ${
-                                  isSelected || isHighlighted
-                                    ? 'theme-bg-surface/85 border-[var(--accent-main)]/40 theme-accent font-semibold shadow-2xs'
-                                    : 'theme-bg-sub theme-text-secondary border-current/10 group-hover/item:border-[var(--accent-main)]/20'
-                                }`}
-                              >
-                                {itemBadge}
-                              </span>
-                            )}
-                          </div>
-                          {itemSub && (
-                            <div
-                              className={`text-[10px] truncate mt-0.5 transition-opacity duration-150 ${
-                                isSelected || isHighlighted ? 'opacity-90' : 'theme-text-secondary'
-                              }`}
-                            >
-                              {itemSub}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <span className="shrink-0 ml-1.5 transform transition-transform duration-200 scale-100">
-                          <SleekCheckIcon className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })
-              ) : safeSearchTerm.trim() && onAddNew ? (
-                <button
-                  type="button"
-                  onClick={handleSaveClick}
-                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-all duration-150 flex items-center justify-between cursor-pointer active:scale-[0.985] animate-item-slide"
-                >
-                  <span className="truncate">Add &ldquo;{safeSearchTerm.trim()}&rdquo;</span>
-                  <span className="text-[10px] font-mono opacity-70">Shift + +</span>
-                </button>
-              ) : (
-                <div className="px-3 py-2 text-center text-xs theme-text-secondary">
-                  No matching options
-                </div>
-              )}
-            </div>
-          </div>,
-          document.body
-        )
-      : null;
-
   return (
     <div ref={containerRef} className={`relative w-full text-left font-sans ${className}`}>
       {/* Top Bar: Label, Badge, and Action */}
-      {(label || subLabel || onActionClick || actionLabel || manageLabel || headerAction || badge) && (
+      {(label || subLabel || onActionClick || actionLabel || actionTo || manageLabel || headerAction || badge) && (
         <div className="flex items-center justify-between gap-2 mb-2 select-none">
           <div className="flex items-center gap-1.5 flex-wrap">
             {label && (
@@ -466,11 +254,20 @@ export default function AutocompleteDropdown({
           <div className="flex items-center gap-2">
             {headerAction ? (
               headerAction
+            ) : actionTo ? (
+              <Link
+                to={actionTo}
+                className="text-xs font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
+                title={actionTitle || (typeof actionLabel === 'string' ? actionLabel : undefined)}
+              >
+                <span>{actionLabel || manageLabel || '+ Add'}</span>
+              </Link>
             ) : onActionClick || actionLabel ? (
               <button
                 type="button"
                 onClick={onActionClick || handleSaveClick}
                 className="text-xs font-semibold theme-accent hover:opacity-80 cursor-pointer flex items-center gap-1 transition-colors"
+                title={actionTitle || undefined}
               >
                 <span>{actionLabel || manageLabel || '+ Save'}</span>
               </button>
@@ -529,8 +326,86 @@ export default function AutocompleteDropdown({
         </div>
       </div>
 
-      {/* Portal Dropdown Menu */}
-      {dropdownMenu}
+      {/* Portal Dropdown Menu using Reusable Portal Component */}
+      <PortalDropdownMenu
+        isOpen={isOpen}
+        coords={coords}
+        dropdownRef={dropdownRef}
+        optionsListRef={optionsListRef}
+      >
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((item, index) => {
+            const itemLabel = typeof item === 'string' ? item : item?.label || item?.name || '';
+            const itemSub =
+              typeof item === 'object' && item !== null
+                ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : null)
+                : null;
+            const itemBadge = typeof item === 'object' && item !== null ? item.badge || item.typeLabel : null;
+            const isHighlighted = index === highlightedIndex;
+            const isSelected = itemLabel.toLowerCase() === safeSearchTerm.toLowerCase();
+
+            return (
+              <button
+                key={index}
+                data-dropdown-item="true"
+                type="button"
+                onClick={() => handleSelect(item)}
+                className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-all duration-150 ease-out flex items-center justify-between cursor-pointer group/item active:scale-[0.985] ${
+                  isSelected || isHighlighted
+                    ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs translate-x-1'
+                    : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary hover:translate-x-0.5'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{itemLabel}</span>
+                      {itemBadge && (
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border transition-all duration-150 ${
+                            isSelected || isHighlighted
+                              ? 'theme-bg-surface/85 border-[var(--accent-main)]/40 theme-accent font-semibold shadow-2xs'
+                              : 'theme-bg-sub theme-text-secondary border-current/10 group-hover/item:border-[var(--accent-main)]/20'
+                          }`}
+                        >
+                          {itemBadge}
+                        </span>
+                      )}
+                    </div>
+                    {itemSub && (
+                      <div
+                        className={`text-[10px] truncate mt-0.5 transition-opacity duration-150 ${
+                          isSelected || isHighlighted ? 'opacity-90' : 'theme-text-secondary'
+                        }`}
+                      >
+                        {itemSub}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {isSelected && (
+                  <span className="shrink-0 ml-1.5 transform transition-transform duration-200 scale-100">
+                    <SleekCheckIcon className="w-3.5 h-3.5" />
+                  </span>
+                )}
+              </button>
+            );
+          })
+        ) : safeSearchTerm.trim() && onAddNew ? (
+          <button
+            type="button"
+            onClick={handleSaveClick}
+            className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-all duration-150 flex items-center justify-between cursor-pointer active:scale-[0.985] animate-item-slide"
+          >
+            <span className="truncate">Add &ldquo;{safeSearchTerm.trim()}&rdquo;</span>
+            <span className="text-[10px] font-mono opacity-70">Shift + +</span>
+          </button>
+        ) : (
+          <div className="px-3 py-2 text-center text-xs theme-text-secondary">
+            No matching options
+          </div>
+        )}
+      </PortalDropdownMenu>
     </div>
   );
 }
