@@ -222,9 +222,11 @@ export default function QuickAdmissionForm({
 
     setIsSubmitting(true);
 
+    const selectedDeptObj = (departments || []).find((d: any) => String(d.id) === String(formData.department));
     const selectedClassObj = (classes || []).find((c: any) => String(c.id) === String(formData.student_class));
     const selectedSectionObj = (sections || []).find((s: any) => String(s.id) === String(formData.student_section));
 
+    const departmentName = selectedDeptObj?.name || selectedDeptObj?.department_name || "";
     const sectionName = selectedSectionObj?.section_name || selectedSectionObj?.name || "";
     const className = selectedClassObj?.name || selectedClassObj?.class_name || "";
 
@@ -258,15 +260,28 @@ export default function QuickAdmissionForm({
         });
 
         if (res.ok) {
-          const updatedStu = await res.json().catch(() => ({}));
-          studentStore.update(String(editStudentId), {
+          const resData = await res.json().catch(() => ({}));
+          const updatedStu = {
+            ...editingStudent,
+            ...resData,
             name: formData.name.trim(),
             name_en: formData.name.trim(),
-            student_class: formData.student_class,
-            department: formData.department,
-            student_section: formData.student_section,
+            department: formData.department || resData.department,
+            department_name: resData.department_name || departmentName,
+            student_class: formData.student_class || resData.student_class,
+            student_class_name: resData.student_class_name || className,
+            class_name: resData.student_class_name || className,
+            education_status: resData.education_status || className,
+            student_section: formData.student_section || resData.student_section,
+            section_name: resData.section_name || sectionName,
+            group_name: resData.group_name || resData.student_group_name || sectionName || className || "General Group",
             guardian_phone: formData.guardian_phone.trim(),
-          });
+            uniq_id: resData.uniq_id || editingStudent?.uniq_id || `ID: ${editStudentId}`,
+            student_id_card_number: resData.student_id_card_number || editingStudent?.student_id_card_number || resData.uniq_id,
+            id: editStudentId,
+            is_editing: true,
+          };
+          studentStore.update(String(editStudentId), updatedStu);
           showToast(`Student "${formData.name}" updated successfully!`, "success");
           window.dispatchEvent(new CustomEvent("spr_students_updated"));
           window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
@@ -296,10 +311,25 @@ export default function QuickAdmissionForm({
             }),
           });
           if (fallbackRes.ok) {
+            const updatedStu = {
+              ...editingStudent,
+              name: formData.name.trim(),
+              name_en: formData.name.trim(),
+              department: formData.department,
+              department_name: departmentName,
+              student_class: formData.student_class,
+              student_class_name: className,
+              class_name: className,
+              education_status: className,
+              student_section: formData.student_section,
+              section_name: sectionName,
+              id: editStudentId,
+              is_editing: true,
+            };
             showToast(`Student "${formData.name}" updated successfully!`, "success");
             window.dispatchEvent(new CustomEvent("spr_students_updated"));
             refetchAcademicData?.();
-            if (onSuccess) onSuccess({ id: editStudentId, name: formData.name });
+            if (onSuccess) onSuccess(updatedStu);
             else navigate("/groups-students");
             return;
           }
@@ -317,16 +347,27 @@ export default function QuickAdmissionForm({
 
     // ─── 2. NEW ADMISSION SUBMISSION (POST) ────────────────────────────────
     const localStudentId = `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const generatedUniqId = `STD-${new Date().getFullYear()}-${localStudentId.slice(-4).toUpperCase()}`;
 
     const newStudentProfile = {
       id: localStudentId,
+      uniq_id: generatedUniqId,
+      student_id_card_number: generatedUniqId,
       name: formData.name.trim(),
       name_en: formData.name.trim(),
       label: formData.name.trim(),
       sub: sectionName || className || "General Group",
       department: formData.department || null,
+      department_name: departmentName,
       student_class: formData.student_class || null,
+      student_class_name: className,
+      class_name: className,
+      education_status: className,
       student_section: formData.student_section || null,
+      section_name: sectionName,
+      group_name: sectionName || className || "General Group",
+      session_year: "2026-2027",
+      admission_date: formData.admission_date,
       admission_mode: "QUICK",
       status: "ACTIVE",
       guardian_phone: formData.guardian_phone.trim(),
@@ -369,6 +410,18 @@ export default function QuickAdmissionForm({
         if (resData && resData.id) {
           savedStudent = {
             ...newStudentProfile,
+            ...resData,
+            department: formData.department || resData.department || null,
+            department_name: resData.department_name || departmentName,
+            student_class: formData.student_class || resData.student_class || null,
+            student_class_name: resData.student_class_name || className,
+            class_name: resData.student_class_name || className,
+            education_status: resData.education_status || className,
+            student_section: formData.student_section || resData.student_section || null,
+            section_name: resData.section_name || sectionName,
+            group_name: resData.group_name || resData.student_group_name || sectionName || className || "General Group",
+            uniq_id: resData.uniq_id || resData.student_id_card_number || newStudentProfile.uniq_id,
+            student_id_card_number: resData.student_id_card_number || resData.uniq_id || newStudentProfile.student_id_card_number,
             id: String(resData.id),
             _local: false,
           };

@@ -2,8 +2,8 @@ import React from "react";
 import CustomInput from "../../../../../../components/ui/CustomInput";
 import PageRangeInput, { type PageRange } from "../../../../../../components/ui/PageRangeInput";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../../../utils/keyboardUtils";
-import { QURAN_CONSTANTS } from "../../../../../../constants/quranConstants";
 import { RowRemoveButton, RowAddCircleButton } from "./QuranRowUI";
+import { QURAN_RULES, getMaxPageForJuz } from "./quranProgressRules";
 import { JuzRowData } from "../../types";
 
 export interface JuzRowProps {
@@ -21,6 +21,19 @@ export default function JuzRow({
 }: JuzRowProps) {
   const handleJuzChange = (val: string | number) => {
     onChange((prevRow) => ({ ...prevRow, juz: val }));
+  };
+
+  const handleJuzBlur = () => {
+    if (rowData.juz !== "" && rowData.juz !== undefined && rowData.juz !== null) {
+      let j = parseInt(String(rowData.juz), 10);
+      if (!isNaN(j)) {
+        if (j < QURAN_RULES.MIN_JUZ) j = QURAN_RULES.MIN_JUZ;
+        if (j > QURAN_RULES.MAX_JUZ) j = QURAN_RULES.MAX_JUZ;
+        if (j !== Number(rowData.juz)) {
+          handleJuzChange(j);
+        }
+      }
+    }
   };
 
   const handleRangeChange = (index: number, newRange: PageRange) => {
@@ -63,7 +76,7 @@ export default function JuzRow({
   }, 0);
 
   return (
-    <div className="flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-all duration-150 select-none">
+    <div className="flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none">
       {/* Left Column: Juz Label & Input — fixed width */}
       <div className="flex items-center gap-1 shrink-0 h-[38px] sm:h-10 self-start">
         <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
@@ -76,14 +89,15 @@ export default function JuzRow({
             allowDecimals={false}
             value={rowData.juz}
             onChange={handleJuzChange}
+            onBlur={handleJuzBlur}
             onEnter={handleEnterFocusNext}
             onAddShift={onAddJuz}
             onEmptyBackspace={(e: any) => {
               if (onRemoveJuz) onRemoveJuz();
               handleBackspaceFocusPrev(e, true);
             }}
-            min={1}
-            max={QURAN_CONSTANTS.MAX_JUZ}
+            min={QURAN_RULES.MIN_JUZ}
+            max={QURAN_RULES.MAX_JUZ}
             placeholder="--"
             className="w-full h-full p-0 min-h-0"
             wrapperClassName="w-full h-full"
@@ -109,7 +123,8 @@ export default function JuzRow({
                   range={range}
                   onChange={(newR) => handleRangeChange(index, newR)}
                   onRemove={rowData.ranges.length > 1 ? () => removeRange(index) : undefined}
-                  juzValue={rowData.juz}
+                  min={QURAN_RULES.MIN_PAGE}
+                  max={getMaxPageForJuz(rowData.juz)}
                   isLast={isLastRange}
                   onAddNextRange={addRange}
                   onAddJuzRow={onAddJuz}

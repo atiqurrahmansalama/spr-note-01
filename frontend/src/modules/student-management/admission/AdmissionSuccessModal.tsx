@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdmissionSlipDocument from "./AdmissionSlipDocument";
 import CustomButton from "../../../components/ui/CustomButton";
+import { useAcademicData } from "../../../hooks/useAcademicData";
 import {
   CheckCircle2Icon,
   PrintIcon,
@@ -13,7 +14,6 @@ import {
   PhoneIcon,
   CopyIcon,
   CheckIcon,
-  HashIcon,
   BuildingOfficeIcon,
 } from "../../../components/ui/Icons";
 
@@ -30,28 +30,37 @@ export interface AdmissionSuccessStudent {
   photo?: string;
   avatar?: string;
   gender?: string;
+  student_class?: string | number;
   student_class_name?: string;
   education_status?: string;
   class_name?: string;
+  class_id?: string | number;
+  section?: string | number;
   section_name?: string;
-  student_section?: string;
+  student_section?: string | number;
+  section_id?: string | number;
   group_name?: string;
   roll_number?: string | number;
   session_year?: string;
   admission_mode?: string;
   guardian_phone?: string;
   guardian_name?: string;
-  department?: string;
+  department?: string | number;
   department_name?: string;
+  department_id?: string | number;
   is_editing?: boolean;
   student_type?: string;
   academic_detail?: {
     class_name?: string;
+    student_class?: string | number;
     section_name?: string;
+    student_section?: string | number;
     group_name?: string;
     roll_number?: string | number;
     session_year?: string;
+    department?: string | number;
     department_name?: string;
+    department_id?: string | number;
   };
   guardian_detail?: {
     primary_guardian_name?: string;
@@ -80,6 +89,7 @@ export default function AdmissionSuccessModal({
   isEditing: propIsEditing,
 }: AdmissionSuccessModalProps) {
   const navigate = useNavigate();
+  const { departments = [], classes = [], sections = [] } = useAcademicData() || {};
   const [showPrintSlip, setShowPrintSlip] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
@@ -94,24 +104,94 @@ export default function AdmissionSuccessModal({
   // Safely extract consolidated student data across Quick and Full Admission schemas
   const studentName = student.name_en || student.name || student.full_name || "Student Record";
   const nativeName = student.bangla_name || student.name_bn || "";
-  const studentId =
-    student.student_id_card_number ||
-    student.uniq_id ||
-    student.id_number ||
-    (student.id ? `ID: ${student.id}` : "ACTIVE");
 
-  const className =
+  // 1. Resolve Class / Program Name cleanly across schemas and numeric ID lookups
+  const rawClass =
     student.student_class_name ||
-    student.education_status ||
     student.class_name ||
     student.academic_detail?.class_name ||
-    "Standard Class";
+    student.education_status;
+
+  const classIdCandidate =
+    student.student_class ||
+    student.class_id ||
+    student.academic_detail?.student_class ||
+    (rawClass && !isNaN(Number(rawClass)) ? rawClass : null);
+
+  const matchedClass = classIdCandidate
+    ? (classes || []).find((c: any) => String(c.id) === String(classIdCandidate) || String(c.value) === String(classIdCandidate))
+    : null;
+
+  const className =
+    (rawClass && isNaN(Number(rawClass)) && rawClass !== "Standard Class")
+      ? rawClass
+      : (matchedClass?.name || matchedClass?.class_name || matchedClass?.label || "General Academic");
+
+  // 2. Resolve Section Name cleanly
+  const rawSection =
+    student.section_name ||
+    student.academic_detail?.section_name ||
+    student.student_section;
+
+  const sectionIdCandidate =
+    student.student_section ||
+    student.section ||
+    student.section_id ||
+    (rawSection && !isNaN(Number(rawSection)) ? rawSection : null);
+
+  const matchedSection = sectionIdCandidate
+    ? (sections || []).find((s: any) => String(s.id) === String(sectionIdCandidate) || String(s.value) === String(sectionIdCandidate))
+    : null;
 
   const sectionName =
-    student.section_name ||
-    student.student_section ||
-    student.academic_detail?.section_name ||
-    "";
+    (rawSection && isNaN(Number(rawSection)))
+      ? rawSection
+      : (matchedSection?.section_name || matchedSection?.name || matchedSection?.label || "");
+
+  // 3. Resolve Department Name cleanly
+  const rawDept =
+    student.department_name ||
+    student.academic_detail?.department_name ||
+    student.department;
+
+  const deptIdCandidate =
+    student.department ||
+    student.department_id ||
+    student.academic_detail?.department ||
+    student.academic_detail?.department_id ||
+    matchedClass?.department ||
+    matchedClass?.department_id ||
+    (rawDept && !isNaN(Number(rawDept)) ? rawDept : null);
+
+  const matchedDept = deptIdCandidate
+    ? (departments || []).find((d: any) => String(d.id) === String(deptIdCandidate) || String(d.value) === String(deptIdCandidate))
+    : null;
+
+  const departmentName =
+    (rawDept && isNaN(Number(rawDept)))
+      ? rawDept
+      : (matchedDept?.name || matchedDept?.department_name || matchedDept?.label || "Academic Department");
+
+  // 4. Resolve Student ID cleanly with enterprise fallback
+  const rawStudentId =
+    student.student_id_card_number ||
+    student.uniq_id ||
+    student.id_number;
+
+  const sessionYear =
+    student.session_year ||
+    student.academic_detail?.session_year ||
+    `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+
+  const currentYearPrefix = sessionYear?.slice(0, 4) || String(new Date().getFullYear());
+
+  const studentId = (rawStudentId && String(rawStudentId).trim() !== "" && rawStudentId !== "ACTIVE")
+    ? String(rawStudentId).trim()
+    : student.id
+    ? (String(student.id).startsWith("stu_")
+        ? `STD-${currentYearPrefix}-${String(student.id).slice(-4).toUpperCase()}`
+        : `STD-${currentYearPrefix}-${String(student.id).padStart(4, "0")}`)
+    : `STD-${currentYearPrefix}-0001`;
 
   const groupName =
     student.group_name ||
@@ -123,22 +203,11 @@ export default function AdmissionSuccessModal({
     student.academic_detail?.roll_number ??
     "";
 
-  const sessionYear =
-    student.session_year ||
-    student.academic_detail?.session_year ||
-    "2026-2027";
-
   const guardianPhone =
     student.guardian_phone ||
     student.guardian_detail?.primary_guardian_phone ||
     student.details?.guardian_phone ||
     "--";
-
-  const departmentName =
-    student.department_name ||
-    student.department ||
-    student.academic_detail?.department_name ||
-    "";
 
   const photoUrl =
     student.photo ||
@@ -150,10 +219,25 @@ export default function AdmissionSuccessModal({
     student.admission_mode ||
     (isEditing ? "RECORD UPDATE" : "DIRECT ADMISSION");
 
-  // Format Class & Section Display
-  const classDisplay = [className, sectionName ? `(${sectionName})` : "", groupName ? `• ${groupName}` : ""]
+  // Format Class & Section Display without redundant group duplicate
+  const classDisplay = [
+    className,
+    sectionName ? `(${sectionName})` : "",
+    groupName && groupName !== sectionName && groupName !== className ? `• ${groupName}` : ""
+  ]
     .filter(Boolean)
     .join(" ");
+
+  const enrichedStudent: AdmissionSuccessStudent = {
+    ...student,
+    uniq_id: studentId,
+    student_id_card_number: studentId,
+    education_status: className,
+    student_class_name: className,
+    class_name: className,
+    section_name: sectionName,
+    department_name: departmentName,
+  };
 
   const handleCopyId = () => {
     if (!studentId || studentId === "ACTIVE") return;
@@ -247,6 +331,11 @@ export default function AdmissionSuccessModal({
             <span className="text-xs sm:text-sm font-mono font-bold theme-text-primary truncate">
               {studentId}
             </span>
+            {rollNumber && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border font-semibold shrink-0">
+                Roll #{rollNumber}
+              </span>
+            )}
           </div>
 
           <button
@@ -284,19 +373,15 @@ export default function AdmissionSuccessModal({
             </div>
           </div>
 
-          {/* Roll Number or Department */}
+          {/* Department */}
           <div className="flex items-start gap-2.5">
-            {departmentName ? (
-              <BuildingOfficeIcon className="w-4 h-4 theme-text-secondary mt-0.5 shrink-0" />
-            ) : (
-              <HashIcon className="w-4 h-4 theme-text-secondary mt-0.5 shrink-0" />
-            )}
+            <BuildingOfficeIcon className="w-4 h-4 theme-text-secondary mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-secondary block">
-                {departmentName ? "Department" : "Roll Number"}
+                Department
               </span>
-              <p className="font-semibold theme-text-primary truncate">
-                {departmentName || (rollNumber ? `#${rollNumber}` : "Assigned")}
+              <p className="font-semibold theme-text-primary truncate" title={departmentName}>
+                {departmentName}
               </p>
             </div>
           </div>
@@ -373,7 +458,7 @@ export default function AdmissionSuccessModal({
       {/* Print Slip Overlay */}
       {showPrintSlip && (
         <AdmissionSlipDocument
-          student={student}
+          student={enrichedStudent}
           onClose={() => setShowPrintSlip(false)}
         />
       )}

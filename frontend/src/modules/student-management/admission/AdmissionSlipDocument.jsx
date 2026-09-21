@@ -11,7 +11,34 @@ export default function AdmissionSlipDocument({ student, onClose }) {
   const instAddress = currentInstitution?.address || "Bismillah Road, Sector 10, Uttara, Dhaka";
   const instPhone = currentInstitution?.phone || "01799999999";
 
-  const qrValue = `${window.location.origin}/verify-admission/${student.uniq_id || student.id}`;
+  const studentId =
+    student.student_id_card_number ||
+    student.uniq_id ||
+    student.id_number ||
+    (student.id
+      ? (String(student.id).startsWith("stu_")
+          ? `STD-${new Date().getFullYear()}-${String(student.id).slice(-4).toUpperCase()}`
+          : `STD-${new Date().getFullYear()}-${String(student.id).padStart(4, "0")}`)
+      : "--");
+
+  const className =
+    student.student_class_name ||
+    student.class_name ||
+    student.education_status ||
+    "Standard Academic Track";
+
+  const departmentName =
+    student.department_name ||
+    student.academic_detail?.department_name ||
+    (student.department && isNaN(Number(student.department)) ? student.department : "");
+
+  const classSectionDisplay = [
+    className,
+    student.section_name ? `(${student.section_name})` : "",
+    student.group_name && student.group_name !== student.section_name && student.group_name !== className ? `/ ${student.group_name}` : ""
+  ].filter(Boolean).join(" ");
+
+  const qrValue = `${window.location.origin}/verify-admission/${student.uniq_id || student.id || studentId}`;
 
   const renderHalf = (title, subtitle) => (
     <div className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 p-6 rounded-2xl bg-white text-zinc-900 flex flex-col justify-between min-h-[480px]">
@@ -59,12 +86,18 @@ export default function AdmissionSlipDocument({ student, onClose }) {
             )}
             <div>
               <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Student ID / Roll</span>
-              <span className="font-mono font-bold text-zinc-800">{student.uniq_id} {student.roll_number ? `(Roll: #${student.roll_number})` : ""}</span>
+              <span className="font-mono font-bold text-zinc-800">{studentId} {student.roll_number ? `(Roll: #${student.roll_number})` : ""}</span>
             </div>
             <div>
-              <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Class / Group</span>
-              <span className="font-bold text-sky-600">{student.education_status || "Standard Program"} / {student.group_name || "General Group"}</span>
+              <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Class / Program</span>
+              <span className="font-bold text-sky-600">{classSectionDisplay}</span>
             </div>
+            {departmentName && (
+              <div>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Department</span>
+                <span className="font-semibold text-zinc-800">{departmentName}</span>
+              </div>
+            )}
             <div>
               <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Guardian Name</span>
               <span className="font-semibold text-zinc-800">{student.guardian_detail?.primary_guardian_name || student.guardian_name || "--"}</span>

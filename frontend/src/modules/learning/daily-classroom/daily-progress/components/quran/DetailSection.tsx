@@ -15,7 +15,7 @@ export interface DetailSectionProps {
   onDragEnd?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, listType: string, index?: number) => void;
-  onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number) => void;
+  onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number, isCopy?: boolean) => void;
   onReset?: () => void;
 }
 
@@ -36,12 +36,19 @@ export default function DetailSection({
 }: DetailSectionProps) {
   const [isSectionDragOver, setIsSectionDragOver] = useState(false);
 
-  const isOtherListDragging = Boolean(draggedItem && draggedItem.listType !== listType);
+  const activeDrag = draggedItem || (typeof window !== "undefined" ? (window as any).__spr_active_drag_item : null);
+  const isOtherListDragging = Boolean(activeDrag && activeDrag.listType !== listType);
 
   const addRow = () => {
     const newId = crypto.randomUUID();
     onChange((prevData) => {
-      const lastJuz = prevData.length > 0 ? prevData[prevData.length - 1].juz : (availableJuzs?.[0] || "");
+      const defaultJuz =
+        (availableJuzs && availableJuzs.length > 0 ? availableJuzs[0] : "") ||
+        (juzPageData?.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || "");
+      const lastJuz =
+        prevData.length > 0 && prevData[prevData.length - 1].juz
+          ? prevData[prevData.length - 1].juz
+          : defaultJuz;
       return [
         ...prevData,
         {
@@ -139,7 +146,32 @@ export default function DetailSection({
   const handleSectionDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsSectionDragOver(false);
-    if (onDrop) {
+
+    let sourceListType =
+      draggedItem?.listType ||
+      (typeof window !== "undefined" ? (window as any).__spr_active_drag_item?.listType : undefined);
+    let sourceIndex =
+      draggedItem?.index ??
+      (typeof window !== "undefined" ? (window as any).__spr_active_drag_item?.index : undefined);
+
+    if (sourceListType === undefined || sourceIndex === undefined) {
+      try {
+        const raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text/plain");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          sourceListType = parsed.listType;
+          sourceIndex = parsed.index;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    const isCopy = e.ctrlKey || e.altKey;
+
+    if (onReorderRows && sourceListType !== undefined && sourceIndex !== undefined) {
+      onReorderRows(sourceListType, sourceIndex, listType, data.length, isCopy);
+    } else if (onDrop) {
       onDrop(e, listType, data.length);
     }
   };
@@ -147,7 +179,7 @@ export default function DetailSection({
   return (
     <div
       data-list-type={listType}
-      className={`relative transition-all duration-200 rounded-2xl p-1.5 -m-1.5 ${
+      className={`relative transition-colors duration-200 rounded-2xl p-1.5 -m-1.5 ${
         isSectionDragOver && isOtherListDragging
           ? "ring-2 ring-dashed ring-[var(--accent-main)]/60 bg-[var(--accent-main)]/5"
           : ""

@@ -1,5 +1,6 @@
 import React from "react";
 import { CloseIcon, RefreshIcon } from "../../../../../../components/ui/Icons";
+import IconButton from "../../../../../../components/ui/IconButton";
 
 export interface RowRemoveButtonProps {
   onRemove?: () => void;
@@ -84,14 +85,16 @@ export function SectionHeaderBar({
         )}
       </h3>
       {showReset && onReset ? (
-        <button
-          type="button"
+        <IconButton
+          icon={RefreshIcon}
+          size="sm"
+          variant="ghost"
+          shape="circle"
           onClick={onReset}
-          className="theme-bg-sub border theme-border theme-text-secondary hover:theme-danger hover:theme-bg-elevated p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
           title={resetTitle}
-        >
-          <RefreshIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-inherit transition-colors" />
-        </button>
+          ariaLabel={resetTitle}
+          className="hover:text-rose-400 hover:!text-rose-400 active:text-rose-500 shrink-0"
+        />
       ) : (
         <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 pointer-events-none opacity-0" />
       )}

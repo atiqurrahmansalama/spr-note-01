@@ -376,11 +376,12 @@ export default function TemplateActionToolbar({
         <IconButton
           icon={RefreshIcon}
           size={size}
-          variant="sub"
+          variant="ghost"
+          shape="circle"
           onClick={handleClear}
           title="Clear text"
           ariaLabel="Clear text"
-          className="hover:!text-rose-500"
+          className="hover:text-rose-400 hover:!text-rose-400 active:text-rose-500"
         />
       )}
 

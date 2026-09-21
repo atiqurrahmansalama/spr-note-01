@@ -2,17 +2,17 @@ import React, { forwardRef } from 'react';
 import { SpinnerIcon } from './Icons';
 
 export type IconButtonVariant =
-  | 'ghost'        // Flat transparent, hover:theme-bg-elevated/60 (Default)
-  | 'sub'          // theme-bg-sub/60 hover:theme-bg-elevated border theme-border
-  | 'surface'      // theme-bg-surface hover:theme-bg-elevated border theme-border
-  | 'outline'      // Transparent border theme-border hover:theme-bg-elevated
-  | 'filled'       // theme-bg-elevated hover:theme-bg-surface
+  | 'ghost'        // Flat transparent, light subtle background on hover/touch (Default)
+  | 'sub'          // Flat transparent, light subtle background on hover/touch
+  | 'surface'      // Flat transparent, light subtle background on hover/touch
+  | 'outline'      // Flat transparent, light subtle background on hover/touch
+  | 'filled'       // theme-bg-elevated, light subtle background on hover/touch
   | 'accent'       // theme-bg-accent theme-accent-text hover:brightness-110 shadow-2xs
   | 'accent-soft'  // theme-bg-accent-soft theme-accent hover:theme-bg-accent hover:theme-accent-text
-  | 'danger'       // text-rose-500 hover:bg-rose-500/10 hover:text-rose-600
-  | 'danger-soft'  // bg-rose-500/15 text-rose-500 hover:bg-rose-500/25
-  | 'success'      // text-emerald-500 hover:bg-emerald-500/10
-  | 'success-soft';// bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25
+  | 'danger'       // text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 active:bg-rose-500/20
+  | 'danger-soft'  // bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 active:bg-rose-500/30
+  | 'success'      // text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 active:bg-emerald-500/20
+  | 'success-soft';// bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 active:bg-emerald-500/30
 
 export type IconButtonSize =
   | '2xs' // 20x20 px (for inline tag chips, clear adornments)
@@ -60,18 +60,18 @@ const SIZE_STYLES: Record<IconButtonSize, { button: string; icon: string }> = {
 
 const SHAPE_STYLES: Record<IconButtonShape, Record<IconButtonSize, string>> = {
   rounded: {
-    '2xs': 'rounded-sm',
-    xs: 'rounded-md',
-    sm: 'rounded-lg',
-    md: 'rounded-xl',
-    lg: 'rounded-2xl',
+    '2xs': 'rounded-full',
+    xs: 'rounded-full',
+    sm: 'rounded-full',
+    md: 'rounded-full',
+    lg: 'rounded-full',
   },
   square: {
-    '2xs': 'rounded-none',
-    xs: 'rounded-none',
-    sm: 'rounded-none',
-    md: 'rounded-none',
-    lg: 'rounded-none',
+    '2xs': 'rounded-full',
+    xs: 'rounded-full',
+    sm: 'rounded-full',
+    md: 'rounded-full',
+    lg: 'rounded-full',
   },
   circle: {
     '2xs': 'rounded-full',
@@ -83,24 +83,24 @@ const SHAPE_STYLES: Record<IconButtonShape, Record<IconButtonSize, string>> = {
 };
 
 const VARIANT_STYLES: Record<IconButtonVariant, string> = {
-  ghost: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/60',
-  sub: 'theme-bg-sub/60 hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border shadow-2xs',
-  surface: 'theme-bg-surface hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border shadow-2xs',
-  outline: 'bg-transparent hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border shadow-2xs',
-  filled: 'theme-bg-elevated hover:theme-bg-surface theme-text-primary border theme-border shadow-2xs',
-  accent: 'theme-bg-accent theme-accent-text hover:brightness-110 shadow-2xs',
-  'accent-soft': 'theme-bg-accent-soft theme-accent hover:theme-bg-accent hover:theme-accent-text shadow-2xs',
-  danger: 'bg-transparent text-rose-500 hover:text-rose-600 hover:bg-rose-500/10',
-  'danger-soft': 'bg-rose-500/15 text-rose-500 hover:bg-rose-500/25',
-  success: 'bg-transparent text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10',
-  'success-soft': 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25',
+  ghost: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
+  sub: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
+  surface: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
+  outline: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
+  filled: 'theme-bg-elevated border-0 theme-text-primary hover:opacity-90 active:opacity-80',
+  accent: 'theme-bg-accent border-0 theme-accent-text hover:brightness-110 active:brightness-95 shadow-2xs',
+  'accent-soft': 'theme-bg-accent-soft border-0 theme-accent hover:theme-bg-accent hover:theme-accent-text',
+  danger: 'bg-transparent border-0 text-rose-400 hover:text-rose-500 hover:bg-rose-500/[0.06] active:bg-rose-500/[0.12]',
+  'danger-soft': 'bg-rose-500/10 border-0 text-rose-400 hover:bg-rose-500/18 active:bg-rose-500/25',
+  success: 'bg-transparent border-0 text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/[0.06] active:bg-emerald-500/[0.12]',
+  'success-soft': 'bg-emerald-500/10 border-0 text-emerald-400 hover:bg-emerald-500/18 active:bg-emerald-500/25',
 };
 
 /**
  * Highly Reusable Enterprise Icon Button Component
  * ------------------------------------------------
- * Standardized touch targets, semantic design token variants,
- * loading indicator, smooth active scale, and strict accessibility.
+ * Fully rounded (rounded-full), borderless (border-0), standardized touch targets,
+ * subtle light background on hover and phone tap/click, loading spinner, and strict accessibility.
  */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   {
@@ -108,7 +108,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     children,
     variant = 'ghost',
     size = 'sm',
-    shape = 'rounded',
+    shape = 'circle',
     loading = false,
     active = false,
     disabled = false,
@@ -122,8 +122,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref
 ) {
   const sizeConfig = SIZE_STYLES[size] || SIZE_STYLES.sm;
-  const shapeClass = SHAPE_STYLES[shape]?.[size] || SHAPE_STYLES.rounded.sm;
-  const variantClass = VARIANT_STYLES[variant] || VARIANT_STYLES.ghost;
+  const shapeClass = SHAPE_STYLES[shape]?.[size] || SHAPE_STYLES.circle.sm;
+  
+  // Prevent default hover text color from overriding caller's custom hover text color
+  const hasCustomHoverText = /hover:(?:!)?(?:text-|theme-)/.test(className);
+  const rawVariantClass = VARIANT_STYLES[variant] || VARIANT_STYLES.ghost;
+  const variantClass = hasCustomHoverText
+    ? rawVariantClass.replace(/\bhover:theme-text-\S+/g, '').trim()
+    : rawVariantClass;
 
   const isDisabled = disabled || loading;
 
@@ -166,9 +172,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       title={title}
       aria-label={resolvedAriaLabel}
       disabled={isDisabled}
+      data-component="icon-button"
       onClick={isDisabled ? undefined : onClick}
       className={`
-        inline-flex items-center justify-center shrink-0 select-none transition-all duration-150
+        theme-icon-btn inline-flex items-center justify-center shrink-0 select-none transition-all duration-150 rounded-full border-0 outline-hidden focus:outline-hidden focus-visible:outline-hidden
         ${sizeConfig.button}
         ${shapeClass}
         ${variantClass}
@@ -188,3 +195,4 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 });
 
 export default IconButton;
+

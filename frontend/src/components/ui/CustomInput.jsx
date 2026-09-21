@@ -96,6 +96,8 @@ const CustomInput = forwardRef(function CustomInput(
     min,
     max,
     step = 1,
+    cyclic = true,
+    initialScrollValue,
     allowDecimals = true,
     allowNegative = false,
     scrollable = true,
@@ -388,23 +390,40 @@ const CustomInput = forwardRef(function CustomInput(
   const updateNumberValue = (stepAmount) => {
     const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
     const numStep = typeof stepAmount === "number" ? stepAmount : parseFloat(stepAmount) || numericStep;
+    const effectiveMin = min !== undefined ? Number(min) : (!allowNegative ? 0 : undefined);
+    const effectiveMax = max !== undefined ? Number(max) : undefined;
 
     let current = parseFloat(stringValue);
     if (isNaN(current)) {
-      current = numStep > 0 ? (min !== undefined ? Number(min) : 0) : (max !== undefined ? Number(max) : (min !== undefined ? Number(min) : 0));
+      if (initialScrollValue !== undefined && initialScrollValue !== null && initialScrollValue !== "" && !isNaN(Number(initialScrollValue))) {
+        let base = Number(initialScrollValue);
+        if (effectiveMin !== undefined && base < effectiveMin) base = effectiveMin;
+        if (effectiveMax !== undefined && base > effectiveMax) base = effectiveMax;
+        current = base + numStep;
+      } else {
+        current = numStep > 0
+          ? (effectiveMin !== undefined ? effectiveMin : 0)
+          : (effectiveMax !== undefined ? effectiveMax : (effectiveMin !== undefined ? effectiveMin : 0));
+      }
     } else {
       current += numStep;
     }
 
-    // Minimum boundary check (clamp, no wrap-around)
-    const effectiveMin = min !== undefined ? Number(min) : (!allowNegative ? 0 : undefined);
-    if (effectiveMin !== undefined && current < effectiveMin) {
-      current = effectiveMin;
-    }
-
-    // Maximum boundary check (clamp, no wrap-around)
-    if (max !== undefined && current > Number(max)) {
-      current = Number(max);
+    // Cyclic wrap-around when boundaries are defined
+    if (cyclic && effectiveMin !== undefined && effectiveMax !== undefined && effectiveMax >= effectiveMin) {
+      if (current > effectiveMax) {
+        current = effectiveMin;
+      } else if (current < effectiveMin) {
+        current = effectiveMax;
+      }
+    } else {
+      // Clamping fallback if cyclic is disabled or boundaries are one-sided
+      if (effectiveMin !== undefined && current < effectiveMin) {
+        current = effectiveMin;
+      }
+      if (effectiveMax !== undefined && current > effectiveMax) {
+        current = effectiveMax;
+      }
     }
 
     // Round to avoid floating point anomalies if stepping decimals

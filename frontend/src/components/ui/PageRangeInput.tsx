@@ -25,10 +25,10 @@ export interface PageRangeInputProps {
   onChange?: ((value: PageRangeChangeValue) => void) | ((value: PageRangeObject) => void);
   onStartChange?: (value: number | string) => void;
   onEndChange?: (value: number | string) => void;
+  onBlur?: (e?: React.FocusEvent<HTMLInputElement>) => void;
   onRemove?: () => void;
   min?: number;
   max?: number;
-  juzValue?: number | string;
   isLast?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -50,8 +50,8 @@ export interface PageRangeInputProps {
  * Enterprise Reusable Page Range Input Component
  * 
  * Provides a unified linked dual-input box for (Start Page — End Page).
- * Guarantees that Start Page is never greater than End Page (start <= end).
- * Supports both direct value props (startValue, endValue) and range object props (range: { start, end }).
+ * Pure generic UI component without domain-specific hardcoding.
+ * Supports unrestricted typing during keystrokes and smart validation upon completion (onBlur / onEnter).
  * Fully responsive, accessible, with keyboard navigation and theme token styling.
  */
 export default function PageRangeInput({
@@ -61,10 +61,10 @@ export default function PageRangeInput({
   onChange,
   onStartChange,
   onEndChange,
+  onBlur,
   onRemove,
   min = 1,
-  max: propMax,
-  juzValue,
+  max: propMax = 9999,
   size = 'md',
   variant = 'sub',
   className = '',
@@ -81,43 +81,20 @@ export default function PageRangeInput({
   onAddJuzRow,
   onEmptyBackspace,
 }: PageRangeInputProps & { variant?: 'sub' | 'surface' | 'elevated' }) {
-  // Determine effective max page from juzValue if provided
-  const getMaxPage = (juzStr?: number | string) => {
-    if (!juzStr) return propMax || 9999;
-    const j = parseInt(String(juzStr), 10);
-    if (j === 29) return 24;
-    if (j === 30) return 25;
-    if (j >= 1 && j <= 30) return 20;
-    return propMax || 9999;
-  };
-
-  const effectiveMax = getMaxPage(juzValue);
+  const max = propMax || 9999;
 
   // Extract start and end values
   const effectiveStart = range ? range.start : startValue;
   const effectiveEnd = range ? range.end : endValue;
   const prefix = idPrefix || (range?.id ? range.id : 'page-range');
 
-  const startNum = effectiveStart !== '' && effectiveStart !== undefined && effectiveStart !== null ? Number(effectiveStart) : NaN;
-  const endNum = effectiveEnd !== '' && effectiveEnd !== undefined && effectiveEnd !== null ? Number(effectiveEnd) : NaN;
-
-  // Maximum allowed start page cannot exceed end page (or max limit)
-  const maxStart = !isNaN(endNum) && endNum >= min ? Math.min(endNum, effectiveMax) : effectiveMax;
-  // Minimum allowed end page cannot be less than start page (or min limit)
-  const minEnd = !isNaN(startNum) && startNum <= effectiveMax ? Math.max(startNum, min) : min;
-
-  // Handle Start Page Change
+  // Handle Start Page Change (DURING TYPING - unrestricted input without premature keystroke clamping)
   const handleStartChange = useCallback(
     (rawVal: any) => {
-      let nextStart: number | string = rawVal === '' ? '' : Number(rawVal);
-      if (typeof nextStart === 'number' && !isNaN(nextStart)) {
-        if (nextStart < min) nextStart = min;
-        if (!isNaN(endNum) && nextStart > endNum) {
-          nextStart = endNum;
-        } else if (nextStart > effectiveMax) {
-          nextStart = effectiveMax;
-        }
-      }
+      const cleanVal = rawVal === '' || rawVal === undefined || rawVal === null
+        ? ''
+        : String(rawVal).replace(/\D/g, '');
+      const nextStart: number | string = cleanVal === '' ? '' : parseInt(cleanVal, 10);
 
       if (onStartChange) onStartChange(nextStart);
       if (onChange) {
@@ -128,22 +105,16 @@ export default function PageRangeInput({
         }
       }
     },
-    [min, effectiveMax, endNum, effectiveEnd, onStartChange, onChange, range]
+    [effectiveEnd, onStartChange, onChange, range]
   );
 
-  // Handle End Page Change
+  // Handle End Page Change (DURING TYPING - unrestricted input without premature keystroke clamping)
   const handleEndChange = useCallback(
     (rawVal: any) => {
-      let nextEnd: number | string = rawVal === '' ? '' : Number(rawVal);
-      if (typeof nextEnd === 'number' && !isNaN(nextEnd)) {
-        if (!isNaN(startNum) && nextEnd < startNum) {
-          nextEnd = startNum;
-        } else if (nextEnd < min) {
-          nextEnd = min;
-        } else if (nextEnd > effectiveMax) {
-          nextEnd = effectiveMax;
-        }
-      }
+      const cleanVal = rawVal === '' || rawVal === undefined || rawVal === null
+        ? ''
+        : String(rawVal).replace(/\D/g, '');
+      const nextEnd: number | string = cleanVal === '' ? '' : parseInt(cleanVal, 10);
 
       if (onEndChange) onEndChange(nextEnd);
       if (onChange) {
@@ -154,8 +125,96 @@ export default function PageRangeInput({
         }
       }
     },
-    [min, effectiveMax, startNum, effectiveStart, onEndChange, onChange, range]
+    [effectiveStart, onEndChange, onChange, range]
   );
+
+  // Post-typing validation & auto-adjustment on blur / completion
+  const handleStartBlur = useCallback(
+    (e?: React.FocusEvent<HTMLInputElement>) => {
+      if (effectiveStart !== '' && effectiveStart !== undefined && effectiveStart !== null) {
+        const startNumVal = Number(effectiveStart);
+        if (!isNaN(startNumVal)) {
+          let adjusted = startNumVal;
+          if (adjusted < min) adjusted = min;
+          if (adjusted > max) adjusted = max;
+
+          const curEnd = effectiveEnd !== '' && effectiveEnd !== undefined && effectiveEnd !== null ? Number(effectiveEnd) : NaN;
+          let nextEndVal = effectiveEnd;
+
+          // If start was adjusted higher than an existing end page, auto-advance end page so range remains valid
+          if (!isNaN(curEnd) && curEnd < adjusted) {
+            nextEndVal = adjusted;
+            if (onEndChange) onEndChange(adjusted);
+          }
+
+          if (adjusted !== startNumVal || nextEndVal !== effectiveEnd) {
+            if (onStartChange) onStartChange(adjusted);
+            if (onChange) {
+              if (range) {
+                (onChange as (val: PageRangeObject) => void)({ ...range, start: adjusted, end: nextEndVal ?? '' });
+              } else {
+                (onChange as (val: PageRangeChangeValue) => void)({ start: adjusted, end: nextEndVal ?? '' });
+              }
+            }
+          }
+        }
+      }
+
+      onBlur?.(e);
+    },
+    [effectiveStart, effectiveEnd, min, max, onStartChange, onEndChange, onChange, range, onBlur]
+  );
+
+  // Post-typing validation & auto-adjustment on blur / completion
+  const handleEndBlur = useCallback(
+    (e?: React.FocusEvent<HTMLInputElement>) => {
+      if (effectiveEnd !== '' && effectiveEnd !== undefined && effectiveEnd !== null) {
+        const endNumVal = Number(effectiveEnd);
+        if (!isNaN(endNumVal)) {
+          let adjusted = endNumVal;
+          const curStart = effectiveStart !== '' && effectiveStart !== undefined && effectiveStart !== null ? Number(effectiveStart) : NaN;
+
+          // Smart relational adjustment after user finishes typing:
+          // If start page is set and end page is less than start, adjust end to match start
+          if (!isNaN(curStart) && adjusted < curStart) {
+            adjusted = curStart;
+          } else if (adjusted < min) {
+            adjusted = min;
+          }
+
+          if (adjusted > max) {
+            adjusted = max;
+          }
+
+          if (adjusted !== endNumVal) {
+            if (onEndChange) onEndChange(adjusted);
+            if (onChange) {
+              if (range) {
+                (onChange as (val: PageRangeObject) => void)({ ...range, end: adjusted });
+              } else {
+                (onChange as (val: PageRangeChangeValue) => void)({ start: effectiveStart ?? '', end: adjusted });
+              }
+            }
+          }
+        }
+      }
+
+      onBlur?.(e);
+    },
+    [effectiveEnd, effectiveStart, min, max, onEndChange, onChange, range, onBlur]
+  );
+
+  const handleStartEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    handleStartBlur();
+    if (onEnter) onEnter(e);
+    else handleEnterFocusNext(e);
+  };
+
+  const handleEndEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    handleEndBlur();
+    if (onEnter) onEnter(e);
+    else handleEnterFocusNext(e);
+  };
 
   // Size styling matching Juz input box (h-[38px] sm:h-10, rounded-lg)
   const sizeClasses = {
@@ -197,12 +256,13 @@ export default function PageRangeInput({
           allowDecimals={false}
           value={effectiveStart}
           onChange={handleStartChange}
-          onEnter={onEnter || handleEnterFocusNext}
+          onBlur={handleStartBlur}
+          onEnter={handleStartEnter}
           onAdd={onAdd || onAddNextRange}
           onAddShift={onAddShift || onAddJuzRow}
           onEmptyBackspace={handleBackspace}
           min={min}
-          max={maxStart}
+          max={max}
           placeholder={placeholderStart}
           disabled={disabled}
           required={required}
@@ -227,14 +287,15 @@ export default function PageRangeInput({
           allowDecimals={false}
           value={effectiveEnd}
           onChange={handleEndChange}
-          onEnter={onEnter || handleEnterFocusNext}
+          onBlur={handleEndBlur}
+          onEnter={handleEndEnter}
           onAdd={onAdd || onAddNextRange}
           onAddShift={onAddShift || onAddJuzRow}
           onEmptyBackspace={(e) => {
             handleBackspaceFocusPrev(e, true);
           }}
-          min={minEnd}
-          max={effectiveMax}
+          min={min}
+          max={max}
           placeholder={placeholderEnd}
           disabled={disabled}
           required={required}

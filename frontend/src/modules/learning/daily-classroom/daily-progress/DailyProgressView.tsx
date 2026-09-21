@@ -560,14 +560,20 @@ export default function DailyProgressView({
     showToast("Stuck section reset", "info");
   };
 
+  const activeDragRef = useRef<{ listType: string; index: number } | null>(null);
   const [draggedItem, setDraggedItem] = useState<{ listType: string; index: number } | null>(null);
 
   const handleDragStart = (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => {
-    setDraggedItem({ listType, index });
+    const payload = { listType, index };
+    activeDragRef.current = payload;
+    (window as any).__spr_active_drag_item = payload;
+    setDraggedItem(payload);
     if ("dataTransfer" in e && e.dataTransfer) {
       e.dataTransfer.effectAllowed = "copyMove";
       try {
-        e.dataTransfer.setData("text/plain", JSON.stringify({ listType, index }));
+        const json = JSON.stringify(payload);
+        e.dataTransfer.setData("application/json", json);
+        e.dataTransfer.setData("text/plain", json);
       } catch {
         // Ignore if dataTransfer is restricted
       }
@@ -575,7 +581,11 @@ export default function DailyProgressView({
   };
 
   const handleDragEnd = () => {
-    setDraggedItem(null);
+    setTimeout(() => {
+      activeDragRef.current = null;
+      (window as any).__spr_active_drag_item = null;
+      setDraggedItem(null);
+    }, 120);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -600,6 +610,15 @@ export default function DailyProgressView({
     let sourceList = sourceListType === "mistake" ? newMistake : newStuck;
     let targetList = targetListType === "mistake" ? newMistake : newStuck;
 
+    const isRowBlank = (r?: any) => {
+      if (!r) return true;
+      const hasPage = r.page !== undefined && r.page !== null && String(r.page).trim() !== "";
+      const hasAyahs = (r.ayahs || []).some(
+        (a: any) => a.value !== undefined && a.value !== null && String(a.value).trim() !== ""
+      );
+      return !hasPage && !hasAyahs;
+    };
+
     if (isCopy) {
       const sourceItem = sourceList[sourceIndex];
       if (!sourceItem) return;
@@ -610,7 +629,9 @@ export default function DailyProgressView({
         ayahs: (sourceItem.ayahs || []).map((a) => ({ ...a, id: crypto.randomUUID() })),
       };
 
-      if (targetIndex !== undefined && targetIndex >= 0) {
+      if (targetList.length === 1 && isRowBlank(targetList[0])) {
+        targetList.splice(0, 1, itemCopy);
+      } else if (targetIndex !== undefined && targetIndex >= 0 && targetIndex <= targetList.length) {
         targetList.splice(targetIndex, 0, itemCopy);
       } else {
         targetList.push(itemCopy);
@@ -632,11 +653,17 @@ export default function DailyProgressView({
       } else {
         if (sourceIndex >= 0 && sourceIndex < sourceList.length) {
           const [movedItem] = sourceList.splice(sourceIndex, 1);
-          if (targetIndex !== undefined && targetIndex >= 0) {
+
+          if (targetList.length === 1 && isRowBlank(targetList[0])) {
+            // Replace the empty blank placeholder row with the moved item
+            targetList.splice(0, 1, movedItem);
+          } else if (targetIndex !== undefined && targetIndex >= 0 && targetIndex <= targetList.length) {
             targetList.splice(targetIndex, 0, movedItem);
           } else {
             targetList.push(movedItem);
           }
+
+          // Ensure source list always keeps at least one blank row if all rows were moved
           if (sourceList.length === 0) {
             sourceList.push(createBlankRow());
           }
@@ -646,14 +673,38 @@ export default function DailyProgressView({
 
     setMistakeData(newMistake);
     setStuckData(newStuck);
+    activeDragRef.current = null;
+    (window as any).__spr_active_drag_item = null;
     setDraggedItem(null);
   };
 
   const handleDrop = (e: React.DragEvent, targetListType: string, targetIndex?: number) => {
     e.preventDefault();
-    if (!draggedItem) return;
 
-    const { listType: sourceListType, index: sourceIndex } = draggedItem;
+    let sourceListType =
+      activeDragRef.current?.listType ||
+      (window as any).__spr_active_drag_item?.listType ||
+      draggedItem?.listType;
+    let sourceIndex =
+      activeDragRef.current?.index ??
+      (window as any).__spr_active_drag_item?.index ??
+      draggedItem?.index;
+
+    if (sourceListType === undefined || sourceIndex === undefined) {
+      try {
+        const raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text/plain");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          sourceListType = parsed.listType;
+          sourceIndex = parsed.index;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    if (sourceListType === undefined || sourceIndex === undefined) return;
+
     const isCopy = e.ctrlKey || e.altKey;
     handleReorderRows(sourceListType, sourceIndex, targetListType, targetIndex, isCopy);
   };

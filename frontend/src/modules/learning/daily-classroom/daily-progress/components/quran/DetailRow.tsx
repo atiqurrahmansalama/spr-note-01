@@ -3,8 +3,13 @@ import CustomSelect from "../../../../../../components/ui/CustomSelect";
 import CustomInput from "../../../../../../components/ui/CustomInput";
 import { DragHandleIcon } from "../../../../../../components/ui/Icons";
 import { handleEnterFocusNext, handleBackspaceFocusPrev } from "../../../../../../utils/keyboardUtils";
-import { QURAN_CONSTANTS } from "../../../../../../constants/quranConstants";
 import { RowRemoveButton, RowAddCircleButton } from "./QuranRowUI";
+import {
+  QURAN_RULES,
+  getJuzPageBounds,
+  useQuranTrackingSession,
+  quranTrackingSession,
+} from "./quranProgressRules";
 import { DetailRowData, DetailAyahItem } from "../../types";
 
 export interface DetailRowProps {
@@ -23,7 +28,7 @@ export interface DetailRowProps {
   onDragEnd?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, listType: string, index?: number) => void;
-  onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number) => void;
+  onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number, isCopy?: boolean) => void;
 }
 
 export default function DetailRow({
@@ -44,10 +49,40 @@ export default function DetailRow({
   onDrop,
   onReorderRows,
 }: DetailRowProps) {
-  const [isDraggable, setIsDraggable] = useState(false);
   const [dropPosition, setDropPosition] = useState<"before" | "after" | null>(null);
 
   const isDragging = Boolean(draggedItem && draggedItem.listType === listType && draggedItem.index === index);
+
+  // Shared tracking session across Mistake & Stuck details
+  const { lastPage, lastAyah } = useQuranTrackingSession();
+
+  // Determine effective Juz for this row:
+  // 1. rowData.juz if explicitly set
+  // 2. availableJuzs[0] if provided
+  // 3. First non-empty juz from juzPageData
+  const effectiveJuz =
+    (rowData.juz !== undefined && rowData.juz !== null && String(rowData.juz).trim() !== "")
+      ? rowData.juz
+      : (availableJuzs && availableJuzs.length > 0 && String(availableJuzs[0]).trim() !== "")
+      ? availableJuzs[0]
+      : (juzPageData && Array.isArray(juzPageData))
+      ? juzPageData.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || ""
+      : "";
+
+  // Dynamic bounds for Page derived from JUZ / PAGE DETAILS ranges for this Juz
+  const { minPage, maxPage } = getJuzPageBounds(effectiveJuz, juzPageData);
+
+  // Keep rowData.juz synchronized if it was empty and an effective Juz is determined
+  useEffect(() => {
+    if (effectiveJuz && !rowData.juz) {
+      onChange((prev) => {
+        if (!prev.juz) {
+          return { ...prev, juz: effectiveJuz };
+        }
+        return prev;
+      });
+    }
+  }, [effectiveJuz, rowData.juz, onChange]);
 
   // Listen to custom hover events from Touchscreen Pointer Drag
   useEffect(() => {
@@ -70,41 +105,6 @@ export default function DetailRow({
     return () => window.removeEventListener("spr_detail_drag_hover", handleDragHoverEvent);
   }, [listType, index, isDragging]);
 
-  const getPageRangeForJuz = (juzNum: string | number) => {
-    if (juzPageData && juzPageData.length > 0) {
-      const matchingRows = juzPageData.filter(
-        (row) => row.juz && row.juz.toString() === juzNum?.toString()
-      );
-
-      if (matchingRows.length > 0) {
-        let min = 9999;
-        let max = -1;
-
-        matchingRows.forEach((row) => {
-          (row.ranges || []).forEach((r: any) => {
-            const s = parseInt(r.start, 10);
-            const e = parseInt(r.end, 10);
-            if (!isNaN(s) && s > 0 && s < min) min = s;
-            if (!isNaN(e) && e > 0 && e > max) max = e;
-          });
-        });
-
-        if (min !== 9999 && max !== -1) {
-          return { min, max };
-        }
-      }
-    }
-
-    const j = parseInt(String(juzNum), 10);
-    const starts = QURAN_CONSTANTS.JUZ_PAGE_STARTS;
-    if (!j || isNaN(j) || !starts || j < 1 || j > 30) return { min: 1, max: 604 };
-    const start = starts[j] || 1;
-    const end = j === 30 ? 604 : starts[j + 1] ? starts[j + 1] - 1 : 604;
-    return { min: start, max: end };
-  };
-
-  const { min: minPage, max: maxPage } = getPageRangeForJuz(rowData.juz);
-
   const handleJuzChange = (newJuz: string | number) => {
     onChange((prev) => ({
       ...prev,
@@ -112,16 +112,72 @@ export default function DetailRow({
     }));
   };
 
+  // Unrestricted typing during keystrokes + track last page in session
   const handlePageChange = (val: string | number) => {
     onChange((prev) => ({ ...prev, page: val }));
+    if (val !== "" && val !== undefined && val !== null) {
+      quranTrackingSession.setLastPage(val);
+    }
   };
 
+  // Smart boundary clamping after leaving page input
+  const handlePageBlur = () => {
+    if (rowData.page !== "" && rowData.page !== undefined && rowData.page !== null) {
+      let p = parseInt(String(rowData.page), 10);
+      if (!isNaN(p)) {
+        if (p < minPage) p = minPage;
+        if (p > maxPage) p = maxPage;
+        if (p !== Number(rowData.page)) {
+          handlePageChange(p);
+        } else {
+          quranTrackingSession.setLastPage(p);
+        }
+      }
+    }
+  };
+
+  const handlePageEnter = (e: any) => {
+    handlePageBlur();
+    handleEnterFocusNext(e);
+  };
+
+  // Unrestricted typing during keystrokes + track last ayah in session
   const handleAyahChange = (ayahIndex: number, val: string | number) => {
     onChange((prevRow) => {
       const newAyahs = [...prevRow.ayahs];
       newAyahs[ayahIndex] = { ...newAyahs[ayahIndex], value: val };
       return { ...prevRow, ayahs: newAyahs };
     });
+    if (val !== "" && val !== undefined && val !== null) {
+      quranTrackingSession.setLastAyah(val);
+    }
+  };
+
+  // Smart boundary clamping after leaving ayah input (min 1, max 286)
+  const handleAyahBlur = (ayahIndex: number) => {
+    const ayah = rowData.ayahs[ayahIndex];
+    if (ayah && ayah.value !== "" && ayah.value !== undefined && ayah.value !== null) {
+      let a = parseInt(String(ayah.value), 10);
+      if (!isNaN(a)) {
+        if (a < QURAN_RULES.MIN_AYAH) a = QURAN_RULES.MIN_AYAH;
+        if (a > QURAN_RULES.MAX_AYAH) a = QURAN_RULES.MAX_AYAH;
+        if (a !== Number(ayah.value)) {
+          handleAyahChange(ayahIndex, a);
+        } else {
+          quranTrackingSession.setLastAyah(a);
+        }
+      }
+    }
+  };
+
+  const handleAyahEnter = (ayahIndex: number, e: any, isLastAyah: boolean) => {
+    handleAyahBlur(ayahIndex);
+    if (isLastRow && isLastAyah && onAddNewRow) {
+      if (e && e.preventDefault) e.preventDefault();
+      onAddNewRow();
+    } else {
+      handleEnterFocusNext(e);
+    }
   };
 
   const addAyah = () => {
@@ -176,15 +232,37 @@ export default function DetailRow({
     e.stopPropagation();
     const targetIdx = dropPosition === "after" ? index + 1 : index;
     setDropPosition(null);
-    if (onReorderRows && draggedItem) {
-      onReorderRows(draggedItem.listType, draggedItem.index, listType, targetIdx);
+
+    let sourceListType =
+      draggedItem?.listType ||
+      (typeof window !== "undefined" ? (window as any).__spr_active_drag_item?.listType : undefined);
+    let sourceIndex =
+      draggedItem?.index ??
+      (typeof window !== "undefined" ? (window as any).__spr_active_drag_item?.index : undefined);
+
+    if (sourceListType === undefined || sourceIndex === undefined) {
+      try {
+        const raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text/plain");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          sourceListType = parsed.listType;
+          sourceIndex = parsed.index;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    const isCopy = e.ctrlKey || e.altKey;
+
+    if (onReorderRows && sourceListType !== undefined && sourceIndex !== undefined) {
+      onReorderRows(sourceListType, sourceIndex, listType, targetIdx, isCopy);
     } else if (onDrop) {
       onDrop(e, listType, targetIdx);
     }
   };
 
   const handleRowDragEnd = () => {
-    setIsDraggable(false);
     setDropPosition(null);
     if (onDragEnd) onDragEnd();
   };
@@ -270,8 +348,6 @@ export default function DetailRow({
 
       window.dispatchEvent(new CustomEvent("spr_detail_drag_hover", { detail: null }));
 
-      if (onDragEnd) onDragEnd();
-
       if (currentTargetListType) {
         if (onReorderRows) {
           onReorderRows(listType, index, currentTargetListType, currentTargetIndex);
@@ -279,6 +355,8 @@ export default function DetailRow({
           onDrop(upEvt as any, currentTargetListType, currentTargetIndex);
         }
       }
+
+      if (onDragEnd) onDragEnd();
     };
 
     handleEl.addEventListener("pointermove", handlePointerMove);
@@ -298,13 +376,15 @@ export default function DetailRow({
         allowDecimals={false}
         value={rowData.page}
         onChange={handlePageChange}
-        onEnter={handleEnterFocusNext}
+        onBlur={handlePageBlur}
+        onEnter={handlePageEnter}
         onEmptyBackspace={(e: any) => {
           if (onRemoveRow) onRemoveRow();
           handleBackspaceFocusPrev(e, true);
         }}
         min={minPage}
         max={maxPage}
+        initialScrollValue={lastPage !== null ? lastPage : minPage}
         placeholder="--"
         className="w-full h-full p-0 min-h-0"
         wrapperClassName="w-full h-full"
@@ -318,7 +398,7 @@ export default function DetailRow({
       data-detail-row="true"
       data-list-type={listType}
       data-row-index={index}
-      className={`flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-all duration-150 select-none focus-within:z-40 hover:z-20 ${
+      className={`flex items-start gap-2 sm:gap-4 w-full py-2 px-1 sm:px-3 -mx-1 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none focus-within:z-40 ${
         isDragging
           ? "opacity-30 scale-[0.985] ring-2 ring-dashed ring-[var(--accent-main)]/60 bg-[var(--accent-main)]/5 shadow-inner"
           : dropPosition
@@ -326,11 +406,6 @@ export default function DetailRow({
           : ""
       }`}
       style={{ zIndex: 30 - index }}
-      draggable={isDraggable}
-      onDragStart={(e) => {
-        if (onDragStart) onDragStart(e, listType, index);
-      }}
-      onDragEnd={handleRowDragEnd}
       onDragOver={handleRowDragOver}
       onDragLeave={handleRowDragLeave}
       onDrop={handleRowDrop}
@@ -345,19 +420,38 @@ export default function DetailRow({
 
       {/* Drag handle with TouchScreen & Mouse Support */}
       <div
+        draggable={true}
+        onDragStart={(e) => {
+          const payload = { listType, index };
+          if (typeof window !== "undefined") {
+            (window as any).__spr_active_drag_item = payload;
+          }
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "copyMove";
+            try {
+              const jsonStr = JSON.stringify(payload);
+              e.dataTransfer.setData("application/json", jsonStr);
+              e.dataTransfer.setData("text/plain", jsonStr);
+            } catch {
+              // Ignore
+            }
+          }
+          if (onDragStart) onDragStart(e, listType, index);
+          const rowEl = e.currentTarget.closest('[data-detail-row="true"]');
+          if (rowEl && e.dataTransfer && typeof e.dataTransfer.setDragImage === "function") {
+            const rect = (rowEl as HTMLElement).getBoundingClientRect();
+            e.dataTransfer.setDragImage(rowEl, e.clientX - rect.left, e.clientY - rect.top);
+          }
+        }}
+        onDragEnd={handleRowDragEnd}
+        onPointerDown={handlePointerDown}
         style={{ touchAction: "none" }}
-        className={`theme-text-secondary hover:theme-accent hover:theme-bg-sub/80 cursor-grab active:cursor-grabbing transition-all p-1 -ml-1 rounded-lg shrink-0 flex items-center justify-center h-[38px] sm:h-10 self-start select-none ${
+        className={`theme-text-secondary hover:theme-accent hover:theme-bg-sub/80 cursor-grab active:cursor-grabbing transition-colors p-1 -ml-1 rounded-lg shrink-0 flex items-center justify-center h-[38px] sm:h-10 self-start select-none ${
           isDragging ? "opacity-20 cursor-grabbing" : "opacity-40 group-hover:opacity-100"
         }`}
-        onMouseEnter={() => setIsDraggable(true)}
-        onMouseLeave={() => {
-          if (!isDragging) setIsDraggable(false);
-        }}
-        onMouseDown={() => setIsDraggable(true)}
-        onPointerDown={handlePointerDown}
         title="Drag to reorder or move between sections"
       >
-        <DragHandleIcon className="w-4 h-4 transition-transform group-hover:scale-110 pointer-events-none" />
+        <DragHandleIcon className="w-4 h-4 pointer-events-none" />
       </div>
 
       {/* Fixed Left Section: [Juz + "Page" label] (if multiple juzs) OR ["Page" label] (if single juz) */}
@@ -367,7 +461,7 @@ export default function DetailRow({
           <div className="h-[38px] sm:h-10 w-[50px] sm:w-[58px] shrink-0">
             <CustomSelect
               options={availableJuzs.map((j) => ({ label: String(j), value: String(j) }))}
-              value={String(rowData.juz || availableJuzs[0] || "")}
+              value={String(effectiveJuz || availableJuzs[0] || "")}
               onChange={(val) => handleJuzChange(val)}
               compactMode={true}
             />
@@ -407,14 +501,8 @@ export default function DetailRow({
                     allowDecimals={false}
                     value={ayah.value}
                     onChange={(val) => handleAyahChange(ayahIdx, val)}
-                    onEnter={(e: any) => {
-                      if (isLastRow && isLastAyah && onAddNewRow) {
-                        if (e && e.preventDefault) e.preventDefault();
-                        onAddNewRow();
-                      } else {
-                        handleEnterFocusNext(e);
-                      }
-                    }}
+                    onBlur={() => handleAyahBlur(ayahIdx)}
+                    onEnter={(e: any) => handleAyahEnter(ayahIdx, e, isLastAyah)}
                     onShiftEnter={onNextSection}
                     onAdd={() => {
                       if (isLastAyah) addAyah();
@@ -423,7 +511,9 @@ export default function DetailRow({
                       handleBackspaceFocusPrev(e, true);
                       removeAyah(ayahIdx);
                     }}
-                    min={1}
+                    min={QURAN_RULES.MIN_AYAH}
+                    max={QURAN_RULES.MAX_AYAH}
+                    initialScrollValue={lastAyah !== null ? lastAyah : 1}
                     placeholder="--"
                     className="w-full h-full p-0 min-h-0"
                     wrapperClassName="w-full h-full"

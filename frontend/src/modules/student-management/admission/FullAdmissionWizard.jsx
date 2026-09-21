@@ -948,7 +948,13 @@ export default function FullAdmissionWizard({
         if (onSuccess) {
           const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);
           const fullData = profileRes.ok ? await profileRes.json() : resData;
-          onSuccess(fullData);
+          const enrichedData = {
+            ...fullData,
+            student_class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+            education_status: fullData.education_status || selectedClassObj?.name || sharedData.education_status,
+            class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+          };
+          onSuccess(enrichedData);
         }
         setLoading(false);
         return;
@@ -1041,7 +1047,13 @@ export default function FullAdmissionWizard({
       if (onSuccess) {
         const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);
         const fullData = profileRes.ok ? await profileRes.json() : resData;
-        onSuccess(fullData);
+        const enrichedData = {
+          ...fullData,
+          student_class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+          education_status: fullData.education_status || selectedClassObj?.name || sharedData.education_status,
+          class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+        };
+        onSuccess(enrichedData);
       }
     } catch (err) {
       console.error("Enrollment error:", err);
