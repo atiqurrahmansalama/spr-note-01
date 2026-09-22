@@ -37,7 +37,7 @@ export default function ProgressAssessmentsView({
   };
 
   const handleGoToReports = () => {
-    navigate('/studies/progress-management?tab=PROGRESS_ASSESSMENT');
+    navigate('/studies/progress-reports');
   };
 
   const upcomingFeatures = [

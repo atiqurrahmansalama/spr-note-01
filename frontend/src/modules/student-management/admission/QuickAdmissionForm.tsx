@@ -57,8 +57,9 @@ export default function QuickAdmissionForm({
   const tenantContext = useTenant ? useTenant() : null;
   const activeTenantId = tenantContext?.activeTenantId || "default";
 
-  const isEditing = Boolean(sharedData?.is_editing || editingStudent || sharedData?.edit_student_id);
-  const editStudentId = sharedData?.edit_student_id || editingStudent?.id;
+  const queryEditId = searchParams.get("edit") || searchParams.get("student_id") || searchParams.get("id") || "";
+  const isEditing = Boolean(sharedData?.is_editing || editingStudent || sharedData?.edit_student_id || queryEditId);
+  const editStudentId = sharedData?.edit_student_id || editingStudent?.id || queryEditId;
 
   const returnTo = searchParams.get("returnTo") || "";
   const paramName = searchParams.get("name") || initialValues?.name || "";
@@ -107,23 +108,33 @@ export default function QuickAdmissionForm({
     refetch: refetchAcademicData,
   } = academicData || {};
 
-  // Form State initialized from sharedData, initialValues, or URL params
+  // Form State initialized from sharedData, editingStudent, initialValues, or URL params
   const [formData, setFormData] = useState({
-    name: sharedData?.name || paramName,
-    department: sharedData?.department || paramDept,
-    student_class: sharedData?.student_class || paramClass,
-    student_section: sharedData?.student_section || paramSection,
-    admission_date: sharedData?.admission_date || new Date().toISOString().split("T")[0],
-    guardian_phone: sharedData?.guardian_phone || sharedData?.father_phone || initialValues?.guardian_phone || "",
+    name: sharedData?.name || editingStudent?.name_en || editingStudent?.name || paramName,
+    department: sharedData?.department || editingStudent?.department || editingStudent?.department_id || paramDept,
+    student_class: sharedData?.student_class || (editingStudent?.student_class != null ? String(editingStudent.student_class) : "") || (editingStudent?.class_id ? String(editingStudent.class_id) : "") || paramClass,
+    student_section: sharedData?.student_section || (editingStudent?.student_section != null ? String(editingStudent.student_section) : "") || (editingStudent?.section != null ? String(editingStudent.section) : "") || (editingStudent?.section_id ? String(editingStudent.section_id) : "") || paramSection,
+    admission_date: sharedData?.admission_date || editingStudent?.admission_date || new Date().toISOString().split("T")[0],
+    guardian_phone: sharedData?.guardian_phone || sharedData?.father_phone || editingStudent?.guardian_phone || editingStudent?.details?.guardian_phone || initialValues?.guardian_phone || "",
   });
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync if sharedData or query parameters change
+  // Sync if editingStudent, sharedData or query parameters change
   useEffect(() => {
-    if (sharedData) {
+    if (editingStudent) {
+      setFormData((prev) => ({
+        ...prev,
+        name: editingStudent.name_en || editingStudent.name || prev.name,
+        department: editingStudent.department || editingStudent.department_id || prev.department,
+        student_class: editingStudent.student_class != null ? String(editingStudent.student_class) : (editingStudent.class_id ? String(editingStudent.class_id) : prev.student_class),
+        student_section: editingStudent.student_section != null ? String(editingStudent.student_section) : (editingStudent.section != null ? String(editingStudent.section) : (editingStudent.section_id ? String(editingStudent.section_id) : prev.student_section)),
+        admission_date: editingStudent.admission_date || prev.admission_date,
+        guardian_phone: editingStudent.guardian_phone || editingStudent.details?.guardian_phone || editingStudent.father_phone || prev.guardian_phone,
+      }));
+    } else if (sharedData) {
       setFormData((prev) => ({
         ...prev,
         name: sharedData.name != null && sharedData.name !== "" ? sharedData.name : (paramName || prev.name),
@@ -143,6 +154,7 @@ export default function QuickAdmissionForm({
       }));
     }
   }, [
+    editingStudent,
     sharedData?.name,
     sharedData?.department,
     sharedData?.student_class,
@@ -268,19 +280,27 @@ export default function QuickAdmissionForm({
     const className = selectedClassObj?.name || selectedClassObj?.class_name || "";
 
     // ─── 1. EDIT MODE SUBMISSION (PATCH) ──────────────────────────────────
-    if (isEditing && editStudentId) {
-      const updatePayload = {
+    if (isEditing) {
+      if (!editStudentId) {
+        showToast("Cannot update student: Student ID is missing. Please select the student again.", "error");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const targetClass = formData.student_class || editingStudent?.student_class || editingStudent?.class_id || null;
+      const targetSection = formData.student_section || editingStudent?.student_section || editingStudent?.section || editingStudent?.section_id || null;
+      const targetDept = formData.department || editingStudent?.department || editingStudent?.department_id || null;
+
+      const updatePayload: Record<string, any> = {
         name: formData.name.trim(),
-        student_class: formData.student_class || null,
-        department: formData.department || null,
-        student_section: formData.student_section || null,
-        education_status: className,
-        admission_date: formData.admission_date,
+        name_en: formData.name.trim(),
+        student_class: targetClass || null,
+        section: targetSection || null,
+        student_section: targetSection || null,
+        education_status: className || editingStudent?.education_status || editingStudent?.student_class_name || "",
+        admission_date: formData.admission_date || editingStudent?.admission_date || undefined,
         academic_data: {
-          department: formData.department || null,
-          student_class: formData.student_class || null,
-          student_section: formData.student_section || null,
-          admission_date: formData.admission_date,
+          admission_date: formData.admission_date || editingStudent?.admission_date || undefined,
         },
         guardian_data: {
           primary_guardian_phone: formData.guardian_phone.trim(),
@@ -303,22 +323,26 @@ export default function QuickAdmissionForm({
             ...resData,
             name: formData.name.trim(),
             name_en: formData.name.trim(),
-            department: formData.department || resData.department,
-            department_name: resData.department_name || departmentName,
-            student_class: formData.student_class || resData.student_class,
-            student_class_name: resData.student_class_name || className,
-            class_name: resData.student_class_name || className,
-            education_status: resData.education_status || className,
-            student_section: formData.student_section || resData.student_section,
-            section_name: resData.section_name || sectionName,
-            group_name: resData.group_name || resData.student_group_name || sectionName || className || "General Group",
+            department: targetDept || resData.department,
+            department_name: resData.department_name || departmentName || editingStudent?.department_name,
+            student_class: targetClass || resData.student_class,
+            student_class_name: resData.student_class_name || className || editingStudent?.student_class_name,
+            class_name: resData.student_class_name || className || editingStudent?.class_name,
+            education_status: resData.education_status || className || editingStudent?.education_status,
+            student_section: targetSection || resData.student_section,
+            section_name: resData.section_name || sectionName || editingStudent?.section_name,
+            group_name: resData.group_name || resData.student_group_name || sectionName || className || editingStudent?.group_name || "General Group",
             guardian_phone: formData.guardian_phone.trim(),
             uniq_id: resData.uniq_id || editingStudent?.uniq_id || `ID: ${editStudentId}`,
             student_id_card_number: resData.student_id_card_number || editingStudent?.student_id_card_number || resData.uniq_id,
             id: editStudentId,
             is_editing: true,
           };
-          studentStore.update(String(editStudentId), updatedStu);
+          try {
+            studentStore.update(String(editStudentId), updatedStu);
+          } catch (stErr) {
+            console.warn("Local studentStore update warning:", stErr);
+          }
           injectIntoAcademicCache(updatedStu);
           showToast(`Student "${formData.name}" updated successfully!`, "success");
           window.dispatchEvent(new CustomEvent("spr_students_updated"));
@@ -341,40 +365,59 @@ export default function QuickAdmissionForm({
             body: JSON.stringify({
               name: formData.name.trim(),
               name_en: formData.name.trim(),
-              student_class: formData.student_class || null,
-              department: formData.department || null,
-              student_section: formData.student_section || null,
+              student_class: targetClass || null,
+              section: targetSection || null,
+              student_section: targetSection || null,
             }),
           });
           if (fallbackRes.ok) {
+            const resData = await fallbackRes.json().catch(() => ({}));
             const updatedStu = {
               ...editingStudent,
+              ...resData,
               name: formData.name.trim(),
               name_en: formData.name.trim(),
-              department: formData.department,
-              department_name: departmentName,
-              student_class: formData.student_class,
-              student_class_name: className,
-              class_name: className,
-              education_status: className,
-              student_section: formData.student_section,
-              section_name: sectionName,
+              department: targetDept || resData.department,
+              department_name: departmentName || editingStudent?.department_name,
+              student_class: targetClass || resData.student_class,
+              student_class_name: className || editingStudent?.student_class_name,
+              class_name: className || editingStudent?.class_name,
+              education_status: className || editingStudent?.education_status,
+              student_section: targetSection || resData.student_section,
+              section_name: sectionName || editingStudent?.section_name,
               id: editStudentId,
               is_editing: true,
             };
+            try {
+              studentStore.update(String(editStudentId), updatedStu);
+            } catch (stErr) {
+              console.warn("Local studentStore update warning:", stErr);
+            }
+            injectIntoAcademicCache(updatedStu);
             showToast(`Student "${formData.name}" updated successfully!`, "success");
             window.dispatchEvent(new CustomEvent("spr_students_updated"));
+            window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
             refetchAcademicData?.();
             if (onSuccess) onSuccess(updatedStu);
             else navigate("/groups-students");
             return;
           }
           const errData = await res.json().catch(() => ({}));
-          showToast(errData?.detail || errData?.message || "Failed to update student profile", "error");
+          let errorMsg = "Failed to update student profile";
+          if (errData && typeof errData === "object") {
+            if (typeof errData.detail === "string") errorMsg = errData.detail;
+            else if (typeof errData.message === "string") errorMsg = errData.message;
+            else {
+              const firstVal = Object.values(errData)[0];
+              if (typeof firstVal === "string") errorMsg = firstVal;
+              else if (Array.isArray(firstVal) && firstVal.length > 0) errorMsg = String(firstVal[0]);
+            }
+          }
+          showToast(errorMsg, "error");
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Quick admission edit error:", err);
-        showToast("Failed to update student profile", "error");
+        showToast(err?.message || "Failed to update student profile", "error");
       } finally {
         setIsSubmitting(false);
       }

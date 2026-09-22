@@ -155,7 +155,7 @@ export default function App() {
               >
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/student-reports" element={<Navigate to="/studies/progress-management" replace />} />
+                <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
                 <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
                 <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />
@@ -224,9 +224,15 @@ export default function App() {
                 {/* Academic Studies — Progress Management Routes */}
                 <Route path="/studies/progress-management" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
                 <Route path="/studies/daily-progress" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
-                <Route path="/studies/progress-assessments" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
-                <Route path="/daily-progress" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
-                <Route path="/progress-assessments" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
+                <Route path="/studies/progress-reports" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
+                <Route path="/studies/progress-assessments" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/studies/progress-management/daily-progress" element={<Navigate to="/studies/daily-progress" replace />} />
+                <Route path="/studies/progress-management/reports" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/studies/progress-management/progress-reports" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/progress-management" element={<Navigate to="/studies/progress-management" replace />} />
+                <Route path="/daily-progress" element={<Navigate to="/studies/daily-progress" replace />} />
+                <Route path="/progress-reports" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/progress-assessments" element={<Navigate to="/studies/progress-reports" replace />} />
 
                 {/* Examination & Result Management Hub Routes */}
                 <Route path="/examinations" element={<ExaminationsHubView />} />

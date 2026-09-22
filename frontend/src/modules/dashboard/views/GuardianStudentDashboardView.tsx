@@ -38,7 +38,7 @@ export default function GuardianStudentDashboardView() {
       trend: { value: '+6 pages this week', isPositive: true },
       icon: SparklesIcon,
       color: 'accent',
-      onClick: () => navigate('/studies/progress-management'),
+      onClick: () => navigate('/studies/progress-reports'),
     },
     {
       id: 'latest_grade',
@@ -58,7 +58,7 @@ export default function GuardianStudentDashboardView() {
       trend: { value: 'Active learner', isPositive: true },
       icon: BookOpenIcon,
       color: 'sky',
-      onClick: () => navigate('/studies/progress-management'),
+      onClick: () => navigate('/studies/progress-reports'),
     },
   ];
 
@@ -133,7 +133,7 @@ export default function GuardianStudentDashboardView() {
 
         <button
           type="button"
-          onClick={() => navigate('/studies/progress-management')}
+          onClick={() => navigate('/studies/progress-reports')}
           className="px-3.5 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-semibold shadow-xs hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
         >
           <SavedMessagesIcon className="w-3.5 h-3.5" />

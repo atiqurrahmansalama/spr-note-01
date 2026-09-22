@@ -78,9 +78,12 @@ export function getLastActiveRoute(fallbackRoute = '/dashboard'): string {
 
     const trimmed = saved.trim();
 
-    // Map legacy /student-reports to modern progress management
+    // Map legacy routes to modern progress reports
     if (trimmed === '/student-reports' || trimmed.startsWith('/student-reports?')) {
-      return '/studies/progress-management';
+      return '/studies/progress-reports';
+    }
+    if (trimmed === '/studies/progress-assessments' || trimmed.startsWith('/studies/progress-assessments?')) {
+      return '/studies/progress-reports';
     }
 
     if (isSavableRoute(trimmed)) {

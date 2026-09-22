@@ -159,8 +159,11 @@ export default function SidebarContainer({
           matchPaths: [
             "/studies/progress-management",
             "/studies/daily-progress",
+            "/studies/progress-reports",
             "/studies/progress-assessments",
+            "/progress-management",
             "/daily-progress",
+            "/progress-reports",
             "/progress-assessments"
           ],
           Icon: TrendingUpIcon,

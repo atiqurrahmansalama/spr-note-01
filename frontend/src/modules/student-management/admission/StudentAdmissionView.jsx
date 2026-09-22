@@ -29,7 +29,7 @@ import { useToast } from '../../../context/ToastContext';
 import { useTenant } from '../../../context/TenantContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { academicYearsStore, admissionSettingsStore } from '../../../utils/localStore';
+import { academicYearsStore, admissionSettingsStore, students as studentStore } from '../../../utils/localStore';
 import {
   getAdmissionTokens,
   toggleAdmissionTokenActive,
@@ -116,6 +116,8 @@ export default function StudentAdmissionView() {
 
   // Shared Direct Form Data
   const [sharedData, setSharedData] = useState({
+    is_editing: Boolean(editId),
+    edit_student_id: editId || null,
     name: searchParams.get('name') || '',
     bangla_name: '',
     student_id_card_number: '',
@@ -163,82 +165,93 @@ export default function StudentAdmissionView() {
 
     let isMounted = true;
     setLoadingEditData(true);
+
+    const applyStudentData = (stu) => {
+      if (!isMounted || !stu) return;
+      setEditingStudent(stu);
+
+      const g = stu.guardian_detail || (Array.isArray(stu.guardians) && stu.guardians[0]) || stu.details || {};
+      const a = stu.academic_detail || {};
+      const pAddr = stu.present_address || {};
+      const permAddr = stu.permanent_address || {};
+
+      setSharedData((prev) => ({
+        ...prev,
+        is_editing: true,
+        edit_student_id: stu.id,
+        student_type: "EXISTING",
+        name: stu.name_en || stu.name || prev.name || '',
+        bangla_name: stu.bangla_name || stu.details?.name_bn || '',
+        student_id_card_number: stu.student_id_card_number || stu.uniq_id || '',
+        gender: stu.gender || 'MALE',
+        dob: stu.dob || stu.details?.date_of_birth || '',
+        blood_group: stu.blood_group || stu.details?.blood_group || '',
+        birth_certificate_no: stu.birth_certificate_no || '',
+        nid_no: stu.nid_no || '',
+        session_year: a.session_year || stu.session_year || ongoingYear?.name || '2026-2027',
+        department: stu.department || a.department || stu.department_id || prev.department || '',
+        student_class: stu.student_class != null ? String(stu.student_class) : (a.student_class != null ? String(a.student_class) : (prev.student_class || '')),
+        student_section: stu.student_section != null ? String(stu.student_section) : (stu.section != null ? String(stu.section) : (stu.student_group != null ? String(stu.student_group) : (a.student_section != null ? String(a.student_section) : (prev.student_section || '')))),
+        education_status: stu.education_status || stu.student_class_name || prev.education_status || '',
+        roll_number: stu.roll_number || '',
+        admission_date: stu.admission_date || a.admission_date || prev.admission_date || new Date().toISOString().split('T')[0],
+        target_status: stu.target_status || 'NON_RESIDENTIAL',
+        branch_id: stu.branch || '',
+        photo: stu.photo || '',
+        previous_school_name: a.previous_school_name || '',
+        previous_school_address: a.previous_school_address || '',
+        previous_class: a.previous_class || '',
+        previous_grade: a.previous_grade || '',
+        previous_average: a.previous_average || '',
+        previous_passing_year: a.previous_passing_year || '',
+        previous_study_details: a.previous_study_details || '',
+        tc_number: a.tc_number || '',
+        father_name: g.father_name || stu.details?.father_name || stu.father_name || '',
+        father_phone: g.father_phone || stu.details?.father_phone || '',
+        father_occupation: g.father_occupation || stu.details?.father_occupation || '',
+        mother_name: g.mother_name || stu.details?.mother_name || '',
+        mother_phone: g.mother_phone || '',
+        mother_occupation: g.mother_occupation || '',
+        primary_guardian_name: g.primary_guardian_name || stu.details?.guardian_name || stu.guardian_name || '',
+        guardian_phone: g.primary_guardian_phone || g.guardian_phone || stu.guardian_phone || stu.details?.guardian_phone || stu.details?.emergency_phone || stu.details?.father_phone || prev.guardian_phone || '',
+        guardian_relation: g.guardian_relation || stu.details?.guardian_relation || 'Father',
+        guardian_nid: g.guardian_nid || '',
+        emergency_contact_phone: g.emergency_contact_phone || stu.details?.emergency_phone || '',
+        street_address: pAddr.street_address || pAddr.address_line1 || '',
+        post_code: pAddr.post_code || '',
+        thana_or_upazila: pAddr.thana_or_upazila || pAddr.thana || '',
+        district: pAddr.district || '',
+        division: pAddr.division || '',
+        perm_street: permAddr.street_address || permAddr.address_line1 || '',
+        perm_post_code: permAddr.post_code || '',
+        perm_thana: permAddr.thana_or_upazila || permAddr.thana || '',
+        perm_district: permAddr.district || '',
+        perm_division: permAddr.division || '',
+      }));
+    };
+
     fetchWithAuth(`/api/v1/students/${editId}/full-profile/`)
       .then((res) => (res.ok ? res.json() : null))
       .then((stu) => {
-        if (!isMounted || !stu) return;
-        setEditingStudent(stu);
-
-        const g = stu.guardian_detail || (Array.isArray(stu.guardians) && stu.guardians[0]) || stu.details || {};
-        const a = stu.academic_detail || {};
-        const pAddr = stu.present_address || {};
-        const permAddr = stu.permanent_address || {};
-
-        setSharedData((prev) => ({
-          ...prev,
-          is_editing: true,
-          edit_student_id: stu.id,
-          student_type: "EXISTING",
-          name: stu.name_en || stu.name || '',
-          bangla_name: stu.bangla_name || stu.details?.name_bn || '',
-          student_id_card_number: stu.student_id_card_number || '',
-          gender: stu.gender || 'MALE',
-          dob: stu.dob || stu.details?.date_of_birth || '',
-          blood_group: stu.blood_group || stu.details?.blood_group || '',
-          birth_certificate_no: stu.birth_certificate_no || '',
-          nid_no: stu.nid_no || '',
-          session_year: a.session_year || stu.session_year || ongoingYear?.name || '2026-2027',
-          department: stu.department || a.department || '',
-          student_class: stu.student_class != null ? String(stu.student_class) : (a.student_class != null ? String(a.student_class) : ''),
-          student_section: stu.student_section != null ? String(stu.student_section) : (stu.student_group != null ? String(stu.student_group) : (a.student_section != null ? String(a.student_section) : '')),
-          education_status: stu.education_status || stu.student_class_name || '',
-          roll_number: stu.roll_number || '',
-          admission_date: stu.admission_date || a.admission_date || new Date().toISOString().split('T')[0],
-          target_status: stu.target_status || 'NON_RESIDENTIAL',
-          branch_id: stu.branch || '',
-          photo: stu.photo || '',
-          previous_school_name: a.previous_school_name || '',
-          previous_school_address: a.previous_school_address || '',
-          previous_class: a.previous_class || '',
-          previous_grade: a.previous_grade || '',
-          previous_average: a.previous_average || '',
-          previous_passing_year: a.previous_passing_year || '',
-          previous_study_details: a.previous_study_details || '',
-          tc_number: a.tc_number || '',
-          father_name: g.father_name || stu.details?.father_name || stu.father_name || '',
-          father_phone: g.father_phone || stu.details?.father_phone || '',
-          father_occupation: g.father_occupation || stu.details?.father_occupation || '',
-          mother_name: g.mother_name || stu.details?.mother_name || '',
-          mother_phone: g.mother_phone || '',
-          mother_occupation: g.mother_occupation || '',
-          primary_guardian_name: g.primary_guardian_name || stu.details?.guardian_name || stu.guardian_name || '',
-          guardian_phone: g.primary_guardian_phone || g.guardian_phone || stu.guardian_phone || stu.details?.guardian_phone || stu.details?.emergency_phone || stu.details?.father_phone || '',
-          guardian_relation: g.guardian_relation || stu.details?.guardian_relation || 'Father',
-          guardian_nid: g.guardian_nid || '',
-          emergency_contact_phone: g.emergency_contact_phone || stu.details?.emergency_phone || '',
-          street_address: pAddr.street_address || pAddr.address_line1 || '',
-          post_code: pAddr.post_code || '',
-          thana_or_upazila: pAddr.thana_or_upazila || pAddr.thana || '',
-          district: pAddr.district || '',
-          division: pAddr.division || '',
-          perm_street: permAddr.street_address || permAddr.address_line1 || '',
-          perm_post_code: permAddr.post_code || '',
-          perm_thana: permAddr.thana_or_upazila || permAddr.thana || '',
-          perm_district: permAddr.district || '',
-          perm_division: permAddr.division || '',
-        }));
-
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev);
-          if (!next.get('tab')) {
-            next.set('tab', 'direct');
-          }
-          return next;
-        });
+        if (stu) {
+          applyStudentData(stu);
+        } else {
+          return fetchWithAuth(`/api/v1/students/${editId}/`)
+            .then((res2) => (res2.ok ? res2.json() : null))
+            .then((stu2) => {
+              if (stu2) {
+                applyStudentData(stu2);
+              } else {
+                const localStu = (studentStore.getAll() || []).find((s) => String(s.id) === String(editId));
+                if (localStu) applyStudentData(localStu);
+              }
+            });
+        }
       })
       .catch((err) => {
-        console.error("Failed to load student for editing", err);
-        showToast("Failed to load student details for editing", "error");
+        console.warn("Failed to load student for editing, checking local cache", err);
+        const localStu = (studentStore.getAll() || []).find((s) => String(s.id) === String(editId));
+        if (localStu) applyStudentData(localStu);
       })
       .finally(() => {
         if (isMounted) setLoadingEditData(false);

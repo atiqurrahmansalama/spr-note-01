@@ -30,6 +30,7 @@ import {
   admissionSettingsStore,
   getAcademicYearStatus,
   DEFAULT_PREVIOUS_CLASSES,
+  students as studentStore,
 } from "../../../utils/localStore";
 import { useTenant } from "../../../context/TenantContext";
 import { useAcademicSession } from "../../../context/AcademicSessionContext";
@@ -851,6 +852,8 @@ export default function FullAdmissionWizard({
       target_status: sharedData.target_status || "NON_RESIDENTIAL",
       branch: sharedData.branch_id || (branches[0] ? branches[0].id : null),
       student_class: sharedData.student_class || null,
+      section: sharedData.student_section || null,
+      student_section: sharedData.student_section || null,
       education_status: selectedClassObj ? selectedClassObj.name : (sharedData.education_status || ""),
       present_address_data: presentAddressData,
       permanent_address_data: permanentAddressData,
@@ -945,15 +948,23 @@ export default function FullAdmissionWizard({
         }
 
         showToast("Student profile updated successfully!", "success");
+        const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`).catch(() => null);
+        const fullData = profileRes && profileRes.ok ? await profileRes.json() : resData;
+        const enrichedData = {
+          ...fullData,
+          student_class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+          education_status: fullData.education_status || selectedClassObj?.name || sharedData.education_status,
+          class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+        };
+        try {
+          studentStore.update(String(studentId), enrichedData);
+        } catch (stErr) {
+          console.warn("Local studentStore update warning:", stErr);
+        }
+        window.dispatchEvent(new CustomEvent("spr_students_updated"));
+        window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: enrichedData }));
+
         if (onSuccess) {
-          const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);
-          const fullData = profileRes.ok ? await profileRes.json() : resData;
-          const enrichedData = {
-            ...fullData,
-            student_class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
-            education_status: fullData.education_status || selectedClassObj?.name || sharedData.education_status,
-            class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
-          };
           onSuccess(enrichedData);
         }
         setLoading(false);

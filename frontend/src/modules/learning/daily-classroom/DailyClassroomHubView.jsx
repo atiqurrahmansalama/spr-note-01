@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { CollapsiblePageHeader } from "../../../components/ui";
 import CustomButton from "../../../components/ui/CustomButton";
 import { PageContainer } from "../../../components/layout";
@@ -26,13 +26,13 @@ import HifzReportBuilderModule from "./daily-progress/DailyProgressView";
 import StudentReportsView from "../../reports-history/components/StudentReportsView";
 
 const LESSON_MANAGEMENT_TABS = [
-  { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon },
-  { id: "LESSON_ASSESSMENT", label: "Lesson Assessments", icon: ChecklistIcon },
+  { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon, path: "/studies/daily-lessons" },
+  { id: "LESSON_ASSESSMENT", label: "Lesson Assessments", icon: ChecklistIcon, path: "/studies/lesson-assessments" },
 ];
 
 const PROGRESS_MANAGEMENT_TABS = [
-  { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon },
-  { id: "PROGRESS_ASSESSMENT", label: "Progress Reports", icon: TrendingUpIcon },
+  { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon, path: "/studies/daily-progress" },
+  { id: "PROGRESS_ASSESSMENT", label: "Progress Reports", icon: TrendingUpIcon, path: "/studies/progress-reports" },
 ];
 
 const normalizeTabId = (tab, isProgress) => {
@@ -44,6 +44,7 @@ const normalizeTabId = (tab, isProgress) => {
   if (
     upper === "PROGRESS_ASSESSMENT" ||
     upper === "PROGRESS_ASSESSMENTS" ||
+    upper === "PROGRESS_REPORTS" ||
     upper === "STUDENT_REPORTS" ||
     upper === "REPORTS"
   ) {
@@ -69,6 +70,7 @@ export default function DailyClassroomHubView({
   const tenantId = activeTenantId || "default";
 
   const location = useLocation();
+  const navigate = useNavigate();
   const path = location.pathname.toLowerCase();
 
   const isProgressHub = useMemo(() => {
@@ -77,6 +79,7 @@ export default function DailyClassroomHubView({
     return (
       path.includes("/progress-management") ||
       path.includes("/daily-progress") ||
+      path.includes("/progress-reports") ||
       path.includes("/progress-assessments") ||
       defaultTab === "PROGRESS" ||
       defaultTab === "PROGRESS_ASSESSMENT"
@@ -88,26 +91,35 @@ export default function DailyClassroomHubView({
   const HubIcon = isProgressHub ? TrendingUpIcon : BookOpenIcon;
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(
-    () => normalizeTabId(searchParams.get("tab") || defaultTab, isProgressHub)
-  );
 
-  useEffect(() => {
+  const resolveActiveTab = useCallback(() => {
     const urlTab = searchParams.get("tab");
     if (urlTab) {
-      const normalized = normalizeTabId(urlTab, isProgressHub);
-      if (normalized !== activeTab) {
-        setActiveTab(normalized);
-      }
-    } else if (defaultTab) {
-      const normalized = normalizeTabId(defaultTab, isProgressHub);
-      if (normalized !== activeTab) {
-        setActiveTab(normalized);
-      }
-    } else {
-      setActiveTab(isProgressHub ? "PROGRESS" : "LESSON");
+      return normalizeTabId(urlTab, isProgressHub);
     }
-  }, [searchParams, defaultTab, isProgressHub]);
+    if (path.includes("/progress-reports") || path.includes("/progress-assessments")) {
+      return "PROGRESS_ASSESSMENT";
+    }
+    if (path.includes("/daily-progress")) {
+      return "PROGRESS";
+    }
+    if (path.includes("/lesson-assessments") || path.includes("/recitations")) {
+      return "LESSON_ASSESSMENT";
+    }
+    if (path.includes("/daily-lessons")) {
+      return "LESSON";
+    }
+    if (defaultTab) {
+      return normalizeTabId(defaultTab, isProgressHub);
+    }
+    return isProgressHub ? "PROGRESS" : "LESSON";
+  }, [searchParams, path, defaultTab, isProgressHub]);
+
+  const [activeTab, setActiveTab] = useState(resolveActiveTab);
+
+  useEffect(() => {
+    setActiveTab(resolveActiveTab());
+  }, [resolveActiveTab]);
 
   const { departments, classes, sections, students, periodSlots } = useAcademicData();
 
@@ -231,14 +243,16 @@ export default function DailyClassroomHubView({
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", tabId);
-        return next;
-      },
-      { replace: true }
-    );
+    let targetPath = "";
+    if (isProgressHub) {
+      targetPath = tabId === "PROGRESS_ASSESSMENT" ? "/studies/progress-reports" : "/studies/daily-progress";
+    } else {
+      targetPath = tabId === "LESSON_ASSESSMENT" ? "/studies/lesson-assessments" : "/studies/daily-lessons";
+    }
+
+    const dateParam = searchParams.get("date");
+    const query = dateParam ? `?date=${encodeURIComponent(dateParam)}` : "";
+    navigate(`${targetPath}${query}`, { replace: true });
   };
 
   // ── Drawer Registrations ──────────────────────────────────────────────────────

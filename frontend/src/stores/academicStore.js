@@ -83,6 +83,36 @@ export const students = {
     return updated;
   },
 
+  /** Update student by ID or label (merge mode). */
+  update: (identifier, updatedFields) => {
+    const list = students.getAll();
+    const targetId = String(identifier || "").trim();
+    let found = false;
+    const updated = list.map((s) => {
+      if (s.id && String(s.id) === targetId) {
+        found = true;
+        return { ...s, ...updatedFields, id: s.id };
+      }
+      return s;
+    });
+    if (!found && (updatedFields?.label || updatedFields?.name)) {
+      const targetLabel = String(updatedFields.label || updatedFields.name).trim().toLowerCase();
+      const byLabel = list.map((s) => {
+        if (s.label && s.label.trim().toLowerCase() === targetLabel) {
+          found = true;
+          return { ...s, ...updatedFields, id: s.id || identifier };
+        }
+        return s;
+      });
+      if (found) {
+        writeJSON(KEYS.STUDENTS, byLabel);
+        return byLabel;
+      }
+    }
+    writeJSON(KEYS.STUDENTS, updated);
+    return updated;
+  },
+
   /** Delete student by name or ID. */
   remove: (identifier) => {
     const updated = students.getAll().filter(

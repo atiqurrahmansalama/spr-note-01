@@ -31,14 +31,17 @@ export const ROUTE_TITLE_MAP = {
   "/studies/daily-classroom": { title: "Lesson Management", category: "Academic Activities" },
   "/studies/lesson-management": { title: "Lesson Management", category: "Academic Activities" },
   "/studies/progress-management": { title: "Progress Management", category: "Academic Activities" },
-  "/studies/lesson-assessments": { title: "Lesson Assessments", category: "Academic Activities" },
-  "/studies/progress-assessments": { title: "Progress Assessments", category: "Academic Activities" },
-  "/studies/daily-lessons": { title: "Daily Lessons", category: "Academic Activities" },
   "/studies/daily-progress": { title: "Daily Progress", category: "Academic Activities" },
+  "/studies/progress-reports": { title: "Progress Reports", category: "Academic Activities" },
+  "/studies/progress-assessments": { title: "Progress Reports", category: "Academic Activities" },
+  "/studies/lesson-assessments": { title: "Lesson Assessments", category: "Academic Activities" },
+  "/studies/daily-lessons": { title: "Daily Lessons", category: "Academic Activities" },
   "/studies/recitations": { title: "Lesson Assessments", category: "Academic Activities" },
   "/studies/homework": { title: "Daily Homework", category: "Academic Activities" },
-  "/daily-lessons": { title: "Daily Lessons", category: "Academic Activities" },
+  "/progress-management": { title: "Progress Management", category: "Academic Activities" },
   "/daily-progress": { title: "Daily Progress", category: "Academic Activities" },
+  "/progress-reports": { title: "Progress Reports", category: "Academic Activities" },
+  "/daily-lessons": { title: "Daily Lessons", category: "Academic Activities" },
   "/recitations": { title: "Daily Assessment", category: "Academic Activities" },
   "/homework-tasks": { title: "Daily Homework", category: "Academic Activities" },
   "/classroom-config": { title: "Classroom Configuration", category: "Admin Tools" },
@@ -548,7 +551,7 @@ export default function AppLayout() {
         else if (key === "s") { e.preventDefault(); navigate("/sessions-comments"); }
         else if (key === "b") { e.preventDefault(); navigate("/data-backup"); }
         else if (key === "k") { e.preventDefault(); navigate("/shortcuts"); }
-        else if (key === "r") { e.preventDefault(); navigate("/studies/progress-management"); }
+        else if (key === "r") { e.preventDefault(); navigate("/studies/progress-reports"); }
       }
 
       if (e.key === "Escape") {

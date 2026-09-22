@@ -89,10 +89,12 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         tenant_id = get_scoped_tenant_id(self.request)
         if tenant_id:
-            base_qs = base_qs.filter(institution_id=tenant_id)
+            from django.db.models import Q
+            base_qs = base_qs.filter(Q(institution_id=tenant_id) | Q(institution_id__isnull=True))
         elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
             if user.institution_id:
-                base_qs = base_qs.filter(institution_id=user.institution_id)
+                from django.db.models import Q
+                base_qs = base_qs.filter(Q(institution_id=user.institution_id) | Q(institution_id__isnull=True))
             else:
                 base_qs = base_qs.filter(created_by=user)
 

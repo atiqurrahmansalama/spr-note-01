@@ -188,6 +188,20 @@ class StudentSerializer(serializers.ModelSerializer):
         if 'unique_id' in mutable_data and 'uniq_id' not in mutable_data:
             mutable_data['uniq_id'] = mutable_data['unique_id']
 
+        # Map student_section -> section
+        if 'student_section' in mutable_data and 'section' not in mutable_data:
+            mutable_data['section'] = mutable_data['student_section']
+
+        # Discard non-model attributes and protect immutable identifiers
+        mutable_data.pop('department', None)
+        mutable_data.pop('id', None)
+        mutable_data.pop('uniq_id', None)
+
+        nullable_fields = ['student_class', 'section', 'student_group', 'admission_date', 'roll_number']
+        for field in nullable_fields:
+            if field in mutable_data and (mutable_data[field] == '' or mutable_data[field] == 'null'):
+                mutable_data[field] = None
+
         return super().to_internal_value(mutable_data)
 
     @transaction.atomic
@@ -254,6 +268,9 @@ class StudentSerializer(serializers.ModelSerializer):
         group_val = validated_data.get('group_name') or self.initial_data.get('group')
         if group_val:
             validated_data['group_name'] = group_val
+
+        validated_data.pop('id', None)
+        validated_data.pop('uniq_id', None)
 
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
@@ -499,6 +516,41 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'completed_juz_count', 'active_juz', 'recent_error_average', 'quran_progress', 'department_type'
         ]
 
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        # Map student_section -> section
+        if 'student_section' in mutable_data and 'section' not in mutable_data:
+            mutable_data['section'] = mutable_data['student_section']
+
+        # Discard non-model department if present directly on student
+        mutable_data.pop('department', None)
+
+        # Sanitize empty strings for date, choice, or FK fields
+        nullable_fields = [
+            'dob', 'admission_date', 'student_class', 'section', 'student_group',
+            'branch', 'blood_group', 'roll_number', 'present_address', 'permanent_address',
+            'latitude', 'longitude'
+        ]
+        for field in nullable_fields:
+            if field in mutable_data and (mutable_data[field] == '' or mutable_data[field] == 'null'):
+                mutable_data[field] = None
+
+        # Sanitize nested academic_data
+        if 'academic_data' in mutable_data and isinstance(mutable_data['academic_data'], dict):
+            acad = mutable_data['academic_data'].copy()
+            for extra in ['department', 'student_class', 'student_section']:
+                acad.pop(extra, None)
+            if 'admission_date' in acad and (acad['admission_date'] == '' or acad['admission_date'] == 'null'):
+                acad['admission_date'] = None
+            mutable_data['academic_data'] = acad
+
+        # Protect immutable identifiers during update
+        mutable_data.pop('id', None)
+        mutable_data.pop('uniq_id', None)
+
+        return super().to_internal_value(mutable_data)
+
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         g_detail = ret.get('guardian_detail') or {}
@@ -530,14 +582,27 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         request = self.context.get('request')
-        user = request.user if request and request.user.is_authenticated else None
+        req_user = getattr(request, 'user', None) if request else None
+        user = req_user if req_user and getattr(req_user, 'is_authenticated', False) else None
+        creator = user or instance.created_by or User.objects.filter(is_superuser=True).first() or User.objects.first()
 
         present_address_data = validated_data.pop('present_address_data', None)
         permanent_address_data = validated_data.pop('permanent_address_data', None)
         academic_data = validated_data.pop('academic_data', None)
         guardian_data = validated_data.pop('guardian_data', None)
 
-        # Update core student fields
+        # Protect immutable primary ID and unique ID
+        validated_data.pop('id', None)
+        validated_data.pop('uniq_id', None)
+
+        # If student has no institution yet, associate with current tenant
+        if not instance.institution_id and request:
+            from core.services import get_scoped_tenant_id
+            tenant_id = get_scoped_tenant_id(request)
+            if tenant_id:
+                instance.institution_id = tenant_id
+
+        # Update core student fields safely without wiping existing class/section if not provided
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
         instance.save()
@@ -549,7 +614,7 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
                     setattr(instance.present_address, k, v)
                 instance.present_address.save()
             else:
-                addr = Address.objects.create(created_by=user, **present_address_data)
+                addr = Address.objects.create(created_by=creator, **present_address_data)
                 instance.present_address = addr
                 instance.save(update_fields=['present_address'])
 
@@ -560,22 +625,24 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
                     setattr(instance.permanent_address, k, v)
                 instance.permanent_address.save()
             else:
-                addr = Address.objects.create(created_by=user, **permanent_address_data)
+                addr = Address.objects.create(created_by=creator, **permanent_address_data)
                 instance.permanent_address = addr
                 instance.save(update_fields=['permanent_address'])
 
         # Deep Update academic details
         if academic_data is not None:
-            academic_detail, _ = StudentAcademicDetail.objects.get_or_create(student=instance, defaults={'created_by': user})
+            academic_detail, _ = StudentAcademicDetail.objects.get_or_create(student=instance, defaults={'created_by': creator})
             for k, v in academic_data.items():
-                setattr(academic_detail, k, v)
+                if hasattr(academic_detail, k):
+                    setattr(academic_detail, k, v)
             academic_detail.save()
 
         # Deep Update guardian details
         if guardian_data is not None:
-            guardian_detail, _ = StudentGuardian.objects.get_or_create(student=instance, defaults={'created_by': user})
+            guardian_detail, _ = StudentGuardian.objects.get_or_create(student=instance)
             for k, v in guardian_data.items():
-                setattr(guardian_detail, k, v)
+                if hasattr(guardian_detail, k):
+                    setattr(guardian_detail, k, v)
             guardian_detail.save()
 
         return instance
