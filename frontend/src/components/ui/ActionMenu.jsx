@@ -127,7 +127,7 @@ export default function ActionMenu({
       ? 'p-1.5 rounded-xl'
       : 'p-2 rounded-xl';
 
-  const iconOnlyVariantClasses =
+  const variantClasses =
     variant === 'ghost'
       ? 'border border-transparent bg-transparent hover:theme-bg-sub theme-accent shadow-none'
       : variant === 'primary'
@@ -137,6 +137,8 @@ export default function ActionMenu({
       : variant === 'sub'
       ? 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary shadow-2xs'
       : 'border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary shadow-xs';
+
+  const iconOnlyVariantClasses = variantClasses;
 
   return (
     <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>

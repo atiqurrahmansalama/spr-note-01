@@ -13,7 +13,7 @@ import { useAcademicData } from "../useAcademicData";
 import { useTenant } from "../../../context/TenantContext";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import { doesLessonMatchClass } from "./dailyClassroomUtils";
-import { LessonDeliveryManagementView, LessonPlanDrawer } from "./lessons";
+import { LessonDeliveryManagementView, LessonPlanDrawer, LessonAnalyticsView } from "./lessons";
 import {
   StudentAssessmentManagementView,
   StudentAssessmentDrawer,
@@ -22,17 +22,19 @@ import {
 import useDailyClassroomData from "./hooks/useDailyClassroomData";
 import useDailyClassroomFilters from "./hooks/useDailyClassroomFilters";
 import { getClassroomTodayDate } from "../../../constants/calendarConstants";
-import HifzReportBuilderModule from "./daily-progress/DailyProgressView";
+import HifzReportBuilderModule, { ProgressAnalyticsView } from "./daily-progress";
 import StudentReportsView from "../../reports-history/components/StudentReportsView";
 
 const LESSON_MANAGEMENT_TABS = [
   { id: "LESSON", label: "Daily Lessons", icon: BookOpenIcon, path: "/studies/daily-lessons" },
   { id: "LESSON_ASSESSMENT", label: "Lesson Assessments", icon: ChecklistIcon, path: "/studies/lesson-assessments" },
+  { id: "LESSON_ANALYTICS", label: "Analytics", icon: TrendingUpIcon, path: "/studies/lesson-analytics" },
 ];
 
 const PROGRESS_MANAGEMENT_TABS = [
   { id: "PROGRESS", label: "Daily Progress", icon: TrendingUpIcon, path: "/studies/daily-progress" },
-  { id: "PROGRESS_ASSESSMENT", label: "Progress Reports", icon: TrendingUpIcon, path: "/studies/progress-reports" },
+  { id: "PROGRESS_ASSESSMENT", label: "Progress Reports", icon: ChecklistIcon, path: "/studies/progress-reports" },
+  { id: "PROGRESS_ANALYTICS", label: "Analytics", icon: TrendingUpIcon, path: "/studies/progress-analytics" },
 ];
 
 const normalizeTabId = (tab, isProgress) => {
@@ -40,6 +42,15 @@ const normalizeTabId = (tab, isProgress) => {
   const upper = String(tab).toUpperCase();
   if (upper === "ASSESSMENT" || upper === "LESSON_ASSESSMENTS" || upper === "RECITATIONS") {
     return "LESSON_ASSESSMENT";
+  }
+  if (upper === "LESSON_ANALYTICS") {
+    return "LESSON_ANALYTICS";
+  }
+  if (upper === "PROGRESS_ANALYTICS") {
+    return "PROGRESS_ANALYTICS";
+  }
+  if (upper === "ANALYTICS") {
+    return isProgress ? "PROGRESS_ANALYTICS" : "LESSON_ANALYTICS";
   }
   if (
     upper === "PROGRESS_ASSESSMENT" ||
@@ -50,10 +61,10 @@ const normalizeTabId = (tab, isProgress) => {
   ) {
     return "PROGRESS_ASSESSMENT";
   }
-  if (isProgress && (upper === "LESSON" || upper === "LESSON_ASSESSMENT")) {
+  if (isProgress && (upper === "LESSON" || upper === "LESSON_ASSESSMENT" || upper === "LESSON_ANALYTICS")) {
     return "PROGRESS";
   }
-  if (!isProgress && (upper === "PROGRESS" || upper === "PROGRESS_ASSESSMENT")) {
+  if (!isProgress && (upper === "PROGRESS" || upper === "PROGRESS_ASSESSMENT" || upper === "PROGRESS_ANALYTICS")) {
     return "LESSON";
   }
   return upper;
@@ -76,13 +87,15 @@ export default function DailyClassroomHubView({
   const isProgressHub = useMemo(() => {
     if (hubType === "PROGRESS_MANAGEMENT") return true;
     if (hubType === "LESSON_MANAGEMENT") return false;
-    return (
+    if (
       path.includes("/progress-management") ||
       path.includes("/daily-progress") ||
       path.includes("/progress-reports") ||
       path.includes("/progress-assessments") ||
+      path.includes("/progress-analytics") ||
       defaultTab === "PROGRESS" ||
-      defaultTab === "PROGRESS_ASSESSMENT"
+      defaultTab === "PROGRESS_ASSESSMENT" ||
+      defaultTab === "PROGRESS_ANALYTICS"
     );
   }, [hubType, path, defaultTab]);
 
@@ -97,11 +110,17 @@ export default function DailyClassroomHubView({
     if (urlTab) {
       return normalizeTabId(urlTab, isProgressHub);
     }
+    if (path.includes("/progress-analytics")) {
+      return "PROGRESS_ANALYTICS";
+    }
     if (path.includes("/progress-reports") || path.includes("/progress-assessments")) {
       return "PROGRESS_ASSESSMENT";
     }
     if (path.includes("/daily-progress")) {
       return "PROGRESS";
+    }
+    if (path.includes("/lesson-analytics")) {
+      return "LESSON_ANALYTICS";
     }
     if (path.includes("/lesson-assessments") || path.includes("/recitations")) {
       return "LESSON_ASSESSMENT";
@@ -245,9 +264,21 @@ export default function DailyClassroomHubView({
     setActiveTab(tabId);
     let targetPath = "";
     if (isProgressHub) {
-      targetPath = tabId === "PROGRESS_ASSESSMENT" ? "/studies/progress-reports" : "/studies/daily-progress";
+      if (tabId === "PROGRESS_ANALYTICS") {
+        targetPath = "/studies/progress-analytics";
+      } else if (tabId === "PROGRESS_ASSESSMENT") {
+        targetPath = "/studies/progress-reports";
+      } else {
+        targetPath = "/studies/daily-progress";
+      }
     } else {
-      targetPath = tabId === "LESSON_ASSESSMENT" ? "/studies/lesson-assessments" : "/studies/daily-lessons";
+      if (tabId === "LESSON_ANALYTICS") {
+        targetPath = "/studies/lesson-analytics";
+      } else if (tabId === "LESSON_ASSESSMENT") {
+        targetPath = "/studies/lesson-assessments";
+      } else {
+        targetPath = "/studies/daily-lessons";
+      }
     }
 
     const dateParam = searchParams.get("date");
@@ -599,6 +630,25 @@ export default function DailyClassroomHubView({
         />
       )}
 
+      {/* Lesson Management — Tab 3: Analytics */}
+      {!isProgressHub && activeTab === "LESSON_ANALYTICS" && (
+        <LessonAnalyticsView
+          filterProps={sharedFilterProps}
+          filteredLessons={filteredLessons}
+          baseFilteredLessons={baseFilteredLessons}
+          lessons={lessons}
+          evaluations={evaluations}
+          assessmentRows={assessmentRows}
+          assessmentMetrics={assessmentMetrics}
+          enrolledStudents={enrolledStudents}
+          periodSlots={periodSlots}
+          getSlotLessonsCount={getSlotLessonsCount}
+          classes={classes}
+          tenantId={tenantId}
+          loadData={loadData}
+        />
+      )}
+
       {/* Progress Management — Tab 1: Daily Progress */}
       {isProgressHub && activeTab === "PROGRESS" && (
         <div className="w-full pt-1">
@@ -610,6 +660,16 @@ export default function DailyClassroomHubView({
       {isProgressHub && (activeTab === "PROGRESS_ASSESSMENT" || activeTab === "PROGRESS_ASSESSMENTS") && (
         <div className="w-full pt-1">
           <StudentReportsView isEmbedded={true} />
+        </div>
+      )}
+
+      {/* Progress Management — Tab 3: Analytics */}
+      {isProgressHub && activeTab === "PROGRESS_ANALYTICS" && (
+        <div className="w-full pt-1">
+          <ProgressAnalyticsView
+            filterProps={sharedFilterProps}
+            isEmbedded={true}
+          />
         </div>
       )}
     </PageContainer>

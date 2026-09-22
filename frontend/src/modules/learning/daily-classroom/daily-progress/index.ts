@@ -7,3 +7,5 @@ export * from "./types";
 export * from "./hooks";
 export * from "./components";
 export * from "./modals";
+export { default as ProgressAnalyticsView } from "./analytics/ProgressAnalyticsView";
+

@@ -138,14 +138,17 @@ export default function SidebarContainer({
           name: "Lesson Management",
           i18nKey: "lessonManagement",
           path: "/studies/lesson-management",
+          exactMatchPaths: ["/studies"],
           matchPaths: [
             "/studies/lesson-management",
             "/studies/daily-lessons",
             "/studies/lesson-assessments",
+            "/studies/lesson-analytics",
             "/studies/recitations",
+            "/studies/homework",
             "/daily-lessons",
+            "/lesson-analytics",
             "/recitations",
-            "/studies",
             "/studies/daily-classroom"
           ],
           Icon: BookOpenIcon,
@@ -161,10 +164,12 @@ export default function SidebarContainer({
             "/studies/daily-progress",
             "/studies/progress-reports",
             "/studies/progress-assessments",
+            "/studies/progress-analytics",
             "/progress-management",
             "/daily-progress",
             "/progress-reports",
-            "/progress-assessments"
+            "/progress-assessments",
+            "/progress-analytics"
           ],
           Icon: TrendingUpIcon,
           key: "progress_management"

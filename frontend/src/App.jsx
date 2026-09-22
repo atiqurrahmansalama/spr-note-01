@@ -215,7 +215,9 @@ export default function App() {
                 <Route path="/studies/lesson-management" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
                 <Route path="/studies/daily-lessons" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
                 <Route path="/studies/lesson-assessments" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
+                <Route path="/studies/lesson-analytics" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ANALYTICS" />} />
                 <Route path="/daily-lessons" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />
+                <Route path="/lesson-analytics" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ANALYTICS" />} />
                 <Route path="/studies/recitations" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
                 <Route path="/recitations" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON_ASSESSMENT" />} />
                 <Route path="/studies/homework" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="HOMEWORK" />} />
@@ -225,14 +227,17 @@ export default function App() {
                 <Route path="/studies/progress-management" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
                 <Route path="/studies/daily-progress" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
                 <Route path="/studies/progress-reports" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" />} />
+                <Route path="/studies/progress-analytics" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ANALYTICS" />} />
                 <Route path="/studies/progress-assessments" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/studies/progress-management/daily-progress" element={<Navigate to="/studies/daily-progress" replace />} />
                 <Route path="/studies/progress-management/reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/studies/progress-management/progress-reports" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/studies/progress-management/analytics" element={<Navigate to="/studies/progress-analytics" replace />} />
                 <Route path="/progress-management" element={<Navigate to="/studies/progress-management" replace />} />
                 <Route path="/daily-progress" element={<Navigate to="/studies/daily-progress" replace />} />
                 <Route path="/progress-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/progress-assessments" element={<Navigate to="/studies/progress-reports" replace />} />
+                <Route path="/progress-analytics" element={<Navigate to="/studies/progress-analytics" replace />} />
 
                 {/* Examination & Result Management Hub Routes */}
                 <Route path="/examinations" element={<ExaminationsHubView />} />

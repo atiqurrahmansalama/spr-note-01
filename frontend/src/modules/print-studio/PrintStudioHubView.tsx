@@ -1,9 +1,13 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import UniversalPrintStudio from '../../components/print/UniversalPrintStudio';
 import { useTranslation } from '../../i18n';
 import { PrintStudioProps } from './types';
-import { TemplatePlaceholderKey } from '../../components/print/docxTemplateEngine';
+import type { TemplatePlaceholderKey } from '../../components/print/docxTemplateEngine';
+import {
+  DAILY_PROGRESS_SCOPE_ID,
+  DAILY_PROGRESS_DOCLAB_KEYS,
+} from '../learning/daily-classroom/daily-progress/dailyProgressDocLabKeys';
 
 /**
  * Enterprise DocLab Studio Hub View
@@ -15,8 +19,14 @@ export default function PrintStudioHubView({
   className = '',
 }: PrintStudioProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scopeParam = searchParams.get('scope') || 'general_document';
+  const returnUrlParam = searchParams.get('returnUrl');
+
   const { t } = useTranslation('navigation');
   const [isOpen, setIsOpen] = useState(true);
+
+  const isDailyProgressScope = scopeParam === DAILY_PROGRESS_SCOPE_ID;
 
   // Standard SPR Note Placeholder Taxonomy for Docx Templates & Custom Sheets
   const standardPlaceholderKeys: TemplatePlaceholderKey[] = useMemo(
@@ -118,30 +128,44 @@ export default function PrintStudioHubView({
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
-    navigate(-1);
-  }, [navigate]);
+    if (returnUrlParam) {
+      navigate(returnUrlParam);
+    } else {
+      navigate(-1);
+    }
+  }, [navigate, returnUrlParam]);
 
   return (
     <div className={`w-full min-h-screen ${className}`}>
       <UniversalPrintStudio
         isOpen={isOpen}
         onClose={handleClose}
-        title="Universal Print & Document Studio"
-        subtitle="Universal Document, Template & Report Publishing Studio"
-        columns={initialColumns}
-        data={initialData}
-        metaItems={initialMetaItems}
-        placeholderKeys={standardPlaceholderKeys}
+        title={
+          isDailyProgressScope
+            ? 'Daily Progress & Hifz Report Studio'
+            : 'Universal Print & Document Studio'
+        }
+        subtitle={
+          isDailyProgressScope
+            ? 'Design, Upload, and Customize Daily Progress Document Templates'
+            : 'Universal Document, Template & Report Publishing Studio'
+        }
+        columns={isDailyProgressScope ? [] : initialColumns}
+        data={isDailyProgressScope ? [] : initialData}
+        metaItems={isDailyProgressScope ? [] : initialMetaItems}
+        placeholderKeys={
+          isDailyProgressScope ? DAILY_PROGRESS_DOCLAB_KEYS : standardPlaceholderKeys
+        }
         showSectionsAndBars={true}
         showSectionsBar={true}
         showDisplayBars={true}
         showDataDisplay={true}
-        showColumns={true}
-        showRows={true}
+        showColumns={!isDailyProgressScope}
+        showRows={!isDailyProgressScope}
         showHeaderSection={true}
         showWatermarkSection={true}
         showSignaturesSection={true}
-        scopeId="general_document"
+        scopeId={scopeParam}
         activeTemplateId="blank_document"
         showPrint={true}
         showPDF={true}

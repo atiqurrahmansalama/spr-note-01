@@ -38,6 +38,9 @@ export interface DailyProgressDraft {
 export interface DailyProgressData {
   studentName?: string;
   groupName?: string;
+  departmentName?: string;
+  className?: string;
+  sectionName?: string;
   selectedSession?: string;
   selectedDate?: string;
   juzPageData?: JuzRowData[];

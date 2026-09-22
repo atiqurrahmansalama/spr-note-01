@@ -2,6 +2,8 @@ import { DocumentScopeDefinition, DocumentScopeId, ScopeValidationResult, KeyTax
 import { CustomDocxTemplate, getSavedDocxTemplates, saveDocxTemplate } from './docxTemplateEngine';
 import { UNIVERSAL_KEY_TAXONOMY } from './keyLibrary/universalKeyTaxonomy';
 
+export type { CustomDocxTemplate };
+
 const SCOPE_DEFAULTS_STORAGE_KEY = 'spr_print_scope_default_templates_v1';
 const SCOPE_TEMPLATES_STORAGE_KEY = 'spr_print_scope_custom_templates_v1';
 
@@ -80,15 +82,45 @@ export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
   },
   {
     id: 'hifz_daily_report',
-    name: 'Daily Hifz & Recitation Report',
+    name: 'Daily Progress & Hifz Report',
     category: 'Academic',
-    description: 'Daily Quran memorization record, sabaq tracker, and mistakes log',
+    description: 'Daily Quran memorization record, sabaq tracker, mistakes, and stuck points',
     iconName: 'BookOpenIcon',
     recommendedPaperSize: 'A4',
     recommendedOrientation: 'PORTRAIT',
-    requiredKeys: ['student_name', 'roll_number', 'current_juz', 'teacher_name', 'issue_date', 'institution_name'],
-    recommendedKeys: ['current_surah', 'sabaq_pages', 'sabqi_juz', 'manzil_juz'],
-    defaultKeys: ['student_name', 'roll_number', 'current_juz', 'current_surah', 'sabaq_pages', 'sabqi_juz', 'manzil_juz', 'teacher_name', 'issue_date'],
+    requiredKeys: [
+      'date',
+      'student-name',
+      'dept',
+      'class',
+      'section',
+      'juz-number',
+      'juz-page',
+      'Session',
+      'total-mis',
+      'total-stuck',
+      'detail-mis',
+      'detail-stuck',
+      'mention-teacher-name',
+      'remarks',
+    ],
+    recommendedKeys: [],
+    defaultKeys: [
+      'date',
+      'student-name',
+      'dept',
+      'class',
+      'section',
+      'juz-number',
+      'juz-page',
+      'Session',
+      'total-mis',
+      'total-stuck',
+      'detail-mis',
+      'detail-stuck',
+      'mention-teacher-name',
+      'remarks',
+    ],
   },
   {
     id: 'attendance_register',
@@ -147,7 +179,7 @@ export function getScopeById(scopeId: string): DocumentScopeDefinition | undefin
  */
 export function extractTagsFromText(text: string): string[] {
   if (!text) return [];
-  const matches: string[] = text.match(/\{{1,2}\s*([a-zA-Z0-9_]+)\s*\}{1,2}/g) || [];
+  const matches: string[] = text.match(/\{{1,2}\s*([a-zA-Z0-9_\-]+)\s*\}{1,2}/g) || [];
   const tags = new Set<string>();
   matches.forEach((m) => {
     const clean = m.replace(/[\{\}\s]/g, '').toLowerCase();
@@ -200,7 +232,21 @@ export function validateTemplateForScope(
   const missingRecommended: string[] = [];
 
   const KEY_SYNONYMS: Record<string, string[]> = {
-    student_name: ['studentname', 'name', 'student_full_name', 'fullname'],
+    date: ['date', 'issue_date', 'issuedate', 'report_date', 'evaluation_date'],
+    'student-name': ['studentname', 'student_name', 'name', 'student_full_name', 'fullname'],
+    student_name: ['studentname', 'student-name', 'name', 'student_full_name', 'fullname'],
+    dept: ['dept', 'department', 'department_name', 'departmentname'],
+    class: ['class', 'class_name', 'classname', 'grade_level', 'target_class'],
+    section: ['section', 'section_name', 'sectionname', 'branch_name', 'branch'],
+    'juz-number': ['juznumber', 'juz_number', 'juz', 'current_juz', 'para', 'para_number'],
+    'juz-page': ['juzpage', 'juz_page', 'page', 'pages', 'sabaq_pages', 'page_range'],
+    session: ['session', 'academicsession', 'academic_session', 'session_name'],
+    'total-mis': ['totalmis', 'total_mis', 'totalmistakes', 'total_mistakes', 'mistakes', 'mistake_count'],
+    'total-stuck': ['totalstuck', 'total_stuck', 'stuck', 'stuck_count'],
+    'detail-mis': ['detailmis', 'detail_mis', 'mistake_details', 'mistakes_detail', 'mistake_list'],
+    'detail-stuck': ['detailstuck', 'detail_stuck', 'stuck_details', 'stuck_detail', 'stuck_list'],
+    'mention-teacher-name': ['mentionteachername', 'mention_teacher_name', 'teacher_name', 'teachername', 'teacher'],
+    remarks: ['remarks', 'comment', 'comments', 'evaluation', 'observation', 'notes'],
     roll_number: ['rollnumber', 'roll', 'roll_no', 'rollno'],
     student_id: ['studentid', 'student_uniq_id', 'uniq_id', 'reg_no', 'regno', 'student_code'],
     class_name: ['classname', 'class', 'grade_level', 'target_class'],

@@ -7,7 +7,11 @@ import {
   JuzPageSection,
   DetailSection,
 } from "./components";
-import { ReportModal } from "./modals";
+import { DocLabQuickReportModal } from "../../../../components/print";
+import {
+  DAILY_PROGRESS_SCOPE_ID,
+  buildDailyProgressReportData,
+} from "./dailyProgressDocLabKeys";
 import SkeletonLoader from "../../../../components/common/SkeletonLoader";
 import { PageContainer } from "../../../../components/layout";
 import { useReportForm } from "./hooks";
@@ -236,37 +240,13 @@ export default function DailyProgressView({
     return sortStudentsByUsage(fullList);
   }, [studentDatabase, academicStudents]);
 
-  // ── Cascading Filter Handlers with Student Reset Validation ──────────────────
+  // ── Cascading Filter Handlers ────────────────────────────────────────────────
   const handleDepartmentChange = (newDeptId: string) => {
     rawOnDepartmentChange(newDeptId);
-    const safeStudent = (studentName || "").trim();
-    if (safeStudent) {
-      const currentStudent = allStudentDatabase.find(
-        (a: any) =>
-          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
-          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
-      );
-      if (newDeptId && currentStudent && !doesStudentMatchDepartment(currentStudent, newDeptId, departments, classes)) {
-        setStudentName("");
-        setGroupName("");
-      }
-    }
   };
 
   const handleClassChange = (newClassId: string) => {
     rawOnClassChange(newClassId);
-    const safeStudent = (studentName || "").trim();
-    if (safeStudent) {
-      const currentStudent = allStudentDatabase.find(
-        (a: any) =>
-          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
-          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
-      );
-      if (newClassId && currentStudent && !doesStudentMatchClass(currentStudent, newClassId, classes)) {
-        setStudentName("");
-        setGroupName("");
-      }
-    }
   };
 
   const handleSectionChange = (newSecId: string) => {
@@ -275,20 +255,6 @@ export default function DailyProgressView({
       const secObj = (sections || []).find((s: any) => String(s.id) === String(newSecId));
       if (secObj) {
         setGroupName(secObj.section_name || secObj.name || "");
-      }
-    } else {
-      setGroupName("");
-    }
-
-    const safeStudent = (studentName || "").trim();
-    if (safeStudent) {
-      const currentStudent = allStudentDatabase.find(
-        (a: any) =>
-          (a.name_en || a.name || "").toLowerCase().trim() === safeStudent.toLowerCase() ||
-          (a.label || "").toLowerCase().trim() === safeStudent.toLowerCase()
-      );
-      if (newSecId && currentStudent && !doesStudentMatchSection(currentStudent, newSecId, sections)) {
-        setStudentName("");
       }
     }
   };
@@ -305,6 +271,148 @@ export default function DailyProgressView({
     filterProps?.hasSectionsForClass !== undefined
       ? filterProps.hasSectionsForClass
       : (sections || []).filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes)).length > 0;
+
+  // ── Direct Academic Hierarchy Context Resolver for DocLab Reports ───────────
+  const resolvedAcademicContext = useMemo(() => {
+    const safeStudent = (studentName || "").trim().toLowerCase();
+    const currentStudent = (allStudentDatabase || []).find(
+      (s: any) =>
+        (selectedStudentId && String(s.id) === String(selectedStudentId)) ||
+        (safeStudent && (s.name_en || s.name || s.label || "").toLowerCase().trim() === safeStudent)
+    );
+
+    // ── 1. Resolve Department Name ──────────────────────────────────────────
+    // Direct from selected Department dropdown option
+    let deptName = "";
+    if (selectedDepartmentId) {
+      const opt = (departmentSelectOptions || []).find(
+        (o: any) => String(o.value) === String(selectedDepartmentId) || String(o.label) === String(selectedDepartmentId)
+      );
+      deptName = opt?.label || "";
+      if (!deptName) {
+        const d = (departments || []).find((x: any) => String(x.id) === String(selectedDepartmentId));
+        deptName = d?.name || d?.department_name || d?.title || d?.label || "";
+      }
+    }
+    // If not selected in dropdown, derive from selected class's department
+    if (!deptName && selectedClassId) {
+      const c = (classes || []).find((x: any) => String(x.id) === String(selectedClassId));
+      deptName = c?.department_name || "";
+      if (!deptName && c) {
+        const cDeptId = getDepartmentId(c) || c.department_id || c.department;
+        if (cDeptId) {
+          const opt = (departmentSelectOptions || []).find((o: any) => String(o.value) === String(cDeptId));
+          deptName = opt?.label || "";
+          if (!deptName) {
+            const d = (departments || []).find((x: any) => String(x.id) === String(cDeptId));
+            deptName = d?.name || d?.department_name || "";
+          }
+        }
+      }
+    }
+    // If still empty, check student profile
+    if (!deptName && currentStudent) {
+      deptName = currentStudent.department_name || "";
+      if (!deptName && currentStudent.department) {
+        const opt = (departmentSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.department));
+        deptName = opt?.label || "";
+        if (!deptName) {
+          const d = (departments || []).find((x: any) => String(x.id) === String(currentStudent.department));
+          deptName = d?.name || d?.department_name || d?.title || "";
+        }
+      }
+    }
+    // Fallback if department options exist in system
+    if (!deptName && departmentSelectOptions && departmentSelectOptions.length > 0) {
+      const hifz = departmentSelectOptions.find((d: any) => /hifz|tahfiz|quran/i.test(d.label || ""));
+      deptName = hifz?.label || departmentSelectOptions[0]?.label || "";
+    } else if (!deptName && departments && departments.length > 0) {
+      const hifz = departments.find((d: any) => /hifz|tahfiz|quran/i.test(d.name || d.department_name || ""));
+      deptName = hifz?.name || hifz?.department_name || departments[0]?.name || departments[0]?.department_name || "";
+    }
+
+    // ── 2. Resolve Class Name ───────────────────────────────────────────────
+    // Direct from selected Class dropdown option
+    let clsName = "";
+    if (selectedClassId) {
+      const opt = (classSelectOptions || []).find(
+        (o: any) => String(o.value) === String(selectedClassId) || String(o.label) === String(selectedClassId)
+      );
+      clsName = opt?.label || "";
+      if (!clsName) {
+        const c = (classes || []).find((x: any) => String(x.id) === String(selectedClassId));
+        clsName = c?.name || c?.class_name || c?.title || c?.label || "";
+      }
+    }
+    // If not selected in dropdown, check student profile
+    if (!clsName && currentStudent) {
+      clsName = currentStudent.student_class_name || currentStudent.class_name || "";
+      if (!clsName && currentStudent.student_class) {
+        const opt = (classSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.student_class));
+        clsName = opt?.label || "";
+        if (!clsName) {
+          const c = (classes || []).find((x: any) => String(x.id) === String(currentStudent.student_class));
+          clsName = c?.name || c?.class_name || c?.title || "";
+        }
+      }
+    }
+    // Fallback if only 1 class option
+    if (!clsName && classSelectOptions && classSelectOptions.length === 1) {
+      clsName = classSelectOptions[0].label || "";
+    } else if (!clsName && classes && classes.length === 1) {
+      clsName = classes[0]?.name || classes[0]?.class_name || "";
+    }
+
+    // ── 3. Resolve Section / Group Name ─────────────────────────────────────
+    // Priority: live groupName input > selected Section dropdown option > student profile
+    let secName = (groupName && groupName.trim()) ? groupName.trim() : "";
+    if (!secName && selectedSectionId) {
+      const opt = (sectionSelectOptions || []).find(
+        (o: any) => String(o.value) === String(selectedSectionId) || String(o.label) === String(selectedSectionId)
+      );
+      secName = opt?.label || "";
+      if (!secName) {
+        const s = (sections || []).find((x: any) => String(x.id) === String(selectedSectionId));
+        secName = s?.section_name || s?.name || s?.title || s?.label || "";
+      }
+    }
+    if (!secName && currentStudent) {
+      secName = currentStudent.section_name || currentStudent.student_section_name || currentStudent.group_name || currentStudent.sub || "";
+      if (!secName && currentStudent.student_section) {
+        const opt = (sectionSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.student_section));
+        secName = opt?.label || "";
+        if (!secName) {
+          const s = (sections || []).find((x: any) => String(x.id) === String(currentStudent.student_section));
+          secName = s?.section_name || s?.name || s?.title || "";
+        }
+      }
+    }
+    if (!secName && sectionSelectOptions && sectionSelectOptions.length === 1) {
+      secName = sectionSelectOptions[0].label || "";
+    } else if (!secName && sections && sections.length === 1) {
+      secName = sections[0]?.section_name || sections[0]?.name || "";
+    }
+
+    return {
+      departmentName: deptName.trim(),
+      className: clsName.trim(),
+      sectionName: secName.trim(),
+    };
+  }, [
+    selectedDepartmentId,
+    selectedClassId,
+    selectedSectionId,
+    departmentSelectOptions,
+    classSelectOptions,
+    sectionSelectOptions,
+    departments,
+    classes,
+    sections,
+    studentName,
+    selectedStudentId,
+    allStudentDatabase,
+    groupName,
+  ]);
 
   // ── Student Selection with Mutual Auto-Population of Hierarchy ───────────────
   // ── Student Selection Handlers ───────────────────────────────────────────────
@@ -340,79 +448,85 @@ export default function DailyProgressView({
       return;
     }
 
+    lastSelectedStudentNameRef.current = chosenName.trim();
     if (isExplicitSelection) {
-      lastSelectedStudentNameRef.current = chosenName.trim();
       isSelectingStudentRef.current = true;
+    }
 
-      const academicProfile = (allStudentDatabase || []).find(
-        (a: any) =>
-          (matchedStudent && matchedStudent.id && String(a.id) === String(matchedStudent.id)) ||
-          (!matchedStudent?.id && (a.name_en || a.name || "").toLowerCase().trim() === chosenName.toLowerCase().trim())
-      );
+    const academicProfile = (allStudentDatabase || []).find(
+      (a: any) =>
+        (matchedStudent && matchedStudent.id && String(a.id) === String(matchedStudent.id)) ||
+        ((a.name_en || a.name || a.label || "").toLowerCase().trim() === chosenName.toLowerCase().trim())
+    );
 
-      const candidate = academicProfile || matchedStudent;
+    const candidate = academicProfile || matchedStudent;
 
-      if (candidate) {
-        // Record student usage for frequency ranking
-        recordStudentUsage(candidate);
+    if (candidate) {
+      if (!selectedStudentId && candidate.id) {
+        setSelectedStudentId(String(candidate.id));
+      }
+      if (!chosenSub && (candidate.section_name || candidate.sub || candidate.group_name)) {
+        chosenSub = candidate.section_name || candidate.sub || candidate.group_name;
+      }
+      // Record student usage for frequency ranking
+      recordStudentUsage(candidate);
 
-        // 1. Resolve Section ID & Section Object
-        let candSecId = getSectionId(candidate) || "";
-        if (!candSecId && chosenSub) {
-          const matchedSec = (sections || []).find(
-            (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
-          );
-          if (matchedSec) candSecId = String(matchedSec.id);
-        }
-        const secObj = candSecId ? (sections || []).find((s: any) => String(s.id) === String(candSecId)) : null;
-
-        // 2. Resolve Class ID & Class Object
-        let candClassId = getClassId(candidate) || (secObj ? getClassId(secObj) : "");
-        if (!candClassId && candidate.student_class_name) {
-          const matchedCls = (classes || []).find(
-            (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === candidate.student_class_name.toLowerCase().trim()
-          );
-          if (matchedCls) candClassId = String(matchedCls.id);
-        }
-        const classObj = candClassId ? (classes || []).find((c: any) => String(c.id) === String(candClassId)) : null;
-
-        // 3. Resolve Department ID & Department Object
-        let candDeptId =
-          getDepartmentId(candidate) ||
-          (classObj ? getDepartmentId(classObj) : "") ||
-          (secObj ? getDepartmentId(secObj) : "");
-        if (!candDeptId && candidate.department_name) {
-          const matchedDept = (departments || []).find(
-            (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === candidate.department_name.toLowerCase().trim()
-          );
-          if (matchedDept) candDeptId = String(matchedDept.id);
-        }
-
-        // 4. Update section / group display name
-        const effectiveGroupName =
-          secObj?.section_name || secObj?.name || candidate.section_name || candidate.sub || chosenSub || "";
-        setGroupName(effectiveGroupName || "");
-
-        // 5. Seamlessly sync the entire academic hierarchy selectors
-        // Never inherit placement filters from a previously selected student
-        const targetDept = candDeptId || "";
-        const targetClass = candClassId || "";
-        const targetSec = candSecId || "";
-
-        updateHierarchy(targetDept, targetClass, targetSec);
-      } else if (chosenSub) {
+      // 1. Resolve Section ID & Section Object
+      let candSecId = getSectionId(candidate) || "";
+      if (!candSecId && chosenSub) {
         const matchedSec = (sections || []).find(
           (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
         );
-        if (matchedSec) {
-          const secClassId = getClassId(matchedSec);
-          const classObj = secClassId ? (classes || []).find((c: any) => String(c.id) === String(secClassId)) : null;
-          const deptId = classObj ? getDepartmentId(classObj) : "";
-          setGroupName(matchedSec.section_name || matchedSec.name || chosenSub);
-          updateHierarchy(deptId || "", secClassId || "", String(matchedSec.id));
-        } else {
-          setGroupName(chosenSub);
-        }
+        if (matchedSec) candSecId = String(matchedSec.id);
+      }
+      const secObj = candSecId ? (sections || []).find((s: any) => String(s.id) === String(candSecId)) : null;
+
+      // 2. Resolve Class ID & Class Object
+      let candClassId = getClassId(candidate) || (secObj ? getClassId(secObj) : "");
+      if (!candClassId && candidate.student_class_name) {
+        const matchedCls = (classes || []).find(
+          (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === candidate.student_class_name.toLowerCase().trim()
+        );
+        if (matchedCls) candClassId = String(matchedCls.id);
+      }
+      const classObj = candClassId ? (classes || []).find((c: any) => String(c.id) === String(candClassId)) : null;
+
+      // 3. Resolve Department ID & Department Object
+      let candDeptId =
+        getDepartmentId(candidate) ||
+        (classObj ? getDepartmentId(classObj) : "") ||
+        (secObj ? getDepartmentId(secObj) : "");
+      if (!candDeptId && candidate.department_name) {
+        const matchedDept = (departments || []).find(
+          (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === candidate.department_name.toLowerCase().trim()
+        );
+        if (matchedDept) candDeptId = String(matchedDept.id);
+      }
+
+      // 4. Update section / group display name
+      const effectiveGroupName =
+        secObj?.section_name || secObj?.name || candidate.section_name || candidate.sub || chosenSub || "";
+      setGroupName(effectiveGroupName || "");
+
+      // 5. Seamlessly sync the entire academic hierarchy selectors
+      // Preserve user selection when student does not have explicit placement filters
+      const targetDept = candDeptId || selectedDepartmentId || "";
+      const targetClass = candClassId || selectedClassId || "";
+      const targetSec = candSecId || selectedSectionId || "";
+
+      updateHierarchy(targetDept, targetClass, targetSec);
+    } else if (chosenSub) {
+      const matchedSec = (sections || []).find(
+        (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
+      );
+      if (matchedSec) {
+        const secClassId = getClassId(matchedSec);
+        const classObj = secClassId ? (classes || []).find((c: any) => String(c.id) === String(secClassId)) : null;
+        const deptId = classObj ? getDepartmentId(classObj) : "";
+        setGroupName(matchedSec.section_name || matchedSec.name || chosenSub);
+        updateHierarchy(deptId || selectedDepartmentId || "", secClassId || selectedClassId || "", String(matchedSec.id));
+      } else {
+        setGroupName(chosenSub);
       }
     }
   };
@@ -423,66 +537,17 @@ export default function DailyProgressView({
   const prevSecIdRef = useRef(selectedSectionId);
 
   useEffect(() => {
-    const deptChanged = prevDeptIdRef.current !== selectedDepartmentId;
-    const classChanged = prevClassIdRef.current !== selectedClassId;
-    const secChanged = prevSecIdRef.current !== selectedSectionId;
-
     prevDeptIdRef.current = selectedDepartmentId;
     prevClassIdRef.current = selectedClassId;
     prevSecIdRef.current = selectedSectionId;
 
-    // Hierarchy change was triggered by programmatically selecting a student: DO NOT CLEAR!
     if (isSelectingStudentRef.current) {
       isSelectingStudentRef.current = false;
-      return;
-    }
-
-    // Only validate when hierarchy filter was explicitly changed by user
-    if (!deptChanged && !classChanged && !secChanged) return;
-    if (!studentName.trim()) return;
-
-    // If current student matches the one just explicitly selected, do not clear
-    if (
-      lastSelectedStudentNameRef.current &&
-      studentName.trim().toLowerCase() === lastSelectedStudentNameRef.current.toLowerCase()
-    ) {
-      return;
-    }
-
-    const currentStudent = (allStudentDatabase || []).find(
-      (a: any) =>
-        (a.name_en || a.name || "").toLowerCase().trim() === studentName.toLowerCase().trim() ||
-        (a.label || "").toLowerCase().trim() === studentName.toLowerCase().trim()
-    );
-
-    if (currentStudent) {
-      if (selectedDepartmentId && departments.length > 0 && !doesStudentMatchDepartment(currentStudent, selectedDepartmentId, departments, classes)) {
-        setStudentName("");
-        setGroupName("");
-        lastSelectedStudentNameRef.current = "";
-        return;
-      }
-      if (selectedClassId && classes.length > 0 && !doesStudentMatchClass(currentStudent, selectedClassId, classes)) {
-        setStudentName("");
-        setGroupName("");
-        lastSelectedStudentNameRef.current = "";
-        return;
-      }
-      if (selectedSectionId && sections.length > 0 && !doesStudentMatchSection(currentStudent, selectedSectionId, sections)) {
-        setStudentName("");
-        lastSelectedStudentNameRef.current = "";
-        return;
-      }
     }
   }, [
     selectedDepartmentId,
     selectedClassId,
     selectedSectionId,
-    studentName,
-    allStudentDatabase,
-    departments,
-    classes,
-    sections,
   ]);
 
   useEffect(() => {
@@ -1037,20 +1102,30 @@ export default function DailyProgressView({
         />
       )}
 
-      {/* 4. Report Modal */}
-      <ReportModal
+      {/* 4. Reusable DocLab Quick Report Modal */}
+      <DocLabQuickReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        reportData={{
-          studentName,
-          groupName,
-          selectedSession,
-          selectedDate,
-          juzPageData,
-          mistakeData,
-          stuckData,
-          comment,
-        }}
+        scopeId={DAILY_PROGRESS_SCOPE_ID}
+        scopeName="Daily Progress"
+        title="Daily Progress Report"
+        returnUrl="/studies/daily-progress"
+        dataRecord={buildDailyProgressReportData(
+          {
+            studentName,
+            groupName: resolvedAcademicContext.sectionName || groupName,
+            departmentName: resolvedAcademicContext.departmentName,
+            className: resolvedAcademicContext.className,
+            sectionName: resolvedAcademicContext.sectionName,
+            selectedSession,
+            selectedDate,
+            juzPageData,
+            mistakeData,
+            stuckData,
+            comment,
+          },
+          resolvedAcademicContext
+        )}
       />
     </PageContainer>
   );

@@ -24,14 +24,34 @@ import { PrintOptions, PrintMetaItem } from '../types';
 
 export const BLANK_PAGE_HTML = `
   <div class="docx-blank-canvas font-sans leading-relaxed" style="min-height: 720px; outline: none;">
-    <h1 style="font-size: 22pt; font-weight: 700; text-align: center; margin-bottom: 6px; color: #0f172a;">Untitled Document</h1>
-    <p style="font-size: 11pt; text-align: center; color: #64748b; margin-bottom: 20px;">Institutional Notice / Letter / Blank Page</p>
-    <hr style="border: 0; border-top: 1.5px solid #e2e8f0; margin-bottom: 20px;" />
-    <p style="font-size: 11pt; color: #334155; line-height: 1.8; margin-bottom: 16px;">
-      Click here and start typing your document content directly on this paper. You can format text, add headers, paste content, or design custom print documents.
-    </p>
+    <p><br /></p>
   </div>
 `;
+
+export function createBlankDocumentTemplate(): any {
+  return {
+    id: 'blank_document',
+    name: 'Blank Page (Live Canvas)',
+    styles: '',
+    templateBody: BLANK_PAGE_HTML,
+    body: BLANK_PAGE_HTML,
+    html: BLANK_PAGE_HTML,
+    rawHtml: BLANK_PAGE_HTML,
+    isTableDocument: false,
+    columns: [],
+    data: [],
+    templateType: 'template',
+    templateMeta: {
+      id: 'blank_document',
+      name: 'Blank Page',
+      rawHtml: BLANK_PAGE_HTML,
+      detectedPlaceholders: [],
+      templateType: 'template',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  };
+}
 
 interface UsePrintDocxEngineParams {
   isOpen: boolean;
@@ -116,7 +136,7 @@ export function usePrintDocxEngine({
     } catch (e) {
       console.warn('Failed to load default template for scope', e);
     }
-    return null;
+    return createBlankDocumentTemplate();
   });
 
   // Undo / Redo History Stack for Docx Templates and Live Canvas Edits
@@ -203,8 +223,8 @@ export function usePrintDocxEngine({
           setDocxRenderMode('template');
         }
       } else {
-        setCustomDocxTemplate(null);
-        setDocxRenderMode('all');
+        setCustomDocxTemplate(createBlankDocumentTemplate());
+        setDocxRenderMode('template');
       }
     } catch (e) {
       console.warn('Failed to sync default template for scope', e);

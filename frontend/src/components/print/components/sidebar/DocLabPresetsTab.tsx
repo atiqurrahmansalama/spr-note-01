@@ -135,7 +135,7 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
       )}
 
       {/* 2. Scope Validation Status Badge */}
-      {activeScopeValidation && isCustomDocxActive && (
+      {activeScopeValidation && isCustomDocxActive && !(customDocxTemplate as any)?.isBlank && customDocxTemplate?.id !== 'blank_document' && (
         <div
           className={`p-3 rounded-xl flex items-start gap-2.5 ${
             activeScopeValidation.isValid
@@ -244,70 +244,91 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
       )}
 
       {/* 6. Saved Custom Templates & Generated Docs */}
-      {customTemplatesList.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider theme-text-muted">
-              Scope Templates ({customTemplatesList.length})
-            </span>
+      <div className="space-y-2 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-wider theme-text-muted">
+            Scope Templates {customTemplatesList.length > 0 ? `(${customTemplatesList.length})` : ''}
+          </span>
 
-            {/* Filter Tabs */}
-            {generatedList.length > 0 && (
-              <div className="flex items-center gap-1 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setFilesFilter('all')}
-                  className={`px-2 py-0.5 rounded cursor-pointer ${
-                    filesFilter === 'all'
-                      ? 'theme-bg-accent text-white font-bold'
-                      : 'theme-text-secondary hover:theme-text-primary'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilesFilter('templates')}
-                  className={`px-2 py-0.5 rounded cursor-pointer ${
-                    filesFilter === 'templates'
-                      ? 'theme-bg-accent text-white font-bold'
-                      : 'theme-text-secondary hover:theme-text-primary'
-                  }`}
-                >
-                  Templates ({templatesList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilesFilter('generated')}
-                  className={`px-2 py-0.5 rounded cursor-pointer ${
-                    filesFilter === 'generated'
-                      ? 'theme-bg-accent text-white font-bold'
-                      : 'theme-text-secondary hover:theme-text-primary'
-                  }`}
-                >
-                  Filled ({generatedList.length})
-                </button>
+          {/* Filter Tabs */}
+          {generatedList.length > 0 && (
+            <div className="flex items-center gap-1 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setFilesFilter('all')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${
+                  filesFilter === 'all'
+                    ? 'theme-bg-accent text-white font-bold'
+                    : 'theme-text-secondary hover:theme-text-primary'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilesFilter('templates')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${
+                  filesFilter === 'templates'
+                    ? 'theme-bg-accent text-white font-bold'
+                    : 'theme-text-secondary hover:theme-text-primary'
+                }`}
+              >
+                Templates ({templatesList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilesFilter('generated')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${
+                  filesFilter === 'generated'
+                    ? 'theme-bg-accent text-white font-bold'
+                    : 'theme-text-secondary hover:theme-text-primary'
+                }`}
+              >
+                Filled ({generatedList.length})
+              </button>
+            </div>
+          )}
+        </div>
+
+        {customTemplatesList.length > 0 ? (
+          <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
+            {displayedFiles.length > 0 ? (
+              displayedFiles.map((tmpl) => (
+                <DocLabTemplateCard
+                  key={tmpl.id}
+                  template={tmpl}
+                  isActive={activeTemplateId === tmpl.id}
+                  isScopeDefault={isScopeDefault && activeTemplateId === tmpl.id}
+                  onSelect={onSelectTemplate}
+                  onEdit={onOpenDocxModal}
+                  onDuplicate={onDuplicateDocxTemplate}
+                  onDelete={onDeleteDocxTemplate}
+                  onToggleScopeDefault={onToggleScopeDefault}
+                />
+              ))
+            ) : (
+              <div className="p-4 rounded-xl border border-dashed theme-border text-center py-6 text-xs theme-text-secondary">
+                No templates in this category
               </div>
             )}
           </div>
-
-          <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
-            {displayedFiles.map((tmpl) => (
-              <DocLabTemplateCard
-                key={tmpl.id}
-                template={tmpl}
-                isActive={activeTemplateId === tmpl.id}
-                isScopeDefault={isScopeDefault && activeTemplateId === tmpl.id}
-                onSelect={onSelectTemplate}
-                onEdit={onOpenDocxModal}
-                onDuplicate={onDuplicateDocxTemplate}
-                onDelete={onDeleteDocxTemplate}
-                onToggleScopeDefault={onToggleScopeDefault}
-              />
-            ))}
+        ) : (
+          /* Empty State: No Template */
+          <div className="p-5 rounded-2xl border border-dashed theme-border theme-bg-sub/40 flex flex-col items-center justify-center text-center space-y-2">
+            <div className="w-10 h-10 rounded-xl theme-bg-sub theme-text-secondary flex items-center justify-center shadow-xs">
+              <FileIcon className="w-5 h-5 opacity-60" />
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold theme-text-primary block">
+                No Template
+              </span>
+              <p className="text-[11px] theme-text-secondary leading-relaxed max-w-[210px]">
+                No templates found for this module. You can import one or design on the canvas.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

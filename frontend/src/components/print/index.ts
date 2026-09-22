@@ -31,6 +31,7 @@ export { default as DocxFormattingRibbon } from './DocxFormattingRibbon';
 export { default as DocxTemplateModal } from './DocxTemplateModal';
 export { default as TemplateLibraryModal } from './TemplateLibraryModal';
 export { default as KeyPaletteExplorer } from './KeyPaletteExplorer';
+export { default as DocLabQuickReportModal } from './DocLabQuickReportModal';
 
 // Custom Hooks & Subcomponents
 export * from './hooks';
@@ -43,3 +44,4 @@ export * from './scopeTemplateStore';
 export * from './docLabExportUtils';
 export { compileVectorPDFDocument } from './vectorPDFCompiler';
 export * from './vectorDocxCompiler';
+export * from './docLabTextConverter';
