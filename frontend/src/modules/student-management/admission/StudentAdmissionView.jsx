@@ -401,8 +401,23 @@ export default function StudentAdmissionView() {
     const targetStudent = studentToHighlight || admittedStudent || editingStudent;
     if (returnTo) {
       const delimiter = returnTo.includes('?') ? '&' : '?';
-      const redirectUrl = targetStudent?.name
-        ? `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(targetStudent.name)}&selectedStudentId=${encodeURIComponent(targetStudent.id || '')}`
+      const nameVal = targetStudent?.name_en || targetStudent?.name || '';
+      const idVal = targetStudent?.id || '';
+      const deptVal = targetStudent?.department || targetStudent?.department_id || '';
+      const classVal = targetStudent?.student_class || targetStudent?.class_id || '';
+      const secVal = targetStudent?.student_section || targetStudent?.section_id || '';
+      const groupVal = targetStudent?.group_name || targetStudent?.section_name || targetStudent?.sub || '';
+
+      const redirectParams = new URLSearchParams();
+      if (nameVal) redirectParams.set('selectedStudentName', nameVal);
+      if (idVal) redirectParams.set('selectedStudentId', String(idVal));
+      if (deptVal) redirectParams.set('dept', String(deptVal));
+      if (classVal) redirectParams.set('class', String(classVal));
+      if (secVal) redirectParams.set('section', String(secVal));
+      if (groupVal) redirectParams.set('group', String(groupVal));
+
+      const redirectUrl = redirectParams.toString()
+        ? `${returnTo}${delimiter}${redirectParams.toString()}`
         : returnTo;
       navigate(redirectUrl, { replace: true });
       return;
@@ -515,7 +530,12 @@ export default function StudentAdmissionView() {
                 }
               }}
               onSuccess={(stu) => {
-                setAdmittedStudent(stu);
+                const returnTo = searchParams.get('returnTo');
+                if (returnTo) {
+                  handleClose(stu);
+                } else {
+                  setAdmittedStudent(stu);
+                }
               }}
               sharedData={sharedData}
               setSharedData={setSharedData}
@@ -540,7 +560,14 @@ export default function StudentAdmissionView() {
           ) : (
             <FullAdmissionWizard
               onCancel={handleClose}
-              onSuccess={setAdmittedStudent}
+              onSuccess={(stu) => {
+                const returnTo = searchParams.get('returnTo');
+                if (returnTo) {
+                  handleClose(stu);
+                } else {
+                  setAdmittedStudent(stu);
+                }
+              }}
               sharedData={sharedData}
               setSharedData={setSharedData}
             />

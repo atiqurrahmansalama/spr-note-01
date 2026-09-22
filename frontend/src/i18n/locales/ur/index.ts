@@ -2,7 +2,7 @@ import { common } from './common';
 import { navigation } from './navigation';
 import { settings } from './settings';
 import { dashboard } from './dashboard';
-import { ur as finance } from '../../../modules/finance/locales/ur';
+import { finance } from './finance';
 
 export const ur = {
   common,
@@ -11,4 +11,3 @@ export const ur = {
   dashboard,
   finance,
 };
-

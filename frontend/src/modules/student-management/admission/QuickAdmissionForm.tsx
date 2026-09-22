@@ -18,6 +18,8 @@ import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { students as studentStore } from "../../../utils/localStore";
 import { validateBDPhone } from "../../../utils/inputValidators";
+import { useTenant } from "../../../context/TenantContext";
+import { readJSON, writeJSON } from "../../../stores/coreStore";
 
 export interface QuickAdmissionFormProps {
   onCancel?: () => void;
@@ -52,6 +54,8 @@ export default function QuickAdmissionForm({
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const tenantContext = useTenant ? useTenant() : null;
+  const activeTenantId = tenantContext?.activeTenantId || "default";
 
   const isEditing = Boolean(sharedData?.is_editing || editingStudent || sharedData?.edit_student_id);
   const editStudentId = sharedData?.edit_student_id || editingStudent?.id;
@@ -61,6 +65,39 @@ export default function QuickAdmissionForm({
   const paramDept = searchParams.get("dept") || initialValues?.department || "";
   const paramClass = searchParams.get("class") || initialValues?.student_class || "";
   const paramSection = searchParams.get("section") || initialValues?.student_section || "";
+
+  const buildRedirectUrl = (baseUrl: string, student: any) => {
+    const delimiter = baseUrl.includes("?") ? "&" : "?";
+    const redirectParams = new URLSearchParams();
+    const nameVal = student?.name_en || student?.name || "";
+    const idVal = student?.id || "";
+    const deptVal = student?.department || student?.department_id || "";
+    const classVal = student?.student_class || student?.class_id || "";
+    const secVal = student?.student_section || student?.section_id || "";
+    const groupVal = student?.group_name || student?.section_name || student?.sub || "";
+
+    if (nameVal) redirectParams.set("selectedStudentName", nameVal);
+    if (idVal) redirectParams.set("selectedStudentId", String(idVal));
+    if (deptVal) redirectParams.set("dept", String(deptVal));
+    if (classVal) redirectParams.set("class", String(classVal));
+    if (secVal) redirectParams.set("section", String(secVal));
+    if (groupVal) redirectParams.set("group", String(groupVal));
+
+    return `${baseUrl}${delimiter}${redirectParams.toString()}`;
+  };
+
+  const injectIntoAcademicCache = (student: any) => {
+    try {
+      const cacheKey = `spr_students_cache_${activeTenantId}`;
+      const cached = readJSON(cacheKey, []);
+      const exists = cached.some((s: any) => String(s.id) === String(student.id));
+      if (!exists) {
+        writeJSON(cacheKey, [student, ...cached]);
+      }
+    } catch (e) {
+      console.warn("Failed to inject student into academic cache:", e);
+    }
+  };
 
   const academicData = useAcademicData();
   const {
@@ -282,6 +319,7 @@ export default function QuickAdmissionForm({
             is_editing: true,
           };
           studentStore.update(String(editStudentId), updatedStu);
+          injectIntoAcademicCache(updatedStu);
           showToast(`Student "${formData.name}" updated successfully!`, "success");
           window.dispatchEvent(new CustomEvent("spr_students_updated"));
           window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
@@ -290,9 +328,7 @@ export default function QuickAdmissionForm({
           if (onSuccess) {
             onSuccess(updatedStu);
           } else if (returnTo) {
-            const delimiter = returnTo.includes("?") ? "&" : "?";
-            const redirectUrl = `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(formData.name)}&selectedStudentId=${encodeURIComponent(editStudentId)}`;
-            navigate(redirectUrl, { replace: true });
+            navigate(buildRedirectUrl(returnTo, updatedStu), { replace: true });
           } else {
             navigate("/groups-students");
           }
@@ -444,6 +480,7 @@ export default function QuickAdmissionForm({
         }
       }
 
+      injectIntoAcademicCache(savedStudent);
       window.dispatchEvent(new CustomEvent("spr_students_updated"));
       window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: savedStudent }));
       refetchAcademicData?.();
@@ -451,24 +488,21 @@ export default function QuickAdmissionForm({
       if (onSuccess) {
         onSuccess(savedStudent);
       } else if (returnTo) {
-        const delimiter = returnTo.includes("?") ? "&" : "?";
-        const redirectUrl = `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(savedStudent.name)}&selectedStudentId=${encodeURIComponent(savedStudent.id)}`;
-        navigate(redirectUrl, { replace: true });
+        navigate(buildRedirectUrl(returnTo, savedStudent), { replace: true });
       } else {
         navigate("/groups-students");
       }
     } catch (err) {
       console.error("Quick admission error:", err);
       showToast(`Student saved locally (offline mode).`, "info");
+      injectIntoAcademicCache(savedStudent);
       window.dispatchEvent(new CustomEvent("spr_students_updated"));
       window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: savedStudent }));
 
       if (onSuccess) {
         onSuccess(savedStudent);
       } else if (returnTo) {
-        const delimiter = returnTo.includes("?") ? "&" : "?";
-        const redirectUrl = `${returnTo}${delimiter}selectedStudentName=${encodeURIComponent(savedStudent.name)}&selectedStudentId=${encodeURIComponent(savedStudent.id)}`;
-        navigate(redirectUrl, { replace: true });
+        navigate(buildRedirectUrl(returnTo, savedStudent), { replace: true });
       } else {
         navigate("/groups-students");
       }

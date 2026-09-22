@@ -374,15 +374,6 @@ export function useReportForm() {
     } else {
       draftReport.remove(currentDraftId);
     }
-
-    const interval = setInterval(() => {
-      if (hasAnyContent) {
-        draftReport.save(currentDraftId, draftPayload);
-        saveStatusStore.set("local", "Saved");
-      }
-    }, 90000);
-
-    return () => clearInterval(interval);
   }, [studentName, groupName, selectedSession, selectedDate, juzPageData, mistakeData, stuckData, comment, currentDraftId]);
 
   const recoverDraft = (draft: any) => {
@@ -581,24 +572,57 @@ export function useReportForm() {
       }
     };
 
-    const handleTimezoneSettingsUpdate = () => {
-      if (isMounted && !editingReport) {
-        setSelectedDate(getClassroomTodayDate());
+    const handleStudentsUpdated = () => {
+      if (isMounted) {
+        const cached = studentStore.getAll();
+        if (cached && cached.length > 0) {
+          setStudentDatabase(cached);
+        }
+      }
+    };
+
+    const handleStudentAdmitted = (e: any) => {
+      if (!isMounted) return;
+      const newStu = e.detail;
+      if (newStu) {
+        setStudentDatabase((prev) => {
+          const exists = prev.some(
+            (s) => String(s.id) === String(newStu.id) || (s.name || s.label) === (newStu.name || newStu.label)
+          );
+          if (!exists) {
+            const formatted = {
+              id: newStu.id,
+              label: newStu.name_en || newStu.name || newStu.label || String(newStu),
+              name: newStu.name_en || newStu.name,
+              sub: newStu.group_name || newStu.section_name || newStu.sub || "General Group",
+              department: newStu.department || newStu.department_id,
+              student_class: newStu.student_class || newStu.class_id,
+              student_section: newStu.student_section || newStu.section_id,
+              originalData: newStu,
+            };
+            return [formatted, ...prev];
+          }
+          return prev;
+        });
+
+        const grp = newStu.group_name || newStu.section_name || newStu.sub;
+        if (grp) {
+          setAvailableGroups((prev) => (prev.includes(grp) ? prev : [grp, ...prev]));
+        }
       }
     };
 
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
-    window.addEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
-    window.addEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
-    window.addEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
+    window.addEventListener("spr_students_updated", handleStudentsUpdated);
+    window.addEventListener("spr_student_admitted", handleStudentAdmitted);
+
     return () => {
       isMounted = false;
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
-      window.removeEventListener("spr_classroom_settings_updated", handleTimezoneSettingsUpdate);
-      window.removeEventListener("spr_calendar_settings_updated", handleTimezoneSettingsUpdate);
-      window.removeEventListener("spr_date_time_updated", handleTimezoneSettingsUpdate);
+      window.removeEventListener("spr_students_updated", handleStudentsUpdated);
+      window.removeEventListener("spr_student_admitted", handleStudentAdmitted);
     };
-  }, [editingReport]);
+  }, []);
 
   const handleSaveResult = async (result: any) => {
     const newStudent = {
@@ -748,8 +772,12 @@ export function useReportForm() {
       const editedAt = new Date().toISOString();
       const isEditing = Boolean(editingReport);
 
-      const selectedStudent = studentDatabase.find(
-        (s) => (s.label || s.name || "").trim().toLowerCase() === studentName.trim().toLowerCase()
+      const allKnown = [
+        ...(studentDatabase || []),
+        ...(studentStore.getAll() || []),
+      ];
+      const selectedStudent = allKnown.find(
+        (s: any) => (s.label || s.name || s.name_en || "").trim().toLowerCase() === studentName.trim().toLowerCase()
       );
       const studentId = selectedStudent && !String(selectedStudent.id).startsWith("stu_") ? selectedStudent.id : null;
 

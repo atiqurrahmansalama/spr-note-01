@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings, auth as authStore, getBranchDisplayName } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
@@ -14,13 +14,14 @@ import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
-import LanguageSelectorDropdown from "./LanguageSelectorDropdown";
+import { LanguageSelector } from "../../i18n";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useToast } from "../../context/ToastContext";
 import { useTheme } from "../../context/useTheme";
 import { SunIcon, MoonIcon, MenuIcon } from "../ui/Icons";
 import IconButton from "../ui/IconButton";
 import { FloatingUndoRedoDock } from "../common";
+import { setLastActiveRoute } from "../../utils/navigationHistory";
 
 // Route details mapping for titles and path lookup
 export const ROUTE_TITLE_MAP = {
@@ -40,7 +41,6 @@ export const ROUTE_TITLE_MAP = {
   "/daily-progress": { title: "Daily Progress", category: "Academic Activities" },
   "/recitations": { title: "Daily Assessment", category: "Academic Activities" },
   "/homework-tasks": { title: "Daily Homework", category: "Academic Activities" },
-  "/student-reports": { title: "Student Reports", category: "Academic Activities" },
   "/classroom-config": { title: "Classroom Configuration", category: "Admin Tools" },
   "/classroom-settings": { title: "Classroom Configuration", category: "Admin Tools" },
   "/copy-report": { title: "Classroom Configuration", category: "Admin Tools" },
@@ -378,6 +378,13 @@ export default function AppLayout() {
   const { currentInstitution, activeTenantId } = useTenant();
   const { activeBranch, activeYear } = useAcademicSession();
 
+  // ── Persistent Route Tracking Across App Restarts ───────────────────
+  useEffect(() => {
+    if (location.pathname) {
+      setLastActiveRoute(location.pathname + location.search);
+    }
+  }, [location.pathname, location.search]);
+
   // 📱 Mobile Touch Edge-Swipe gesture to open sidebar (and swipe left to close)
   useEffect(() => {
     let touchStartX = 0;
@@ -541,7 +548,7 @@ export default function AppLayout() {
         else if (key === "s") { e.preventDefault(); navigate("/sessions-comments"); }
         else if (key === "b") { e.preventDefault(); navigate("/data-backup"); }
         else if (key === "k") { e.preventDefault(); navigate("/shortcuts"); }
-        else if (key === "r") { e.preventDefault(); navigate("/student-reports"); }
+        else if (key === "r") { e.preventDefault(); navigate("/studies/progress-management"); }
       }
 
       if (e.key === "Escape") {
@@ -719,7 +726,7 @@ export default function AppLayout() {
           />
 
           {/* Multi-Language & RTL Switcher */}
-          <LanguageSelectorDropdown />
+          <LanguageSelector />
 
           {/* Real-time In-App Notification Bell */}
           <NotificationBellDropdown />

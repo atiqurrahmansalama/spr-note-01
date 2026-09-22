@@ -78,7 +78,7 @@ export interface AdmissionSuccessStudent {
 export interface AdmissionSuccessModalProps {
   student: AdmissionSuccessStudent;
   onReset: () => void;
-  onClose: () => void;
+  onClose?: (student?: any) => void;
   isEditing?: boolean;
 }
 
@@ -247,10 +247,18 @@ export default function AdmissionSuccessModal({
   };
 
   const handleViewDirectory = () => {
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get("returnTo");
+    if (returnTo) {
+      if (onClose) {
+        onClose(student);
+      }
+      return;
+    }
     if (student?.id) {
       navigate(`/groups-students?highlight=${student.id}`);
     } else {
-      onClose();
+      if (onClose) onClose();
     }
   };
 
@@ -451,7 +459,7 @@ export default function AdmissionSuccessModal({
           icon={ArrowRightIcon}
           onClick={handleViewDirectory}
         >
-          View Directory
+          {Boolean(new URLSearchParams(window.location.search).get("returnTo")) ? "Return & Select" : "View Directory"}
         </CustomButton>
       </div>
 

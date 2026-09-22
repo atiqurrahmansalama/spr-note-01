@@ -1,4 +1,4 @@
-export const ur = {
+export const finance = {
   // Navigation & Headers
   title: "مالیات اور اکاؤنٹس",
   subtitle: "ادارہ جاتی ڈبل اینٹری بک کیپنگ، طلباء کی فیس، عملے کی تنخواہ اور رسید کی تصدیق",

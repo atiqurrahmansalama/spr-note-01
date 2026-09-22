@@ -1,4 +1,4 @@
-export const bn = {
+export const finance = {
   // Navigation & Headers
   title: "অর্থ ও হিসাব ব্যবস্থাপনা",
   subtitle: "প্রাতিষ্ঠানিক ডাবল-এন্ট্রি খতিয়ান, শিক্ষার্থী ফি, স্টাফ পে-রোল ও ডিজিটাল রসিদ ভেরিফিকেশন",

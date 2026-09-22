@@ -7,6 +7,7 @@ import { FeatureGuard } from "./components/common/FeatureGuard";
 import { UndoRedoProvider } from "./context/UndoRedoContext";
 import { I18nProvider } from "./i18n";
 import { lazyWithRetry as lazy } from "./utils/lazyWithRetry";
+import { getLastActiveRoute } from "./utils/navigationHistory";
 
 // ─── Public & Auth Views (Lazy Loaded with Auto-Retry) ────────────────────────
 const LandingPageView = lazy(() => import("./modules/landing/LandingPageView"));
@@ -115,7 +116,8 @@ function ProtectedRoute({ children }) {
 
 function RootRoute() {
   if (authStore.isLoggedIn()) {
-    return <Navigate to="/dashboard" replace />;
+    const destination = getLastActiveRoute("/dashboard");
+    return <Navigate to={destination} replace />;
   }
   return <LandingPageView />;
 }
@@ -153,7 +155,7 @@ export default function App() {
               >
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/student-reports" element={<FeatureGuard sectionKey="report_history" fallback={<Navigate to="/dashboard" replace />}><StudentReportsView /></FeatureGuard>} />
+                <Route path="/student-reports" element={<Navigate to="/studies/progress-management" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
                 <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
                 <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />

@@ -2,7 +2,7 @@ import { common } from './common';
 import { navigation } from './navigation';
 import { settings } from './settings';
 import { dashboard } from './dashboard';
-import { ar as finance } from '../../../modules/finance/locales/ar';
+import { finance } from './finance';
 
 export const ar = {
   common,
@@ -11,4 +11,3 @@ export const ar = {
   dashboard,
   finance,
 };
-

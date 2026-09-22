@@ -57,26 +57,24 @@ export default function DetailRow({
   const { lastPage, lastAyah } = useQuranTrackingSession();
 
   // Determine effective Juz for this row:
-  // 1. rowData.juz if explicitly set
-  // 2. availableJuzs[0] if provided
-  // 3. First non-empty juz from juzPageData
+  // 1. If only 1 Juz is available in JUZ / PAGE DETAILS, this row belongs to that Juz.
+  // 2. If multiple Juzs are available, use rowData.juz if it matches an available Juz, else default to availableJuzs[0].
+  // 3. Fallback to rowData.juz or the first non-empty Juz in juzPageData, or empty string.
   const effectiveJuz =
-    (rowData.juz !== undefined && rowData.juz !== null && String(rowData.juz).trim() !== "")
-      ? rowData.juz
-      : (availableJuzs && availableJuzs.length > 0 && String(availableJuzs[0]).trim() !== "")
+    availableJuzs && availableJuzs.length === 1
       ? availableJuzs[0]
-      : (juzPageData && Array.isArray(juzPageData))
-      ? juzPageData.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || ""
-      : "";
+      : availableJuzs && availableJuzs.length > 1
+      ? (rowData.juz && availableJuzs.some((j) => String(j) === String(rowData.juz)) ? rowData.juz : availableJuzs[0])
+      : (rowData.juz || (juzPageData && Array.isArray(juzPageData) && juzPageData.find((r) => r.juz && String(r.juz).trim() !== "")?.juz) || "");
 
-  // Dynamic bounds for Page derived from JUZ / PAGE DETAILS ranges for this Juz
+  // Dynamic bounds for Page derived from JUZ / PAGE DETAILS bounds for this Juz
   const { minPage, maxPage } = getJuzPageBounds(effectiveJuz, juzPageData);
 
-  // Keep rowData.juz synchronized if it was empty and an effective Juz is determined
+  // Keep rowData.juz synchronized whenever effectiveJuz is resolved
   useEffect(() => {
-    if (effectiveJuz && !rowData.juz) {
+    if (effectiveJuz && String(rowData.juz || "") !== String(effectiveJuz)) {
       onChange((prev) => {
-        if (!prev.juz) {
+        if (String(prev.juz || "") !== String(effectiveJuz)) {
           return { ...prev, juz: effectiveJuz };
         }
         return prev;

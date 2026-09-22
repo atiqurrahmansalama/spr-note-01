@@ -129,7 +129,10 @@ export default function StudentInputSection({
     if (sectionId) {
       params.set("section", String(sectionId));
     }
-    params.set("returnTo", "/daily-progress");
+    const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
+    const returnToUrl = currentPath ? `${currentPath}${currentSearch || ""}` : "/studies/progress-management";
+    params.set("returnTo", returnToUrl);
     return `/admission?${params.toString()}`;
   };
 
@@ -146,6 +149,7 @@ export default function StudentInputSection({
         actionTo={getActionUrl}
         actionTitle="Add new student (Quick Admission)"
         size="md"
+        showAllOptionsOnFocus={true}
       />
     </div>
   );

@@ -16,15 +16,16 @@ export const QURAN_RULES = {
  * - Juz 30: max 25 pages
  * - Juz 29: max 24 pages
  * - Other Juz (1-28): max 20 pages
+ * - Unspecified / Fallback: max 25 pages (highest in Quran, prevents premature clamping)
  */
 export function getMaxPageForJuz(juzNum?: string | number): number {
-  if (!juzNum) return 20;
+  if (!juzNum || String(juzNum).trim() === "") return 25;
   const j = parseInt(String(juzNum), 10);
-  if (isNaN(j)) return 20;
+  if (isNaN(j)) return 25;
   if (j === 30) return 25;
   if (j === 29) return 24;
   if (j >= 1 && j <= 28) return 20;
-  return 20;
+  return 25;
 }
 
 /**
@@ -32,8 +33,8 @@ export function getMaxPageForJuz(juzNum?: string | number): number {
  * based on the user's defined ranges in JUZ / PAGE DETAILS.
  * 
  * Rule:
- * Page in MISTAKE DETAILS and STUCK DETAILS must stay within the Start-End range
- * defined in JUZ / PAGE DETAILS for the corresponding Juz.
+ * Page in MISTAKE DETAILS and STUCK DETAILS must stay within the bounds
+ * for the corresponding Juz (max 24 for Juz 29, max 25 for Juz 30, max 20 for Juz 1-28).
  */
 export function getJuzPageBounds(
   juzNum?: string | number,
@@ -59,25 +60,21 @@ export function getJuzPageBounds(
     );
 
     if (matchingRows.length > 0) {
-      let minStart = Infinity;
       let maxEnd = -Infinity;
 
       matchingRows.forEach((row) => {
         (row.ranges || []).forEach((r: any) => {
-          const s = parseInt(String(r.start), 10);
           const e = parseInt(String(r.end), 10);
-          if (!isNaN(s) && s > 0 && s < minStart) minStart = s;
           if (!isNaN(e) && e > 0 && e > maxEnd) maxEnd = e;
         });
       });
 
-      const effectiveMin = minStart !== Infinity ? minStart : 1;
       const effectiveMax =
-        maxEnd !== -Infinity && maxEnd >= effectiveMin
+        maxEnd !== -Infinity && maxEnd >= 1
           ? Math.max(maxEnd, defaultMax)
           : defaultMax;
 
-      return { minPage: effectiveMin, maxPage: effectiveMax };
+      return { minPage: 1, maxPage: effectiveMax };
     }
   }
 

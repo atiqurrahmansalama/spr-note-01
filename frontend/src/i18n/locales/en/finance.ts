@@ -1,4 +1,4 @@
-export const en = {
+export const finance = {
   // Navigation & Headers
   title: "Finance & Accounts",
   subtitle: "Institutional Double-Entry Bookkeeping, Student Fees, Staff Payroll, and Verified Receipts",

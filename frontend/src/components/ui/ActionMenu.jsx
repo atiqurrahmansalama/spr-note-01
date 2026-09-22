@@ -120,16 +120,23 @@ export default function ActionMenu({
       ? 'px-3 py-1.5 text-xs gap-1.5 rounded-xl'
       : 'px-3.5 py-2 text-xs gap-2 rounded-xl';
 
-  const variantClasses =
+  const iconOnlySizeClasses =
+    size === 'xs'
+      ? 'p-1 rounded-lg'
+      : size === 'sm'
+      ? 'p-1.5 rounded-xl'
+      : 'p-2 rounded-xl';
+
+  const iconOnlyVariantClasses =
     variant === 'ghost'
-      ? 'bg-transparent border-transparent hover:bg-transparent shadow-none font-bold theme-accent hover:opacity-85'
+      ? 'border border-transparent bg-transparent hover:theme-bg-sub theme-accent shadow-none'
       : variant === 'primary'
-      ? 'theme-bg-accent theme-accent-text hover:opacity-95 shadow-xs border-transparent font-bold'
+      ? 'border border-transparent theme-bg-accent theme-accent-text hover:opacity-95 shadow-xs'
       : variant === 'surface'
-      ? 'theme-bg-surface hover:theme-bg-sub/60 theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
+      ? 'theme-bg-surface hover:theme-bg-sub/60 border theme-border theme-text-secondary hover:theme-text-primary shadow-2xs'
       : variant === 'sub'
-      ? 'theme-bg-sub hover:theme-bg-elevated theme-border hover:theme-border-strong theme-text-secondary hover:theme-text-primary shadow-2xs'
-      : 'theme-bg-surface border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary shadow-xs';
+      ? 'theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary shadow-2xs'
+      : 'border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary shadow-xs';
 
   return (
     <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
@@ -143,7 +150,7 @@ export default function ActionMenu({
         className={`${
           label
             ? `inline-flex items-center font-semibold border transition-all duration-150 select-none ${sizeClasses} ${variantClasses}`
-            : `p-1.5 rounded-xl border theme-border hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-all duration-150 shadow-xs focus:outline-none flex items-center justify-center`
+            : `transition-all duration-150 focus:outline-none flex items-center justify-center ${iconOnlySizeClasses} ${iconOnlyVariantClasses}`
         } ${
           disabled ? 'opacity-50 cursor-not-allowed pointer-events-none shadow-none' : 'cursor-pointer'
         } ${
@@ -160,7 +167,7 @@ export default function ActionMenu({
           TriggerIcon,
           label
             ? `w-3.5 h-3.5 shrink-0 ${variant === 'primary' ? '' : 'theme-accent'}`
-            : 'w-4 h-4'
+            : `w-4 h-4 shrink-0 ${variant === 'ghost' ? 'theme-accent' : ''}`
         )}
         {label && <span className="truncate">{label}</span>}
         {label && showChevron && (

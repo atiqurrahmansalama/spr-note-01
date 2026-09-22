@@ -24,6 +24,7 @@ export interface AutocompleteDropdownProps {
   options?: (string | AutocompleteOption)[];
   value?: string | AutocompleteOption;
   onChange?: (val: any) => void;
+  onQueryChange?: (val: string) => void;
   onAddNew?: (val: string) => void;
   onNextFocus?: () => void;
   placeholder?: string;
@@ -63,6 +64,7 @@ export default function AutocompleteDropdown({
   options = [],
   value = '',
   onChange,
+  onQueryChange = null,
   onAddNew,
   onNextFocus,
   placeholder = 'Search or type...',
@@ -98,9 +100,19 @@ export default function AutocompleteDropdown({
   const localInputRef = useRef<HTMLInputElement>(null);
   const refToUse = (inputRef as React.RefObject<HTMLInputElement>) || localInputRef;
 
+  const isUserTypingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      isUserTypingRef.current = false;
+    }
+  }, [isOpen]);
+
   if (value !== prevValue) {
     setPrevValue(value);
-    setSearchTerm(typeof value === 'string' ? value : value?.label || value?.name || '');
+    if (!isUserTypingRef.current) {
+      setSearchTerm(typeof value === 'string' ? value : value?.label || value?.name || '');
+    }
   }
 
   // Headless Positioning Engine
@@ -117,7 +129,25 @@ export default function AutocompleteDropdown({
 
   const filteredOptions = useMemo(() => {
     return (options || []).filter((item) => {
-      if (showAllOptionsOnFocus && isOpen) return true;
+      if (readOnly) return true;
+
+      // 1. If user is actively typing, ALWAYS filter strictly by what they typed!
+      if (isUserTypingRef.current) {
+        if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
+        const term = safeSearchTerm.trim().toLowerCase();
+        const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
+        const sub = (
+          typeof item === 'object' && item !== null
+            ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : '')
+            : ''
+        ).toLowerCase();
+        return labelText.includes(term) || sub.includes(term);
+      }
+
+      // 2. When not typing and dropdown is opened, show all if showAllOptionsOnFocus is true
+      if (showAllOptionsOnFocus) return true;
+
+      // 3. Fallback when not typing and showAllOptionsOnFocus is false
       if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
       const term = safeSearchTerm.trim().toLowerCase();
       const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
@@ -128,7 +158,7 @@ export default function AutocompleteDropdown({
       ).toLowerCase();
       return labelText.includes(term) || sub.includes(term);
     });
-  }, [options, showAllOptionsOnFocus, isOpen, safeSearchTerm]);
+  }, [options, showAllOptionsOnFocus, safeSearchTerm, readOnly, isOpen]);
 
   const triggerNextFocus = () => {
     if (onNextFocus) {
@@ -142,7 +172,13 @@ export default function AutocompleteDropdown({
     }
   };
 
+  const lastSelectTimeRef = useRef(0);
   const handleSelect = (item: string | AutocompleteOption) => {
+    const now = Date.now();
+    if (now - lastSelectTimeRef.current < 200) return;
+    lastSelectTimeRef.current = now;
+
+    isUserTypingRef.current = false;
     const selectedLabel = typeof item === 'string' ? item : item.label || item.name || '';
     setSearchTerm(selectedLabel);
     setIsOpen(false);
@@ -204,11 +240,16 @@ export default function AutocompleteDropdown({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
+    isUserTypingRef.current = true;
     setSearchTerm(val);
     updatePosition();
     setIsOpen(true);
     resetHighlight();
-    if (onChange) onChange(val);
+    if (onQueryChange) {
+      onQueryChange(val);
+    } else if (onChange) {
+      onChange(val);
+    }
   };
 
   // Size classes matching CustomInput and CustomSelect
@@ -310,7 +351,12 @@ export default function AutocompleteDropdown({
             value={safeSearchTerm}
             onChange={readOnly ? undefined : handleInputChange}
             onKeyDown={readOnly ? (e) => { if (e.key === 'Enter') handleToggle(e as any); } : handleKeyDown}
-            onFocus={handleOpen}
+            onFocus={(e) => {
+              handleOpen();
+              if (safeSearchTerm) {
+                e.target.select();
+              }
+            }}
             onClick={handleOpen}
             placeholder={placeholder}
             className={`w-full bg-transparent border-0 outline-none p-0 font-medium theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 text-xs sm:text-sm ${
@@ -350,7 +396,21 @@ export default function AutocompleteDropdown({
                 key={index}
                 data-dropdown-item="true"
                 type="button"
-                onClick={() => handleSelect(item)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelect(item);
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelect(item);
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelect(item);
+                }}
                 className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-all duration-150 ease-out flex items-center justify-between cursor-pointer group/item active:scale-[0.985] ${
                   isSelected || isHighlighted
                     ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs translate-x-1'
@@ -395,6 +455,11 @@ export default function AutocompleteDropdown({
         ) : safeSearchTerm.trim() && onAddNew ? (
           <button
             type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSaveClick(e);
+            }}
             onClick={handleSaveClick}
             className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-semibold theme-accent hover:bg-[var(--accent-main)]/15 transition-all duration-150 flex items-center justify-between cursor-pointer active:scale-[0.985] animate-item-slide"
           >

@@ -58,7 +58,7 @@ export default function TeacherUstadhDashboardView() {
       trend: { value: '+4 vs target', isPositive: true },
       icon: SparklesIcon,
       color: 'purple',
-      onClick: () => navigate('/student-reports'),
+      onClick: () => navigate('/studies/progress-management'),
     },
   ];
 

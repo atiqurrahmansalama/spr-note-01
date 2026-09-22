@@ -1,4 +1,4 @@
-export const ar = {
+export const finance = {
   // Navigation & Headers
   title: "المالية والحسابات",
   subtitle: "مسك الدفاتر المزدوجة المؤسسية، ورسوم الطلاب، ورواتب الموظفين، والتحقق من الإيصالات",

@@ -4,6 +4,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import ForgotPasswordModal from './ForgotPasswordModal';
+import { getLastActiveRoute } from '../../utils/navigationHistory';
 
 export default function LoginView() {
   const { login, loginWithGoogle } = useAuth();
@@ -40,7 +41,7 @@ export default function LoginView() {
         const result = await loginWithGoogle(tokenResponse);
         if (result.success) {
           showToast('Signed in with Google successfully!', 'success');
-          navigate('/dashboard');
+          navigate(getLastActiveRoute('/dashboard'), { replace: true });
         } else {
           setAuthErrorBanner(result.error || 'Google authentication failed.');
           showToast(result.error || 'Google authentication failed.', 'error');
@@ -78,7 +79,7 @@ export default function LoginView() {
 
     if (result.success) {
       showToast('Signed in successfully!', 'success');
-      navigate('/dashboard');
+      navigate(getLastActiveRoute('/dashboard'), { replace: true });
     } else {
       setAuthErrorBanner(result.error || 'Authentication failed.');
       showToast(result.error || 'Authentication failed.', 'error');

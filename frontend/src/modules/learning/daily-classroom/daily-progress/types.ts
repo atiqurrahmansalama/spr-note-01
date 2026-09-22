@@ -63,19 +63,27 @@ export interface SectionVisibilityConfig {
 }
 
 export interface DailyProgressFilterProps {
+  selectedDate?: string;
+  onDateChange?: (date: string) => void;
+  dateFormat?: string;
   selectedDepartmentId?: string;
   onDepartmentChange?: (val: string) => void;
-  departmentSelectOptions?: Array<{ label: string; value: string }>;
+  departmentSelectOptions?: Array<{ label: string; value: string; [key: string]: any }>;
   hasDepartments?: boolean;
   selectedClassId?: string;
   onClassChange?: (val: string) => void;
-  classSelectOptions?: Array<{ label: string; value: string }>;
+  classSelectOptions?: Array<{ label: string; value: string; [key: string]: any }>;
   selectedSectionId?: string;
   onSectionChange?: (val: string) => void;
-  sectionSelectOptions?: Array<{ label: string; value: string }>;
+  sectionSelectOptions?: Array<{ label: string; value: string; [key: string]: any }>;
   hasSectionsForClass?: boolean;
+  allPeriodFilterOptions?: Array<{ value: string; label: string; [key: string]: any }>;
+  activePeriodId?: string;
+  onPeriodChange?: (periodId: string) => void;
+  getPeriodSubtitle?: (periodId: string) => string;
   onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
   setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
+  [key: string]: any;
 }
 
 export interface DailyProgressViewProps {

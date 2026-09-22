@@ -49,11 +49,17 @@ export default function DetailSection({
         prevData.length > 0 && prevData[prevData.length - 1].juz
           ? prevData[prevData.length - 1].juz
           : defaultJuz;
+      const rowJuz =
+        availableJuzs && availableJuzs.length === 1
+          ? availableJuzs[0]
+          : availableJuzs && availableJuzs.length > 1
+          ? (lastJuz && availableJuzs.some((j) => String(j) === String(lastJuz)) ? lastJuz : availableJuzs[0])
+          : (lastJuz || defaultJuz);
       return [
         ...prevData,
         {
           id: newId,
-          juz: lastJuz,
+          juz: rowJuz,
           page: "",
           ayahs: [{ id: crypto.randomUUID(), value: "" }],
         },

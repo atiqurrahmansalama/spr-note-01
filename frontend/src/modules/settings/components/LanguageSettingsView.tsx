@@ -1,7 +1,5 @@
-import React from 'react';
-import { useI18n, type LanguageCode } from '@/i18n';
+import { useI18n, useLocaleNavigate, type LanguageCode } from '@/i18n';
 import { GlobeIcon, CheckIcon, LanguagesIcon, SparklesIcon } from '@/components/ui/Icons';
-import { useLocaleNavigate } from '@/hooks/useLocaleNavigate';
 
 export interface LanguageSettingsViewProps {
   hideHeader?: boolean;
