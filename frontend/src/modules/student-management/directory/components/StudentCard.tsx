@@ -42,11 +42,20 @@ export default function StudentCard({
                 : "S"}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-bold theme-text-primary text-sm truncate">
-                {s.name_en || s.name}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold theme-text-primary text-sm truncate">
+                  {s.name_en || s.name}
+                </h3>
+                {(s.roll_number != null || s.student_id_card_number || s.uniq_id) && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded theme-bg-sub border theme-border theme-text-secondary leading-normal">
+                    {s.roll_number != null && <span>Roll: {s.roll_number}</span>}
+                    {s.roll_number != null && (s.student_id_card_number || s.uniq_id) && <span>•</span>}
+                    {(s.student_id_card_number || s.uniq_id) && <span>{s.student_id_card_number || s.uniq_id}</span>}
+                  </span>
+                )}
+              </div>
               {fatherName && (
-                <p className="text-[11px] theme-text-secondary truncate">
+                <p className="text-[11px] theme-text-secondary truncate mt-0.5">
                   {fatherName}
                 </p>
               )}

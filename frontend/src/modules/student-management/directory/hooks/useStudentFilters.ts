@@ -80,14 +80,21 @@ export function useStudentFilters(students: StudentRecord[], classes: any[], gro
       const name = (s.name_en || s.name || "").toLowerCase();
       const bName = (s.bangla_name || "").toLowerCase();
       const roll = String(s.roll_number || s.roll || "");
+      const cardNo = (s.student_id_card_number || "").toLowerCase();
+      const uniqId = (s.uniq_id || "").toLowerCase();
+      const stuId = String(s.id || "").toLowerCase();
       const gPhone = (s.details?.guardian_phone || "").toLowerCase();
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
 
       const matchesSearch =
         !query ||
         name.includes(query) ||
         bName.includes(query) ||
+        roll === query ||
         roll.includes(query) ||
+        cardNo.includes(query) ||
+        uniqId.includes(query) ||
+        stuId === query ||
         gPhone.includes(query);
 
       let matchesGroup = true;

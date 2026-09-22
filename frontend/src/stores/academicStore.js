@@ -133,35 +133,28 @@ export function mergeStudents(apiStudents, localStudents) {
     const subVal =
       typeof s === "object" && typeof s?.sub === "string"
         ? s.sub
-        : typeof s === "object" && (s?.group_name || s?.group)
-        ? String(s.group_name || s.group)
+        : typeof s === "object" && (s?.section_name || s?.student_section_name || s?.group_name || s?.group)
+        ? String(s.section_name || s.student_section_name || s.group_name || s.group)
         : "General Group";
 
     return {
+      ...(typeof s === "object" ? s : {}),
       id: typeof s === "object" ? s?.id ?? null : null,
-      label: typeof s === "object" ? s?.label || s?.name || s?.student_name || "" : String(s || ""),
+      label: typeof s === "object" ? s?.label || s?.name_en || s?.name || s?.student_name || "" : String(s || ""),
+      name: typeof s === "object" ? s?.name || s?.name_en || s?.label || "" : String(s || ""),
+      name_en: typeof s === "object" ? s?.name_en || s?.name || s?.label || "" : String(s || ""),
       sub: subVal,
+      group_name: subVal,
     };
   });
 
   const apiIds = new Set(apiList.map((s) => String(s.id)).filter((id) => id && id !== "null" && id !== "undefined"));
-  const apiKeys = new Set(apiList.map((s) => `${(s.label || "").trim().toLowerCase()}_${(s.sub || "").trim().toLowerCase()}`));
 
   const localOnly = (Array.isArray(localStudents) ? localStudents : [])
     .filter((s) => {
       if (!s || (!s.label && !s.name)) return false;
       const sId = s.id ? String(s.id) : null;
-      const sSub =
-        typeof s === "object" && typeof s?.sub === "string"
-          ? s.sub
-          : typeof s === "object" && (s?.group || s?.group_name)
-          ? String(s.group || s.group_name)
-          : "General Group";
-      const sKey = `${(s.label || s.name || "").trim().toLowerCase()}_${sSub.trim().toLowerCase()}`;
-      
       if (sId && apiIds.has(sId)) return false;
-      if (apiKeys.has(sKey)) return false;
-      
       return Boolean(s._local);
     })
     .map((s) => ({ ...s, _local: true }));
@@ -173,7 +166,7 @@ export function mergeStudents(apiStudents, localStudents) {
     const sSub = typeof s?.sub === "string" ? s.sub : "General Group";
     const key = s.id
       ? `id_${s.id}`
-      : `key_${(s.label || "").trim().toLowerCase()}_${sSub.trim().toLowerCase()}`;
+      : `local_${(s.label || s.name || "").trim().toLowerCase()}_${sSub.trim().toLowerCase()}`;
     if (!seenKeys.has(key)) {
       seenKeys.add(key);
       merged.push({ ...s, sub: sSub });

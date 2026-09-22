@@ -74,9 +74,18 @@ export function useStudentTableColumns({
                   : "S"}
               </div>
               <div className="min-w-0">
-                <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
-                  {s.name_en || s.name}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
+                    {s.name_en || s.name}
+                  </span>
+                  {(s.roll_number != null || s.student_id_card_number || s.uniq_id) && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded theme-bg-sub border theme-border theme-text-secondary leading-normal">
+                      {s.roll_number != null && <span>Roll: {s.roll_number}</span>}
+                      {s.roll_number != null && (s.student_id_card_number || s.uniq_id) && <span>•</span>}
+                      {(s.student_id_card_number || s.uniq_id) && <span>{s.student_id_card_number || s.uniq_id}</span>}
+                    </span>
+                  )}
+                </div>
                 {fatherName && (
                   <span className="text-[11px] theme-text-secondary block mt-0.5 truncate">
                     {fatherName}

@@ -87,14 +87,16 @@ export default function QuickAdmissionForm({
     return `${baseUrl}${delimiter}${redirectParams.toString()}`;
   };
 
-  const injectIntoAcademicCache = (student: any) => {
+  const injectIntoAcademicCache = (student: any, tempIdToRemove?: string) => {
     try {
       const cacheKey = `spr_students_cache_${activeTenantId}`;
       const cached = readJSON(cacheKey, []);
-      const exists = cached.some((s: any) => String(s.id) === String(student.id));
-      if (!exists) {
-        writeJSON(cacheKey, [student, ...cached]);
-      }
+      const filtered = cached.filter(
+        (s: any) =>
+          String(s.id) !== String(student.id) &&
+          (!tempIdToRemove || String(s.id) !== String(tempIdToRemove))
+      );
+      writeJSON(cacheKey, [student, ...filtered]);
     } catch (e) {
       console.warn("Failed to inject student into academic cache:", e);
     }
@@ -487,6 +489,7 @@ export default function QuickAdmissionForm({
       if (res.ok) {
         const resData = await res.json().catch(() => ({}));
         if (resData && resData.id) {
+          studentStore.remove(localStudentId);
           savedStudent = {
             ...newStudentProfile,
             ...resData,
@@ -501,6 +504,7 @@ export default function QuickAdmissionForm({
             group_name: resData.group_name || resData.student_group_name || sectionName || className || "General Group",
             uniq_id: resData.uniq_id || resData.student_id_card_number || newStudentProfile.uniq_id,
             student_id_card_number: resData.student_id_card_number || resData.uniq_id || newStudentProfile.student_id_card_number,
+            roll_number: resData.roll_number,
             id: String(resData.id),
             _local: false,
           };
@@ -517,13 +521,25 @@ export default function QuickAdmissionForm({
         }).catch(() => null);
 
         if (fallbackRes && fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json().catch(() => ({}));
+          if (fallbackData && fallbackData.id) {
+            studentStore.remove(localStudentId);
+            savedStudent = {
+              ...newStudentProfile,
+              ...fallbackData,
+              id: String(fallbackData.id),
+              roll_number: fallbackData.roll_number,
+              _local: false,
+            };
+            studentStore.add(savedStudent);
+          }
           showToast(`Student "${formData.name}" admitted successfully!`, "success");
         } else {
           showToast(`"${formData.name}" saved locally. Will sync when online.`, "info");
         }
       }
 
-      injectIntoAcademicCache(savedStudent);
+      injectIntoAcademicCache(savedStudent, localStudentId);
       window.dispatchEvent(new CustomEvent("spr_students_updated"));
       window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: savedStudent }));
       refetchAcademicData?.();

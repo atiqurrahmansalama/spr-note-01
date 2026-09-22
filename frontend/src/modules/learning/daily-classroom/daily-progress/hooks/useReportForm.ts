@@ -28,6 +28,7 @@ export function useReportForm() {
 
   const [selectedDate, setSelectedDate] = useState<string>(() => getClassroomTodayDate());
   const [studentName, setStudentName] = useState<string>("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null);
   const [groupName, setGroupName] = useState<string>("");
   const [selectedSession, setSelectedSession] = useState<string>("");
 
@@ -492,6 +493,7 @@ export function useReportForm() {
               : "";
 
           return {
+            ...(typeof s === "object" ? s : {}),
             id: typeof s === "object" ? s.id : null,
             label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
             sub: subVal,
@@ -776,10 +778,18 @@ export function useReportForm() {
         ...(studentDatabase || []),
         ...(studentStore.getAll() || []),
       ];
-      const selectedStudent = allKnown.find(
-        (s: any) => (s.label || s.name || s.name_en || "").trim().toLowerCase() === studentName.trim().toLowerCase()
-      );
-      const studentId = selectedStudent && !String(selectedStudent.id).startsWith("stu_") ? selectedStudent.id : null;
+      let selectedStudent: any = null;
+      if (selectedStudentId) {
+        selectedStudent = allKnown.find((s: any) => String(s.id) === String(selectedStudentId));
+      }
+      if (!selectedStudent) {
+        selectedStudent = allKnown.find(
+          (s: any) => (s.label || s.name || s.name_en || "").trim().toLowerCase() === studentName.trim().toLowerCase()
+        );
+      }
+      const studentId = (selectedStudentId && !String(selectedStudentId).startsWith("stu_"))
+        ? selectedStudentId
+        : (selectedStudent && !String(selectedStudent.id).startsWith("stu_") ? selectedStudent.id : null);
 
       // Track student usage count
       recordStudentUsage(selectedStudent || studentName.trim());
@@ -990,6 +1000,8 @@ export function useReportForm() {
     setSelectedDate,
     studentName,
     setStudentName,
+    selectedStudentId,
+    setSelectedStudentId,
     groupName,
     setGroupName,
     selectedSession,

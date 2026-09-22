@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Max, Q, Count, Avg, Sum
+from django.db.models import Max, Q, Count, Avg, Sum, F
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -224,31 +224,13 @@ class StudentSerializer(serializers.ModelSerializer):
         if name_val and str(name_val).strip():
             validated_data['name_en'] = str(name_val).strip()
 
-        # Deduplication Guard: Only merge if no explicit roll_number, uniq_id, or is_new flag is set
-        is_explicit = (
-            self.initial_data.get('is_new')
-            or self.initial_data.get('id')
-            or self.initial_data.get('uniq_id')
-            or validated_data.get('roll_number') is not None
-            or self.initial_data.get('roll_number') is not None
-        )
-
-        if not is_explicit:
-            existing_student = Student.objects.filter(
-                name_en__iexact=validated_data.get('name_en', ''),
-                group_name__iexact=group_val
-            ).first()
-
-            if existing_student:
-                if details_data and isinstance(details_data, dict):
-                    detail_obj, _ = StudentDetail.objects.get_or_create(student=existing_student)
-                    for k, v in details_data.items():
-                        setattr(detail_obj, k, v)
-                    detail_obj.save()
-                return existing_student
-
         if 'roll_number' not in validated_data or validated_data['roll_number'] is None:
-            max_roll = Student.objects.filter(group_name=group_val).aggregate(Max('roll_number'))['roll_number__max'] or 0
+            roll_filter = {}
+            if validated_data.get('student_class_id'):
+                roll_filter['student_class_id'] = validated_data['student_class_id']
+            elif group_val:
+                roll_filter['group_name'] = group_val
+            max_roll = Student.objects.filter(**roll_filter).aggregate(Max('roll_number'))['roll_number__max'] or 0
             validated_data['roll_number'] = max_roll + 1
 
         student = Student.objects.create(**validated_data)

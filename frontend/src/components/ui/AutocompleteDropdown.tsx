@@ -51,6 +51,7 @@ export interface AutocompleteDropdownProps {
   disabled?: boolean;
   icon?: React.ComponentType<{ className?: string }> | null;
   error?: string | null;
+  selectedId?: string | number | null;
   [key: string]: any;
 }
 
@@ -63,6 +64,7 @@ export interface AutocompleteDropdownProps {
 export default function AutocompleteDropdown({
   options = [],
   value = '',
+  selectedId = null,
   onChange,
   onQueryChange = null,
   onAddNew,
@@ -389,11 +391,13 @@ export default function AutocompleteDropdown({
                 : null;
             const itemBadge = typeof item === 'object' && item !== null ? item.badge || item.typeLabel : null;
             const isHighlighted = index === highlightedIndex;
-            const isSelected = itemLabel.toLowerCase() === safeSearchTerm.toLowerCase();
+            const isSelected = selectedId && typeof item === 'object' && item?.id != null
+              ? String(item.id) === String(selectedId)
+              : Boolean(safeSearchTerm && itemLabel.toLowerCase() === safeSearchTerm.toLowerCase());
 
             return (
               <button
-                key={index}
+                key={typeof item === 'object' && item?.id != null ? `item_${item.id}` : index}
                 data-dropdown-item="true"
                 type="button"
                 onMouseDown={(e) => {

@@ -1054,6 +1054,18 @@ export default function FullAdmissionWizard({
 
       showToast("Student successfully enrolled & registered!", "success");
       clearDraft();
+
+      try {
+        studentStore.add({
+          ...resData,
+          id: String(studentId),
+          name: sharedData.name,
+          label: sharedData.name,
+          sub: selectedClassObj?.name || sharedData.education_status || "General Group",
+        });
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent("spr_students_updated"));
+      window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: resData }));
       
       if (onSuccess) {
         const profileRes = await fetchWithAuth(`/api/v1/students/${studentId}/full-profile/`);

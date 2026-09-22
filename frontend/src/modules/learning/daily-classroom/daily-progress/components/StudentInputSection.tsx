@@ -17,12 +17,17 @@ export interface StudentProfileOption {
   class_id?: string | number;
   student_section?: string | number;
   section_id?: string | number;
+  roll_number?: number | string;
+  student_id_card_number?: string;
+  uniq_id?: string;
+  badge?: string;
   originalData?: any;
 }
 
 export interface StudentInputSectionProps {
   studentDatabase?: StudentProfileOption[];
   studentName?: string;
+  studentId?: string | number | null;
   departmentId?: string;
   classId?: string;
   sectionId?: string;
@@ -36,6 +41,7 @@ export interface StudentInputSectionProps {
 export default function StudentInputSection({
   studentDatabase = [],
   studentName = "",
+  studentId = null,
   departmentId,
   classId,
   sectionId,
@@ -67,10 +73,19 @@ export default function StudentInputSection({
           ? String(s.student_section || s.section_id || s.section)
           : undefined;
 
+      const roll = typeof s === "object" ? (s.roll_number ?? s.originalData?.roll_number) : undefined;
+      const cardNo = typeof s === "object" ? (s.student_id_card_number ?? s.originalData?.student_id_card_number) : undefined;
+      const uniq = typeof s === "object" ? (s.uniq_id ?? s.originalData?.uniq_id) : undefined;
+      const badge = typeof s === "object" && s.badge ? s.badge : (roll != null ? `Roll: ${roll}` : (cardNo || uniq || (s?.id ? `ID: ${s.id}` : undefined)));
+
       return {
         id: typeof s === "object" && s?.id ? String(s.id) : undefined,
         label: typeof s === "object" ? s.label || s.name_en || s.name || "" : String(s || ""),
         sub: subVal,
+        badge,
+        roll_number: roll,
+        student_id_card_number: cardNo,
+        uniq_id: uniq,
         department: deptVal,
         department_name: typeof s === "object" ? s.department_name : undefined,
         student_class: classVal,
@@ -96,6 +111,10 @@ export default function StudentInputSection({
         name: typeof option.label === "string" ? option.label : String(option.label || ""),
         sub: safeSub,
         group_name: safeSub,
+        roll_number: option.roll_number,
+        student_id_card_number: option.student_id_card_number,
+        uniq_id: option.uniq_id,
+        badge: option.badge,
         department: option.department,
         department_name: option.department_name,
         student_class: option.student_class,
@@ -141,6 +160,7 @@ export default function StudentInputSection({
       <AutocompleteDropdown
         options={options}
         value={studentName}
+        selectedId={studentId ? String(studentId) : undefined}
         onChange={handleSelect}
         onQueryChange={handleQueryChange}
         placeholder="Enter student name..."

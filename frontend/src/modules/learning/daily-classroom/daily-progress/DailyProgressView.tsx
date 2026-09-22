@@ -64,6 +64,8 @@ export default function DailyProgressView({
     setSelectedDate,
     studentName,
     setStudentName,
+    selectedStudentId,
+    setSelectedStudentId,
     groupName,
     setGroupName,
     selectedSession,
@@ -180,88 +182,56 @@ export default function DailyProgressView({
   // Complete student roster sorted by usage frequency (highest used students first)
   const allStudentDatabase = useMemo(() => {
     const fullList: any[] = [];
-    const existingNames = new Set<string>();
+    const seenKeys = new Set<string>();
 
-    (academicStudents || []).forEach((st: any) => {
-      const stName = (st.name_en || st.name || "").trim();
-      if (stName && !existingNames.has(stName.toLowerCase())) {
-        existingNames.add(stName.toLowerCase());
-        const secSub =
-          st.section_name ||
-          st.student_section_name ||
-          (st.section && typeof st.section === "object" ? st.section.section_name : null) ||
-          st.sub ||
-          st.student_class_name ||
-          "";
+    const appendStudent = (st: any) => {
+      const stName = (typeof st === "object" ? st.name_en || st.name || st.label : String(st || "")).trim();
+      if (!stName) return;
 
-        fullList.push({
-          id: String(st.id),
-          label: stName,
-          name: stName,
-          name_en: st.name_en || stName,
-          sub: secSub,
-          section_name: secSub,
-          student_class: st.student_class || st.class_id,
-          student_class_name: st.student_class_name,
-          student_section: st.student_section || st.section_id || (typeof st.section === "object" ? st.section?.id : st.section),
-          department: st.department || st.department_id,
-          department_name: st.department_name,
-          originalData: st,
-        });
-      }
-    });
+      const secSub =
+        typeof st === "object"
+          ? st.section_name ||
+            st.student_section_name ||
+            (st.section && typeof st.section === "object" ? st.section.section_name : null) ||
+            st.sub ||
+            st.group_name ||
+            st.student_class_name ||
+            ""
+          : "";
 
-    (studentDatabase || []).forEach((st: any) => {
-      const stName = (typeof st === "object" ? st.label || st.name_en || st.name : String(st || "")).trim();
-      if (stName && !existingNames.has(stName.toLowerCase())) {
-        existingNames.add(stName.toLowerCase());
-        const secSub =
-          typeof st === "object"
-            ? st.section_name || st.sub || st.group_name || ""
-            : "";
+      const rawId = typeof st === "object" && st?.id != null ? String(st.id) : null;
+      const key = rawId ? `id_${rawId}` : `raw_${stName.toLowerCase()}_${secSub.toLowerCase()}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
 
-        fullList.push({
-          id: typeof st === "object" && st.id ? String(st.id) : undefined,
-          label: stName,
-          name: stName,
-          name_en: stName,
-          sub: secSub,
-          section_name: secSub,
-          student_class: typeof st === "object" ? st.student_class || st.class_id : undefined,
-          student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
-          student_section: typeof st === "object" ? st.student_section || st.section_id : undefined,
-          department: typeof st === "object" ? st.department || st.department_id : undefined,
-          department_name: typeof st === "object" ? st.department_name : undefined,
-          originalData: st,
-        });
-      }
-    });
+      const roll = typeof st === "object" ? (st.roll_number ?? st.originalData?.roll_number) : undefined;
+      const cardNo = typeof st === "object" ? (st.student_id_card_number ?? st.originalData?.student_id_card_number) : undefined;
+      const uniq = typeof st === "object" ? (st.uniq_id ?? st.originalData?.uniq_id) : undefined;
+      const badge = roll != null ? `Roll: ${roll}` : (cardNo || uniq || (rawId ? `ID: ${rawId}` : undefined));
 
-    (studentStore.getAll() || []).forEach((st: any) => {
-      const stName = (typeof st === "object" ? st.label || st.name_en || st.name : String(st || "")).trim();
-      if (stName && !existingNames.has(stName.toLowerCase())) {
-        existingNames.add(stName.toLowerCase());
-        const secSub =
-          typeof st === "object"
-            ? st.section_name || st.sub || st.group_name || ""
-            : "";
+      fullList.push({
+        id: rawId || undefined,
+        label: stName,
+        name: stName,
+        name_en: typeof st === "object" ? st.name_en || stName : stName,
+        sub: secSub,
+        section_name: secSub,
+        roll_number: roll,
+        student_id_card_number: cardNo,
+        uniq_id: uniq,
+        badge,
+        student_class: typeof st === "object" ? st.student_class || st.class_id : undefined,
+        student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
+        student_section: typeof st === "object" ? st.student_section || st.section_id || (typeof st.section === "object" ? st.section?.id : st.section) : undefined,
+        department: typeof st === "object" ? st.department || st.department_id : undefined,
+        department_name: typeof st === "object" ? st.department_name : undefined,
+        originalData: st,
+      });
+    };
 
-        fullList.push({
-          id: typeof st === "object" && st.id ? String(st.id) : undefined,
-          label: stName,
-          name: stName,
-          name_en: stName,
-          sub: secSub,
-          section_name: secSub,
-          student_class: typeof st === "object" ? st.student_class || st.class_id : undefined,
-          student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
-          student_section: typeof st === "object" ? st.student_section || st.section_id : undefined,
-          department: typeof st === "object" ? st.department || st.department_id : undefined,
-          department_name: typeof st === "object" ? st.department_name : undefined,
-          originalData: st,
-        });
-      }
-    });
+    (academicStudents || []).forEach(appendStudent);
+    (studentDatabase || []).forEach(appendStudent);
+    (studentStore.getAll() || []).forEach(appendStudent);
 
     return sortStudentsByUsage(fullList);
   }, [studentDatabase, academicStudents]);
@@ -363,6 +333,7 @@ export default function DailyProgressView({
     }
 
     setStudentName(chosenName);
+    setSelectedStudentId(matchedStudent?.id ? String(matchedStudent.id) : null);
 
     if (!chosenName.trim()) {
       lastSelectedStudentNameRef.current = "";
@@ -376,7 +347,7 @@ export default function DailyProgressView({
       const academicProfile = (allStudentDatabase || []).find(
         (a: any) =>
           (matchedStudent && matchedStudent.id && String(a.id) === String(matchedStudent.id)) ||
-          (a.name_en || a.name || "").toLowerCase().trim() === chosenName.toLowerCase().trim()
+          (!matchedStudent?.id && (a.name_en || a.name || "").toLowerCase().trim() === chosenName.toLowerCase().trim())
       );
 
       const candidate = academicProfile || matchedStudent;
@@ -971,6 +942,7 @@ export default function DailyProgressView({
               <StudentInputSection
                 studentDatabase={allStudentDatabase}
                 studentName={studentName}
+                studentId={selectedStudentId}
                 departmentId={selectedDepartmentId}
                 classId={selectedClassId}
                 sectionId={selectedSectionId}
