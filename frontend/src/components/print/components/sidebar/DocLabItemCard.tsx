@@ -14,6 +14,7 @@ export interface DocLabItemCardProps {
   onClick?: (e: React.MouseEvent) => void;
   onMouseDown?: (e: React.MouseEvent) => void;
   className?: string;
+  children?: React.ReactNode;
 }
 
 /**
@@ -23,6 +24,7 @@ export interface DocLabItemCardProps {
  * - Line 2: Description / Subtitle / Live value
  * - Right: Action controls (Three-dot ActionMenu or Copy Button)
  * - Left: Optional Icon (Included in Presets, omitted in Tokens)
+ * - Bottom (optional): Parameter inputs or children container
  */
 export const DocLabItemCard: React.FC<DocLabItemCardProps> = ({
   icon,
@@ -38,6 +40,7 @@ export const DocLabItemCard: React.FC<DocLabItemCardProps> = ({
   onClick,
   onMouseDown,
   className = '',
+  children,
 }) => {
   let stateClasses =
     'theme-bg-surface theme-border-subtle hover:theme-border-accent-soft hover:theme-bg-sub/30';
@@ -54,52 +57,65 @@ export const DocLabItemCard: React.FC<DocLabItemCardProps> = ({
     <div
       onClick={onClick}
       onMouseDown={onMouseDown}
-      className={`group relative p-2.5 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-2.5 active:scale-[0.99] ${stateClasses} ${className}`}
+      className={`group relative p-2.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col gap-2 active:scale-[0.99] ${stateClasses} ${className}`}
     >
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {/* Optional Icon (Rendered in Presets, omitted in Tokens) */}
-        {icon && (
-          <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-              isActive
-                ? 'theme-bg-accent text-white shadow-xs'
-                : 'theme-bg-sub theme-text-secondary group-hover:theme-accent'
-            }`}
-          >
-            {icon}
+      <div className="flex items-center justify-between gap-2.5 w-full">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {/* Optional Icon (Rendered in Presets, omitted in Tokens) */}
+          {icon && (
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                isActive
+                  ? 'theme-bg-accent text-white shadow-xs'
+                  : 'theme-bg-sub theme-text-secondary group-hover:theme-accent'
+              }`}
+            >
+              {icon}
+            </div>
+          )}
+
+          {/* 2-Line Content Body */}
+          <div className="min-w-0 flex-1 text-left">
+            {/* Line 1: Title, Indicator, and Badge */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className={`text-xs font-semibold truncate ${
+                  isActive ? 'theme-accent font-bold' : 'theme-text-primary'
+                } ${titleClassName}`}
+                title={titleTooltip || (typeof title === 'string' ? title : undefined)}
+              >
+                {title}
+              </span>
+
+              {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
+              {badge && <div className="shrink-0 flex items-center">{badge}</div>}
+            </div>
+
+            {/* Line 2: Description / Subtitle */}
+            {description && (
+              <p className="text-[11px] theme-text-secondary truncate mt-0.5 leading-tight">
+                {description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right Action Controls */}
+        {actions && (
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {actions}
           </div>
         )}
-
-        {/* 2-Line Content Body */}
-        <div className="min-w-0 flex-1 text-left">
-          {/* Line 1: Title, Indicator, and Badge */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className={`text-xs font-semibold truncate ${
-                isActive ? 'theme-accent font-bold' : 'theme-text-primary'
-              } ${titleClassName}`}
-              title={titleTooltip || (typeof title === 'string' ? title : undefined)}
-            >
-              {title}
-            </span>
-
-            {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
-            {badge && <div className="shrink-0 flex items-center">{badge}</div>}
-          </div>
-
-          {/* Line 2: Description / Subtitle */}
-          {description && (
-            <p className="text-[11px] theme-text-secondary truncate mt-0.5 leading-tight">
-              {description}
-            </p>
-          )}
-        </div>
       </div>
 
-      {/* Right Action Controls */}
-      {actions && (
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {actions}
+      {/* Optional Children / Parameters Row */}
+      {children && (
+        <div
+          className="w-full pt-2 border-t theme-border-subtle"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {children}
         </div>
       )}
     </div>

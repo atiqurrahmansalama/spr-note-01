@@ -8,12 +8,13 @@ import RightSidebarPanel from "../ui/RightSidebarPanel";
 import PanelResizer from "../ui/PanelResizer";
 import InstitutionSwitcher from "./InstitutionSwitcher";
 import InstitutionSwitchModal from "./InstitutionSwitchModal";
-import { useRightSidebar, saveDrawerWidthToStorage } from "../../context/RightSidebarContext";
+import { useRightSidebar, useDrawerRegistration, saveDrawerWidthToStorage } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
+import NotificationDetailDrawer from "./NotificationDetailDrawer";
 import { LanguageSelector } from "../../i18n";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useToast } from "../../context/ToastContext";
@@ -163,9 +164,28 @@ export default function AppLayout() {
     isRightSidebarOpen,
     rightSidebarConfig,
     closeRightSidebar,
+    closeDrawer,
     drawerWidth,
     setDrawerWidth,
   } = useRightSidebar();
+
+  // Global Drawer Registration: Notification Detail
+  useDrawerRegistration('notification_detail', (params) => {
+    const notifId = params.get('id');
+    return {
+      title: 'Notification Detail',
+      category: 'Notifications',
+      size: 'md',
+      content: (
+        <NotificationDetailDrawer
+          key={`notification_detail_${notifId || 'active'}`}
+          notificationId={notifId}
+          onClose={closeDrawer || closeRightSidebar}
+        />
+      ),
+    };
+  });
+
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     try {

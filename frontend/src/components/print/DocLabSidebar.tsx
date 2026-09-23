@@ -4,6 +4,7 @@ import DrawerContainer from '../layout/DrawerContainer';
 import {
   DocLabPresetsTab,
   DocLabKeysTab,
+  DocLabConditionsTab,
   DocLabLayoutTab,
   DocLabSignaturesTab,
 } from './components/sidebar';
@@ -12,6 +13,7 @@ import {
   BookOpenIcon,
   AdjustmentsHorizontalIcon,
   FileIcon,
+  CodeBracketIcon,
 } from '../ui/Icons';
 import { getScopeById, validateTemplateForScope } from './scopeTemplateStore';
 import { DocxTemplate, PrintOptions } from './types';
@@ -96,7 +98,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   onResetResize,
   className = '',
 }) => {
-  const [activeTab, setActiveTab] = useState<'presets' | 'keys' | 'layout' | 'signatures'>('presets');
+  const [activeTab, setActiveTab] = useState<'presets' | 'keys' | 'conditions' | 'layout' | 'signatures'>('presets');
 
   // Compute scope metadata
   const scopeDefinition: DocumentScopeDefinition = useMemo(() => {
@@ -156,15 +158,16 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
     >
       <DrawerContainer padding="none">
         {/* Navigation Tabs Bar */}
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
+        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
           <button
             type="button"
             onClick={() => setActiveTab('presets')}
-            className={`py-2 px-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
               activeTab === 'presets'
                 ? 'theme-bg-accent text-white shadow-xs font-bold'
                 : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
             }`}
+            title="Scope Templates"
           >
             <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Presets</span>
@@ -173,11 +176,12 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('keys')}
-            className={`py-2 px-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
               activeTab === 'keys'
                 ? 'theme-bg-accent text-white shadow-xs font-bold'
                 : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
             }`}
+            title="Scope Blueprint Tokens"
           >
             <SparklesIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Tokens</span>
@@ -185,12 +189,27 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab('conditions')}
+            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
+              activeTab === 'conditions'
+                ? 'theme-bg-accent text-white shadow-xs font-bold'
+                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
+            }`}
+            title="Conditions & Indent Rules"
+          >
+            <CodeBracketIcon className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Rules</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('layout')}
-            className={`py-2 px-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
               activeTab === 'layout'
                 ? 'theme-bg-accent text-white shadow-xs font-bold'
                 : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
             }`}
+            title="Page Layout & Setup"
           >
             <AdjustmentsHorizontalIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Layout</span>
@@ -199,11 +218,12 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('signatures')}
-            className={`py-2 px-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
               activeTab === 'signatures'
                 ? 'theme-bg-accent text-white shadow-xs font-bold'
                 : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
             }`}
+            title="Signers & Seals"
           >
             <FileIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Signers</span>
@@ -241,6 +261,17 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
             requiredKeys={requiredKeys}
             activeRecord={activeRecord}
             onInsertKey={onInsertKey}
+            scopeId={scopeId}
+            scopeName={scopeName}
+          />
+        )}
+
+        {activeTab === 'conditions' && (
+          <DocLabConditionsTab
+            onInsertKey={onInsertKey}
+            placeholderKeys={placeholderKeys}
+            requiredKeys={requiredKeys}
+            activeRecord={activeRecord}
             scopeId={scopeId}
             scopeName={scopeName}
           />

@@ -7,7 +7,9 @@ import {
   Volume2Icon,
   VolumeXIcon,
   LaptopIcon,
+  ChevronRightIcon,
 } from '../ui/Icons';
+import { useRightSidebar } from '@/context/RightSidebarContext';
 import {
   getInAppNotifications,
   getUnreadNotificationCount,
@@ -46,6 +48,7 @@ function formatTimeAgo(isoString: string): string {
 
 export default function NotificationBellDropdown() {
   const navigate = useNavigate();
+  const { openDrawer } = useRightSidebar();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -167,10 +170,10 @@ export default function NotificationBellDropdown() {
         console.error('Failed to mark read:', err);
       }
     }
-    if (notif.action_url) {
-      setIsOpen(false);
-      navigate(notif.action_url);
-    }
+    // Close the dropdown menu popover
+    setIsOpen(false);
+    // Open full notification detail in the right sidebar drawer
+    openDrawer('notification_detail', { id: notif.id });
   };
 
   const handleMarkAllRead = async () => {
@@ -409,11 +412,12 @@ export default function NotificationBellDropdown() {
                   <div
                     key={item.id}
                     onClick={() => handleItemClick(item)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-3 items-start ${
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-3 items-start group ${
                       item.is_read
                         ? 'theme-bg-surface border-transparent hover:theme-bg-elevated'
                         : 'theme-bg-elevated border-[var(--accent-main)]/30 hover:border-[var(--accent-main)] shadow-sm'
                     }`}
+                    title="Click to view notification details in the right sidebar"
                   >
                     {/* Unread indicator / type icon */}
                     <div className="shrink-0 mt-0.5">
@@ -437,9 +441,13 @@ export default function NotificationBellDropdown() {
                       </div>
                     </div>
 
-                    {!item.is_read && (
-                      <span className="w-2 h-2 rounded-full theme-bg-accent shrink-0 mt-1.5" />
-                    )}
+                    {/* Indicators */}
+                    <div className="shrink-0 flex items-center gap-1 mt-1">
+                      {!item.is_read && (
+                        <span className="w-2 h-2 rounded-full theme-bg-accent" />
+                      )}
+                      <ChevronRightIcon className="w-3.5 h-3.5 theme-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </div>
                 );
               })

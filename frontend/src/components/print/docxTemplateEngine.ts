@@ -966,43 +966,172 @@ export function extractTableDataFromHtml(html: string): {
 }
 
 /**
+ * Parses arguments of an indent directive like ": 5, from: 2, to: 4" or ": 5, from: 3" or ": 5"
+ * Returns a standardized filter specification string, e.g. "indent: 5, from: 2, to: 4"
+ */
+export function parseIndentDirectiveArgs(rawInner: string): string {
+  let clean = (rawInner || '').replace(/^[:\s]+/, '').trim();
+  clean = clean.replace(/&(?:gt|lt);?/gi, '').replace(/[<>]/g, '').trim();
+  if (!clean) return 'indent: 5';
+
+  const spaceMatch = clean.match(/^(\d+)/);
+  const fromMatch = clean.match(/\bfrom:\s*(\d+)/i);
+  const toMatch = clean.match(/\bto:\s*(\d+)/i);
+
+  const spaces = spaceMatch ? parseInt(spaceMatch[1], 10) : 5;
+  const from = fromMatch ? parseInt(fromMatch[1], 10) : null;
+  const to = toMatch ? parseInt(toMatch[1], 10) : null;
+
+  let spec = `indent: ${spaces}`;
+  if (from !== null) spec += `, from: ${from}`;
+  if (to !== null) spec += `, to: ${to}`;
+  return spec;
+}
+
+/**
+ * Normalizes directive syntax like <| indent: 5, from: 2, to: 4> into template tokens,
+ * associating the indentation directive with its target placeholder, and removing directive tags from output.
+ * Examples:
+ * - {{detail-mis<| indent: 5, from: 2, to: 4>}} -> {{detail-mis | indent: 5, from: 2, to: 4}}
+ * - {{juz-page<| indent: 10>}} -> {{juz-page | indent: 10}}
+ * - {{detail-mis}}<| indent: 5, from: 2, to: 4> -> {{detail-mis | indent: 5, from: 2, to: 4}}
+ * - {{detail-mis}} <| indent: 5, from: 3> -> {{detail-mis | indent: 5, from: 3}}
+ * - <| indent: 5>{{detail-mis}} -> {{detail-mis | indent: 5}}
+ * - {{detail-mis <| indent: 5, from: 2>}} -> {{detail-mis | indent: 5, from: 2}}
+ * - <p>{{detail-mis}}</p><p><| indent: 5, from: 2></p> -> <p>{{detail-mis | indent: 5, from: 2}}</p>
+ */
+export function normalizeIndentDirectives(html: string): string {
+  if (!html) return '';
+
+  let res = html;
+
+  // 1. Direct inside-braces syntax:
+  // e.g. {{key <| indent: 5, from: 2, to: 4>}} or {{key<| indent: 5>}}
+  res = res.replace(
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\s*(?:\|)?\s*(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)\s*\}\}/gi,
+    (_, key, innerArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
+  );
+
+  // 2. Direct adjacency (with optional spaces/entities):
+  // e.g. {{key}}<| indent: 5, from: 2> or {{key}} <| indent: 5>
+  res = res.replace(
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}(?:\s|&nbsp;)*(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/gi,
+    (_, key, innerArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
+  );
+
+  // 3. Preceding direct adjacency:
+  // e.g. <| indent: 5>{{key}} or <| indent: 5, from: 2> {{key}}
+  res = res.replace(
+    /(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)(?:\s|&nbsp;)*\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}/gi,
+    (_, innerArgs, key) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
+  );
+
+  // 4. Robust scanning for any remaining <| indent... > or &lt;| indent... &gt;
+  // Associates with the closest preceding placeholder (or following if none preceding)
+  const directiveRegex = /(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/i;
+  let match: RegExpExecArray | null;
+
+  let safetyCount = 0;
+  while ((match = directiveRegex.exec(res)) !== null && safetyCount < 100) {
+    safetyCount++;
+    const matchIndex = match.index;
+    const matchLength = match[0].length;
+    const innerArgs = match[1] || '';
+    const filterSpec = parseIndentDirectiveArgs(innerArgs);
+
+    const before = res.slice(0, matchIndex);
+    const after = res.slice(matchIndex + matchLength);
+
+    // Look backwards in `before` for the closest placeholder: {{...}}
+    const lastOpenBrace = before.lastIndexOf('{{');
+    const lastCloseBrace = before.lastIndexOf('}}');
+
+    let handled = false;
+
+    if (lastOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > lastOpenBrace) {
+      const candidateKey = before.slice(lastOpenBrace + 2, lastCloseBrace).trim();
+      if (/^[a-zA-Z0-9_\-\.\s|:'",]+$/.test(candidateKey)) {
+        const cleanKey = candidateKey.split('|')[0].trim();
+        const updatedPlaceholder = `{{${cleanKey} | ${filterSpec}}}`;
+        const newBefore = before.slice(0, lastOpenBrace) + updatedPlaceholder + before.slice(lastCloseBrace + 2);
+        res = newBefore + after;
+        handled = true;
+      }
+    }
+
+    if (!handled) {
+      // Look forwards in `after` for the first placeholder: {{...}}
+      const nextOpenBrace = after.indexOf('{{');
+      const nextCloseBrace = after.indexOf('}}');
+
+      if (nextOpenBrace !== -1 && nextCloseBrace !== -1 && nextCloseBrace > nextOpenBrace) {
+        const candidateKey = after.slice(nextOpenBrace + 2, nextCloseBrace).trim();
+        if (/^[a-zA-Z0-9_\-\.\s|:'",]+$/.test(candidateKey)) {
+          const cleanKey = candidateKey.split('|')[0].trim();
+          const updatedPlaceholder = `{{${cleanKey} | ${filterSpec}}}`;
+          const newAfter = after.slice(0, nextOpenBrace) + updatedPlaceholder + after.slice(nextCloseBrace + 2);
+          res = before + newAfter;
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      // Standalone directive with no placeholder nearby, remove it
+      res = before + after;
+    }
+  }
+
+  // 5. Final fallback cleanup of any lingering directives
+  res = res.replace(/(?:&lt;|<)\|\s*indent[^>]*?(?:&gt;|>)/gi, '');
+
+  return res;
+}
+
+/**
  * Cleans Word HTML by collapsing split run tags inside {{placeholders}} or {placeholders}.
  * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
+ * Preserves <| indent... > directives inside placeholders.
  */
 export function sanitizeDocxPlaceholders(html: string): string {
   if (!html) return '';
 
-  // 1. Collapse HTML tags between {{ and }}
+  // 1. Collapse HTML tags between {{ and }} FIRST so that split tags inside placeholders don't interfere
+  // Strictly preserve <| indent... > directives (starting with <|)
   let cleaned = html.replace(/\{\{([\s\S]*?)\}\}/g, (match, inner) => {
+    const stripped = inner.replace(/<(?!\/?\|)[^>]*>/g, '').trim();
+    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return `{{${cleanKey}}}`;
+  });
+
+  // 2. Normalize indent directives now that placeholders are clean
+  cleaned = normalizeIndentDirectives(cleaned);
+
+  // 3. Collapse standalone single {variable} ONLY if not preceded or followed by { or }
+  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}(?!\})/g, (match, inner) => {
     const stripped = inner.replace(/<[^>]*>/g, '').trim();
     const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
     return `{{${cleanKey}}}`;
   });
 
-  // 2. Collapse standalone single {variable} ONLY if not preceded or followed by { or }
-  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s]{1,50})\}(?!\})/g, (match, inner) => {
-    const stripped = inner.replace(/<[^>]*>/g, '').trim();
-    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
-    return `{{${cleanKey}}}`;
-  });
-
-  // 3. Prevent and collapse any accidental triple or quadruple braces: {{{key}}} -> {{key}}
-  cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
+  // 4. Prevent and collapse any accidental triple or quadruple braces: {{{key}}} -> {{key}}
+  cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s|:'",]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
 
   return cleaned;
 }
 
 /**
- * Detect all placeholder tokens like {{student_name}}, {{roll_number}}, {class} etc.
+ * Detect all placeholder tokens like {{student_name}}, {{detail-mis | indent: 7}}, {class} etc.
  */
 export function detectPlaceholders(html: string): string[] {
   if (!html) return [];
   const sanitized = sanitizeDocxPlaceholders(html);
-  const regex = /\{\{([a-zA-Z0-9_\-\.\s]+)\}\}/g;
+  const regex = /\{\{([a-zA-Z0-9_\-\.\s|:'",]+)\}\}/g;
   const placeholders = new Set<string>();
   let match;
   while ((match = regex.exec(sanitized)) !== null) {
-    const token = (match[1] || '').trim();
+    const raw = (match[1] || '').trim();
+    const token = raw.split('|')[0].trim();
     if (token) {
       placeholders.add(token);
     }
@@ -1015,6 +1144,185 @@ export function detectPlaceholders(html: string): string[] {
  */
 function normalizeKey(str: string): string {
   return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Multi-line indentation filter:
+ * Indents lines within the range [fromLine, toLine] with `spaceCount` spaces.
+ * Line numbers are 1-indexed (e.g. line 1 is first line, line 2 is second line).
+ * If toLine is omitted, null, or <= 0, indentation applies to all remaining lines from fromLine onwards.
+ */
+export function applyIndentFilter(
+  text: string,
+  spaceCount: number = 7,
+  fromLine: number = 2,
+  toLine?: number | null,
+  mode: 'html' | 'text' = 'html',
+  forceAll: boolean = false
+): string {
+  if (!text) return '';
+  // Split on newlines or existing <br>
+  const rawLines = text.includes('<br>') || text.includes('<br/>') || text.includes('<br />')
+    ? text.split(/<br\s*[\/]?>/gi)
+    : text.split(/\r?\n/);
+
+  if (rawLines.length === 0) return text;
+
+  // In HTML mode, use non-breaking space &nbsp; so browsers never collapse consecutive spaces
+  const spaceChar = mode === 'html' ? '&nbsp;' : ' ';
+  const indent = spaceChar.repeat(Math.max(1, spaceCount));
+
+  const effectiveFrom = Math.max(1, fromLine || 2);
+  const effectiveTo = toLine && toLine > 0 ? toLine : Infinity;
+
+  // Smart hierarchical detection:
+  // Check if this text is a hierarchical list containing group headers (e.g. "3: Page 4 Ayah 5")
+  // alongside indented sub-items (e.g. "Page 7 Ayah 7").
+  // If ALL non-empty lines match the header pattern (like in {{juz-page}}: "3: 3", "5: 2–4"),
+  // there are no sub-items, so every line in [effectiveFrom, effectiveTo] must be indented.
+  const headerRegex = /^(?:\d+|Juz\s*\d+):\s+/i;
+  const cleanedLines = rawLines.map((l) => l.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
+  const headerLinesCount = cleanedLines.filter((l) => l && headerRegex.test(l)).length;
+  const nonEmptyLinesCount = cleanedLines.filter((l) => Boolean(l)).length;
+
+  const isHierarchicalGroupList = !forceAll && headerLinesCount > 0 && headerLinesCount < nonEmptyLinesCount;
+
+  const formattedLines = rawLines.map((line, idx) => {
+    const lineNum = idx + 1; // 1-indexed
+
+    const cleanLineText = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    if (!cleanLineText) {
+      return line;
+    }
+
+    if (isHierarchicalGroupList && headerRegex.test(cleanLineText)) {
+      return line;
+    }
+
+    if (lineNum >= effectiveFrom && lineNum <= effectiveTo) {
+      return `${indent}${line}`;
+    }
+    return line;
+  });
+
+  return mode === 'html' ? formattedLines.join('<br>') : formattedLines.join('\n');
+}
+
+/**
+ * Applies a specific condition/formatting filter to a value string.
+ * Extensible filter registry pattern for DocLab conditions.
+ */
+export function applyFilter(
+  value: string,
+  filterSpec: string,
+  mode: 'html' | 'text' = 'html'
+): string {
+  if (!filterSpec || typeof value !== 'string') return value;
+
+  // Parse filter name and arguments, e.g. "indent: 5, from: 2, to: 4" or "indent: 7" or "default: 'N/A'"
+  const colonIdx = filterSpec.indexOf(':');
+  const filterName = (colonIdx > -1 ? filterSpec.slice(0, colonIdx) : filterSpec).trim().toLowerCase();
+  const rawArgs = colonIdx > -1 ? filterSpec.slice(colonIdx + 1).trim() : '';
+
+  switch (filterName) {
+    case 'indent': {
+      // Parse arguments: e.g. "5, from: 2, to: 4" or "5:2:4" or "5" or "10, all: true"
+      let spaceCount = 5;
+      let fromLine = 2;
+      let toLine: number | undefined = undefined;
+      const forceAll = /\b(all|force):\s*true\b/i.test(rawArgs) || /\bheaders?:\s*false\b/i.test(rawArgs);
+
+      const fromMatch = rawArgs.match(/\bfrom:\s*(\d+)/i);
+      const toMatch = rawArgs.match(/\bto:\s*(\d+)/i);
+
+      if (fromMatch) fromLine = parseInt(fromMatch[1], 10);
+      if (toMatch) toLine = parseInt(toMatch[1], 10);
+
+      if (rawArgs.includes(':') && !fromMatch && !toMatch && !forceAll) {
+        // Positional syntax "5:2:4" or "5:2"
+        const parts = rawArgs.split(':').map((p) => parseInt(p.trim(), 10));
+        if (!isNaN(parts[0])) spaceCount = parts[0];
+        if (parts.length > 1 && !isNaN(parts[1])) fromLine = parts[1];
+        if (parts.length > 2 && !isNaN(parts[2])) toLine = parts[2];
+      } else {
+        const firstNumMatch = rawArgs.match(/^\s*(\d+)/);
+        if (firstNumMatch) {
+          spaceCount = parseInt(firstNumMatch[1], 10);
+        }
+      }
+
+      return applyIndentFilter(value, spaceCount, fromLine, toLine, mode, forceAll);
+    }
+    case 'uppercase':
+    case 'upper':
+      return value.toUpperCase();
+    case 'lowercase':
+    case 'lower':
+      return value.toLowerCase();
+    case 'capitalize':
+    case 'cap':
+      return value.replace(/\b\w/g, (c) => c.toUpperCase());
+    case 'default': {
+      const fallback = rawArgs.replace(/^['"]|['"]$/g, '');
+      return (!value || value.trim() === '') ? fallback : value;
+    }
+    case 'prefix': {
+      const prefix = rawArgs.replace(/^['"]|['"]$/g, '');
+      return `${prefix}${value}`;
+    }
+    default:
+      return value;
+  }
+}
+
+/**
+ * Resolves a token with potential condition/formatting filters (e.g. {{detail-mis | indent: 7}})
+ * Matches base key against lookup and cascades through filter specifications.
+ */
+export function resolveTokenValue(
+  tokenContent: string,
+  lookup: Map<string, string>,
+  mode: 'html' | 'text' = 'html'
+): string | null {
+  const parts = tokenContent.split('|').map((p) => p.trim());
+  const rawKey = parts[0];
+  const filterSpecs = parts.slice(1);
+
+  const norm = normalizeKey(rawKey);
+  let value: string | undefined = undefined;
+
+  if (lookup.has(norm)) {
+    value = lookup.get(norm);
+  } else if (lookup.has(rawKey.toLowerCase())) {
+    value = lookup.get(rawKey.toLowerCase());
+  } else if (lookup.has(rawKey)) {
+    value = lookup.get(rawKey);
+  }
+
+  if (value === undefined) {
+    return null; // Value not found, keep fullMatch
+  }
+
+  // If no filters, return raw value (converted to <br> for multi-line values in html mode)
+  if (filterSpecs.length === 0) {
+    if (mode === 'html' && typeof value === 'string' && value.includes('\n')) {
+      return value.split(/\r?\n/).join('<br>');
+    }
+    return value;
+  }
+
+  // Apply filters in sequence
+  let processed = value;
+  for (const filterSpec of filterSpecs) {
+    processed = applyFilter(processed, filterSpec, mode);
+  }
+
+  // Ensure multi-line output in HTML mode converts remaining \n to <br>
+  if (mode === 'html' && typeof processed === 'string' && processed.includes('\n') && !processed.includes('<br')) {
+    processed = processed.split(/\r?\n/).join('<br>');
+  }
+
+  return processed;
 }
 
 /**
@@ -1483,19 +1791,8 @@ export function mergeTemplateWithData(
 
   // Match any {{placeholder}} or {placeholder}
   const merged = sanitized.replace(/\{\{([\s\S]*?)\}\}/g, (fullMatch, token) => {
-    const rawKey = token.trim();
-    const norm = normalizeKey(rawKey);
-    if (lookup.has(norm)) {
-      return lookup.get(norm)!;
-    }
-    if (lookup.has(rawKey.toLowerCase())) {
-      return lookup.get(rawKey.toLowerCase())!;
-    }
-    if (lookup.has(rawKey)) {
-      return lookup.get(rawKey)!;
-    }
-    // Return original placeholder if no value is found
-    return fullMatch;
+    const resolved = resolveTokenValue(token.trim(), lookup, 'html');
+    return resolved !== null ? resolved : fullMatch;
   });
 
   return merged;
@@ -1525,19 +1822,8 @@ export function bulkMergeTemplate(
     const placeholderRegex = /\{\{([\s\S]*?)\}\}/g;
 
     const merged = sanitizedBody.replace(placeholderRegex, (fullMatch, token) => {
-      const rawKey = token.trim();
-      const norm = normalizeKey(rawKey);
-      if (lookup.has(norm)) {
-        return lookup.get(norm)!;
-      }
-      const lower = rawKey.toLowerCase();
-      if (lookup.has(lower)) {
-        return lookup.get(lower)!;
-      }
-      if (lookup.has(rawKey)) {
-        return lookup.get(rawKey)!;
-      }
-      return fullMatch;
+      const resolved = resolveTokenValue(token.trim(), lookup, 'html');
+      return resolved !== null ? resolved : fullMatch;
     });
 
     return styles ? `${styles}\n${merged}` : merged;

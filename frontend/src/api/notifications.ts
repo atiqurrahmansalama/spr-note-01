@@ -78,6 +78,45 @@ export const markAllNotificationsAsRead = async (): Promise<any> => {
   return await response.json();
 };
 
+export const getInAppNotificationById = async (id: string | number): Promise<InAppNotification> => {
+  const response = await fetchWithAuth(`/api/v1/notifications/in-app/${id}/`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch notification details (Status: ${response.status})`);
+  }
+  return await response.json();
+};
+
+export const deleteInAppNotification = async (id: string | number): Promise<any> => {
+  const response = await fetchWithAuth(`/api/v1/notifications/in-app/${id}/`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete notification (Status: ${response.status})`);
+  }
+  if (response.status === 204) {
+    return { success: true };
+  }
+  return await response.json().catch(() => ({ success: true }));
+};
+
+export const toggleNotificationReadStatus = async (
+  id: string | number,
+  isRead: boolean
+): Promise<InAppNotification> => {
+  if (isRead) {
+    const res = await markNotificationAsRead(id);
+    return res.notification || res;
+  }
+  const response = await fetchWithAuth(`/api/v1/notifications/in-app/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_read: false }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update notification status (Status: ${response.status})`);
+  }
+  return await response.json();
+};
+
 // ==========================================
 // 2. NOTIFICATION GATEWAYS & CREDENTIALS
 // ==========================================

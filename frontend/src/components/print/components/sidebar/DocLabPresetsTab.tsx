@@ -4,8 +4,6 @@ import {
   SparklesIcon,
   PlusIcon,
   BookOpenIcon,
-  AlertTriangleIcon,
-  CheckCircleIcon,
   AdjustmentsHorizontalIcon,
   TrashIcon,
   EditIcon,
@@ -18,6 +16,7 @@ import { DocLabSaveModal } from './DocLabSaveModal';
 import { DocxTemplate } from '../../types';
 import { DocumentScopeDefinition, ScopeValidationResult } from '../../keyLibrary/types';
 import { getDefaultTemplateIdForScope } from '../../scopeTemplateStore';
+import { useToast } from '../../../../context/ToastContext';
 
 interface DocLabPresetsTabProps {
   templates: DocxTemplate[];
@@ -73,10 +72,41 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
     return scopeDefinition?.id ? getDefaultTemplateIdForScope(scopeDefinition.id) : null;
   }, [scopeDefinition?.id, isScopeDefault]);
 
+  const { showToast } = useToast();
+
   const handleEditTemplate = (tmpl: DocxTemplate) => {
     onSelectTemplate(tmpl);
     if (onDocxRenderModeChange) {
       onDocxRenderModeChange('template');
+    }
+
+    // Programmatically focus and scroll to the document canvas
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const editable = document.querySelector(
+          '.universal-print-workbench [contenteditable="true"]'
+        ) as HTMLElement | null;
+        if (editable) {
+          editable.focus({ preventScroll: false });
+          const sel = window.getSelection();
+          if (sel) {
+            const range = document.createRange();
+            const leafNodes = Array.from(
+              editable.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
+            ) as HTMLElement[];
+            const targetEl = leafNodes[leafNodes.length - 1] || editable.lastElementChild || editable;
+            range.selectNodeContents(targetEl);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+          editable.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    });
+
+    if (showToast) {
+      showToast(`Loaded "${tmpl.name || 'Template'}" for editing. Edits will auto-save.`, 'info');
     }
   };
 
@@ -179,32 +209,7 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
         </div>
       )}
 
-      {/* 2. Scope Validation Status Badge */}
-      {activeScopeValidation && isCustomDocxActive && !(customDocxTemplate as any)?.isBlank && customDocxTemplate?.id !== 'blank_document' && (
-        <div
-          className={`p-3 rounded-xl flex items-start gap-2.5 ${
-            activeScopeValidation.isValid
-              ? 'theme-success-badge'
-              : 'theme-warning-badge'
-          }`}
-        >
-          {activeScopeValidation.isValid ? (
-            <CheckCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
-          ) : (
-            <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
-          )}
-          <div className="min-w-0 flex-1 text-[11px]">
-            <span className="font-bold block">
-              {activeScopeValidation.isValid ? 'Scope Blueprint Valid' : 'Missing Blueprint Tokens'}
-            </span>
-            <p className="leading-tight mt-0.5 opacity-90">
-              {activeScopeValidation.validationMessage}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Master Document Creation & Library Bar */}
+      {/* 2. Master Document Creation & Library Bar */}
       <div className="grid grid-cols-2 gap-2">
         {onOpenDocxModal && (
           <button

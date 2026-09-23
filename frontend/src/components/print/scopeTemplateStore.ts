@@ -175,14 +175,16 @@ export function getScopeById(scopeId: string): DocumentScopeDefinition | undefin
 }
 
 /**
- * Extracts all placeholder tag names from raw HTML or text (e.g. {{student_name}} or {roll_number})
+ * Extracts all placeholder tag names from raw HTML or text (e.g. {{student_name}}, {{detail-mis | indent: 7}} or {roll_number})
  */
 export function extractTagsFromText(text: string): string[] {
   if (!text) return [];
-  const matches: string[] = text.match(/\{{1,2}\s*([a-zA-Z0-9_\-]+)\s*\}{1,2}/g) || [];
+  const matches: string[] = text.match(/\{{1,2}\s*([a-zA-Z0-9_\-|:'",<>&;\s]+?)\s*\}{1,2}/g) || [];
   const tags = new Set<string>();
   matches.forEach((m) => {
-    const clean = m.replace(/[\{\}\s]/g, '').toLowerCase();
+    const raw = m.replace(/[\{\}]/g, '').trim();
+    const baseKey = raw.split(/[|<]/)[0].trim().toLowerCase();
+    const clean = baseKey.replace(/[\s]/g, '');
     if (clean) tags.add(clean);
   });
   return Array.from(tags);

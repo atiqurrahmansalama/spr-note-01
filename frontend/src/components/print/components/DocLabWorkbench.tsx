@@ -66,6 +66,9 @@ export interface DocLabWorkbenchProps {
   handleRowInsert: (rowIndex: number, position?: 'above' | 'below') => void;
   handleRowMove: (fromIndex: number, toIndex: number) => void;
   handleColumnHeaderChange: (colKey: string, newHeader: string) => void;
+  autoSaveStatus?: string;
+  autoSaveLastSavedAt?: string | null;
+  isAutoSaving?: boolean;
 }
 
 /**
@@ -119,6 +122,9 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
   handleRowInsert,
   handleRowMove,
   handleColumnHeaderChange,
+  autoSaveStatus,
+  autoSaveLastSavedAt,
+  isAutoSaving = false,
 }) => {
   const effectiveDocs =
     documents && documents.length > 0
@@ -299,6 +305,18 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                 ? `Template Blueprint • ${mergedDocxPages.length} ${mergedDocxPages.length === 1 ? 'Page' : 'Pages'}`
                 : `Batch Document • ${mergedDocxPages.length} ${mergedDocxPages.length === 1 ? 'Page' : 'Pages'}`}
             </span>
+            {docxRenderMode === 'template' && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className={`w-1.5 h-1.5 rounded-full ${isAutoSaving ? 'bg-amber-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`} />
+                <span>
+                  {isAutoSaving
+                    ? 'Saving...'
+                    : autoSaveLastSavedAt
+                    ? `Auto-saved at ${autoSaveLastSavedAt}`
+                    : 'Auto-saved'}
+                </span>
+              </span>
+            )}
           </div>
 
           {/* Center / Right: Rich Text Formatting Ribbon */}
@@ -434,17 +452,22 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                       onNavigateNextPage={() => handleFocusPage(pIdx + 1, 'start')}
                       onContentChange={(newHtml) => {
                         if (docxRenderMode !== 'template') return;
+                        const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(newHtml);
+                        const cleanNewHtml = incomingBody || newHtml;
+
                         const updater = (prev: any) => {
                           if (!prev) return null;
                           const preservedStyles =
-                            prev.styles || separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
+                            incomingStyles ||
+                            prev.styles ||
+                            separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
                           const currentRawBody = prev.templateBody || prev.body || prev.html || '';
                           const currentPages = splitHtmlIntoPages(currentRawBody);
 
                           let updatedPages: string[];
-                          // Check if newHtml contains a new explicit page break
-                          if (newHtml.includes('<!-- spr-page-break -->') || newHtml.includes('spr-page-break')) {
-                            const subPages = splitHtmlIntoPages(newHtml);
+                          // Check if cleanNewHtml contains a new explicit page break
+                          if (cleanNewHtml.includes('<!-- spr-page-break -->') || cleanNewHtml.includes('spr-page-break')) {
+                            const subPages = splitHtmlIntoPages(cleanNewHtml);
                             if (subPages.length > 1) {
                               updatedPages = [
                                 ...currentPages.slice(0, pIdx),
@@ -453,14 +476,14 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                               ];
                             } else {
                               updatedPages = [...currentPages];
-                              updatedPages[pIdx] = newHtml;
+                              updatedPages[pIdx] = cleanNewHtml;
                             }
                           } else {
                             if (currentPages.length > pIdx) {
                               updatedPages = [...currentPages];
-                              updatedPages[pIdx] = newHtml;
+                              updatedPages[pIdx] = cleanNewHtml;
                             } else {
-                              updatedPages = [newHtml];
+                              updatedPages = [cleanNewHtml];
                             }
                           }
 

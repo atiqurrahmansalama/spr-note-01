@@ -109,9 +109,13 @@ if (typeof window !== 'undefined') {
 export function insertTokenAtActiveCaret(rawToken: string): boolean {
   if (typeof window === 'undefined' || !rawToken) return false;
 
-  // Normalize token to pristine `{{key_name}}`
-  const cleanKey = String(rawToken).replace(/^\{+/, '').replace(/\}+$/, '').trim();
-  const token = `{{${cleanKey}}}`;
+  const isDirective = rawToken.trim().startsWith('<') || rawToken.trim().startsWith('|');
+
+  // Directives like `<| indent: 5>` are inserted verbatim without `{{...}}` wrappers.
+  // Standard field keys (e.g. `student-name`) are normalized to `{{student-name}}`.
+  const token = isDirective
+    ? rawToken.trim()
+    : `{{${String(rawToken).replace(/^\{+/, '').replace(/\}+$/, '').trim()}}`;
 
   // Refresh active caret state
   captureActiveCaret();
@@ -125,20 +129,21 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
     let end = selectionEnd ?? inputEl.value.length;
     const val = inputEl.value || '';
 
-    // Smart deduplication for inputs: if user typed `{` or `{{` before caret
-    const beforeText = val.slice(0, start);
-    if (beforeText.endsWith('{{')) {
-      start -= 2;
-    } else if (beforeText.endsWith('{')) {
-      start -= 1;
-    }
+    // Smart deduplication for standard placeholder tokens only:
+    if (!isDirective) {
+      const beforeText = val.slice(0, start);
+      if (beforeText.endsWith('{{')) {
+        start -= 2;
+      } else if (beforeText.endsWith('{')) {
+        start -= 1;
+      }
 
-    // If user has `}` or `}}` after caret
-    const afterText = val.slice(end);
-    if (afterText.startsWith('}}')) {
-      end += 2;
-    } else if (afterText.startsWith('}')) {
-      end += 1;
+      const afterText = val.slice(end);
+      if (afterText.startsWith('}}')) {
+        end += 2;
+      } else if (afterText.startsWith('}')) {
+        end += 1;
+      }
     }
 
     const nextVal = val.slice(0, start) + token + val.slice(end);
@@ -165,9 +170,9 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
       const selection = window.getSelection();
       if (selection) {
         selection.removeAllRanges();
-        
-        // Smart deduplication for ContentEditable: check text node before/after cursor
-        if (range.startContainer.nodeType === Node.TEXT_NODE) {
+
+        // Smart deduplication for ContentEditable (standard placeholder tokens only):
+        if (!isDirective && range.startContainer.nodeType === Node.TEXT_NODE) {
           const text = range.startContainer.textContent || '';
           const offset = range.startOffset;
 

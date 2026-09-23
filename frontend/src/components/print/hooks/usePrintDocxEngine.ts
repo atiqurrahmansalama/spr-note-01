@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAutoSave } from '../../../hooks/useAutoSave';
 import {
   CustomDocxTemplate,
   getSavedDocxTemplates,
@@ -238,29 +239,34 @@ export function usePrintDocxEngine({
 
   // Combine built-in templates with user-saved Word (.docx) templates strictly isolated by scopeId
   const combinedTemplates = useMemo(() => {
-    const list: any[] = [
-      {
-        id: 'blank_document',
-        name: 'Blank Page (Live Canvas)',
-        description: 'Interactive In-Place Typing & Word Layout',
-        isWordDocx: true,
-        isBlank: true,
-      },
-    ];
+    const map = new Map<string, any>();
+
+    // 1. Interactive blank canvas entry
+    map.set('blank_document', {
+      id: 'blank_document',
+      name: 'Blank Page (Live Canvas)',
+      description: 'Interactive In-Place Typing & Word Layout',
+      isWordDocx: true,
+      isBlank: true,
+    });
+
+    // 2. Built-in or prop templates
     if (Array.isArray(templates)) {
       templates.forEach((t) => {
-        if (!t.isTable && t.id !== 'default_table' && t.id !== 'default_layout' && !list.some((existing) => existing.id === t.id)) {
-          list.push(t);
+        if (!t.isTable && t.id !== 'default_table' && t.id !== 'default_layout' && t.id) {
+          map.set(t.id, t);
         }
       });
     }
+
+    // 3. User-saved templates (highest precedence: overwrite built-ins with same ID)
     if (Array.isArray(savedWordTemplates)) {
       savedWordTemplates.forEach((wt) => {
         const tScope = wt.scopeId || (wt as any).templateMeta?.scopeId || 'general_document';
         const isMatch = scopeId && scopeId !== 'general_document' ? tScope === scopeId : true;
-        if (isMatch) {
+        if (isMatch && wt.id) {
           const isGen = wt.templateType === 'generated' || wt.id?.startsWith('gen_');
-          list.push({
+          map.set(wt.id, {
             id: wt.id,
             name: wt.name,
             description: wt.description || (isGen ? `Generated Document (${wt.recordsCount || 'All'} Records)` : `Custom Template for ${scopeName || scopeId}`),
@@ -273,11 +279,13 @@ export function usePrintDocxEngine({
             sourceTemplateId: wt.sourceTemplateId,
             detectedPlaceholders: wt.detectedPlaceholders || [],
             createdAt: wt.createdAt,
+            updatedAt: wt.updatedAt,
           });
         }
       });
     }
-    return list;
+
+    return Array.from(map.values());
   }, [templates, savedWordTemplates, scopeId, scopeName]);
 
   // Extracted docx scoped styles rendered once at canvas container level (prevents 100 duplicate <style> tags)
@@ -290,6 +298,124 @@ export function usePrintDocxEngine({
 
   // Docx & Live Canvas Render Mode: 'template' (Single page with placeholder keys) | 'sample' (1 record sample) | 'all' (Batch all records)
   const [docxRenderMode, setDocxRenderMode] = useState<'template' | 'sample' | 'all'>('template');
+
+  // Payload watched by universal useAutoSave engine
+  const autoSavePayload = useMemo(() => {
+    if (docxRenderMode !== 'template' || !customDocxTemplate) return null;
+    const targetId = customDocxTemplate.id || customDocxTemplate.templateMeta?.id;
+    if (!targetId || targetId === 'blank_document' || targetId === 'default_table' || targetId === 'default_layout') {
+      return null;
+    }
+
+    const styles =
+      customDocxTemplate.styles ||
+      separateDocxStylesAndBody(customDocxTemplate.rawHtml || customDocxTemplate.html || '').styles ||
+      '';
+    const body =
+      customDocxTemplate.templateBody ||
+      customDocxTemplate.body ||
+      separateDocxStylesAndBody(customDocxTemplate.rawHtml || customDocxTemplate.html || '').body ||
+      '';
+
+    if (!body || body === BLANK_PAGE_HTML) return null;
+    const fullHtml = styles ? `${styles}\n${body}` : body;
+
+    return {
+      targetId,
+      fullHtml,
+      name: customDocxTemplate.name,
+      description: customDocxTemplate.description,
+      scopeId: customDocxTemplate.scopeId || scopeId,
+      isTableDocument: Boolean(customDocxTemplate.isTableDocument),
+      columns: customDocxTemplate.columns,
+      data: customDocxTemplate.data,
+      pageSize: options.pageSize || customDocxTemplate.pageSize,
+      orientation: options.orientation || customDocxTemplate.orientation,
+      margin: options.margin || customDocxTemplate.margin,
+      pageProperties: customDocxTemplate.pageProperties,
+      createdAt: customDocxTemplate.createdAt,
+    };
+  }, [
+    docxRenderMode,
+    customDocxTemplate,
+    scopeId,
+    options.pageSize,
+    options.orientation,
+    options.margin,
+  ]);
+
+  // Persistent auto-save handler invoked by useAutoSave engine
+  const handleAutoSave = useCallback(
+    async (payload: any) => {
+      if (!payload || !payload.targetId || !payload.fullHtml) return;
+
+      const { targetId, fullHtml } = payload;
+      const allSaved = getSavedDocxTemplates();
+      const existing = allSaved.find((t) => t.id === targetId);
+      const scopeDef = getScopeById(scopeId as any);
+      const detectedKeys = extractTagsFromText(fullHtml);
+
+      const templateToSave: CustomDocxTemplate = {
+        id: targetId,
+        name: payload.name || existing?.name || `${scopeDef?.name || 'Custom'} Template`,
+        description: payload.description || existing?.description || `Custom Template for ${scopeDef?.name || scopeId}`,
+        scopeId: payload.scopeId || existing?.scopeId || scopeId,
+        rawHtml: fullHtml,
+        detectedPlaceholders: detectedKeys,
+        isTableDocument: Boolean(payload.isTableDocument || existing?.isTableDocument),
+        sampleColumns: payload.columns || existing?.sampleColumns || [],
+        sampleData: payload.data || existing?.sampleData || [],
+        pageSize: payload.pageSize || existing?.pageSize,
+        orientation: payload.orientation || existing?.orientation,
+        margin: payload.margin || existing?.margin,
+        pageProperties: payload.pageProperties || existing?.pageProperties,
+        templateType: 'template',
+        createdAt: existing?.createdAt || payload.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      saveDocxTemplate(templateToSave);
+      setSavedWordTemplates(getSavedDocxTemplates());
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('spr_doclab_template_saved', { detail: { templateId: targetId } })
+        );
+      }
+    },
+    [scopeId]
+  );
+
+  // Universal Enterprise Auto-Save Engine Integration
+  const {
+    status: autoSaveStatus,
+    lastSavedAt: autoSaveLastSavedAt,
+    isSaving: isAutoSaving,
+    isSaved: isAutoSaved,
+    forceSave: flushAutoSave,
+    resetSavedState: resetAutoSaveState,
+  } = useAutoSave({
+    data: autoSavePayload,
+    onSave: handleAutoSave,
+    debounceMs: 500,
+    enabled: Boolean(autoSavePayload),
+    validate: (data: any) => Boolean(data && data.targetId && data.fullHtml),
+  });
+
+  // Flush pending auto-save on component unmount and beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushAutoSave();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+    return () => {
+      flushAutoSave();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
+    };
+  }, [flushAutoSave]);
 
   // Context-enriched base record containing tenant, document metadata, header and option information
   const contextEnrichedBaseRecord = useMemo<Record<string, any>>(() => {
@@ -441,6 +567,9 @@ export function usePrintDocxEngine({
   // Handle template selection
   const handleTemplateSelection = useCallback(
     (templateIdOrObj: any) => {
+      // Flush any pending edits of current template before loading the new one
+      flushAutoSave();
+
       const tId = typeof templateIdOrObj === 'object' ? templateIdOrObj?.id : templateIdOrObj;
       if (!tId || tId === 'default_layout' || tId === 'native_layout' || tId === 'default_table') {
         setCustomDocxTemplate(null);
@@ -476,11 +605,11 @@ export function usePrintDocxEngine({
         return;
       }
 
-      // Robustly resolve target template from object, savedWordTemplates, combinedTemplates, or templates prop
+      // Robustly resolve target template: prioritize savedWordTemplates (latest edited copy)
       const foundWordTemplate =
-        (typeof templateIdOrObj === 'object' && templateIdOrObj?.rawHtml ? templateIdOrObj : null) ||
         (savedWordTemplates || []).find((t) => t.id === tId) ||
         (combinedTemplates || []).find((t) => t.id === tId) ||
+        (typeof templateIdOrObj === 'object' && templateIdOrObj?.rawHtml ? templateIdOrObj : null) ||
         (templates || []).find((t: any) => t.id === tId);
 
       if (foundWordTemplate) {
@@ -549,6 +678,7 @@ export function usePrintDocxEngine({
 
   const handleDocxRenderModeChange = useCallback(
     (mode: 'template' | 'sample' | 'all') => {
+      flushAutoSave();
       setDocxRenderMode(mode);
       if (mode === 'template') {
         // If currently loaded document is a generated document, immediately switch back to its source template
@@ -837,9 +967,36 @@ export function usePrintDocxEngine({
   }, []);
 
   const handleUpdateDocxTemplate = useCallback(
-    (templateId: string, updates: { name?: string; description?: string }) => {
+    (templateId: string, updates: { name?: string; description?: string; rawHtml?: string }) => {
       const all = getSavedDocxTemplates();
-      const existing = all.find((t) => t.id === templateId);
+      let existing = all.find((t) => t.id === templateId);
+
+      if (!existing) {
+        const found = (combinedTemplates || []).find((t) => t.id === templateId) ||
+                      (templates || []).find((t: any) => t.id === templateId);
+        if (found) {
+          const scopeDef = getScopeById(scopeId as any);
+          existing = {
+            id: templateId,
+            name: found.name || `${scopeDef?.name || 'Custom'} Template`,
+            description: found.description || '',
+            scopeId: found.scopeId || scopeId,
+            rawHtml: found.rawHtml || found.html || BLANK_PAGE_HTML,
+            detectedPlaceholders: found.detectedPlaceholders || [],
+            isTableDocument: Boolean(found.isTableDocument),
+            sampleColumns: found.sampleColumns || found.columns || [],
+            sampleData: found.sampleData || found.data || [],
+            pageSize: found.pageSize,
+            orientation: found.orientation,
+            margin: found.margin,
+            pageProperties: found.pageProperties,
+            templateType: found.templateType || 'template',
+            createdAt: found.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      }
+
       if (!existing) return;
       const updated: CustomDocxTemplate = {
         ...existing,
@@ -854,6 +1011,7 @@ export function usePrintDocxEngine({
             ...prev,
             name: updates.name ?? prev.name,
             description: updates.description !== undefined ? updates.description : prev.description,
+            ...(updates.rawHtml ? { rawHtml: updates.rawHtml, html: updates.rawHtml } : {}),
             templateMeta: {
               ...prev.templateMeta,
               ...updates,
@@ -863,7 +1021,7 @@ export function usePrintDocxEngine({
         return prev;
       });
     },
-    []
+    [combinedTemplates, templates, scopeId]
   );
 
   const handleSetScopeDefault = useCallback(
@@ -918,5 +1076,10 @@ export function usePrintDocxEngine({
     handleDocxUndo,
     handleDocxRedo,
     updateCustomDocxTemplateWithHistory,
+    flushAutoSave,
+    autoSaveStatus,
+    autoSaveLastSavedAt,
+    isAutoSaving,
+    isAutoSaved,
   };
 }

@@ -330,5 +330,34 @@ declare module '@/context/RightSidebarContext' {
   ): void;
 }
 
+declare module '@/components/common/DeleteImpactModal' {
+  export interface DeleteImpactModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm?: () => Promise<void> | void;
+    onDirectDelete?: () => Promise<void> | void;
+    title?: string;
+    subtitle?: string;
+    entityName?: string;
+    itemName?: string;
+    entityType?: string;
+    itemType?: string;
+    impactItems?: any[];
+    impactData?: any;
+    warningMessage?: string;
+    requireAck?: boolean;
+    requireNameMatch?: boolean;
+    requirePassword?: boolean;
+    confirmButtonText?: string;
+    isDeleting?: boolean;
+    onMigrate?: () => void;
+    onMigrateOpen?: () => void;
+    migrateButtonText?: string;
+    [key: string]: any;
+  }
+  const DeleteImpactModal: React.ComponentType<DeleteImpactModalProps>;
+  export default DeleteImpactModal;
+}
+
 
 

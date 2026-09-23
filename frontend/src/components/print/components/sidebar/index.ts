@@ -4,4 +4,5 @@ export * from './DocLabSaveModal';
 export * from './DocLabPresetsTab';
 export * from './DocLabKeysTab';
 export * from './DocLabLayoutTab';
+export * from './DocLabConditionsTab';
 export * from './DocLabSignaturesTab';

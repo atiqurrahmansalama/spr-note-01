@@ -182,6 +182,10 @@ export default function UniversalPrintStudio({
     handleDocxUndo,
     handleDocxRedo,
     updateCustomDocxTemplateWithHistory,
+    autoSaveStatus,
+    autoSaveLastSavedAt,
+    isAutoSaving,
+    isAutoSaved,
   } = usePrintDocxEngine({
     isOpen,
     scopeId,
@@ -420,6 +424,9 @@ export default function UniversalPrintStudio({
             handleRowInsert={handleRowInsert}
             handleRowMove={handleRowMove}
             handleColumnHeaderChange={handleColumnHeaderChange}
+            autoSaveStatus={autoSaveStatus}
+            autoSaveLastSavedAt={autoSaveLastSavedAt}
+            isAutoSaving={isAutoSaving}
           />
 
           {/* Right Configuration Sidebar */}

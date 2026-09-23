@@ -3,6 +3,7 @@ import { navigation } from './navigation';
 import { settings } from './settings';
 import { dashboard } from './dashboard';
 import { finance } from './finance';
+import { notifications } from './notifications';
 
 export const ar = {
   common,
@@ -10,4 +11,6 @@ export const ar = {
   settings,
   dashboard,
   finance,
+  notifications,
 };
+

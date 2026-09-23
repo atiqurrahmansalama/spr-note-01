@@ -63,15 +63,15 @@ export const DAILY_PROGRESS_DOCLAB_KEYS: KeyTaxonomyItem[] = [
     key: 'juz-number',
     label: 'Juz Number',
     category: 'hifz',
-    example: '30',
+    example: '22',
     description: 'Recited Para or Juz number(s)',
   },
   {
     key: 'juz-page',
     label: 'Juz Page',
     category: 'hifz',
-    example: '582–586',
-    description: 'Page range recited during session',
+    example: '13–14',
+    description: 'Page range (e.g. "13–14" or "22: 13–14" per line if multiple juz)',
   },
   {
     key: 'Session',
@@ -98,15 +98,15 @@ export const DAILY_PROGRESS_DOCLAB_KEYS: KeyTaxonomyItem[] = [
     key: 'detail-mis',
     label: 'Mistake Details',
     category: 'hifz',
-    example: 'Page 582 Ayah 3\nPage 583 Ayah 12',
-    description: 'Detailed list of mistakes (one item per line)',
+    example: 'Page 13 Ayah 3',
+    description: 'Detailed list of mistakes (or "22: Page 13 Ayah 3" per line if multiple juz)',
   },
   {
     key: 'detail-stuck',
     label: 'Stuck Details',
     category: 'hifz',
-    example: 'Page 584 Ayah 7',
-    description: 'Detailed list of stuck points (one item per line)',
+    example: 'Page 13 Ayah 3',
+    description: 'Detailed list of stuck points (or "22: Page 13 Ayah 3" per line if multiple juz)',
   },
   {
     key: 'mention-teacher-name',
@@ -147,16 +147,30 @@ function countValidAyahItems(data?: DetailRowData[]): number {
 
 /**
  * Formats mistake or stuck items with strict "one item per line" rule.
+ * - Single Juz: "Page 13 Ayah 3" (without Juz prefix).
+ * - Multiple Juz:
+ *   For each Juz group:
+ *     1st line: "22: Page 13 Ayah 3" (with Juz prefix)
+ *     2nd line onwards for that Juz: "Page 14 Ayah 5" (Juz prefix omitted).
  * If empty or no items exist, returns an empty string "".
  */
-function formatDetailLines(data?: DetailRowData[]): string {
+function formatDetailLines(
+  data?: DetailRowData[],
+  sessionJuzs: string[] = [],
+  isMultiJuzSession: boolean = false
+): string {
   if (!Array.isArray(data) || data.length === 0) return '';
 
-  const lines: string[] = [];
+  const itemsByJuz = new Map<string, Array<{ page: string; ayah: string }>>();
 
   data.forEach((row) => {
     const pageStr = (row.page !== undefined && row.page !== null) ? String(row.page).trim() : '';
     if (!pageStr) return;
+
+    let rowJuz = (row.juz !== undefined && row.juz !== null) ? String(row.juz).trim() : '';
+    if (!rowJuz && sessionJuzs.length > 0) {
+      rowJuz = sessionJuzs[0];
+    }
 
     const validAyahs = (row.ayahs || [])
       .map((a) => (a.value !== undefined && a.value !== null ? String(a.value).trim() : ''))
@@ -164,16 +178,50 @@ function formatDetailLines(data?: DetailRowData[]): string {
 
     if (validAyahs.length === 0) return;
 
+    if (!itemsByJuz.has(rowJuz)) {
+      itemsByJuz.set(rowJuz, []);
+    }
+
     validAyahs.forEach((ayahVal) => {
-      lines.push(`Page ${pageStr} Ayah ${ayahVal}`);
+      itemsByJuz.get(rowJuz)!.push({ page: pageStr, ayah: ayahVal });
     });
   });
+
+  if (itemsByJuz.size === 0) return '';
+
+  const distinctDataJuzs = Array.from(itemsByJuz.keys()).filter((j) => j !== '');
+  const isMultiJuz = isMultiJuzSession || sessionJuzs.length > 1 || distinctDataJuzs.length > 1;
+
+  const lines: string[] = [];
+
+  if (!isMultiJuz) {
+    // Single Juz: standard formatting without any Juz prefix
+    itemsByJuz.forEach((items) => {
+      items.forEach((item) => {
+        lines.push(`Page ${item.page} Ayah ${item.ayah}`);
+      });
+    });
+  } else {
+    // Multiple Juz:
+    // 1st line of each Juz gets the Juz prefix (e.g. "22: Page 13 Ayah 3"),
+    // subsequent lines for that Juz omit the prefix ("Page 14 Ayah 5").
+    itemsByJuz.forEach((items, juz) => {
+      items.forEach((item, index) => {
+        const itemText = `Page ${item.page} Ayah ${item.ayah}`;
+        if (index === 0 && juz) {
+          lines.push(`${juz}: ${itemText}`);
+        } else {
+          lines.push(itemText);
+        }
+      });
+    });
+  }
 
   return lines.join('\n');
 }
 
 /**
- * Extracts and formats Juz number string (e.g. "30" or "29, 30")
+ * Extracts and formats Juz number string (e.g. "30" or "22, 23")
  */
 function extractJuzNumberString(juzPageData?: JuzRowData[]): string {
   if (!Array.isArray(juzPageData)) return '';
@@ -188,29 +236,67 @@ function extractJuzNumberString(juzPageData?: JuzRowData[]): string {
 }
 
 /**
- * Extracts and formats page range string (e.g. "582–586" or multi-juz breakdown)
+ * Extracts and formats page range string:
+ * - Single Juz: "13–14" (or "13–14, 16–18" if multiple ranges in same juz)
+ * - Multiple Juz: each Juz on a separate line, e.g.:
+ *   22: 13–14
+ *   23: 1–5
  */
 function extractJuzPageString(juzPageData?: JuzRowData[]): string {
-  if (!Array.isArray(juzPageData)) return '';
-  const rangesList: string[] = [];
+  if (!Array.isArray(juzPageData) || juzPageData.length === 0) return '';
+
+  const groupMap = new Map<string, string[]>();
 
   juzPageData.forEach((row) => {
-    if (row.ranges && Array.isArray(row.ranges)) {
-      row.ranges.forEach((r) => {
-        const s = (r.start || '').toString().trim();
-        const e = (r.end || '').toString().trim();
-        if (s) {
-          if (e && e !== s) {
-            rangesList.push(`${s}–${e}`);
-          } else {
-            rangesList.push(s);
-          }
+    const jStr = (row.juz !== undefined && row.juz !== null) ? String(row.juz).trim() : '';
+    if (!row.ranges || !Array.isArray(row.ranges)) return;
+
+    const currentRanges: string[] = [];
+    row.ranges.forEach((r) => {
+      const s = (r.start || '').toString().trim();
+      const e = (r.end || '').toString().trim();
+      if (s) {
+        if (e && e !== s) {
+          currentRanges.push(`${s}–${e}`);
+        } else {
+          currentRanges.push(s);
         }
-      });
+      }
+    });
+
+    if (currentRanges.length > 0) {
+      if (!groupMap.has(jStr)) {
+        groupMap.set(jStr, []);
+      }
+      groupMap.get(jStr)!.push(...currentRanges);
     }
   });
 
-  return rangesList.join(', ');
+  if (groupMap.size === 0) return '';
+
+  const distinctJuzs = Array.from(groupMap.keys()).filter((j) => j !== '');
+  const isMultiJuz = distinctJuzs.length > 1;
+
+  if (!isMultiJuz) {
+    const allRanges: string[] = [];
+    groupMap.forEach((ranges) => {
+      allRanges.push(...ranges);
+    });
+    return allRanges.join(', ');
+  }
+
+  // Multiple Juz: each Juz on a separate line
+  const lines: string[] = [];
+  groupMap.forEach((ranges, juz) => {
+    const rangesStr = ranges.join(', ');
+    if (juz) {
+      lines.push(`${juz}: ${rangesStr}`);
+    } else {
+      lines.push(rangesStr);
+    }
+  });
+
+  return lines.join('\n');
 }
 
 /**
@@ -248,8 +334,36 @@ export function buildDailyProgressReportData(
   const sectionName = (academicContext.sectionName || propSectionName || '').trim();
 
   // 4. Juz Number & Juz Page
+  const sessionJuzSet = new Set<string>();
+  (juzPageData || []).forEach((row) => {
+    if (row.juz !== undefined && row.juz !== null) {
+      const jStr = String(row.juz).trim();
+      if (jStr) sessionJuzSet.add(jStr);
+    }
+  });
+  const sessionJuzs = Array.from(sessionJuzSet);
+
   const juzNumber = extractJuzNumberString(juzPageData);
   const juzPage = extractJuzPageString(juzPageData);
+
+  // Check if session or detail rows represent multi-juz
+  const mistakeJuzSet = new Set<string>();
+  (mistakeData || []).forEach((r) => {
+    if (r.juz !== undefined && r.juz !== null) {
+      const jStr = String(r.juz).trim();
+      if (jStr) mistakeJuzSet.add(jStr);
+    }
+  });
+
+  const stuckJuzSet = new Set<string>();
+  (stuckData || []).forEach((r) => {
+    if (r.juz !== undefined && r.juz !== null) {
+      const jStr = String(r.juz).trim();
+      if (jStr) stuckJuzSet.add(jStr);
+    }
+  });
+
+  const isMultiJuz = sessionJuzs.length > 1 || mistakeJuzSet.size > 1 || stuckJuzSet.size > 1;
 
   // 5. Session
   const sessionName = (selectedSession || '').trim();
@@ -261,8 +375,8 @@ export function buildDailyProgressReportData(
   const totalStuckStr = String(totalStuckCount);
 
   // 7. Detail Mistakes & Detail Stuck (Strict: one item per line, empty if none)
-  const detailMisStr = formatDetailLines(mistakeData);
-  const detailStuckStr = formatDetailLines(stuckData);
+  const detailMisStr = formatDetailLines(mistakeData, sessionJuzs, isMultiJuz);
+  const detailStuckStr = formatDetailLines(stuckData, sessionJuzs, isMultiJuz);
 
   // 8. Teacher Mention
   let resolvedTeacher = (propTeacherName || academicContext.teacherName || '').trim();
