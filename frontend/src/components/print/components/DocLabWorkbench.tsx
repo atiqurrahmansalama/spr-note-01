@@ -425,7 +425,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                     <DocxLiveRenderer
                       htmlContent={pageHtml}
                       styles={docxStyles}
-                      isEditable={true}
+                      isEditable={docxRenderMode === 'template'}
                       pageIndex={pIdx}
                       totalPages={mergedDocxPages.length}
                       onAddNextPage={() => handleAddPageBelow(pIdx)}
@@ -433,52 +433,51 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                       onNavigatePrevPage={() => handleFocusPage(pIdx - 1, 'end')}
                       onNavigateNextPage={() => handleFocusPage(pIdx + 1, 'start')}
                       onContentChange={(newHtml) => {
-                        if (docxRenderMode === 'template' || customDocxTemplate) {
-                          const updater = (prev: any) => {
-                            if (!prev) return null;
-                            const preservedStyles =
-                              prev.styles || separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
-                            const currentRawBody = prev.templateBody || prev.body || prev.html || '';
-                            const currentPages = splitHtmlIntoPages(currentRawBody);
+                        if (docxRenderMode !== 'template') return;
+                        const updater = (prev: any) => {
+                          if (!prev) return null;
+                          const preservedStyles =
+                            prev.styles || separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
+                          const currentRawBody = prev.templateBody || prev.body || prev.html || '';
+                          const currentPages = splitHtmlIntoPages(currentRawBody);
 
-                            let updatedPages: string[];
-                            // Check if newHtml contains a new explicit page break
-                            if (newHtml.includes('<!-- spr-page-break -->') || newHtml.includes('spr-page-break')) {
-                              const subPages = splitHtmlIntoPages(newHtml);
-                              if (subPages.length > 1) {
-                                updatedPages = [
-                                  ...currentPages.slice(0, pIdx),
-                                  ...subPages,
-                                  ...currentPages.slice(pIdx + 1),
-                                ];
-                              } else {
-                                updatedPages = [...currentPages];
-                                updatedPages[pIdx] = newHtml;
-                              }
+                          let updatedPages: string[];
+                          // Check if newHtml contains a new explicit page break
+                          if (newHtml.includes('<!-- spr-page-break -->') || newHtml.includes('spr-page-break')) {
+                            const subPages = splitHtmlIntoPages(newHtml);
+                            if (subPages.length > 1) {
+                              updatedPages = [
+                                ...currentPages.slice(0, pIdx),
+                                ...subPages,
+                                ...currentPages.slice(pIdx + 1),
+                              ];
                             } else {
-                              if (currentPages.length > pIdx) {
-                                updatedPages = [...currentPages];
-                                updatedPages[pIdx] = newHtml;
-                              } else {
-                                updatedPages = [newHtml];
-                              }
+                              updatedPages = [...currentPages];
+                              updatedPages[pIdx] = newHtml;
                             }
-
-                            const combinedBody = joinPagesIntoHtml(updatedPages);
-                            return {
-                              ...prev,
-                              styles: preservedStyles,
-                              templateBody: combinedBody,
-                              body: combinedBody,
-                              html: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-                              rawHtml: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-                            };
-                          };
-                          if (updateCustomDocxTemplateWithHistory) {
-                            updateCustomDocxTemplateWithHistory(updater);
                           } else {
-                            setCustomDocxTemplate(updater);
+                            if (currentPages.length > pIdx) {
+                              updatedPages = [...currentPages];
+                              updatedPages[pIdx] = newHtml;
+                            } else {
+                              updatedPages = [newHtml];
+                            }
                           }
+
+                          const combinedBody = joinPagesIntoHtml(updatedPages);
+                          return {
+                            ...prev,
+                            styles: preservedStyles,
+                            templateBody: combinedBody,
+                            body: combinedBody,
+                            html: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
+                            rawHtml: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
+                          };
+                        };
+                        if (updateCustomDocxTemplateWithHistory) {
+                          updateCustomDocxTemplateWithHistory(updater);
+                        } else {
+                          setCustomDocxTemplate(updater);
                         }
                       }}
                     />

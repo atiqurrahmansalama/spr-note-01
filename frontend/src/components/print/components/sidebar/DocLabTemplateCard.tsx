@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import ActionMenu from '../../../../components/ui/ActionMenu';
 import {
   FileIcon,
   StarIcon,
@@ -8,12 +9,15 @@ import {
 } from '../../../../components/ui/Icons';
 import { DocxTemplate } from '../../types';
 
+import { DocLabItemCard } from './DocLabItemCard';
+
 interface DocLabTemplateCardProps {
   template: DocxTemplate;
   isActive: boolean;
   isScopeDefault: boolean;
   onSelect: (template: DocxTemplate) => void;
   onEdit?: (template: DocxTemplate) => void;
+  onRename?: (template: DocxTemplate) => void;
   onDuplicate?: (template: DocxTemplate) => void;
   onDelete?: (template: DocxTemplate) => void;
   onToggleScopeDefault?: (templateId: string) => void;
@@ -21,7 +25,7 @@ interface DocLabTemplateCardProps {
 
 /**
  * DocLabTemplateCard
- * Dedicated template item card with scope badge, default toggle, and action buttons.
+ * Dedicated template item card built on top of the reusable 2-line DocLabItemCard.
  */
 export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   template,
@@ -29,112 +33,108 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   isScopeDefault,
   onSelect,
   onEdit,
+  onRename,
   onDuplicate,
   onDelete,
   onToggleScopeDefault,
 }) => {
   const isGenerated = template.templateType === 'generated' || template.id?.startsWith('gen_');
 
+  const menuItems = useMemo(() => {
+    const items: any[] = [];
+
+    // 1. Edit in DocLab (Loads template to canvas in Template Design mode)
+    if (onEdit && !isGenerated) {
+      items.push({
+        label: 'Edit in DocLab',
+        icon: EditIcon,
+        onClick: () => onEdit(template),
+      });
+    }
+
+    // 2. Rename / Edit Details
+    if (onRename) {
+      items.push({
+        label: 'Rename / Edit Details',
+        icon: EditIcon,
+        onClick: () => onRename(template),
+      });
+    }
+
+    // 3. Duplicate Template
+    if (onDuplicate) {
+      items.push({
+        label: 'Duplicate',
+        icon: DuplicateIcon,
+        onClick: () => onDuplicate(template),
+      });
+    }
+
+    // 4. Scope Default Toggle
+    if (onToggleScopeDefault && !isGenerated) {
+      items.push({
+        label: isScopeDefault ? 'Remove Scope Default' : 'Set as Scope Default',
+        icon: StarIcon,
+        iconClassName: 'theme-accent',
+        onClick: () => onToggleScopeDefault(template.id),
+      });
+    }
+
+    // 5. Delete Template (Triggers ConfirmModal)
+    if (onDelete && !(template as any).isBuiltin) {
+      if (items.length > 0) {
+        items.push({ divider: true });
+      }
+      items.push({
+        label: 'Delete Template',
+        icon: TrashIcon,
+        danger: true,
+        onClick: () => onDelete(template),
+      });
+    }
+
+    return items;
+  }, [template, isGenerated, isScopeDefault, onEdit, onRename, onDuplicate, onToggleScopeDefault, onDelete]);
+
   return (
-    <div
-      onClick={() => onSelect(template)}
-      className={`group relative p-3 rounded-xl border transition-all cursor-pointer select-none ${
-        isActive
-          ? 'theme-bg-accent-soft theme-border-accent shadow-xs'
-          : 'theme-bg-surface theme-border hover:theme-border-accent/40'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-          <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-              isActive
-                ? 'theme-bg-accent text-white shadow-xs'
-                : 'theme-bg-sub theme-text-secondary group-hover:theme-accent'
-            }`}
+    <DocLabItemCard
+      icon={<FileIcon className="w-4 h-4" />}
+      title={template.name}
+      isActive={isActive}
+      indicator={
+        isScopeDefault && !isGenerated ? (
+          <span
+            title="Default template for this scope"
+            className="theme-accent inline-flex items-center shrink-0"
           >
-            <FileIcon className="w-4 h-4" />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span
-                className={`text-xs font-semibold truncate ${
-                  isActive ? 'theme-accent font-bold' : 'theme-text-primary'
-                }`}
-                title={template.name}
-              >
-                {template.name}
-              </span>
-
-              {isGenerated && (
-                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium theme-success-badge">
-                  Filled
-                </span>
-              )}
-            </div>
-
-            <p className="text-[11px] theme-text-secondary truncate mt-0.5">
-              {template.description || (isGenerated ? 'Generated filled document' : 'Custom layout document')}
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {/* Scope Default Star */}
-          {onToggleScopeDefault && !isGenerated && (
-            <button
-              type="button"
-              onClick={() => onToggleScopeDefault(template.id)}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isScopeDefault
-                  ? 'theme-warning'
-                  : 'theme-text-muted hover:theme-text-primary'
-              }`}
-              title={isScopeDefault ? 'Current default for this scope' : 'Set as default template for this scope'}
-            >
-              <StarIcon className={`w-3.5 h-3.5 ${isScopeDefault ? 'theme-warning' : ''}`} />
-            </button>
-          )}
-
-          {/* Edit Template */}
-          {onEdit && !isGenerated && (
-            <button
-              type="button"
-              onClick={() => onEdit(template)}
-              className="p-1.5 rounded-lg theme-text-muted hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
-              title="Edit in Document Designer"
-            >
-              <EditIcon className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Duplicate Template */}
-          {onDuplicate && (
-            <button
-              type="button"
-              onClick={() => onDuplicate(template)}
-              className="p-1.5 rounded-lg theme-text-muted hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
-              title="Duplicate"
-            >
-              <DuplicateIcon className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Delete Template */}
-          {onDelete && !(template as any).isBuiltin && (
-            <button
-              type="button"
-              onClick={() => onDelete(template)}
-              className="p-1.5 rounded-lg theme-text-muted hover:theme-danger hover:theme-bg-sub transition-colors cursor-pointer"
-              title="Delete"
-            >
-              <TrashIcon className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+            <StarIcon className="w-3.5 h-3.5" />
+          </span>
+        ) : null
+      }
+      badge={
+        isGenerated ? (
+          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium theme-success-badge">
+            Filled
+          </span>
+        ) : null
+      }
+      description={
+        template.description || (isGenerated ? 'Generated filled document' : 'Custom layout document')
+      }
+      actions={
+        menuItems.length > 0 ? (
+          <ActionMenu
+            items={menuItems}
+            align="right"
+            size="xs"
+            variant="ghost"
+            showChevron={false}
+            ariaLabel="Template actions"
+            buttonClassName="p-1 rounded-lg theme-text-muted hover:theme-text-primary hover:theme-bg-sub transition-colors"
+          />
+        ) : null
+      }
+      onClick={() => onSelect(template)}
+    />
   );
 };

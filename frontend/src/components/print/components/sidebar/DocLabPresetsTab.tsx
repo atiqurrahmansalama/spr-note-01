@@ -7,11 +7,17 @@ import {
   AlertTriangleIcon,
   CheckCircleIcon,
   AdjustmentsHorizontalIcon,
+  TrashIcon,
+  EditIcon,
 } from '../../../ui/Icons';
+import Modal, { ConfirmModal } from '../../../ui/Modal';
+import CustomButton from '../../../ui/CustomButton';
+import CustomInput from '../../../ui/CustomInput';
 import { DocLabTemplateCard } from './DocLabTemplateCard';
 import { DocLabSaveModal } from './DocLabSaveModal';
 import { DocxTemplate } from '../../types';
 import { DocumentScopeDefinition, ScopeValidationResult } from '../../keyLibrary/types';
+import { getDefaultTemplateIdForScope } from '../../scopeTemplateStore';
 
 interface DocLabPresetsTabProps {
   templates: DocxTemplate[];
@@ -27,6 +33,7 @@ interface DocLabPresetsTabProps {
   onOpenTemplateLibrary?: () => void;
   onDeleteDocxTemplate?: (template: DocxTemplate) => void;
   onDuplicateDocxTemplate?: (template: DocxTemplate) => void;
+  onUpdateDocxTemplate?: (templateId: string, updates: { name?: string; description?: string }) => void;
   onSaveCurrentTemplate?: (name: string, docType: 'template' | 'generated') => void;
   onDocxRenderModeChange?: (mode: 'template' | 'sample' | 'all') => void;
   onToggleScopeDefault?: (templateId: string) => void;
@@ -50,12 +57,44 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
   onOpenTemplateLibrary,
   onDeleteDocxTemplate,
   onDuplicateDocxTemplate,
+  onUpdateDocxTemplate,
   onSaveCurrentTemplate,
   onDocxRenderModeChange,
   onToggleScopeDefault,
 }) => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [filesFilter, setFilesFilter] = useState<'all' | 'templates' | 'generated'>('all');
+  const [templateToDelete, setTemplateToDelete] = useState<DocxTemplate | null>(null);
+  const [templateToRename, setTemplateToRename] = useState<DocxTemplate | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renameDescription, setRenameDescription] = useState('');
+
+  const scopeDefaultTemplateId = useMemo(() => {
+    return scopeDefinition?.id ? getDefaultTemplateIdForScope(scopeDefinition.id) : null;
+  }, [scopeDefinition?.id, isScopeDefault]);
+
+  const handleEditTemplate = (tmpl: DocxTemplate) => {
+    onSelectTemplate(tmpl);
+    if (onDocxRenderModeChange) {
+      onDocxRenderModeChange('template');
+    }
+  };
+
+  const handleOpenRename = (tmpl: DocxTemplate) => {
+    setTemplateToRename(tmpl);
+    setRenameName(tmpl.name || '');
+    setRenameDescription(tmpl.description || '');
+  };
+
+  const handleSaveRename = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!templateToRename || !renameName.trim()) return;
+    onUpdateDocxTemplate?.(templateToRename.id, {
+      name: renameName.trim(),
+      description: renameDescription.trim(),
+    });
+    setTemplateToRename(null);
+  };
 
   const customTemplatesList = useMemo(() => {
     return (templates || []).filter((t: any) => {
@@ -95,7 +134,7 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
   return (
     <div className="space-y-4 pt-1">
       {/* 1. Batch Data Generation Controls */}
-      {totalRecordsCount > 0 && isCustomDocxActive && (
+      {isCustomDocxActive && (
         <div className="p-3.5 rounded-xl border theme-border theme-bg-sub/60 space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
@@ -103,7 +142,9 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
               <span>Multi-Page Batch Generator</span>
             </div>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold theme-info-badge">
-              {totalRecordsCount} Records
+              {totalRecordsCount > 0
+                ? `${totalRecordsCount} ${totalRecordsCount === 1 ? 'Record' : 'Records'}`
+                : 'Active Template'}
             </span>
           </div>
 
@@ -128,7 +169,11 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
                   : 'theme-text-secondary hover:theme-text-primary'
               }`}
             >
-              <span> Generate {totalRecordsCount} Documents </span>
+              <span>
+                {totalRecordsCount > 0
+                  ? `Generate ${totalRecordsCount} ${totalRecordsCount === 1 ? 'Document' : 'Documents'}`
+                  : 'Generate Documents'}
+              </span>
             </button>
           </div>
         </div>
@@ -218,8 +263,8 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
             onClick={() => onSelectTemplate(blankTemplate)}
             className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
               activeTemplateId === blankTemplate.id
-                ? 'theme-bg-accent-soft theme-border-accent shadow-xs'
-                : 'theme-bg-card theme-border hover:theme-border-accent/40'
+                ? 'theme-bg-accent-soft theme-border-accent-soft shadow-xs'
+                : 'theme-bg-surface theme-border-subtle hover:theme-border-accent-soft hover:theme-bg-sub/30'
             }`}
           >
             <div
@@ -298,11 +343,12 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
                   key={tmpl.id}
                   template={tmpl}
                   isActive={activeTemplateId === tmpl.id}
-                  isScopeDefault={isScopeDefault && activeTemplateId === tmpl.id}
+                  isScopeDefault={scopeDefaultTemplateId === tmpl.id}
                   onSelect={onSelectTemplate}
-                  onEdit={onOpenDocxModal}
+                  onEdit={handleEditTemplate}
+                  onRename={handleOpenRename}
                   onDuplicate={onDuplicateDocxTemplate}
-                  onDelete={onDeleteDocxTemplate}
+                  onDelete={(target) => setTemplateToDelete(target)}
                   onToggleScopeDefault={onToggleScopeDefault}
                 />
               ))
@@ -329,6 +375,83 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(templateToDelete)}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={() => {
+          if (templateToDelete) {
+            onDeleteDocxTemplate?.(templateToDelete);
+            setTemplateToDelete(null);
+          }
+        }}
+        title="Delete Template"
+        subtitle={`Are you sure you want to delete "${templateToDelete?.name}"?`}
+        icon={TrashIcon}
+        confirmText="Delete Template"
+        confirmVariant="danger"
+        confirmIcon={TrashIcon}
+        callout={{
+          type: 'danger',
+          title: 'Permanent Deletion',
+          message: 'This document template will be permanently removed from your scope library. Any future print jobs requiring this specific design will have to be recreated.',
+        }}
+        summaryItems={[
+          { label: 'Template Name', value: templateToDelete?.name || '' },
+          { label: 'Scope', value: scopeDefinition?.name || 'General' },
+          { label: 'Type', value: templateToDelete?.templateType === 'generated' ? 'Filled Document' : 'Document Template' },
+        ]}
+      />
+
+      {/* Rename / Edit Details Modal */}
+      <Modal
+        isOpen={Boolean(templateToRename)}
+        onClose={() => setTemplateToRename(null)}
+        title="Edit Template Details"
+        subtitle="Update the title and description for this template"
+        icon={EditIcon}
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <CustomButton variant="sub" size="sm" onClick={() => setTemplateToRename(null)}>
+              Cancel
+            </CustomButton>
+            <CustomButton
+              variant="primary"
+              size="sm"
+              disabled={!renameName.trim()}
+              onClick={() => handleSaveRename()}
+            >
+              Save Changes
+            </CustomButton>
+          </div>
+        }
+      >
+        <form onSubmit={handleSaveRename} className="p-4 sm:p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold theme-text-primary mb-1.5">
+              Template Name <span className="theme-danger">*</span>
+            </label>
+            <CustomInput
+              value={renameName}
+              onChange={(val: any) => setRenameName(typeof val === 'string' ? val : val?.target?.value ?? '')}
+              placeholder="e.g. Official Daily Progress Template"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold theme-text-primary mb-1.5">
+              Description (Optional)
+            </label>
+            <CustomInput
+              value={renameDescription}
+              onChange={(val: any) => setRenameDescription(typeof val === 'string' ? val : val?.target?.value ?? '')}
+              placeholder="e.g. Used for daily student memorization reports"
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

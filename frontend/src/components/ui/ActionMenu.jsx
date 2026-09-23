@@ -231,7 +231,7 @@ export default function ActionMenu({
                   {renderIcon(
                     item.icon,
                     `w-3.5 h-3.5 shrink-0 transition-transform duration-150 group-hover/item:scale-110 ${
-                      isDanger ? 'theme-danger' : 'theme-accent'
+                      item.iconClassName || (isDanger ? 'theme-danger' : 'theme-accent')
                     }`
                   )}
                   <span className="flex-1 truncate">{item.label}</span>

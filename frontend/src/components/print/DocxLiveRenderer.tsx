@@ -332,15 +332,32 @@ function DocxLiveRendererComponent({
 
   // Track global selection changes to continuously preserve caret position
   useEffect(() => {
-    if (!isEditable) return;
+    if (!isEditable) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      return;
+    }
     const handleSelectionChange = () => {
       saveSelection();
     };
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [saveSelection, isEditable]);
+
+  // Cleanup pending debounce timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleBlur = useCallback(() => {
     if (!isEditable) return;

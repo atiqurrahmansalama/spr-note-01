@@ -22,6 +22,8 @@ import {
 } from './hooks';
 import { DocLabHeader, DocLabWorkbench } from './components';
 import { UniversalPrintStudioProps } from './types';
+import { exportToNativeDocx } from './vectorDocxCompiler';
+import { useToast } from '../../context/ToastContext';
 import './printEngine.css';
 
 /**
@@ -96,6 +98,7 @@ export default function UniversalPrintStudio({
   urlParamValue = null,
 }: UniversalPrintStudioProps) {
   const { tenant } = useTenant();
+  const { showToast } = useToast();
 
   // 1. Core State & History Hook
   const {
@@ -172,6 +175,7 @@ export default function UniversalPrintStudio({
     handleDeleteDocxTemplate,
     handleSaveCurrentTemplate,
     handleDuplicateDocxTemplate,
+    handleUpdateDocxTemplate,
     handleSetScopeDefault,
     docxCanUndo,
     docxCanRedo,
@@ -197,7 +201,41 @@ export default function UniversalPrintStudio({
     resolvedTitle,
     resolvedSubtitle,
     onTemplateChange,
+    activeTemplateId,
   });
+
+  // Dedicated Live Canvas Native Word (.docx) Exporter Handler
+  const handleExportWord = React.useCallback(async () => {
+    await exportToNativeDocx({
+      targetId: 'universal-print-portal',
+      title: resolvedTitle || title,
+      subtitle: resolvedSubtitle || subtitle,
+      metaItems: liveMetaItems,
+      options: options,
+      customPages: customDocxTemplate ? mergedDocxPages : undefined,
+      columns: liveColumns,
+      visibleColumnKeys: visibleColumnKeys,
+      data: liveData,
+      extraBlankRows: extraBlankRows,
+      summaryMetrics: liveSummaryMetrics,
+      showToast,
+    });
+  }, [
+    resolvedTitle,
+    title,
+    resolvedSubtitle,
+    subtitle,
+    liveMetaItems,
+    options,
+    customDocxTemplate,
+    mergedDocxPages,
+    liveColumns,
+    visibleColumnKeys,
+    liveData,
+    extraBlankRows,
+    liveSummaryMetrics,
+    showToast,
+  ]);
 
   const effectiveCanUndo = customDocxTemplate ? docxCanUndo : canUndo;
   const effectiveCanRedo = customDocxTemplate ? docxCanRedo : canRedo;
@@ -328,7 +366,7 @@ export default function UniversalPrintStudio({
           onExportExcel={onExportExcel}
           onExportCsv={onExportCsv}
           onExportTxt={onExportTxt}
-          onExportWord={onExportWord}
+          onExportWord={onExportWord || handleExportWord}
           onExportPng={onExportPng}
           onExportJpg={onExportJpg}
         />
@@ -415,6 +453,7 @@ export default function UniversalPrintStudio({
                   onDeleteDocxTemplate={(t: any) => handleDeleteDocxTemplate(t?.id || t)}
                   onSaveCurrentTemplate={handleSaveCurrentTemplate}
                   onDuplicateDocxTemplate={(t: any) => handleDuplicateDocxTemplate(t?.id || t)}
+                  onUpdateDocxTemplate={handleUpdateDocxTemplate}
                   onSetScopeDefault={handleSetScopeDefault}
                   scopeId={scopeId}
                   scopeName={scopeName}
@@ -426,23 +465,15 @@ export default function UniversalPrintStudio({
                       ? getDefaultTemplateIdForScope(scopeId) === (customDocxTemplate.id || customDocxTemplate.templateMeta?.id)
                       : false
                   }
-                  onToggleScopeDefault={() => {
-                    const currentTmplId = customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id;
+                  onToggleScopeDefault={(targetTmplId?: string) => {
+                    const currentTmplId = targetTmplId || customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id;
                     if (!currentTmplId) return;
                     const currentDefId = getDefaultTemplateIdForScope(scopeId);
                     if (currentDefId === currentTmplId) {
-                      setDefaultTemplateForScope(scopeId, null);
+                      handleSetScopeDefault(null);
                     } else {
-                      const val = validateTemplateForScope(customDocxTemplate, scopeId);
-                      if (!val.isValid) {
-                        const proceed = window.confirm(
-                          `Warning: This template is missing ${val.missingRequiredKeys.length} required key(s) for "${val.scopeName}":\n\n${val.missingRequiredKeys.map((k) => `• {{${k}}}`).join('\n')}\n\nSetting this template as default may result in missing data during print generation. Do you want to set it as default anyway?`
-                        );
-                        if (!proceed) return;
-                      }
-                      setDefaultTemplateForScope(scopeId, currentTmplId);
+                      handleSetScopeDefault(currentTmplId);
                     }
-                    setSavedWordTemplates(getSavedDocxTemplates());
                   }}
                   activeRecord={liveData && liveData[0] ? liveData[0] : {}}
                   docxRenderMode={docxRenderMode}

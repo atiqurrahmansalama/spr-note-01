@@ -1,6 +1,6 @@
 import React from 'react';
 import html2canvas from 'html2canvas-pro';
-import { exportToNativeDocx, compileNativeDocxDocument } from './vectorDocxCompiler';
+import { exportToNativeDocx, compileNativeDocxDocument, compileCanvasToNativeDocx } from './vectorDocxCompiler';
 import { compileVectorPDFDocument, getSafeFilename } from './vectorPDFCompiler';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 
@@ -422,10 +422,13 @@ export function exportToPlainText({
  * 5. Native OpenXML Word Document (.docx) Exporter
  */
 export async function exportToWord(params: any = {}): Promise<void> {
-  return exportToNativeDocx(params);
+  return exportToNativeDocx({
+    targetId: 'universal-print-portal',
+    ...params,
+  });
 }
 
-export { exportToNativeDocx, compileNativeDocxDocument };
+export { exportToNativeDocx, compileNativeDocxDocument, compileCanvasToNativeDocx };
 
 /**
  * 6 & 7. Lossless PNG & JPEG Image Exporter (300+ DPI Ultra HD)

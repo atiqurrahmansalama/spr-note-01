@@ -10,6 +10,7 @@ import {
   DocumentScopeDefinition,
   ScopeValidationResult,
 } from './keyLibrary';
+import { DocLabItemCard } from './components/sidebar/DocLabItemCard';
 
 export interface KeyPaletteExplorerProps {
   onInsertKey?: (keyToken: string) => void;
@@ -147,58 +148,45 @@ export default function KeyPaletteExplorer({
             );
 
             return (
-              <div
+              <DocLabItemCard
                 key={item.key}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onInsertKey?.(token)}
-                className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 active:scale-[0.99] ${
-                  isMissing
-                    ? 'border-amber-500/40 theme-bg-sub/80 hover:border-amber-500'
-                    : isMatched
-                    ? 'theme-border-accent/40 theme-bg-sub/60 hover:border-[var(--accent-main)]'
-                    : 'theme-border theme-card hover:border-[var(--accent-main)] hover:theme-bg-sub'
-                }`}
-                title={`Click to insert ${token} at cursor in document`}
-              >
-                <div className="min-w-0 flex-1 text-left">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-mono text-[11px] font-bold theme-accent truncate">
-                      {token}
-                    </span>
-
-                    {/* Status Badge */}
-                    <span
-                      className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase tracking-wider ${
-                        isMatched
-                          ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30'
-                          : isMissing
-                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                          : 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20'
-                      }`}
-                    >
-                      {isMatched ? 'Used' : isMissing ? 'Missing' : 'Required'}
-                    </span>
-                  </div>
-
-                  <div className="text-[11px] theme-text-secondary truncate mt-0.5">
+                title={token}
+                titleClassName="font-mono text-[11px] font-bold theme-accent"
+                titleTooltip={`Click to insert ${token} at cursor in document`}
+                borderVariant={isMissing ? 'amber' : isMatched ? 'accent' : 'default'}
+                badge={
+                  <span
+                    className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase tracking-wider ${
+                      isMatched
+                        ? 'theme-bg-accent-soft theme-accent border theme-border-accent-soft'
+                        : isMissing
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25'
+                        : 'theme-bg-accent-soft theme-accent border theme-border-accent-soft'
+                    }`}
+                  >
+                    {isMatched ? 'Used' : isMissing ? 'Missing' : 'Required'}
+                  </span>
+                }
+                description={
+                  <span>
                     {item.label}
-                  </div>
-
-                  {liveValue && (
-                    <div className="text-[10px] theme-text-muted truncate mt-0.5 italic">
-                      Live: &quot;{String(liveValue)}&quot;
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
+                    {liveValue !== undefined && liveValue !== null && liveValue !== '' ? (
+                      <span className="theme-text-muted italic ml-1.5">
+                        (Live: &quot;{String(liveValue)}&quot;)
+                      </span>
+                    ) : null}
+                  </span>
+                }
+                actions={
                   <button
                     type="button"
                     onClick={(e) => handleCopyKey(item.key, e)}
                     className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                       isCopied
-                        ? 'border-[var(--accent-main)] theme-accent theme-bg-accent-soft'
-                        : 'theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
+                        ? 'theme-border-accent-soft theme-accent theme-bg-accent-soft'
+                        : 'theme-border-subtle theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
                     }`}
                     title="Copy token to clipboard"
                   >
@@ -208,8 +196,8 @@ export default function KeyPaletteExplorer({
                       <CopyIcon className="w-3.5 h-3.5" />
                     )}
                   </button>
-                </div>
-              </div>
+                }
+              />
             );
           })
         ) : (

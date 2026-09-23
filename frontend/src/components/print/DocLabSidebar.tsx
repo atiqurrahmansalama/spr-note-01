@@ -29,6 +29,7 @@ export interface DocLabSidebarProps {
   onDeleteDocxTemplate?: (template: DocxTemplate) => void;
   onSaveCurrentTemplate?: (name: string, docType: 'template' | 'generated') => void;
   onDuplicateDocxTemplate?: (template: DocxTemplate) => void;
+  onUpdateDocxTemplate?: (templateId: string, updates: { name?: string; description?: string }) => void;
   onSetScopeDefault?: (templateId: string) => void;
   scopeId?: string;
   scopeName?: string;
@@ -74,6 +75,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   onDeleteDocxTemplate,
   onSaveCurrentTemplate,
   onDuplicateDocxTemplate,
+  onUpdateDocxTemplate,
   scopeId = 'general_document',
   scopeName = '',
   scopeDescription = '',
@@ -224,6 +226,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
             onOpenTemplateLibrary={onOpenTemplateLibrary}
             onDeleteDocxTemplate={onDeleteDocxTemplate}
             onDuplicateDocxTemplate={onDuplicateDocxTemplate}
+            onUpdateDocxTemplate={onUpdateDocxTemplate}
             onSaveCurrentTemplate={onSaveCurrentTemplate}
             onDocxRenderModeChange={onDocxRenderModeChange}
             onToggleScopeDefault={onToggleScopeDefault}

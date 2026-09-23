@@ -32,49 +32,6 @@ export interface DocLabQuickReportModalProps {
 }
 
 /**
- * Built-in standard fallback template for Daily Progress reports when no custom Word
- * template is stored locally. Ensures instant 0ms report generation with zero empty states.
- */
-const DEFAULT_DAILY_PROGRESS_TEMPLATE: CustomDocxTemplate = {
-  id: 'builtin_daily_progress_report',
-  name: 'Standard Daily Progress',
-  description: 'System standard Daily Progress & Sabaq evaluation format',
-  scopeId: 'hifz_daily_report',
-  rawHtml: `
-<p><strong>Daily Progress Evaluation Report</strong></p>
-<p>Date: {{date}}</p>
-<p>Student Name: {{student-name}}</p>
-<p>Department: {{dept}} | Class: {{class}} | Section: {{section}}</p>
-<p>Session: {{Session}}</p>
-<p>Juz: {{juz-number}} | Page: {{juz-page}}</p>
-<p>Total Mistakes: {{total-mis}}</p>
-<p>Mistake Details:<br>{{detail-mis}}</p>
-<p>Total Stuck: {{total-stuck}}</p>
-<p>Stuck Details:<br>{{detail-stuck}}</p>
-<p>Teacher: {{mention-teacher-name}}</p>
-<p>Remarks: {{remarks}}</p>
-  `.trim(),
-  detectedPlaceholders: [
-    'date',
-    'student-name',
-    'dept',
-    'class',
-    'section',
-    'Session',
-    'juz-number',
-    'juz-page',
-    'total-mis',
-    'total-stuck',
-    'detail-mis',
-    'detail-stuck',
-    'mention-teacher-name',
-    'remarks',
-  ],
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-};
-
-/**
  * DocLabQuickReportModal
  * 
  * Enterprise-grade, lightweight, high-performance report modal for DocLab.
@@ -113,22 +70,13 @@ export default function DocLabQuickReportModal({
     }
 
     const templates = getSavedTemplatesForScope(scopeId);
-    
-    // Fallback to built-in template if scope is Daily Progress and no custom templates exist
-    const effectiveTemplates =
-      templates.length > 0
-        ? templates
-        : scopeId === 'hifz_daily_report'
-        ? [DEFAULT_DAILY_PROGRESS_TEMPLATE]
-        : [];
-
-    setSavedTemplates(effectiveTemplates);
+    setSavedTemplates(templates);
 
     const defaultTmplId = getDefaultTemplateIdForScope(scopeId);
-    if (defaultTmplId && effectiveTemplates.some((t) => t.id === defaultTmplId)) {
+    if (defaultTmplId && templates.some((t) => t.id === defaultTmplId)) {
       setSelectedTemplateId(defaultTmplId);
-    } else if (effectiveTemplates.length > 0) {
-      setSelectedTemplateId(effectiveTemplates[0].id);
+    } else if (templates.length > 0) {
+      setSelectedTemplateId(templates[0].id);
     } else {
       setSelectedTemplateId(null);
     }
@@ -222,6 +170,13 @@ export default function DocLabQuickReportModal({
   // Navigate to DocLab Studio workspace
   const handleGoToDocLab = () => {
     onClose();
+    if (dataRecord && Object.keys(dataRecord).length > 0) {
+      try {
+        sessionStorage.setItem(`spr_doclab_scope_data_${scopeId}`, JSON.stringify([dataRecord]));
+      } catch (e) {
+        console.warn('Failed to store doclab scope data in sessionStorage', e);
+      }
+    }
     if (onNavigateToDocLab) {
       onNavigateToDocLab();
       return;

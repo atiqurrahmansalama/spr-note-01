@@ -1,3 +1,4 @@
+export * from './DocLabItemCard';
 export * from './DocLabTemplateCard';
 export * from './DocLabSaveModal';
 export * from './DocLabPresetsTab';

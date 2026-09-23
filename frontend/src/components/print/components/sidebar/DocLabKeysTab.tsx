@@ -48,7 +48,7 @@ export const DocLabKeysTab: React.FC<DocLabKeysTabProps> = ({
     <div className="space-y-4 pt-1">
       {/* 1. Scope Blueprint Progress Card */}
       {totalRequired > 0 && (
-        <div className="p-3.5 rounded-xl border theme-border theme-bg-sub/60 space-y-2">
+        <div className="p-3.5 rounded-xl border theme-border-subtle theme-bg-sub/40 space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
               <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
@@ -57,8 +57,8 @@ export const DocLabKeysTab: React.FC<DocLabKeysTabProps> = ({
             <span
               className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold transition-colors ${
                 isComplete
-                  ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30'
-                  : 'theme-bg-surface theme-text-secondary border theme-border'
+                  ? 'theme-bg-accent-soft theme-accent border theme-border-accent-soft'
+                  : 'theme-bg-surface theme-text-secondary border theme-border-subtle'
               }`}
             >
               {matchedRequired} / {totalRequired} Required
@@ -66,7 +66,7 @@ export const DocLabKeysTab: React.FC<DocLabKeysTabProps> = ({
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-1.5 rounded-full theme-bg-surface border theme-border overflow-hidden">
+          <div className="w-full h-1.5 rounded-full theme-bg-surface border theme-border-subtle overflow-hidden">
             <div
               className="h-full theme-bg-accent transition-all duration-300"
               style={{
@@ -76,7 +76,7 @@ export const DocLabKeysTab: React.FC<DocLabKeysTabProps> = ({
           </div>
 
           <p className="text-[11px] theme-text-secondary leading-tight">
-            Click any field below to insert <code className="text-[10px] font-mono theme-text-primary theme-bg-surface border theme-border px-1.5 py-0.5 rounded-md">{'{{token}}'}</code> at your active cursor position on the document canvas.
+            Click any field below to insert <code className="text-[10px] font-mono theme-text-primary theme-bg-surface border theme-border-subtle px-1.5 py-0.5 rounded-md">{'{{token}}'}</code> at your active cursor position on the document canvas.
           </p>
         </div>
       )}

@@ -171,6 +171,12 @@ body {
 @utility theme-border-light {
   border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
 }
+@utility theme-border-accent {
+  border-color: var(--accent-main);
+}
+@utility theme-border-accent-soft {
+  border-color: color-mix(in srgb, var(--accent-main) 40%, transparent);
+}
 @utility theme-text-primary {
   color: var(--text-primary);
 }

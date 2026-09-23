@@ -72,6 +72,7 @@ interface UsePrintDocxEngineParams {
   resolvedTitle?: string;
   resolvedSubtitle?: string;
   onTemplateChange?: ((templateId: any) => void) | null;
+  activeTemplateId?: string | null;
 }
 
 export function usePrintDocxEngine({
@@ -93,6 +94,7 @@ export function usePrintDocxEngine({
   resolvedTitle = 'Official Document',
   resolvedSubtitle = '',
   onTemplateChange = null,
+  activeTemplateId = null,
 }: UsePrintDocxEngineParams) {
   const [isDocxModalOpen, setIsDocxModalOpen] = useState<boolean>(false);
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState<boolean>(false);
@@ -191,7 +193,10 @@ export function usePrintDocxEngine({
   useEffect(() => {
     if (!isOpen) return;
     try {
-      const scopeDefault = getDefaultTemplateForScope(scopeId);
+      const scopeDefault =
+        getDefaultTemplateForScope(scopeId) ||
+        (templates || []).find((t: any) => (t.scopeId && t.scopeId === scopeId) || (activeTemplateId && t.id === activeTemplateId)) ||
+        (savedWordTemplates || []).find((t) => t.scopeId === scopeId && t.templateType !== 'generated');
       if (scopeDefault) {
         const { styles, body } = separateDocxStylesAndBody(scopeDefault.rawHtml || '');
         const isGen = scopeDefault.templateType === 'generated' || scopeDefault.id?.startsWith('gen_');
@@ -359,10 +364,33 @@ export function usePrintDocxEngine({
       }
     }
 
-    // 1. Template Design Mode / Blank Document: Split by page breaks or sections
-    if (docxRenderMode === 'template' || customDocxTemplate.id === 'blank_document') {
-      const pages = splitHtmlIntoPages(templateBodyContent);
-      return pages.length > 0 ? pages : [templateBodyContent];
+    // 1. Template Design Mode: Split by page breaks or sections
+    if (docxRenderMode === 'template') {
+      let activeBody = templateBodyContent;
+      // If current document is a generated document, try resolving its unmerged source template body
+      if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
+        let srcBody = '';
+        if (customDocxTemplate.sourceTemplateId) {
+          const src = (savedWordTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId) ||
+                      (combinedTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId);
+          if (src) {
+            srcBody = separateDocxStylesAndBody(src.rawHtml || src.html || '').body || src.rawHtml || '';
+          }
+        }
+        if (!srcBody) {
+          const scopeDefTmpl = getDefaultTemplateForScope(scopeId) ||
+            (combinedTemplates || []).find((t) => t.scopeId === scopeId && t.templateType !== 'generated') ||
+            (templates || []).find((t: any) => t.scopeId === scopeId);
+          if (scopeDefTmpl) {
+            srcBody = separateDocxStylesAndBody(scopeDefTmpl.rawHtml || scopeDefTmpl.html || '').body || scopeDefTmpl.rawHtml || '';
+          }
+        }
+        if (srcBody) {
+          activeBody = srcBody;
+        }
+      }
+      const pages = splitHtmlIntoPages(activeBody);
+      return pages.length > 0 ? pages : [activeBody];
     }
 
     // 0. Pre-Generated Document: If it is already a saved generated document in Batch view
@@ -517,6 +545,45 @@ export function usePrintDocxEngine({
       onTemplateChange?.(templateIdOrObj);
     },
     [savedWordTemplates, combinedTemplates, templates, onTemplateChange, updateOptionsWithHistory, setOptions]
+  );
+
+  const handleDocxRenderModeChange = useCallback(
+    (mode: 'template' | 'sample' | 'all') => {
+      setDocxRenderMode(mode);
+      if (mode === 'template') {
+        // If currently loaded document is a generated document, immediately switch back to its source template
+        if (customDocxTemplate?.templateType === 'generated' || customDocxTemplate?.id?.startsWith('gen_')) {
+          let sourceTmpl: any = null;
+          if (customDocxTemplate.sourceTemplateId) {
+            sourceTmpl =
+              (savedWordTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId) ||
+              (combinedTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId);
+          }
+          if (!sourceTmpl) {
+            sourceTmpl =
+              getDefaultTemplateForScope(scopeId) ||
+              (combinedTemplates || []).find((t) => t.scopeId === scopeId && t.templateType !== 'generated') ||
+              (savedWordTemplates || []).find((t) => t.scopeId === scopeId && t.templateType !== 'generated') ||
+              (templates || []).find((t: any) => t.scopeId === scopeId);
+          }
+          if (sourceTmpl) {
+            handleTemplateSelection(sourceTmpl);
+          } else if (customDocxTemplate.templateBody && customDocxTemplate.templateBody !== BLANK_PAGE_HTML) {
+            const rawBody = customDocxTemplate.templateBody;
+            const preservedStyles = customDocxTemplate.styles || '';
+            const fullHtml = preservedStyles ? `${preservedStyles}\n${rawBody}` : rawBody;
+            setCustomDocxTemplate((prev: any) => ({
+              ...prev,
+              body: rawBody,
+              html: fullHtml,
+              rawHtml: fullHtml,
+              templateType: 'template' as const,
+            }));
+          }
+        }
+      }
+    },
+    [customDocxTemplate, savedWordTemplates, combinedTemplates, scopeId, templates, handleTemplateSelection]
   );
 
   const handleApplyDocxTemplate = useCallback((result: any) => {
@@ -769,6 +836,36 @@ export function usePrintDocxEngine({
     setSavedWordTemplates(getSavedDocxTemplates());
   }, []);
 
+  const handleUpdateDocxTemplate = useCallback(
+    (templateId: string, updates: { name?: string; description?: string }) => {
+      const all = getSavedDocxTemplates();
+      const existing = all.find((t) => t.id === templateId);
+      if (!existing) return;
+      const updated: CustomDocxTemplate = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDocxTemplate(updated);
+      setSavedWordTemplates(getSavedDocxTemplates());
+      setCustomDocxTemplate((prev: any) => {
+        if (prev?.templateMeta?.id === templateId || prev?.id === templateId) {
+          return {
+            ...prev,
+            name: updates.name ?? prev.name,
+            description: updates.description !== undefined ? updates.description : prev.description,
+            templateMeta: {
+              ...prev.templateMeta,
+              ...updates,
+            },
+          };
+        }
+        return prev;
+      });
+    },
+    []
+  );
+
   const handleSetScopeDefault = useCallback(
     (templateId: string | null) => {
       if (!templateId) {
@@ -805,7 +902,7 @@ export function usePrintDocxEngine({
     combinedTemplates,
     docxStyles,
     docxRenderMode,
-    setDocxRenderMode,
+    setDocxRenderMode: handleDocxRenderModeChange,
     contextEnrichedBaseRecord,
     enrichedRecords,
     mergedDocxPages,
@@ -814,6 +911,7 @@ export function usePrintDocxEngine({
     handleDeleteDocxTemplate,
     handleSaveCurrentTemplate,
     handleDuplicateDocxTemplate,
+    handleUpdateDocxTemplate,
     handleSetScopeDefault,
     docxCanUndo,
     docxCanRedo,

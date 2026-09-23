@@ -63,7 +63,7 @@ export default function PrintStudioHubView({
     []
   );
 
-  // Initial Sample Rows for Instant WYSIWYG Editing
+  // Initial Sample Rows for Instant WYSIWYG Editing (General Scopes)
   const initialData = useMemo(
     () => [
       {
@@ -115,6 +115,29 @@ export default function PrintStudioHubView({
     []
   );
 
+  // Check if session storage has data forwarded from user-picked modal
+  const forwardedDailyProgressData = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(`spr_doclab_scope_data_${scopeParam}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }, [scopeParam]);
+
+  // Strictly user-picked data: blank if not selected by user
+  const activeData = useMemo(() => {
+    if (isDailyProgressScope) {
+      return forwardedDailyProgressData || [];
+    }
+    return initialData;
+  }, [forwardedDailyProgressData, isDailyProgressScope, initialData]);
+
   // Metadata items displayed at the top of the generated document
   const initialMetaItems = useMemo(
     () => [
@@ -151,8 +174,9 @@ export default function PrintStudioHubView({
             : 'Universal Document, Template & Report Publishing Studio'
         }
         columns={isDailyProgressScope ? [] : initialColumns}
-        data={isDailyProgressScope ? [] : initialData}
+        data={activeData}
         metaItems={isDailyProgressScope ? [] : initialMetaItems}
+        templates={[]}
         placeholderKeys={
           isDailyProgressScope ? DAILY_PROGRESS_DOCLAB_KEYS : standardPlaceholderKeys
         }
