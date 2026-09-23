@@ -242,20 +242,30 @@ export default function DailyProgressView({
 
   // ── Cascading Filter Handlers ────────────────────────────────────────────────
   const handleDepartmentChange = (newDeptId: string) => {
+    setLocalDeptId(newDeptId);
+    setLocalClassId("");
+    setLocalSectionId("");
+    setGroupName("");
     rawOnDepartmentChange(newDeptId);
   };
 
   const handleClassChange = (newClassId: string) => {
+    setLocalClassId(newClassId);
+    setLocalSectionId("");
+    setGroupName("");
     rawOnClassChange(newClassId);
   };
 
   const handleSectionChange = (newSecId: string) => {
+    setLocalSectionId(newSecId);
     rawOnSectionChange(newSecId);
     if (newSecId) {
       const secObj = (sections || []).find((s: any) => String(s.id) === String(newSecId));
       if (secObj) {
         setGroupName(secObj.section_name || secObj.name || "");
       }
+    } else {
+      setGroupName("");
     }
   };
 
@@ -273,16 +283,10 @@ export default function DailyProgressView({
       : (sections || []).filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes)).length > 0;
 
   // ── Direct Academic Hierarchy Context Resolver for DocLab Reports ───────────
+  // Resolves strictly what the user picked in the top selectors (Date, Dept, Class, Section).
+  // Zero forced data, zero guessing, zero regex fallbacks. If not picked, remains blank.
   const resolvedAcademicContext = useMemo(() => {
-    const safeStudent = (studentName || "").trim().toLowerCase();
-    const currentStudent = (allStudentDatabase || []).find(
-      (s: any) =>
-        (selectedStudentId && String(s.id) === String(selectedStudentId)) ||
-        (safeStudent && (s.name_en || s.name || s.label || "").toLowerCase().trim() === safeStudent)
-    );
-
-    // ── 1. Resolve Department Name ──────────────────────────────────────────
-    // Direct from selected Department dropdown option
+    // ── 1. Resolve Department Name (Direct from user's picked Department in filter) ──
     let deptName = "";
     if (selectedDepartmentId) {
       const opt = (departmentSelectOptions || []).find(
@@ -294,45 +298,8 @@ export default function DailyProgressView({
         deptName = d?.name || d?.department_name || d?.title || d?.label || "";
       }
     }
-    // If not selected in dropdown, derive from selected class's department
-    if (!deptName && selectedClassId) {
-      const c = (classes || []).find((x: any) => String(x.id) === String(selectedClassId));
-      deptName = c?.department_name || "";
-      if (!deptName && c) {
-        const cDeptId = getDepartmentId(c) || c.department_id || c.department;
-        if (cDeptId) {
-          const opt = (departmentSelectOptions || []).find((o: any) => String(o.value) === String(cDeptId));
-          deptName = opt?.label || "";
-          if (!deptName) {
-            const d = (departments || []).find((x: any) => String(x.id) === String(cDeptId));
-            deptName = d?.name || d?.department_name || "";
-          }
-        }
-      }
-    }
-    // If still empty, check student profile
-    if (!deptName && currentStudent) {
-      deptName = currentStudent.department_name || "";
-      if (!deptName && currentStudent.department) {
-        const opt = (departmentSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.department));
-        deptName = opt?.label || "";
-        if (!deptName) {
-          const d = (departments || []).find((x: any) => String(x.id) === String(currentStudent.department));
-          deptName = d?.name || d?.department_name || d?.title || "";
-        }
-      }
-    }
-    // Fallback if department options exist in system
-    if (!deptName && departmentSelectOptions && departmentSelectOptions.length > 0) {
-      const hifz = departmentSelectOptions.find((d: any) => /hifz|tahfiz|quran/i.test(d.label || ""));
-      deptName = hifz?.label || departmentSelectOptions[0]?.label || "";
-    } else if (!deptName && departments && departments.length > 0) {
-      const hifz = departments.find((d: any) => /hifz|tahfiz|quran/i.test(d.name || d.department_name || ""));
-      deptName = hifz?.name || hifz?.department_name || departments[0]?.name || departments[0]?.department_name || "";
-    }
 
-    // ── 2. Resolve Class Name ───────────────────────────────────────────────
-    // Direct from selected Class dropdown option
+    // ── 2. Resolve Class Name (Direct from user's picked Class in filter) ────────
     let clsName = "";
     if (selectedClassId) {
       const opt = (classSelectOptions || []).find(
@@ -344,29 +311,10 @@ export default function DailyProgressView({
         clsName = c?.name || c?.class_name || c?.title || c?.label || "";
       }
     }
-    // If not selected in dropdown, check student profile
-    if (!clsName && currentStudent) {
-      clsName = currentStudent.student_class_name || currentStudent.class_name || "";
-      if (!clsName && currentStudent.student_class) {
-        const opt = (classSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.student_class));
-        clsName = opt?.label || "";
-        if (!clsName) {
-          const c = (classes || []).find((x: any) => String(x.id) === String(currentStudent.student_class));
-          clsName = c?.name || c?.class_name || c?.title || "";
-        }
-      }
-    }
-    // Fallback if only 1 class option
-    if (!clsName && classSelectOptions && classSelectOptions.length === 1) {
-      clsName = classSelectOptions[0].label || "";
-    } else if (!clsName && classes && classes.length === 1) {
-      clsName = classes[0]?.name || classes[0]?.class_name || "";
-    }
 
-    // ── 3. Resolve Section / Group Name ─────────────────────────────────────
-    // Priority: live groupName input > selected Section dropdown option > student profile
-    let secName = (groupName && groupName.trim()) ? groupName.trim() : "";
-    if (!secName && selectedSectionId) {
+    // ── 3. Resolve Section Name (Direct from user's picked Section in filter) ─────
+    let secName = "";
+    if (selectedSectionId) {
       const opt = (sectionSelectOptions || []).find(
         (o: any) => String(o.value) === String(selectedSectionId) || String(o.label) === String(selectedSectionId)
       );
@@ -375,22 +323,6 @@ export default function DailyProgressView({
         const s = (sections || []).find((x: any) => String(x.id) === String(selectedSectionId));
         secName = s?.section_name || s?.name || s?.title || s?.label || "";
       }
-    }
-    if (!secName && currentStudent) {
-      secName = currentStudent.section_name || currentStudent.student_section_name || currentStudent.group_name || currentStudent.sub || "";
-      if (!secName && currentStudent.student_section) {
-        const opt = (sectionSelectOptions || []).find((o: any) => String(o.value) === String(currentStudent.student_section));
-        secName = opt?.label || "";
-        if (!secName) {
-          const s = (sections || []).find((x: any) => String(x.id) === String(currentStudent.student_section));
-          secName = s?.section_name || s?.name || s?.title || "";
-        }
-      }
-    }
-    if (!secName && sectionSelectOptions && sectionSelectOptions.length === 1) {
-      secName = sectionSelectOptions[0].label || "";
-    } else if (!secName && sections && sections.length === 1) {
-      secName = sections[0]?.section_name || sections[0]?.name || "";
     }
 
     return {
@@ -408,10 +340,35 @@ export default function DailyProgressView({
     departments,
     classes,
     sections,
+  ]);
+
+  // ── Memoized DocLab Data Record for Quick Report Modal ───────────────────────
+  const dailyProgressReportData = useMemo(() => {
+    return buildDailyProgressReportData(
+      {
+        studentName,
+        groupName: resolvedAcademicContext.sectionName,
+        departmentName: resolvedAcademicContext.departmentName,
+        className: resolvedAcademicContext.className,
+        sectionName: resolvedAcademicContext.sectionName,
+        selectedSession,
+        selectedDate,
+        juzPageData,
+        mistakeData,
+        stuckData,
+        comment,
+      },
+      resolvedAcademicContext
+    );
+  }, [
     studentName,
-    selectedStudentId,
-    allStudentDatabase,
-    groupName,
+    resolvedAcademicContext,
+    selectedSession,
+    selectedDate,
+    juzPageData,
+    mistakeData,
+    stuckData,
+    comment,
   ]);
 
   // ── Student Selection with Mutual Auto-Population of Hierarchy ───────────────
@@ -1110,22 +1067,7 @@ export default function DailyProgressView({
         scopeName="Daily Progress"
         title="Daily Progress Report"
         returnUrl="/studies/daily-progress"
-        dataRecord={buildDailyProgressReportData(
-          {
-            studentName,
-            groupName: resolvedAcademicContext.sectionName || groupName,
-            departmentName: resolvedAcademicContext.departmentName,
-            className: resolvedAcademicContext.className,
-            sectionName: resolvedAcademicContext.sectionName,
-            selectedSession,
-            selectedDate,
-            juzPageData,
-            mistakeData,
-            stuckData,
-            comment,
-          },
-          resolvedAcademicContext
-        )}
+        dataRecord={dailyProgressReportData}
       />
     </PageContainer>
   );

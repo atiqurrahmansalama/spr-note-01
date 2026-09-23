@@ -227,6 +227,8 @@ export default function UniversalPrintStudio({
     onClose,
     handleUndo: effectiveHandleUndo,
     handleRedo: effectiveHandleRedo,
+    canUndo: effectiveCanUndo,
+    canRedo: effectiveCanRedo,
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,

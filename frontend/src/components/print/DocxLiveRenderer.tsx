@@ -299,7 +299,7 @@ function DocxLiveRendererComponent({
       return;
     }
 
-    // While user is actively focused and typing inside this container, NEVER overwrite innerHTML!
+    // While user is actively typing inside this container, don't overwrite if the body matches what was typed
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
       lastKnownHtmlRef.current = cleanBody || '';
@@ -311,14 +311,11 @@ function DocxLiveRendererComponent({
       (document.activeElement === containerRef.current ||
         containerRef.current.contains(document.activeElement));
 
-    if (isCurrentActive) {
-      // User is actively focused in this editor; keep DOM intact
-      lastKnownHtmlRef.current = cleanBody || '';
-      return;
-    }
-
-    // External change (e.g. Undo, Redo, Template Switch): update DOM if different
+    // External change (e.g. Undo, Redo, Template Switch, Token Insert): update DOM if different
     if (containerRef.current.innerHTML !== cleanBody) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       const targetBookmark = savedBookmarkRef.current;
       containerRef.current.innerHTML = cleanBody || '';
       lastKnownHtmlRef.current = cleanBody || '';

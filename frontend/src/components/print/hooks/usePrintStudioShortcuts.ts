@@ -9,6 +9,8 @@ interface UsePrintStudioShortcutsParams {
   onClose?: () => void;
   handleUndo: () => void;
   handleRedo: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   handleZoomIn: () => void;
   handleZoomOut: () => void;
   handleResetZoom: () => void;
@@ -31,6 +33,8 @@ export function usePrintStudioShortcuts({
   onClose,
   handleUndo,
   handleRedo,
+  canUndo = true,
+  canRedo = true,
   handleZoomIn,
   handleZoomOut,
   handleResetZoom,
@@ -111,16 +115,20 @@ export function usePrintStudioShortcuts({
         setIsSidebarOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         if (!inSidebar) {
-          e.preventDefault();
-          handleUndo();
+          if (canUndo) {
+            e.preventDefault();
+            handleUndo();
+          }
         }
       } else if (
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.shiftKey)
       ) {
         if (!inSidebar) {
-          e.preventDefault();
-          handleRedo();
+          if (canRedo) {
+            e.preventDefault();
+            handleRedo();
+          }
         }
       } else if (!inSidebar && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'm') {
@@ -133,7 +141,7 @@ export function usePrintStudioShortcuts({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handlePrint, onClose, handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom, setIsSidebarOpen, setPointerMode]);
+  }, [isOpen, handlePrint, onClose, handleUndo, handleRedo, canUndo, canRedo, handleZoomIn, handleZoomOut, handleResetZoom, setIsSidebarOpen, setPointerMode]);
 
   // URL Synchronization & Browser History (Back/Forward button support)
   const wasOpenRef = useRef(false);

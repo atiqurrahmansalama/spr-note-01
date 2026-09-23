@@ -433,7 +433,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                       onNavigatePrevPage={() => handleFocusPage(pIdx - 1, 'end')}
                       onNavigateNextPage={() => handleFocusPage(pIdx + 1, 'start')}
                       onContentChange={(newHtml) => {
-                        if (docxRenderMode === 'template') {
+                        if (docxRenderMode === 'template' || customDocxTemplate) {
                           const updater = (prev: any) => {
                             if (!prev) return null;
                             const preservedStyles =

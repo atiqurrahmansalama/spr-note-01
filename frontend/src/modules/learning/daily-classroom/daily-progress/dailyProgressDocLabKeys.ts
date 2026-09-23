@@ -223,7 +223,6 @@ export function buildDailyProgressReportData(
 ): Record<string, string> {
   const {
     studentName = '',
-    groupName = '',
     departmentName: propDeptName = '',
     className: propClassName = '',
     sectionName: propSectionName = '',
@@ -236,40 +235,17 @@ export function buildDailyProgressReportData(
     teacherName: propTeacherName = '',
   } = reportData;
 
-  // 1. Date
-  const rawDate = selectedDate || new Date().toISOString().split('T')[0];
-  const formattedDate = formatReportDate(rawDate);
+  // 1. Date (Direct from user's picked date, empty if none)
+  const rawDate = selectedDate || '';
+  const formattedDate = rawDate ? formatReportDate(rawDate) : '';
 
   // 2. Student Name
   const safeStudentName = (studentName || '').trim();
 
-  // 3. Dept, Class, Section (with groupName fallback)
-  const deptName = (
-    academicContext.departmentName ||
-    propDeptName ||
-    (reportData as any).dept ||
-    (reportData as any).dept_name ||
-    (reportData as any).department ||
-    ''
-  ).trim();
-
-  const className = (
-    academicContext.className ||
-    propClassName ||
-    (reportData as any).class ||
-    (reportData as any).class_name ||
-    ''
-  ).trim();
-
-  const sectionName = (
-    academicContext.sectionName ||
-    propSectionName ||
-    groupName ||
-    (reportData as any).sec ||
-    (reportData as any).section_name ||
-    (reportData as any).section ||
-    ''
-  ).trim();
+  // 3. Dept, Class, Section (Strictly user-picked, no forced fallbacks)
+  const deptName = (academicContext.departmentName || propDeptName || '').trim();
+  const className = (academicContext.className || propClassName || '').trim();
+  const sectionName = (academicContext.sectionName || propSectionName || '').trim();
 
   // 4. Juz Number & Juz Page
   const juzNumber = extractJuzNumberString(juzPageData);
@@ -319,8 +295,13 @@ export function buildDailyProgressReportData(
     'remarks': remarksStr,
 
     // Case-Insensitive, Short Form & Underscore/CamelCase Aliases
+    'Date': formattedDate,
+    'delivery_date': formattedDate,
+    'report_date': formattedDate,
+    'selected_date': formattedDate,
     'student_name': safeStudentName,
     'studentName': safeStudentName,
+    'StudentName': safeStudentName,
     'dept_name': deptName,
     'department': deptName,
     'department_name': deptName,
@@ -330,6 +311,8 @@ export function buildDailyProgressReportData(
     'class_name': className,
     'class-name': className,
     'Class': className,
+    'ClassName': className,
+    'target_class': className,
     'sec': sectionName,
     'Sec': sectionName,
     'section_name': sectionName,
