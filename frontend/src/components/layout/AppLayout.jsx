@@ -6,7 +6,6 @@ import SaveStatusBadge from "../common/SaveStatusBadge";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
 import PanelResizer from "../ui/PanelResizer";
-import InstitutionSwitcher from "./InstitutionSwitcher";
 import InstitutionSwitchModal from "./InstitutionSwitchModal";
 import { useRightSidebar, useDrawerRegistration, saveDrawerWidthToStorage } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
@@ -730,9 +729,9 @@ export default function AppLayout() {
           </button>
         </div>
 
-        {/* Selected Active Institution, Branch & Academic Year in Header Middle - Absolutely Centered to prevent shifting */}
+        {/* Selected Active Institution, Branch & Academic Year in Header Middle - Absolutely Centered to prevent shifting (Hidden on small screens) */}
         {currentInstitution?.name && (
-          <div className="absolute left-1/2 -translate-x-1/2 flex justify-center items-center px-4 max-w-[calc(100%-420px)] pointer-events-none text-center">
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 justify-center items-center px-4 max-w-[calc(100%-420px)] pointer-events-none text-center">
             <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
               <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
                 {currentInstitution.name}

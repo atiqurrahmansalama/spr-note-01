@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import UserProfileCard from "./UserProfileCard";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
 import { useTranslation } from "../../i18n";
