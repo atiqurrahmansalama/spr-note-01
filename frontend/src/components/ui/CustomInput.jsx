@@ -483,14 +483,11 @@ const CustomInput = forwardRef(function CustomInput(
           focusNextInput(innerRef.current);
           return;
         }
-      } else if (e.key === "+" || e.key === "=") {
-        if (e.shiftKey && onAddShift) {
+      } else if (e.key === "+" || e.key === "=" || e.code === "NumpadAdd" || e.key === ",") {
+        const addHandler = (e.shiftKey && onAddShift) ? onAddShift : (onAdd || onAddShift);
+        if (addHandler) {
           e.preventDefault();
-          onAddShift(e);
-          return;
-        } else if (onAdd) {
-          e.preventDefault();
-          onAdd(e);
+          addHandler(e);
           return;
         }
       }

@@ -260,11 +260,11 @@ export default function DailyClassroomFilterControls({
         className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
         <div
-          className={`grid grid-cols-1 ${
+          className={`grid grid-cols-2 ${
             hasDepartments && hasSectionsForClass
-              ? '@[480px]:grid-cols-2 @[800px]:grid-cols-4'
+              ? '@[800px]:grid-cols-4'
               : hasDepartments || hasSectionsForClass
-              ? '@[480px]:grid-cols-2 @[720px]:grid-cols-3'
+              ? '@[720px]:grid-cols-3'
               : '@[480px]:grid-cols-2'
           } gap-2.5 sm:gap-3 w-full items-end ${gridClassName}`}
         >
@@ -290,11 +290,11 @@ export default function DailyClassroomFilterControls({
   if (wrapGrid) {
     return (
       <div
-        className={`@container grid grid-cols-1 ${
+        className={`@container grid grid-cols-2 ${
           hasDepartments && hasSectionsForClass
-            ? '@[480px]:grid-cols-2 @[800px]:grid-cols-4'
+            ? '@[800px]:grid-cols-4'
             : hasDepartments || hasSectionsForClass
-            ? '@[480px]:grid-cols-2 @[720px]:grid-cols-3'
+            ? '@[720px]:grid-cols-3'
             : '@[480px]:grid-cols-2'
         } gap-3 ${gridClassName}`}
       >

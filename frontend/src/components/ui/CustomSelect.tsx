@@ -32,6 +32,8 @@ export interface CustomSelectProps {
   icon?: React.ComponentType<{ className?: string }> | null;
   size?: 'sm' | 'md' | 'lg' | string;
   compactMode?: boolean;
+  showChevron?: boolean;
+  hideChevron?: boolean;
   showDescription?: boolean;
   showBadge?: boolean;
   multiple?: boolean;
@@ -70,6 +72,8 @@ export default function CustomSelect({
   icon: Icon = null,
   size = 'md',
   compactMode = false,
+  showChevron = true,
+  hideChevron = false,
   showDescription = false,
   showBadge = true,
   multiple = false,
@@ -248,9 +252,11 @@ export default function CustomSelect({
           <span className="w-full text-center text-[12px] sm:text-[14px] font-mono font-semibold theme-text-primary pointer-events-none">
             {selectedLabel || placeholder}
           </span>
-          <span className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
-            <ChevronIcon isOpen={isOpen} className="w-2.5 h-2.5 theme-text-secondary transition-transform duration-200" />
-          </span>
+          {showChevron && !hideChevron && (
+            <span className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
+              <ChevronIcon isOpen={isOpen} className="w-2.5 h-2.5 theme-text-secondary transition-transform duration-200" />
+            </span>
+          )}
         </button>
       ) : (
         <button

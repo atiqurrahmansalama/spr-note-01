@@ -663,18 +663,16 @@ html[lang="ur"] button {
 /* Standard Enterprise Icon Button Feedback (Fully rounded, borderless, subtle light background on hover & touch) */
 .theme-icon-btn,
 button[data-component="icon-button"] {
-  border-radius: 9999px !important;
-  border-width: 0 !important;
-  border-style: none !important;
+  border-radius: 9999px;
   outline: none !important;
   -webkit-tap-highlight-color: transparent;
 }
 .theme-icon-btn:where(:not([class*="hover:bg-"])):hover,
 button[data-component="icon-button"]:where(:not([class*="hover:bg-"])):hover {
-  background-color: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  background-color: color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
 .theme-icon-btn:where(:not([class*="active:bg-"])):active,
 button[data-component="icon-button"]:where(:not([class*="active:bg-"])):active {
-  background-color: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  background-color: color-mix(in srgb, var(--text-primary) 18%, transparent);
   transform: scale(0.95);
 }

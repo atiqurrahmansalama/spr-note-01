@@ -83,16 +83,16 @@ const SHAPE_STYLES: Record<IconButtonShape, Record<IconButtonSize, string>> = {
 };
 
 const VARIANT_STYLES: Record<IconButtonVariant, string> = {
-  ghost: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
-  sub: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
-  surface: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
-  outline: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.06] active:bg-current/[0.12]',
+  ghost: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
+  sub: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
+  surface: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
+  outline: 'bg-transparent border theme-border theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
   filled: 'theme-bg-elevated border-0 theme-text-primary hover:opacity-90 active:opacity-80',
   accent: 'theme-bg-accent border-0 theme-accent-text hover:brightness-110 active:brightness-95 shadow-2xs',
   'accent-soft': 'theme-bg-accent-soft border-0 theme-accent hover:theme-bg-accent hover:theme-accent-text',
-  danger: 'bg-transparent border-0 text-rose-400 hover:text-rose-500 hover:bg-rose-500/[0.06] active:bg-rose-500/[0.12]',
+  danger: 'bg-transparent border-0 text-rose-400 hover:text-rose-500 hover:bg-rose-500/[0.10] active:bg-rose-500/[0.20]',
   'danger-soft': 'bg-rose-500/10 border-0 text-rose-400 hover:bg-rose-500/18 active:bg-rose-500/25',
-  success: 'bg-transparent border-0 text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/[0.06] active:bg-emerald-500/[0.12]',
+  success: 'bg-transparent border-0 text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/[0.10] active:bg-emerald-500/[0.20]',
   'success-soft': 'bg-emerald-500/10 border-0 text-emerald-400 hover:bg-emerald-500/18 active:bg-emerald-500/25',
 };
 

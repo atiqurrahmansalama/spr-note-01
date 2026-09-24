@@ -68,7 +68,7 @@ export default function PageRangeInput({
   size = 'md',
   variant = 'sub',
   className = '',
-  width = 'w-28 sm:w-32',
+  width = 'w-24 sm:w-28',
   placeholderStart = '--',
   placeholderEnd = '--',
   disabled = false,
@@ -216,12 +216,12 @@ export default function PageRangeInput({
     else handleEnterFocusNext(e);
   };
 
-  // Size styling matching Juz input box (h-[38px] sm:h-10, rounded-lg)
+  // Size styling matching Juz input box (compact: h-9, md: h-10)
   const sizeClasses = {
-    sm: 'h-[36px] rounded-lg text-xs',
-    md: 'h-[38px] sm:h-10 rounded-lg text-xs sm:text-sm',
+    sm: 'h-9 rounded-lg text-xs sm:text-sm',
+    md: 'h-10 rounded-lg text-xs sm:text-sm',
     lg: 'h-[44px] rounded-xl text-sm sm:text-base',
-  }[size] || 'h-[38px] sm:h-10 rounded-lg text-xs sm:text-sm';
+  }[size] || 'h-10 rounded-lg text-xs sm:text-sm';
 
   // Variant classes (default theme-bg-sub matching Juz input)
   let variantClasses = 'theme-bg-sub border theme-border shadow-sm';
