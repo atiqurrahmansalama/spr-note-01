@@ -157,8 +157,9 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
       className={className}
     >
       <DrawerContainer padding="none">
-        {/* Navigation Tabs Bar */}
-        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
+        <div className="pb-8">
+          {/* Navigation Tabs Bar */}
+          <div className="grid grid-cols-5 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
           <button
             type="button"
             onClick={() => setActiveTab('presets')}
@@ -291,6 +292,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
             onOptionsChange={onOptionsChange}
           />
         )}
+        </div>
       </DrawerContainer>
     </RightSidebarPanel>
   );

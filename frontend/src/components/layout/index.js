@@ -8,6 +8,7 @@ export { default as UserProfileCard } from './UserProfileCard';
 export { default as UserProfileDrawer } from './UserProfileDrawer';
 export { default as SidebarScreenBlockView } from './SidebarScreenBlockView';
 export { default as NotificationBellDropdown } from './NotificationBellDropdown';
+export { default as NotificationCenterDrawer } from './NotificationCenterDrawer';
 export { default as NotificationDetailDrawer } from './NotificationDetailDrawer';
 
 

@@ -309,6 +309,7 @@ function convertViaTokenEngine(html: string, opts: Required<DocTextConvertOption
 
 /**
  * Line-by-line normalization and hygiene post-processor.
+ * Preserves intentional indentation (e.g. from DocLab indent filter / &nbsp;) while trimming trailing whitespace.
  */
 function postProcessLines(rawLines: string[], opts: Required<DocTextConvertOptions>): string {
   const processedLines: string[] = [];
@@ -316,18 +317,18 @@ function postProcessLines(rawLines: string[], opts: Required<DocTextConvertOptio
   for (let rawLine of rawLines) {
     let line = rawLine;
 
-    // Normalize non-breaking spaces and zero-width characters
+    // Normalize non-breaking spaces (\u00A0) and zero-width characters to standard spaces
+    // Crucial for DocLab indent feature (where &nbsp; represents indentation columns)
     line = line
       .replace(/[\u00A0]/g, ' ')
       .replace(/[\u200B-\u200D\uFEFF]/g, '');
 
-    // Trim line if option enabled
-    if (opts.trimLines) {
-      line = line.trim();
-    }
+    // Trim trailing whitespace on all lines
+    line = line.trimEnd();
 
-    // Eliminate orphaned leading space caused by empty placeholders (e.g. " He's Student...")
-    if (line.startsWith(' ') && line.length > 1 && line[1] !== ' ') {
+    // Eliminate single orphaned leading space caused by empty placeholders (e.g. " John")
+    // Strictly preserve multi-space intentional indentation (e.g. "     Page 14 Ayah 5" from indent filter)
+    if (line.startsWith(' ') && !line.startsWith('  ')) {
       line = line.trimStart();
     }
 
@@ -339,7 +340,7 @@ function postProcessLines(rawLines: string[], opts: Required<DocTextConvertOptio
   let consecutiveEmptyCount = 0;
 
   for (const line of processedLines) {
-    if (line === '') {
+    if (line.trim() === '') {
       if (consecutiveEmptyCount < opts.maxConsecutiveBlankLines && finalLines.length > 0) {
         finalLines.push('');
         consecutiveEmptyCount++;

@@ -62,7 +62,6 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
   onToggleScopeDefault,
 }) => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [filesFilter, setFilesFilter] = useState<'all' | 'templates' | 'generated'>('all');
   const [templateToDelete, setTemplateToDelete] = useState<DocxTemplate | null>(null);
   const [templateToRename, setTemplateToRename] = useState<DocxTemplate | null>(null);
   const [renameName, setRenameName] = useState('');
@@ -127,7 +126,7 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
   };
 
   const customTemplatesList = useMemo(() => {
-    return (templates || []).filter((t: any) => {
+    const list = (templates || []).filter((t: any) => {
       if (t.isTable || t.id === 'default_table' || t.isBlank || t.id === 'blank_document' || t.id === 'default_layout') {
         return false;
       }
@@ -137,21 +136,14 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
       }
       return true;
     });
+
+    // Stable alphabetical sorting by template/file name (prevents jumping on selection)
+    return [...list].sort((a: any, b: any) => {
+      const nameA = String(a.name || a.title || a.id || '').trim().toLowerCase();
+      const nameB = String(b.name || b.title || b.id || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
   }, [templates, scopeDefinition]);
-
-  const templatesList = useMemo(() => {
-    return customTemplatesList.filter((t: any) => t.templateType !== 'generated' && !t.id?.startsWith('gen_'));
-  }, [customTemplatesList]);
-
-  const generatedList = useMemo(() => {
-    return customTemplatesList.filter((t: any) => t.templateType === 'generated' || t.id?.startsWith('gen_'));
-  }, [customTemplatesList]);
-
-  const displayedFiles = useMemo(() => {
-    if (filesFilter === 'templates') return templatesList;
-    if (filesFilter === 'generated') return generatedList;
-    return customTemplatesList;
-  }, [filesFilter, templatesList, generatedList, customTemplatesList]);
 
   const blankTemplate = useMemo(() => {
     return (templates || []).find((t: any) => t.isBlank || t.id === 'blank_document');
@@ -162,7 +154,7 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
   );
 
   return (
-    <div className="space-y-4 pt-1">
+    <div className="space-y-4 pt-1 pb-6">
       {/* 1. Batch Data Generation Controls */}
       {isCustomDocxActive && (
         <div className="p-3.5 rounded-xl border theme-border theme-bg-sub/60 space-y-2.5">
@@ -293,75 +285,30 @@ export const DocLabPresetsTab: React.FC<DocLabPresetsTabProps> = ({
         </div>
       )}
 
-      {/* 6. Saved Custom Templates & Generated Docs */}
+      {/* 6. Saved Custom Scope Templates */}
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider theme-text-muted">
             Scope Templates {customTemplatesList.length > 0 ? `(${customTemplatesList.length})` : ''}
           </span>
-
-          {/* Filter Tabs */}
-          {generatedList.length > 0 && (
-            <div className="flex items-center gap-1 text-[10px]">
-              <button
-                type="button"
-                onClick={() => setFilesFilter('all')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  filesFilter === 'all'
-                    ? 'theme-bg-accent text-white font-bold'
-                    : 'theme-text-secondary hover:theme-text-primary'
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilesFilter('templates')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  filesFilter === 'templates'
-                    ? 'theme-bg-accent text-white font-bold'
-                    : 'theme-text-secondary hover:theme-text-primary'
-                }`}
-              >
-                Templates ({templatesList.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilesFilter('generated')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  filesFilter === 'generated'
-                    ? 'theme-bg-accent text-white font-bold'
-                    : 'theme-text-secondary hover:theme-text-primary'
-                }`}
-              >
-                Filled ({generatedList.length})
-              </button>
-            </div>
-          )}
         </div>
 
         {customTemplatesList.length > 0 ? (
-          <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
-            {displayedFiles.length > 0 ? (
-              displayedFiles.map((tmpl) => (
-                <DocLabTemplateCard
-                  key={tmpl.id}
-                  template={tmpl}
-                  isActive={activeTemplateId === tmpl.id}
-                  isScopeDefault={scopeDefaultTemplateId === tmpl.id}
-                  onSelect={onSelectTemplate}
-                  onEdit={handleEditTemplate}
-                  onRename={handleOpenRename}
-                  onDuplicate={onDuplicateDocxTemplate}
-                  onDelete={(target) => setTemplateToDelete(target)}
-                  onToggleScopeDefault={onToggleScopeDefault}
-                />
-              ))
-            ) : (
-              <div className="p-4 rounded-xl border border-dashed theme-border text-center py-6 text-xs theme-text-secondary">
-                No templates in this category
-              </div>
-            )}
+          <div className="space-y-2">
+            {customTemplatesList.map((tmpl) => (
+              <DocLabTemplateCard
+                key={tmpl.id}
+                template={tmpl}
+                isActive={activeTemplateId === tmpl.id}
+                isScopeDefault={scopeDefaultTemplateId === tmpl.id}
+                onSelect={onSelectTemplate}
+                onEdit={handleEditTemplate}
+                onRename={handleOpenRename}
+                onDuplicate={onDuplicateDocxTemplate}
+                onDelete={(target) => setTemplateToDelete(target)}
+                onToggleScopeDefault={onToggleScopeDefault}
+              />
+            ))}
           </div>
         ) : (
           /* Empty State: No Template */

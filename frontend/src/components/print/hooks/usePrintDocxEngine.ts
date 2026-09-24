@@ -1031,21 +1031,10 @@ export function usePrintDocxEngine({
         setSavedWordTemplates(getSavedDocxTemplates());
         return;
       }
-      const allTemplates = getSavedDocxTemplates();
-      const tmpl = allTemplates.find((t) => t.id === templateId) || (customDocxTemplate?.id === templateId ? customDocxTemplate : null);
-      if (tmpl) {
-        const val = validateTemplateForScope(tmpl, scopeId);
-        if (!val.isValid) {
-          const proceed = window.confirm(
-            `Warning: This template is missing ${val.missingRequiredKeys.length} required key(s) for "${val.scopeName}":\n\n${val.missingRequiredKeys.map((k) => `• {{${k}}}`).join('\n')}\n\nSetting this template as default may result in missing data during print generation. Do you want to set it as default anyway?`
-          );
-          if (!proceed) return;
-        }
-      }
       setDefaultTemplateForScope(scopeId, templateId);
       setSavedWordTemplates(getSavedDocxTemplates());
     },
-    [scopeId, customDocxTemplate]
+    [scopeId]
   );
 
   return {

@@ -19,7 +19,7 @@ import {
 } from "../../student-management/admission/AdmissionTaxonomyPanels";
 import GradingRulesView from "../../examinations/grading-rules/GradingRulesView";
 import SessionManager from "../../student-management/sessions/SessionManager";
-import ClassroomConfigurationView from "../../learning/daily-classroom/ClassroomConfigurationView";
+import ClassroomConfigurationView from "../../learning/components/ClassroomConfigurationView";
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
 

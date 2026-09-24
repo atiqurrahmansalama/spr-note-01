@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTenant } from '../../../context/TenantContext';
-import { useAcademicData } from '../../learning/useAcademicData';
+import { useAcademicData } from '@/hooks/useAcademicData';
 import { examStore } from '@/stores/examStore';
 import {
   academicYearsStore,

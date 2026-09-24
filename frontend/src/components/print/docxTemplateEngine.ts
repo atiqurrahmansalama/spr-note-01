@@ -1114,6 +1114,18 @@ export function sanitizeDocxPlaceholders(html: string): string {
     return `{{${cleanKey}}}`;
   });
 
+  // 3b. Auto-repair unbalanced single-close on double-open: {{key} -> {{key}}
+  cleaned = cleaned.replace(/\{\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}(?!\})/g, (_, key) => {
+    const cleanKey = key.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return `{{${cleanKey}}}`;
+  });
+
+  // 3c. Auto-repair unbalanced single-open on double-close: {key}} -> {{key}}
+  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}\}/g, (_, key) => {
+    const cleanKey = key.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return `{{${cleanKey}}}`;
+  });
+
   // 4. Prevent and collapse any accidental triple or quadruple braces: {{{key}}} -> {{key}}
   cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s|:'",]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
 
@@ -1850,14 +1862,23 @@ export function getSavedDocxTemplates(): CustomDocxTemplate[] {
 export function saveDocxTemplate(template: Omit<CustomDocxTemplate, 'createdAt' | 'updatedAt'>): CustomDocxTemplate {
   const existing = getSavedDocxTemplates();
   const now = new Date().toISOString();
+  
+  const existingIndex = existing.findIndex((t) => t.id === template.id);
+  const existingItem = existingIndex >= 0 ? existing[existingIndex] : null;
+
   const newTemplate: CustomDocxTemplate = {
     ...template,
-    createdAt: now,
+    createdAt: existingItem?.createdAt || (template as any).createdAt || now,
     updatedAt: now,
   };
 
-  const filtered = existing.filter((t) => t.id !== template.id);
-  const updated = [newTemplate, ...filtered];
+  let updated: CustomDocxTemplate[];
+  if (existingIndex >= 0) {
+    updated = [...existing];
+    updated[existingIndex] = newTemplate;
+  } else {
+    updated = [newTemplate, ...existing];
+  }
 
   if (typeof window !== 'undefined') {
     try {

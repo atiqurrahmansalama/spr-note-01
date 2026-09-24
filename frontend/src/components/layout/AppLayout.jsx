@@ -14,6 +14,7 @@ import { initActivityTracker } from "../../utils/activityTracker";
 import { triggerCloudSync, syncTenantTaxonomies } from "../../utils/syncEngine";
 import { fetchWithAuth } from "../../utils/authService";
 import NotificationBellDropdown from "./NotificationBellDropdown";
+import NotificationCenterDrawer from "./NotificationCenterDrawer";
 import NotificationDetailDrawer from "./NotificationDetailDrawer";
 import { LanguageSelector } from "../../i18n";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
@@ -168,6 +169,22 @@ export default function AppLayout() {
     drawerWidth,
     setDrawerWidth,
   } = useRightSidebar();
+  // Global Drawer Registration: Notification Center (Master List & Detail)
+  useDrawerRegistration('notifications', (params) => {
+    const notifId = params.get('id');
+    return {
+      title: 'Notifications',
+      category: 'System Alerts',
+      size: 'md',
+      content: (
+        <NotificationCenterDrawer
+          key={`notifications_center_${notifId || 'list'}`}
+          initialNotificationId={notifId}
+          onClose={closeDrawer || closeRightSidebar}
+        />
+      ),
+    };
+  });
 
   // Global Drawer Registration: Notification Detail
   useDrawerRegistration('notification_detail', (params) => {
@@ -177,9 +194,9 @@ export default function AppLayout() {
       category: 'Notifications',
       size: 'md',
       content: (
-        <NotificationDetailDrawer
+        <NotificationCenterDrawer
           key={`notification_detail_${notifId || 'active'}`}
-          notificationId={notifId}
+          initialNotificationId={notifId}
           onClose={closeDrawer || closeRightSidebar}
         />
       ),

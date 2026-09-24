@@ -197,6 +197,7 @@ export default function AutocompleteDropdown({
   // Headless Keyboard Navigation Engine
   const {
     highlightedIndex,
+    setHighlightedIndex,
     handleKeyDown,
     optionsListRef,
     resetHighlight,
@@ -211,6 +212,28 @@ export default function AutocompleteDropdown({
     onAddNew: safeSearchTerm.trim() && onAddNew ? () => handleSaveClick() : undefined,
     onNextFocus: triggerNextFocus,
   });
+
+  const selectedIndex = useMemo(() => {
+    if (!filteredOptions || filteredOptions.length === 0) return -1;
+    const hasSpecificId = selectedId != null && String(selectedId).trim() !== '';
+    return filteredOptions.findIndex((item) => {
+      if (hasSpecificId) {
+        return typeof item === 'object' && item?.id != null && String(item.id) === String(selectedId);
+      }
+      const itemLabel = typeof item === 'string' ? item : item?.label || item?.name || '';
+      return Boolean(safeSearchTerm && itemLabel.toLowerCase() === safeSearchTerm.toLowerCase());
+    });
+  }, [filteredOptions, selectedId, safeSearchTerm]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (selectedIndex >= 0) {
+        resetHighlight(selectedIndex);
+      } else {
+        resetHighlight(-1);
+      }
+    }
+  }, [isOpen, selectedIndex, resetHighlight]);
 
   useEffect(() => {
     if (autoFocus && refToUse.current) {
@@ -391,8 +414,9 @@ export default function AutocompleteDropdown({
                 : null;
             const itemBadge = typeof item === 'object' && item !== null ? item.badge || item.typeLabel : null;
             const isHighlighted = index === highlightedIndex;
-            const isSelected = selectedId && typeof item === 'object' && item?.id != null
-              ? String(item.id) === String(selectedId)
+            const hasSpecificId = selectedId != null && String(selectedId).trim() !== '';
+            const isSelected = hasSpecificId
+              ? (typeof item === 'object' && item?.id != null && String(item.id) === String(selectedId))
               : Boolean(safeSearchTerm && itemLabel.toLowerCase() === safeSearchTerm.toLowerCase());
 
             return (
@@ -400,6 +424,7 @@ export default function AutocompleteDropdown({
                 key={typeof item === 'object' && item?.id != null ? `item_${item.id}` : index}
                 data-dropdown-item="true"
                 type="button"
+                onMouseEnter={() => setHighlightedIndex(index)}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -416,9 +441,11 @@ export default function AutocompleteDropdown({
                   handleSelect(item);
                 }}
                 className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-all duration-150 ease-out flex items-center justify-between cursor-pointer group/item active:scale-[0.985] ${
-                  isSelected || isHighlighted
-                    ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs translate-x-1'
-                    : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary hover:translate-x-0.5'
+                  isSelected
+                    ? 'theme-bg-accent theme-accent-text font-semibold shadow-xs'
+                    : isHighlighted
+                    ? 'bg-[var(--accent-main)]/15 theme-accent font-semibold translate-x-1'
+                    : 'hover:bg-[var(--accent-main)]/10 hover:theme-accent theme-text-primary hover:translate-x-0.5'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">

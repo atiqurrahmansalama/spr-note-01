@@ -21,8 +21,8 @@ const PublicOnlineAdmissionView = lazy(() => import("./modules/student-managemen
 const PublicStaffOnboardingView = lazy(() => import("./modules/staff-management/onboarding/PublicStaffOnboardingView"));
 
 // ─── Protected Student & Reports Views (Lazy Loaded with Auto-Retry) ──────────
-const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-classroom/daily-progress/DailyProgressView"));
-const StudentReportsView = lazy(() => import("./modules/reports-history/components/StudentReportsView"));
+const HifzReportBuilderModule = lazy(() => import("./modules/learning/progress-management/daily-progress/DailyProgressView"));
+const StudentReportsView = lazy(() => import("./modules/learning/progress-management/progress-reports/ProgressReportsView"));
 const StudentDirectoryView = lazy(() => import("./modules/student-management/directory/StudentDirectoryView"));
 const StudentAdmissionView = lazy(() => import("./modules/student-management/admission/StudentAdmissionView"));
 const SessionManager = lazy(() => import("./modules/student-management/sessions/SessionManager"));
@@ -59,7 +59,7 @@ const ResidentialHubView = lazy(() => import("./modules/academy/residential/Resi
 const AcademyProfileView = lazy(() => import("./modules/settings/components/AcademyProfileView"));
 
 // ─── Protected Academic Learning & Lesson Management Views (Lazy Loaded) ─────
-const DailyClassroomHubView = lazy(() => import("./modules/learning/daily-classroom/DailyClassroomHubView"));
+const DailyClassroomHubView = lazy(() => import("./modules/learning/DailyClassroomHubView"));
 
 // ─── Protected Examination & Result Management Views (Lazy Loaded) ───────────
 const ExaminationsHubView = lazy(() => import("./modules/examinations/ExaminationsHubView"));
@@ -74,7 +74,7 @@ const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestoration
 const ProfileSettingsView = lazy(() => import("./modules/settings/ProfileSettingsView"));
 const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/PersonalizeSettingsHubView"));
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
-const ClassroomConfigurationView = lazy(() => import("./modules/learning/daily-classroom/ClassroomConfigurationView"));
+const ClassroomConfigurationView = lazy(() => import("./modules/learning/components/ClassroomConfigurationView"));
 const ReportSettingsView = ClassroomConfigurationView;
 const DataBackupView = lazy(() => import("./modules/settings/components/DataBackupView"));
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));

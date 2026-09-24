@@ -22,7 +22,7 @@ import {
   admissionDocRequirementsSectionConfig,
 } from "../../student-management/admission/AdmissionTaxonomyPanels";
 import { classroomSessionsSectionConfig } from "../../student-management/sessions/SessionManager";
-import { classroomConfigSectionConfig } from "../../learning/daily-classroom/ClassroomConfigurationView";
+import { classroomConfigSectionConfig } from "../../learning/components/ClassroomConfigurationView";
 import { trashRestorationSectionConfig } from "../../admin/TrashRestorationView";
 import { systemEnvironmentSectionConfig } from "./SystemEnvironmentPanel";
 

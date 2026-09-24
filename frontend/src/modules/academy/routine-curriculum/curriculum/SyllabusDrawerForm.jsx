@@ -12,7 +12,7 @@ import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import { TeacherSelect, SubjectSelect } from '../../../../components/selectors';
 import { useToast } from '../../../../context/ToastContext';
 import { curriculumStore, academicYearsStore } from '../../../../utils/localStore';
-import { useAcademicData } from '../../../learning/useAcademicData';
+import { useAcademicData } from '@/hooks/useAcademicData';
 import { useTenant } from '../../../../context/TenantContext';
 import { DrawerContainer } from '../../../../components/layout';
 import { fetchWithAuth } from '../../../../utils/authService';

@@ -189,8 +189,12 @@ class StudentSerializer(serializers.ModelSerializer):
             mutable_data['uniq_id'] = mutable_data['unique_id']
 
         # Map student_section -> section
-        if 'student_section' in mutable_data and 'section' not in mutable_data:
+        if ('section' not in mutable_data or not mutable_data.get('section')) and mutable_data.get('student_section'):
             mutable_data['section'] = mutable_data['student_section']
+
+        for fk_field in ['section', 'student_class', 'student_group']:
+            if isinstance(mutable_data.get(fk_field), dict):
+                mutable_data[fk_field] = mutable_data[fk_field].get('id')
 
         # Discard non-model attributes and protect immutable identifiers
         mutable_data.pop('department', None)
@@ -332,8 +336,38 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             'permanent_address_data', 'academic_data', 'guardian_data',
             'latitude', 'longitude', 'map_place_id',
             'admission_mode', 'status', 'target_status', 'group_name', 'roll_number', 'education_status',
-            'student_class', 'student_group', 'branch'
+            'student_class', 'section', 'student_group', 'branch'
         ]
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        # Map student_section -> section
+        if ('section' not in mutable_data or not mutable_data.get('section')) and mutable_data.get('student_section'):
+            mutable_data['section'] = mutable_data['student_section']
+
+        for fk_field in ['section', 'student_class', 'student_group', 'branch']:
+            if isinstance(mutable_data.get(fk_field), dict):
+                mutable_data[fk_field] = mutable_data[fk_field].get('id')
+
+        # Pop non-model department if present directly on student
+        mutable_data.pop('department', None)
+
+        nullable_fields = ['student_class', 'section', 'student_group', 'branch', 'roll_number']
+        for field in nullable_fields:
+            if field in mutable_data and (mutable_data[field] == '' or mutable_data[field] == 'null'):
+                mutable_data[field] = None
+
+        # Sanitize nested academic_data if passed
+        if 'academic_data' in mutable_data and isinstance(mutable_data['academic_data'], dict):
+            acad = mutable_data['academic_data'].copy()
+            for extra in ['department', 'student_class', 'student_section', 'section']:
+                acad.pop(extra, None)
+            if 'admission_date' in acad and (acad['admission_date'] == '' or acad['admission_date'] == 'null'):
+                acad['admission_date'] = None
+            mutable_data['academic_data'] = acad
+
+        return super().to_internal_value(mutable_data)
 
     @transaction.atomic
     def create(self, validated_data):
@@ -377,6 +411,14 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
                     validated_data['institution_id'] = token_obj.institution_id
                 if not validated_data.get('student_class') and token_obj.target_class:
                     validated_data['student_class'] = token_obj.target_class
+
+        # Auto sync section / group / class
+        section = validated_data.get('section')
+        if section:
+            if not validated_data.get('group_name'):
+                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or 'General Group'
+            if not validated_data.get('student_class') and getattr(section, 'student_class', None):
+                validated_data['student_class'] = section.student_class
 
         # Auto sync class name / relation
         student_class = validated_data.get('student_class')
@@ -469,6 +511,8 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
     branch_name = serializers.CharField(source='branch.name', read_only=True, default='')
     section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    student_section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
+    student_section = serializers.PrimaryKeyRelatedField(source='section', read_only=True)
     department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
     department_id = serializers.CharField(source='student_class.department.id', read_only=True, default='')
 
@@ -491,7 +535,7 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             'birth_certificate_no', 'nid_no', 'photo', 'present_address', 'permanent_address', 
             'latitude', 'longitude', 'map_place_id', 'branch', 'branch_name',
             'academic_detail', 'guardian_detail', 'details', 'documents', 'academic_history', 'admission_mode', 
-            'status', 'student_class', 'student_class_name', 'section', 'section_name', 'student_group', 'student_group_name',
+            'status', 'student_class', 'student_class_name', 'section', 'section_name', 'student_section', 'student_section_name', 'student_group', 'student_group_name',
             'department_id', 'department_name',
             'group_name', 'created_at', 'updated_at', 'education_status',
             'present_address_data', 'permanent_address_data', 'academic_data', 'guardian_data',
@@ -502,8 +546,12 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
 
         # Map student_section -> section
-        if 'student_section' in mutable_data and 'section' not in mutable_data:
+        if ('section' not in mutable_data or not mutable_data.get('section')) and mutable_data.get('student_section'):
             mutable_data['section'] = mutable_data['student_section']
+
+        for fk_field in ['section', 'student_class', 'student_group', 'branch']:
+            if isinstance(mutable_data.get(fk_field), dict):
+                mutable_data[fk_field] = mutable_data[fk_field].get('id')
 
         # Discard non-model department if present directly on student
         mutable_data.pop('department', None)

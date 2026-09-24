@@ -7,7 +7,7 @@ import type { TemplatePlaceholderKey } from '../../components/print/docxTemplate
 import {
   DAILY_PROGRESS_SCOPE_ID,
   DAILY_PROGRESS_DOCLAB_KEYS,
-} from '../learning/daily-classroom/daily-progress/dailyProgressDocLabKeys';
+} from '../learning/progress-management';
 
 /**
  * Enterprise DocLab Studio Hub View

@@ -13,7 +13,7 @@ import { useAcademicData } from "../../../hooks/useAcademicData";
 import {
   doesStudentMatchDepartment,
   doesStudentMatchClass,
-} from "../../learning/daily-classroom/dailyClassroomUtils";
+} from "../../learning/utils/dailyClassroomUtils";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { students as studentStore } from "../../../utils/localStore";
@@ -63,9 +63,12 @@ export default function QuickAdmissionForm({
 
   const returnTo = searchParams.get("returnTo") || "";
   const paramName = searchParams.get("name") || initialValues?.name || "";
-  const paramDept = searchParams.get("dept") || initialValues?.department || "";
-  const paramClass = searchParams.get("class") || initialValues?.student_class || "";
-  const paramSection = searchParams.get("section") || initialValues?.student_section || "";
+  const rawDept = searchParams.get("dept") || initialValues?.department || "";
+  const rawClass = searchParams.get("class") || initialValues?.student_class || "";
+  const rawSection = searchParams.get("section") || initialValues?.student_section || "";
+  const paramDept = rawDept === "ALL" ? "" : rawDept;
+  const paramClass = rawClass === "ALL" ? "" : rawClass;
+  const paramSection = rawSection === "ALL" ? "" : rawSection;
 
   const buildRedirectUrl = (baseUrl: string, student: any) => {
     const delimiter = baseUrl.includes("?") ? "&" : "?";
@@ -74,7 +77,11 @@ export default function QuickAdmissionForm({
     const idVal = student?.id || "";
     const deptVal = student?.department || student?.department_id || "";
     const classVal = student?.student_class || student?.class_id || "";
-    const secVal = student?.student_section || student?.section_id || "";
+    const secVal =
+      student?.student_section ||
+      (typeof student?.section === "object" ? student?.section?.id : student?.section) ||
+      student?.section_id ||
+      "";
     const groupVal = student?.group_name || student?.section_name || student?.sub || "";
 
     if (nameVal) redirectParams.set("selectedStudentName", nameVal);
@@ -198,6 +205,27 @@ export default function QuickAdmissionForm({
         next.student_section = "";
       } else if (field === "student_class") {
         next.student_section = "";
+      } else if (field === "student_section" && value) {
+        const matchedSec = (sections || []).find((s: any) => String(s.id) === String(value));
+        if (matchedSec) {
+          const secClassId =
+            matchedSec.student_class ||
+            matchedSec.class_id ||
+            (typeof matchedSec.student_class === "object" ? matchedSec.student_class?.id : null);
+          if (secClassId && !next.student_class) {
+            next.student_class = String(secClassId);
+            const matchedCls = (classes || []).find((c: any) => String(c.id) === String(secClassId));
+            if (matchedCls) {
+              const clsDeptId =
+                matchedCls.department ||
+                matchedCls.department_id ||
+                (typeof matchedCls.department === "object" ? matchedCls.department?.id : null);
+              if (clsDeptId && !next.department) {
+                next.department = String(clsDeptId);
+              }
+            }
+          }
+        }
       }
       return next;
     });
@@ -211,6 +239,27 @@ export default function QuickAdmissionForm({
           next.student_section = "";
         } else if (field === "student_class") {
           next.student_section = "";
+        } else if (field === "student_section" && value) {
+          const matchedSec = (sections || []).find((s: any) => String(s.id) === String(value));
+          if (matchedSec) {
+            const secClassId =
+              matchedSec.student_class ||
+              matchedSec.class_id ||
+              (typeof matchedSec.student_class === "object" ? matchedSec.student_class?.id : null);
+            if (secClassId && !next.student_class) {
+              next.student_class = String(secClassId);
+              const matchedCls = (classes || []).find((c: any) => String(c.id) === String(secClassId));
+              if (matchedCls) {
+                const clsDeptId =
+                  matchedCls.department ||
+                  matchedCls.department_id ||
+                  (typeof matchedCls.department === "object" ? matchedCls.department?.id : null);
+                if (clsDeptId && !next.department) {
+                  next.department = String(clsDeptId);
+                }
+              }
+            }
+          }
         }
         return next;
       });
@@ -445,6 +494,8 @@ export default function QuickAdmissionForm({
       class_name: className,
       education_status: className,
       student_section: formData.student_section || null,
+      section: formData.student_section || null,
+      section_id: formData.student_section || null,
       section_name: sectionName,
       group_name: sectionName || className || "General Group",
       session_year: "2026-2027",
@@ -462,11 +513,13 @@ export default function QuickAdmissionForm({
       student_class: formData.student_class || null,
       department: formData.department || null,
       student_section: formData.student_section || null,
+      section: formData.student_section || null,
       education_status: className,
       academic_data: {
         department: formData.department || null,
         student_class: formData.student_class || null,
         student_section: formData.student_section || null,
+        section: formData.student_section || null,
         admission_date: formData.admission_date,
       },
       guardian_data: {
@@ -490,6 +543,18 @@ export default function QuickAdmissionForm({
         const resData = await res.json().catch(() => ({}));
         if (resData && resData.id) {
           studentStore.remove(localStudentId);
+          const finalSectionId =
+            formData.student_section ||
+            (typeof resData.section === "object" ? resData.section?.id : resData.section) ||
+            (typeof resData.student_section === "object" ? resData.student_section?.id : resData.student_section) ||
+            resData.section_id ||
+            null;
+          const finalSectionName =
+            resData.section_name ||
+            resData.student_section_name ||
+            sectionName ||
+            "";
+
           savedStudent = {
             ...newStudentProfile,
             ...resData,
@@ -499,9 +564,12 @@ export default function QuickAdmissionForm({
             student_class_name: resData.student_class_name || className,
             class_name: resData.student_class_name || className,
             education_status: resData.education_status || className,
-            student_section: formData.student_section || resData.student_section || null,
-            section_name: resData.section_name || sectionName,
-            group_name: resData.group_name || resData.student_group_name || sectionName || className || "General Group",
+            student_section: finalSectionId,
+            section: finalSectionId,
+            section_id: finalSectionId,
+            section_name: finalSectionName,
+            group_name: resData.group_name || resData.student_group_name || finalSectionName || className || "General Group",
+            sub: finalSectionName || className || "General Group",
             uniq_id: resData.uniq_id || resData.student_id_card_number || newStudentProfile.uniq_id,
             student_id_card_number: resData.student_id_card_number || resData.uniq_id || newStudentProfile.student_id_card_number,
             roll_number: resData.roll_number,
@@ -524,9 +592,15 @@ export default function QuickAdmissionForm({
           const fallbackData = await fallbackRes.json().catch(() => ({}));
           if (fallbackData && fallbackData.id) {
             studentStore.remove(localStudentId);
+            const fallbackSectionId = formData.student_section || null;
             savedStudent = {
               ...newStudentProfile,
               ...fallbackData,
+              student_section: fallbackSectionId,
+              section: fallbackSectionId,
+              section_id: fallbackSectionId,
+              section_name: sectionName || "",
+              sub: sectionName || className || "General Group",
               id: String(fallbackData.id),
               roll_number: fallbackData.roll_number,
               _local: false,

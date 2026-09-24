@@ -418,7 +418,11 @@ export default function StudentAdmissionView() {
       const idVal = targetStudent?.id || '';
       const deptVal = targetStudent?.department || targetStudent?.department_id || '';
       const classVal = targetStudent?.student_class || targetStudent?.class_id || '';
-      const secVal = targetStudent?.student_section || targetStudent?.section_id || '';
+      const secVal =
+        targetStudent?.student_section ||
+        (typeof targetStudent?.section === 'object' ? targetStudent?.section?.id : targetStudent?.section) ||
+        targetStudent?.section_id ||
+        '';
       const groupVal = targetStudent?.group_name || targetStudent?.section_name || targetStudent?.sub || '';
 
       const redirectParams = new URLSearchParams();

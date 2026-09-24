@@ -38,13 +38,11 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   onDelete,
   onToggleScopeDefault,
 }) => {
-  const isGenerated = template.templateType === 'generated' || template.id?.startsWith('gen_');
-
   const menuItems = useMemo(() => {
     const items: any[] = [];
 
     // 1. Edit in DocLab (Loads template to canvas in Template Design mode)
-    if (onEdit && !isGenerated) {
+    if (onEdit) {
       items.push({
         label: 'Edit in DocLab',
         icon: EditIcon,
@@ -71,7 +69,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
     }
 
     // 4. Scope Default Toggle
-    if (onToggleScopeDefault && !isGenerated) {
+    if (onToggleScopeDefault) {
       items.push({
         label: isScopeDefault ? 'Remove Scope Default' : 'Set as Scope Default',
         icon: StarIcon,
@@ -94,7 +92,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
     }
 
     return items;
-  }, [template, isGenerated, isScopeDefault, onEdit, onRename, onDuplicate, onToggleScopeDefault, onDelete]);
+  }, [template, isScopeDefault, onEdit, onRename, onDuplicate, onToggleScopeDefault, onDelete]);
 
   return (
     <DocLabItemCard
@@ -102,7 +100,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
       title={template.name}
       isActive={isActive}
       indicator={
-        isScopeDefault && !isGenerated ? (
+        isScopeDefault ? (
           <span
             title="Default template for this scope"
             className="theme-accent inline-flex items-center shrink-0"
@@ -111,15 +109,8 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
           </span>
         ) : null
       }
-      badge={
-        isGenerated ? (
-          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium theme-success-badge">
-            Filled
-          </span>
-        ) : null
-      }
       description={
-        template.description || (isGenerated ? 'Generated filled document' : 'Custom layout document')
+        template.description || 'Custom layout document'
       }
       actions={
         menuItems.length > 0 ? (

@@ -133,7 +133,7 @@ export default function KeyPaletteExplorer({
       />
 
       {/* Required Taxonomy Keys List */}
-      <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-0.5">
+      <div className="space-y-1.5">
         {filteredKeys.length > 0 ? (
           filteredKeys.map((item) => {
             const token = `{{${item.key}}}`;
@@ -155,19 +155,12 @@ export default function KeyPaletteExplorer({
                 title={token}
                 titleClassName="font-mono text-[11px] font-bold theme-accent"
                 titleTooltip={`Click to insert ${token} at cursor in document`}
-                borderVariant={isMissing ? 'amber' : isMatched ? 'accent' : 'default'}
                 badge={
-                  <span
-                    className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase tracking-wider ${
-                      isMatched
-                        ? 'theme-bg-accent-soft theme-accent border theme-border-accent-soft'
-                        : isMissing
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25'
-                        : 'theme-bg-accent-soft theme-accent border theme-border-accent-soft'
-                    }`}
-                  >
-                    {isMatched ? 'Used' : isMissing ? 'Missing' : 'Required'}
-                  </span>
+                  isMatched ? (
+                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent border theme-border-accent-soft">
+                      Used
+                    </span>
+                  ) : null
                 }
                 description={
                   <span>

@@ -114,7 +114,7 @@ export default function TemplateLibraryModal({
 
   // Filtered templates based on scope, category, and search query
   const filteredTemplates = useMemo(() => {
-    return templates.filter((tmpl) => {
+    const list = templates.filter((tmpl) => {
       // 1. Search Query Filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -134,9 +134,15 @@ export default function TemplateLibraryModal({
 
       return true;
     });
+
+    return [...list].sort((a, b) => {
+      const nameA = String(a.name || a.id || '').trim().toLowerCase();
+      const nameB = String(b.name || b.id || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
   }, [templates, selectedScope, selectedCategory, searchQuery]);
 
-  // Handle setting a template as default for its scope with validation safety check
+  // Handle setting a template as default for its scope
   const handleToggleDefault = (tmpl: CustomDocxTemplate) => {
     const scopeId = (tmpl as any).scopeId || selectedScope || 'general_document';
     const currentDefault = scopeDefaults[scopeId];
@@ -150,15 +156,6 @@ export default function TemplateLibraryModal({
         return next;
       });
     } else {
-      // Validate template before setting as default
-      const val = validateTemplateForScope(tmpl, scopeId);
-      if (!val.isValid) {
-        const proceed = window.confirm(
-          `Warning: This template is missing ${val.missingRequiredKeys.length} required keys for "${val.scopeName}":\n\n${val.missingRequiredKeys.map((k) => `{{${k}}}`).join(', ')}\n\nSetting this template as default may result in missing data on printouts. Do you still want to proceed?`
-        );
-        if (!proceed) return;
-      }
-
       setDefaultTemplateForScope(scopeId, tmpl.id);
       setScopeDefaults((prev) => ({ ...prev, [scopeId]: tmpl.id }));
     }

@@ -882,6 +882,14 @@ export function CheckCircle2Icon({ className = "w-4 h-4" }) {
   );
 }
 
+export function CheckDoubleIcon({ className = "w-4 h-4" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7m-9 9l4 4 10-10" />
+    </svg>
+  );
+}
+
 export function MoreVerticalIcon({ className = "w-4 h-4" }) {
   return <DotsVerticalIcon className={className} />;
 }

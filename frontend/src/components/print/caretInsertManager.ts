@@ -112,10 +112,12 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
   const isDirective = rawToken.trim().startsWith('<') || rawToken.trim().startsWith('|');
 
   // Directives like `<| indent: 5>` are inserted verbatim without `{{...}}` wrappers.
-  // Standard field keys (e.g. `student-name`) are normalized to `{{student-name}}`.
-  const token = isDirective
-    ? rawToken.trim()
-    : `{{${String(rawToken).replace(/^\{+/, '').replace(/\}+$/, '').trim()}}`;
+  // Standard field keys (e.g. `student-name`) are normalized strictly to `{{student-name}}`.
+  const cleanKey = String(rawToken)
+    .replace(/^\{+/, '')
+    .replace(/\}+$/, '')
+    .trim();
+  const token = isDirective ? rawToken.trim() : `{{${cleanKey}}}`;
 
   // Refresh active caret state
   captureActiveCaret();
@@ -193,21 +195,17 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
 
         selection.addRange(range);
 
-        // Standard text insertion command
-        const success = document.execCommand('insertText', false, token);
+        // Pristine DOM insertion: delete any selected content and insert clean text node
+        // (Bypasses deprecated, lossy document.execCommand to guarantee zero bracket truncation)
+        range.deleteContents();
+        const textNode = document.createTextNode(token);
+        range.insertNode(textNode);
 
-        if (!success) {
-          // Robust DOM fallback if execCommand fails
-          range.deleteContents();
-          const textNode = document.createTextNode(token);
-          range.insertNode(textNode);
-
-          // Move cursor after the inserted text node
-          range.setStartAfter(textNode);
-          range.setEndAfter(textNode);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
+        // Move cursor right after the newly inserted text node
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
 
         // Save updated range
         if (selection.rangeCount > 0) {
@@ -236,10 +234,16 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
         const range = document.createRange();
         range.selectNodeContents(fallbackEditable);
         range.collapse(false); // Move to end
+
+        range.deleteContents();
+        const textNode = document.createTextNode(token);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+
         selection.removeAllRanges();
         selection.addRange(range);
 
-        document.execCommand('insertText', false, token);
         fallbackEditable.dispatchEvent(new Event('input', { bubbles: true }));
 
         if (selection.rangeCount > 0) {

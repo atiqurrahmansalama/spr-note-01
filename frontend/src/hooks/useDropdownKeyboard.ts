@@ -16,7 +16,7 @@ export interface UseDropdownKeyboardReturn {
   setHighlightedIndex: React.Dispatch<React.SetStateAction<number>>;
   handleKeyDown: (e: React.KeyboardEvent<HTMLElement>) => void;
   optionsListRef: React.RefObject<HTMLDivElement | null>;
-  resetHighlight: () => void;
+  resetHighlight: (toIndex?: number) => void;
 }
 
 /**
@@ -36,12 +36,12 @@ export function useDropdownKeyboard({
   itemSelector = '[data-dropdown-item="true"]',
   autoScroll = true,
 }: UseDropdownKeyboardOptions): UseDropdownKeyboardReturn {
-  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const optionsListRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll highlighted item into view during keyboard navigation
   useEffect(() => {
-    if (!isOpen || !autoScroll || !optionsListRef.current) return;
+    if (!isOpen || !autoScroll || !optionsListRef.current || highlightedIndex < 0) return;
     const container = optionsListRef.current;
     const items = container.querySelectorAll<HTMLElement>(itemSelector);
     const highlightedEl = items[highlightedIndex];
@@ -51,9 +51,9 @@ export function useDropdownKeyboard({
     }
   }, [highlightedIndex, isOpen, autoScroll, itemSelector]);
 
-  const resetHighlight = useCallback(() => {
-    setHighlightedIndex(0);
-    if (optionsListRef.current) {
+  const resetHighlight = useCallback((toIndex: number = -1) => {
+    setHighlightedIndex(toIndex);
+    if (optionsListRef.current && toIndex <= 0) {
       optionsListRef.current.scrollTop = 0;
     }
   }, []);
@@ -72,13 +72,13 @@ export function useDropdownKeyboard({
       if (isOpen && itemCount > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setHighlightedIndex((prev) => (prev + 1) % itemCount);
+          setHighlightedIndex((prev) => (prev < 0 ? 0 : (prev + 1) % itemCount));
           return;
         }
 
         if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setHighlightedIndex((prev) => (prev - 1 + itemCount) % itemCount);
+          setHighlightedIndex((prev) => (prev < 0 ? itemCount - 1 : (prev - 1 + itemCount) % itemCount));
           return;
         }
 

@@ -352,7 +352,7 @@ export function getScopeKeysBlueprint(scopeId: string): {
  */
 export function getSavedTemplatesForScope(scopeId: string, onlyValid: boolean = false): CustomDocxTemplate[] {
   const allTemplates = getSavedDocxTemplates();
-  return allTemplates.filter((t) => {
+  const filtered = allTemplates.filter((t) => {
     if (t.scopeId === scopeId) {
       if (!onlyValid) return true;
       const val = validateTemplateForScope(t, scopeId);
@@ -364,6 +364,12 @@ export function getSavedTemplatesForScope(scopeId: string, onlyValid: boolean = 
       return val.isValid;
     }
     return false;
+  });
+
+  return [...filtered].sort((a, b) => {
+    const nameA = String(a.name || a.id || '').trim().toLowerCase();
+    const nameB = String(b.name || b.id || '').trim().toLowerCase();
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
   });
 }
 
