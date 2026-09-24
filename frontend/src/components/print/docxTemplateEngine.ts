@@ -992,13 +992,13 @@ export function parseIndentDirectiveArgs(rawInner: string): string {
  * Normalizes directive syntax like <| indent: 5, from: 2, to: 4> into template tokens,
  * associating the indentation directive with its target placeholder, and removing directive tags from output.
  * Examples:
- * - {{detail-mis<| indent: 5, from: 2, to: 4>}} -> {{detail-mis | indent: 5, from: 2, to: 4}}
- * - {{juz-page<| indent: 10>}} -> {{juz-page | indent: 10}}
- * - {{detail-mis}}<| indent: 5, from: 2, to: 4> -> {{detail-mis | indent: 5, from: 2, to: 4}}
- * - {{detail-mis}} <| indent: 5, from: 3> -> {{detail-mis | indent: 5, from: 3}}
- * - <| indent: 5>{{detail-mis}} -> {{detail-mis | indent: 5}}
- * - {{detail-mis <| indent: 5, from: 2>}} -> {{detail-mis | indent: 5, from: 2}}
- * - <p>{{detail-mis}}</p><p><| indent: 5, from: 2></p> -> <p>{{detail-mis | indent: 5, from: 2}}</p>
+ * - {{field_name<| indent: 5, from: 2, to: 4>}} -> {{field_name | indent: 5, from: 2, to: 4}}
+ * - {{summary<| indent: 10>}} -> {{summary | indent: 10}}
+ * - {{field_name}}<| indent: 5, from: 2, to: 4> -> {{field_name | indent: 5, from: 2, to: 4}}
+ * - {{field_name}} <| indent: 5, from: 3> -> {{field_name | indent: 5, from: 3}}
+ * - <| indent: 5>{{field_name}} -> {{field_name | indent: 5}}
+ * - {{field_name <| indent: 5, from: 2>}} -> {{field_name | indent: 5, from: 2}}
+ * - <p>{{field_name}}</p><p><| indent: 5, from: 2></p> -> <p>{{field_name | indent: 5, from: 2}}</p>
  */
 export function normalizeIndentDirectives(html: string): string {
   if (!html) return '';
@@ -1133,7 +1133,7 @@ export function sanitizeDocxPlaceholders(html: string): string {
 }
 
 /**
- * Detect all placeholder tokens like {{student_name}}, {{detail-mis | indent: 7}}, {class} etc.
+ * Detect all placeholder tokens like {{student_name}}, {{field_name | indent: 7}}, {class} etc.
  */
 export function detectPlaceholders(html: string): string[] {
   if (!html) return [];
@@ -1169,8 +1169,7 @@ export function applyIndentFilter(
   spaceCount: number = 7,
   fromLine: number = 2,
   toLine?: number | null,
-  mode: 'html' | 'text' = 'html',
-  forceAll: boolean = false
+  mode: 'html' | 'text' = 'html'
 ): string {
   if (!text) return '';
   // Split on newlines or existing <br>
@@ -1187,27 +1186,11 @@ export function applyIndentFilter(
   const effectiveFrom = Math.max(1, fromLine || 2);
   const effectiveTo = toLine && toLine > 0 ? toLine : Infinity;
 
-  // Smart hierarchical detection:
-  // Check if this text is a hierarchical list containing group headers (e.g. "3: Page 4 Ayah 5")
-  // alongside indented sub-items (e.g. "Page 7 Ayah 7").
-  // If ALL non-empty lines match the header pattern (like in {{juz-page}}: "3: 3", "5: 2–4"),
-  // there are no sub-items, so every line in [effectiveFrom, effectiveTo] must be indented.
-  const headerRegex = /^(?:\d+|Juz\s*\d+):\s+/i;
-  const cleanedLines = rawLines.map((l) => l.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
-  const headerLinesCount = cleanedLines.filter((l) => l && headerRegex.test(l)).length;
-  const nonEmptyLinesCount = cleanedLines.filter((l) => Boolean(l)).length;
-
-  const isHierarchicalGroupList = !forceAll && headerLinesCount > 0 && headerLinesCount < nonEmptyLinesCount;
-
   const formattedLines = rawLines.map((line, idx) => {
     const lineNum = idx + 1; // 1-indexed
 
     const cleanLineText = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
     if (!cleanLineText) {
-      return line;
-    }
-
-    if (isHierarchicalGroupList && headerRegex.test(cleanLineText)) {
       return line;
     }
 
@@ -1218,6 +1201,30 @@ export function applyIndentFilter(
   });
 
   return mode === 'html' ? formattedLines.join('<br>') : formattedLines.join('\n');
+}
+
+export type TokenFilterInterceptor = (
+  tokenKey: string,
+  filterName: string,
+  filterArgs: string,
+  value: string,
+  lookup: Map<string, string>,
+  mode: 'html' | 'text'
+) => { handled?: boolean; result?: string; skipFilter?: boolean } | null | void;
+
+const tokenFilterInterceptors: TokenFilterInterceptor[] = [];
+
+/**
+ * Registers a dynamic token filter interceptor from any feature module.
+ * Enables feature modules (like Daily Progress, Finance, Examinations) to apply domain-specific
+ * formatting rules, conditional filters, or overrides without coupling the core docx engine.
+ */
+export function registerTokenFilterInterceptor(interceptor: TokenFilterInterceptor): () => void {
+  tokenFilterInterceptors.push(interceptor);
+  return () => {
+    const idx = tokenFilterInterceptors.indexOf(interceptor);
+    if (idx >= 0) tokenFilterInterceptors.splice(idx, 1);
+  };
 }
 
 /**
@@ -1243,6 +1250,9 @@ export function applyFilter(
       let fromLine = 2;
       let toLine: number | undefined = undefined;
       const forceAll = /\b(all|force):\s*true\b/i.test(rawArgs) || /\bheaders?:\s*false\b/i.test(rawArgs);
+      if (forceAll) {
+        fromLine = 1;
+      }
 
       const fromMatch = rawArgs.match(/\bfrom:\s*(\d+)/i);
       const toMatch = rawArgs.match(/\bto:\s*(\d+)/i);
@@ -1263,7 +1273,7 @@ export function applyFilter(
         }
       }
 
-      return applyIndentFilter(value, spaceCount, fromLine, toLine, mode, forceAll);
+      return applyIndentFilter(value, spaceCount, fromLine, toLine, mode);
     }
     case 'uppercase':
     case 'upper':
@@ -1288,7 +1298,7 @@ export function applyFilter(
 }
 
 /**
- * Resolves a token with potential condition/formatting filters (e.g. {{detail-mis | indent: 7}})
+ * Resolves a token with potential condition/formatting filters (e.g. {{key | indent: 7}})
  * Matches base key against lookup and cascades through filter specifications.
  */
 export function resolveTokenValue(
@@ -1326,7 +1336,28 @@ export function resolveTokenValue(
   // Apply filters in sequence
   let processed = value;
   for (const filterSpec of filterSpecs) {
-    processed = applyFilter(processed, filterSpec, mode);
+    const colonIdx = filterSpec.indexOf(':');
+    const filterName = (colonIdx > -1 ? filterSpec.slice(0, colonIdx) : filterSpec).trim().toLowerCase();
+    const rawArgs = colonIdx > -1 ? filterSpec.slice(colonIdx + 1).trim() : '';
+
+    // Check if any feature-registered interceptor handles, modifies, or skips this filter
+    let intercepted = false;
+    for (const interceptor of tokenFilterInterceptors) {
+      const interceptRes = interceptor(norm, filterName, rawArgs, processed, lookup, mode);
+      if (interceptRes) {
+        if (interceptRes.result !== undefined) {
+          processed = interceptRes.result;
+        }
+        if (interceptRes.handled || interceptRes.skipFilter) {
+          intercepted = true;
+          break;
+        }
+      }
+    }
+
+    if (!intercepted) {
+      processed = applyFilter(processed, filterSpec, mode);
+    }
   }
 
   // Ensure multi-line output in HTML mode converts remaining \n to <br>

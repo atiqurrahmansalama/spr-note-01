@@ -1,4 +1,5 @@
 import type { KeyTaxonomyItem } from '@/components/print/keyLibrary/types';
+import { registerTokenFilterInterceptor } from '@/components/print/docxTemplateEngine';
 import type { DailyProgressData, DetailRowData, JuzRowData } from './types';
 
 /**
@@ -380,6 +381,9 @@ export function buildDailyProgressReportData(
     'detail-stuck': detailStuckStr,
     'mention-teacher-name': teacherHandle,
     'remarks': remarksStr,
+    'is_multi_juz': isMultiJuz ? 'true' : 'false',
+    'isMultiJuz': isMultiJuz ? 'true' : 'false',
+    'has_multiple_juz': isMultiJuz ? 'true' : 'false',
 
     'Date': formattedDate,
     'delivery_date': formattedDate,
@@ -422,3 +426,75 @@ export function buildDailyProgressReportData(
     'comment': remarksStr,
   };
 }
+
+/**
+ * Daily Progress Domain Filter Interceptor:
+ * - When only a single Juz is evaluated: Indent filter is completely skipped (all lines remain flush left).
+ * - When multiple Juz exist: The 1st line (header line) of each Juz remains unindented,
+ *   while subsequent sub-item lines under that Juz are indented with the requested spaces.
+ */
+let isDailyProgressInterceptorRegistered = false;
+export function registerDailyProgressDocLabInterceptor(): void {
+  if (isDailyProgressInterceptorRegistered) return;
+  isDailyProgressInterceptorRegistered = true;
+
+  registerTokenFilterInterceptor((tokenKey, filterName, args, value, lookup, mode) => {
+    const isDetailKey = tokenKey === 'detailmis' || tokenKey === 'detailstuck';
+    if (!isDetailKey || filterName !== 'indent') {
+      return null;
+    }
+
+    const isMultiJuzFlag =
+      lookup.get('is_multi_juz') === 'true' ||
+      lookup.get('ismultijuz') === 'true' ||
+      lookup.get('has_multiple_juz') === 'true';
+
+    const juzNumStr = lookup.get('juz_number') || lookup.get('juznumber') || lookup.get('juz-number') || '';
+    const hasMultipleInJuzNumber = juzNumStr.includes(',') || juzNumStr.includes('–') || juzNumStr.includes('-');
+
+    let hasMultipleJuz = isMultiJuzFlag || hasMultipleInJuzNumber;
+    const rawLines = value.includes('<br>') || value.includes('<br/>') || value.includes('<br />')
+      ? value.split(/<br\s*[\/]?>/gi)
+      : value.split(/\r?\n/);
+
+    const juzHeaderRegex = /^(?:[A-Za-z0-9_\-\.\s]+|\d+):\s+/i;
+    const headerLines = rawLines.filter((l) => juzHeaderRegex.test(l.replace(/<[^>]*>/g, '').trim()));
+
+    if (headerLines.length > 0) {
+      hasMultipleJuz = true;
+    }
+
+    // 1. Single Juz: Indentation is NOT applied (keep flush left)
+    if (!hasMultipleJuz || headerLines.length === 0) {
+      return { handled: true, skipFilter: true };
+    }
+
+    // 2. Multiple Juz: Parse indent arguments and indent only sub-items under each Juz header
+    let spaceCount = 5;
+    const numMatch = (args || '').match(/\b(\d+)\b/);
+    if (numMatch) {
+      spaceCount = parseInt(numMatch[1], 10);
+    }
+    const spaceChar = mode === 'html' ? '&nbsp;' : ' ';
+    const indent = spaceChar.repeat(Math.max(1, spaceCount));
+
+    const formattedLines = rawLines.map((line) => {
+      const cleanLine = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      if (!cleanLine) return line;
+
+      // Skip indent on 1st line of each Juz (Juz header line, e.g. "22: Page 13 Ayah 3")
+      if (juzHeaderRegex.test(cleanLine)) {
+        return line;
+      }
+
+      // Indent sub-item lines under that Juz (e.g. "Page 14 Ayah 5")
+      return `${indent}${line}`;
+    });
+
+    const result = mode === 'html' ? formattedLines.join('<br>') : formattedLines.join('\n');
+    return { handled: true, result };
+  });
+}
+
+// Automatically register interceptor on module load
+registerDailyProgressDocLabInterceptor();

@@ -40,7 +40,7 @@ const PrintStudioHubView = lazy(() => import("./modules/print-studio/PrintStudio
 
 
 // ─── Protected Attendance Views (Lazy Loaded with Auto-Retry) ─────────────────
-const ClassAttendanceView = lazy(() => import("./modules/attendance/ClassAttendanceView"));
+const ClassAttendanceView = lazy(() => import("./modules/learning/class-attendance/ClassAttendanceView"));
 const AttendanceSettingsView = lazy(() => import("./modules/attendance/AttendanceSettingsView"));
 const ResidentialAttendanceView = lazy(() => import("./modules/attendance/ResidentialAttendanceView"));
 const AdHocHeadcountView = lazy(() => import("./modules/attendance/AdHocHeadcountView"));
