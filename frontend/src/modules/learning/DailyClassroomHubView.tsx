@@ -598,26 +598,66 @@ export default function DailyClassroomHubView({
     hasDepartments,
     selectedDepartmentId,
     onDepartmentChange: (val: any) => {
-      setSelectedDepartmentId(val);
+      setSelectedDepartmentId(val || '');
       setSelectedClassId('');
       setSelectedSectionId('');
     },
     departmentSelectOptions,
     selectedClassId,
     onClassChange: (val: any) => {
-      setSelectedClassId(val);
+      setSelectedClassId(val || '');
       setSelectedSectionId('');
     },
     classSelectOptions,
     hasSectionsForClass,
     selectedSectionId,
-    onSectionChange: setSelectedSectionId,
+    onSectionChange: (val: any) => {
+      setSelectedSectionId(val || '');
+    },
     sectionSelectOptions,
     showPeriodSwitcher: true,
     allPeriodFilterOptions,
     activePeriodId,
     onPeriodChange: setActivePeriodId,
     getPeriodSubtitle: getPeriodTimeForSlot,
+    onBatchHierarchyChange: ({ departmentId, classId, sectionId }: { departmentId?: string; classId?: string; sectionId?: string }) => {
+      if (departmentId !== undefined) setSelectedDepartmentId(departmentId || '');
+      if (classId !== undefined) setSelectedClassId(classId || '');
+      if (sectionId !== undefined) setSelectedSectionId(sectionId || '');
+      const params = new URLSearchParams(searchParams);
+      if (departmentId !== undefined) {
+        if (departmentId) params.set('department', departmentId);
+        else params.delete('department');
+      }
+      if (classId !== undefined) {
+        if (classId) params.set('class', classId);
+        else params.delete('class');
+      }
+      if (sectionId !== undefined) {
+        if (sectionId) params.set('section', sectionId);
+        else params.delete('section');
+      }
+      navigate(`?${params.toString()}`, { replace: true });
+    },
+    setAcademicFilters: ({ departmentId, classId, sectionId }: { departmentId?: string; classId?: string; sectionId?: string }) => {
+      if (departmentId !== undefined) setSelectedDepartmentId(departmentId || '');
+      if (classId !== undefined) setSelectedClassId(classId || '');
+      if (sectionId !== undefined) setSelectedSectionId(sectionId || '');
+      const params = new URLSearchParams(searchParams);
+      if (departmentId !== undefined) {
+        if (departmentId) params.set('department', departmentId);
+        else params.delete('department');
+      }
+      if (classId !== undefined) {
+        if (classId) params.set('class', classId);
+        else params.delete('class');
+      }
+      if (sectionId !== undefined) {
+        if (sectionId) params.set('section', sectionId);
+        else params.delete('section');
+      }
+      navigate(`?${params.toString()}`, { replace: true });
+    },
   }), [
     isProgressHub,
     selectedDate,
@@ -625,14 +665,18 @@ export default function DailyClassroomHubView({
     navigate,
     hasDepartments,
     selectedDepartmentId,
+    setSelectedDepartmentId,
     departmentSelectOptions,
     selectedClassId,
+    setSelectedClassId,
     classSelectOptions,
     hasSectionsForClass,
     selectedSectionId,
+    setSelectedSectionId,
     sectionSelectOptions,
     allPeriodFilterOptions,
     activePeriodId,
+    setActivePeriodId,
     getPeriodTimeForSlot,
   ]);
 

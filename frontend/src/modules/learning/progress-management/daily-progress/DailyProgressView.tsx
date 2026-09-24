@@ -2251,14 +2251,28 @@ export default function DailyProgressView({
   const rawOnSectionChange = filterProps?.onSectionChange || setLocalSectionId;
 
   const updateHierarchy = (deptId: string, clsId: string, secId: string) => {
+    const finalDept = deptId || "";
+    const finalCls = clsId || "";
+    const finalSec = secId || "";
+
+    setLocalDeptId(finalDept);
+    setLocalClassId(finalCls);
+    setLocalSectionId(finalSec);
+
     if (filterProps?.onBatchHierarchyChange) {
-      filterProps.onBatchHierarchyChange({ departmentId: deptId, classId: clsId, sectionId: secId });
+      filterProps.onBatchHierarchyChange({ departmentId: finalDept, classId: finalCls, sectionId: finalSec });
     } else if (filterProps?.setAcademicFilters) {
-      filterProps.setAcademicFilters({ departmentId: deptId, classId: clsId, sectionId: secId });
+      filterProps.setAcademicFilters({ departmentId: finalDept, classId: finalCls, sectionId: finalSec });
     } else {
-      setLocalDeptId(deptId);
-      setLocalClassId(clsId);
-      setLocalSectionId(secId);
+      if (filterProps?.onDepartmentChange) {
+        filterProps.onDepartmentChange(finalDept);
+      }
+      if (filterProps?.onClassChange) {
+        filterProps.onClassChange(finalCls);
+      }
+      if (filterProps?.onSectionChange) {
+        filterProps.onSectionChange(finalSec);
+      }
     }
   };
 
@@ -2310,21 +2324,25 @@ export default function DailyProgressView({
           ? `ID: ${rawId}`
           : undefined;
 
+      const stClsId = typeof st === "object" ? getClassId(st) || (st.student_class || st.class_id) : undefined;
+      const stSecId = typeof st === "object" ? getSectionId(st) || (st.student_section || st.section_id) : undefined;
+      const stDeptId = typeof st === "object" ? getDepartmentId(st) || (st.department || st.department_id) : undefined;
+
       fullList.push({
         id: rawId || undefined,
         label: stName,
         name: stName,
         name_en: typeof st === "object" ? st.name_en || stName : stName,
         sub: secSub,
-        section_name: secSub,
+        section_name: (typeof st === "object" ? st.section_name || st.student_section_name : null) || secSub || undefined,
         roll_number: roll,
         student_id_card_number: cardNo,
         uniq_id: uniq,
         badge,
-        student_class: typeof st === "object" ? st.student_class || st.class_id : undefined,
+        student_class: stClsId,
         student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
-        student_section: typeof st === "object" ? st.student_section || st.section_id || (typeof st.section === "object" ? st.section?.id : st.section) : undefined,
-        department: typeof st === "object" ? st.department || st.department_id : undefined,
+        student_section: stSecId,
+        department: stDeptId,
         department_name: typeof st === "object" ? st.department_name : undefined,
         originalData: st,
       });
@@ -2501,9 +2519,13 @@ export default function DailyProgressView({
     lastSelectedStudentNameRef.current = chosenName.trim();
     if (isExplicitSelection) isSelectingStudentRef.current = true;
 
+    // 1. Locate best academic profile from all student sources
     let academicProfile: any = null;
     if (studentExplicitId) {
-      academicProfile = (allStudentDatabase || []).find((a: any) => String(a.id) === studentExplicitId);
+      academicProfile =
+        (allStudentDatabase || []).find((a: any) => String(a.id) === studentExplicitId) ||
+        (academicStudents || []).find((a: any) => String(a.id) === studentExplicitId) ||
+        (studentStore.getAll() || []).find((a: any) => String(a.id) === studentExplicitId);
     } else if (chosenName.trim()) {
       const nameMatches = (allStudentDatabase || []).filter(
         (a: any) => (a.name_en || a.name || a.label || "").toLowerCase().trim() === chosenName.toLowerCase().trim()
@@ -2524,47 +2546,80 @@ export default function DailyProgressView({
     if (candidate) {
       const resolvedId = candidate.id != null ? String(candidate.id) : studentExplicitId;
       if (resolvedId) setSelectedStudentId(resolvedId);
-      if (!chosenSub && (candidate.section_name || candidate.sub || candidate.group_name)) {
-        chosenSub = candidate.section_name || candidate.sub || candidate.group_name;
+      if (!chosenSub && (candidate.section_name || candidate.student_section_name || candidate.sub || candidate.group_name)) {
+        chosenSub = candidate.section_name || candidate.student_section_name || candidate.sub || candidate.group_name;
       }
       recordStudentUsage(candidate);
 
-      let candSecId = getSectionId(candidate) || "";
-      if (!candSecId && chosenSub) {
+      // A. Extract Section
+      let candSecId =
+        getSectionId(candidate) ||
+        getSectionId(candidate?.originalData) ||
+        getSectionId(matchedStudent) ||
+        "";
+      if (!candSecId && (candidate.student_section || candidate.section_id || candidate.section)) {
+        const rawSec = candidate.student_section || candidate.section_id || candidate.section;
+        candSecId = typeof rawSec === "object" ? String(rawSec?.id || "") : String(rawSec || "");
+      }
+      if (!candSecId && (candidate.section_name || candidate.student_section_name || chosenSub)) {
+        const secSearch = (candidate.section_name || candidate.student_section_name || chosenSub).toLowerCase().trim();
         const matchedSec = (sections || []).find(
-          (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
+          (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === secSearch
         );
         if (matchedSec) candSecId = String(matchedSec.id);
       }
       const secObj = candSecId ? (sections || []).find((s: any) => String(s.id) === String(candSecId)) : null;
 
-      let candClassId = getClassId(candidate) || (secObj ? getClassId(secObj) : "");
-      if (!candClassId && candidate.student_class_name) {
+      // B. Extract Class
+      let candClassId =
+        getClassId(candidate) ||
+        getClassId(candidate?.originalData) ||
+        getClassId(matchedStudent) ||
+        (secObj ? getClassId(secObj) : "");
+
+      if (!candClassId && (candidate.student_class || candidate.class_id || candidate.academic_class || candidate.academic_class_id)) {
+        const rawCls = candidate.student_class || candidate.class_id || candidate.academic_class || candidate.academic_class_id;
+        candClassId = typeof rawCls === "object" ? String(rawCls?.id || "") : String(rawCls || "");
+      }
+      if (!candClassId && (candidate.student_class_name || candidate.class_name)) {
+        const targetClsName = (candidate.student_class_name || candidate.class_name || "").toLowerCase().trim();
         const matchedCls = (classes || []).find(
-          (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === candidate.student_class_name.toLowerCase().trim()
+          (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === targetClsName ||
+                      (c.code || "").toLowerCase().trim() === targetClsName
         );
         if (matchedCls) candClassId = String(matchedCls.id);
       }
       const classObj = candClassId ? (classes || []).find((c: any) => String(c.id) === String(candClassId)) : null;
 
+      // C. Extract Department
       let candDeptId =
         getDepartmentId(candidate) ||
+        getDepartmentId(candidate?.originalData) ||
+        getDepartmentId(matchedStudent) ||
         (classObj ? getDepartmentId(classObj) : "") ||
         (secObj ? getDepartmentId(secObj) : "");
-      if (!candDeptId && candidate.department_name) {
+
+      if (!candDeptId && (candidate.department || candidate.department_id || candidate.dept_id)) {
+        const rawDept = candidate.department || candidate.department_id || candidate.dept_id;
+        candDeptId = typeof rawDept === "object" ? String(rawDept?.id || "") : String(rawDept || "");
+      }
+      if (!candDeptId && (candidate.department_name || classObj?.department_name)) {
+        const targetDeptName = (candidate.department_name || classObj?.department_name || "").toLowerCase().trim();
         const matchedDept = (departments || []).find(
-          (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === candidate.department_name.toLowerCase().trim()
+          (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === targetDeptName ||
+                      (d.code || "").toLowerCase().trim() === targetDeptName
         );
         if (matchedDept) candDeptId = String(matchedDept.id);
       }
 
       const effectiveGroupName =
-        secObj?.section_name || secObj?.name || candidate.section_name || candidate.sub || chosenSub || "";
+        secObj?.section_name || secObj?.name || candidate.section_name || candidate.student_section_name || candidate.sub || chosenSub || "";
       setGroupName(effectiveGroupName || "");
 
-      const targetDept = candDeptId || selectedDepartmentId || "";
-      const targetClass = candClassId || selectedClassId || "";
-      const targetSec = candSecId || selectedSectionId || "";
+      // Auto-select resolved Department, Class, and Section
+      const targetDept = candDeptId || (classObj ? getDepartmentId(classObj) : "") || selectedDepartmentId || "";
+      const targetClass = candClassId || (secObj ? getClassId(secObj) : "") || selectedClassId || "";
+      const targetSec = candSecId || "";
 
       updateHierarchy(targetDept, targetClass, targetSec);
     } else if (chosenSub) {
