@@ -51,13 +51,32 @@ export function isSavableRoute(path: string): boolean {
 /**
  * Persists the user's active in-app route to localStorage.
  */
-export function setLastActiveRoute(path: string): void {
+export function setLastActiveRoute(fullPath: string): void {
   if (typeof window === 'undefined') return;
 
   try {
-    if (!isSavableRoute(path)) return;
+    if (!isSavableRoute(fullPath)) return;
 
-    localStorage.setItem(LAST_ACTIVE_ROUTE_KEY, path);
+    // Sanitize query params: strip transient drawer and notification parameters
+    const [pathname, search] = fullPath.split('?');
+    let cleanSearch = '';
+    if (search) {
+      const params = new URLSearchParams(search);
+      params.delete('drawer');
+      params.delete('drawerId');
+      params.delete('mode');
+      params.delete('eventId');
+      params.delete('targetId');
+      params.delete('classId');
+      params.delete('slotId');
+      const paramStr = params.toString();
+      if (paramStr) cleanSearch = `?${paramStr}`;
+    }
+
+    const cleanPath = `${pathname}${cleanSearch}`;
+    if (!isSavableRoute(cleanPath)) return;
+
+    localStorage.setItem(LAST_ACTIVE_ROUTE_KEY, cleanPath);
   } catch {
     // Ignore storage quota or security errors
   }
@@ -76,7 +95,19 @@ export function getLastActiveRoute(fallbackRoute = '/dashboard'): string {
       return fallbackRoute;
     }
 
-    const trimmed = saved.trim();
+    let trimmed = saved.trim();
+
+    // Clean any drawer params from previously saved routes in localStorage
+    if (trimmed.includes('drawer=')) {
+      const [pathname, search] = trimmed.split('?');
+      if (search) {
+        const params = new URLSearchParams(search);
+        params.delete('drawer');
+        params.delete('drawerId');
+        const paramStr = params.toString();
+        trimmed = paramStr ? `${pathname}?${paramStr}` : pathname;
+      }
+    }
 
     // Map legacy routes to modern progress reports
     if (trimmed === '/student-reports' || trimmed.startsWith('/student-reports?')) {

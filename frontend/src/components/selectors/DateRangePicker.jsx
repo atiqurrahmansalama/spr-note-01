@@ -445,7 +445,11 @@ export default function DateRangePicker({
       <button
         type="button"
         onClick={handleTriggerClick}
-        className={`w-full ${heightClass} flex items-center justify-between px-3.5 rounded-xl theme-bg-sub border theme-border theme-text-primary font-semibold hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-sm`}
+        className={`w-full ${heightClass} flex items-center justify-between px-3.5 rounded-xl border transition-all duration-150 cursor-pointer select-none font-semibold ${
+          isDropdownOpen || showCustomCalendar
+            ? 'theme-bg-elevated border-[var(--accent-main)] theme-text-primary'
+            : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--border-hover)] theme-text-primary'
+        }`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
           <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />

@@ -41,7 +41,12 @@ export function JuzRow({
   const handleRangeChange = (index: number, newRange: PageRange) => {
     onChange((prevRow) => {
       const newRanges = [...prevRow.ranges];
-      newRanges[index] = newRange;
+      const prevRange = newRanges[index] || {};
+      newRanges[index] = {
+        ...prevRange,
+        ...newRange,
+        id: prevRange.id || newRange.id || `range-${index}`,
+      };
       return { ...prevRow, ranges: newRanges };
     });
   };
@@ -72,9 +77,9 @@ export function JuzRow({
     <div className="flex items-start gap-2 sm:gap-3 w-full py-1.5 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-xl relative group hover:theme-bg-elevated transition-colors duration-150 select-none">
       <div className="flex items-center gap-1 shrink-0 h-10 self-start">
         <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary select-none">Juz</label>
-        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-10 w-12 sm:w-14 shadow-xs shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 flex items-center justify-center">
+        <div className="theme-bg-sub rounded-lg border theme-border hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] overflow-hidden h-10 w-12 sm:w-14 shrink-0 transition-all flex items-center justify-center">
           <CustomInput
-            id={rowData.juzInputId}
+            id={rowData.juzInputId || `juz-input-${rowData.id}`}
             type="number"
             variant="borderless"
             scrollable={true}
@@ -102,10 +107,12 @@ export function JuzRow({
       <div className="flex-1 flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
         {(rowData.ranges || []).map((range, index) => {
           const isLastRange = index === (rowData.ranges?.length || 0) - 1;
+          const rangeKey = range.id || `range-${index}`;
           return (
-            <div key={range.id || index} className="flex items-center gap-1.5 shrink-0">
+            <div key={rangeKey} className="flex items-center gap-1.5 shrink-0">
               <PageRangeInput
-                idPrefix={range.id}
+                idPrefix={rangeKey}
+                range={range}
                 startValue={range.start}
                 endValue={range.end}
                 size="md"
@@ -158,7 +165,12 @@ export function JuzPageSection({
     onChange((prevData) => {
       const newData = [...prevData];
       const oldRow = newData[index];
-      newData[index] = typeof rowUpdater === "function" ? rowUpdater(oldRow) : rowUpdater;
+      const updatedRow = typeof rowUpdater === "function" ? rowUpdater(oldRow) : rowUpdater;
+      newData[index] = {
+        ...oldRow,
+        ...updatedRow,
+        id: oldRow.id || updatedRow.id || `juz-row-${index}`,
+      };
       return newData;
     });
   };

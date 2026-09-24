@@ -191,7 +191,7 @@ export function DetailRow({
   const hasMultiJuz = Boolean(availableJuzs && availableJuzs.length > 1);
 
   const pageInputBlock = (
-    <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-10 w-12 sm:w-14 shadow-xs shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 flex items-center justify-center">
+    <div className="theme-bg-sub rounded-lg border theme-border hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] overflow-hidden h-10 w-12 sm:w-14 shrink-0 transition-all flex items-center justify-center">
       <CustomInput
         id={`page-${rowData.id}`}
         type="number"
@@ -223,7 +223,7 @@ export function DetailRow({
     const isLastAyah = aIdx === (rowData.ayahs?.length || 0) - 1;
     return (
       <div key={ayah.id || aIdx} className="flex items-center gap-1.5 shrink-0">
-        <div className="theme-bg-sub rounded-lg border theme-border overflow-hidden h-10 w-12 sm:w-14 shadow-xs shrink-0 transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 flex items-center justify-center">
+        <div className="theme-bg-sub rounded-lg border theme-border hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] overflow-hidden h-10 w-12 sm:w-14 shrink-0 transition-all flex items-center justify-center">
           <CustomInput
             id={`ayah-${ayah.id}`}
             type="number"
@@ -423,7 +423,13 @@ export function DetailSection({
   const handleRowChange = (index: number, newRow: DetailRowData | ((prevRow: DetailRowData) => DetailRowData)) => {
     onChange((prevData) => {
       const newData = [...prevData];
-      newData[index] = typeof newRow === "function" ? newRow(newData[index]) : newRow;
+      const oldRow = newData[index];
+      const updated = typeof newRow === "function" ? newRow(oldRow) : newRow;
+      newData[index] = {
+        ...oldRow,
+        ...updated,
+        id: oldRow.id || updated.id || `detail-row-${index}`,
+      };
       return newData;
     });
   };
@@ -440,9 +446,8 @@ export function DetailSection({
     (data || []).length > 1 ||
     (data || []).some(
       (row) =>
-        Boolean(row.page && String(row.page).trim() !== "") ||
-        Boolean(row.juz && String(row.juz).trim() !== "") ||
-        (row.ayahs || []).some((a) => Boolean(a.value !== undefined && String(a.value).trim() !== ""))
+        Boolean(row.page !== undefined && row.page !== null && String(row.page).trim() !== "") ||
+        (row.ayahs || []).some((a) => Boolean(a.value !== undefined && a.value !== null && String(a.value).trim() !== ""))
     );
 
   return (

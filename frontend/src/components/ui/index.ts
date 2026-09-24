@@ -1,5 +1,6 @@
 export { default as CustomButton } from './CustomButton';
 export { default as CustomInput } from './CustomInput';
+export type { CustomInputProps } from './CustomInput';
 export { default as CustomSelect } from './CustomSelect';
 export type { CustomSelectProps, SelectOption } from './CustomSelect';
 export { default as CustomCheckbox } from './CustomCheckbox';

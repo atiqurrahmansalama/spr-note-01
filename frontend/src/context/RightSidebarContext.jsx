@@ -151,13 +151,13 @@ export function RightSidebarProvider({ children }) {
       closeRightSidebar();
       return;
     }
-    const { title, content, size = 'md', width, onClose, ownerId, drawerKey, ...restConfig } = config;
+    const { title, content, size = 'md', width, onClose, ownerId, drawerKey, syncUrl = true, ...restConfig } = config;
 
     // Retrieve per-drawer customized saved width from localStorage if available
     const resolvedWidth = getSavedDrawerWidth(drawerKey, width || size || 'md');
     setDrawerWidth(resolvedWidth);
 
-    if (drawerKey) {
+    if (drawerKey && syncUrl && drawerKey !== 'notifications' && drawerKey !== 'notification_detail') {
       updateUrlParams((params) => {
         params.set('drawer', drawerKey);
       });
@@ -171,16 +171,17 @@ export function RightSidebarProvider({ children }) {
       drawerKey: drawerKey || null,
       onClose: onClose || null,
       ownerId: ownerId || null,
+      syncUrl,
       _renderKey: `${drawerKey || 'panel'}-${Date.now()}-${Math.random()}`,
       ...restConfig,
     });
-  }, [setDrawerWidth]);
+  }, [setDrawerWidth, closeRightSidebar]);
 
   /**
    * openDrawer
    * Industry-standard: opens a registered drawer by key and syncs query params to the URL
    */
-  const openDrawer = useCallback((drawerKeyOrConfig, queryParams = {}) => {
+  const openDrawer = useCallback((drawerKeyOrConfig, queryParams = {}, options = {}) => {
     if (!drawerKeyOrConfig) return;
 
     if (typeof drawerKeyOrConfig === 'object' && drawerKeyOrConfig !== null) {
@@ -189,30 +190,37 @@ export function RightSidebarProvider({ children }) {
     }
 
     const drawerKey = drawerKeyOrConfig;
+    const syncUrl = options?.syncUrl !== undefined
+      ? options.syncUrl
+      : (drawerKey !== 'notifications' && drawerKey !== 'notification_detail');
 
-    updateUrlParams((params) => {
-      // Clear previous drawer-specific params
-      const drawerParamKeys = ['id', 'mode', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
-      drawerParamKeys.forEach((k) => params.delete(k));
+    if (syncUrl) {
+      updateUrlParams((params) => {
+        // Clear previous drawer-specific params
+        const drawerParamKeys = ['id', 'mode', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
+        drawerParamKeys.forEach((k) => params.delete(k));
 
-      params.set('drawer', drawerKey);
-      Object.entries(queryParams).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') {
-          params.set(k, String(v));
-        } else {
-          params.delete(k);
-        }
+        params.set('drawer', drawerKey);
+        Object.entries(queryParams).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== '') {
+            params.set(k, String(v));
+          } else {
+            params.delete(k);
+          }
+        });
       });
-    });
+    }
 
     const renderer = drawerRegistry.get(drawerKey);
     if (renderer) {
       const currentParams = getUrlParams();
-      const config = renderer(currentParams);
+      const paramsToPass = syncUrl ? currentParams : new URLSearchParams(queryParams);
+      const config = renderer(paramsToPass);
       if (config) {
         openRightSidebar({
           ...config,
           drawerKey,
+          syncUrl,
         });
       }
     }
@@ -346,7 +354,15 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
     if (!initialCheckedRef.current) {
       initialCheckedRef.current = true;
       const currentParams = getUrlParams();
-      if (currentParams.get('drawer') === drawerKey) {
+      const requestedDrawer = currentParams.get('drawer');
+      if (requestedDrawer === drawerKey) {
+        // For notifications without an ID, do not auto-open on page reload/refresh and clean URL
+        if (drawerKey === 'notifications' && !currentParams.get('id')) {
+          updateUrlParams((params) => {
+            params.delete('drawer');
+          });
+          return;
+        }
         const config = rendererRef.current(currentParams);
         if (config) {
           openRightSidebar({
@@ -367,6 +383,7 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
     if (!drawerKey) return;
     const currentParams = getUrlParams();
     if (currentParams.get('drawer') === drawerKey) {
+      if (drawerKey === 'notifications' && !currentParams.get('id')) return;
       const config = rendererRef.current ? rendererRef.current(currentParams) : null;
       if (config) {
         openRightSidebar({

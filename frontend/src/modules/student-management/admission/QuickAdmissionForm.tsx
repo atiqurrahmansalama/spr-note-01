@@ -5,10 +5,8 @@ import CustomSelect from "../../../components/ui/CustomSelect";
 import CustomButton from "../../../components/ui/CustomButton";
 import {
   CheckCircleIcon,
-  CalendarIcon,
 } from "../../../components/ui/Icons";
 import ReusableCalendar from "../../../components/common/ReusableCalendar";
-import { formatDate } from "../../../utils/reportGenerator";
 import { useAcademicData } from "../../../hooks/useAcademicData";
 import {
   doesStudentMatchDepartment,
@@ -20,12 +18,15 @@ import { students as studentStore } from "../../../utils/localStore";
 import { validateBDPhone } from "../../../utils/inputValidators";
 import { useTenant } from "../../../context/TenantContext";
 import { readJSON, writeJSON } from "../../../stores/coreStore";
+import { getLocalizedValue, normalizeLocalizedValue, hasAnyLanguageContent, type LocalizedValue } from "@/i18n/localizedEntity";
+import { useFormAutoSave } from "../../../hooks";
+import AutoSaveBadge from "../../../components/ui/AutoSaveBadge";
 
 export interface QuickAdmissionFormProps {
   onCancel?: () => void;
   onSuccess?: (student: any) => void;
   initialValues?: {
-    name?: string;
+    name?: string | LocalizedValue;
     department?: string;
     student_class?: string;
     student_section?: string;
@@ -127,8 +128,15 @@ export default function QuickAdmissionForm({
     guardian_phone: sharedData?.guardian_phone || sharedData?.father_phone || editingStudent?.guardian_phone || editingStudent?.details?.guardian_phone || initialValues?.guardian_phone || "",
   });
 
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const calendarContainerRef = useRef<HTMLDivElement>(null);
+  // Auto-Save / Draft Persistence (Restores and persists form draft across browser refreshes)
+  const storageKey = `spr_quick_adm_${activeTenantId || 'default'}`;
+  const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
+    formData,
+    setFormData,
+    storageKey,
+    enabled: !isEditing && !editingStudent && !sharedData?.is_editing && !sharedData?.edit_student_id,
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync if editingStudent, sharedData or query parameters change
@@ -176,22 +184,6 @@ export default function QuickAdmissionForm({
     paramClass,
     paramSection,
   ]);
-
-  // Handle outside click for date picker popover
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        calendarContainerRef.current &&
-        !calendarContainerRef.current.contains(e.target as Node)
-      ) {
-        setIsCalendarOpen(false);
-      }
-    };
-    if (isCalendarOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isCalendarOpen]);
 
   const handleFieldChange = (field: string, rawVal: any) => {
     const value =
@@ -305,7 +297,11 @@ export default function QuickAdmissionForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
+    const hasName = typeof formData.name === "object"
+      ? hasAnyLanguageContent(formData.name)
+      : Boolean(formData.name && String(formData.name).trim().length > 0);
+
+    if (!hasName) {
       showToast("Student Name is required", "warning");
       return;
     }
@@ -342,9 +338,18 @@ export default function QuickAdmissionForm({
       const targetSection = formData.student_section || editingStudent?.student_section || editingStudent?.section || editingStudent?.section_id || null;
       const targetDept = formData.department || editingStudent?.department || editingStudent?.department_id || null;
 
+      const primaryName = (typeof formData.name === "object"
+        ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name).find(Boolean) || ""
+        : String(formData.name || "")
+      ).trim();
+      const bnName = typeof formData.name === "object" ? getLocalizedValue(formData.name, "bn") : "";
+      const nameI18n = typeof formData.name === "object" ? formData.name : { en: primaryName, bn: bnName };
+
       const updatePayload: Record<string, any> = {
-        name: formData.name.trim(),
-        name_en: formData.name.trim(),
+        name: primaryName,
+        name_en: primaryName,
+        bangla_name: bnName,
+        name_i18n: nameI18n,
         student_class: targetClass || null,
         section: targetSection || null,
         student_section: targetSection || null,
@@ -372,8 +377,8 @@ export default function QuickAdmissionForm({
           const updatedStu = {
             ...editingStudent,
             ...resData,
-            name: formData.name.trim(),
-            name_en: formData.name.trim(),
+            name: primaryName,
+            name_en: primaryName,
             department: targetDept || resData.department,
             department_name: resData.department_name || departmentName || editingStudent?.department_name,
             student_class: targetClass || resData.student_class,
@@ -395,7 +400,8 @@ export default function QuickAdmissionForm({
             console.warn("Local studentStore update warning:", stErr);
           }
           injectIntoAcademicCache(updatedStu);
-          showToast(`Student "${formData.name}" updated successfully!`, "success");
+          clearDraft();
+          showToast(`Student "${primaryName}" updated successfully!`, "success");
           window.dispatchEvent(new CustomEvent("spr_students_updated"));
           window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
           refetchAcademicData?.();
@@ -414,8 +420,8 @@ export default function QuickAdmissionForm({
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              name: formData.name.trim(),
-              name_en: formData.name.trim(),
+              name: primaryName,
+              name_en: primaryName,
               student_class: targetClass || null,
               section: targetSection || null,
               student_section: targetSection || null,
@@ -426,8 +432,8 @@ export default function QuickAdmissionForm({
             const updatedStu = {
               ...editingStudent,
               ...resData,
-              name: formData.name.trim(),
-              name_en: formData.name.trim(),
+              name: primaryName,
+              name_en: primaryName,
               department: targetDept || resData.department,
               department_name: departmentName || editingStudent?.department_name,
               student_class: targetClass || resData.student_class,
@@ -445,7 +451,8 @@ export default function QuickAdmissionForm({
               console.warn("Local studentStore update warning:", stErr);
             }
             injectIntoAcademicCache(updatedStu);
-            showToast(`Student "${formData.name}" updated successfully!`, "success");
+            clearDraft();
+            showToast(`Student "${primaryName}" updated successfully!`, "success");
             window.dispatchEvent(new CustomEvent("spr_students_updated"));
             window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: updatedStu }));
             refetchAcademicData?.();
@@ -479,13 +486,22 @@ export default function QuickAdmissionForm({
     const localStudentId = `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const generatedUniqId = `STD-${new Date().getFullYear()}-${localStudentId.slice(-4).toUpperCase()}`;
 
+    const primaryName = (typeof formData.name === "object"
+      ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name).find(Boolean) || ""
+      : String(formData.name || "")
+    ).trim();
+    const bnName = typeof formData.name === "object" ? getLocalizedValue(formData.name, "bn") : "";
+    const nameI18n = typeof formData.name === "object" ? formData.name : { en: primaryName, bn: bnName };
+
     const newStudentProfile = {
       id: localStudentId,
       uniq_id: generatedUniqId,
       student_id_card_number: generatedUniqId,
-      name: formData.name.trim(),
-      name_en: formData.name.trim(),
-      label: formData.name.trim(),
+      name: primaryName,
+      name_en: primaryName,
+      bangla_name: bnName,
+      name_i18n: nameI18n,
+      label: primaryName,
       sub: sectionName || className || "General Group",
       department: formData.department || null,
       department_name: departmentName,
@@ -507,7 +523,10 @@ export default function QuickAdmissionForm({
     };
 
     const admissionPayload = {
-      name: formData.name.trim(),
+      name: primaryName,
+      name_en: primaryName,
+      bangla_name: bnName,
+      name_i18n: nameI18n,
       admission_mode: "QUICK",
       status: "ACTIVE",
       student_class: formData.student_class || null,
@@ -578,12 +597,12 @@ export default function QuickAdmissionForm({
           };
           studentStore.add(savedStudent);
         }
-        showToast(`Student "${formData.name}" admitted successfully!`, "success");
+        showToast(`Student "${primaryName}" admitted successfully!`, "success");
       } else {
         const fallbackRes = await fetchWithAuth("/students/", {
           method: "POST",
           body: JSON.stringify({
-            name: formData.name.trim(),
+            name: primaryName,
             group: sectionName || "General Group",
           }),
         }).catch(() => null);
@@ -607,13 +626,14 @@ export default function QuickAdmissionForm({
             };
             studentStore.add(savedStudent);
           }
-          showToast(`Student "${formData.name}" admitted successfully!`, "success");
+          showToast(`Student "${primaryName}" admitted successfully!`, "success");
         } else {
-          showToast(`"${formData.name}" saved locally. Will sync when online.`, "info");
+          showToast(`"${primaryName}" saved locally. Will sync when online.`, "info");
         }
       }
 
       injectIntoAcademicCache(savedStudent, localStudentId);
+      clearDraft();
       window.dispatchEvent(new CustomEvent("spr_students_updated"));
       window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: savedStudent }));
       refetchAcademicData?.();
@@ -629,6 +649,7 @@ export default function QuickAdmissionForm({
       console.error("Quick admission error:", err);
       showToast(`Student saved locally (offline mode).`, "info");
       injectIntoAcademicCache(savedStudent);
+      clearDraft();
       window.dispatchEvent(new CustomEvent("spr_students_updated"));
       window.dispatchEvent(new CustomEvent("spr_student_admitted", { detail: savedStudent }));
 
@@ -650,13 +671,33 @@ export default function QuickAdmissionForm({
         onSubmit={handleSubmit}
         className="theme-bg-surface rounded-2xl sm:rounded-3xl p-6 sm:p-8 border theme-border shadow-xs space-y-6"
       >
+        {/* Form Header & Auto-Save Badge */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b theme-border">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
+              {isEditing ? "Edit Student Profile" : "Quick Admission"}
+            </h2>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              {isEditing
+                ? "Update student academic and contact details"
+                : "Fast-track student enrollment with auto-saved drafts"}
+            </p>
+          </div>
+          {!isEditing && (
+            <AutoSaveBadge status={autoSaveStatus} lastSavedAt={lastSavedAt} />
+          )}
+        </div>
+
         {/* Clean Responsive Grid for All 6 Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* 1. Student Name */}
           <div className="sm:col-span-2 lg:col-span-1">
             <CustomInput
+              id="quick_adm_name"
+              name="name"
               label="Student Name"
               required={true}
+              multiLanguage={true}
               placeholder="e.g. Abdullah Ibn Omar"
               value={formData.name}
               onChange={(val: any) => handleFieldChange("name", val)}
@@ -666,6 +707,8 @@ export default function QuickAdmissionForm({
 
           {/* 2. Contact Phone */}
           <CustomInput
+            id="quick_adm_phone"
+            name="guardian_phone"
             label="EMERGENCY NUMBER"
             type="phone"
             placeholder="01XXXXXXXXX"
@@ -674,37 +717,15 @@ export default function QuickAdmissionForm({
           />
 
           {/* 3. Reusable Calendar Date Picker */}
-          <div ref={calendarContainerRef} className="relative w-full text-left font-sans">
-            <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2 select-none">
-              Admission Date
-            </label>
-            <button
-              type="button"
-              onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-              className="w-full flex items-center justify-between px-4 py-2.5 sm:py-3 min-h-[46px] rounded-2xl theme-bg-sub border theme-border text-xs sm:text-sm font-semibold theme-text-primary hover:border-[var(--accent-main)]/40 focus:outline-none focus:border-[var(--accent-main)] focus:ring-2 focus:ring-[var(--accent-main)]/20 transition-all cursor-pointer shadow-xs"
-              title="Select Admission Date"
-            >
-              <span>
-                {formData.admission_date
-                  ? formatDate(formData.admission_date)
-                  : "Select date..."}
-              </span>
-              <CalendarIcon className="w-4 h-4 theme-text-secondary shrink-0" />
-            </button>
-
-            {isCalendarOpen && (
-              <div className="absolute top-full left-0 mt-2 z-50 theme-bg-surface border theme-border rounded-2xl p-2 shadow-2xl w-72 animate-fade-in text-left">
-                <ReusableCalendar
-                  isInline
-                  selectedDate={formData.admission_date}
-                  onSelectDate={(dateStr: string) => {
-                    handleFieldChange("admission_date", dateStr);
-                    setIsCalendarOpen(false);
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          <ReusableCalendar
+            id="quick_adm_date"
+            name="admission_date"
+            label="Admission Date"
+            required={true}
+            selectedDate={formData.admission_date}
+            onSelectDate={(dateStr: string) => handleFieldChange("admission_date", dateStr)}
+            size="md"
+          />
 
           {/* 4. Department (if available) */}
           {departmentOptions.length > 0 && (

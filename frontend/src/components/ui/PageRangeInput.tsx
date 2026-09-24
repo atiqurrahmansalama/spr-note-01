@@ -101,11 +101,15 @@ export default function PageRangeInput({
         if (range) {
           (onChange as (val: PageRangeObject) => void)({ ...range, start: nextStart });
         } else {
-          (onChange as (val: PageRangeChangeValue) => void)({ start: nextStart, end: effectiveEnd ?? '' });
+          (onChange as (val: PageRangeChangeValue) => void)({
+            ...(prefix ? { id: prefix } : {}),
+            start: nextStart,
+            end: effectiveEnd ?? ''
+          });
         }
       }
     },
-    [effectiveEnd, onStartChange, onChange, range]
+    [effectiveEnd, onStartChange, onChange, range, prefix]
   );
 
   // Handle End Page Change (DURING TYPING - unrestricted input without premature keystroke clamping)
@@ -121,11 +125,15 @@ export default function PageRangeInput({
         if (range) {
           (onChange as (val: PageRangeObject) => void)({ ...range, end: nextEnd });
         } else {
-          (onChange as (val: PageRangeChangeValue) => void)({ start: effectiveStart ?? '', end: nextEnd });
+          (onChange as (val: PageRangeChangeValue) => void)({
+            ...(prefix ? { id: prefix } : {}),
+            start: effectiveStart ?? '',
+            end: nextEnd
+          });
         }
       }
     },
-    [effectiveStart, onEndChange, onChange, range]
+    [effectiveStart, onEndChange, onChange, range, prefix]
   );
 
   // Post-typing validation & auto-adjustment on blur / completion
@@ -153,7 +161,11 @@ export default function PageRangeInput({
               if (range) {
                 (onChange as (val: PageRangeObject) => void)({ ...range, start: adjusted, end: nextEndVal ?? '' });
               } else {
-                (onChange as (val: PageRangeChangeValue) => void)({ start: adjusted, end: nextEndVal ?? '' });
+                (onChange as (val: PageRangeChangeValue) => void)({
+                  ...(prefix ? { id: prefix } : {}),
+                  start: adjusted,
+                  end: nextEndVal ?? ''
+                });
               }
             }
           }
@@ -162,7 +174,7 @@ export default function PageRangeInput({
 
       onBlur?.(e);
     },
-    [effectiveStart, effectiveEnd, min, max, onStartChange, onEndChange, onChange, range, onBlur]
+    [effectiveStart, effectiveEnd, min, max, onStartChange, onEndChange, onChange, range, prefix, onBlur]
   );
 
   // Post-typing validation & auto-adjustment on blur / completion
@@ -192,7 +204,11 @@ export default function PageRangeInput({
               if (range) {
                 (onChange as (val: PageRangeObject) => void)({ ...range, end: adjusted });
               } else {
-                (onChange as (val: PageRangeChangeValue) => void)({ start: effectiveStart ?? '', end: adjusted });
+                (onChange as (val: PageRangeChangeValue) => void)({
+                  ...(prefix ? { id: prefix } : {}),
+                  start: effectiveStart ?? '',
+                  end: adjusted
+                });
               }
             }
           }
@@ -201,7 +217,7 @@ export default function PageRangeInput({
 
       onBlur?.(e);
     },
-    [effectiveEnd, effectiveStart, min, max, onEndChange, onChange, range, onBlur]
+    [effectiveEnd, effectiveStart, min, max, onEndChange, onChange, range, prefix, onBlur]
   );
 
   const handleStartEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -224,11 +240,11 @@ export default function PageRangeInput({
   }[size] || 'h-10 rounded-lg text-xs sm:text-sm';
 
   // Variant classes (default theme-bg-sub matching Juz input)
-  let variantClasses = 'theme-bg-sub border theme-border shadow-sm';
+  let variantClasses = 'theme-bg-sub border theme-border';
   if (variant === 'surface') {
-    variantClasses = 'theme-bg-surface border theme-border shadow-sm';
+    variantClasses = 'theme-bg-surface border theme-border';
   } else if (variant === 'elevated') {
-    variantClasses = 'theme-bg-elevated border theme-border shadow-sm';
+    variantClasses = 'theme-bg-elevated border theme-border';
   }
 
   const handleBackspace = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -242,7 +258,7 @@ export default function PageRangeInput({
 
   return (
     <div
-      className={`flex items-center overflow-hidden transition-all focus-within:border-[var(--accent-main)]/50 focus-within:ring-1 focus-within:ring-[var(--accent-main)]/30 ${variantClasses} ${sizeClasses} ${width} ${
+      className={`flex items-center overflow-hidden transition-all hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] ${variantClasses} ${sizeClasses} ${width} ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       } ${className}`}
     >

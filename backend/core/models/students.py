@@ -58,6 +58,7 @@ class Student(models.Model):
     # Extended fields
     name = models.CharField(max_length=255, blank=True, null=True)
     bangla_name = models.CharField(max_length=255, blank=True, null=True)
+    name_i18n = models.JSONField(default=dict, blank=True, null=True)
     student_id_card_number = models.CharField(max_length=64, blank=True, null=True)
     gender = models.CharField(max_length=20, choices=[('MALE', 'Male'), ('FEMALE', 'Female'), ('OTHER', 'Other')], default='MALE')
     dob = models.DateField(null=True, blank=True)
@@ -82,6 +83,18 @@ class Student(models.Model):
             self.name_en = self.name
         elif self.name_en and not self.name:
             self.name = self.name_en
+
+        if isinstance(self.name_i18n, dict) and self.name_i18n:
+            if not self.name_en and self.name_i18n.get('en'):
+                self.name_en = self.name_i18n['en']
+                self.name = self.name_en
+            if not self.bangla_name and self.name_i18n.get('bn'):
+                self.bangla_name = self.name_i18n['bn']
+        elif self.name_en:
+            if not self.name_i18n:
+                self.name_i18n = {'en': self.name_en}
+                if self.bangla_name:
+                    self.name_i18n['bn'] = self.bangla_name
 
         if not self.uniq_id or not str(self.uniq_id).strip():
             self.uniq_id = f"STU-{uuid.uuid4().hex[:8].upper()}"

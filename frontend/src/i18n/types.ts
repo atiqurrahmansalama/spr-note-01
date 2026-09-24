@@ -19,6 +19,7 @@ export interface LanguageConfig {
   fontFamily: string;
   badgeLabel: string;
   numericScript: 'latn' | 'beng' | 'arab';
+  defaultPlaceholder?: string;
 }
 
 export type TranslationNamespace =

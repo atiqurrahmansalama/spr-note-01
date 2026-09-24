@@ -22,6 +22,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     badgeLabel: 'EN',
     numericScript: 'latn',
+    defaultPlaceholder: 'Enter in English...',
   },
   {
     code: 'bn',
@@ -31,8 +32,9 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     isRTL: false,
     script: 'Bengali',
     fontFamily: '"Hind Siliguri", "Tiro Bangla", system-ui, sans-serif',
-    badgeLabel: 'বাং',
+    badgeLabel: 'BN',
     numericScript: 'beng',
+    defaultPlaceholder: 'বাংলায় লিখুন...',
   },
   {
     code: 'ar',
@@ -41,9 +43,10 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     dir: 'rtl',
     isRTL: true,
     script: 'Arabic',
-    fontFamily: '"Amiri", "Scheherazade New", "Noto Naskh Arabic", "Tajawal", system-ui, sans-serif',
-    badgeLabel: 'عربي',
+    fontFamily: '"Tajawal", "Noto Sans Arabic", "Amiri", "Noto Naskh Arabic", system-ui, sans-serif',
+    badgeLabel: 'AR',
     numericScript: 'arab',
+    defaultPlaceholder: 'اكتب بالعربية...',
   },
   {
     code: 'ur',
@@ -51,10 +54,11 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'اردو',
     dir: 'rtl',
     isRTL: true,
-    script: 'Arabic (Nastaliq)',
-    fontFamily: '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", system-ui, serif',
-    badgeLabel: 'اردو',
+    script: 'Arabic (Nastaliq / Naskh)',
+    fontFamily: '"Noto Sans Arabic", "Tajawal", "Noto Naskh Arabic", "Segoe UI", system-ui, sans-serif',
+    badgeLabel: 'UR',
     numericScript: 'arab',
+    defaultPlaceholder: 'اردو میں درج کریں...',
   },
 ];
 

@@ -285,7 +285,7 @@ export default function DocumentFilePicker({
       </div>
 
       {error && (
-        <span className="text-[11px] font-medium text-rose-500 block text-center">
+        <span className="text-[11px] font-medium text-[var(--danger-text)] block text-center animate-fade-in">
           {error}
         </span>
       )}

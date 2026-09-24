@@ -754,7 +754,7 @@ export default function ReusableCalendar({
                   onClick={() => handleSelectDay(dayNum)}
                   className={`w-8 h-8 text-xs font-medium flex items-center justify-center transition-all cursor-pointer relative select-none ${
                     isSelected
-                      ? 'theme-bg-accent theme-accent-text font-bold rounded-lg shadow-xs scale-102 ring-1 ring-[var(--accent-main)]/30 z-10'
+                      ? 'theme-bg-accent theme-accent-text font-bold rounded-lg border border-[var(--accent-main)] z-10'
                       : isInRange
                       ? 'bg-[var(--accent-main)]/15 theme-accent font-semibold rounded-none'
                       : isToday
@@ -793,7 +793,7 @@ export default function ReusableCalendar({
           <button
             type="button"
             onClick={handleClear}
-            className="text-xs font-medium text-rose-500/80 hover:text-rose-500 hover:theme-bg-elevated px-2 py-0.5 rounded-md transition cursor-pointer"
+            className="text-xs font-medium text-[var(--danger-text)] hover:opacity-80 hover:theme-bg-elevated px-2 py-0.5 rounded-md transition cursor-pointer"
             title="Clear date"
           >
             {t('clear', 'Clear')}

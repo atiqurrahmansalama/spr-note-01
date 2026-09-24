@@ -144,7 +144,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'institution', 'institution_name', 'uniq_id', 'unique_id',
             'roll_number', 'roll',
-            'name_en', 'name',
+            'name_en', 'name', 'bangla_name', 'name_i18n',
             'student_class', 'student_class_name',
             'section', 'section_name', 'student_section', 'student_section_name',
             'student_group', 'student_group_name',
@@ -158,6 +158,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'uniq_id': {'required': False, 'allow_null': True},
             'roll_number': {'required': False, 'allow_null': True},
             'name_en': {'required': False, 'allow_null': True},
+            'bangla_name': {'required': False, 'allow_null': True},
+            'name_i18n': {'required': False, 'allow_null': True},
             'student_class': {'required': False, 'allow_null': True},
             'section': {'required': False, 'allow_null': True},
             'student_group': {'required': False, 'allow_null': True},
@@ -170,6 +172,13 @@ class StudentSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        # Handle multi-language name_i18n sync
+        if 'name_i18n' in mutable_data and isinstance(mutable_data['name_i18n'], dict):
+            if not mutable_data.get('name_en') and mutable_data['name_i18n'].get('en'):
+                mutable_data['name_en'] = mutable_data['name_i18n']['en']
+            if not mutable_data.get('bangla_name') and mutable_data['name_i18n'].get('bn'):
+                mutable_data['bangla_name'] = mutable_data['name_i18n']['bn']
 
         # Handle legacy keys (label/name -> name_en, sub/group -> group_name, roll -> roll_number, unique_id -> uniq_id)
         if 'label' in mutable_data and 'name_en' not in mutable_data and 'name' not in mutable_data:

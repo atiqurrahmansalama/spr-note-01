@@ -196,7 +196,7 @@ export default function CustomSelect({
                 onClick={() => handleToggle()}
                 className="block text-xs font-bold theme-text-secondary uppercase tracking-wider cursor-pointer"
               >
-                {label} {required && <span className="theme-danger">*</span>}
+                {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
               </label>
             )}
             {badge && (
@@ -243,10 +243,10 @@ export default function CustomSelect({
           type="button"
           disabled={disabled}
           onClick={handleToggle}
-          className={`w-full h-full theme-bg-sub rounded-lg border overflow-hidden relative flex items-center justify-center cursor-pointer shadow-xs transition-all hover:theme-bg-elevated focus:outline-none ${
+          className={`w-full h-full theme-bg-sub rounded-lg border overflow-hidden relative flex items-center justify-center cursor-pointer transition-all hover:theme-bg-elevated focus:outline-none ${
             isOpen
-              ? 'border-[var(--accent-main)]/60 ring-1 ring-[var(--accent-main)]/20 shadow-xs'
-              : 'theme-border hover:border-[var(--accent-main)]/40'
+              ? 'border-[var(--accent-main)]'
+              : 'theme-border hover:border-[var(--border-hover)]'
           }`}
         >
           <span className="w-full text-center text-[12px] sm:text-[14px] font-mono font-semibold theme-text-primary pointer-events-none">
@@ -267,10 +267,10 @@ export default function CustomSelect({
             disabled
               ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
               : isOpen
-              ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
+              ? 'theme-bg-elevated border-[var(--accent-main)]'
               : error
-              ? 'border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 theme-bg-sub theme-text-primary'
-              : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-current/20 theme-text-primary'
+              ? 'border-[var(--danger-text)]/40 hover:border-[var(--danger-text)]/60 theme-bg-sub theme-text-primary'
+              : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--border-hover)] theme-text-primary'
           }`}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -336,8 +336,8 @@ export default function CustomSelect({
       )}
 
       {error && (
-        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium theme-danger animate-fade-in">
-          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-[var(--danger-text)] animate-fade-in">
+          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0 opacity-85" />
           <span>{error}</span>
         </div>
       )}

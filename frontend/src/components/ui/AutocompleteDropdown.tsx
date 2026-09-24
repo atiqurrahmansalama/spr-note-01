@@ -303,7 +303,7 @@ export default function AutocompleteDropdown({
                 onClick={() => refToUse.current?.focus()}
                 className="block text-xs font-bold theme-text-secondary uppercase tracking-wider cursor-pointer"
               >
-                {label} {required && <span className="theme-danger">*</span>}
+                {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
               </label>
             )}
             {optional && (
@@ -355,10 +355,10 @@ export default function AutocompleteDropdown({
           disabled
             ? 'opacity-50 cursor-not-allowed theme-bg-sub theme-border theme-text-secondary'
             : isOpen
-            ? 'theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
+            ? 'theme-bg-elevated border-[var(--accent-main)]'
             : error
-            ? 'border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 theme-bg-sub theme-text-primary'
-            : 'hover:border-[var(--accent-main)]/40 focus-within:border-[var(--accent-main)] focus-within:ring-2 focus-within:ring-[var(--accent-main)]/20 theme-text-primary'
+            ? 'border-[var(--danger-text)]/40 hover:border-[var(--danger-text)]/60 focus-within:border-[var(--danger-text)]/75 theme-bg-sub theme-text-primary'
+            : 'hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] theme-text-primary'
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1 h-full">

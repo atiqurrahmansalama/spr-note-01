@@ -2,6 +2,7 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useMemo,
   forwardRef,
   useId,
   useImperativeHandle,
@@ -21,6 +22,9 @@ import {
   HashIcon,
   PlusIcon,
   MinusIcon,
+  GlobeIcon,
+  ChevronIcon,
+  CalendarIcon,
 } from "./Icons";
 import IconButton from "./IconButton";
 import {
@@ -41,12 +45,22 @@ import {
 } from "../../utils/keyboardUtils";
 import TemplateActionToolbar from "./TemplateActionToolbar";
 import { useUndoRedo } from "../../context/useUndoRedo";
+import { SUPPORTED_LANGUAGES } from "../../i18n/constants";
+import { useTranslation } from "../../i18n/useTranslation";
+import {
+  normalizeLocalizedValue,
+  hasMultiLanguageContent,
+  hasAnyLanguageContent,
+  getFilledLanguagesCount,
+  sanitizeScriptForLanguage,
+  getLocalizedPlaceholder,
+} from "../../i18n/localizedEntity";
 
 /**
  * Enterprise Responsive Universal CustomInput Component
  * 
  * Reusable input for: text, number (with scroll/arrows), phone, NID, BRN,
- * email, password (with toggle), search (with clear), currency, textarea, etc.
+ * email, password (with toggle), search (with clear), currency, textarea, multi-language, etc.
  * 
  * Fully responsive across Mobile, Tablet, and Desktop screens.
  * Uses 100% theme tokens with zero hardcoded styling.
@@ -142,6 +156,7 @@ const CustomInput = forwardRef(function CustomInput(
     actionTo = null,
     actionTitle = null,
     headerAction = null,
+    multiLanguage = false,
     ...restProps
   },
   forwardedRef
@@ -149,6 +164,73 @@ const CustomInput = forwardRef(function CustomInput(
   const autoId = useId();
   const inputId = id || autoId;
   const innerRef = useRef(null);
+
+  // Multi-Language state & resolution
+  const isMultiLang = Boolean(multiLanguage || type === "multilang");
+  const { language: currentLang } = useTranslation();
+  const expandStorageKey = `spr_multilang_open_${name || id || (label ? String(label).toLowerCase().replace(/[^a-z0-9]/g, '_') : 'global')}`;
+
+  const [isMultiLangExpanded, setIsMultiLangExpanded] = useState(() => {
+    try {
+      const saved = localStorage.getItem(expandStorageKey);
+      if (saved === "true") return true;
+      if (saved === "false") return false;
+    } catch {
+      // fallback
+    }
+    const initialMap = normalizeLocalizedValue(value !== undefined ? value : defaultValue, currentLang);
+    return hasMultiLanguageContent(initialMap);
+  });
+
+  const toggleMultiLangExpanded = () => {
+    setIsMultiLangExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(expandStorageKey, String(next));
+      } catch {
+        // fallback
+      }
+      return next;
+    });
+  };
+
+  const localizedMap = useMemo(() => {
+    if (!isMultiLang) return null;
+    return normalizeLocalizedValue(value !== undefined ? value : defaultValue, currentLang);
+  }, [isMultiLang, value, defaultValue, currentLang]);
+
+  // Auto-expand if incoming data has multiple languages populated
+  useEffect(() => {
+    if (isMultiLang && localizedMap && hasMultiLanguageContent(localizedMap)) {
+      setIsMultiLangExpanded(true);
+    }
+  }, [isMultiLang, localizedMap]);
+
+  const primaryLang = useMemo(() => {
+    if (!isMultiLang) return null;
+    return SUPPORTED_LANGUAGES.find((l) => l.code === currentLang) || SUPPORTED_LANGUAGES[0];
+  }, [isMultiLang, currentLang]);
+
+  const handleMultiLangFieldChange = (langCode, textVal) => {
+    const cleanText = sanitizeScriptForLanguage(textVal, langCode);
+    const updated = { ...(localizedMap || {}), [langCode]: cleanText };
+    if (!isControlled) {
+      setInternalValue(updated);
+    }
+    if (validateOn === "change" || validateOn === "both") {
+      triggerValidation(updated);
+    }
+    if (onChange) {
+      const syntheticEvent = {
+        target: { name, value: updated, id: inputId },
+        currentTarget: { name, value: updated, id: inputId },
+        type: "change",
+        preventDefault: () => {},
+        stopPropagation: () => {},
+      };
+      onChange(updated, syntheticEvent);
+    }
+  };
 
   // Resolve template category: priority to explicit category/namespace, then field name, avoiding row-specific DOM ID
   const resolvedTemplateCategory =
@@ -172,7 +254,9 @@ const CustomInput = forwardRef(function CustomInput(
   const [internalValue, setInternalValue] = useState(
     defaultValue !== undefined ? defaultValue : ""
   );
-  const currentValue = isControlled ? (value ?? "") : internalValue;
+  const currentValue = isMultiLang
+    ? (localizedMap && primaryLang ? localizedMap[primaryLang.code] || "" : "")
+    : (isControlled ? (value ?? "") : internalValue);
   const stringValue = String(currentValue);
 
   // State management
@@ -209,15 +293,27 @@ const CustomInput = forwardRef(function CustomInput(
   const effectiveMaxLength = maxLength !== undefined ? maxLength : config.maxLength;
 
   // Effective Placeholder
-  const effectivePlaceholder =
-    placeholder !== undefined
-      ? placeholder
-      : config.defaultPlaceholder || (label ? `Enter ${label}...` : "");
+  const effectivePlaceholder = isMultiLang && primaryLang
+    ? getLocalizedPlaceholder(placeholder, primaryLang.code, label)
+    : placeholder !== undefined
+    ? placeholder
+    : config.defaultPlaceholder || (label ? `Enter ${label}...` : "");
 
   // ----------------------------------------------------------------------------
   // VALIDATION LOGIC
   // ----------------------------------------------------------------------------
   const runValidation = (val) => {
+    if (isMultiLang) {
+      const map =
+        typeof val === "object" && val !== null
+          ? val
+          : localizedMap || normalizeLocalizedValue(val, currentLang);
+      if (required && !hasAnyLanguageContent(map)) {
+        return "This field is required.";
+      }
+      return "";
+    }
+
     const str = String(val ?? "").trim();
 
     // Required check
@@ -288,6 +384,16 @@ const CustomInput = forwardRef(function CustomInput(
     setValidationError(errorMsg);
   };
 
+  // Clear validation error reactively as soon as valid input is entered
+  useEffect(() => {
+    if (touched && validationError) {
+      const errorMsg = runValidation(isMultiLang ? localizedMap : currentValue);
+      if (!errorMsg) {
+        setValidationError("");
+      }
+    }
+  }, [touched, validationError, isMultiLang, localizedMap, currentValue]);
+
   // ----------------------------------------------------------------------------
   // VALUE CHANGE & SANITIZATION HANDLER
   // ----------------------------------------------------------------------------
@@ -319,6 +425,11 @@ const CustomInput = forwardRef(function CustomInput(
     // Enforce maxLength
     if (effectiveMaxLength && sanitized.length > effectiveMaxLength) {
       sanitized = sanitized.slice(0, effectiveMaxLength);
+    }
+
+    if (isMultiLang && primaryLang) {
+      handleMultiLangFieldChange(primaryLang.code, sanitized);
+      return;
     }
 
     if (!isControlled) {
@@ -358,7 +469,7 @@ const CustomInput = forwardRef(function CustomInput(
     setTouched(true);
 
     if (validateOn === "blur" || validateOn === "both") {
-      triggerValidation(stringValue);
+      triggerValidation(isMultiLang ? localizedMap : stringValue);
     }
 
     // Number clamping on blur
@@ -559,9 +670,12 @@ const CustomInput = forwardRef(function CustomInput(
 
   const isInvalid = Boolean(explicitError || (touched && validationError));
   const activeError = explicitError || validationError;
+  const hasValue = isMultiLang
+    ? hasAnyLanguageContent(localizedMap)
+    : stringValue.trim() !== "";
   const isValid = Boolean(
     explicitSuccess ||
-      (showSuccessState && touched && !isInvalid && stringValue.trim() !== "")
+      (showSuccessState && touched && !isInvalid && hasValue)
   );
 
   // Variant classes
@@ -569,12 +683,12 @@ const CustomInput = forwardRef(function CustomInput(
   if (variant === "filled") {
     variantClasses = "theme-bg-elevated theme-border border";
   } else if (variant === "elevated") {
-    variantClasses = "theme-bg-elevated theme-border border shadow-sm";
+    variantClasses = "theme-bg-elevated theme-border border";
   } else if (isBorderless) {
     variantClasses = "bg-transparent border-0 outline-none shadow-none";
   }
 
-  // Focus & State Border/Ring classes
+  // Focus & State Border classes (Thin Minimal Single Border with Soft Tone States)
   let stateClasses = "";
   if (isBorderless) {
     stateClasses = "";
@@ -584,13 +698,13 @@ const CustomInput = forwardRef(function CustomInput(
     stateClasses = "cursor-default theme-bg-sub/70 theme-border";
   } else if (isInvalid) {
     stateClasses =
-      "border-[var(--color-danger)]/70 ring-2 ring-[var(--color-danger)]/20 shadow-xs";
+      "border-[var(--danger-text)]/40 hover:border-[var(--danger-text)]/60 focus-within:border-[var(--danger-text)]/75";
   } else if (isValid) {
     stateClasses =
-      "border-[var(--color-success)]/70 focus-within:ring-2 focus-within:ring-[var(--color-success)]/20 shadow-xs";
+      "border-[var(--color-success)]/40 hover:border-[var(--color-success)]/60 focus-within:border-[var(--color-success)]/75";
   } else {
     stateClasses =
-      "hover:border-[var(--accent-main)]/40 focus-within:border-[var(--accent-main)] focus-within:ring-2 focus-within:ring-[var(--accent-main)]/20";
+      "hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)]";
   }
 
   // ----------------------------------------------------------------------------
@@ -606,6 +720,9 @@ const CustomInput = forwardRef(function CustomInput(
     }
     else if (normalizedType === "email") iconElement = <MailIcon className="w-4 h-4 shrink-0 theme-accent opacity-80" />;
     else if (normalizedType === "password") iconElement = <LockClosedIcon className="w-4 h-4 shrink-0 theme-text-secondary opacity-70" />;
+    else if (normalizedType === "date" || normalizedType === "datetime-local") {
+      iconElement = <CalendarIcon className="w-4 h-4 shrink-0 theme-accent opacity-80" />;
+    }
 
     if (!iconElement) return null;
     return (
@@ -689,10 +806,29 @@ const CustomInput = forwardRef(function CustomInput(
     innerRef.current?.focus();
   };
 
+  const multiLangFilledCount = localizedMap ? getFilledLanguagesCount(localizedMap) : 0;
+
+  const multiLangToggleButton = isMultiLang ? (
+    <button
+      type="button"
+      onClick={toggleMultiLangExpanded}
+      className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1 select-none"
+      title={isMultiLangExpanded ? "Collapse to single language input" : "Expand all language fields"}
+    >
+      <GlobeIcon className="w-3.5 h-3.5 shrink-0" />
+      <span>MultiLang</span>
+      {multiLangFilledCount > 1 && (
+        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold theme-bg-accent-soft theme-accent border theme-border font-mono leading-none">
+          {multiLangFilledCount}
+        </span>
+      )}
+    </button>
+  ) : null;
+
   return (
     <div className={`text-left font-sans ${isBorderless && !label && !subLabel && !badge && !optional ? (wrapperClassName || "w-full h-full") : `w-full ${wrapperClassName}`}`}>
-      {/* Top Bar: Label, Optional Sublabel, and Badges */}
-      {(label || subLabel || badge || optional || enableTemplates || headerAction || onManage || onActionClick || actionTo || actionLabel) && (
+      {/* Top Bar: Label, Optional Sublabel, Badges, Multi-Lang Toggle & Actions */}
+      {(label || subLabel || badge || optional || enableTemplates || headerAction || onManage || onActionClick || actionTo || actionLabel || isMultiLang) && (
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {label && (
@@ -702,7 +838,7 @@ const CustomInput = forwardRef(function CustomInput(
                   disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
                 } ${labelClassName}`}
               >
-                {label} {required && <span className="theme-danger">*</span>}
+                {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
               </label>
             )}
             {optional && (
@@ -713,6 +849,7 @@ const CustomInput = forwardRef(function CustomInput(
           </div>
 
           <div className="flex items-center gap-1.5">
+            {multiLangToggleButton}
             {headerAction ? (
               headerAction
             ) : actionTo ? (
@@ -768,80 +905,149 @@ const CustomInput = forwardRef(function CustomInput(
         </p>
       )}
 
-      {/* Input Outer Shell */}
-      <div
-        className={`relative flex items-center w-full transition-all duration-150 ${sizeContainerClasses} ${variantClasses} ${stateClasses} ${className}`}
-      >
-        {/* Left Side Prefix / Icon / Adornment */}
-        {startAdornment ? (
-          <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
-        ) : prefix ? (
-          <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
-            {prefix}
-          </div>
-        ) : normalizedType === "currency" ? (
-          <div className="mr-2 shrink-0 text-sm font-bold theme-accent font-mono">
-            {currencySymbol}
-          </div>
-        ) : (
-          <ResolvedDefaultIcon />
-        )}
+      {/* Input Core: Expanded Multi-Language Stack vs Standard Single Input Shell */}
+      {isMultiLang && isMultiLangExpanded ? (
+        <div className="w-full space-y-2 animate-fade-in">
+          {SUPPORTED_LANGUAGES.map((lang) => {
+            const langVal = localizedMap ? (localizedMap[lang.code] || "") : "";
+            const badge = lang.code.toUpperCase();
+            const isRTL = lang.dir === "rtl";
+            return (
+              <div
+                key={lang.code}
+                className={`relative flex items-center w-full transition-all duration-150 ${sizeContainerClasses} ${variantClasses} ${stateClasses}`}
+              >
+                {/* LTR Indicator (EN, BN) on Left */}
+                {!isRTL && (
+                  <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
+                    {badge}
+                  </div>
+                )}
 
-        {/* Core Input Element / Textarea */}
-        {normalizedType === "textarea" ? (
-          <textarea
-            ref={innerRef}
-            id={inputId}
-            name={name}
-            value={stringValue}
-            onChange={handleInputChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            readOnly={readOnly}
-            autoFocus={autoFocus}
-            autoComplete={autoComplete}
-            placeholder={effectivePlaceholder}
-            rows={rows}
-            maxLength={effectiveMaxLength}
-            className={`w-full bg-transparent border-none outline-none resize-none font-semibold theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent transition-all select-text ${inputClassName}`}
-            {...restProps}
-          />
-        ) : (
-          <input
-            ref={innerRef}
-            id={inputId}
-            name={name}
-            type={resolvedHtmlType}
-            value={stringValue}
-            onChange={handleInputChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            readOnly={readOnly}
-            autoFocus={autoFocus}
-            autoComplete={autoComplete}
-            inputMode={resolvedInputMode}
-            placeholder={effectivePlaceholder}
-            maxLength={effectiveMaxLength}
-            className={`w-full bg-transparent border-none outline-none font-semibold theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent transition-all select-text ${
-              isCompactNumber ? "text-center font-mono" : ""
-            } ${inputClassName}`}
-            {...restProps}
-          />
-        )}
+                {/* Core Input Field for this language */}
+                <input
+                  id={`${inputId}-${lang.code}`}
+                  type="text"
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  dir={lang.dir}
+                  value={langVal}
+                  onChange={(e) => handleMultiLangFieldChange(lang.code, e.target.value)}
+                  placeholder={getLocalizedPlaceholder(placeholder, lang.code, label)}
+                  className={`w-full bg-transparent border-none outline-none font-semibold theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent text-xs sm:text-sm select-text ${
+                    isRTL ? "text-right" : "text-left"
+                  }`}
+                  style={{ fontFamily: lang.fontFamily }}
+                />
+
+                {/* RTL Indicator (AR, UR) on Right */}
+                {isRTL && (
+                  <div className="ml-3 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
+                    {badge}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Input Outer Shell */
+        <div
+          className={`relative flex items-center w-full transition-all duration-150 ${sizeContainerClasses} ${variantClasses} ${stateClasses} ${className}`}
+        >
+          {/* Left Side Prefix / Icon / Adornment / LTR MultiLang Indicator */}
+          {startAdornment ? (
+            <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
+          ) : prefix ? (
+            <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
+              {prefix}
+            </div>
+          ) : isMultiLang && primaryLang && primaryLang.dir !== "rtl" ? (
+            <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
+              {primaryLang.code.toUpperCase()}
+            </div>
+          ) : normalizedType === "currency" ? (
+            <div className="mr-2 shrink-0 text-sm font-bold theme-accent font-mono">
+              {currencySymbol}
+            </div>
+          ) : (
+            <ResolvedDefaultIcon />
+          )}
+
+          {/* Core Input Element / Textarea */}
+          {normalizedType === "textarea" ? (
+            <textarea
+              ref={innerRef}
+              id={inputId}
+              name={name}
+              value={stringValue}
+              onChange={handleInputChange}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              readOnly={readOnly}
+              autoFocus={autoFocus}
+              autoComplete={autoComplete}
+              placeholder={effectivePlaceholder}
+              rows={rows}
+              maxLength={effectiveMaxLength}
+              dir={isMultiLang && primaryLang ? primaryLang.dir : undefined}
+              style={
+                isMultiLang && primaryLang
+                  ? { fontFamily: primaryLang.fontFamily, ...restProps.style }
+                  : restProps.style
+              }
+              className={`w-full bg-transparent border-none outline-none resize-none font-semibold theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent transition-all select-text ${inputClassName}`}
+              {...restProps}
+            />
+          ) : (
+            <input
+              ref={innerRef}
+              id={inputId}
+              name={name}
+              type={resolvedHtmlType}
+              value={stringValue}
+              onChange={handleInputChange}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              readOnly={readOnly}
+              autoFocus={autoFocus}
+              autoComplete={autoComplete}
+              inputMode={resolvedInputMode}
+              placeholder={effectivePlaceholder}
+              maxLength={effectiveMaxLength}
+              dir={isMultiLang && primaryLang ? primaryLang.dir : undefined}
+              style={
+                isMultiLang && primaryLang
+                  ? { fontFamily: primaryLang.fontFamily, ...restProps.style }
+                  : restProps.style
+              }
+              className={`w-full bg-transparent border-none outline-none font-semibold theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 focus:placeholder-transparent transition-all select-text ${
+                isCompactNumber ? "text-center font-mono" : ""
+              } ${isMultiLang && primaryLang?.dir === "rtl" ? "text-right" : ""} ${inputClassName}`}
+              {...restProps}
+            />
+          )}
 
         {/* Right Side Suffix / Unit / Steppers / Password Toggle / Clear Button */}
         {((normalizedType === "number" && stepper && !disabled && !readOnly) ||
           (normalizedType === "password" && showPasswordToggle && !disabled) ||
           (clearable && stringValue.length > 0 && !disabled && !readOnly) ||
           (!isBorderless && isValid && !isInvalid) ||
+          (isMultiLang && primaryLang && primaryLang.dir === "rtl") ||
           suffix ||
           unit ||
           endAdornment) && (
           <div className="flex items-center gap-1.5 ml-2 shrink-0">
+            {/* RTL Indicator (AR, UR) in Collapsed Mode */}
+            {isMultiLang && primaryLang && primaryLang.dir === "rtl" && (
+              <div className="ml-1 mr-1 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
+                {primaryLang.code.toUpperCase()}
+              </div>
+            )}
             {/* Stepper Buttons for Number mode */}
             {normalizedType === "number" && stepper && !disabled && !readOnly && (
               <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -895,7 +1101,7 @@ const CustomInput = forwardRef(function CustomInput(
                 onClick={handleClear}
                 title="Clear input"
                 ariaLabel="Clear input"
-                className="hover:!text-rose-500"
+                className="hover:text-[var(--danger-text)]"
               />
             )}
 
@@ -914,11 +1120,12 @@ const CustomInput = forwardRef(function CustomInput(
           </div>
         )}
       </div>
+      )}
 
       {/* Bottom Status / Error / Helper Text */}
       {isInvalid ? (
-        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold theme-danger animate-fade-in">
-          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-[var(--danger-text)] animate-fade-in">
+          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0 opacity-85" />
           <span>{activeError}</span>
         </div>
       ) : helperText ? (

@@ -429,6 +429,17 @@ export default function AppLayout() {
     }
   }, [location.pathname, location.search]);
 
+  // Close right sidebar drawer when navigating to a different page route
+  const prevPathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    if (prevPathnameRef.current !== location.pathname) {
+      prevPathnameRef.current = location.pathname;
+      if (isRightSidebarOpen) {
+        closeRightSidebar();
+      }
+    }
+  }, [location.pathname, isRightSidebarOpen, closeRightSidebar]);
+
   // 📱 Mobile Touch Edge-Swipe gesture to open sidebar (and swipe left to close)
   useEffect(() => {
     let touchStartX = 0;

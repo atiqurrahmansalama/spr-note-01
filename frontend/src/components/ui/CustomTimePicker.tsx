@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { TimerIcon, SleekCheckIcon, ChevronIcon } from './Icons';
+import { TimerIcon, SleekCheckIcon, ChevronIcon, AlertCircleIcon } from './Icons';
 
 /**
  * Parses a 24-hour time string ("08:00", "14:30:00") into 12-hour components.
@@ -395,7 +395,7 @@ export default function CustomTimePicker({
       {label && (
         <div className="flex items-center justify-between gap-2 mb-2">
           <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
-            {label} {required && <span className="theme-danger">*</span>}
+            {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
           </label>
           {rightElement}
         </div>
@@ -413,10 +413,10 @@ export default function CustomTimePicker({
             : readOnly
             ? 'cursor-default theme-bg-sub theme-border theme-text-primary'
             : isOpen
-            ? 'cursor-pointer theme-bg-elevated border-[var(--accent-main)]/70 ring-2 ring-[var(--accent-main)]/15 shadow-xs'
+            ? 'cursor-pointer theme-bg-elevated border-[var(--accent-main)]'
             : error
-            ? 'cursor-pointer border-[var(--accent-main)] theme-bg-sub theme-text-primary'
-            : 'cursor-pointer theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--accent-main)]/40 theme-text-primary'
+            ? 'cursor-pointer border-[var(--danger-text)]/40 hover:border-[var(--danger-text)]/60 theme-bg-sub theme-text-primary'
+            : 'cursor-pointer theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--border-hover)] theme-text-primary'
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
@@ -442,7 +442,12 @@ export default function CustomTimePicker({
         </div>
       </button>
 
-      {error && <p className="mt-1 text-[11px] theme-accent font-medium">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-[var(--danger-text)] animate-fade-in">
+          <AlertCircleIcon className="w-3.5 h-3.5 shrink-0 opacity-85" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Render Portal Popover */}
       {popoverMenu}
