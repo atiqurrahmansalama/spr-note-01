@@ -180,7 +180,9 @@ export default function StudentAdmissionView() {
         is_editing: true,
         edit_student_id: stu.id,
         student_type: "EXISTING",
-        name: stu.name_en || stu.name || prev.name || '',
+        name: stu.name_i18n && typeof stu.name_i18n === 'object' && Object.keys(stu.name_i18n).length > 0
+          ? stu.name_i18n
+          : (stu.bangla_name ? { en: stu.name_en || stu.name || '', bn: stu.bangla_name } : (stu.name_en || stu.name || prev.name || '')),
         bangla_name: stu.bangla_name || stu.details?.name_bn || '',
         student_id_card_number: stu.student_id_card_number || stu.uniq_id || '',
         gender: stu.gender || 'MALE',

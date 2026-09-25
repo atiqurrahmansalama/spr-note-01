@@ -24,13 +24,11 @@ export function normalizeLocalizedValue(
   }
 
   if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return {};
+    if (value === '') return {};
 
-    // If it is a string, assign it to the current/default language
     return {
-      [currentLanguage]: trimmed,
-      [DEFAULT_LANGUAGE]: trimmed,
+      [currentLanguage]: value,
+      [DEFAULT_LANGUAGE]: value,
     };
   }
 
@@ -65,27 +63,27 @@ export function getLocalizedValue(
 
   if (typeof value === 'object') {
     // 1. Target language check
-    if (value[targetLang] && String(value[targetLang]).trim().length > 0) {
-      return String(value[targetLang]).trim();
+    if (value[targetLang] !== undefined && value[targetLang] !== null && String(value[targetLang]).length > 0) {
+      return String(value[targetLang]);
     }
 
     // 2. Fallback language check
-    if (fallbackLang !== targetLang && value[fallbackLang] && String(value[fallbackLang]).trim().length > 0) {
-      return String(value[fallbackLang]).trim();
+    if (fallbackLang !== targetLang && value[fallbackLang] !== undefined && value[fallbackLang] !== null && String(value[fallbackLang]).length > 0) {
+      return String(value[fallbackLang]);
     }
 
     // 3. Any available non-empty translation
     for (const langConfig of SUPPORTED_LANGUAGES) {
       const code = langConfig.code;
-      if (value[code] && String(value[code]).trim().length > 0) {
-        return String(value[code]).trim();
+      if (value[code] !== undefined && value[code] !== null && String(value[code]).length > 0) {
+        return String(value[code]);
       }
     }
 
     // 4. Any other custom key
     for (const val of Object.values(value)) {
-      if (typeof val === 'string' && val.trim().length > 0) {
-        return val.trim();
+      if (typeof val === 'string' && val.length > 0) {
+        return val;
       }
     }
   }
@@ -135,6 +133,18 @@ export function getPopulatedLanguageCodes(value: LocalizedFieldInput): LanguageC
     return codes;
   }
   return [];
+}
+
+/**
+ * Detects the dominant script language of a given text string.
+ * Returns 'bn' for Bengali, 'ar' for Arabic/Urdu, 'en' for English/Latin.
+ */
+export function detectScriptLanguage(text: string, fallback: LanguageCode = DEFAULT_LANGUAGE): LanguageCode {
+  if (!text) return fallback;
+  if (/[\u0980-\u09FF]/.test(text)) return 'bn';
+  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text)) return 'ar';
+  if (/[A-Za-z]/.test(text)) return 'en';
+  return fallback;
 }
 
 /**

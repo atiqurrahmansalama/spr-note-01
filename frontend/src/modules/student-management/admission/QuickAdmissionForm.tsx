@@ -118,15 +118,34 @@ export default function QuickAdmissionForm({
     refetch: refetchAcademicData,
   } = academicData || {};
 
+  const resolveInitialName = (stu: any, shared: any, param: string) => {
+    if (stu) {
+      if (stu.name_i18n && typeof stu.name_i18n === "object" && Object.keys(stu.name_i18n).length > 0) {
+        return stu.name_i18n;
+      }
+      if (stu.bangla_name || stu.details?.name_bn) {
+        return {
+          en: stu.name_en || stu.name || "",
+          bn: stu.bangla_name || stu.details?.name_bn || "",
+        };
+      }
+      return stu.name_en || stu.name || "";
+    }
+    if (shared?.name) {
+      return shared.name;
+    }
+    return param || "";
+  };
+
   // Form State initialized from sharedData, editingStudent, initialValues, or URL params
-  const [formData, setFormData] = useState({
-    name: sharedData?.name || editingStudent?.name_en || editingStudent?.name || paramName,
+  const [formData, setFormData] = useState(() => ({
+    name: resolveInitialName(editingStudent, sharedData, paramName),
     department: sharedData?.department || editingStudent?.department || editingStudent?.department_id || paramDept,
     student_class: sharedData?.student_class || (editingStudent?.student_class != null ? String(editingStudent.student_class) : "") || (editingStudent?.class_id ? String(editingStudent.class_id) : "") || paramClass,
     student_section: sharedData?.student_section || (editingStudent?.student_section != null ? String(editingStudent.student_section) : "") || (editingStudent?.section != null ? String(editingStudent.section) : "") || (editingStudent?.section_id ? String(editingStudent.section_id) : "") || paramSection,
     admission_date: sharedData?.admission_date || editingStudent?.admission_date || new Date().toISOString().split("T")[0],
     guardian_phone: sharedData?.guardian_phone || sharedData?.father_phone || editingStudent?.guardian_phone || editingStudent?.details?.guardian_phone || initialValues?.guardian_phone || "",
-  });
+  }));
 
   // Auto-Save / Draft Persistence (Restores and persists form draft across browser refreshes)
   const storageKey = `spr_quick_adm_${activeTenantId || 'default'}`;
@@ -138,52 +157,22 @@ export default function QuickAdmissionForm({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastLoadedStudentIdRef = useRef<string | number | null>(editingStudent?.id || null);
 
-  // Sync if editingStudent, sharedData or query parameters change
+  // Sync ONLY when editing student record changes (by ID) to avoid overwriting typed keystrokes
   useEffect(() => {
-    if (editingStudent) {
-      setFormData((prev) => ({
-        ...prev,
-        name: editingStudent.name_en || editingStudent.name || prev.name,
-        department: editingStudent.department || editingStudent.department_id || prev.department,
-        student_class: editingStudent.student_class != null ? String(editingStudent.student_class) : (editingStudent.class_id ? String(editingStudent.class_id) : prev.student_class),
-        student_section: editingStudent.student_section != null ? String(editingStudent.student_section) : (editingStudent.section != null ? String(editingStudent.section) : (editingStudent.section_id ? String(editingStudent.section_id) : prev.student_section)),
-        admission_date: editingStudent.admission_date || prev.admission_date,
-        guardian_phone: editingStudent.guardian_phone || editingStudent.details?.guardian_phone || editingStudent.father_phone || prev.guardian_phone,
-      }));
-    } else if (sharedData) {
-      setFormData((prev) => ({
-        ...prev,
-        name: sharedData.name != null && sharedData.name !== "" ? sharedData.name : (paramName || prev.name),
-        department: sharedData.department != null && sharedData.department !== "" ? String(sharedData.department) : (paramDept || prev.department),
-        student_class: sharedData.student_class != null && sharedData.student_class !== "" ? String(sharedData.student_class) : (paramClass || prev.student_class),
-        student_section: sharedData.student_section != null && sharedData.student_section !== "" ? String(sharedData.student_section) : (paramSection || prev.student_section),
-        admission_date: sharedData.admission_date || prev.admission_date,
-        guardian_phone: sharedData.guardian_phone || sharedData.father_phone || prev.guardian_phone,
-      }));
-    } else if (paramName || paramDept || paramClass || paramSection) {
-      setFormData((prev) => ({
-        ...prev,
-        name: paramName || prev.name,
-        department: paramDept || prev.department,
-        student_class: paramClass || prev.student_class,
-        student_section: paramSection || prev.student_section,
-      }));
+    if (editingStudent && editingStudent.id && lastLoadedStudentIdRef.current !== editingStudent.id) {
+      lastLoadedStudentIdRef.current = editingStudent.id;
+      setFormData({
+        name: resolveInitialName(editingStudent, null, ""),
+        department: editingStudent.department || editingStudent.department_id || "",
+        student_class: editingStudent.student_class != null ? String(editingStudent.student_class) : (editingStudent.class_id ? String(editingStudent.class_id) : ""),
+        student_section: editingStudent.student_section != null ? String(editingStudent.student_section) : (editingStudent.section != null ? String(editingStudent.section) : (editingStudent.section_id ? String(editingStudent.section_id) : "")),
+        admission_date: editingStudent.admission_date || new Date().toISOString().split("T")[0],
+        guardian_phone: editingStudent.guardian_phone || editingStudent.details?.guardian_phone || editingStudent.father_phone || "",
+      });
     }
-  }, [
-    editingStudent,
-    sharedData?.name,
-    sharedData?.department,
-    sharedData?.student_class,
-    sharedData?.student_section,
-    sharedData?.admission_date,
-    sharedData?.guardian_phone,
-    sharedData?.father_phone,
-    paramName,
-    paramDept,
-    paramClass,
-    paramSection,
-  ]);
+  }, [editingStudent?.id]);
 
   const handleFieldChange = (field: string, rawVal: any) => {
     const value =

@@ -183,9 +183,11 @@ class StudentViewSet(viewsets.ModelViewSet):
         
         result = transfer_student_academic(
             student_id=pk,
+            target_department_id=serializer.validated_data.get('target_department_id'),
             target_class_id=serializer.validated_data.get('target_class_id'),
             target_section_id=serializer.validated_data.get('target_section_id'),
             target_group_id=serializer.validated_data.get('target_group_id'),
+            target_room_id=serializer.validated_data.get('target_room_id'),
             transition_date=serializer.validated_data.get('transition_date'),
             transition_reason=serializer.validated_data.get('transition_reason', ''),
             performed_by=request.user
@@ -279,25 +281,36 @@ class StudentViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 if action_type == 'transfer':
+                    target_department_id = request.data.get('target_department_id')
                     target_class_id = request.data.get('target_class_id')
                     target_section_id = request.data.get('target_section_id')
                     target_group_id = request.data.get('target_group_id')
+                    target_room_id = request.data.get('target_room_id')
                     transition_date = request.data.get('transition_date')
                     transition_reason = request.data.get('transition_reason', 'Bulk Academic Transfer')
                     from core.services import transfer_student_academic
+                    success_count = 0
+                    errors = []
                     for s_id in student_ids:
                         try:
                             transfer_student_academic(
                                 student_id=s_id,
+                                target_department_id=target_department_id,
                                 target_class_id=target_class_id,
                                 target_section_id=target_section_id,
                                 target_group_id=target_group_id,
+                                target_room_id=target_room_id,
                                 transition_date=transition_date,
                                 transition_reason=transition_reason,
                                 performed_by=request.user
                             )
+                            success_count += 1
                         except Exception as ex:
                             logger.warning(f"Error transferring student {s_id}: {ex}")
+                            errors.append(f"Student #{s_id}: {str(ex)}")
+
+                    if success_count == 0 and errors:
+                        return Response({"error": f"Failed to transfer students: {errors[0]}"}, status=status.HTTP_400_BAD_REQUEST)
                 elif action_type == 'assign_class':
                     target_class_id = request.data.get('target_class_id') or request.data.get('class_id')
                     if not target_class_id:

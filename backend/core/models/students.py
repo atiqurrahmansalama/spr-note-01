@@ -110,7 +110,13 @@ class Student(models.Model):
             elif self.created_by and self.created_by.institution:
                 self.institution = self.created_by.institution
 
-        # ── Section & Class Auto-Sync ──
+        # ── Section, Group & Class Auto-Sync ──
+        if not self.student_group and self.group_name and str(self.group_name).strip():
+            from core.models import StudentGroup
+            grp = StudentGroup.objects.filter(name__iexact=self.group_name.strip(), is_deleted=False).first()
+            if grp:
+                self.student_group = grp
+
         if self.section and self.section.student_class_id and not self.student_class_id:
             self.student_class = self.section.student_class
 

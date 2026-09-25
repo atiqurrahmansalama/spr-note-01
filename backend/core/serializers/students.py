@@ -91,8 +91,28 @@ class StudentTransferAcademicSerializer(serializers.Serializer):
     transition_reason = serializers.CharField(required=False, allow_blank=True, max_length=255)
 
     def validate(self, attrs):
-        if not attrs.get('target_class_id') and not attrs.get('target_section_id') and not attrs.get('target_group_id') and not attrs.get('target_department_id'):
-            raise serializers.ValidationError("At least one destination (target_class_id, target_section_id, or target_group_id) must be specified.")
+        def _clean(val):
+            if not val:
+                return None
+            s = str(val).strip()
+            if s.lower() in ('', '0', 'none', 'null', 'undefined', 'all'):
+                return None
+            return s
+
+        target_department_id = _clean(attrs.get('target_department_id'))
+        target_class_id = _clean(attrs.get('target_class_id'))
+        target_section_id = _clean(attrs.get('target_section_id'))
+        target_group_id = _clean(attrs.get('target_group_id'))
+        target_room_id = _clean(attrs.get('target_room_id'))
+
+        attrs['target_department_id'] = target_department_id
+        attrs['target_class_id'] = target_class_id
+        attrs['target_section_id'] = target_section_id
+        attrs['target_group_id'] = target_group_id
+        attrs['target_room_id'] = target_room_id
+
+        if not target_class_id and not target_section_id and not target_group_id and not target_department_id and not target_room_id:
+            raise serializers.ValidationError("At least one destination (Department, Class, Section, Group, or Dormitory Room) must be specified.")
         return attrs
 
 

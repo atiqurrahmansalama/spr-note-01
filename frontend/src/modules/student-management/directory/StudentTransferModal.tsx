@@ -259,9 +259,25 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
     }
   }, [isOpen, student, initialReasonTemplates]);
 
+  const sanitizeId = (val: any): string | null => {
+    if (!val) return null;
+    const str = String(val).trim();
+    if (
+      str === "" ||
+      str === "0" ||
+      str.toUpperCase() === "ALL" ||
+      str.toLowerCase() === "null" ||
+      str.toLowerCase() === "undefined"
+    ) {
+      return null;
+    }
+    return str;
+  };
+
   // Dynamically load available sections and groups for selected destination class
   useEffect(() => {
-    if (!targetClassId || targetClassId === "ALL") {
+    const cleanClassId = sanitizeId(targetClassId);
+    if (!cleanClassId) {
       setAvailableSections([]);
       setAvailableGroups([]);
       setTargetSectionId("");
@@ -273,8 +289,8 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
     setLoadingStructure(true);
 
     Promise.allSettled([
-      fetchWithAuth(`/api/v1/academy/sections/?class=${targetClassId}&page_size=500&all=true`),
-      fetchWithAuth(`/api/v1/groups/?student_class=${targetClassId}&page_size=500&all=true`),
+      fetchWithAuth(`/api/v1/academy/sections/?class=${cleanClassId}&page_size=500&all=true`),
+      fetchWithAuth(`/api/v1/groups/?student_class=${cleanClassId}&page_size=500&all=true`),
     ]).then(([secRes, grpRes]) => {
       if (!isMounted) return;
       if (secRes.status === "fulfilled" && secRes.value?.ok) {
@@ -326,36 +342,66 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
 
   // Cascading handler when Department changes
   const handleDepartmentChange = (deptId: string) => {
-    setTargetDepartmentId(deptId);
-    setTargetClassId("");
-    setTargetSectionId("");
-    setTargetGroupId("");
-    setAvailableSections([]);
-    setAvailableGroups([]);
+    const cleanDept = sanitizeId(deptId) || "";
+    setTargetDepartmentId(cleanDept);
+    // If current selected class doesn't belong to the newly selected department, reset class & children
+    if (targetClassId && cleanDept) {
+      const clsObj = classes.find((c: any) => String(c.id) === String(targetClassId));
+      const classDept =
+        clsObj?.department?.id ||
+        clsObj?.department_id ||
+        (typeof clsObj?.department === "string" ? clsObj?.department : "");
+      if (classDept && String(classDept) !== String(cleanDept)) {
+        setTargetClassId("");
+        setTargetSectionId("");
+        setTargetGroupId("");
+        setAvailableSections([]);
+        setAvailableGroups([]);
+      }
+    }
   };
 
   // Cascading handler when Class changes
   const handleClassChange = (cid: string) => {
-    setTargetClassId(cid);
+    const cleanClass = sanitizeId(cid) || "";
+    setTargetClassId(cleanClass);
     setTargetSectionId("");
     setTargetGroupId("");
+
+    // Auto sync department if not set and class has a department
+    if (cleanClass && classes.length > 0) {
+      const clsObj = classes.find((c: any) => String(c.id) === String(cleanClass));
+      const classDept =
+        clsObj?.department?.id ||
+        clsObj?.department_id ||
+        (typeof clsObj?.department === "string" ? clsObj?.department : "");
+      if (classDept && !targetDepartmentId) {
+        setTargetDepartmentId(String(classDept));
+      }
+    }
   };
 
   // Cascading handler when Section changes
   const handleSectionChange = (sid: string) => {
-    setTargetSectionId(sid);
+    setTargetSectionId(sanitizeId(sid) || "");
     setTargetGroupId("");
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
 
+    const sanitizedDeptId = sanitizeId(targetDepartmentId);
+    const sanitizedClassId = sanitizeId(targetClassId);
+    const sanitizedSectionId = sanitizeId(targetSectionId);
+    const sanitizedGroupId = sanitizeId(targetGroupId);
+    const sanitizedRoomId = sanitizeId(targetRoomId);
+
     if (
-      !targetDepartmentId &&
-      !targetClassId &&
-      !targetSectionId &&
-      !targetGroupId &&
-      !targetRoomId
+      !sanitizedDeptId &&
+      !sanitizedClassId &&
+      !sanitizedSectionId &&
+      !sanitizedGroupId &&
+      !sanitizedRoomId
     ) {
       showToast(
         "Please select at least one destination (Department, Class, Section, Group, or Dormitory Room).",
@@ -364,7 +410,7 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
       return;
     }
 
-    const finalReason = transitionReason.trim() || initialReasonTemplates[0] || "";
+    const finalReason = transitionReason.trim() || initialReasonTemplates[0] || "Academic Placement Transfer";
 
     setSubmitting(true);
 
@@ -374,11 +420,11 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
         const payload = {
           action: "transfer",
           student_ids: studentIds,
-          target_department_id: targetDepartmentId || null,
-          target_class_id: targetClassId || null,
-          target_section_id: targetSectionId || null,
-          target_group_id: targetGroupId || null,
-          target_room_id: targetRoomId || null,
+          target_department_id: sanitizedDeptId,
+          target_class_id: sanitizedClassId,
+          target_section_id: sanitizedSectionId,
+          target_group_id: sanitizedGroupId,
+          target_room_id: sanitizedRoomId,
           transition_date: transitionDate,
           transition_reason: finalReason,
         };
@@ -398,7 +444,8 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
           onClose();
         } else {
           const err = await res.json().catch(() => ({}));
-          showToast(err.error || err.detail || "Failed to transfer students.", "error");
+          const msg = err.error || err.detail || "Failed to transfer students.";
+          showToast(typeof msg === "string" ? msg : JSON.stringify(msg), "error");
         }
       } else {
         // Single Student Transfer Action
@@ -412,11 +459,11 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
         }
 
         const payload = {
-          target_department_id: targetDepartmentId || null,
-          target_class_id: targetClassId || null,
-          target_section_id: targetSectionId || null,
-          target_group_id: targetGroupId || null,
-          target_room_id: targetRoomId || null,
+          target_department_id: sanitizedDeptId,
+          target_class_id: sanitizedClassId,
+          target_section_id: sanitizedSectionId,
+          target_group_id: sanitizedGroupId,
+          target_room_id: sanitizedRoomId,
           transition_date: transitionDate,
           transition_reason: finalReason,
         };
@@ -440,8 +487,8 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
           onClose();
         } else {
           const err = await res.json().catch(() => ({}));
-          const msg = err.error || err.detail || "Failed to transfer student.";
-          showToast(msg, "error");
+          const msg = err.error || err.detail || (typeof err === "object" ? Object.values(err)[0] : "Failed to transfer student.");
+          showToast(typeof msg === "string" ? msg : JSON.stringify(msg), "error");
         }
       }
     } catch {
@@ -452,11 +499,11 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
   };
 
   const hasAnyDestinationSelected =
-    Boolean(targetDepartmentId) ||
-    Boolean(targetClassId) ||
-    Boolean(targetSectionId) ||
-    Boolean(targetGroupId) ||
-    Boolean(targetRoomId);
+    Boolean(sanitizeId(targetDepartmentId)) ||
+    Boolean(sanitizeId(targetClassId)) ||
+    Boolean(sanitizeId(targetSectionId)) ||
+    Boolean(sanitizeId(targetGroupId)) ||
+    Boolean(sanitizeId(targetRoomId));
 
   return (
     <Modal
@@ -571,10 +618,10 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
                 onChange={handleClassChange}
                 classes={classes}
                 departmentId={targetDepartmentId || undefined}
-                disabled={!targetDepartmentId}
+                disabled={false}
                 allowAll={true}
                 allLabel="Keep Current"
-                placeholder={!targetDepartmentId ? "Select Department first" : "Keep Current"}
+                placeholder="Keep Current"
                 icon={ClassIcon}
               />
             </div>

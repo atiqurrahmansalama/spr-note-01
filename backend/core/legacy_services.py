@@ -696,43 +696,72 @@ def delete_section_with_migration(source_section_id, target_section_id=None, per
     }
 
 
-def transfer_student_academic(student_id, target_class_id=None, target_section_id=None, target_group_id=None, transition_date=None, transition_reason="", performed_by=None):
+def transfer_student_academic(student_id, target_class_id=None, target_section_id=None, target_group_id=None, target_department_id=None, target_room_id=None, transition_date=None, transition_reason="", performed_by=None):
     """
-    Transfers a single student between classes, sections, and groups with custom transition date
-    and audit reason, maintaining chronological lifecycle timelines and auto-syncing classes.
+    Transfers a single student between departments, classes, sections, groups, and dormitory rooms
+    with custom transition date and audit reason, maintaining chronological lifecycle timelines
+    and auto-syncing hierarchy.
     """
     from django.db import transaction
     from rest_framework.exceptions import ValidationError, NotFound
-    from core.models import Student, StudentClass, ClassSection, StudentGroup, StudentAcademicHistory
+    from core.models import (
+        Student, StudentClass, ClassSection, StudentGroup,
+        StudentAcademicHistory, AcademicDepartment, DormitoryRoom, BedAllocation
+    )
+
+    def _clean_id(val):
+        if val is None:
+            return None
+        s = str(val).strip()
+        if s.lower() in ('', '0', 'none', 'null', 'undefined', 'all'):
+            return None
+        return s
+
+    clean_class_id = _clean_id(target_class_id)
+    clean_section_id = _clean_id(target_section_id)
+    clean_group_id = _clean_id(target_group_id)
+    clean_dept_id = _clean_id(target_department_id)
+    clean_room_id = _clean_id(target_room_id)
 
     try:
         student = Student.objects.get(id=student_id, is_deleted=False)
-    except Student.DoesNotExist:
+    except (Student.DoesNotExist, ValueError):
         raise NotFound("Student not found.")
 
-    target_class = None
-    if target_class_id and str(target_class_id).lower() not in ('none', 'null', '', '0'):
+    target_dept = None
+    if clean_dept_id:
         try:
-            target_class = StudentClass.objects.get(id=target_class_id, is_deleted=False)
+            target_dept = AcademicDepartment.objects.get(id=clean_dept_id, is_deleted=False)
+        except (AcademicDepartment.DoesNotExist, ValueError):
+            raise ValidationError({"target_department_id": "Target department not found or inactive."})
+
+    target_class = None
+    if clean_class_id:
+        try:
+            target_class = StudentClass.objects.get(id=clean_class_id, is_deleted=False)
         except (StudentClass.DoesNotExist, ValueError):
             raise ValidationError({"target_class_id": "Target class not found or inactive."})
 
     target_section = None
-    if target_section_id and str(target_section_id).lower() not in ('none', 'null', '', '0'):
+    if clean_section_id:
         try:
-            target_section = ClassSection.objects.get(id=target_section_id, is_deleted=False)
+            target_section = ClassSection.objects.get(id=clean_section_id, is_deleted=False)
         except (ClassSection.DoesNotExist, ValueError):
             raise ValidationError({"target_section_id": "Target section not found or inactive."})
 
     target_group = None
-    if target_group_id and str(target_group_id).lower() not in ('none', 'null', '', '0'):
+    if clean_group_id:
         try:
-            target_group = StudentGroup.objects.get(id=target_group_id, is_deleted=False)
+            target_group = StudentGroup.objects.get(id=clean_group_id, is_deleted=False)
         except (StudentGroup.DoesNotExist, ValueError):
             raise ValidationError({"target_group_id": "Target group not found or inactive."})
 
-    if not target_class and not target_section and not target_group:
-        raise ValidationError("At least one destination (target class, section, or group) must be specified.")
+    target_room = None
+    if clean_room_id:
+        try:
+            target_room = DormitoryRoom.objects.get(id=clean_room_id, is_deleted=False)
+        except (DormitoryRoom.DoesNotExist, ValueError):
+            raise ValidationError({"target_room_id": "Target dormitory room not found or inactive."})
 
     # Guardrail 1: If section specified has a parent class, auto-sync target class if not explicitly specified
     if target_section and target_section.student_class and not target_class:
@@ -742,8 +771,20 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
     if target_group and target_group.student_class and not target_class:
         target_class = target_group.student_class
 
+    # Guardrail 3: If target department specified and student needs class update
+    if target_dept and not target_class:
+        if student.student_class and student.student_class.department_id == target_dept.id:
+            pass
+        else:
+            first_cls = StudentClass.objects.filter(department=target_dept, is_deleted=False).order_by('order_rank', 'name').first()
+            if first_cls:
+                target_class = first_cls
+
+    if not target_class and not target_section and not target_group and not target_dept and not target_room and not (target_room_id is not None and str(target_room_id).strip() in ('0', '')):
+        raise ValidationError("At least one destination (Department, Class, Section, Group, or Dormitory Room) must be specified.")
+
     effective_date = transition_date or timezone.now().date()
-    reason = transition_reason.strip() or "Academic Reassignment / Level Promotion"
+    reason = str(transition_reason).strip() or "Academic Reassignment / Level Promotion"
 
     before_state = {
         "department_id": str(student.student_class.department_id) if (student.student_class and student.student_class.department_id) else None,
@@ -752,7 +793,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
         "class_name": student.student_class.name if student.student_class else None,
         "section_id": str(student.section_id) if student.section_id else None,
         "section_name": student.section.section_name if student.section else None,
-        "group_id": student.student_group_id if student.student_group_id else None,
+        "group_id": str(student.student_group_id) if student.student_group_id else None,
         "group_name": student.group_name
     }
 
@@ -767,23 +808,42 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
         if target_class:
             student.student_class = target_class
             # If changing class and target_section was not passed, reset section if old section belonged to previous class
-            if student.section and target_section is None and target_section_id is None:
+            if student.section and target_section is None and clean_section_id is None:
                 if student.section.student_class_id != target_class.id:
                     student.section = None
 
         if target_section is not None:
             student.section = target_section
-        elif target_section_id is not None and str(target_section_id).strip() in ('', '0'):
+        elif clean_section_id is None and target_section_id is not None and str(target_section_id).strip() in ('', '0'):
             student.section = None
 
         if target_group is not None:
             student.student_group = target_group
             student.group_name = target_group.name
-        elif target_group_id is not None and str(target_group_id).strip() in ('', '0'):
+        elif clean_group_id is None and target_group_id is not None and str(target_group_id).strip() in ('', '0'):
             student.student_group = None
             student.group_name = ''
 
         student.save()
+
+        # Handle residential room assignment if specified
+        if target_room:
+            BedAllocation.objects.filter(student=student, is_active=True).update(student=None, status='VACANT')
+            vacant_bed = BedAllocation.objects.filter(room=target_room, status='VACANT', is_active=True).first()
+            if not vacant_bed:
+                bed_count = BedAllocation.objects.filter(room=target_room).count()
+                vacant_bed = BedAllocation.objects.create(
+                    room=target_room,
+                    bed_number=f"Bed-{str(bed_count + 1).zfill(2)}",
+                    status='VACANT'
+                )
+            vacant_bed.student = student
+            vacant_bed.status = 'OCCUPIED'
+            vacant_bed.assigned_date = effective_date
+            vacant_bed.remarks = reason
+            vacant_bed.save()
+        elif clean_room_id is None and target_room_id is not None and str(target_room_id).strip() in ('0', ''):
+            BedAllocation.objects.filter(student=student, is_active=True).update(student=None, status='VACANT')
 
         # Create new active academic progression log in lifecycle timeline
         new_history = StudentAcademicHistory.objects.create(
@@ -793,7 +853,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
             start_date=effective_date,
             is_current=True,
             transition_reason=reason,
-            transferred_by=performed_by
+            transferred_by=performed_by if (performed_by and getattr(performed_by, 'is_authenticated', False)) else None
         )
 
         after_state = {
@@ -803,7 +863,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
             "class_name": student.student_class.name if student.student_class else None,
             "section_id": str(student.section_id) if student.section_id else None,
             "section_name": student.section.section_name if student.section else None,
-            "group_id": student.student_group_id if student.student_group_id else None,
+            "group_id": str(student.student_group_id) if student.student_group_id else None,
             "group_name": student.group_name
         }
 
@@ -835,7 +895,7 @@ def transfer_student_academic(student_id, target_class_id=None, target_section_i
         "student_group": student.student_group.name if student.student_group else student.group_name,
         "transition_date": str(effective_date),
         "transition_reason": reason,
-        "history_id": new_history.id
+        "history_id": str(new_history.id)
     }
 
 

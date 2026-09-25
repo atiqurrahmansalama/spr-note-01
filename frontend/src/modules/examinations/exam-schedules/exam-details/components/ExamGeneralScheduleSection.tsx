@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import CustomInput from '../../../../../components/ui/CustomInput';
 import CustomSelect from '../../../../../components/ui/CustomSelect';
 import CustomTimePicker from '../../../../../components/ui/CustomTimePicker';
+import IconButton from '../../../../../components/ui/IconButton';
 import ReusableCalendar from '../../../../../components/common/ReusableCalendar';
 import ActionMenu from '../../../../../components/ui/ActionMenu';
 import { DrawerSection } from '../../../../../components/layout';
@@ -548,15 +549,14 @@ export default function ExamGeneralScheduleSection({
                 </div>
 
                 {shifts.length > 1 && (
-                  <button
-                    type="button"
+                  <IconButton
+                    icon={TrashIcon}
+                    size="xs"
+                    variant="danger"
                     onClick={() => onRemoveShift(idx)}
                     title="Remove this shift"
-                    className="text-[11px] font-semibold theme-text-secondary hover:theme-danger cursor-pointer flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:theme-bg-danger-soft active:scale-95 shrink-0"
-                  >
-                    <TrashIcon className="w-3.5 h-3.5" />
-                    <span className="hidden @[480px]:inline">Remove Shift</span>
-                  </button>
+                    ariaLabel="Remove this shift"
+                  />
                 )}
               </div>
 

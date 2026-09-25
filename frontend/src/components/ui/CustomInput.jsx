@@ -53,6 +53,7 @@ import {
   hasAnyLanguageContent,
   getFilledLanguagesCount,
   sanitizeScriptForLanguage,
+  detectScriptLanguage,
   getLocalizedPlaceholder,
 } from "../../i18n/localizedEntity";
 
@@ -261,7 +262,11 @@ const CustomInput = forwardRef(function CustomInput(
     defaultValue !== undefined ? defaultValue : ""
   );
   const currentValue = isMultiLang
-    ? (localizedMap && primaryLang ? localizedMap[primaryLang.code] || "" : "")
+    ? (localizedMap && primaryLang
+        ? (localizedMap[primaryLang.code] !== undefined && localizedMap[primaryLang.code] !== ""
+            ? localizedMap[primaryLang.code]
+            : getLocalizedValue(localizedMap, primaryLang.code, 'en'))
+        : (typeof value === "string" ? value : ""))
     : (isControlled ? (value ?? "") : internalValue);
   const stringValue = String(currentValue);
 
@@ -453,7 +458,8 @@ const CustomInput = forwardRef(function CustomInput(
     }
 
     if (isMultiLang && primaryLang) {
-      handleMultiLangFieldChange(primaryLang.code, sanitized);
+      const targetLangCode = detectScriptLanguage(sanitized, primaryLang.code);
+      handleMultiLangFieldChange(targetLangCode, sanitized);
       return;
     }
 

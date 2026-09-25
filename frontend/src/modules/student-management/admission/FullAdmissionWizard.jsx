@@ -32,6 +32,7 @@ import {
   DEFAULT_PREVIOUS_CLASSES,
   students as studentStore,
 } from "../../../utils/localStore";
+import { getLocalizedValue } from "../../../i18n/localizedEntity";
 import { useTenant } from "../../../context/TenantContext";
 import { useAcademicSession } from "../../../context/AcademicSessionContext";
 import AutoSaveBadge from "../../../components/ui/AutoSaveBadge";
@@ -1220,8 +1221,14 @@ export default function FullAdmissionWizard({
                   <CustomInput
                     label="Full Name (English)"
                     required
-                    value={sharedData.name || ""}
-                    onChange={(val) => handleChange("name", val)}
+                    value={typeof sharedData.name === "object" ? getLocalizedValue(sharedData.name, "en") : (sharedData.name || "")}
+                    onChange={(val) => {
+                      if (typeof sharedData.name === "object") {
+                        handleChange("name", { ...sharedData.name, en: val });
+                      } else {
+                        handleChange("name", val);
+                      }
+                    }}
                     placeholder="e.g. Abdullah Bin Arif"
                   />
                 </div>
@@ -1229,8 +1236,13 @@ export default function FullAdmissionWizard({
                 <div>
                   <CustomInput
                     label="Full Name (Native)"
-                    value={sharedData.bangla_name || ""}
-                    onChange={(val) => handleChange("bangla_name", val)}
+                    value={sharedData.bangla_name || (typeof sharedData.name === "object" ? getLocalizedValue(sharedData.name, "bn") : "")}
+                    onChange={(val) => {
+                      handleChange("bangla_name", val);
+                      if (typeof sharedData.name === "object") {
+                        handleChange("name", { ...sharedData.name, bn: val });
+                      }
+                    }}
                     placeholder="e.g. Abdullah Bin Arif (In Native Script)"
                   />
                 </div>
