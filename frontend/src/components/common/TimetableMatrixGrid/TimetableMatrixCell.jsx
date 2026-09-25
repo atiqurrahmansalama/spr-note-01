@@ -8,7 +8,7 @@ import {
   ArrowsRightLeftIcon,
 } from '../../ui/Icons';
 import { LENS_MODES } from './TimetableLensSelector';
-import RoutineConflictBadge from '../../../modules/examinations/exam-schedules/routine-matrix/components/RoutineConflictBadge';
+import RoutineConflictBadge from '../../../modules/examinations/exam-schedules/subject-routine/components/RoutineConflictBadge';
 
 /**
  * TimetableMatrixCell

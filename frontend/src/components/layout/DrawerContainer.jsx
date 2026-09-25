@@ -12,7 +12,7 @@ import { ChevronIcon } from "../ui/Icons";
  * @param {React.ReactNode} props.children - Main drawer content
  * @param {React.ReactNode} [props.header] - Optional Header element / Banner
  * @param {React.ReactNode} [props.footer] - Optional Sticky / Bottom Action Footer
- * @param {'normal'|'compact'|'relaxed'} [props.spacing='normal'] - Vertical spacing between sections
+ * @param {'normal'|'compact'|'relaxed'|'none'} [props.spacing='normal'] - Vertical spacing between sections
  * @param {'normal'|'compact'|'none'} [props.padding='normal'] - Outer container padding
  * @param {boolean} [props.animate=true] - Whether to apply smooth fade-in animation
  * @param {string} [props.className=''] - Additional custom CSS classes

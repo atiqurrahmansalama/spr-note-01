@@ -15,7 +15,7 @@ import { examStore } from '@/stores/examStore';
 import useExamData from '../../hooks/useExamData';
 import { formatShortDateLabel, generateDateRange } from '../utils/examScheduleUtils';
 import InvigilationDutyDrawerForm from './InvigilationDutyDrawerForm';
-import SubjectMatrixHeader from '../routine-matrix/components/SubjectMatrixHeader';
+import { SubjectMatrixHeader } from '../subject-routine';
 import { UniversalAutoPopulateDrawer } from '../../../../components/ui/auto-populate';
 
 /**

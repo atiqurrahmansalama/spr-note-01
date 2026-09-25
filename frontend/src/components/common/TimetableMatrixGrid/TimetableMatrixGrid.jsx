@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import TimetableMatrixCell from './TimetableMatrixCell';
 import TimetableCellContextMenu from './TimetableCellContextMenu';
 import TimetableLensSelector, { LENS_MODES } from './TimetableLensSelector';
-import { getItemConflicts } from '../../../modules/examinations/exam-schedules/routine-matrix/utils/routineConflictHelper';
+import { getItemConflicts } from '../../../modules/examinations/exam-schedules/subject-routine/utils/routineConflictHelper';
 import { validateMatrixGridDnd } from './timetableDndValidator';
 import {
   CalendarIcon,
@@ -51,16 +51,16 @@ export default function TimetableMatrixGrid({
   rows = [], // Array of row objects: { id, label, sub, code, ... }
   columns = [], // Array of column objects: { id, date, shiftId, shiftName, timing, label, ... }
   items = [], // Array of scheduled items
-  cellItemExtractor, // (items, rowItem, colItem) => item | null
+  cellItemExtractor = null, // (items, rowItem, colItem) => item | null
   conflictMap = null, // Map<itemId, Conflict[]>
-  onItemMove, // (draggedItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
-  onItemSwap, // (draggedItem, targetItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
-  onItemCopy, // (draggedItem, targetItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
-  onCellAdd, // (rowItem, colItem) => void
-  onCellEdit, // (item, rowItem, colItem) => void
-  onCellDuplicate, // (item, rowItem, colItem) => void
-  onCellDelete, // (item, rowItem, colItem) => void
-  onCellClick, // (item, rowItem, colItem) => void
+  onItemMove = null, // (draggedItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
+  onItemSwap = null, // (draggedItem, targetItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
+  onItemCopy = null, // (draggedItem, targetItem, sourceRow, sourceCol, targetRow, targetCol, activeLens) => void
+  onCellAdd = null, // (rowItem, colItem) => void
+  onCellEdit = null, // (item, rowItem, colItem) => void
+  onCellDuplicate = null, // (item, rowItem, colItem) => void
+  onCellDelete = null, // (item, rowItem, colItem) => void
+  onCellClick = null, // (item, rowItem, colItem) => void
   allowCrossRowDnd = true, // boolean | ((context) => boolean)
   allowCrossColDnd = true, // boolean | ((context) => boolean)
   validateDnd = null, // (context) => { allowed: boolean, reason?: string } | boolean

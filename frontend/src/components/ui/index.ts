@@ -23,7 +23,15 @@ export { default as PanelResizer, PanelResizer as NamedPanelResizer } from './Pa
 export type { PanelResizerProps } from './PanelResizer';
 export { default as PageRangeInput } from './PageRangeInput';
 export type { PageRangeInputProps, PageRangeObject, PageRangeChangeValue, PageRange } from './PageRangeInput';
-export { default as MetricsGrid } from './MetricsGrid';
+export { default as MetricsGrid, MetricCard } from './MetricsGrid';
+export type {
+  MetricsGridProps,
+  MetricCardProps,
+  MetricItem,
+  MetricCardDensity,
+  MetricCardVariant,
+  MetricIconPosition,
+} from './MetricsGrid';
 export { default as AutocompleteDropdown } from './AutocompleteDropdown';
 export type { AutocompleteDropdownProps, AutocompleteOption } from './AutocompleteDropdown';
 export { default as RadioCard } from './RadioCard';
@@ -34,5 +42,14 @@ export { default as IconButton, IconButton as NamedIconButton } from './IconButt
 export type { IconButtonProps, IconButtonVariant, IconButtonSize, IconButtonShape } from './IconButton';
 export { default as PortalDropdownMenu } from './PortalDropdownMenu';
 export type { PortalDropdownMenuProps } from './PortalDropdownMenu';
+export { default as EmptyState, EmptyState as NamedEmptyState, EmptyData } from './EmptyState';
+export type {
+  EmptyStateProps,
+  EmptyStateVariant,
+  EmptyStateSize,
+  EmptyStateIconVariant,
+  EmptyStateIconSize,
+  EmptyStateAction,
+} from './EmptyState';
 export * from './Icons';
 

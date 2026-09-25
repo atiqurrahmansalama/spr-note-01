@@ -91,6 +91,13 @@ export interface CustomInputProps {
   actionTitle?: string | null;
   headerAction?: React.ReactNode;
   multiLanguage?: boolean;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  expanded?: boolean;
+  onToggle?: (expanded: boolean) => void;
+  children?: React.ReactNode;
+  expandableContentClassName?: string;
+  bodyClassName?: string;
   dir?: 'ltr' | 'rtl' | 'auto';
   style?: React.CSSProperties;
   [key: string]: any;

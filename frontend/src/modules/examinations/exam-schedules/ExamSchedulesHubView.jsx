@@ -4,8 +4,8 @@ import { PageContainer } from '../../../components/layout';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
-import ExamSchedulesView from './schedules/ExamSchedulesView';
-import SubjectRoutineMatrixView from './routine-matrix/SubjectRoutineMatrixView';
+import ExamDetailsView from './exam-details/ExamDetailsView';
+import SubjectRoutineMatrixView from './subject-routine/SubjectRoutineMatrixView';
 import InvigilationScheduleView from './invigilation/InvigilationScheduleView';
 import {
   CalendarIcon,
@@ -79,8 +79,8 @@ export default function ExamSchedulesHubView({
   }, [location.pathname, searchParams, defaultTab]);
 
   const tabs = [
-    { id: 'SCHEDULES', label: 'Exam Schedules', icon: CalendarIcon },
-    { id: 'SUBJECT_MATRIX', label: 'Subject Routine Matrix', icon: BookOpenIcon },
+    { id: 'SCHEDULES', label: 'Exam Details', icon: CalendarIcon },
+    { id: 'SUBJECT_MATRIX', label: 'Subject Routine', icon: BookOpenIcon },
     { id: 'INVIGILATION_SCHEDULE', label: 'Invigilation Schedule', icon: UserCheckIcon },
   ];
 
@@ -156,7 +156,7 @@ export default function ExamSchedulesHubView({
       {/* 3. Active Tab Workspace */}
       <div className="w-full min-h-[480px]">
         {activeTab === 'SCHEDULES' && (
-          <ExamSchedulesView
+          <ExamDetailsView
             isEmbedded={true}
             hideHeader={true}
             onNavigateToMatrix={handleNavigateToMatrix}

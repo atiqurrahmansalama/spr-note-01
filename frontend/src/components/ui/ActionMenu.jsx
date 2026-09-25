@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { DotsVerticalIcon, ChevronIcon } from './Icons';
+import IconButton from './IconButton';
 
 /** @type {any} */
 export default function ActionMenu({
@@ -142,43 +143,66 @@ export default function ActionMenu({
 
   return (
     <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        onClick={handleToggle}
-        aria-label={ariaLabel}
-        aria-expanded={isOpen}
-        className={`${
-          label
-            ? `inline-flex items-center font-semibold border transition-all duration-150 select-none ${sizeClasses} ${variantClasses}`
-            : `transition-all duration-150 focus:outline-none flex items-center justify-center ${iconOnlySizeClasses} ${iconOnlyVariantClasses}`
-        } ${
-          disabled ? 'opacity-50 cursor-not-allowed pointer-events-none shadow-none' : 'cursor-pointer'
-        } ${
-          isOpen
-            ? variant === 'primary'
-              ? 'opacity-95 ring-2 ring-[var(--accent-main)]/40'
-              : variant === 'ghost'
-              ? 'opacity-85'
-              : 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
-            : ''
-        } ${buttonClassName}`}
-      >
-        {renderIcon(
-          TriggerIcon,
-          label
-            ? `w-3.5 h-3.5 shrink-0 ${variant === 'primary' ? '' : 'theme-accent'}`
-            : `w-4 h-4 shrink-0 ${variant === 'ghost' ? 'theme-accent' : ''}`
-        )}
-        {label && <span className="truncate">{label}</span>}
-        {label && showChevron && (
-          <ChevronIcon
-            isOpen={isOpen}
-            className={`w-3 h-3 ml-0.5 shrink-0 ${variant === 'primary' ? 'opacity-90' : variant === 'ghost' ? 'theme-accent opacity-90' : 'opacity-70'}`}
-          />
-        )}
-      </button>
+      {label ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          disabled={disabled}
+          onClick={handleToggle}
+          aria-label={ariaLabel}
+          aria-expanded={isOpen}
+          className={`inline-flex items-center font-semibold border transition-all duration-150 select-none ${sizeClasses} ${variantClasses} ${
+            disabled ? 'opacity-50 cursor-not-allowed pointer-events-none shadow-none' : 'cursor-pointer'
+          } ${
+            isOpen
+              ? variant === 'primary'
+                ? 'opacity-95 ring-2 ring-[var(--accent-main)]/40'
+                : variant === 'ghost'
+                ? 'opacity-85'
+                : 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
+              : ''
+          } ${buttonClassName}`}
+        >
+          {renderIcon(
+            TriggerIcon,
+            `w-3.5 h-3.5 shrink-0 ${variant === 'primary' ? '' : 'theme-accent'}`
+          )}
+          <span className="truncate">{label}</span>
+          {showChevron && (
+            <ChevronIcon
+              isOpen={isOpen}
+              className={`w-3 h-3 ml-0.5 shrink-0 ${variant === 'primary' ? 'opacity-90' : variant === 'ghost' ? 'theme-accent opacity-90' : 'opacity-70'}`}
+            />
+          )}
+        </button>
+      ) : (
+        <IconButton
+          ref={buttonRef}
+          type="button"
+          disabled={disabled}
+          onClick={handleToggle}
+          ariaLabel={ariaLabel}
+          aria-expanded={isOpen}
+          icon={TriggerIcon}
+          size={size === 'xs' ? 'xs' : size === 'sm' ? 'sm' : 'md'}
+          variant={
+            variant === 'ghost'
+              ? 'ghost'
+              : variant === 'primary'
+              ? 'accent-soft'
+              : variant === 'surface'
+              ? 'surface'
+              : variant === 'sub'
+              ? 'sub'
+              : 'sub'
+          }
+          shape="rounded"
+          active={isOpen}
+          className={`${
+            isOpen ? 'ring-2 ring-[var(--accent-main)]/30 theme-bg-sub' : ''
+          } ${buttonClassName}`}
+        />
+      )}
 
       {isOpen && coords.top > 0 && typeof document !== 'undefined' &&
         createPortal(

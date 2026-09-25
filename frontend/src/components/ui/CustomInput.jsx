@@ -154,9 +154,15 @@ const CustomInput = forwardRef(function CustomInput(
     onActionClick = null,
     actionLabel = null,
     actionTo = null,
-    actionTitle = null,
     headerAction = null,
     multiLanguage = false,
+    collapsible = false,
+    defaultExpanded = false,
+    expanded: controlledExpanded,
+    onToggle = null,
+    children = null,
+    expandableContentClassName = "",
+    bodyClassName = "",
     ...restProps
   },
   forwardedRef
@@ -262,6 +268,25 @@ const CustomInput = forwardRef(function CustomInput(
   // State management
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+
+  // Collapsible state & toggle logic
+  const isCollapsible = Boolean(collapsible || type === "collapsible");
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const isControlledExpanded = controlledExpanded !== undefined;
+  const isExpanded = isCollapsible ? (isControlledExpanded ? Boolean(controlledExpanded) : internalExpanded) : false;
+
+  const handleCollapsibleToggle = () => {
+    if (!isCollapsible || disabled || readOnly) return;
+    if (isControlledExpanded) {
+      onToggle?.(!isExpanded);
+    } else {
+      setInternalExpanded((prev) => {
+        const next = !prev;
+        onToggle?.(next);
+        return next;
+      });
+    }
+  };
   const [touched, setTouched] = useState(false);
   const [validationError, setValidationError] = useState("");
 
@@ -950,10 +975,129 @@ const CustomInput = forwardRef(function CustomInput(
             );
           })}
         </div>
+      ) : isCollapsible ? (
+        /* Collapsible Accordion Mode with Merged Card Shell (Instant Zero Transition) */
+        isExpanded ? (
+          <div
+            className={`w-full rounded-2xl border theme-border theme-bg-sub/10 shadow-2xs overflow-hidden`}
+          >
+            {/* Expanded Header Bar */}
+            <div
+              role="button"
+              onClick={disabled ? undefined : handleCollapsibleToggle}
+              style={restProps.style}
+              className={`relative flex items-center justify-between w-full ${sizeContainerClasses} rounded-t-2xl rounded-b-none border-0 border-b theme-border theme-bg-surface shadow-none ${
+                disabled
+                  ? "opacity-60 cursor-not-allowed select-none"
+                  : "cursor-pointer hover:theme-bg-sub/20 select-none"
+              } ${className}`}
+            >
+              {/* Left Side Prefix / Icon / Start Adornment */}
+              <div className="flex items-center flex-1 min-w-0 mr-2">
+                {startAdornment ? (
+                  <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
+                ) : prefix ? (
+                  <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
+                    {prefix}
+                  </div>
+                ) : (
+                  <ResolvedDefaultIcon />
+                )}
+
+                {/* Collapsible Text Summary Display */}
+                <span
+                  className={`font-semibold text-xs sm:text-sm truncate text-left select-none ${
+                    stringValue
+                      ? "theme-text-primary"
+                      : "theme-text-secondary opacity-60"
+                  }`}
+                >
+                  {stringValue || effectivePlaceholder || "Click to configure"}
+                </span>
+              </div>
+
+              {/* Right Side Collapsible Chevron & End Adornment */}
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                {endAdornment}
+                <div
+                  className="flex items-center justify-center shrink-0"
+                  title="Collapse"
+                >
+                  <ChevronIcon
+                    isOpen={true}
+                    className="w-4 h-4 theme-accent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Collapsible Expandable Body / Children */}
+            {children && (
+              <div
+                className={`p-3.5 sm:p-4 space-y-3 animate-fade-in ${
+                  expandableContentClassName || bodyClassName
+                }`}
+              >
+                {children}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Collapsed Single Input Shell (Instant Zero Transition) */
+          <div
+            role="button"
+            onClick={disabled ? undefined : handleCollapsibleToggle}
+            style={restProps.style}
+            className={`relative flex items-center justify-between w-full ${sizeContainerClasses} ${variantClasses} hover:border-[var(--accent-main)]/40 ${
+              disabled
+                ? "opacity-60 cursor-not-allowed select-none"
+                : "cursor-pointer hover:theme-bg-sub/20 select-none"
+            } ${className}`}
+          >
+            {/* Left Side Prefix / Icon / Start Adornment */}
+            <div className="flex items-center flex-1 min-w-0 mr-2">
+              {startAdornment ? (
+                <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
+              ) : prefix ? (
+                <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
+                  {prefix}
+                </div>
+              ) : (
+                <ResolvedDefaultIcon />
+              )}
+
+              {/* Collapsible Text Summary Display */}
+              <span
+                className={`font-semibold text-xs sm:text-sm truncate text-left select-none ${
+                  stringValue
+                    ? "theme-text-primary"
+                    : "theme-text-secondary opacity-60"
+                }`}
+              >
+                {stringValue || effectivePlaceholder || "Click to configure"}
+              </span>
+            </div>
+
+            {/* Right Side Collapsible Chevron & End Adornment */}
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              {endAdornment}
+              <div
+                className="flex items-center justify-center shrink-0"
+                title="Expand"
+              >
+                <ChevronIcon
+                  isOpen={false}
+                  className="w-4 h-4 theme-accent"
+                />
+              </div>
+            </div>
+          </div>
+        )
       ) : (
-        /* Input Outer Shell */
+        /* Standard Single Input / Textarea Shell */
         <div
-          className={`relative flex items-center w-full transition-all duration-150 ${sizeContainerClasses} ${variantClasses} ${stateClasses} ${className}`}
+          style={restProps.style}
+          className={`relative flex items-center w-full ${sizeContainerClasses} ${variantClasses} ${stateClasses} ${className}`}
         >
           {/* Left Side Prefix / Icon / Adornment / LTR MultiLang Indicator */}
           {startAdornment ? (
@@ -1032,94 +1176,94 @@ const CustomInput = forwardRef(function CustomInput(
             />
           )}
 
-        {/* Right Side Suffix / Unit / Steppers / Password Toggle / Clear Button */}
-        {((normalizedType === "number" && stepper && !disabled && !readOnly) ||
-          (normalizedType === "password" && showPasswordToggle && !disabled) ||
-          (clearable && stringValue.length > 0 && !disabled && !readOnly) ||
-          (!isBorderless && isValid && !isInvalid) ||
-          (isMultiLang && primaryLang && primaryLang.dir === "rtl") ||
-          suffix ||
-          unit ||
-          endAdornment) && (
-          <div className="flex items-center gap-1.5 ml-2 shrink-0">
-            {/* RTL Indicator (AR, UR) in Collapsed Mode */}
-            {isMultiLang && primaryLang && primaryLang.dir === "rtl" && (
-              <div className="ml-1 mr-1 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
-                {primaryLang.code.toUpperCase()}
-              </div>
-            )}
-            {/* Stepper Buttons for Number mode */}
-            {normalizedType === "number" && stepper && !disabled && !readOnly && (
-              <div className="flex flex-col items-center gap-0.5 shrink-0">
+          {/* Right Side Suffix / Unit / Steppers / Password Toggle / Clear Button */}
+          {((normalizedType === "number" && stepper && !disabled && !readOnly) ||
+            (normalizedType === "password" && showPasswordToggle && !disabled) ||
+            (clearable && stringValue.length > 0 && !disabled && !readOnly) ||
+            (!isBorderless && isValid && !isInvalid) ||
+            (isMultiLang && primaryLang && primaryLang.dir === "rtl") ||
+            suffix ||
+            unit ||
+            endAdornment) && (
+            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+              {/* RTL Indicator (AR, UR) in Collapsed Mode */}
+              {isMultiLang && primaryLang && primaryLang.dir === "rtl" && (
+                <div className="ml-1 mr-1 shrink-0 text-xs font-bold theme-text-secondary uppercase tracking-wider font-mono select-none pointer-events-none">
+                  {primaryLang.code.toUpperCase()}
+                </div>
+              )}
+              {/* Stepper Buttons for Number mode */}
+              {normalizedType === "number" && stepper && !disabled && !readOnly && (
+                <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <IconButton
+                    icon={PlusIcon}
+                    size="2xs"
+                    variant="ghost"
+                    tabIndex={-1}
+                    onClick={() => {
+                      const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+                      updateNumberValue(numericStep);
+                    }}
+                    title="Increase value"
+                    ariaLabel="Increase value"
+                  />
+                  <IconButton
+                    icon={MinusIcon}
+                    size="2xs"
+                    variant="ghost"
+                    tabIndex={-1}
+                    onClick={() => {
+                      const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
+                      updateNumberValue(-numericStep);
+                    }}
+                    title="Decrease value"
+                    ariaLabel="Decrease value"
+                  />
+                </div>
+              )}
+
+              {/* Password Show/Hide Toggle */}
+              {normalizedType === "password" && showPasswordToggle && !disabled && (
                 <IconButton
-                  icon={PlusIcon}
+                  icon={showPassword ? EyeOffIcon : EyeIcon}
+                  size="xs"
+                  variant="ghost"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  ariaLabel={showPassword ? "Hide password" : "Show password"}
+                />
+              )}
+
+              {/* Instant Clear Button */}
+              {clearable && stringValue.length > 0 && !disabled && !readOnly && (
+                <IconButton
+                  icon={CloseIcon}
                   size="2xs"
                   variant="ghost"
                   tabIndex={-1}
-                  onClick={() => {
-                    const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
-                    updateNumberValue(numericStep);
-                  }}
-                  title="Increase value"
-                  ariaLabel="Increase value"
+                  onClick={handleClear}
+                  title="Clear input"
+                  ariaLabel="Clear input"
+                  className="hover:text-[var(--danger-text)]"
                 />
-                <IconButton
-                  icon={MinusIcon}
-                  size="2xs"
-                  variant="ghost"
-                  tabIndex={-1}
-                  onClick={() => {
-                    const numericStep = typeof step === "number" ? step : parseFloat(step) || 1;
-                    updateNumberValue(-numericStep);
-                  }}
-                  title="Decrease value"
-                  ariaLabel="Decrease value"
-                />
-              </div>
-            )}
+              )}
 
-            {/* Password Show/Hide Toggle */}
-            {normalizedType === "password" && showPasswordToggle && !disabled && (
-              <IconButton
-                icon={showPassword ? EyeOffIcon : EyeIcon}
-                size="xs"
-                variant="ghost"
-                tabIndex={-1}
-                onClick={() => setShowPassword((prev) => !prev)}
-                title={showPassword ? "Hide password" : "Show password"}
-                ariaLabel={showPassword ? "Hide password" : "Show password"}
-              />
-            )}
+              {/* Valid Success Check Icon */}
+              {!isBorderless && isValid && !isInvalid && (
+                <CheckCircleIcon className="w-4 h-4 theme-success shrink-0" />
+              )}
 
-            {/* Instant Clear Button */}
-            {clearable && stringValue.length > 0 && !disabled && !readOnly && (
-              <IconButton
-                icon={CloseIcon}
-                size="2xs"
-                variant="ghost"
-                tabIndex={-1}
-                onClick={handleClear}
-                title="Clear input"
-                ariaLabel="Clear input"
-                className="hover:text-[var(--danger-text)]"
-              />
-            )}
-
-            {/* Valid Success Check Icon */}
-            {!isBorderless && isValid && !isInvalid && (
-              <CheckCircleIcon className="w-4 h-4 theme-success shrink-0" />
-            )}
-
-            {/* Custom End Adornment / Suffix / Unit (Placeholder-style) */}
-            {(suffix || unit) && (
-              <span className="text-xs font-semibold theme-text-secondary opacity-60 select-none pointer-events-none pr-0.5">
-                {suffix || unit}
-              </span>
-            )}
-            {endAdornment}
-          </div>
-        )}
-      </div>
+              {/* Custom End Adornment / Suffix / Unit (Placeholder-style) */}
+              {(suffix || unit) && (
+                <span className="text-xs font-semibold theme-text-secondary opacity-60 select-none pointer-events-none pr-0.5">
+                  {suffix || unit}
+                </span>
+              )}
+              {endAdornment}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Bottom Status / Error / Helper Text */}
