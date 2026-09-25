@@ -500,3 +500,92 @@ export async function exportToImage({
     showToast?.(`Failed to export ${isPng ? 'PNG' : 'JPG'}: ` + (err?.message || 'Unknown error'), 'error');
   }
 }
+
+/**
+ * 8. Standalone Vector SVG (.svg) Document Exporter
+ */
+export async function exportToSVG({
+  targetId = 'universal-print-portal',
+  title = 'Official_Document',
+  showToast,
+  onCustomExport,
+}: {
+  targetId?: string;
+  title?: string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}): Promise<void> {
+  if (onCustomExport) {
+    onCustomExport();
+    return;
+  }
+
+  const portalEl = document.getElementById(targetId);
+  if (!portalEl) {
+    showToast?.('Document element not ready for SVG export.', 'error');
+    return;
+  }
+
+  showToast?.('Generating standalone vector SVG document...', 'info');
+
+  try {
+    const clone = portalEl.cloneNode(true) as HTMLElement;
+
+    // Clean up unwanted non-printable elements in clone
+    const removeSelectors = [
+      '.print\\:hidden',
+      '.print-studio-no-print',
+      '.paper-sheet-header',
+      '.spr-no-print',
+      '.no-print',
+      '.action-menu',
+      '.resizer',
+    ];
+    removeSelectors.forEach((sel) => {
+      clone.querySelectorAll(sel).forEach((el) => el.remove());
+    });
+
+    const rect = portalEl.getBoundingClientRect();
+    const width = Math.max(Math.round(rect.width) || 794, 794);
+    const height = Math.max(Math.round(rect.height) || 1123, 1123);
+
+    // Collect all document styles
+    const styles = collectDocumentStyles();
+
+    // Serialize cleaned inner content into self-contained XML SVG
+    const serializer = new XMLSerializer();
+    const serializedHtml = serializer.serializeToString(clone);
+
+    const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <style type="text/css"><![CDATA[
+      ${styles}
+      body { margin: 0; padding: 0; background: #ffffff; font-family: Inter, system-ui, sans-serif; }
+    ]]></style>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <foreignObject width="100%" height="100%" x="0" y="0">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width: 100%; height: 100%; background: #ffffff;">
+      ${serializedHtml}
+    </div>
+  </foreignObject>
+</svg>`;
+
+    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = getSafeFilename(title, 'svg');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast?.('Vector SVG (.svg) document downloaded successfully!', 'success');
+  } catch (err: any) {
+    console.error('SVG export failed:', err);
+    showToast?.('Failed to export vector SVG: ' + (err?.message || 'Unknown error'), 'error');
+  }
+}
+

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../../components/layout';
 import PageHeader from '../../../components/ui/PageHeader';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
 import ExamDetailsView from './exam-details/ExamDetailsView';
@@ -13,8 +14,11 @@ import {
   AcademicCapIcon,
   PlusIcon,
   UserCheckIcon,
+  PrinterIcon,
 } from '../../../components/ui/Icons';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { getSavedTemplatesForScope } from '../../../components/print/scopeTemplateStore';
+import { SUBJECT_ROUTINE_SCOPE_ID } from './subject-routine/subjectRoutineDocLabKeys';
 
 /**
  * ExamSchedulesHubView
@@ -73,6 +77,7 @@ export default function ExamSchedulesHubView({
 
   const [activeTab, setActiveTab] = useState(resolveActiveTab);
   const [selectedExamContext, setSelectedExamContext] = useState(null);
+  const [isRoutinePrintOpen, setIsRoutinePrintOpen] = useState(false);
 
   useEffect(() => {
     setActiveTab(resolveActiveTab());
@@ -134,6 +139,42 @@ export default function ExamSchedulesHubView({
     return null;
   };
 
+  // Dynamic three-dot action menu items tailored for each active schedule tab
+  const headerActionItems = useMemo(() => {
+    if (activeTab === 'SUBJECT_MATRIX') {
+      return [
+        {
+          label: 'Print Routine',
+          icon: PrinterIcon,
+          onClick: () => {
+            const saved = getSavedTemplatesForScope(SUBJECT_ROUTINE_SCOPE_ID);
+            if (!saved || saved.length === 0) {
+              navigate(`/print-studio?scope=${SUBJECT_ROUTINE_SCOPE_ID}&returnUrl=/examinations/routine-matrix`);
+            } else {
+              setIsRoutinePrintOpen(true);
+            }
+          },
+        },
+      ];
+    }
+    if (activeTab === 'INVIGILATION_SCHEDULE') {
+      return [
+        {
+          label: 'Print Invigilation Schedule',
+          icon: PrinterIcon,
+          onClick: () => window.print(),
+        },
+      ];
+    }
+    return [
+      {
+        label: 'Print Exam Details',
+        icon: PrinterIcon,
+        onClick: () => window.print(),
+      },
+    ];
+  }, [activeTab]);
+
   const content = (
     <div className="space-y-4 text-left animate-fade-in">
       {/* 1. Page Header (shown when not hidden) */}
@@ -142,6 +183,18 @@ export default function ExamSchedulesHubView({
           title="Examination Schedules & Routine Matrix"
           subtitle="Configure institutional exam sessions, multi-class routine matrix, 2D visual timetable board, and daily hall invigilation rosters."
           icon={AcademicCapIcon}
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <ActionMenu
+                size="sm"
+                variant="sub"
+                align="right"
+                ariaLabel="More Options"
+                items={headerActionItems}
+                menuClassName="w-56"
+              />
+            </div>
+          }
         />
       )}
 
@@ -169,6 +222,8 @@ export default function ExamSchedulesHubView({
           <SubjectRoutineMatrixView
             initialExamId={selectedExamContext}
             onNavigateToExamSessions={() => handleTabChange('SCHEDULES')}
+            isPrintOpen={isRoutinePrintOpen}
+            onClosePrint={() => setIsRoutinePrintOpen(false)}
           />
         )}
 

@@ -143,7 +143,7 @@ function parseAlignment(el: Element): (typeof AlignmentType)[keyof typeof Alignm
 function shouldSkipElement(el: Element): boolean {
   if (el.nodeType !== 1) return false;
   const tag = el.tagName.toLowerCase();
-  if (['script', 'style', 'noscript', 'template', 'svg', 'button'].includes(tag)) return true;
+  if (['script', 'style', 'noscript', 'template', 'button'].includes(tag)) return true;
 
   const cls = (el.className || '').toString();
   if (
@@ -456,8 +456,8 @@ function domToDocxBlocks(containerEl: HTMLElement): (Paragraph | Table)[] {
       return;
     }
 
-    // Horizontal Rule
-    if (tag === 'hr') {
+    // Horizontal Rule & SVG Dividers
+    if (tag === 'hr' || (tag === 'div' && el.classList.contains('spr-svg-divider'))) {
       blocks.push(
         new Paragraph({
           border: {
@@ -468,6 +468,83 @@ function domToDocxBlocks(containerEl: HTMLElement): (Paragraph | Table)[] {
         })
       );
       return;
+    }
+
+    // SVG Callout Box / Panel
+    if (el.classList.contains('spr-svg-box')) {
+      const boxRuns = extractTextRuns(el);
+      blocks.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  shading: { fill: 'EFF6FF', type: ShadingType.CLEAR },
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+                    bottom: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+                    left: { style: BorderStyle.SINGLE, size: 14, color: '3B82F6' },
+                    right: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+                  },
+                  margins: { top: 100, bottom: 100, left: 140, right: 140 },
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 0, after: 0 },
+                      children: boxRuns.length > 0 ? boxRuns : [new TextRun({ text: '' })],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        })
+      );
+      return;
+    }
+
+    // SVG Signature Block
+    if (el.classList.contains('spr-signature-block')) {
+      const sigRuns = extractTextRuns(el);
+      blocks.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 140, after: 40 },
+          children: [
+            new TextRun({ text: '__________________________', color: '64748B', bold: true }),
+            new TextRun({ break: 1 }),
+            ...sigRuns,
+          ],
+        })
+      );
+      return;
+    }
+
+    // Standalone SVG / Vector Lines / Dividers
+    if (tag === 'svg') {
+      const svgText = el.textContent?.trim();
+      if (svgText) {
+        blocks.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 60, after: 60 },
+            children: extractTextRuns(el),
+          })
+        );
+        return;
+      } else {
+        // Line or divider SVG
+        blocks.push(
+          new Paragraph({
+            border: {
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '0F172A' },
+            },
+            spacing: { before: 40, after: 60 },
+            children: [],
+          })
+        );
+        return;
+      }
     }
 
     // Headings
@@ -528,14 +605,24 @@ function domToDocxBlocks(containerEl: HTMLElement): (Paragraph | Table)[] {
       }
 
       const runs = extractTextRuns(el);
-      if (runs.length > 0) {
-        blocks.push(
-          new Paragraph({
-            alignment: parseAlignment(el),
-            spacing: { before: 0, after: 40 },
-            children: runs,
-          })
-        );
+      const hasBottomBorder =
+        Boolean(el.style.borderBottom && el.style.borderBottom !== 'none') ||
+        Boolean(el.style.border && el.style.border !== 'none');
+
+      const paragraphProps: any = {
+        alignment: parseAlignment(el),
+        spacing: { before: 0, after: 40 },
+        children: runs,
+      };
+
+      if (hasBottomBorder) {
+        paragraphProps.border = {
+          bottom: { style: BorderStyle.SINGLE, size: 6, color: '0F172A' },
+        };
+      }
+
+      if (runs.length > 0 || hasBottomBorder) {
+        blocks.push(new Paragraph(paragraphProps));
       }
       return;
     }

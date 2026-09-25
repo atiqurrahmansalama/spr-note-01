@@ -138,7 +138,7 @@ export function usePrintStudioState({
   }, [defaultOptionsSig, defaultOptions]);
 
   const resolvedInitialColumns = useMemo<PrintColumn[]>(() => {
-    if (Array.isArray(columns) && columns.length > 0) return columns;
+    if (Array.isArray(columns)) return columns;
     return deriveColumnsFromDataOrKeys(data, placeholderKeys);
   }, [columns, data, placeholderKeys]);
 
@@ -164,7 +164,7 @@ export function usePrintStudioState({
   }, [isOpen, dataSignature, data]);
 
   const activeColumnsSignature = useMemo(() => {
-    const list = Array.isArray(columns) && columns.length > 0
+    const list = Array.isArray(columns)
       ? columns
       : deriveColumnsFromDataOrKeys(data, placeholderKeys);
     return list.map((c) => `${c.id || c.key || c.accessor || c.dataIndex}_${c.header || c.label || ''}`).join('||');
@@ -177,7 +177,7 @@ export function usePrintStudioState({
     if (activeColumnsSignature !== prevActiveColumnsSigRef.current) {
       prevActiveColumnsSigRef.current = activeColumnsSignature;
       const cols =
-        Array.isArray(columns) && columns.length > 0
+        Array.isArray(columns)
           ? columns
           : deriveColumnsFromDataOrKeys(data, placeholderKeys);
       setLiveColumns(cols);

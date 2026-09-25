@@ -5,7 +5,7 @@ import {
   ChartBarIcon,
   SparklesIcon,
 } from '../../../../../components/ui/Icons';
-import { Exam } from '../types';
+import { Exam, ExamAssessmentComponent } from '../types';
 
 export interface GroupedDepartmentSchedule {
   startDate: string;
@@ -19,6 +19,58 @@ export const LIFECYCLE_STAGES = [
   { key: 'REVIEW', label: 'Review' },
   { key: 'FINAL', label: 'Certified' },
 ];
+
+/**
+ * Normalizes single, array, comma-separated or missing department IDs into a clean string array.
+ */
+export function normalizeDepartmentIdList(
+  departmentId: string | string[] | undefined | null
+): string[] {
+  if (Array.isArray(departmentId)) {
+    const cleaned = departmentId.map(String).filter((s) => s.trim().length > 0);
+    return cleaned.length > 0 ? cleaned : ['ALL'];
+  }
+  if (typeof departmentId === 'string' && departmentId.trim()) {
+    const trimmed = departmentId.trim();
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+      return parts.length > 0 ? parts : ['ALL'];
+    }
+    return [trimmed];
+  }
+  return ['ALL'];
+}
+
+/**
+ * Returns canonical assessment components with fallback support for legacy breakdowns.
+ */
+export function getDefaultComponents(
+  exam?: Exam | null,
+  savedDraft?: any
+): ExamAssessmentComponent[] {
+  if (Array.isArray(savedDraft?.defaultComponents) && savedDraft.defaultComponents.length > 0) {
+    return savedDraft.defaultComponents;
+  }
+  if (Array.isArray(exam?.defaultComponents) && exam.defaultComponents.length > 0) {
+    return exam.defaultComponents.map((c: any, idx: number) => ({
+      id: c.id || `comp_${idx + 1}`,
+      name: c.name || `Component ${idx + 1}`,
+      maxMarks: Number(c.maxMarks) || 0,
+    }));
+  }
+  if (exam?.defaultBreakdown) {
+    const w = Number(exam.defaultBreakdown.written) || 70;
+    const o = Number(exam.defaultBreakdown.oral) || 30;
+    return [
+      { id: 'comp_1', name: 'Written Exam', maxMarks: w },
+      { id: 'comp_2', name: 'Oral', maxMarks: o },
+    ];
+  }
+  return [
+    { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
+    { id: 'comp_2', name: 'Oral', maxMarks: 30 },
+  ];
+}
 
 export function getLifecycleStageIndex(status?: string): number {
   switch (status) {

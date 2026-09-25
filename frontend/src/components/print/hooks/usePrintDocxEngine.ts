@@ -572,8 +572,8 @@ export function usePrintDocxEngine({
 
       const tId = typeof templateIdOrObj === 'object' ? templateIdOrObj?.id : templateIdOrObj;
       if (!tId || tId === 'default_layout' || tId === 'native_layout' || tId === 'default_table') {
-        setCustomDocxTemplate(null);
-        setDocxRenderMode('all');
+        setCustomDocxTemplate(createBlankDocumentTemplate());
+        setDocxRenderMode('template');
         onTemplateChange?.(templateIdOrObj);
         return;
       }
@@ -795,7 +795,7 @@ export function usePrintDocxEngine({
     setSavedWordTemplates(getSavedDocxTemplates());
     setCustomDocxTemplate((prev: any) => {
       if (prev?.templateMeta?.id === templateId || prev?.id === templateId) {
-        return null;
+        return createBlankDocumentTemplate();
       }
       return prev;
     });

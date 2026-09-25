@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useSubjectMatrixState from './hooks/useSubjectMatrixState';
 import SubjectMatrixHeader from './components/SubjectMatrixHeader';
 import SubjectMatrixTable from './components/SubjectMatrixTable';
@@ -8,6 +9,9 @@ import { UniversalAutoPopulateDrawer } from '../../../../components/ui/auto-popu
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import { examStore } from '@/stores/examStore';
+import { getSavedTemplatesForScope } from '../../../../components/print/scopeTemplateStore';
+import { SUBJECT_ROUTINE_SCOPE_ID } from './subjectRoutineDocLabKeys';
+import SubjectRoutinePrintModal from './SubjectRoutinePrintModal';
 import { SubjectRoutineItem, SubjectRoutineMatrixViewProps } from './types';
 
 /**
@@ -20,6 +24,10 @@ export default function SubjectRoutineMatrixView({
   initialExamId = null,
   initialViewMode = 'table',
   onNavigateToExamSessions = null,
+  onPrint = null,
+  isPrintOpen = false,
+  onClosePrint = undefined,
+  actionMenuItems = undefined,
 }: SubjectRoutineMatrixViewProps) {
   const { openDrawer, closeDrawer } = useRightSidebar();
   const [viewMode, setViewMode] = useState<string>(initialViewMode || 'table');
@@ -70,6 +78,29 @@ export default function SubjectRoutineMatrixView({
   // Delete Impact Modal States
   const [rowToDelete, setRowToDelete] = useState<SubjectRoutineItem | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState<boolean>(false);
+  const [internalPrintOpen, setInternalPrintOpen] = useState<boolean>(false);
+
+  const isPrintModalOpen = Boolean(isPrintOpen || internalPrintOpen);
+
+  const handleClosePrintModal = () => {
+    setInternalPrintOpen(false);
+    onClosePrint?.();
+  };
+
+  const navigate = useNavigate();
+
+  const handleTriggerPrint = () => {
+    const saved = getSavedTemplatesForScope(SUBJECT_ROUTINE_SCOPE_ID);
+    if (!saved || saved.length === 0) {
+      navigate(`/print-studio?scope=${SUBJECT_ROUTINE_SCOPE_ID}&returnUrl=/examinations/routine-matrix`);
+      return;
+    }
+    if (onPrint) {
+      onPrint();
+    } else {
+      setInternalPrintOpen(true);
+    }
+  };
 
   // ─── Right Sidebar Drawer Registration for Single Subject Routine Form ────────
   useDrawerRegistration(
@@ -85,7 +116,7 @@ export default function SubjectRoutineMatrixView({
           : null;
 
       return {
-        title: mode === 'edit' ? 'Edit Subject Routine' : 'Add Subject Routine',
+        title: mode === 'edit' ? 'Edit Routine' : 'Add Routine',
         subtitle:
           mode === 'edit'
             ? `Update routine schedule and marks for ${foundRow?.subjectName || 'Subject'}`
@@ -211,6 +242,20 @@ export default function SubjectRoutineMatrixView({
             setViewMode('table');
           }}
           onNavigateToExamSessions={onNavigateToExamSessions}
+          onPrint={handleTriggerPrint}
+          actionMenuItems={actionMenuItems}
+        />
+
+        {/* Dedicated Subject Routine Print Studio & DocLab Modal */}
+        <SubjectRoutinePrintModal
+          isOpen={isPrintModalOpen}
+          onClose={handleClosePrintModal}
+          activeExam={activeExam}
+          routineRows={rows}
+          academicContext={{
+            departmentName: filterDepartmentId !== 'ALL' ? (matrixState.departments || []).find((d: any) => String(d.id) === String(filterDepartmentId))?.name : undefined,
+            className: filterClassId !== 'ALL' ? (allAvailableClasses || []).find((c: any) => String(c.id) === String(filterClassId))?.name : undefined,
+          }}
         />
       </div>
     );
@@ -232,6 +277,8 @@ export default function SubjectRoutineMatrixView({
           setViewMode('studio');
         }}
         onAddRow={handleOpenAddDrawer}
+        onPrint={handleTriggerPrint}
+        actionMenuItems={actionMenuItems}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         filterDepartmentId={filterDepartmentId}
@@ -291,6 +338,18 @@ export default function SubjectRoutineMatrixView({
         requireNameMatch={false}
         confirmButtonText={`Delete ${selectedRowIds.size} Selected`}
         warningMessage="Permanently deleting these selected subject routines will remove their examination schedules and mark breakdown configs from this exam session."
+      />
+
+      {/* ── 6. Dedicated Subject Routine Print Studio & DocLab Modal ── */}
+      <SubjectRoutinePrintModal
+        isOpen={isPrintModalOpen}
+        onClose={handleClosePrintModal}
+        activeExam={activeExam}
+        routineRows={filteredRows}
+        academicContext={{
+          departmentName: filterDepartmentId !== 'ALL' ? (matrixState.departments || []).find((d: any) => String(d.id) === String(filterDepartmentId))?.name : undefined,
+          className: filterClassId !== 'ALL' ? (allAvailableClasses || []).find((c: any) => String(c.id) === String(filterClassId))?.name : undefined,
+        }}
       />
     </div>
   );

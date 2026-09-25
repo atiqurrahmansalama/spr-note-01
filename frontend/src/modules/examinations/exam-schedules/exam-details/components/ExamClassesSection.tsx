@@ -129,11 +129,11 @@ export default function ExamClassesSection({
                   <div
                     className={`w-5 h-5 rounded-md flex items-center justify-center border text-[11px] shrink-0 transition-all ${
                       isSelected
-                        ? 'theme-bg-accent text-white border-[var(--accent-main)] shadow-2xs'
+                        ? 'theme-bg-accent theme-accent-text border-[var(--accent-main)] shadow-2xs'
                         : 'theme-border theme-bg-sub/60 group-hover:border-[var(--accent-main)]/40'
                     }`}
                   >
-                    {isSelected && <CheckIcon className="w-3 h-3 text-white stroke-[2.5]" />}
+                    {isSelected && <CheckIcon className="w-3 h-3 theme-accent-text stroke-[2.5]" />}
                   </div>
                 </div>
               );

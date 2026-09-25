@@ -49,6 +49,7 @@ import { SUPPORTED_LANGUAGES } from "../../i18n/constants";
 import { useTranslation } from "../../i18n/useTranslation";
 import {
   normalizeLocalizedValue,
+  getLocalizedValue,
   hasMultiLanguageContent,
   hasAnyLanguageContent,
   getFilledLanguagesCount,

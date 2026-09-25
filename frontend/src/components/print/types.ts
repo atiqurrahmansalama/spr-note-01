@@ -167,6 +167,7 @@ export interface UniversalPrintStudioProps {
   showImages?: boolean;
   showPng?: boolean;
   showJpg?: boolean;
+  showSvg?: boolean;
   enabledFormats?: string[] | null;
   // Custom action triggers
   onPrint?: () => void;
@@ -177,6 +178,7 @@ export interface UniversalPrintStudioProps {
   onExportWord?: () => void;
   onExportPng?: () => void;
   onExportJpg?: () => void;
+  onExportSvg?: () => void;
   // Document Scope & Taxonomy Integration
   scopeId?: DocumentScopeId | string;
   scopeName?: string;

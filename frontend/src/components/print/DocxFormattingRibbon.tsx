@@ -20,7 +20,22 @@ import {
   TableIcon,
   ChevronDownIcon,
   PageBreakIcon,
+  ShapesIcon,
+  PenLineIcon,
+  CircleIcon,
+  SquareIcon,
+  SvgIcon,
+  UploadIcon,
+  SparklesIcon,
 } from '../ui/Icons';
+import {
+  generateSvgDividerHtml,
+  generateSvgSignatureBlockHtml,
+  generateSvgBoxHtml,
+  generateSvgSealHtml,
+  wrapRawSvgCode,
+  SVG_PRESET_ITEMS,
+} from './svgShapeTemplates';
 
 export interface DocxFormattingRibbonProps {
   onCommand?: (cmd: string, val?: string) => void;
@@ -76,7 +91,14 @@ export default function DocxFormattingRibbon({
   className = '',
 }: DocxFormattingRibbonProps) {
   const [activeColorMenu, setActiveColorMenu] = useState<'text' | 'highlight' | null>(null);
+  const [isShapeMenuOpen, setIsShapeMenuOpen] = useState(false);
+  const [shapeCategory, setShapeCategory] = useState<'lines' | 'signatures' | 'boxes' | 'stamps' | 'custom'>('lines');
+  const [customSvgInput, setCustomSvgInput] = useState('');
+  const [showCustomSvgModal, setShowCustomSvgModal] = useState(false);
+
   const colorMenuRef = useRef<HTMLDivElement>(null);
+  const shapeMenuRef = useRef<HTMLDivElement>(null);
+  const svgFileInputRef = useRef<HTMLInputElement>(null);
 
   const executeCommand = useCallback(
     (cmd: string, val: string = '') => {
@@ -134,11 +156,14 @@ export default function DocxFormattingRibbon({
     [onCommand]
   );
 
-  // Close color menu when clicking outside
+  // Close color & shape menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (colorMenuRef.current && !colorMenuRef.current.contains(e.target as Node)) {
         setActiveColorMenu(null);
+      }
+      if (shapeMenuRef.current && !shapeMenuRef.current.contains(e.target as Node)) {
+        setIsShapeMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -164,7 +189,33 @@ export default function DocxFormattingRibbon({
   };
 
   const handleInsertDivider = () => {
-    executeCommand('insertHTML', '<hr style="border: 0; border-top: 1.5px solid #cbd5e1; margin: 16px 0;" /><p><br></p>');
+    executeCommand('insertHTML', generateSvgDividerHtml({ style: 'solid', thickness: 1.5, color: '#94a3b8' }));
+  };
+
+  const handleInsertSvgItem = (htmlContent: string) => {
+    executeCommand('insertHTML', htmlContent);
+    setIsShapeMenuOpen(false);
+  };
+
+  const handleSvgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        handleInsertSvgItem(wrapRawSvgCode(text));
+      }
+    };
+    reader.readAsText(file);
+    if (svgFileInputRef.current) svgFileInputRef.current.value = '';
+  };
+
+  const handleInsertCustomSvgCode = () => {
+    if (!customSvgInput.trim()) return;
+    handleInsertSvgItem(wrapRawSvgCode(customSvgInput.trim()));
+    setCustomSvgInput('');
+    setShowCustomSvgModal(false);
   };
 
   const handleInsertPageBreak = useCallback(() => {
@@ -435,7 +486,7 @@ export default function DocxFormattingRibbon({
         </button>
       </div>
 
-      {/* 6. Insert Elements: Table, Horizontal Divider & Page Break */}
+      {/* 6. Insert Elements: Table, Horizontal Divider, Shapes (SVG) & Page Break */}
       <div className="flex items-center gap-0.5 border-r theme-border pr-1 mr-0.5">
         <button
           type="button"
@@ -453,6 +504,148 @@ export default function DocxFormattingRibbon({
         >
           <DividerIcon className="w-3.5 h-3.5" />
         </button>
+
+        {/* Shapes & Vectors (SVG) Menu Trigger */}
+        <div className="relative" ref={shapeMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsShapeMenuOpen((prev) => !prev)}
+            title="Insert Shapes, Lines, Stamps & Custom SVG"
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+              isShapeMenuOpen
+                ? 'theme-bg-accent-soft theme-accent font-bold'
+                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
+            }`}
+          >
+            <ShapesIcon className="w-3.5 h-3.5 theme-accent" />
+            <span className="text-[11px] font-semibold hidden sm:inline">Shapes</span>
+            <ChevronDownIcon className="w-2.5 h-2.5 opacity-70" />
+          </button>
+
+          {isShapeMenuOpen && (
+            <div className="absolute top-full left-0 mt-1.5 w-72 rounded-2xl theme-bg-elevated border theme-border shadow-2xl z-50 p-2 text-left animate-in fade-in zoom-in-95">
+              {/* Category Switcher Tabs */}
+              <div className="flex items-center gap-1 pb-1.5 mb-1.5 border-b theme-border overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setShapeCategory('lines')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    shapeCategory === 'lines'
+                      ? 'theme-bg-accent-soft theme-accent font-bold'
+                      : 'theme-text-secondary hover:theme-bg-sub'
+                  }`}
+                >
+                  Lines
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShapeCategory('signatures')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    shapeCategory === 'signatures'
+                      ? 'theme-bg-accent-soft theme-accent font-bold'
+                      : 'theme-text-secondary hover:theme-bg-sub'
+                  }`}
+                >
+                  Signatures
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShapeCategory('boxes')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    shapeCategory === 'boxes'
+                      ? 'theme-bg-accent-soft theme-accent font-bold'
+                      : 'theme-text-secondary hover:theme-bg-sub'
+                  }`}
+                >
+                  Boxes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShapeCategory('stamps')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    shapeCategory === 'stamps'
+                      ? 'theme-bg-accent-soft theme-accent font-bold'
+                      : 'theme-text-secondary hover:theme-bg-sub'
+                  }`}
+                >
+                  Seals
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShapeCategory('custom')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    shapeCategory === 'custom'
+                      ? 'theme-bg-accent-soft theme-accent font-bold'
+                      : 'theme-text-secondary hover:theme-bg-sub'
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+
+              {/* Items List based on Category */}
+              <div className="max-h-60 overflow-y-auto space-y-1">
+                {shapeCategory === 'custom' ? (
+                  <div className="p-1 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => svgFileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border border-dashed theme-border theme-text-primary hover:theme-border-accent hover:theme-bg-accent-soft transition-all cursor-pointer"
+                    >
+                      <UploadIcon className="w-4 h-4 theme-accent" />
+                      <span>Upload SVG File (.svg)</span>
+                    </button>
+                    <input
+                      ref={svgFileInputRef}
+                      type="file"
+                      accept=".svg,image/svg+xml"
+                      onChange={handleSvgFileUpload}
+                      className="hidden"
+                    />
+
+                    <div className="space-y-1 pt-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
+                        Paste SVG Code
+                      </label>
+                      <textarea
+                        value={customSvgInput}
+                        onChange={(e) => setCustomSvgInput(e.target.value)}
+                        placeholder="<svg ...> ... </svg>"
+                        rows={3}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono rounded-xl theme-bg-surface border theme-border theme-text-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleInsertCustomSvgCode}
+                        disabled={!customSvgInput.trim()}
+                        className="w-full py-1.5 rounded-xl text-xs font-bold theme-bg-accent theme-text-on-accent disabled:opacity-50 cursor-pointer shadow-2xs"
+                      >
+                        Insert SVG
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  SVG_PRESET_ITEMS.filter((item) => item.category === shapeCategory).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleInsertSvgItem(preset.html())}
+                      className="w-full text-left p-2 rounded-xl hover:theme-bg-sub transition-colors flex flex-col gap-0.5 cursor-pointer group"
+                    >
+                      <div className="text-xs font-bold theme-text-primary group-hover:theme-accent">
+                        {preset.label}
+                      </div>
+                      <div className="text-[10px] theme-text-secondary truncate">
+                        {preset.description}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={handleInsertPageBreak}

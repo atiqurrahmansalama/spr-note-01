@@ -139,6 +139,18 @@ export interface ExamDetailsViewProps {
   onNavigateToTabulation?: (examId: string) => void;
 }
 
+export interface ExamSessionCardProps {
+  exam: Exam;
+  currentSubjects: any[];
+  getExamTitle: (name: any) => string;
+  onEdit: (exam: Exam) => void;
+  onDelete: (exam: Exam) => void;
+  onNavigateToMatrix: (examId: string) => void;
+  onNavigateToMarkEntry?: (examId: string) => void;
+  onNavigateToTabulation?: (examId: string) => void;
+  onStatusChange: (examId: string, newStatus: string) => void;
+}
+
 export interface ExamFormDrawerProps {
   exam?: Exam | null;
   tenantId?: string;
@@ -149,6 +161,16 @@ export interface ExamFormDrawerProps {
   classOptions?: SelectOption[];
   onSaveSuccess?: () => void;
   onCancel?: () => void;
+}
+
+export interface ExamDateMappingGridProps {
+  startDate: string;
+  endDate: string;
+  scheduleDays?: ExamScheduleDay[];
+  shifts?: ExamShift[];
+  onAddShift?: () => void;
+  onChange?: (days: ExamScheduleDay[]) => void;
+  defaultExpanded?: boolean;
 }
 
 export interface ExamGeneralScheduleSectionProps {

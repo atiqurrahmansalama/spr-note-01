@@ -80,6 +80,7 @@ export default function UniversalPrintStudio({
   showImages = true,
   showPng = true,
   showJpg = true,
+  showSvg = true,
   enabledFormats = null,
   onPrint = undefined,
   onExportPDF = undefined,
@@ -89,6 +90,7 @@ export default function UniversalPrintStudio({
   onExportWord = undefined,
   onExportPng = undefined,
   onExportJpg = undefined,
+  onExportSvg = undefined,
   scopeId = 'general_document',
   scopeName = '',
   scopeDescription = '',
@@ -364,6 +366,7 @@ export default function UniversalPrintStudio({
           showImages={showImages}
           showPng={showPng}
           showJpg={showJpg}
+          showSvg={showSvg}
           enabledFormats={enabledFormats as any}
           onPrint={onPrint}
           onExportPDF={onExportPDF}
@@ -373,6 +376,7 @@ export default function UniversalPrintStudio({
           onExportWord={onExportWord || handleExportWord}
           onExportPng={onExportPng}
           onExportJpg={onExportJpg}
+          onExportSvg={onExportSvg}
         />
 
         {/* 2. Main Studio Body: Workbench Canvas (Left/Center) + Right Configuration Sidebar */}

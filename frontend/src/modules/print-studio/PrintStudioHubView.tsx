@@ -8,6 +8,10 @@ import {
   DAILY_PROGRESS_SCOPE_ID,
   DAILY_PROGRESS_DOCLAB_KEYS,
 } from '../learning/progress-management';
+import {
+  SUBJECT_ROUTINE_SCOPE_ID,
+  SUBJECT_ROUTINE_DOCLAB_KEYS,
+} from '../examinations/exam-schedules/subject-routine';
 
 /**
  * Enterprise DocLab Studio Hub View
@@ -27,6 +31,8 @@ export default function PrintStudioHubView({
   const [isOpen, setIsOpen] = useState(true);
 
   const isDailyProgressScope = scopeParam === DAILY_PROGRESS_SCOPE_ID;
+  const isSubjectRoutineScope = scopeParam === SUBJECT_ROUTINE_SCOPE_ID;
+  const isCustomScoped = isDailyProgressScope || isSubjectRoutineScope;
 
   // Standard SPR Note Placeholder Taxonomy for Docx Templates & Custom Sheets
   const standardPlaceholderKeys: TemplatePlaceholderKey[] = useMemo(
@@ -50,73 +56,8 @@ export default function PrintStudioHubView({
     []
   );
 
-  // Initial Sample Columns for Table & Tabular Document Designer
-  const initialColumns = useMemo(
-    () => [
-      { id: 'roll', header: 'Roll No', label: 'Roll No', accessor: 'roll' },
-      { id: 'name', header: 'Student Name', label: 'Student Name', accessor: 'name' },
-      { id: 'department', header: 'Department', label: 'Department', accessor: 'department' },
-      { id: 'class_section', header: 'Class & Section', label: 'Class & Section', accessor: 'class_section' },
-      { id: 'progress', header: 'Quran Progress / Status', label: 'Quran Progress / Status', accessor: 'progress' },
-      { id: 'evaluation', header: 'Evaluation / Remarks', label: 'Evaluation / Remarks', accessor: 'evaluation' },
-    ],
-    []
-  );
-
-  // Initial Sample Rows for Instant WYSIWYG Editing (General Scopes)
-  const initialData = useMemo(
-    () => [
-      {
-        id: '1',
-        roll: '01',
-        name: 'Abdullah Al Mamun',
-        department: 'Tahfizul Quran',
-        class_section: 'Hifz - Sec A',
-        progress: 'Juz 30 (Complete)',
-        evaluation: 'Excellent Tajweed & Fluency',
-      },
-      {
-        id: '2',
-        roll: '02',
-        name: 'Muhammad Rayhan',
-        department: 'Tahfizul Quran',
-        class_section: 'Hifz - Sec A',
-        progress: 'Juz 15 (Page 10-15)',
-        evaluation: 'Regular & Attentive',
-      },
-      {
-        id: '3',
-        roll: '03',
-        name: 'Abu Bakr Siddiq',
-        department: 'Tahfizul Quran',
-        class_section: 'Hifz - Sec B',
-        progress: 'Juz 05 (Revision)',
-        evaluation: 'Needs Makhraj Revision',
-      },
-      {
-        id: '4',
-        roll: '04',
-        name: 'Zubair Ahmed',
-        department: 'Tahfizul Quran',
-        class_section: 'Hifz - Sec B',
-        progress: 'Juz 22 (Page 1-5)',
-        evaluation: 'Good Progress',
-      },
-      {
-        id: '5',
-        roll: '05',
-        name: 'Tariq Hasan',
-        department: 'Tahfizul Quran',
-        class_section: 'Hifz - Sec A',
-        progress: 'Juz 28 (Sabaq)',
-        evaluation: 'Clear Pronunciation',
-      },
-    ],
-    []
-  );
-
   // Check if session storage has data forwarded from user-picked modal
-  const forwardedDailyProgressData = useMemo(() => {
+  const forwardedScopeData = useMemo(() => {
     if (typeof window === 'undefined') return null;
     try {
       const raw = sessionStorage.getItem(`spr_doclab_scope_data_${scopeParam}`);
@@ -132,22 +73,8 @@ export default function PrintStudioHubView({
 
   // Strictly user-picked data: blank if not selected by user
   const activeData = useMemo(() => {
-    if (isDailyProgressScope) {
-      return forwardedDailyProgressData || [];
-    }
-    return initialData;
-  }, [forwardedDailyProgressData, isDailyProgressScope, initialData]);
-
-  // Metadata items displayed at the top of the generated document
-  const initialMetaItems = useMemo(
-    () => [
-      { label: 'Academic Session', value: '2025 - 2026' },
-      { label: 'Department', value: 'Tahfizul Quran' },
-      { label: 'Branch / Campus', value: 'Main Campus' },
-      { label: 'Generated Date', value: new Date().toLocaleDateString() },
-    ],
-    []
-  );
+    return forwardedScopeData || [];
+  }, [forwardedScopeData]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -158,34 +85,42 @@ export default function PrintStudioHubView({
     }
   }, [navigate, returnUrlParam]);
 
+  const studioTitle = isDailyProgressScope
+    ? 'Daily Progress & Hifz Report Studio'
+    : isSubjectRoutineScope
+    ? 'Examination Subject Routine Studio'
+    : 'Universal Print & Document Studio';
+
+  const studioSubtitle = isDailyProgressScope
+    ? 'Design, Upload, and Customize Daily Progress Document Templates'
+    : isSubjectRoutineScope
+    ? 'Design, Upload, and Customize Examination Routine Document Templates'
+    : 'Universal Document, Template & Report Publishing Studio';
+
+  const activePlaceholderKeys = isDailyProgressScope
+    ? DAILY_PROGRESS_DOCLAB_KEYS
+    : isSubjectRoutineScope
+    ? SUBJECT_ROUTINE_DOCLAB_KEYS
+    : standardPlaceholderKeys;
+
   return (
     <div className={`w-full min-h-screen ${className}`}>
       <UniversalPrintStudio
         isOpen={isOpen}
         onClose={handleClose}
-        title={
-          isDailyProgressScope
-            ? 'Daily Progress & Hifz Report Studio'
-            : 'Universal Print & Document Studio'
-        }
-        subtitle={
-          isDailyProgressScope
-            ? 'Design, Upload, and Customize Daily Progress Document Templates'
-            : 'Universal Document, Template & Report Publishing Studio'
-        }
-        columns={isDailyProgressScope ? [] : initialColumns}
+        title={studioTitle}
+        subtitle={studioSubtitle}
+        columns={[]}
         data={activeData}
-        metaItems={isDailyProgressScope ? [] : initialMetaItems}
+        metaItems={[]}
         templates={[]}
-        placeholderKeys={
-          isDailyProgressScope ? DAILY_PROGRESS_DOCLAB_KEYS : standardPlaceholderKeys
-        }
+        placeholderKeys={activePlaceholderKeys}
         showSectionsAndBars={true}
         showSectionsBar={true}
         showDisplayBars={true}
         showDataDisplay={true}
-        showColumns={!isDailyProgressScope}
-        showRows={!isDailyProgressScope}
+        showColumns={false}
+        showRows={false}
         showHeaderSection={true}
         showWatermarkSection={true}
         showSignaturesSection={true}

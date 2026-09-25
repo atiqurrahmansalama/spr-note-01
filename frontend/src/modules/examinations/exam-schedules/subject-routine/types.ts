@@ -91,10 +91,27 @@ export interface SelectOption<T = string> {
   [key: string]: any;
 }
 
+export interface ActionMenuItem {
+  id?: string;
+  label?: string;
+  icon?: any;
+  onClick?: (item?: any) => void;
+  variant?: 'default' | 'danger';
+  disabled?: boolean;
+  divider?: boolean;
+  hidden?: boolean;
+  badge?: string | number;
+  [key: string]: any;
+}
+
 export interface SubjectRoutineMatrixViewProps {
   initialExamId?: string | null;
   initialViewMode?: 'table' | 'studio' | 'matrix' | string;
   onNavigateToExamSessions?: (() => void) | null;
+  onPrint?: (() => void) | null;
+  isPrintOpen?: boolean;
+  onClosePrint?: () => void;
+  actionMenuItems?: ActionMenuItem[];
 }
 
 export interface SubjectRoutineStudioViewProps {
@@ -102,6 +119,8 @@ export interface SubjectRoutineStudioViewProps {
   initialExamId?: string | null;
   onToggleViewMode?: (() => void) | null;
   onNavigateToExamSessions?: (() => void) | null;
+  onPrint?: (() => void) | null;
+  actionMenuItems?: ActionMenuItem[];
 }
 
 export interface SubjectRoutineDrawerFormProps {
@@ -129,6 +148,7 @@ export interface SubjectMatrixHeaderProps {
   onClearRoutine?: () => void;
   onAddRow?: () => void;
   onPrint?: () => void;
+  actionMenuItems?: ActionMenuItem[];
   rightActions?: React.ReactNode;
   showSearch?: boolean;
   searchQuery?: string;

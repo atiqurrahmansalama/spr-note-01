@@ -35,6 +35,7 @@ export interface DocLabHeaderProps {
   showImages?: boolean;
   showPng?: boolean;
   showJpg?: boolean;
+  showSvg?: boolean;
   enabledFormats?: string[] | null | any;
   onPrint?: () => void;
   onExportPDF?: () => void;
@@ -44,6 +45,7 @@ export interface DocLabHeaderProps {
   onExportWord?: () => void;
   onExportPng?: () => void;
   onExportJpg?: () => void;
+  onExportSvg?: () => void;
 }
 
 /**
@@ -78,6 +80,7 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
   showImages,
   showPng,
   showJpg,
+  showSvg = true,
   enabledFormats,
   onPrint,
   onExportPDF,
@@ -87,6 +90,7 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
   onExportWord,
   onExportPng,
   onExportJpg,
+  onExportSvg,
 }) => {
   return (
     <header className="px-4 py-2.5 border-b theme-border theme-bg-surface flex items-center justify-between shrink-0 shadow-xs print-topbar-control print-studio-no-print">
@@ -150,6 +154,7 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
           showImages={showImages}
           showPng={showPng}
           showJpg={showJpg}
+          showSvg={showSvg}
           enabledFormats={enabledFormats}
           onPrint={onPrint}
           onExportPDF={onExportPDF}
@@ -159,6 +164,7 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
           onExportWord={onExportWord}
           onExportPng={onExportPng}
           onExportJpg={onExportJpg}
+          onExportSvg={onExportSvg}
         />
 
         {/* Right Sidebar Toggle Button */}

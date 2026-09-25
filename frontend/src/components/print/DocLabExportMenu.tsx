@@ -7,6 +7,7 @@ import {
   FileIcon,
   FileTextIcon,
   ImageIcon,
+  SvgIcon,
 } from '../ui/Icons';
 import {
   printDocument,
@@ -15,6 +16,7 @@ import {
   exportToPlainText,
   exportToWord,
   exportToImage,
+  exportToSVG,
 } from './docLabExportUtils';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 
@@ -36,6 +38,7 @@ export interface DocLabExportMenuProps {
   showImages?: boolean;
   showPng?: boolean;
   showJpg?: boolean;
+  showSvg?: boolean;
   enabledFormats?: string[] | null;
   onPrint?: (() => void) | null;
   onExportPDF?: (() => void) | null;
@@ -45,6 +48,7 @@ export interface DocLabExportMenuProps {
   onExportWord?: (() => void) | null;
   onExportPng?: (() => void) | null;
   onExportJpg?: (() => void) | null;
+  onExportSvg?: (() => void) | null;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   showChevron?: boolean;
@@ -74,6 +78,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
   showImages = true,
   showPng = true,
   showJpg = true,
+  showSvg = true,
   enabledFormats = null,
   onPrint,
   onExportPDF,
@@ -83,6 +88,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
   onExportWord,
   onExportPng,
   onExportJpg,
+  onExportSvg,
   size = 'sm',
   variant = 'primary',
   showChevron = true,
@@ -112,6 +118,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
       case 'jpg':
       case 'jpeg':
         return options.showImages !== false && showImages !== false && options.showJpg !== false && showJpg !== false;
+      case 'svg':
+        return showSvg !== false;
       default:
         return true;
     }
@@ -124,6 +132,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
   const isWordActive = isFormatEnabled('word');
   const isPngActive = isFormatEnabled('png');
   const isJpgActive = isFormatEnabled('jpg');
+  const isSvgActive = isFormatEnabled('svg');
 
   const exportMenuItems = useMemo(() => {
     const items: any[] = [];
@@ -282,6 +291,22 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
       });
     }
 
+    if (isSvgActive) {
+      items.push({
+        id: 'svg',
+        label: 'SVG Vector File',
+        icon: SvgIcon,
+        badge: '.svg',
+        onClick: () =>
+          exportToSVG({
+            title,
+            showToast,
+            onCustomExport: onExportSvg,
+          }),
+        title: 'Pure standalone SVG vector document',
+      });
+    }
+
     return items;
   }, [
     isPrintActive,
@@ -291,6 +316,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
     isWordActive,
     isPngActive,
     isJpgActive,
+    isSvgActive,
     title,
     subtitle,
     metaItems,
@@ -309,6 +335,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
     onExportWord,
     onExportPng,
     onExportJpg,
+    onExportSvg,
   ]);
 
   return (

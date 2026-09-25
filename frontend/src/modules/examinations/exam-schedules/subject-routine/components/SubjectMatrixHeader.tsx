@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import CustomSelect from '../../../../../components/ui/CustomSelect';
 import CustomButton from '../../../../../components/ui/CustomButton';
+import ActionMenu from '../../../../../components/ui/ActionMenu';
 import DataViewToolbar from '../../../../../components/ui/DataViewToolbar';
 import { DepartmentSelect, ClassSelect, TeacherSelect } from '../../../../../components/selectors';
 import TimetableLensSelector, { LENS_MODES } from '../../../../../components/common/TimetableMatrixGrid/TimetableLensSelector';
@@ -13,7 +14,7 @@ import {
   TableIcon,
   PrinterIcon,
 } from '../../../../../components/ui/Icons';
-import { SubjectMatrixHeaderProps } from '../types';
+import { SubjectMatrixHeaderProps, ActionMenuItem } from '../types';
 
 /**
  * SubjectMatrixHeader
@@ -33,6 +34,7 @@ export default function SubjectMatrixHeader({
   autoPopulateLabel = 'Auto-Populate',
   autoPopulateTitle,
   onPrint,
+  actionMenuItems,
   rightActions,
   showSearch = true,
   searchQuery = '',
@@ -68,6 +70,13 @@ export default function SubjectMatrixHeader({
 }: SubjectMatrixHeaderProps) {
   const isTableMode = viewMode === 'table';
   const effectiveTotalCount = totalRowsCount !== undefined ? totalRowsCount : totalCount;
+
+  const menuItems = useMemo<ActionMenuItem[]>(() => {
+    if (actionMenuItems && actionMenuItems.length > 0) {
+      return actionMenuItems;
+    }
+    return [];
+  }, [actionMenuItems]);
 
   const isFilterActive = isTableMode
     ? Boolean(
@@ -136,7 +145,7 @@ export default function SubjectMatrixHeader({
             />
           </div>
 
-          {(onToggleViewMode || onAutoPopulate || onPrint || rightActions || selectedCount > 0) && (
+          {(onToggleViewMode || onAutoPopulate || menuItems.length > 0 || rightActions || selectedCount > 0) && (
             <div className="flex items-center gap-2 flex-wrap pb-0.5 shrink-0">
               {selectedCount > 0 && isTableMode && (
                 <div className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl theme-bg-danger-soft border border-[var(--danger-main)]/30 theme-danger animate-fade-in text-xs font-semibold shadow-2xs">
@@ -165,22 +174,7 @@ export default function SubjectMatrixHeader({
                 </CustomButton>
               )}
 
-              {onPrint && (
-                <CustomButton
-                  type="button"
-                  variant="sub"
-                  size="sm"
-                  icon={PrinterIcon}
-                  onClick={onPrint}
-                  title="Print official institutional examination timetable sheet"
-                >
-                  Print
-                </CustomButton>
-              )}
-
-              {rightActions}
-
-              {/* View Switcher Button (Positioned at the far right) */}
+              {/* View Switcher Button */}
               {onToggleViewMode && (
                 <CustomButton
                   type="button"
@@ -192,6 +186,20 @@ export default function SubjectMatrixHeader({
                 >
                   {!isTableMode ? 'Matrix Table' : 'Routine Studio'}
                 </CustomButton>
+              )}
+
+              {rightActions}
+
+              {/* 3-Dot Action Menu (Positioned at the far right) */}
+              {menuItems.length > 0 && (
+                <ActionMenu
+                  items={menuItems}
+                  align="right"
+                  size="sm"
+                  variant="sub"
+                  ariaLabel="Subject Routine Options"
+                  menuClassName="w-48"
+                />
               )}
             </div>
           )}

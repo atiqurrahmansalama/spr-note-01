@@ -600,7 +600,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
               </DocLabDocumentWrapper>
             </div>
           </div>
-        ) : (
+        ) : liveColumns && liveColumns.length > 0 ? (
           paginationResult.pages.map((page, pIdx) => (
             <div key={pIdx} className="relative paper-sheet-wrapper group">
               <div
@@ -647,6 +647,40 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
               </div>
             </div>
           ))
+        ) : (
+          <div className="relative paper-sheet-wrapper group flex flex-col items-center">
+            <div
+              className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-lg cursor-text"
+              data-size={options.pageSize || 'A4'}
+              data-orientation={options.orientation || 'PORTRAIT'}
+              data-margin={options.margin || 'NORMAL'}
+              data-density={options.density || 'NORMAL'}
+              data-color-mode={options.colorMode || 'FULL_COLOR'}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                width: docxDimensions.width,
+                maxWidth: docxDimensions.maxWidth,
+                minHeight: docxDimensions.height,
+                height: docxDimensions.height,
+                maxHeight: docxDimensions.height,
+                padding: docxCustomPadding,
+                textAlign: 'left',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }}
+            >
+              <div className="w-full h-full text-left">
+                <DocxLiveRenderer
+                  htmlContent="<p style='font-size: 11pt; color: #334155; line-height: 1.6;'><br></p>"
+                  styles=""
+                  isEditable={true}
+                  pageIndex={0}
+                  totalPages={1}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </DocLabCanvasViewer>
     </main>

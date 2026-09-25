@@ -14,7 +14,7 @@ export interface SubjectCurriculumSectionProps {
 
 /**
  * SubjectCurriculumSection
- * Handles Curriculum Book selection and Subject Examination Title.
+ * Handles Curriculum Book selection, Subject Examination Title, and Subject Code.
  * Streamlined Enterprise Section Headers (Zero Boxed Cards).
  */
 export default function SubjectCurriculumSection({
@@ -58,6 +58,14 @@ export default function SubjectCurriculumSection({
               onChange={(val: string) => setFormData((prev: any) => ({ ...prev, subjectName: val }))}
               placeholder="e.g. Arabic Grammar 1st Paper"
               required
+            />
+          </div>
+          <div>
+            <CustomInput
+              label="Subject Code"
+              value={formData.subjectCode}
+              onChange={(val: string) => setFormData((prev: any) => ({ ...prev, subjectCode: val }))}
+              placeholder="e.g. AR-101"
             />
           </div>
         </div>

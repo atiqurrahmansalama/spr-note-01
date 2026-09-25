@@ -22,6 +22,10 @@ import {
   SelectOption,
   ExamFormDrawerProps,
 } from '../types';
+import {
+  normalizeDepartmentIdList,
+  getDefaultComponents,
+} from '../utils/examCardHelper';
 
 export { DEFAULT_SHIFT_PRESETS };
 
@@ -232,25 +236,11 @@ export default function useExamFormState({
 
   // ── Step 2: Departments & Classes ─────────────────────────────────────────
   const [departmentId, setDepartmentId] = useState<string | string[]>(() => {
-    if (Array.isArray(savedDraft?.departmentId)) {
-      return savedDraft.departmentId.map(String);
+    if (savedDraft?.departmentId !== undefined || savedDraft?.departmentIds !== undefined) {
+      return normalizeDepartmentIdList(savedDraft.departmentIds ?? savedDraft.departmentId);
     }
-    if (Array.isArray(savedDraft?.departmentIds)) {
-      return savedDraft.departmentIds.map(String);
-    }
-    if (savedDraft?.departmentId !== undefined && savedDraft?.departmentId !== null) {
-      const val = String(savedDraft.departmentId);
-      return val.includes(',') ? val.split(',').map((s) => s.trim()) : [val];
-    }
-    if (Array.isArray(exam?.departmentId)) {
-      return exam.departmentId.map(String);
-    }
-    if (Array.isArray(exam?.departmentIds)) {
-      return exam.departmentIds.map(String);
-    }
-    if (exam?.departmentId !== undefined && exam?.departmentId !== null) {
-      const val = String(exam.departmentId);
-      return val.includes(',') ? val.split(',').map((s) => s.trim()) : [val];
+    if (exam?.departmentId !== undefined || exam?.departmentIds !== undefined) {
+      return normalizeDepartmentIdList(exam.departmentIds ?? exam.departmentId);
     }
     return ['ALL'];
   });
@@ -273,15 +263,7 @@ export default function useExamFormState({
   const activeDepartments = useMemo(() => {
     const deptsMap = new Map<string, { label: string; code: string }>();
     const cleanDepts = (departmentOptions || []).filter((d) => d.value && d.value !== 'ALL');
-
-    const currentDeptList = Array.isArray(departmentId)
-      ? departmentId.map(String)
-      : typeof departmentId === 'string' && departmentId.trim()
-      ? departmentId.includes(',')
-        ? departmentId.split(',').map((s) => s.trim())
-        : [departmentId.trim()]
-      : ['ALL'];
-
+    const currentDeptList = normalizeDepartmentIdList(departmentId);
     const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
 
     if (!hasAll) {
@@ -343,8 +325,7 @@ export default function useExamFormState({
 
   useEffect(() => {
     if (exam?.departmentId !== undefined && exam?.departmentId !== null && !savedDraft) {
-      const val = exam.departmentId;
-      setDepartmentId(Array.isArray(val) ? val.map(String) : [String(val)]);
+      setDepartmentId(normalizeDepartmentIdList(exam.departmentId));
     }
   }, [exam?.departmentId, savedDraft]);
 
@@ -365,14 +346,7 @@ export default function useExamFormState({
   }, [exam?.targetClassIds, savedDraft]);
 
   const visibleClasses = useMemo(() => {
-    const currentDeptList = Array.isArray(departmentId)
-      ? departmentId.map(String)
-      : typeof departmentId === 'string' && departmentId.trim()
-      ? departmentId.includes(',')
-        ? departmentId.split(',').map((s) => s.trim())
-        : [departmentId.trim()]
-      : ['ALL'];
-
+    const currentDeptList = normalizeDepartmentIdList(departmentId);
     const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
 
     if (hasAll) {
@@ -385,14 +359,7 @@ export default function useExamFormState({
 
   useEffect(() => {
     if (!exam?.id && !savedDraft && classOptions.length > 0 && targetClassIds.length === 0) {
-      const currentDeptList = Array.isArray(departmentId)
-        ? departmentId.map(String)
-        : typeof departmentId === 'string' && departmentId.trim()
-        ? departmentId.includes(',')
-          ? departmentId.split(',').map((s) => s.trim())
-          : [departmentId.trim()]
-        : ['ALL'];
-
+      const currentDeptList = normalizeDepartmentIdList(departmentId);
       const hasAll = currentDeptList.includes('ALL') || currentDeptList.length === 0;
 
       if (hasAll) {
@@ -411,21 +378,7 @@ export default function useExamFormState({
   }, [classOptions, departmentId, exam?.id, savedDraft, targetClassIds.length]);
 
   const handleDepartmentChange = (newDeptVal: string | string[]) => {
-    let nextList: string[] = [];
-    if (Array.isArray(newDeptVal)) {
-      nextList = newDeptVal.map(String);
-    } else if (typeof newDeptVal === 'string' && newDeptVal.trim()) {
-      nextList = newDeptVal.includes(',')
-        ? newDeptVal.split(',').map((s) => s.trim())
-        : [newDeptVal.trim()];
-    } else {
-      nextList = ['ALL'];
-    }
-
-    if (nextList.length === 0) {
-      nextList = ['ALL'];
-    }
-
+    const nextList = normalizeDepartmentIdList(newDeptVal);
     setDepartmentId(nextList);
 
     const hasAll = nextList.includes('ALL');
@@ -475,30 +428,9 @@ export default function useExamFormState({
     savedDraft?.targetFullMarks ?? exam?.defaultFullMarks ?? 100
   );
 
-  const [defaultComponents, setDefaultComponents] = useState<ExamAssessmentComponent[]>(() => {
-    if (Array.isArray(savedDraft?.defaultComponents) && savedDraft.defaultComponents.length > 0) {
-      return savedDraft.defaultComponents;
-    }
-    if (Array.isArray(exam?.defaultComponents) && exam.defaultComponents.length > 0) {
-      return exam.defaultComponents.map((c: any, idx: number) => ({
-        id: c.id || `comp_${idx + 1}`,
-        name: c.name || `Component ${idx + 1}`,
-        maxMarks: Number(c.maxMarks) || 0,
-      }));
-    }
-    if (exam?.defaultBreakdown) {
-      const w = Number(exam.defaultBreakdown.written) || 70;
-      const o = Number(exam.defaultBreakdown.oral) || 30;
-      return [
-        { id: 'comp_1', name: 'Written Exam', maxMarks: w },
-        { id: 'comp_2', name: 'Oral', maxMarks: o },
-      ];
-    }
-    return [
-      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
-      { id: 'comp_2', name: 'Oral', maxMarks: 30 },
-    ];
-  });
+  const [defaultComponents, setDefaultComponents] = useState<ExamAssessmentComponent[]>(() =>
+    getDefaultComponents(exam, savedDraft)
+  );
 
   const handleAddComponent = () => {
     setDefaultComponents((prev) => {
@@ -798,16 +730,7 @@ export default function useExamFormState({
     setAcademicYearId(defYear);
     setSemesterId(exam?.semesterId ? String(exam.semesterId) : (semesterOptions[0]?.value || 'annual_term'));
     setGradingSystemId(exam?.gradingSystemId || gradingSystemOptions[0]?.value || 'dars_e_nizami_standard');
-    const initDept = exam?.departmentIds
-      ? Array.isArray(exam.departmentIds)
-        ? exam.departmentIds.map(String)
-        : [String(exam.departmentIds)]
-      : exam?.departmentId !== undefined && exam?.departmentId !== null
-      ? Array.isArray(exam.departmentId)
-        ? exam.departmentId.map(String)
-        : [String(exam.departmentId)]
-      : ['ALL'];
-    setDepartmentId(initDept);
+    setDepartmentId(normalizeDepartmentIdList(exam?.departmentIds ?? exam?.departmentId));
     setTargetClassIds(Array.isArray(exam?.targetClassIds) ? exam.targetClassIds.map(String) : []);
     setStartDate(exam?.startDate || new Date().toISOString().split('T')[0]);
     setEndDate(exam?.endDate || new Date().toISOString().split('T')[0]);
@@ -834,10 +757,7 @@ export default function useExamFormState({
     );
     setBreakdownEnabled(exam?.breakdownEnabled ?? true);
     setTargetFullMarks(exam?.defaultFullMarks || 100);
-    setDefaultComponents([
-      { id: 'comp_1', name: 'Written Exam', maxMarks: 70 },
-      { id: 'comp_2', name: 'Oral / Nazera / Hifz', maxMarks: 30 },
-    ]);
+    setDefaultComponents(getDefaultComponents(exam));
     setCaEnabled(exam?.caWeightage?.enabled || false);
     setDailyEnabled(exam?.caWeightage?.dailyEnabled ?? true);
     setAttendanceEnabled(exam?.caWeightage?.attendanceEnabled ?? true);
@@ -876,15 +796,7 @@ export default function useExamFormState({
         academicYears.find((y: any) => String(y.id || y.academic_year || y.year_code) === String(academicYearId)) ||
         selectedYear;
       const selectedSemObj = semesterOptions.find((s) => String(s.value) === String(semesterId));
-
-      const currentDeptList = Array.isArray(departmentId)
-        ? departmentId.map(String)
-        : typeof departmentId === 'string' && departmentId.trim()
-        ? departmentId.includes(',')
-          ? departmentId.split(',').map((s) => s.trim())
-          : [departmentId.trim()]
-        : ['ALL'];
-
+      const currentDeptList = normalizeDepartmentIdList(departmentId);
       const hasAllDepts = currentDeptList.includes('ALL') || currentDeptList.length === 0;
 
       let resolvedDeptName = 'All Departments';
@@ -1013,7 +925,7 @@ export default function useExamFormState({
             ? payload.name
             : getLocalizedValue(payload.name, 'en') || 'Examination';
 
-        const calendarPayload = {
+        const calendarPayload: any = {
           id: examEventId,
           examId: savedId,
           title: `${calendarTitle} (Examination)`,
@@ -1035,9 +947,9 @@ export default function useExamFormState({
 
         if (existingIdx >= 0) {
           calendarEvents[existingIdx] = { ...calendarEvents[existingIdx], ...calendarPayload };
-          masterCalendarStore.saveEvents(tenantId, calendarEvents);
+          masterCalendarStore.saveEvents(tenantId, calendarEvents as any);
         } else {
-          masterCalendarStore.addEvent(tenantId, calendarPayload);
+          masterCalendarStore.addEvent(tenantId, calendarPayload as any);
         }
       } catch (syncErr) {
         console.warn('Event Calendar Sync Notice:', syncErr);

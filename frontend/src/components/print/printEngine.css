@@ -763,10 +763,15 @@ body.spr-printing-in-progress .universal-export-menu-portal {
 .docx-parsed-body p:empty,
 .docx-parsed-body div.docx_p:empty,
 .docx-preview-content p:empty,
-.docx-preview-content div.docx_p:empty {
+.docx-preview-content div.docx_p:empty,
+.docx-live-container p:has(> br:only-child),
+.docx-parsed-body p:has(> br:only-child),
+.docx-preview-content p:has(> br:only-child) {
   min-height: 1.25em !important;
   display: block !important;
   cursor: text !important;
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
 }
 
 /* Ensure empty table cells are clickable and have adequate dimensions */
@@ -800,18 +805,29 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   text-align: left;
 }
 
-/* Ensure all vector shapes, line dividers, and SVG drawing overlays pass clicks straight through to text */
+/* High-Fidelity SVG, vector graphics, and drawing shape styling */
 .docx-live-container svg,
-.docx-live-container svg *,
 .docx-parsed-body svg,
-.docx-parsed-body svg *,
-.docx-preview-content svg,
-.docx-preview-content svg *,
-.docx-live-container [style*="position:absolute"] > svg,
-.docx-parsed-body [style*="position:absolute"] > svg,
-.docx-live-container div:has(> svg),
-.docx-parsed-body div:has(> svg) {
-  pointer-events: none !important;
+.docx-preview-content svg {
+  max-width: 100%;
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.docx-live-container img[src*="svg"],
+.docx-parsed-body img[src*="svg"],
+.docx-preview-content img[src*="svg"] {
+  max-width: 100%;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.docx-live-container .spr-svg-shape-container,
+.docx-parsed-body .spr-svg-shape-container,
+.docx-preview-content .spr-svg-shape-container {
+  max-width: 100%;
+  vertical-align: middle;
 }
 
 .docx-live-container table th,
