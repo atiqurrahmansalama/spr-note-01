@@ -82,15 +82,18 @@ const CustomInput = forwardRef(function CustomInput(
     onEnter,
     onShiftEnter,
     onEmptyBackspace,
-    onAdd,
     onAddShift,
     label,
     subLabel,
+    title,
+    description,
+    indicator,
+    actions,
     required = false,
     optional = false,
     badge,
     placeholder,
-    size = "md", // 'sm' | 'md' | 'lg'
+    size = "md", // 'xs' | 'sm' | 'md' | 'lg'
     variant = "default", // 'default' | 'filled' | 'elevated' | 'sub' | 'borderless' | 'compact-number'
     disabled = false,
     readOnly = false,
@@ -691,6 +694,7 @@ const CustomInput = forwardRef(function CustomInput(
   const isBorderless = variant === "borderless";
 
   let sizeContainerClasses = {
+    xs: isCompactNumber ? "h-[30px]" : "min-h-[28px] sm:min-h-[30px] h-[30px] px-2.5 py-1 text-xs rounded-lg",
     sm: isCompactNumber ? "h-[36px] sm:h-[38px]" : "min-h-[38px] px-3 py-1.5 text-xs rounded-xl",
     md: isCompactNumber ? "h-[42px] sm:h-[46px]" : "min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl",
     lg: isCompactNumber ? "h-[48px] sm:h-[54px]" : "min-h-[54px] px-5 py-3.5 text-sm sm:text-base rounded-2xl",
@@ -859,16 +863,18 @@ const CustomInput = forwardRef(function CustomInput(
 
   return (
     <div className={`text-left font-sans ${isBorderless && !label && !subLabel && !badge && !optional ? (wrapperClassName || "w-full h-full") : `w-full ${wrapperClassName}`}`}>
-      {/* Top Bar: Label, Optional Sublabel, Badges, Multi-Lang Toggle & Actions */}
-      {(label || subLabel || badge || optional || enableTemplates || headerAction || onManage || onActionClick || actionTo || actionLabel || isMultiLang) && (
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Top Bar: Label, Optional Sublabel, Badges, Multi-Lang Toggle & Actions (Only rendered for non-collapsible standard inputs) */}
+      {!isCollapsible && (label || subLabel || badge || optional || enableTemplates || headerAction || onManage || onActionClick || actionTo || actionLabel || isMultiLang) && (
+        <div className={`flex items-center justify-between gap-2 ${size === 'xs' ? 'mb-1' : 'mb-2'}`}>
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {label && (
               <label
                 htmlFor={inputId}
-                className={`block text-xs font-bold theme-text-secondary uppercase tracking-wider ${
-                  disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-                } ${labelClassName}`}
+                className={`block truncate ${
+                  size === 'xs'
+                    ? 'text-[10px] font-semibold theme-text-secondary tracking-tight'
+                    : 'text-xs font-bold theme-text-secondary uppercase tracking-wider'
+                } ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} ${labelClassName}`}
               >
                 {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
               </label>
@@ -984,122 +990,196 @@ const CustomInput = forwardRef(function CustomInput(
         </div>
       ) : isCollapsible ? (
         /* Collapsible Accordion Mode with Merged Card Shell (Instant Zero Transition) */
-        isExpanded ? (
-          <div
-            className={`w-full rounded-2xl border theme-border theme-bg-sub/10 shadow-2xs overflow-hidden`}
-          >
-            {/* Expanded Header Bar */}
+        (() => {
+          const effectiveTitle = title || label || stringValue || effectivePlaceholder || "Click to configure";
+          const effectiveDescription = description || subLabel || (title || label ? (stringValue || "") : null);
+          const cardRadius = (size === "xs" || size === "sm") ? "rounded-xl" : "rounded-2xl";
+          const bodyPadding = size === "xs" ? "p-2.5 space-y-2.5" : size === "sm" ? "p-3 space-y-3" : "p-3.5 sm:p-4 space-y-3";
+          
+          return isExpanded ? (
+            <div
+              className={`w-full ${cardRadius} border theme-border theme-bg-sub/10 shadow-2xs overflow-hidden transition-all text-left`}
+            >
+              {/* Expanded Header Bar */}
+              <div
+                role="button"
+                onClick={disabled ? undefined : handleCollapsibleToggle}
+                style={restProps.style}
+                className={`relative flex items-center justify-between w-full ${effectiveDescription ? "p-2.5 sm:p-3 min-h-[38px]" : sizeContainerClasses} ${cardRadius} rounded-b-none border-0 border-b theme-border theme-bg-surface shadow-none ${
+                  disabled
+                    ? "opacity-60 cursor-not-allowed select-none"
+                    : "cursor-pointer hover:theme-bg-sub/30 select-none"
+                } ${className}`}
+              >
+                {/* Left Side Prefix / Icon / Start Adornment & Title/Desc */}
+                <div className="flex items-center gap-2.5 flex-1 min-w-0 mr-2 text-left">
+                  {startAdornment ? (
+                    <div className="shrink-0 flex items-center">{startAdornment}</div>
+                  ) : prefix ? (
+                    <div className="shrink-0 text-xs font-bold theme-text-secondary font-mono">
+                      {prefix}
+                    </div>
+                  ) : (
+                    <ResolvedDefaultIcon />
+                  )}
+
+                  {effectiveDescription ? (
+                    /* 2-Line Content Body */
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className={`text-xs sm:text-sm font-semibold truncate ${
+                            disabled ? "theme-text-secondary" : "theme-text-primary"
+                          }`}
+                        >
+                          {effectiveTitle}
+                        </span>
+                        {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
+                        {badge && (
+                          <div className="shrink-0 text-[10px] font-bold theme-accent font-mono uppercase px-1.5 py-0.5 rounded theme-bg-sub">
+                            {badge}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] theme-text-secondary truncate mt-0.5 leading-tight">
+                        {effectiveDescription}
+                      </p>
+                    </div>
+                  ) : (
+                    /* Single Line Text Summary Display */
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
+                      <span
+                        className={`font-semibold text-xs sm:text-sm truncate select-none ${
+                          stringValue
+                            ? "theme-text-primary"
+                            : "theme-text-secondary opacity-60"
+                        }`}
+                      >
+                        {effectiveTitle}
+                      </span>
+                      {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
+                      {badge && (
+                        <div className="shrink-0 text-[10px] font-bold theme-accent font-mono uppercase px-1.5 py-0.5 rounded theme-bg-sub">
+                          {badge}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Side Actions & Collapsible Chevron */}
+                <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => actions ? e.stopPropagation() : undefined}>
+                  {actions}
+                  {endAdornment}
+                  <div
+                    className="w-6 h-6 rounded-lg flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/80 transition-colors cursor-pointer"
+                    title="Collapse"
+                  >
+                    <ChevronIcon
+                      isOpen={true}
+                      className="w-3.5 h-3.5 theme-accent transition-transform duration-200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Collapsible Expandable Body / Children */}
+              {children && (
+                <div
+                  className={`animate-fade-in ${bodyPadding} ${
+                    expandableContentClassName || bodyClassName
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {children}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Collapsed Single Card Shell (Instant Zero Transition) */
             <div
               role="button"
               onClick={disabled ? undefined : handleCollapsibleToggle}
               style={restProps.style}
-              className={`relative flex items-center justify-between w-full ${sizeContainerClasses} rounded-t-2xl rounded-b-none border-0 border-b theme-border theme-bg-surface shadow-none ${
+              className={`relative flex items-center justify-between w-full ${effectiveDescription ? "p-2.5 sm:p-3 min-h-[38px]" : sizeContainerClasses} ${cardRadius} ${variantClasses} hover:border-[var(--accent-main)]/40 ${
                 disabled
                   ? "opacity-60 cursor-not-allowed select-none"
-                  : "cursor-pointer hover:theme-bg-sub/20 select-none"
+                  : "cursor-pointer hover:theme-bg-sub/30 select-none"
               } ${className}`}
             >
-              {/* Left Side Prefix / Icon / Start Adornment */}
-              <div className="flex items-center flex-1 min-w-0 mr-2">
+              {/* Left Side Prefix / Icon / Start Adornment & Title/Desc */}
+              <div className="flex items-center gap-2.5 flex-1 min-w-0 mr-2 text-left">
                 {startAdornment ? (
-                  <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
+                  <div className="shrink-0 flex items-center">{startAdornment}</div>
                 ) : prefix ? (
-                  <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
+                  <div className="shrink-0 text-xs font-bold theme-text-secondary font-mono">
                     {prefix}
                   </div>
                 ) : (
                   <ResolvedDefaultIcon />
                 )}
 
-                {/* Collapsible Text Summary Display */}
-                <span
-                  className={`font-semibold text-xs sm:text-sm truncate text-left select-none ${
-                    stringValue
-                      ? "theme-text-primary"
-                      : "theme-text-secondary opacity-60"
-                  }`}
-                >
-                  {stringValue || effectivePlaceholder || "Click to configure"}
-                </span>
+                {effectiveDescription ? (
+                  /* 2-Line Content Body */
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`text-xs sm:text-sm font-semibold truncate ${
+                          disabled ? "theme-text-secondary" : "theme-text-primary"
+                        }`}
+                      >
+                        {effectiveTitle}
+                      </span>
+                      {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
+                      {badge && (
+                        <div className="shrink-0 text-[10px] font-bold theme-accent font-mono uppercase px-1.5 py-0.5 rounded theme-bg-sub">
+                          {badge}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] theme-text-secondary truncate mt-0.5 leading-tight">
+                      {effectiveDescription}
+                    </p>
+                  </div>
+                ) : (
+                  /* Single Line Text Summary Display */
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
+                    <span
+                      className={`font-semibold text-xs sm:text-sm truncate select-none ${
+                        stringValue
+                          ? "theme-text-primary"
+                          : "theme-text-secondary opacity-60"
+                      }`}
+                    >
+                      {effectiveTitle}
+                    </span>
+                    {indicator && <div className="shrink-0 flex items-center">{indicator}</div>}
+                    {badge && (
+                      <div className="shrink-0 text-[10px] font-bold theme-accent font-mono uppercase px-1.5 py-0.5 rounded theme-bg-sub">
+                        {badge}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Right Side Collapsible Chevron & End Adornment */}
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              {/* Right Side Actions & Collapsible Chevron */}
+              <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => actions ? e.stopPropagation() : undefined}>
+                {actions}
                 {endAdornment}
                 <div
-                  className="flex items-center justify-center shrink-0"
-                  title="Collapse"
+                  className="w-6 h-6 rounded-lg flex items-center justify-center theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/80 transition-colors cursor-pointer"
+                  title="Expand"
                 >
                   <ChevronIcon
-                    isOpen={true}
-                    className="w-4 h-4 theme-accent"
+                    isOpen={false}
+                    className="w-3.5 h-3.5 theme-accent transition-transform duration-200"
                   />
                 </div>
               </div>
             </div>
-
-            {/* Collapsible Expandable Body / Children */}
-            {children && (
-              <div
-                className={`p-3.5 sm:p-4 space-y-3 animate-fade-in ${
-                  expandableContentClassName || bodyClassName
-                }`}
-              >
-                {children}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Collapsed Single Input Shell (Instant Zero Transition) */
-          <div
-            role="button"
-            onClick={disabled ? undefined : handleCollapsibleToggle}
-            style={restProps.style}
-            className={`relative flex items-center justify-between w-full ${sizeContainerClasses} ${variantClasses} hover:border-[var(--accent-main)]/40 ${
-              disabled
-                ? "opacity-60 cursor-not-allowed select-none"
-                : "cursor-pointer hover:theme-bg-sub/20 select-none"
-            } ${className}`}
-          >
-            {/* Left Side Prefix / Icon / Start Adornment */}
-            <div className="flex items-center flex-1 min-w-0 mr-2">
-              {startAdornment ? (
-                <div className="mr-3 shrink-0 flex items-center">{startAdornment}</div>
-              ) : prefix ? (
-                <div className="mr-3 shrink-0 text-xs font-bold theme-text-secondary font-mono">
-                  {prefix}
-                </div>
-              ) : (
-                <ResolvedDefaultIcon />
-              )}
-
-              {/* Collapsible Text Summary Display */}
-              <span
-                className={`font-semibold text-xs sm:text-sm truncate text-left select-none ${
-                  stringValue
-                    ? "theme-text-primary"
-                    : "theme-text-secondary opacity-60"
-                }`}
-              >
-                {stringValue || effectivePlaceholder || "Click to configure"}
-              </span>
-            </div>
-
-            {/* Right Side Collapsible Chevron & End Adornment */}
-            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              {endAdornment}
-              <div
-                className="flex items-center justify-center shrink-0"
-                title="Expand"
-              >
-                <ChevronIcon
-                  isOpen={false}
-                  className="w-4 h-4 theme-accent"
-                />
-              </div>
-            </div>
-          </div>
-        )
+          );
+        })()
       ) : (
         /* Standard Single Input / Textarea Shell */
         <div

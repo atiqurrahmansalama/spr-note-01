@@ -10,7 +10,7 @@ import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import { examStore } from '@/stores/examStore';
 import { getSavedTemplatesForScope } from '../../../../components/print/scopeTemplateStore';
-import { SUBJECT_ROUTINE_SCOPE_ID } from './subjectRoutineDocLabKeys';
+import { SUBJECT_ROUTINE_SCOPE_ID, buildSubjectRoutineReportData } from './subjectRoutineDocLabKeys';
 import SubjectRoutinePrintModal from './SubjectRoutinePrintModal';
 import { SubjectRoutineItem, SubjectRoutineMatrixViewProps } from './types';
 
@@ -90,6 +90,23 @@ export default function SubjectRoutineMatrixView({
   const navigate = useNavigate();
 
   const handleTriggerPrint = () => {
+    const reportDataRecord = buildSubjectRoutineReportData(rows, activeExam, {
+      departmentName: filterDepartmentId !== 'ALL' ? (matrixState.departments || []).find((d: any) => String(d.id) === String(filterDepartmentId))?.name : undefined,
+      className: filterClassId !== 'ALL' ? (allAvailableClasses || []).find((c: any) => String(c.id) === String(filterClassId))?.name : undefined,
+      allAvailableClasses,
+      participatingClasses,
+      examShifts,
+      designatedExamDays,
+    });
+
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(`spr_doclab_scope_data_${SUBJECT_ROUTINE_SCOPE_ID}`, JSON.stringify([reportDataRecord]));
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const saved = getSavedTemplatesForScope(SUBJECT_ROUTINE_SCOPE_ID);
     if (!saved || saved.length === 0) {
       navigate(`/print-studio?scope=${SUBJECT_ROUTINE_SCOPE_ID}&returnUrl=/examinations/routine-matrix`);
@@ -255,6 +272,10 @@ export default function SubjectRoutineMatrixView({
           academicContext={{
             departmentName: filterDepartmentId !== 'ALL' ? (matrixState.departments || []).find((d: any) => String(d.id) === String(filterDepartmentId))?.name : undefined,
             className: filterClassId !== 'ALL' ? (allAvailableClasses || []).find((c: any) => String(c.id) === String(filterClassId))?.name : undefined,
+            allAvailableClasses,
+            participatingClasses,
+            examShifts,
+            designatedExamDays,
           }}
         />
       </div>
@@ -349,6 +370,10 @@ export default function SubjectRoutineMatrixView({
         academicContext={{
           departmentName: filterDepartmentId !== 'ALL' ? (matrixState.departments || []).find((d: any) => String(d.id) === String(filterDepartmentId))?.name : undefined,
           className: filterClassId !== 'ALL' ? (allAvailableClasses || []).find((c: any) => String(c.id) === String(filterClassId))?.name : undefined,
+          allAvailableClasses,
+          participatingClasses,
+          examShifts,
+          designatedExamDays,
         }}
       />
     </div>

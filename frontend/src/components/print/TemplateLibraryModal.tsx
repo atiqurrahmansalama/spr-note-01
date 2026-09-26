@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Modal, CustomButton, CustomInput, CustomSelect } from '../ui';
+import Modal, { ConfirmModal } from '../ui/Modal';
+import { CustomButton, CustomInput, CustomSelect } from '../ui';
 import {
   FileIcon,
   CheckCircleIcon,
@@ -61,6 +62,7 @@ export default function TemplateLibraryModal({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [scopeDefaults, setScopeDefaults] = useState<Record<string, string>>({});
   const [copiedKeys, setCopiedKeys] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<CustomDocxTemplate | null>(null);
 
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
@@ -87,16 +89,15 @@ export default function TemplateLibraryModal({
     }
   }, [isOpen, activeScopeId]);
 
-  // Categories list
+  // Categories list dynamically extracted from ALL_DOCUMENT_SCOPES schema
   const categories = useMemo(() => {
+    const cats = new Set<string>();
+    ALL_DOCUMENT_SCOPES.forEach((s) => {
+      if (s.category) cats.add(s.category);
+    });
     return [
       { id: 'all', label: 'All Templates' },
-      { id: 'Examination', label: 'Examination & Results' },
-      { id: 'Academic', label: 'Academic & Studies' },
-      { id: 'Financial', label: 'Financial & Fees' },
-      { id: 'Certificates', label: 'Certificates & Testimonials' },
-      { id: 'Staff', label: 'Staff Management' },
-      { id: 'General', label: 'General Documents' },
+      ...Array.from(cats).sort().map((c) => ({ id: c, label: c })),
     ];
   }, []);
 
@@ -204,11 +205,8 @@ export default function TemplateLibraryModal({
   };
 
   // Handle template deletion
-  const handleDelete = (tmplId: string, tmplName: string) => {
-    if (window.confirm(`Are you sure you want to delete template "${tmplName}"?`)) {
-      deleteDocxTemplate(tmplId);
-      reloadData();
-    }
+  const handleDelete = (tmpl: CustomDocxTemplate) => {
+    setTemplateToDelete(tmpl);
   };
 
   // Handle applying template to canvas
@@ -467,7 +465,7 @@ export default function TemplateLibraryModal({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => handleDelete(tmpl.id, tmpl.name)}
+                        onClick={() => handleDelete(tmpl)}
                         className="p-1.5 rounded-lg theme-text-secondary hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Delete template"
                       >
@@ -509,6 +507,34 @@ export default function TemplateLibraryModal({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(templateToDelete)}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={() => {
+          if (templateToDelete) {
+            deleteDocxTemplate(templateToDelete.id);
+            setTemplateToDelete(null);
+            reloadData();
+          }
+        }}
+        title="Delete Template"
+        subtitle={`Are you sure you want to delete "${templateToDelete?.name}"?`}
+        icon={TrashIcon}
+        confirmText="Delete Template"
+        confirmVariant="danger"
+        confirmIcon={TrashIcon}
+        callout={{
+          type: 'danger',
+          title: 'Permanent Deletion',
+          message: 'This document template will be permanently removed from your template library.',
+        }}
+        summaryItems={[
+          { label: 'Template Name', value: templateToDelete?.name || '' },
+          { label: 'Scope', value: templateToDelete?.scopeId || 'General' },
+        ]}
+      />
     </Modal>
   );
 }

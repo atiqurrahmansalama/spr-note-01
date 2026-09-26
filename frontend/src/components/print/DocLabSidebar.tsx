@@ -1,19 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import RightSidebarPanel from '../ui/RightSidebarPanel';
 import DrawerContainer from '../layout/DrawerContainer';
 import {
-  DocLabPresetsTab,
+  DocLabTemplatesTab,
   DocLabKeysTab,
-  DocLabConditionsTab,
   DocLabLayoutTab,
-  DocLabSignaturesTab,
 } from './components/sidebar';
 import {
   SparklesIcon,
   BookOpenIcon,
   AdjustmentsHorizontalIcon,
-  FileIcon,
-  CodeBracketIcon,
 } from '../ui/Icons';
 import { getScopeById, validateTemplateForScope } from './scopeTemplateStore';
 import { DocxTemplate, PrintOptions } from './types';
@@ -26,7 +21,6 @@ export interface DocLabSidebarProps {
   customDocxTemplate?: DocxTemplate | null;
   activeTemplateId?: string | null;
   onTemplateChange?: (template: DocxTemplate) => void;
-  onOpenDocxModal?: () => void;
   onOpenTemplateLibrary?: () => void;
   onDeleteDocxTemplate?: (template: DocxTemplate) => void;
   onSaveCurrentTemplate?: (name: string, docType: 'template' | 'generated') => void;
@@ -63,7 +57,7 @@ const EMPTY_OPTIONS: Partial<PrintOptions> = {};
 /**
  * DocLabSidebar
  * Master Document Studio Right Sidebar Panel.
- * Decomposed into modular tabs: Presets, Blueprint Tokens, Layout & Security, and Signatures.
+ * Decomposed into modular tabs: Templates, Blueprint Tokens & Rules, and Layout (with Signatures).
  */
 export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   options = EMPTY_OPTIONS,
@@ -72,7 +66,6 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   customDocxTemplate = null,
   activeTemplateId = null,
   onTemplateChange = () => {},
-  onOpenDocxModal,
   onOpenTemplateLibrary,
   onDeleteDocxTemplate,
   onSaveCurrentTemplate,
@@ -98,7 +91,31 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   onResetResize,
   className = '',
 }) => {
-  const [activeTab, setActiveTab] = useState<'presets' | 'keys' | 'conditions' | 'layout' | 'signatures'>('presets');
+  const [activeTab, setActiveTab] = useState<'templates' | 'keys' | 'layout'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('spr_doclab_sidebar_active_tab');
+        if (saved && ['templates', 'keys', 'layout'].includes(saved)) {
+          return saved as 'templates' | 'keys' | 'layout';
+        }
+        if (saved === 'presets') return 'templates';
+      } catch (err) {
+        // Fallback to templates
+      }
+    }
+    return 'templates';
+  });
+
+  const handleTabChange = (tab: 'templates' | 'keys' | 'layout') => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('spr_doclab_sidebar_active_tab', tab);
+      } catch (err) {
+        // Ignore
+      }
+    }
+  };
 
   // Compute scope metadata
   const scopeDefinition: DocumentScopeDefinition = useMemo(() => {
@@ -144,158 +161,104 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   );
 
   return (
-    <RightSidebarPanel
-      onClose={onClose}
-      showCloseButton={false}
-      title={scopeName || 'Document Configuration'}
-      icon={AdjustmentsHorizontalIcon}
-      category=""
-      width={width}
-      isResizing={isResizing}
-      onStartResize={onStartResize}
-      onResetResize={onResetResize}
-      className={className}
+    <div
+      className={`w-full h-full flex flex-col theme-bg-app text-left overflow-y-auto px-4 py-3.5 @container max-w-full ${className}`}
+      role="region"
+      aria-label="Document Studio Configuration"
     >
       <DrawerContainer padding="none">
         <div className="pb-8">
-          {/* Navigation Tabs Bar */}
-          <div className="grid grid-cols-5 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('presets')}
-            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
-              activeTab === 'presets'
-                ? 'theme-bg-accent text-white shadow-xs font-bold'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-            }`}
-            title="Scope Templates"
-          >
-            <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Presets</span>
-          </button>
+          {/* Navigation Tabs Bar - 3 Tabs: Templates, Tokens, Layout */}
+          <div className="grid grid-cols-3 gap-1 p-1 rounded-xl theme-bg-sub border theme-border mb-4">
+            <button
+              type="button"
+              onClick={() => handleTabChange('templates')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                activeTab === 'templates'
+                  ? 'theme-bg-accent text-white shadow-xs font-bold'
+                  : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
+              }`}
+              title="Scope Templates & Library"
+            >
+              <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Templates</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('keys')}
-            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
-              activeTab === 'keys'
-                ? 'theme-bg-accent text-white shadow-xs font-bold'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-            }`}
-            title="Scope Blueprint Tokens"
-          >
-            <SparklesIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Tokens</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('keys')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                activeTab === 'keys'
+                  ? 'theme-bg-accent text-white shadow-xs font-bold'
+                  : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
+              }`}
+              title="Scope Blueprint Tokens & Formatting Rules"
+            >
+              <SparklesIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Tokens</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('conditions')}
-            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
-              activeTab === 'conditions'
-                ? 'theme-bg-accent text-white shadow-xs font-bold'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-            }`}
-            title="Conditions & Indent Rules"
-          >
-            <CodeBracketIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Rules</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('layout')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                activeTab === 'layout'
+                  ? 'theme-bg-accent text-white shadow-xs font-bold'
+                  : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
+              }`}
+              title="Page Layout, Setup & Signatures"
+            >
+              <AdjustmentsHorizontalIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Layout</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('layout')}
-            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
-              activeTab === 'layout'
-                ? 'theme-bg-accent text-white shadow-xs font-bold'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-            }`}
-            title="Page Layout & Setup"
-          >
-            <AdjustmentsHorizontalIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Layout</span>
-          </button>
+          {/* Tab Content Panes */}
+          {activeTab === 'templates' && (
+            <DocLabTemplatesTab
+              templates={templates}
+              activeTemplateId={activeTemplateId}
+              customDocxTemplate={customDocxTemplate}
+              scopeDefinition={scopeDefinition}
+              activeScopeValidation={activeScopeValidation}
+              docxRenderMode={docxRenderMode}
+              totalRecordsCount={totalRecordsCount}
+              isScopeDefault={isScopeDefault}
+              onSelectTemplate={onTemplateChange}
+              onDeleteDocxTemplate={onDeleteDocxTemplate}
+              onDuplicateDocxTemplate={onDuplicateDocxTemplate}
+              onUpdateDocxTemplate={onUpdateDocxTemplate}
+              onSaveCurrentTemplate={onSaveCurrentTemplate}
+              onDocxRenderModeChange={onDocxRenderModeChange}
+              onToggleScopeDefault={onToggleScopeDefault}
+            />
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('signatures')}
-            className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
-              activeTab === 'signatures'
-                ? 'theme-bg-accent text-white shadow-xs font-bold'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-            }`}
-            title="Signers & Seals"
-          >
-            <FileIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Signers</span>
-          </button>
-        </div>
+          {activeTab === 'keys' && (
+            <DocLabKeysTab
+              scopeDefinition={scopeDefinition}
+              activeScopeValidation={activeScopeValidation}
+              placeholderKeys={placeholderKeys}
+              requiredKeys={requiredKeys}
+              activeRecord={activeRecord}
+              onInsertKey={onInsertKey}
+              scopeId={scopeId}
+              scopeName={scopeName}
+            />
+          )}
 
-        {/* Tab Content Panes */}
-        {activeTab === 'presets' && (
-          <DocLabPresetsTab
-            templates={templates}
-            activeTemplateId={activeTemplateId}
-            customDocxTemplate={customDocxTemplate}
-            scopeDefinition={scopeDefinition}
-            activeScopeValidation={activeScopeValidation}
-            docxRenderMode={docxRenderMode}
-            totalRecordsCount={totalRecordsCount}
-            isScopeDefault={isScopeDefault}
-            onSelectTemplate={onTemplateChange}
-            onOpenDocxModal={onOpenDocxModal}
-            onOpenTemplateLibrary={onOpenTemplateLibrary}
-            onDeleteDocxTemplate={onDeleteDocxTemplate}
-            onDuplicateDocxTemplate={onDuplicateDocxTemplate}
-            onUpdateDocxTemplate={onUpdateDocxTemplate}
-            onSaveCurrentTemplate={onSaveCurrentTemplate}
-            onDocxRenderModeChange={onDocxRenderModeChange}
-            onToggleScopeDefault={onToggleScopeDefault}
-          />
-        )}
-
-        {activeTab === 'keys' && (
-          <DocLabKeysTab
-            scopeDefinition={scopeDefinition}
-            activeScopeValidation={activeScopeValidation}
-            placeholderKeys={placeholderKeys}
-            requiredKeys={requiredKeys}
-            activeRecord={activeRecord}
-            onInsertKey={onInsertKey}
-            scopeId={scopeId}
-            scopeName={scopeName}
-          />
-        )}
-
-        {activeTab === 'conditions' && (
-          <DocLabConditionsTab
-            onInsertKey={onInsertKey}
-            placeholderKeys={placeholderKeys}
-            requiredKeys={requiredKeys}
-            activeRecord={activeRecord}
-            scopeId={scopeId}
-            scopeName={scopeName}
-          />
-        )}
-
-        {activeTab === 'layout' && (
-          <DocLabLayoutTab
-            options={options}
-            onOptionsChange={onOptionsChange}
-            isCustomDocxActive={isCustomDocxActive}
-          />
-        )}
-
-        {activeTab === 'signatures' && (
-          <DocLabSignaturesTab
-            options={options}
-            onOptionsChange={onOptionsChange}
-          />
-        )}
+          {activeTab === 'layout' && (
+            <DocLabLayoutTab
+              options={options}
+              onOptionsChange={onOptionsChange}
+              isCustomDocxActive={isCustomDocxActive}
+            />
+          )}
         </div>
       </DrawerContainer>
-    </RightSidebarPanel>
+    </div>
   );
 };
 
 export default DocLabSidebar;
+

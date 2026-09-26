@@ -1,17 +1,16 @@
 import React, { useMemo } from 'react';
-import ActionMenu from '../../../../components/ui/ActionMenu';
+import ActionMenu from '@/components/ui/ActionMenu';
 import {
   FileIcon,
   StarIcon,
   DuplicateIcon,
   TrashIcon,
   EditIcon,
-} from '../../../../components/ui/Icons';
-import { DocxTemplate } from '../../types';
+} from '@/components/ui/Icons';
+import { DocxTemplate } from '@/components/print/types';
+import { DocLabItemCard } from '../DocLabItemCard';
 
-import { DocLabItemCard } from './DocLabItemCard';
-
-interface DocLabTemplateCardProps {
+export interface DocLabTemplateCardProps {
   template: DocxTemplate;
   isActive: boolean;
   isScopeDefault: boolean;
@@ -129,3 +128,5 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
     />
   );
 };
+
+export default DocLabTemplateCard;

@@ -41,7 +41,7 @@ export function JuzRow({
   const handleRangeChange = (index: number, newRange: PageRange) => {
     onChange((prevRow) => {
       const newRanges = [...prevRow.ranges];
-      const prevRange = newRanges[index] || {};
+      const prevRange = (newRanges[index] || {}) as Partial<PageRange>;
       newRanges[index] = {
         ...prevRange,
         ...newRange,

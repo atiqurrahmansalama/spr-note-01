@@ -41,6 +41,7 @@ export type DocumentScopeId =
   | 'hifz_daily_report'
   | 'attendance_register'
   | 'staff_id_card'
+  | 'subject_routine'
   | 'general_document';
 
 export interface DocumentScopeDefinition {

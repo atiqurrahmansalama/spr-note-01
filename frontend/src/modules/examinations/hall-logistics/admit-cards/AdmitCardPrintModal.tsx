@@ -173,7 +173,7 @@ export default function AdmitCardPrintModal({
       customSheets={true}
       data={liveCards.length > 0 ? liveCards : cards}
       placeholderKeys={ADMIT_CARD_PLACEHOLDER_KEYS}
-      scopeId="examinations_admit_card"
+      scopeId="exam_admit_card"
       scopeName="Student Admit Cards"
       scopeDescription="Admit card blueprints and examination entry passes"
       defaultOptions={defaultPrintOptions}

@@ -94,7 +94,7 @@ export default function HallAttendancePrintModal({
       customSheets={true}
       data={activeData.students || []}
       placeholderKeys={HALL_ATTENDANCE_PLACEHOLDER_KEYS}
-      scopeId="examinations_attendance_sheet"
+      scopeId="attendance_register"
       scopeName="Hall Attendance Sheets"
       scopeDescription="Examination hall student roll call and attendance registers"
       defaultOptions={defaultPrintOptions}

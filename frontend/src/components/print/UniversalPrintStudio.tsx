@@ -4,7 +4,6 @@ import { useFullscreen, useResizablePanel } from '../../hooks';
 import { useTenant } from '../../context/TenantContext';
 import PanelResizer from '../ui/PanelResizer';
 import DocLabSidebar from './DocLabSidebar';
-import DocxTemplateModal from './DocxTemplateModal';
 import TemplateLibraryModal from './TemplateLibraryModal';
 import { insertTokenAtActiveCaret } from './caretInsertManager';
 import { getPageMarginCSS } from './docLabExportUtils';
@@ -306,8 +305,8 @@ export default function UniversalPrintStudio({
     <div
       className={`universal-print-studio-root ${
         isFullscreen
-          ? 'fixed inset-0 z-[9999] flex flex-col theme-bg-app theme-text-primary overflow-hidden select-none animate-fade-in w-screen h-screen'
-          : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 animate-fade-in text-left font-sans select-none'
+          ? 'fixed inset-0 z-[9999] flex flex-col theme-bg-app theme-text-primary overflow-hidden animate-fade-in w-screen h-screen'
+          : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 animate-fade-in text-left font-sans'
       } print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:backdrop-filter-none print:shadow-none print:overflow-visible`}
     >
       {/* Dynamic @page Rules for Clean Browser Print Dialog */}
@@ -428,6 +427,7 @@ export default function UniversalPrintStudio({
             handleRowInsert={handleRowInsert}
             handleRowMove={handleRowMove}
             handleColumnHeaderChange={handleColumnHeaderChange}
+            onSaveCurrentTemplate={handleSaveCurrentTemplate}
             autoSaveStatus={autoSaveStatus}
             autoSaveLastSavedAt={autoSaveLastSavedAt}
             isAutoSaving={isAutoSaving}
@@ -459,8 +459,6 @@ export default function UniversalPrintStudio({
                   customDocxTemplate={customDocxTemplate}
                   activeTemplateId={customDocxTemplate?.id || customDocxTemplate?.templateMeta?.id || activeTemplateId}
                   onTemplateChange={handleTemplateSelection}
-                  onOpenDocxModal={() => setIsDocxModalOpen(true)}
-                  onOpenTemplateLibrary={() => setIsTemplateLibraryOpen(true)}
                   onDeleteDocxTemplate={(t: any) => handleDeleteDocxTemplate(t?.id || t)}
                   onSaveCurrentTemplate={handleSaveCurrentTemplate}
                   onDuplicateDocxTemplate={(t: any) => handleDuplicateDocxTemplate(t?.id || t)}
@@ -502,19 +500,6 @@ export default function UniversalPrintStudio({
           )}
         </div>
       </div>
-
-      {/* Docx Template Ingestion Modal */}
-      {isDocxModalOpen && (
-        <DocxTemplateModal
-          isOpen={isDocxModalOpen}
-          onClose={() => setIsDocxModalOpen(false)}
-          onApplyTemplate={handleApplyDocxTemplate}
-          placeholderKeys={placeholderKeys}
-          sampleData={liveData && liveData[0] ? { ...liveData[0], title, subtitle } : { title, subtitle }}
-          columns={liveColumns as any}
-          metaItems={metaItems}
-        />
-      )}
 
       {/* Universal Template Library Hub Modal */}
       {isTemplateLibraryOpen && (

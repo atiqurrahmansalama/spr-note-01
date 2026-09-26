@@ -22,6 +22,8 @@ import {
   getScopeById,
 } from '../scopeTemplateStore';
 import { PrintOptions, PrintMetaItem } from '../types';
+import { examStore } from '../../../stores/examStore';
+import { buildSubjectRoutineReportData } from '../../../modules/examinations/exam-schedules/subject-routine/subjectRoutineDocLabKeys';
 
 export const BLANK_PAGE_HTML = `
   <div class="docx-blank-canvas font-sans leading-relaxed" style="min-height: 720px; outline: none;">
@@ -106,6 +108,27 @@ export function usePrintDocxEngine({
       return [];
     }
   });
+
+  // Real-time synchronization of saved templates across tabs, modals, and storage events
+  useEffect(() => {
+    const handleTemplateSync = () => {
+      try {
+        setSavedWordTemplates(getSavedDocxTemplates());
+      } catch (e) {
+        console.warn('Failed to sync saved templates', e);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('spr_doclab_template_saved', handleTemplateSync);
+      window.addEventListener('storage', handleTemplateSync);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('spr_doclab_template_saved', handleTemplateSync);
+        window.removeEventListener('storage', handleTemplateSync);
+      }
+    };
+  }, []);
 
   const [customDocxTemplate, setCustomDocxTemplate] = useState<any>(() => {
     try {
@@ -237,7 +260,7 @@ export function usePrintDocxEngine({
     }
   }, [isOpen, scopeId]);
 
-  // Combine built-in templates with user-saved Word (.docx) templates strictly isolated by scopeId
+  // Combine built-in templates with all user-saved Word (.docx) templates across all scopes
   const combinedTemplates = useMemo(() => {
     const map = new Map<string, any>();
 
@@ -259,17 +282,16 @@ export function usePrintDocxEngine({
       });
     }
 
-    // 3. User-saved templates (highest precedence: overwrite built-ins with same ID)
+    // 3. User-saved templates across all scopes (highest precedence: overwrite built-ins with same ID)
     if (Array.isArray(savedWordTemplates)) {
       savedWordTemplates.forEach((wt) => {
         const tScope = wt.scopeId || (wt as any).templateMeta?.scopeId || 'general_document';
-        const isMatch = scopeId && scopeId !== 'general_document' ? tScope === scopeId : true;
-        if (isMatch && wt.id) {
+        if (wt.id) {
           const isGen = wt.templateType === 'generated' || wt.id?.startsWith('gen_');
           map.set(wt.id, {
             id: wt.id,
             name: wt.name,
-            description: wt.description || (isGen ? `Generated Document (${wt.recordsCount || 'All'} Records)` : `Custom Template for ${scopeName || scopeId}`),
+            description: wt.description || (isGen ? `Generated Document (${wt.recordsCount || 'All'} Records)` : `Custom Template`),
             isWordDocx: true,
             scopeId: tScope,
             rawHtml: wt.rawHtml,
@@ -286,7 +308,7 @@ export function usePrintDocxEngine({
     }
 
     return Array.from(map.values());
-  }, [templates, savedWordTemplates, scopeId, scopeName]);
+  }, [templates, savedWordTemplates]);
 
   // Extracted docx scoped styles rendered once at canvas container level (prevents 100 duplicate <style> tags)
   const docxStyles = useMemo<string>(() => {
@@ -455,8 +477,52 @@ export function usePrintDocxEngine({
       });
     }
 
+    // Dynamic Subject Routine resolution from examStore or rich fallback
+    if (scopeId === 'subject_routine') {
+      let resolvedFromStore = false;
+      try {
+        const tenantId = 'default';
+        const exams = examStore.getExams(tenantId) || [];
+        const activeExam = exams.find((e: any) => e.status === 'ACTIVE' || e.is_active || e.isActive) || exams[0];
+        if (activeExam) {
+          const subjects = examStore.getExamSubjects(tenantId, activeExam.id) || [];
+          const generated = buildSubjectRoutineReportData(subjects, activeExam, {});
+          Object.entries(generated).forEach(([k, v]) => {
+            if (base[k] === undefined || (Array.isArray(v) && (!Array.isArray(base[k]) || base[k].length === 0))) {
+              base[k] = v;
+            }
+          });
+          resolvedFromStore = true;
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      if (!resolvedFromStore) {
+        const sampleRoutine: Record<string, any> = {
+          'exam-name': 'Annual Examination 2026',
+          'academic-year': '2026-2027',
+          'exam-date': ['15/10/2026', '16/10/2026', '17/10/2026', '18/10/2026', '19/10/2026', '20/10/2026'],
+          'day-name': ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+          'date-day': ['15/10/2026<br>Saturday', '16/10/2026<br>Sunday', '17/10/2026<br>Monday', '18/10/2026<br>Tuesday', '19/10/2026<br>Wednesday', '20/10/2026<br>Thursday'],
+          'exam-date-day': ['15/10/2026<br>Saturday', '16/10/2026<br>Sunday', '17/10/2026<br>Monday', '18/10/2026<br>Tuesday', '19/10/2026<br>Wednesday', '20/10/2026<br>Thursday'],
+          shift: ['Morning Shift', 'Morning Shift', 'Morning Shift', 'Morning Shift', 'Morning Shift', 'Morning Shift'],
+          'shift-time': ['09:00 AM - 12:00 PM', '09:00 AM - 12:00 PM', '09:00 AM - 12:00 PM', '09:00 AM - 12:00 PM', '09:00 AM - 12:00 PM', '09:00 AM - 12:00 PM'],
+          class: 'Class 1, Class 2, Class 3',
+          'class-sub1': ['Al-Quran', 'Bangla 1st', 'English 1st', 'Mathematics', 'General Science', 'Social Science'],
+          'class-sub2': ['Arabic 1st', 'Bangla 2nd', 'English 2nd', 'Social Science', 'ICT', 'General Science'],
+          'class-sub3': ['Hadith Studies', 'Islamic History', 'General Math', 'Higher Math', 'Physics', 'Chemistry'],
+        };
+        Object.entries(sampleRoutine).forEach(([k, v]) => {
+          if (base[k] === undefined || (Array.isArray(v) && typeof base[k] === 'string')) {
+            base[k] = v;
+          }
+        });
+      }
+    }
+
     return base;
-  }, [institutionName, institutionAddress, resolvedTitle, resolvedSubtitle, options.pageSize, options.orientation, liveMetaItems, placeholderKeys]);
+  }, [institutionName, institutionAddress, resolvedTitle, resolvedSubtitle, options.pageSize, options.orientation, liveMetaItems, placeholderKeys, scopeId]);
 
   // Enriched records combining base document context with row-level data
   const enrichedRecords = useMemo<Array<Record<string, any>>>(() => {
@@ -490,31 +556,9 @@ export function usePrintDocxEngine({
       }
     }
 
-    // 1. Template Design Mode: Split by page breaks or sections
+    // 1. Template Design Mode: Split by page breaks or auto-paginate into discrete paper sheets
     if (docxRenderMode === 'template') {
-      let activeBody = templateBodyContent;
-      // If current document is a generated document, try resolving its unmerged source template body
-      if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
-        let srcBody = '';
-        if (customDocxTemplate.sourceTemplateId) {
-          const src = (savedWordTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId) ||
-                      (combinedTemplates || []).find((t) => t.id === customDocxTemplate.sourceTemplateId);
-          if (src) {
-            srcBody = separateDocxStylesAndBody(src.rawHtml || src.html || '').body || src.rawHtml || '';
-          }
-        }
-        if (!srcBody) {
-          const scopeDefTmpl = getDefaultTemplateForScope(scopeId) ||
-            (combinedTemplates || []).find((t) => t.scopeId === scopeId && t.templateType !== 'generated') ||
-            (templates || []).find((t: any) => t.scopeId === scopeId);
-          if (scopeDefTmpl) {
-            srcBody = separateDocxStylesAndBody(scopeDefTmpl.rawHtml || scopeDefTmpl.html || '').body || scopeDefTmpl.rawHtml || '';
-          }
-        }
-        if (srcBody) {
-          activeBody = srcBody;
-        }
-      }
+      const activeBody = templateBodyContent;
       const pages = splitHtmlIntoPages(activeBody);
       return pages.length > 0 ? pages : [activeBody];
     }

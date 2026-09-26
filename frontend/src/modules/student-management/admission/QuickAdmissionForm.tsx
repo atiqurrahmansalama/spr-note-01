@@ -118,7 +118,7 @@ export default function QuickAdmissionForm({
     refetch: refetchAcademicData,
   } = academicData || {};
 
-  const resolveInitialName = (stu: any, shared: any, param: string) => {
+  const resolveInitialName = (stu: any, shared: any, param: any): string | LocalizedValue => {
     if (stu) {
       if (stu.name_i18n && typeof stu.name_i18n === "object" && Object.keys(stu.name_i18n).length > 0) {
         return stu.name_i18n;
@@ -327,9 +327,10 @@ export default function QuickAdmissionForm({
       const targetSection = formData.student_section || editingStudent?.student_section || editingStudent?.section || editingStudent?.section_id || null;
       const targetDept = formData.department || editingStudent?.department || editingStudent?.department_id || null;
 
-      const primaryName = (typeof formData.name === "object"
-        ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name).find(Boolean) || ""
-        : String(formData.name || "")
+      const primaryName = String(
+        typeof formData.name === "object"
+          ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name || {}).find(Boolean) || ""
+          : formData.name || ""
       ).trim();
       const bnName = typeof formData.name === "object" ? getLocalizedValue(formData.name, "bn") : "";
       const nameI18n = typeof formData.name === "object" ? formData.name : { en: primaryName, bn: bnName };
@@ -475,9 +476,10 @@ export default function QuickAdmissionForm({
     const localStudentId = `stu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const generatedUniqId = `STD-${new Date().getFullYear()}-${localStudentId.slice(-4).toUpperCase()}`;
 
-    const primaryName = (typeof formData.name === "object"
-      ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name).find(Boolean) || ""
-      : String(formData.name || "")
+    const primaryName = String(
+      typeof formData.name === "object"
+        ? getLocalizedValue(formData.name, "en") || getLocalizedValue(formData.name, "bn") || Object.values(formData.name || {}).find(Boolean) || ""
+        : formData.name || ""
     ).trim();
     const bnName = typeof formData.name === "object" ? getLocalizedValue(formData.name, "bn") : "";
     const nameI18n = typeof formData.name === "object" ? formData.name : { en: primaryName, bn: bnName };

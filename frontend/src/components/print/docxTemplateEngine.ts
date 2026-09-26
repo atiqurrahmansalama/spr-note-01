@@ -3,6 +3,7 @@ import mammoth from 'mammoth';
 import JSZip from 'jszip';
 
 import type { PrintPageSize, PrintOrientation, PrintMargin } from './types';
+import { parseTokenDirective, formatMultiValueData, type TokenDirectiveOptions } from './docLabDirectiveEngine';
 
 export type DocxTemplateType = 'template' | 'generated';
 
@@ -137,7 +138,7 @@ export function splitHtmlIntoPages(rawHtml: string): string[] {
 
   const trimmed = rawHtml.trim();
 
-  // 1. Explicit SPR comment page breaks
+  // 1. Explicit SPR comment page breaks (User-defined / Real-time split boundaries)
   if (trimmed.includes('<!-- spr-page-break -->')) {
     const parts = trimmed
       .split('<!-- spr-page-break -->')
@@ -365,7 +366,7 @@ function wrapPageHtml(innerParts: string[], rootEl: HTMLElement): string {
 /**
  * Extracts element attributes as a clean string for element reconstruction
  */
-function getElementAttributesString(el: HTMLElement): string {
+export function getElementAttributesString(el: HTMLElement): string {
   const attrs: string[] = [];
   for (let i = 0; i < el.attributes.length; i++) {
     const attr = el.attributes[i];
@@ -660,7 +661,7 @@ export function normalizeSandboxSvgElements(sandbox: HTMLElement): void {
   const svgs = sandbox.querySelectorAll('svg');
   svgs.forEach((svg) => {
     const el = svg as SVGElement;
-    const htmlEl = el as HTMLElement;
+    const htmlEl = el as unknown as HTMLElement;
     el.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     htmlEl.style.maxWidth = '100%';
     htmlEl.style.overflow = 'visible';
@@ -1326,10 +1327,11 @@ export async function parseDocxDocument(arrayBuffer: ArrayBuffer): Promise<DocxP
       const svgs = sandbox.querySelectorAll('svg');
       svgs.forEach((svg) => {
         const el = svg as SVGElement;
-        (el as HTMLElement).style.maxWidth = '100%';
-        (el as HTMLElement).style.overflow = 'visible';
-        (el as HTMLElement).style.display = 'inline-block';
-        (el as HTMLElement).style.verticalAlign = 'middle';
+        const htmlEl = el as unknown as HTMLElement;
+        htmlEl.style.maxWidth = '100%';
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.display = 'inline-block';
+        htmlEl.style.verticalAlign = 'middle';
         if (!el.getAttribute('xmlns')) {
           el.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         }
@@ -1715,57 +1717,93 @@ export function normalizeIndentDirectives(html: string): string {
  * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
  * Preserves <| indent... > directives inside placeholders.
  */
+/**
+ * Cleans Word HTML by collapsing split run tags inside {{placeholders}} or {placeholders}.
+ * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
+ * Preserves <| indent... > directives inside placeholders.
+ */
 export function sanitizeDocxPlaceholders(html: string): string {
   if (!html) return '';
 
-  // 1. Collapse HTML tags between {{ and }} FIRST so that split tags inside placeholders don't interfere
-  // Strictly preserve <| indent... > directives (starting with <|)
-  let cleaned = html.replace(/\{\{([\s\S]*?)\}\}/g, (match, inner) => {
-    const stripped = inner.replace(/<(?!\/?\|)[^>]*>/g, '').trim();
-    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
-    return `{{${cleanKey}}}`;
+  // 0. Collapse split braces across HTML tags first (e.g. {<span>{</span> -> {{ or }</span>} -> }})
+  let res = html
+    .replace(/\{\s*(?:<[^>]+>\s*)*\{/g, '{{')
+    .replace(/\}\s*(?:<[^>]+>\s*)*\}/g, '}}');
+
+  // 1. Collapse HTML tags and decode entities inside {{ ... }}
+  let cleaned = res.replace(/\{\{([\s\S]*?)\}\}/g, (match, inner) => {
+    // Decode HTML entities
+    let decoded = inner
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&amp;/gi, '&')
+      .replace(/&nbsp;/gi, ' ');
+
+    // Strip HTML element tags (span, strong, b, em, i, u, font, a, small, mark, sub, sup, div, p, br, etc.)
+    const stripped = decoded.replace(/<\/?(span|strong|b|em|i|u|font|a|small|mark|sub|sup|div|p|br)[^>]*>/gi, '').trim();
+    // Normalize linebreaks and broken words inside placeholder
+    const normalized = stripped
+      .replace(/-\s*[\r\n]+\s*/g, '')
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^\{+/, '')
+      .replace(/\}+$/, '')
+      .trim();
+
+    return `{{${normalized}}}`;
   });
 
   // 2. Normalize indent directives now that placeholders are clean
   cleaned = normalizeIndentDirectives(cleaned);
 
   // 3. Collapse standalone single {variable} ONLY if not preceded or followed by { or }
-  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}(?!\})/g, (match, inner) => {
-    const stripped = inner.replace(/<[^>]*>/g, '').trim();
-    const cleanKey = stripped.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",<>&;=/()]{1,160})\}(?!\})/g, (match, inner) => {
+    let decoded = inner
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&amp;/gi, '&')
+      .replace(/&nbsp;/gi, ' ');
+    const stripped = decoded.replace(/<\/?(span|strong|b|em|i|u|font|a|small|mark|sub|sup|div|p|br)[^>]*>/gi, '').trim();
+    const cleanKey = stripped
+      .replace(/-\s*[\r\n]+\s*/g, '')
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^\{+/, '')
+      .replace(/\}+$/, '')
+      .trim();
     return `{{${cleanKey}}}`;
   });
 
   // 3b. Auto-repair unbalanced single-close on double-open: {{key} -> {{key}}
-  cleaned = cleaned.replace(/\{\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}(?!\})/g, (_, key) => {
+  cleaned = cleaned.replace(/\{\{([a-zA-Z0-9_\-\.\s|:'",<>&;=/()]{1,160})\}(?!\})/g, (_, key) => {
     const cleanKey = key.replace(/^\{+/, '').replace(/\}+$/, '').trim();
     return `{{${cleanKey}}}`;
   });
 
   // 3c. Auto-repair unbalanced single-open on double-close: {key}} -> {{key}}
-  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",]{1,80})\}\}/g, (_, key) => {
+  cleaned = cleaned.replace(/(?<!\{)\{([a-zA-Z0-9_\-\.\s|:'",<>&;=/()]{1,160})\}\}/g, (_, key) => {
     const cleanKey = key.replace(/^\{+/, '').replace(/\}+$/, '').trim();
     return `{{${cleanKey}}}`;
   });
 
   // 4. Prevent and collapse any accidental triple or quadruple braces: {{{key}}} -> {{key}}
-  cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s|:'",]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
+  cleaned = cleaned.replace(/\{{3,}([a-zA-Z0-9_\-\.\s|:'",<>&;=/()]+)\}{3,}/g, (_, key) => `{{${key.trim()}}}`);
 
   return cleaned;
 }
 
 /**
- * Detect all placeholder tokens like {{student_name}}, {{field_name | indent: 7}}, {class} etc.
+ * Detect all placeholder tokens like {{student_name}}, {{field_name | indent: 7}}, {{exam-date <direction: horizontal>}} etc.
  */
 export function detectPlaceholders(html: string): string[] {
   if (!html) return [];
   const sanitized = sanitizeDocxPlaceholders(html);
-  const regex = /\{\{([a-zA-Z0-9_\-\.\s|:'",]+)\}\}/g;
+  const regex = /\{\{([a-zA-Z0-9_\-\.\s|:'",<>&;=/()]+)\}\}/g;
   const placeholders = new Set<string>();
   let match;
   while ((match = regex.exec(sanitized)) !== null) {
     const raw = (match[1] || '').trim();
-    const token = raw.split('|')[0].trim();
+    const token = raw.split(/[|<]/)[0].trim();
     if (token) {
       placeholders.add(token);
     }
@@ -1779,6 +1817,19 @@ export function detectPlaceholders(html: string): string[] {
 function normalizeKey(str: string): string {
   return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
+
+/**
+ * Pure document-level / metadata keys that represent global context and must NEVER trigger row repetition
+ * and must NEVER be overwritten with repeating row arrays in lookup.
+ */
+export const PURE_METADATA_KEYS = new Set([
+  'examname', 'exam', 'academicyear', 'year', 'session',
+  'institutionname', 'campusname', 'campusaddress', 'institutionaddress',
+  'documenttitle', 'title', 'subtitle', 'documentsubtitle',
+  'issuedate', 'currentdate', 'pagesize', 'orientation',
+  'totalstudents', 'totalrecords', 'recordscount', 'totalcount',
+  'teachername', 'staffname', 'headmaster', 'principal'
+]);
 
 /**
  * Multi-line indentation filter:
@@ -1920,20 +1971,20 @@ export function applyFilter(
 }
 
 /**
- * Resolves a token with potential condition/formatting filters (e.g. {{key | indent: 7}})
- * Matches base key against lookup and cascades through filter specifications.
+ * Resolves a token with potential condition/formatting filters or modern <direction: vertical, ...> directives.
+ * Matches base key against lookup and cascades through directive options and filter specifications.
  */
 export function resolveTokenValue(
   tokenContent: string,
-  lookup: Map<string, string>,
+  lookup: Map<string, any>,
   mode: 'html' | 'text' = 'html'
 ): string | null {
-  const parts = tokenContent.split('|').map((p) => p.trim());
-  const rawKey = parts[0];
-  const filterSpecs = parts.slice(1);
+  const directiveParsed = parseTokenDirective(tokenContent);
+  const rawKey = directiveParsed.baseKey;
+  const filterSpecs = directiveParsed.legacyFilterSpecs;
 
   const norm = normalizeKey(rawKey);
-  let value: string | undefined = undefined;
+  let value: any = undefined;
 
   if (lookup.has(norm)) {
     value = lookup.get(norm);
@@ -1947,16 +1998,29 @@ export function resolveTokenValue(
     return null; // Value not found, keep fullMatch
   }
 
-  // If no filters, return raw value (converted to <br> for multi-line values in html mode)
-  if (filterSpecs.length === 0) {
-    if (mode === 'html' && typeof value === 'string' && value.includes('\n')) {
-      return value.split(/\r?\n/).join('<br>');
-    }
-    return value;
+  // 1. If modern <...> directive is present, format multi-value or single value data
+  let processed: any = value;
+  if (directiveParsed.hasDirective) {
+    processed = formatMultiValueData(value, directiveParsed.options, mode);
+  } else if (Array.isArray(value)) {
+    processed = value
+      .map((it) => (it && typeof it === 'object' ? (it.name || it.title || it.subjectName || JSON.stringify(it)) : String(it)))
+      .join(', ');
+  } else if (typeof value === 'object' && value !== null) {
+    processed = JSON.stringify(value);
+  } else {
+    processed = String(value);
   }
 
-  // Apply filters in sequence
-  let processed = value;
+  // 2. If no legacy filters, return processed value (converting \n to <br> if needed in HTML mode)
+  if (filterSpecs.length === 0) {
+    if (mode === 'html' && typeof processed === 'string' && processed.includes('\n') && !processed.includes('<br') && !processed.includes('<!-- spr-')) {
+      return processed.split(/\r?\n/).join('<br>');
+    }
+    return String(processed);
+  }
+
+  // 3. Apply legacy filters in sequence
   for (const filterSpec of filterSpecs) {
     const colonIdx = filterSpec.indexOf(':');
     const filterName = (colonIdx > -1 ? filterSpec.slice(0, colonIdx) : filterSpec).trim().toLowerCase();
@@ -1965,7 +2029,7 @@ export function resolveTokenValue(
     // Check if any feature-registered interceptor handles, modifies, or skips this filter
     let intercepted = false;
     for (const interceptor of tokenFilterInterceptors) {
-      const interceptRes = interceptor(norm, filterName, rawArgs, processed, lookup, mode);
+      const interceptRes = interceptor(norm, filterName, rawArgs, String(processed), lookup, mode);
       if (interceptRes) {
         if (interceptRes.result !== undefined) {
           processed = interceptRes.result;
@@ -1978,76 +2042,75 @@ export function resolveTokenValue(
     }
 
     if (!intercepted) {
-      processed = applyFilter(processed, filterSpec, mode);
+      processed = applyFilter(String(processed), filterSpec, mode);
     }
   }
 
   // Ensure multi-line output in HTML mode converts remaining \n to <br>
-  if (mode === 'html' && typeof processed === 'string' && processed.includes('\n') && !processed.includes('<br')) {
+  if (mode === 'html' && typeof processed === 'string' && processed.includes('\n') && !processed.includes('<br') && !processed.includes('<!-- spr-')) {
     processed = processed.split(/\r?\n/).join('<br>');
   }
 
-  return processed;
+  return String(processed);
 }
 
 /**
  * Builds an enriched key-value lookup map supporting camelCase, snake_case, spaces, nested properties, and casing variations.
  * 100% Dynamic & Algorithmic with smart universal domain alias resolution.
  */
-function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, string> {
-  const map = new Map<string, string>();
+function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, any> {
+  const map = new Map<string, any>();
   if (!dataRecord || typeof dataRecord !== 'object') return map;
 
   const insertKeyVariants = (rawKey: string, val: any) => {
     if (val === undefined || val === null) return;
-    const strVal = typeof val === 'object' && !Array.isArray(val) ? JSON.stringify(val) : String(val);
 
     // 1. Raw exact key
-    map.set(rawKey, strVal);
+    map.set(rawKey, val);
 
     // 2. Lowercase key
     const lowerKey = rawKey.toLowerCase();
-    map.set(lowerKey, strVal);
+    map.set(lowerKey, val);
 
     // 3. Alphanumeric stripped key (e.g. 'roll_number' -> 'rollnumber', 'student-name' -> 'studentname')
     const norm = normalizeKey(rawKey);
     if (norm) {
-      map.set(norm, strVal);
+      map.set(norm, val);
     }
 
     // 4. camelCase to snake_case (e.g. 'studentName' -> 'student_name')
     const snakeCase = rawKey.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
     if (snakeCase && snakeCase !== lowerKey) {
-      map.set(snakeCase, strVal);
-      map.set(snakeCase.replace(/_/g, ' '), strVal);
+      map.set(snakeCase, val);
+      map.set(snakeCase.replace(/_/g, ' '), val);
     }
 
     // 5. snake_case to camelCase (e.g. 'student_name' -> 'studentName')
     const camelCase = rawKey.replace(/_([a-z0-9])/gi, (_, letter) => letter.toUpperCase());
     if (camelCase && camelCase !== rawKey) {
-      map.set(camelCase, strVal);
-      map.set(camelCase.toLowerCase(), strVal);
+      map.set(camelCase, val);
+      map.set(camelCase.toLowerCase(), val);
     }
 
     // 6. Space-separated variant (e.g. 'student_name' or 'studentName' -> 'student name')
     const spaceCase = rawKey.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
     if (spaceCase) {
-      map.set(spaceCase, strVal);
+      map.set(spaceCase, val);
     }
 
     // 7. Universal Declarative Synonym Matching
     for (const group of UNIVERSAL_SYNONYM_GROUPS) {
       if (group.some((syn) => syn.replace(/[^a-z0-9]/g, '') === norm)) {
         group.forEach((syn) => {
-          map.set(syn, strVal);
-          map.set(syn.replace(/[^a-z0-9]/g, ''), strVal);
+          map.set(syn, val);
+          map.set(syn.replace(/[^a-z0-9]/g, ''), val);
         });
         break;
       }
     }
   };
 
-  // Process all direct and nested properties
+  // 1. Process all direct and nested properties
   Object.entries(dataRecord).forEach(([k, v]) => {
     insertKeyVariants(k, v);
 
@@ -2058,6 +2121,36 @@ function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, strin
         insertKeyVariants(`${k}.${subK}`, subV);
       });
     }
+  });
+
+  // 2. Aggregate column-level lists across repeating row arrays (rows, items, data, routine, schedule, etc.)
+  const arrayProps = [dataRecord.rows, dataRecord.items, dataRecord.data, dataRecord.schedule, dataRecord.routine, dataRecord.records]
+    .filter((arr) => Array.isArray(arr) && arr.length > 0 && typeof arr[0] === 'object');
+
+  arrayProps.forEach((rows) => {
+    const colKeys = new Set<string>();
+    rows.forEach((r: any) => {
+      if (r && typeof r === 'object') {
+        Object.keys(r).forEach((k) => colKeys.add(k));
+      }
+    });
+
+    colKeys.forEach((colKey) => {
+      const norm = normalizeKey(colKey);
+      if (PURE_METADATA_KEYS.has(norm)) {
+        return; // Preserve single top-level metadata string (exam-name, academic-year, session, etc.)
+      }
+      if (dataRecord[colKey] !== undefined && !Array.isArray(dataRecord[colKey])) {
+        return; // Preserve explicit top-level scalar property
+      }
+
+      const colValues = rows
+        .map((r: any) => r[colKey])
+        .filter((val: any) => val !== undefined && val !== null && val !== '');
+      if (colValues.length > 0) {
+        insertKeyVariants(colKey, colValues);
+      }
+    });
   });
 
   return map;
@@ -2105,7 +2198,7 @@ export function isTabularTemplate(html: string): boolean {
         const rows = table.querySelectorAll('tr');
         for (const tr of Array.from(rows)) {
           // Check if this row contains {{...}} placeholders and is not purely <th> header cells
-          const hasPlaceholders = /\{\{([a-zA-Z0-9_\-\.\s]+)\}\}/.test(tr.innerHTML);
+          const hasPlaceholders = /\{\{([\s\S]+?)\}\}/.test(tr.innerHTML);
           const hasOnlyTh = tr.querySelectorAll('th').length > 0 && tr.querySelectorAll('td').length === 0;
           if (hasPlaceholders && !hasOnlyTh) {
             return true;
@@ -2118,7 +2211,7 @@ export function isTabularTemplate(html: string): boolean {
   }
 
   // 3. Fallback regex for tables containing placeholders inside <td>
-  const tdPlaceholderRegex = /<tr\b[^>]*>[\s\S]*?<td\b[^>]*>[\s\S]*?\{\{([a-zA-Z0-9_\-\.\s]+)\}\}[\s\S]*?<\/td>[\s\S]*?<\/tr>/i;
+  const tdPlaceholderRegex = /<tr\b[^>]*>[\s\S]*?<td\b[^>]*>[\s\S]*?\{\{([\s\S]+?)\}\}[\s\S]*?<\/td>[\s\S]*?<\/tr>/i;
   return tdPlaceholderRegex.test(html);
 }
 
@@ -2340,6 +2433,12 @@ function expandNestedArraysAndTables(html: string, dataRecord: Record<string, an
           return; // Fixed slot table: populated directly by mergeTemplateWithData!
         }
 
+        // If the table explicitly uses multi-value token layout directives (direction: / separator: / prefix:), NEVER auto-expand as repeating rows!
+        const tableHasDirectives = /(?:<|&lt;)(?:\s*direction|\s*separator|\s*prefix|\s*orient|\s*layout|\s*gap|\s*indent)\s*:/i.test(table.innerHTML);
+        if (tableHasDirectives) {
+          return;
+        }
+
         // Try to match this table against any array in arrayEntries
         for (const [_, items] of arrayEntries) {
           if (!Array.isArray(items) || items.length === 0) continue;
@@ -2359,6 +2458,12 @@ function expandNestedArraysAndTables(html: string, dataRecord: Record<string, an
             }
 
             const inner = tr.innerHTML.toLowerCase();
+
+            // Skip rows containing multi-value directives (e.g. {{exam-date<direction: horizontal, separator: cell>}})
+            if (/(?:<|&lt;)(?:\s*direction|\s*separator|\s*prefix|\s*orient|\s*layout|\s*gap|\s*indent)\s*:/i.test(tr.innerHTML)) {
+              return false;
+            }
+
             const placeholders = detectPlaceholders(inner);
 
             // Skip rows that look like summary or total rows (e.g. only containing total_marks, average, gpa)
@@ -2368,18 +2473,27 @@ function expandNestedArraysAndTables(html: string, dataRecord: Record<string, an
             });
             if (isSummaryOnlyRow) return false;
 
+            // Skip rows that ONLY contain pure metadata keys (e.g. {{exam-name}}, {{academic-year}})
+            const nonMetaPlaceholders = placeholders.filter((p) => {
+              const norm = normalizeKey(p);
+              return !PURE_METADATA_KEYS.has(norm);
+            });
+            if (nonMetaPlaceholders.length === 0) {
+              return false; // Header / metadata row, NEVER repeat!
+            }
+
             // Row MUST contain a primary item identifier placeholder (e.g. subject_name, subject, name, item_name, title)
-            const hasPrimaryItemKey = placeholders.some((p) => {
+            const hasPrimaryItemKey = nonMetaPlaceholders.some((p) => {
               const norm = normalizeKey(p);
               return ['subject', 'subjectname', 'item', 'itemname', 'name', 'title', 'course', 'coursename'].includes(norm);
             });
 
-            const matchesArrayKeys = placeholders.some((p) => {
+            const matchesArrayKeys = nonMetaPlaceholders.some((p) => {
               const norm = normalizeKey(p);
-              return itemKeys.some((k) => normalizeKey(k) === norm);
+              return itemKeys.some((k) => normalizeKey(k) === norm && !PURE_METADATA_KEYS.has(normalizeKey(k)));
             });
 
-            return hasPrimaryItemKey || (matchesArrayKeys && placeholders.length >= 2);
+            return hasPrimaryItemKey || (matchesArrayKeys && nonMetaPlaceholders.length >= 2);
           });
 
           if (templateTr && templateTr.parentNode) {
@@ -2440,6 +2554,270 @@ function expandNestedArraysAndTables(html: string, dataRecord: Record<string, an
 }
 
 /**
+ * Helper to extract split parts from a cell, preserving internal formatting wrapper tags
+ * (such as font-family, font-size, bold, color, align, etc.) across all split parts,
+ * and supporting multi-stream zipping when multiple tokens are in the same cell.
+ */
+function extractCellSplitParts(rawHtml: string): string[] {
+  if (!rawHtml || !rawHtml.includes('<!-- spr-cell-split -->')) return [rawHtml];
+
+  // 1. Check if multiple distinct paragraphs/lines contain split streams
+  const pRegex = /<p\b[^>]*>[\s\S]*?<\/p>|<div\b[^>]*>[\s\S]*?<\/div>/gi;
+  const pMatches = rawHtml.match(pRegex);
+  const streamBlocks = pMatches ? pMatches.filter((p) => p.includes('<!-- spr-cell-split -->')) : [];
+
+  if (streamBlocks.length > 1) {
+    const streamLists: string[][] = streamBlocks.map((blockHtml) => {
+      const parts = blockHtml.split('<!-- spr-cell-split -->');
+      const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
+      const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+      const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
+      return cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
+    });
+
+    const maxCols = Math.max(...streamLists.map((s) => s.length));
+    const zipped: string[] = [];
+
+    for (let c = 0; c < maxCols; c++) {
+      const colItems = streamLists.map((s) => s[c] || '').filter(Boolean);
+      zipped.push(colItems.join(''));
+    }
+    return zipped;
+  }
+
+  // 2. Check comma-separated split streams (e.g. date1<!-- -->date2, day1<!-- -->day2)
+  if (rawHtml.includes('<!-- spr-cell-split -->') && rawHtml.includes(',')) {
+    const commaParts = rawHtml.split(/,\s*(?=[^<]*<!-- spr-cell-split -->|[A-Za-z0-9])/);
+    const streamParts = commaParts.filter((p) => p.includes('<!-- spr-cell-split -->'));
+    if (streamParts.length > 1) {
+      const streams = streamParts.map((p) => {
+        const parts = p.split('<!-- spr-cell-split -->');
+        const cleanValues = parts.map((it) => it.replace(/<[^>]*>/g, '').trim());
+        const openTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+        const closeTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
+        return cleanValues.map((val) => `${openTags}${val}${closeTags}`);
+      });
+      const maxCols = Math.max(...streams.map((s) => s.length));
+      const zipped: string[] = [];
+
+      for (let c = 0; c < maxCols; c++) {
+        const colItems = streams.map((s) => s[c] || '').filter(Boolean);
+        zipped.push(colItems.join(', '));
+      }
+      return zipped;
+    }
+  }
+
+  // 3. Single stream with preserved wrapping tags
+  const parts = rawHtml.split('<!-- spr-cell-split -->');
+  if (parts.length <= 1) return [rawHtml];
+
+  const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
+  const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+  const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
+
+  return cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
+}
+
+/**
+ * Expands table cell split directives (<!-- spr-cell-split --> and <!-- spr-row-cell-split -->)
+ * generated by token directives like `<separator: cell>` or `<direction: horizontal, separator: cell>`.
+ */
+function expandTableCellSplits(html: string): string {
+  if (!html || (!html.includes('<!-- spr-cell-split -->') && !html.includes('<!-- spr-row-cell-split -->'))) {
+    return html;
+  }
+
+  if (typeof document !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // 1. Horizontal cell splits (populate consecutive <td> cells in current <tr>)
+      const splitTds = Array.from(doc.querySelectorAll('td, th')).filter((cell) =>
+        cell.innerHTML.includes('<!-- spr-cell-split -->')
+      );
+
+      splitTds.forEach((cell) => {
+        const parentTr = cell.parentElement;
+        if (!parentTr) return;
+
+        const parts = extractCellSplitParts(cell.innerHTML);
+        if (parts.length <= 1) return;
+
+        // Current cell gets the first formatted value
+        cell.innerHTML = parts[0];
+        (cell as HTMLElement).style.width = '';
+
+        // Capture cell styling template to clone to all subsequent cells
+        const sourceClass = cell.className;
+        const sourceStyle = cell.getAttribute('style') || '';
+        const sourceAlign = cell.getAttribute('align');
+        const sourceValign = cell.getAttribute('valign');
+
+        // Subsequent values get populated into consecutive existing sibling cells, or cloned if none exist
+        let currentRef: Element = cell;
+        for (let i = 1; i < parts.length; i++) {
+          const nextSibling = currentRef.nextElementSibling;
+          if (nextSibling && (nextSibling.tagName.toLowerCase() === 'td' || nextSibling.tagName.toLowerCase() === 'th')) {
+            nextSibling.innerHTML = parts[i];
+            if (sourceClass) nextSibling.className = sourceClass;
+            if (sourceStyle) nextSibling.setAttribute('style', sourceStyle);
+            if (sourceAlign) nextSibling.setAttribute('align', sourceAlign);
+            if (sourceValign) nextSibling.setAttribute('valign', sourceValign);
+            (nextSibling as HTMLElement).style.width = '';
+            currentRef = nextSibling;
+          } else {
+            const newCell = cell.cloneNode(false) as HTMLElement;
+            newCell.removeAttribute('colspan');
+            newCell.removeAttribute('rowspan');
+            if (sourceClass) newCell.className = sourceClass;
+            if (sourceStyle) newCell.setAttribute('style', sourceStyle);
+            if (sourceAlign) newCell.setAttribute('align', sourceAlign);
+            if (sourceValign) newCell.setAttribute('valign', sourceValign);
+            newCell.innerHTML = parts[i];
+            newCell.style.width = '';
+            currentRef.insertAdjacentElement('afterend', newCell);
+            currentRef = newCell;
+          }
+        }
+      });
+
+      // 2. Vertical row-cell splits (populate consecutive rows in the same column)
+      const splitRowTds = Array.from(doc.querySelectorAll('td, th')).filter((cell) =>
+        cell.innerHTML.includes('<!-- spr-row-cell-split -->')
+      );
+
+      splitRowTds.forEach((cell) => {
+        const parentTr = cell.parentElement;
+        const parentTbody = parentTr?.parentElement;
+        if (!parentTr || !parentTbody) return;
+
+        const cellIndex = Array.from(parentTr.children).indexOf(cell);
+        const parts = cell.innerHTML.split('<!-- spr-row-cell-split -->');
+        if (parts.length <= 1) return;
+
+        const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
+        const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+        const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
+        const formattedParts = cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
+
+        cell.innerHTML = formattedParts[0];
+
+        const sourceClass = cell.className;
+        const sourceStyle = cell.getAttribute('style') || '';
+
+        const allRows = Array.from(parentTbody.querySelectorAll('tr'));
+        const currentRowIndex = allRows.indexOf(parentTr as HTMLTableRowElement);
+
+        for (let i = 1; i < formattedParts.length; i++) {
+          let targetTr = allRows[currentRowIndex + i];
+          if (!targetTr) {
+            targetTr = parentTr.cloneNode(true) as HTMLTableRowElement;
+            Array.from(targetTr.children).forEach((c, idx) => {
+              if (idx !== cellIndex) (c as HTMLElement).innerHTML = '';
+            });
+            parentTbody.appendChild(targetTr);
+          }
+          const targetCell = targetTr.children[cellIndex] as HTMLElement;
+          if (targetCell) {
+            if (sourceClass) targetCell.className = sourceClass;
+            if (sourceStyle) targetCell.setAttribute('style', sourceStyle);
+            targetCell.style.width = '';
+            targetCell.innerHTML = formattedParts[i];
+          }
+        }
+      });
+
+      // 3. Balance all tables so all rows have equal column counts and no cramped or overflowing cells
+      const tables = Array.from(doc.querySelectorAll('table'));
+      tables.forEach((table) => {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+
+        // Determine max column count across rows (accounting for colspan)
+        let maxCols = 0;
+        const rowColCounts: number[] = [];
+
+        rows.forEach((tr) => {
+          let cols = 0;
+          Array.from(tr.children).forEach((child) => {
+            const colspan = parseInt(child.getAttribute('colspan') || '1', 10);
+            cols += isNaN(colspan) || colspan < 1 ? 1 : colspan;
+          });
+          rowColCounts.push(cols);
+          if (cols > maxCols) maxCols = cols;
+        });
+
+        if (maxCols <= 1) return;
+
+        // Remove rigid <colgroup> definitions that restrict the table to fewer columns
+        const colgroups = table.querySelectorAll('colgroup, col');
+        colgroups.forEach((cg) => cg.remove());
+
+        // Ensure table has clean width
+        table.style.width = '100%';
+
+        // Pad shorter rows with empty cells or expand single-cell full-width headers
+        rows.forEach((tr, rIdx) => {
+          const currentCols = rowColCounts[rIdx];
+          const children = Array.from(tr.children) as HTMLElement[];
+
+          // If row has a single cell spanning the table header, expand its colspan to maxCols
+          if (children.length === 1 && (children[0].hasAttribute('colspan') || currentCols < maxCols)) {
+            const onlyCell = children[0];
+            const textLen = onlyCell.textContent?.trim().length || 0;
+            if (textLen > 0 && rIdx === 0) {
+              onlyCell.setAttribute('colspan', String(maxCols));
+              return;
+            }
+          }
+
+          if (currentCols < maxCols) {
+            const needed = maxCols - currentCols;
+            const templateCell = children[children.length - 1] || children[0];
+            for (let k = 0; k < needed; k++) {
+              if (templateCell) {
+                const newTd = templateCell.cloneNode(false) as HTMLElement;
+                newTd.removeAttribute('colspan');
+                newTd.removeAttribute('rowspan');
+                newTd.innerHTML = '';
+                newTd.style.width = '';
+                tr.appendChild(newTd);
+              } else {
+                const newTd = doc.createElement('td');
+                tr.appendChild(newTd);
+              }
+            }
+          }
+
+          // Normalize cell widths
+          children.forEach((c) => {
+            if (c.style.width && (c.style.width.includes('pt') || c.style.width.includes('px') || c.style.width.includes('%'))) {
+              c.style.width = '';
+            }
+          });
+        });
+      });
+
+      // Clean up any stray split comments outside tables
+      const output = doc.body.innerHTML
+        .replace(/<!-- spr-cell-split -->/g, ' &nbsp; ')
+        .replace(/<!-- spr-row-cell-split -->/g, '<br>');
+
+      return output;
+    } catch (e) {
+      console.warn('Table cell split expansion failed', e);
+    }
+  }
+
+  // Fallback if DOMParser is unavailable
+  return html
+    .replace(/<!-- spr-cell-split -->/g, ' &nbsp; ')
+    .replace(/<!-- spr-row-cell-split -->/g, '<br>');
+}
+
+/**
  * Merges template HTML with a single record or multiple records with smart fuzzy key matching.
  */
 export function mergeTemplateWithData(
@@ -2460,7 +2838,7 @@ export function mergeTemplateWithData(
     return resolved !== null ? resolved : fullMatch;
   });
 
-  return merged;
+  return expandTableCellSplits(merged);
 }
 
 /**
@@ -2491,7 +2869,8 @@ export function bulkMergeTemplate(
       return resolved !== null ? resolved : fullMatch;
     });
 
-    return styles ? `${styles}\n${merged}` : merged;
+    const finalHtml = expandTableCellSplits(merged);
+    return styles ? `${styles}\n${finalHtml}` : finalHtml;
   });
 }
 
@@ -2536,6 +2915,9 @@ export function saveDocxTemplate(template: Omit<CustomDocxTemplate, 'createdAt' 
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(
+        new CustomEvent('spr_doclab_template_saved', { detail: { templateId: newTemplate.id } })
+      );
     } catch (e) {
       console.warn('Failed to save docx template to localStorage', e);
     }
@@ -2551,6 +2933,9 @@ export function deleteDocxTemplate(id: string): boolean {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(
+        new CustomEvent('spr_doclab_template_saved', { detail: { templateId: id, deleted: true } })
+      );
       return true;
     } catch (e) {
       console.warn('Failed to delete docx template', e);

@@ -139,7 +139,7 @@ export default function DeskSlipsPrintModal({
       customSheets={true}
       data={liveSlips.length > 0 ? liveSlips : slips}
       placeholderKeys={DESK_SLIPS_PLACEHOLDER_KEYS}
-      scopeId="examinations_desk_slips"
+      scopeId="exam_admit_card"
       scopeName="Seat Plan & Desk Slips"
       scopeDescription="Exam hall seating cards and desk slip layout templates"
       defaultOptions={defaultPrintOptions}

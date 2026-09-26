@@ -1,11 +1,10 @@
-import { DocumentScopeDefinition, DocumentScopeId, ScopeValidationResult, KeyTaxonomyItem } from './keyLibrary/types';
-import { CustomDocxTemplate, getSavedDocxTemplates, saveDocxTemplate } from './docxTemplateEngine';
-import { UNIVERSAL_KEY_TAXONOMY } from './keyLibrary/universalKeyTaxonomy';
+import { DocumentScopeDefinition, ScopeValidationResult, KeyTaxonomyItem } from './keyLibrary/types';
+import { CustomDocxTemplate, getSavedDocxTemplates, UNIVERSAL_SYNONYM_GROUPS } from './docxTemplateEngine';
+import { createDynamicKeyItem } from './keyLibrary/universalKeyTaxonomy';
 
 export type { CustomDocxTemplate };
 
 const SCOPE_DEFAULTS_STORAGE_KEY = 'spr_print_scope_default_templates_v1';
-const SCOPE_TEMPLATES_STORAGE_KEY = 'spr_print_scope_custom_templates_v1';
 
 export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
   {
@@ -147,6 +146,18 @@ export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
     defaultKeys: ['staff_name', 'designation', 'employee_id', 'department_name', 'blood_group', 'emergency_contact', 'institution_name', 'principal_signature'],
   },
   {
+    id: 'subject_routine',
+    name: 'Examination Subject Routine',
+    category: 'Examination',
+    description: 'Class-wise and shift-wise examination date routine and subject timetable matrix',
+    iconName: 'BookOpenIcon',
+    recommendedPaperSize: 'A4',
+    recommendedOrientation: 'LANDSCAPE',
+    requiredKeys: ['exam-name', 'academic-year', 'exam-date', 'day-name', 'shift', 'shift-time', 'class', 'class-sub1'],
+    recommendedKeys: [],
+    defaultKeys: ['exam-name', 'academic-year', 'exam-date', 'day-name', 'shift', 'shift-time', 'class', 'class-sub1'],
+  },
+  {
     id: 'general_document',
     name: 'General Document & Notice',
     category: 'General',
@@ -160,6 +171,17 @@ export const ALL_DOCUMENT_SCOPES: DocumentScopeDefinition[] = [
   },
 ];
 
+export const SCOPE_ALIASES: Record<string, string> = {
+  examinations_admit_card: 'exam_admit_card',
+  examination_admit_card: 'exam_admit_card',
+  examinations_attendance_sheet: 'attendance_register',
+  examinations_desk_slips: 'exam_admit_card',
+  daily_progress: 'hifz_daily_report',
+  hifz_progress: 'hifz_daily_report',
+  student_marksheet: 'marksheet_transcript',
+  tabulation_ledger: 'tabulation_sheet',
+};
+
 /**
  * Returns list of all defined document scopes
  */
@@ -168,10 +190,12 @@ export function getAllDocumentScopes(): DocumentScopeDefinition[] {
 }
 
 /**
- * Retrieves scope definition by its ID
+ * Retrieves scope definition by its ID, supporting aliases
  */
-export function getScopeById(scopeId: string): DocumentScopeDefinition | undefined {
-  return ALL_DOCUMENT_SCOPES.find((s) => s.id === scopeId);
+export function getScopeById(scopeId?: string | null): DocumentScopeDefinition | undefined {
+  if (!scopeId) return undefined;
+  const canonicalId = SCOPE_ALIASES[scopeId] || scopeId;
+  return ALL_DOCUMENT_SCOPES.find((s) => s.id === canonicalId);
 }
 
 /**
@@ -188,6 +212,80 @@ export function extractTagsFromText(text: string): string[] {
     if (clean) tags.add(clean);
   });
   return Array.from(tags);
+}
+
+/**
+ * Resolves the true canonical scope of a template dynamically
+ * using schema key validation and title heuristic scoring (zero hardcoded static branches).
+ */
+export function resolveTemplateScopeId(template: any): string {
+  if (!template) return 'general_document';
+
+  const rawScope = template.scopeId || template.templateMeta?.scopeId;
+  const canonicalRaw = rawScope ? (SCOPE_ALIASES[rawScope] || rawScope) : null;
+
+  // Extract all tags from the template
+  const templateHtml = template.rawHtml || template.html || '';
+  const detectedKeys = Array.isArray(template.detectedPlaceholders)
+    ? template.detectedPlaceholders.map((p: any) => (typeof p === 'string' ? p : p?.key || p?.name || ''))
+    : [];
+  const tags = extractTagsFromText(templateHtml);
+  const allTemplateTokens = new Set<string>(
+    [...tags, ...detectedKeys].map((k) => k.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  );
+
+  const templateName = String(template.name || template.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+
+  // Compute best matching scope based on schema definitions
+  let bestScopeId: string | null = null;
+  let highestScore = 0;
+
+  ALL_DOCUMENT_SCOPES.forEach((scope) => {
+    if (scope.id === 'general_document') return;
+
+    let score = 0;
+
+    // 1. Title keyword matching dynamically from scope metadata
+    const scopeKeywords = [
+      ...scope.name.toLowerCase().split(/[\s&/_-]+/),
+      ...scope.id.toLowerCase().split(/[\s&/_-]+/),
+    ].filter((w) => w.length > 2);
+
+    scopeKeywords.forEach((kw) => {
+      if (templateName.includes(kw)) {
+        score += 15;
+      }
+    });
+
+    // 2. Placeholder key overlap from scope required/default keys
+    const scopeKeys = [...(scope.requiredKeys || []), ...(scope.defaultKeys || [])];
+    scopeKeys.forEach((key) => {
+      const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanKey && allTemplateTokens.has(cleanKey)) {
+        score += 10;
+      }
+    });
+
+    // 3. Raw scope match bonus
+    if (canonicalRaw === scope.id) {
+      score += 20;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestScopeId = scope.id;
+    }
+  });
+
+  if (bestScopeId && highestScore >= 20) {
+    return bestScopeId;
+  }
+
+  if (canonicalRaw && ALL_DOCUMENT_SCOPES.some((s) => s.id === canonicalRaw)) {
+    return canonicalRaw;
+  }
+
+  return 'general_document';
 }
 
 /**
@@ -210,7 +308,7 @@ export function validateTemplateForScope(
       };
   
   // Extract keys present in the template
-  let presentKeySet = new Set<string>();
+  const presentKeySet = new Set<string>();
   if (Array.isArray(template)) {
     template.forEach((k) => presentKeySet.add(String(k).toLowerCase()));
   } else if (typeof template === 'string') {
@@ -228,54 +326,30 @@ export function validateTemplateForScope(
     }
   }
 
-  const matchedRequired: string[] = [];
-  const missingRequired: string[] = [];
-  const matchedRecommended: string[] = [];
-  const missingRecommended: string[] = [];
-
-  const KEY_SYNONYMS: Record<string, string[]> = {
-    date: ['date', 'issue_date', 'issuedate', 'report_date', 'evaluation_date'],
-    'student-name': ['studentname', 'student_name', 'name', 'student_full_name', 'fullname'],
-    student_name: ['studentname', 'student-name', 'name', 'student_full_name', 'fullname'],
-    dept: ['dept', 'department', 'department_name', 'departmentname'],
-    class: ['class', 'class_name', 'classname', 'grade_level', 'target_class'],
-    section: ['section', 'section_name', 'sectionname', 'branch_name', 'branch'],
-    'juz-number': ['juznumber', 'juz_number', 'juz', 'current_juz', 'para', 'para_number'],
-    'juz-page': ['juzpage', 'juz_page', 'page', 'pages', 'sabaq_pages', 'page_range'],
-    session: ['session', 'academicsession', 'academic_session', 'session_name'],
-    'total-mis': ['totalmis', 'total_mis', 'totalmistakes', 'total_mistakes', 'mistakes', 'mistake_count'],
-    'total-stuck': ['totalstuck', 'total_stuck', 'stuck', 'stuck_count'],
-    'detail-mis': ['detailmis', 'detail_mis', 'mistake_details', 'mistakes_detail', 'mistake_list'],
-    'detail-stuck': ['detailstuck', 'detail_stuck', 'stuck_details', 'stuck_detail', 'stuck_list'],
-    'mention-teacher-name': ['mentionteachername', 'mention_teacher_name', 'teacher_name', 'teachername', 'teacher'],
-    remarks: ['remarks', 'comment', 'comments', 'evaluation', 'observation', 'notes'],
-    roll_number: ['rollnumber', 'roll', 'roll_no', 'rollno'],
-    student_id: ['studentid', 'student_uniq_id', 'uniq_id', 'reg_no', 'regno', 'student_code'],
-    class_name: ['classname', 'class', 'grade_level', 'target_class'],
-    section_name: ['sectionname', 'section', 'branch_name', 'branch'],
-    academic_session: ['academicsession', 'session', 'academic_year', 'academicyear', 'session_year'],
-    exam_name: ['examname', 'exam', 'examination', 'exam_title'],
-    total_subjects: ['totalsubjects', 'total_subjects_count', 'subjects_count', 'subject_count'],
-    total_marks: ['totalmarks', 'total_full_marks', 'totalfull', 'total_max_marks', 'total', 'full_marks'],
-    obtained_marks: ['obtainedmarks', 'total_obtained', 'totalobtained', 'obtained', 'total_obtained_marks', 'got_marks'],
-    average_marks: ['averagemarks', 'avg_marks', 'avgmarks', 'average', 'mean_marks', 'avg', 'average_mark'],
-    highest_marks: ['highestmarks', 'highest_total', 'highesttotal', 'highest', 'class_highest', 'class_highest_marks'],
-    gpa: ['gpa_score', 'overall_gpa', 'gp', 'grade_point_average', 'cgpa', 'grade_point'],
-    grade: ['letter_grade', 'overall_grade', 'final_grade', 'result_grade'],
-    merit_position: ['meritposition', 'merit', 'rank', 'class_rank', 'position', 'standing', 'merit_rank', 'merit_status', 'rank_ordinal'],
-    merit_status: ['meritstatus', 'merit_position', 'result_summary', 'result_merit', 'merit_result'],
-    result_status: ['resultstatus', 'status', 'exam_status', 'pass_status', 'result', 'qualification_status'],
-    result_summary: ['resultsummary', 'summary', 'result_overview', 'academic_summary'],
-  };
-
   const isKeyPresent = (targetKey: string): boolean => {
     const lower = targetKey.toLowerCase();
     if (presentKeySet.has(lower)) return true;
     const norm = lower.replace(/[^a-z0-9]/g, '');
     if (presentKeySet.has(norm)) return true;
-    const synonyms = KEY_SYNONYMS[lower] || [];
-    return synonyms.some((syn) => presentKeySet.has(syn) || presentKeySet.has(syn.replace(/[^a-z0-9]/g, '')));
+
+    // Check against universal synonym groups from docxTemplateEngine
+    const matchingGroup = UNIVERSAL_SYNONYM_GROUPS.find((group) =>
+      group.some((syn) => syn.toLowerCase() === lower || syn.replace(/[^a-z0-9]/g, '') === norm)
+    );
+    if (matchingGroup) {
+      return matchingGroup.some((syn) => {
+        const synNorm = syn.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return presentKeySet.has(syn.toLowerCase()) || presentKeySet.has(synNorm);
+      });
+    }
+
+    return false;
   };
+
+  const matchedRequired: string[] = [];
+  const missingRequired: string[] = [];
+  const matchedRecommended: string[] = [];
+  const missingRecommended: string[] = [];
 
   (scope.requiredKeys || []).forEach((reqKey) => {
     if (isKeyPresent(reqKey)) {
@@ -297,7 +371,7 @@ export function validateTemplateForScope(
   const isFullyValid = missingRequired.length === 0;
   const matchScore = totalRequired > 0 ? Math.round((matchedRequired.length / totalRequired) * 100) : 100;
 
-  let validationMessage = isFullyValid
+  const validationMessage = isFullyValid
     ? `Template is 100% compliant with ${scope.name}.`
     : `Missing ${missingRequired.length} required key(s) for ${scope.name}: ${missingRequired.map((k) => `{{${k}}}`).join(', ')}`;
 
@@ -317,32 +391,33 @@ export function validateTemplateForScope(
 /**
  * Returns the rich taxonomy objects for required and recommended keys of a scope
  */
-export function getScopeKeysBlueprint(scopeId: string): {
+export function getScopeKeysBlueprint(
+  scopeId: string,
+  providedKeys: KeyTaxonomyItem[] = []
+): {
   scope: DocumentScopeDefinition;
   required: KeyTaxonomyItem[];
   recommended: KeyTaxonomyItem[];
 } {
   const scope = getScopeById(scopeId) || getScopeById('general_document')!;
   const keyMap = new Map<string, KeyTaxonomyItem>();
-  UNIVERSAL_KEY_TAXONOMY.forEach((item) => keyMap.set(item.key.toLowerCase(), item));
+  providedKeys.forEach((item) => keyMap.set(item.key.toLowerCase(), item));
 
-  const required = (scope.requiredKeys || []).map((k) => {
-    return keyMap.get(k.toLowerCase()) || {
-      key: k,
-      label: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      category: 'custom' as const,
-      example: `[${k}]`,
-    };
-  });
+  const mapKey = (k: string): KeyTaxonomyItem => {
+    return (
+      keyMap.get(k.toLowerCase()) ||
+      createDynamicKeyItem(
+        k,
+        k.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        'general',
+        `[${k}]`,
+        'Document blueprint variable'
+      )
+    );
+  };
 
-  const recommended = (scope.recommendedKeys || []).map((k) => {
-    return keyMap.get(k.toLowerCase()) || {
-      key: k,
-      label: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      category: 'custom' as const,
-      example: `[${k}]`,
-    };
-  });
+  const required = (scope.requiredKeys || []).map(mapKey);
+  const recommended = (scope.recommendedKeys || []).map(mapKey);
 
   return { scope, required, recommended };
 }
@@ -352,15 +427,16 @@ export function getScopeKeysBlueprint(scopeId: string): {
  */
 export function getSavedTemplatesForScope(scopeId: string, onlyValid: boolean = false): CustomDocxTemplate[] {
   const allTemplates = getSavedDocxTemplates();
+  const canonicalScope = getScopeById(scopeId)?.id || scopeId;
   const filtered = allTemplates.filter((t) => {
-    if (t.scopeId === scopeId) {
+    const tScope = resolveTemplateScopeId(t);
+    if (tScope === canonicalScope) {
       if (!onlyValid) return true;
-      const val = validateTemplateForScope(t, scopeId);
+      const val = validateTemplateForScope(t, canonicalScope);
       return val.isValid;
     }
-    // Also include general templates if they validate against this scope
     if (onlyValid) {
-      const val = validateTemplateForScope(t, scopeId);
+      const val = validateTemplateForScope(t, canonicalScope);
       return val.isValid;
     }
     return false;
@@ -396,14 +472,15 @@ export function getScopeDefaultMap(): Record<string, string> {
 export function setDefaultTemplateForScope(scopeId: string, templateId: string | null): void {
   if (typeof window === 'undefined') return;
   try {
+    const canonicalScope = getScopeById(scopeId)?.id || scopeId;
     const current = getScopeDefaultMap();
     if (!templateId) {
-      delete current[scopeId];
+      delete current[canonicalScope];
     } else {
-      current[scopeId] = templateId;
+      current[canonicalScope] = templateId;
     }
     localStorage.setItem(SCOPE_DEFAULTS_STORAGE_KEY, JSON.stringify(current));
-    window.dispatchEvent(new CustomEvent('spr_print_scope_default_changed', { detail: { scopeId, templateId } }));
+    window.dispatchEvent(new CustomEvent('spr_print_scope_default_changed', { detail: { scopeId: canonicalScope, templateId } }));
   } catch (e) {
     console.error('Failed to set default template for scope', e);
   }
@@ -413,8 +490,9 @@ export function setDefaultTemplateForScope(scopeId: string, templateId: string |
  * Gets the active default template ID for a specific scope
  */
 export function getDefaultTemplateIdForScope(scopeId: string): string | null {
+  const canonicalScope = getScopeById(scopeId)?.id || scopeId;
   const map = getScopeDefaultMap();
-  return map[scopeId] || null;
+  return map[canonicalScope] || null;
 }
 
 /**
@@ -426,4 +504,3 @@ export function getDefaultTemplateForScope(scopeId: string): CustomDocxTemplate 
   const allTemplates = getSavedDocxTemplates();
   return allTemplates.find((t) => t.id === defaultTemplateId) || null;
 }
-

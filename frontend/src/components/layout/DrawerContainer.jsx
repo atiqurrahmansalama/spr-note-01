@@ -128,20 +128,41 @@ export function DrawerSection({
   collapsible = false,
   defaultExpanded = true,
   expanded: controlledExpanded,
+  storageKey,
   onToggle,
   ...rest
 }) {
-  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(() => {
+    if (typeof window !== "undefined" && storageKey && collapsible) {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved !== null) {
+          return JSON.parse(saved) === true;
+        }
+      } catch (err) {
+        // Fallback to default
+      }
+    }
+    return defaultExpanded;
+  });
   const isControlled = controlledExpanded !== undefined;
   const isExpanded = collapsible ? (isControlled ? controlledExpanded : internalExpanded) : true;
 
   const handleToggle = () => {
     if (!collapsible) return;
+    const next = !isExpanded;
     if (isControlled) {
-      onToggle?.(!isExpanded);
+      onToggle?.(next);
     } else {
-      setInternalExpanded((prev) => !prev);
-      onToggle?.(!internalExpanded);
+      setInternalExpanded(next);
+      if (typeof window !== "undefined" && storageKey) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch (err) {
+          // Ignore
+        }
+      }
+      onToggle?.(next);
     }
   };
 

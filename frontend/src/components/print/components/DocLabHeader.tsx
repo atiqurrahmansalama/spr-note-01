@@ -104,26 +104,8 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
             <span className="font-extrabold theme-text-primary text-base tracking-tight truncate leading-tight">
               DocLab
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold theme-bg-sub theme-text-secondary border theme-border uppercase">
-              {totalPages > 1 ? `${totalPages} Pages • ` : ''}
-              {pageSize} • {orientation}
-            </span>
-            <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold theme-bg-accent/10 theme-accent border border-[var(--accent-main)]/20">
-              Live Canvas • Click to Edit
-            </span>
           </div>
-          <p className="text-xs theme-text-secondary truncate leading-tight">
-            {title} {subtitle ? `— ${subtitle}` : ''}
-          </p>
         </div>
-      </div>
-
-      {/* Center: Live Status / Info */}
-      <div className="hidden sm:flex items-center gap-2">
-        <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium theme-bg-sub/80 theme-text-secondary border theme-border">
-          <span className="w-1.5 h-1.5 rounded-full theme-bg-accent animate-pulse" />
-          Interactive Artboard
-        </span>
       </div>
 
       {/* Right: Actions (Export Dropdown Menu, Fullscreen, Sidebar Toggle, Close) */}

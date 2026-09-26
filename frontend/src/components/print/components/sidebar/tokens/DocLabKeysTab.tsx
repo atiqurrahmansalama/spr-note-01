@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import KeyPaletteExplorer from '../../KeyPaletteExplorer';
-import { DocumentScopeDefinition, ScopeValidationResult } from '../../keyLibrary/types';
+import KeyPaletteExplorer from './KeyPaletteExplorer';
+import { DocumentScopeDefinition, ScopeValidationResult } from '@/components/print/keyLibrary/types';
 
-interface DocLabKeysTabProps {
+export interface DocLabKeysTabProps {
   scopeDefinition?: DocumentScopeDefinition;
   activeScopeValidation?: ScopeValidationResult | null;
   placeholderKeys?: any[];
@@ -40,11 +40,6 @@ export const DocLabKeysTab: React.FC<DocLabKeysTabProps> = ({
 
   return (
     <div className="space-y-3 pt-1 pb-6 text-left">
-      {/* Guidance Helper Text */}
-      <p className="text-[11px] theme-text-secondary leading-tight">
-        Click any field below to insert <code className="text-[10px] font-mono theme-text-primary theme-bg-surface border theme-border-subtle px-1.5 py-0.5 rounded-md">{'{{token}}'}</code> at your active cursor position on the document canvas.
-      </p>
-
       {/* Key Palette Explorer Component */}
       <KeyPaletteExplorer
         placeholderKeys={placeholderKeys}

@@ -58,9 +58,10 @@ function getCaretBookmark(root: HTMLElement): CaretBookmark | null {
   }
 
   const leafOffset = range.startOffset;
-  const tagName = range.startContainer.nodeType === Node.ELEMENT_NODE
-    ? (range.startContainer as HTMLElement).tagName
-    : range.startContainer.parentElement?.tagName;
+  const tagName =
+    range.startContainer.nodeType === Node.ELEMENT_NODE
+      ? (range.startContainer as HTMLElement).tagName
+      : range.startContainer.parentElement?.tagName;
 
   return { offset, nodePath, leafOffset, tagName };
 }
@@ -153,13 +154,15 @@ function restoreCaretBookmark(root: HTMLElement, bookmark: CaretBookmark | null)
     }
   }
 
-  // Safe fallback: NEVER place at offset 0 (top) unless document is completely empty!
+  // Safe fallback: NEVER place at offset 0 (top) unless document is completely empty
   try {
-    const leafNodes = Array.from(root.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')) as HTMLElement[];
+    const leafNodes = Array.from(
+      root.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
+    ) as HTMLElement[];
     const targetEl = leafNodes[leafNodes.length - 1] || root.lastElementChild || root;
     const range = document.createRange();
     range.selectNodeContents(targetEl);
-    range.collapse(false); // ALWAYS place at the end
+    range.collapse(false); // ALWAYS collapse to the end
     sel.removeAllRanges();
     sel.addRange(range);
   } catch (err) {
@@ -168,75 +171,14 @@ function restoreCaretBookmark(root: HTMLElement, bookmark: CaretBookmark | null)
 }
 
 /**
- * Accurately determines if the active caret is at the end of the container content.
- */
-function isCaretAtEndOfContainer(container: HTMLElement): boolean {
-  if (typeof window === 'undefined') return false;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return false;
-  const range = sel.getRangeAt(0);
-  if (!container.contains(range.endContainer) && container !== range.endContainer) return false;
-
-  const leafElements = Array.from(
-    container.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
-  ) as HTMLElement[];
-
-  const lastEl = leafElements[leafElements.length - 1] || container.lastElementChild || container;
-  if (!lastEl) return true;
-
-  if (lastEl.contains(range.endContainer) || lastEl === range.endContainer) {
-    if (range.endContainer.nodeType === Node.TEXT_NODE) {
-      const text = range.endContainer.textContent || '';
-      return range.endOffset >= text.length;
-    }
-    return range.endOffset >= range.endContainer.childNodes.length;
-  }
-
-  try {
-    const endRange = document.createRange();
-    endRange.selectNodeContents(container);
-    endRange.setStart(range.endContainer, range.endOffset);
-    return endRange.toString().trim().length === 0;
-  } catch (e) {
-    return false;
-  }
-}
-
-/**
- * Checks if the content has filled the printable height or reached the bottom boundary.
- */
-function isPageAtBottomBoundary(container: HTMLElement): boolean {
-  if (!container) return false;
-  // Check if content scrollHeight exceeds clientHeight
-  if (container.scrollHeight > container.clientHeight + 4) {
-    return true;
-  }
-
-  // Check physical position of last element vs container bottom
-  const containerRect = container.getBoundingClientRect();
-  const leafElements = Array.from(
-    container.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li, table')
-  ) as HTMLElement[];
-  const lastEl = leafElements[leafElements.length - 1] || container.lastElementChild;
-  if (lastEl) {
-    const lastRect = lastEl.getBoundingClientRect();
-    if (lastRect.bottom >= containerRect.bottom - 45) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Enterprise Docx Live Document & Template Renderer
- * 
- * Unified Single Source of Truth for rendering imported Word document structure,
- * custom template HTML, or blank canvas sheets across Modal Preview and Studio Workbench.
- * 
+ * Enterprise Unified Docx Live Document & Template Renderer
+ *
+ * Single Source of Truth for rendering imported Word documents,
+ * custom template HTML, and interactive canvas sheets with 100% native editing.
+ *
  * - In Preview Mode (isEditable=false): Synchronously mounts clean HTML and CSS with 100% OpenXML fidelity.
- * - In Studio Mode (isEditable=true): Provides rich in-place contentEditable editing, live caret tracking,
- *   seamless page-to-page keyboard transitions, and smart downward page continuation.
+ * - In Studio Mode (isEditable=true): Provides rich in-place contentEditable editing, natural multi-page flow,
+ *   Ctrl+A select all across all pages, Ctrl+Enter page breaks, and zero jumping.
  */
 function DocxLiveRendererComponent({
   htmlContent,
@@ -244,12 +186,6 @@ function DocxLiveRendererComponent({
   isEditable = true,
   onContentChange,
   className = '',
-  pageIndex = 0,
-  totalPages = 1,
-  onAddNextPage,
-  onDeleteCurrentPage,
-  onNavigatePrevPage,
-  onNavigateNextPage,
 }: DocxLiveRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isFocusedRef = useRef<boolean>(false);
@@ -266,7 +202,6 @@ function DocxLiveRendererComponent({
     return raw.replace(/<\/?style\b[^>]*>/gi, '').trim();
   }, [styles, extractedStyles]);
 
-  const lastBodyRef = useRef<string>(cleanBody);
   const isInternalChangeRef = useRef<boolean>(false);
 
   // Save current caret selection range and bookmark
@@ -281,7 +216,7 @@ function DocxLiveRendererComponent({
   const isInitializedRef = useRef<boolean>(false);
   const lastKnownHtmlRef = useRef<string>('');
 
-  // Initial DOM population and external synchronization (Undo/Redo, Template Switching)
+  // Initial DOM population and external synchronization (Undo/Redo, Template Switching, Ribbon clicks)
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -311,8 +246,8 @@ function DocxLiveRendererComponent({
       (document.activeElement === containerRef.current ||
         containerRef.current.contains(document.activeElement));
 
-    // External change (e.g. Undo, Redo, Template Switch, Token Insert): update DOM if different
-    if (containerRef.current.innerHTML !== cleanBody) {
+    // External change: update DOM if different
+    if (containerRef.current.innerHTML !== cleanBody && lastKnownHtmlRef.current !== cleanBody) {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -339,6 +274,10 @@ function DocxLiveRendererComponent({
       return;
     }
     const handleSelectionChange = () => {
+      if (typeof window === 'undefined') return;
+      const sel = window.getSelection();
+      // If user is currently dragging / highlighting a text selection, do not interfere
+      if (sel && !sel.isCollapsed) return;
       saveSelection();
     };
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -358,6 +297,159 @@ function DocxLiveRendererComponent({
       }
     };
   }, []);
+
+  /**
+   * Splits a single overflowing paragraph at the exact text boundary crossing page bottom
+   */
+  const splitParagraphAtHeight = useCallback(
+    (pEl: HTMLElement, maxBottom: number): HTMLElement | null => {
+      if (typeof document === 'undefined' || !pEl) return null;
+
+      const textNodes: Node[] = [];
+      function collectText(n: Node) {
+        if (n.nodeType === Node.TEXT_NODE) textNodes.push(n);
+        else n.childNodes.forEach(collectText);
+      }
+      collectText(pEl);
+      if (textNodes.length === 0) return null;
+
+      const range = document.createRange();
+      let splitNode: Node | null = null;
+      let splitOffset = -1;
+
+      for (const tNode of textNodes) {
+        const len = tNode.textContent?.length || 0;
+        if (len === 0) continue;
+        for (let o = 0; o < len; o += 6) {
+          try {
+            range.setStart(tNode, o);
+            range.setEnd(tNode, Math.min(o + 1, len));
+            const rects = range.getClientRects();
+            if (rects.length > 0 && rects[0].bottom > maxBottom) {
+              splitNode = tNode;
+              splitOffset = o;
+              break;
+            }
+          } catch (e) {
+            // ignore range errors
+          }
+        }
+        if (splitNode) break;
+      }
+
+      if (splitNode && splitOffset > 0) {
+        const content = splitNode.textContent || '';
+        const lastSpace = content.lastIndexOf(' ', splitOffset);
+        const safeOffset = lastSpace > 10 ? lastSpace : splitOffset;
+
+        try {
+          const postRange = document.createRange();
+          postRange.setStart(splitNode, safeOffset);
+          postRange.setEnd(pEl, pEl.childNodes.length);
+          const postFrag = postRange.extractContents();
+
+          const p2 = document.createElement(pEl.tagName.toLowerCase());
+          Array.from(pEl.attributes).forEach((attr) => {
+            p2.setAttribute(attr.name, attr.value);
+          });
+          p2.appendChild(postFrag);
+          return p2;
+        } catch (err) {
+          console.warn('splitParagraphAtHeight error', err);
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
+  /**
+   * Automatically paginates content across discrete visual paper pages by inserting
+   * page-breaks directly into the unified DOM stream when height exceeds printable limits.
+   */
+  const autoPaginateOverflowInDom = useCallback(
+    (root: HTMLElement, pageHeightPx: number = 930): boolean => {
+      if (typeof document === 'undefined' || !root || !root.isConnected) return false;
+
+      const children = Array.from(root.children) as HTMLElement[];
+      if (children.length === 0) return false;
+
+      const rootRect = root.getBoundingClientRect();
+      let currentPageTop = rootRect.top;
+      let modified = false;
+
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+
+        if (child.classList.contains('spr-page-break')) {
+          const breakRect = child.getBoundingClientRect();
+          currentPageTop = breakRect.bottom;
+          continue;
+        }
+
+        const childRect = child.getBoundingClientRect();
+        const currentHeightFromPageTop = childRect.bottom - currentPageTop;
+
+        if (currentHeightFromPageTop > pageHeightPx) {
+          const prevSibling = child.previousElementSibling as HTMLElement | null;
+          if (prevSibling && prevSibling.classList.contains('spr-page-break')) {
+            continue;
+          }
+
+          const maxBottom = currentPageTop + pageHeightPx;
+          const tag = child.tagName.toLowerCase();
+
+          // In-paragraph split
+          if (
+            (tag === 'p' || tag === 'div' || tag.startsWith('h')) &&
+            (child.textContent?.length || 0) > 80
+          ) {
+            const p2 = splitParagraphAtHeight(child, maxBottom);
+            if (p2) {
+              const pageBreak = document.createElement('div');
+              pageBreak.className = 'spr-page-break';
+              pageBreak.contentEditable = 'false';
+              pageBreak.style.pageBreakAfter = 'always';
+              pageBreak.style.breakAfter = 'page';
+              pageBreak.innerHTML =
+                '<hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span>';
+
+              if (child.nextSibling) {
+                root.insertBefore(pageBreak, child.nextSibling);
+                root.insertBefore(p2, pageBreak.nextSibling);
+              } else {
+                root.appendChild(pageBreak);
+                root.appendChild(p2);
+              }
+
+              modified = true;
+              currentPageTop = pageBreak.getBoundingClientRect().bottom;
+              continue;
+            }
+          }
+
+          // Block-level boundary split
+          if (i > 0) {
+            const pageBreak = document.createElement('div');
+            pageBreak.className = 'spr-page-break';
+            pageBreak.contentEditable = 'false';
+            pageBreak.style.pageBreakAfter = 'always';
+            pageBreak.style.breakAfter = 'page';
+            pageBreak.innerHTML =
+              '<hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span>';
+
+            root.insertBefore(pageBreak, child);
+            modified = true;
+            currentPageTop = pageBreak.getBoundingClientRect().bottom;
+          }
+        }
+      }
+
+      return modified;
+    },
+    [splitParagraphAtHeight]
+  );
 
   const handleBlur = useCallback(() => {
     if (!isEditable) return;
@@ -383,85 +475,62 @@ function DocxLiveRendererComponent({
     if (!isEditable || !containerRef.current) return;
     isInternalChangeRef.current = true;
     saveSelection();
-    const currentHtml = containerRef.current.innerHTML;
-    lastKnownHtmlRef.current = currentHtml;
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
+      if (!containerRef.current) return;
+
+      // Auto-paginate overflow into discrete visual sheets
+      const hasSplit = autoPaginateOverflowInDom(containerRef.current);
+      if (hasSplit && savedBookmarkRef.current) {
+        restoreCaretBookmark(containerRef.current, savedBookmarkRef.current);
+      }
+
+      const currentHtml = containerRef.current.innerHTML;
+      lastKnownHtmlRef.current = currentHtml;
       const finalExportHtml = activeStyles ? `<style>${activeStyles}</style>\n${currentHtml}` : currentHtml;
       onContentChange?.(finalExportHtml);
-    }, 180);
-  }, [onContentChange, saveSelection, activeStyles, isEditable]);
+    }, 280);
+  }, [onContentChange, saveSelection, activeStyles, isEditable, autoPaginateOverflowInDom]);
 
-  // Keyboard navigation and Enter at the bottom of the page
+  // Paste handling: clean HTML, check overflow, and trigger automatic pagination
+  const handlePaste = useCallback(() => {
+    if (!isEditable || !containerRef.current) return;
+    setTimeout(() => {
+      if (!containerRef.current) return;
+      saveSelection();
+      const hasSplit = autoPaginateOverflowInDom(containerRef.current);
+      if (hasSplit && savedBookmarkRef.current) {
+        restoreCaretBookmark(containerRef.current, savedBookmarkRef.current);
+      }
+      handleInput();
+    }, 40);
+  }, [isEditable, autoPaginateOverflowInDom, saveSelection, handleInput]);
+
+  // Keyboard navigation, shortcuts, and page break insertion
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!isEditable || !containerRef.current) return;
-      const container = containerRef.current;
 
-      // 1. Enter Key at the bottom of the page (or when page is full):
-      if (e.key === 'Enter' && !e.shiftKey) {
-        const atEnd = isCaretAtEndOfContainer(container);
-        const atBottom = isPageAtBottomBoundary(container);
-
-        // If at the end of the page and page is at the bottom boundary:
-        if (atEnd && atBottom) {
-          e.preventDefault();
-          if (pageIndex < totalPages - 1) {
-            onNavigateNextPage?.();
-          } else {
-            onAddNextPage?.();
-          }
-          return;
+      // 1. Ctrl+Enter / Cmd+Enter: Insert explicit visual Page Break (Standard Word / Google Docs shortcut)
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        try {
+          const pageBreakHtml =
+            '<div class="spr-page-break" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+          document.execCommand('insertHTML', false, pageBreakHtml);
+          handleInput();
+        } catch (err) {
+          console.warn('Page break insertion error', err);
         }
+        return;
       }
 
-      // 2. Down Arrow at the very last position:
-      if (e.key === 'ArrowDown') {
-        const atEnd = isCaretAtEndOfContainer(container);
-        if (atEnd && pageIndex < totalPages - 1) {
-          e.preventDefault();
-          onNavigateNextPage?.();
-          return;
-        }
-      }
-
-      // 3. Up Arrow at the very first position:
-      if (e.key === 'ArrowUp') {
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const leafElements = Array.from(
-            container.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
-          );
-          const firstEl = leafElements[0] || container.firstElementChild || container;
-          if (
-            (firstEl.contains(range.startContainer) || firstEl === range.startContainer) &&
-            range.startOffset === 0
-          ) {
-            if (pageIndex > 0) {
-              e.preventDefault();
-              onNavigatePrevPage?.();
-              return;
-            }
-          }
-        }
-      }
-
-      // 4. Backspace on an empty page (pageIndex > 0):
-      if (e.key === 'Backspace') {
-        const text = container.textContent?.trim() || '';
-        if (text === '' && pageIndex > 0) {
-          e.preventDefault();
-          onDeleteCurrentPage?.();
-          onNavigatePrevPage?.();
-          return;
-        }
-      }
+      // Standard Enter, Backspace, Arrow keys: 100% native browser handling without jumping!
     },
-    [isEditable, pageIndex, totalPages, onAddNextPage, onDeleteCurrentPage, onNavigateNextPage, onNavigatePrevPage]
+    [isEditable, handleInput]
   );
 
   // Handle clicking anywhere on empty margin space of document to place the cursor at the bottom
@@ -469,15 +538,19 @@ function DocxLiveRendererComponent({
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!isEditable || !containerRef.current) return;
 
+      // If user is selecting/highlighting text with mouse drag, NEVER collapse it
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;
+
       const target = e.target as HTMLElement;
 
-      // If clicked inside an existing text node, paragraph, or table cell, browser native selection handles it
+      // If clicked inside an existing text node, paragraph, or table cell, native selection handles it
       if (target !== containerRef.current && containerRef.current.contains(target)) {
         saveSelection();
         return;
       }
 
-      // If clicked directly on the empty background/margin of containerRef:
+      // If clicked directly on empty margin of containerRef:
       try {
         const leafElements = Array.from(
           containerRef.current.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
@@ -491,7 +564,6 @@ function DocxLiveRendererComponent({
           const range = document.createRange();
           range.setStart(p, 0);
           range.collapse(true);
-          const sel = window.getSelection();
           if (sel) {
             sel.removeAllRanges();
             sel.addRange(range);
@@ -500,13 +572,12 @@ function DocxLiveRendererComponent({
           return;
         }
 
-        // Place caret at the END of the last content block (never jump to start/top!)
+        // Place caret at the end of last content block
         const lastEl = leafElements[leafElements.length - 1];
         containerRef.current.focus({ preventScroll: true });
         const range = document.createRange();
         range.selectNodeContents(lastEl);
-        range.collapse(false); // ALWAYS COLLAPSE TO END
-        const sel = window.getSelection();
+        range.collapse(false);
         if (sel) {
           sel.removeAllRanges();
           sel.addRange(range);
@@ -519,12 +590,112 @@ function DocxLiveRendererComponent({
     [isEditable, saveSelection]
   );
 
+  // Listen for global insert page break events triggered from ribbons or workbench toolbars
+  useEffect(() => {
+    const handleInsertPageBreakEvent = () => {
+      if (!isEditable || !containerRef.current) return;
+      containerRef.current.focus({ preventScroll: true });
+
+      const pageBreakHtml =
+        '<div class="spr-page-break" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && containerRef.current.contains(sel.anchorNode)) {
+        try {
+          document.execCommand('insertHTML', false, pageBreakHtml);
+        } catch (e) {
+          // fallback
+        }
+      } else {
+        const dummy = document.createElement('div');
+        dummy.innerHTML = pageBreakHtml;
+        while (dummy.firstChild) {
+          containerRef.current.appendChild(dummy.firstChild);
+        }
+        const lastP = containerRef.current.querySelector('p:last-of-type');
+        if (lastP) {
+          const range = document.createRange();
+          range.selectNodeContents(lastP);
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      }
+      handleInput();
+    };
+
+    window.addEventListener('spr_doclab_insert_page_break', handleInsertPageBreakEvent);
+    return () => {
+      window.removeEventListener('spr_doclab_insert_page_break', handleInsertPageBreakEvent);
+    };
+  }, [isEditable, handleInput]);
+
   return (
-    <div className="relative group/docx-renderer w-full h-full flex flex-col cursor-text">
-      {/* Active Document CSS Style Element (Interpreted natively by Browser) */}
-      {activeStyles && (
-        <style dangerouslySetInnerHTML={{ __html: activeStyles }} />
-      )}
+    <div className="relative group/docx-renderer w-full h-full flex flex-col cursor-text select-text">
+      {/* Active Document CSS Style Element */}
+      {activeStyles && <style dangerouslySetInnerHTML={{ __html: activeStyles }} />}
+
+      {/* Visual Page Break Styles */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .spr-page-break {
+              display: block;
+              page-break-after: always;
+              break-after: page;
+              margin: 40px -42px 40px -42px;
+              position: relative;
+              user-select: none;
+              -webkit-user-select: none;
+              background: #090d16;
+              padding: 20px 0;
+              border-top: 1.5px solid rgba(0, 0, 0, 0.4);
+              border-bottom: 1.5px solid rgba(0, 0, 0, 0.4);
+              box-shadow: inset 0 8px 16px -4px rgba(0, 0, 0, 0.75), inset 0 -8px 16px -4px rgba(0, 0, 0, 0.75);
+              cursor: default;
+            }
+            .spr-page-break-divider {
+              border: none;
+              border-top: 1px dashed rgba(255, 255, 255, 0.2);
+              margin: 0;
+            }
+            .spr-page-break-badge {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: #1e293b;
+              padding: 3px 14px;
+              font-size: 10px;
+              font-weight: 700;
+              color: #94a3b8;
+              border: 1px solid rgba(255, 255, 255, 0.15);
+              border-radius: 9999px;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+              letter-spacing: 0.06em;
+              text-transform: uppercase;
+              pointer-events: none;
+            }
+            @media print {
+              .spr-page-break {
+                display: block !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+              }
+              .spr-page-break-divider,
+              .spr-page-break-badge {
+                display: none !important;
+              }
+            }
+          `,
+        }}
+      />
 
       {/* Main Document Paper Body */}
       {isEditable ? (
@@ -535,18 +706,31 @@ function DocxLiveRendererComponent({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onInput={handleInput}
+          onPaste={handlePaste}
           onKeyDown={handleKeyDown}
           onKeyUp={saveSelection}
           onMouseUp={saveSelection}
           onClick={handleContainerClick}
-          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full h-full text-left focus:outline-none cursor-text focus:ring-1 focus:ring-blue-500/20 rounded-xs ${className}`}
-          style={{ backgroundColor: '#ffffff', color: '#0f172a', textAlign: 'left' }}
+          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full h-full text-left focus:outline-none cursor-text focus:ring-1 focus:ring-blue-500/20 rounded-xs select-text ${className}`}
+          style={{
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            textAlign: 'left',
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
+          }}
         />
       ) : (
         <div
           ref={containerRef}
           className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full h-full text-left select-text ${className}`}
-          style={{ backgroundColor: '#ffffff', color: '#0f172a', textAlign: 'left' }}
+          style={{
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            textAlign: 'left',
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
+          }}
         />
       )}
     </div>
@@ -555,5 +739,3 @@ function DocxLiveRendererComponent({
 
 const DocxLiveRenderer = memo(DocxLiveRendererComponent);
 export default DocxLiveRenderer;
-
-

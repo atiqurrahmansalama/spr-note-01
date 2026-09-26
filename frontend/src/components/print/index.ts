@@ -28,9 +28,8 @@ export default UniversalPrintStudio;
 // Document & Word Engine Modals
 export { default as DocxLiveRenderer } from './DocxLiveRenderer';
 export { default as DocxFormattingRibbon } from './DocxFormattingRibbon';
-export { default as DocxTemplateModal } from './DocxTemplateModal';
 export { default as TemplateLibraryModal } from './TemplateLibraryModal';
-export { default as KeyPaletteExplorer } from './KeyPaletteExplorer';
+export { default as KeyPaletteExplorer } from './components/sidebar/tokens/KeyPaletteExplorer';
 export { default as DocLabQuickReportModal } from './DocLabQuickReportModal';
 export { default as DocLabQuickDocumentModal } from './DocLabQuickDocumentModal';
 
@@ -47,4 +46,5 @@ export * from './docLabExportUtils';
 export { compileVectorPDFDocument } from './vectorPDFCompiler';
 export * from './vectorDocxCompiler';
 export * from './docLabTextConverter';
+export * from './docLabDirectiveEngine';
 export * from './svgShapeTemplates';

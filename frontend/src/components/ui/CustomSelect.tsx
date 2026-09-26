@@ -24,13 +24,14 @@ export interface CustomSelectProps {
   options?: (string | number | SelectOption)[];
   placeholder?: string;
   label?: React.ReactNode;
+  labelClassName?: string;
   error?: string | null;
   required?: boolean;
   searchable?: boolean;
   disabled?: boolean;
   direction?: 'auto' | 'up' | 'down';
   icon?: React.ComponentType<{ className?: string }> | null;
-  size?: 'sm' | 'md' | 'lg' | string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | string;
   compactMode?: boolean;
   showChevron?: boolean;
   hideChevron?: boolean;
@@ -64,6 +65,7 @@ export default function CustomSelect({
   options = [],
   placeholder = 'Select an option...',
   label = '',
+  labelClassName = '',
   error = null,
   required = false,
   searchable = false,
@@ -177,6 +179,7 @@ export default function CustomSelect({
   };
 
   const sizeClasses = {
+    xs: 'min-h-[28px] sm:min-h-[30px] h-[30px] px-2.5 py-1 text-xs rounded-lg',
     sm: 'min-h-[38px] px-3 py-1.5 text-xs rounded-xl',
     md: 'min-h-[46px] px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl',
     lg: 'min-h-[54px] px-5 py-3.5 text-sm sm:text-base rounded-2xl',
@@ -189,12 +192,16 @@ export default function CustomSelect({
     >
       {/* Top Bar: Label, Badge, and Action */}
       {(label || subLabel || onManage || onActionClick || actionTo || actionLabel || headerAction || badge) && (
-        <div className="flex items-center justify-between gap-2 mb-2 select-none">
-          <div className="flex items-center gap-1.5 flex-wrap">
+        <div className={`flex items-center justify-between gap-2 select-none ${size === 'xs' ? 'mb-1' : 'mb-2'}`}>
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {label && (
               <label
                 onClick={() => handleToggle()}
-                className="block text-xs font-bold theme-text-secondary uppercase tracking-wider cursor-pointer"
+                className={`block truncate cursor-pointer ${
+                  size === 'xs'
+                    ? 'text-[10px] font-semibold theme-text-secondary tracking-tight'
+                    : 'text-xs font-bold theme-text-secondary uppercase tracking-wider'
+                } ${labelClassName}`}
               >
                 {label} {required && <span className="text-[var(--danger-text)] font-semibold ml-0.5">*</span>}
               </label>

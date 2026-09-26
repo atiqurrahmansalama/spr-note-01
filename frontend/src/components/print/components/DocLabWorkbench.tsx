@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import DocLabCanvasViewer from '../DocLabCanvasViewer';
 import DocLabDocumentWrapper from '../DocLabDocumentWrapper';
 import DocLabTableRenderer from '../DocLabTableRenderer';
 import DocxLiveRenderer from '../DocxLiveRenderer';
 import DocxFormattingRibbon from '../DocxFormattingRibbon';
+import { DocLabSaveModal } from './sidebar';
+import { SparklesIcon, PageBreakIcon } from '@/components/ui/Icons';
 import {
   separateDocxStylesAndBody,
   getDocxPaperDimensions,
@@ -66,6 +68,7 @@ export interface DocLabWorkbenchProps {
   handleRowInsert: (rowIndex: number, position?: 'above' | 'below') => void;
   handleRowMove: (fromIndex: number, toIndex: number) => void;
   handleColumnHeaderChange: (colKey: string, newHeader: string) => void;
+  onSaveCurrentTemplate?: (name: string, docType: 'template' | 'generated') => void;
   autoSaveStatus?: string;
   autoSaveLastSavedAt?: string | null;
   isAutoSaving?: boolean;
@@ -122,10 +125,12 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
   handleRowInsert,
   handleRowMove,
   handleColumnHeaderChange,
+  onSaveCurrentTemplate,
   autoSaveStatus,
   autoSaveLastSavedAt,
   isAutoSaving = false,
 }) => {
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const effectiveDocs =
     documents && documents.length > 0
       ? documents
@@ -145,186 +150,72 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
     return getDocxPaperPadding(pp, margin);
   }, [customDocxTemplate, options.margin]);
 
-  const pendingFocusRef = React.useRef<{ pageIdx: number; position: 'start' | 'end'; retries: number } | null>(null);
-
-  const attemptFocusPage = React.useCallback((pageIdx: number, position: 'start' | 'end' = 'start') => {
-    const targetSheet = document.getElementById(`docx-live-page-${pageIdx}`);
-    if (targetSheet) {
-      const editable = targetSheet.querySelector('[contenteditable="true"]') as HTMLElement | null;
-      if (editable) {
-        editable.focus({ preventScroll: true });
-        const sel = window.getSelection();
-        if (sel) {
-          const range = document.createRange();
-          const leafNodes = Array.from(
-            editable.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
-          ) as HTMLElement[];
-          const targetEl =
-            position === 'start' ? leafNodes[0] || editable : leafNodes[leafNodes.length - 1] || editable;
-          
-          if (targetEl) {
-            range.selectNodeContents(targetEl);
-            range.collapse(position === 'start');
-          } else {
-            range.selectNodeContents(editable);
-            range.collapse(position === 'start');
-          }
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-        return true;
-      }
-    }
-    return false;
-  }, []);
-
-  const handleFocusPage = React.useCallback(
-    (pageIdx: number, position: 'start' | 'end' = 'start') => {
-      // 1. Immediate attempt
-      if (attemptFocusPage(pageIdx, position)) {
-        pendingFocusRef.current = null;
-        return;
-      }
-
-      // 2. Set pending focus with retry loop
-      pendingFocusRef.current = { pageIdx, position, retries: 0 };
-
-      const checkAndFocus = () => {
-        if (!pendingFocusRef.current) return;
-        const { pageIdx: p, position: pos, retries } = pendingFocusRef.current;
-        if (attemptFocusPage(p, pos)) {
-          pendingFocusRef.current = null;
-          return;
-        }
-        if (retries < 15) {
-          pendingFocusRef.current.retries += 1;
-          setTimeout(checkAndFocus, 35);
-        } else {
-          pendingFocusRef.current = null;
-        }
-      };
-
-      requestAnimationFrame(checkAndFocus);
-    },
-    [attemptFocusPage]
-  );
-
-  // Trigger focus when mergedDocxPages updates if a focus is pending
-  React.useEffect(() => {
-    if (pendingFocusRef.current) {
-      const { pageIdx, position } = pendingFocusRef.current;
-      if (attemptFocusPage(pageIdx, position)) {
-        pendingFocusRef.current = null;
-      }
-    }
-  }, [mergedDocxPages, attemptFocusPage]);
-
-  const handleAddPageBelow = React.useCallback(
-    (pIdx: number) => {
-      if (docxRenderMode === 'template' || customDocxTemplate) {
-        const updater = (prev: any) => {
-          if (!prev) return null;
-          const preservedStyles =
-            prev.styles || separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
-          const currentRawBody = prev.templateBody || prev.body || prev.html || '';
-          const currentPages = splitHtmlIntoPages(currentRawBody);
-          const updatedPages = [
-            ...currentPages.slice(0, pIdx + 1),
-            '<p style="font-size: 11pt; color: #334155; line-height: 1.6;"><br></p>',
-            ...currentPages.slice(pIdx + 1),
-          ];
-          const combinedBody = joinPagesIntoHtml(updatedPages);
-          return {
-            ...prev,
-            styles: preservedStyles,
-            templateBody: combinedBody,
-            body: combinedBody,
-            html: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-            rawHtml: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-          };
-        };
-        if (updateCustomDocxTemplateWithHistory) {
-          updateCustomDocxTemplateWithHistory(updater);
-        } else {
-          setCustomDocxTemplate(updater);
-        }
-        handleFocusPage(pIdx + 1, 'start');
-      }
-    },
-    [docxRenderMode, customDocxTemplate, updateCustomDocxTemplateWithHistory, setCustomDocxTemplate, handleFocusPage]
-  );
-
-  const handleDeletePage = React.useCallback(
-    (pIdx: number) => {
-      if (docxRenderMode === 'template' || customDocxTemplate) {
-        const updater = (prev: any) => {
-          if (!prev) return null;
-          const preservedStyles =
-            prev.styles || separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
-          const currentRawBody = prev.templateBody || prev.body || prev.html || '';
-          const currentPages = splitHtmlIntoPages(currentRawBody);
-          if (currentPages.length <= 1) return prev;
-          const updatedPages = currentPages.filter((_, idx) => idx !== pIdx);
-          const combinedBody = joinPagesIntoHtml(updatedPages);
-          return {
-            ...prev,
-            styles: preservedStyles,
-            templateBody: combinedBody,
-            body: combinedBody,
-            html: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-            rawHtml: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-          };
-        };
-        if (updateCustomDocxTemplateWithHistory) {
-          updateCustomDocxTemplateWithHistory(updater);
-        } else {
-          setCustomDocxTemplate(updater);
-        }
-        if (pIdx > 0) {
-          handleFocusPage(pIdx - 1, 'end');
-        } else {
-          handleFocusPage(0, 'start');
-        }
-      }
-    },
-    [docxRenderMode, customDocxTemplate, updateCustomDocxTemplateWithHistory, setCustomDocxTemplate, handleFocusPage]
-  );
-
   return (
     <main className="flex-1 flex flex-col overflow-hidden relative universal-print-workbench print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:overflow-visible">
-      {/* Top Template Workbench Toolbar (Visible when Custom Template is active) */}
+      {/* 1. Top Template Workbench Sub-Header (Visible when Custom Template is active) */}
       {customDocxTemplate && (
-        <div className="px-4 py-2 bg-gradient-to-r from-[var(--accent-main)]/10 via-[var(--accent-main)]/5 to-transparent border-b theme-border flex items-center justify-between gap-3 flex-wrap print:hidden select-none z-20">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full theme-bg-accent shadow-2xs" />
-            <span className="text-xs font-bold theme-text-primary">
+        <div className="px-4 py-2 bg-gradient-to-r from-[var(--accent-main)]/10 via-[var(--accent-main)]/5 to-transparent flex items-center justify-between gap-3 flex-wrap print:hidden select-none z-20">
+          {/* Left: Template Name & Auto-save Badge */}
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <span className="w-2 h-2 rounded-full theme-bg-accent shadow-2xs shrink-0" />
+            <span className="text-xs font-bold theme-text-primary truncate max-w-[200px] sm:max-w-[320px]" title={customDocxTemplate.name || 'Custom Template'}>
               {customDocxTemplate.name || 'Custom Template'}
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold theme-bg-accent/15 theme-accent font-mono">
-              {docxRenderMode === 'template'
-                ? `Template Blueprint • ${mergedDocxPages.length} ${mergedDocxPages.length === 1 ? 'Page' : 'Pages'}`
-                : `Batch Document • ${mergedDocxPages.length} ${mergedDocxPages.length === 1 ? 'Page' : 'Pages'}`}
-            </span>
             {docxRenderMode === 'template' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                 <span className={`w-1.5 h-1.5 rounded-full ${isAutoSaving ? 'bg-amber-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`} />
                 <span>
                   {isAutoSaving
                     ? 'Saving...'
-                    : autoSaveLastSavedAt
-                    ? `Auto-saved at ${autoSaveLastSavedAt}`
                     : 'Auto-saved'}
                 </span>
               </span>
             )}
           </div>
 
-          {/* Center / Right: Rich Text Formatting Ribbon */}
-          <div className="flex items-center gap-3">
-            {docxRenderMode === 'template' && (
-              <DocxFormattingRibbon onInsertToken={undefined} />
-            )}
+          {/* Far Right: Mode Switcher Segment */}
+          <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
+            {/* Mode Switcher Segment (Template Design vs Generate N Document(s)) */}
+            <div className="flex items-center p-0.5 rounded-lg theme-bg-elevated border theme-border shadow-2xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setDocxRenderMode('template')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  docxRenderMode === 'template'
+                    ? 'theme-bg-accent-soft theme-accent shadow-2xs font-bold'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/50'
+                }`}
+                title="Edit and customize template design"
+              >
+                <span>Template Design</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDocxRenderMode('all')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  docxRenderMode === 'all'
+                    ? 'theme-bg-accent text-white shadow-xs font-bold'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/50'
+                }`}
+                title="Generate all populated batch documents with live records"
+              >
+                <SparklesIcon className="w-3.5 h-3.5" />
+                <span>
+                  {(liveData?.length || documents?.length || batchDocuments?.length || 0) > 0
+                    ? `Generate ${(liveData?.length || documents?.length || batchDocuments?.length || 0)} ${(liveData?.length || documents?.length || batchDocuments?.length || 0) === 1 ? 'Document' : 'Documents'}`
+                    : 'Generate Documents'}
+                </span>
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* 2. Dedicated Rich Text Formatting Ribbon Strip (Above Canvas) */}
+      {customDocxTemplate && docxRenderMode === 'template' && (
+        <div className="px-4 py-1.5 flex items-center justify-start sm:justify-center overflow-x-auto print:hidden select-none z-15 scrollbar-none">
+          <DocxFormattingRibbon onInsertToken={undefined} />
         </div>
       )}
 
@@ -354,10 +245,10 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                 }}
               />
             )}
-            {mergedDocxPages.map((pageHtml, pIdx) => (
+            {docxRenderMode === 'template' ? (
+              /* Single Unified Master Document Canvas in Template Design Mode */
               <div
-                key={`docx_page_${pIdx}`}
-                id={`docx-live-page-${pIdx}`}
+                id="docx-live-master-canvas"
                 className="relative paper-sheet-wrapper group flex flex-col items-center"
               >
                 {/* Page Sheet Header Controls (Screen only) */}
@@ -368,33 +259,51 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                   <div className="flex items-center gap-2 font-medium">
                     <span className="w-2 h-2 rounded-full theme-bg-accent" />
                     <span className="font-bold theme-text-primary font-mono text-[11.5px]">
-                      Page {pIdx + 1} of {mergedDocxPages.length}
+                      Document Canvas ({options.pageSize || customDocxTemplate?.pageSize || 'A4'} &bull;{' '}
+                      {options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'})
+                    </span>
+                    <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
+                      {Math.max(
+                        1,
+                        splitHtmlIntoPages(
+                          customDocxTemplate?.templateBody ||
+                            customDocxTemplate?.body ||
+                            customDocxTemplate?.rawHtml ||
+                            ''
+                        ).length
+                      )}{' '}
+                      {splitHtmlIntoPages(
+                        customDocxTemplate?.templateBody ||
+                          customDocxTemplate?.body ||
+                          customDocxTemplate?.rawHtml ||
+                          ''
+                      ).length === 1
+                        ? 'Page'
+                        : 'Pages'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] theme-text-muted hidden md:inline">
+                      Press <kbd className="px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono text-[10px]">Ctrl+Enter</kbd> for new page
+                    </span>
                     <button
                       type="button"
-                      onClick={() => handleAddPageBelow(pIdx)}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold theme-bg-sub/80 border theme-border hover:theme-bg-surface hover:theme-accent transition-all flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-                      title="Add a new page below this page"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('spr_doclab_insert_page_break'));
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-md theme-bg-accent text-white hover:opacity-95 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                      title="Insert a page break to create Page 2 (Ctrl + Enter)"
                     >
-                      <span>+ Add Page Below</span>
+                      <PageBreakIcon className="w-3.5 h-3.5" />
+                      <span>+ Add Page</span>
                     </button>
-                    {mergedDocxPages.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePage(pIdx)}
-                        className="px-2 py-1 rounded-lg text-[11px] font-semibold theme-bg-sub/80 border theme-border hover:theme-danger transition-all flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-                        title="Delete this page"
-                      >
-                        <span>Delete Page</span>
-                      </button>
-                    )}
                   </div>
                 </div>
 
                 <div
-                  className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-lg cursor-text"
+                  className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-lg cursor-text select-text"
                   data-size={options.pageSize || customDocxTemplate?.pageSize || 'A4'}
                   data-orientation={options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'}
                   data-margin={options.margin || customDocxTemplate?.margin || 'NORMAL'}
@@ -403,25 +312,11 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                   data-page-break={options.enablePageBreak !== false ? 'true' : 'false'}
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
+                      const sel = window.getSelection();
+                      if (sel && !sel.isCollapsed) return;
                       const editable = e.currentTarget.querySelector('[contenteditable="true"]') as HTMLElement | null;
                       if (editable) {
-                        const leafNodes = Array.from(
-                          editable.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
-                        ) as HTMLElement[];
-                        const lastEl =
-                          leafNodes[leafNodes.length - 1] || editable.lastElementChild || editable.lastChild;
-                        if (lastEl) {
-                          const range = document.createRange();
-                          range.selectNodeContents(lastEl);
-                          range.collapse(false);
-                          const sel = window.getSelection();
-                          if (sel) {
-                            sel.removeAllRanges();
-                            sel.addRange(range);
-                          }
-                        } else {
-                          editable.focus({ preventScroll: true });
-                        }
+                        editable.focus({ preventScroll: true });
                       }
                     }
                   }}
@@ -431,27 +326,25 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                     width: docxDimensions.width,
                     maxWidth: docxDimensions.maxWidth,
                     minHeight: docxDimensions.height,
-                    height: docxDimensions.height,
-                    maxHeight: docxDimensions.height,
                     padding: docxCustomPadding,
                     textAlign: 'left',
                     boxSizing: 'border-box',
-                    overflow: 'hidden',
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text',
                   }}
                 >
-                  <div className="w-full h-full text-left">
+                  <div className="w-full h-full text-left select-text">
                     <DocxLiveRenderer
-                      htmlContent={pageHtml}
+                      key="docx_live_master_renderer"
+                      htmlContent={
+                        customDocxTemplate.templateBody ||
+                        customDocxTemplate.body ||
+                        customDocxTemplate.rawHtml ||
+                        ''
+                      }
                       styles={docxStyles}
-                      isEditable={docxRenderMode === 'template'}
-                      pageIndex={pIdx}
-                      totalPages={mergedDocxPages.length}
-                      onAddNextPage={() => handleAddPageBelow(pIdx)}
-                      onDeleteCurrentPage={() => handleDeletePage(pIdx)}
-                      onNavigatePrevPage={() => handleFocusPage(pIdx - 1, 'end')}
-                      onNavigateNextPage={() => handleFocusPage(pIdx + 1, 'start')}
+                      isEditable={true}
                       onContentChange={(newHtml) => {
-                        if (docxRenderMode !== 'template') return;
                         const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(newHtml);
                         const cleanNewHtml = incomingBody || newHtml;
 
@@ -460,41 +353,16 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                           const preservedStyles =
                             incomingStyles ||
                             prev.styles ||
-                            separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles;
-                          const currentRawBody = prev.templateBody || prev.body || prev.html || '';
-                          const currentPages = splitHtmlIntoPages(currentRawBody);
+                            separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
+                            '';
 
-                          let updatedPages: string[];
-                          // Check if cleanNewHtml contains a new explicit page break
-                          if (cleanNewHtml.includes('<!-- spr-page-break -->') || cleanNewHtml.includes('spr-page-break')) {
-                            const subPages = splitHtmlIntoPages(cleanNewHtml);
-                            if (subPages.length > 1) {
-                              updatedPages = [
-                                ...currentPages.slice(0, pIdx),
-                                ...subPages,
-                                ...currentPages.slice(pIdx + 1),
-                              ];
-                            } else {
-                              updatedPages = [...currentPages];
-                              updatedPages[pIdx] = cleanNewHtml;
-                            }
-                          } else {
-                            if (currentPages.length > pIdx) {
-                              updatedPages = [...currentPages];
-                              updatedPages[pIdx] = cleanNewHtml;
-                            } else {
-                              updatedPages = [cleanNewHtml];
-                            }
-                          }
-
-                          const combinedBody = joinPagesIntoHtml(updatedPages);
                           return {
                             ...prev,
                             styles: preservedStyles,
-                            templateBody: combinedBody,
-                            body: combinedBody,
-                            html: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
-                            rawHtml: preservedStyles ? `${preservedStyles}\n${combinedBody}` : combinedBody,
+                            templateBody: cleanNewHtml,
+                            body: cleanNewHtml,
+                            html: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+                            rawHtml: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
                           };
                         };
                         if (updateCustomDocxTemplateWithHistory) {
@@ -507,7 +375,65 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+            ) : (
+              /* Discrete Multi-Record Sheets in Batch Generation Mode ('all' or 'sample') */
+              mergedDocxPages.map((pageHtml, pIdx) => (
+                <div
+                  key={`docx_page_${pIdx}`}
+                  id={`docx-live-page-${pIdx}`}
+                  className="relative paper-sheet-wrapper group flex flex-col items-center"
+                >
+                  {/* Page Sheet Header Controls (Screen only) */}
+                  <div
+                    style={{ width: docxDimensions.width, maxWidth: docxDimensions.maxWidth }}
+                    className="flex items-center justify-between px-2 py-1 mb-1.5 text-xs theme-text-secondary select-none print:hidden"
+                  >
+                    <div className="flex items-center gap-2 font-medium">
+                      <span className="w-2 h-2 rounded-full theme-bg-accent" />
+                      <span className="font-bold theme-text-primary font-mono text-[11.5px]">
+                        Document {pIdx + 1} of {mergedDocxPages.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-lg cursor-text select-text"
+                    data-size={options.pageSize || customDocxTemplate?.pageSize || 'A4'}
+                    data-orientation={options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'}
+                    data-margin={options.margin || customDocxTemplate?.margin || 'NORMAL'}
+                    data-density={options.density || 'NORMAL'}
+                    data-color-mode={options.colorMode || 'FULL_COLOR'}
+                    data-page-break="true"
+                    style={{
+                      backgroundColor: '#ffffff',
+                      color: '#0f172a',
+                      width: docxDimensions.width,
+                      maxWidth: docxDimensions.maxWidth,
+                      minHeight: docxDimensions.height,
+                      height: docxDimensions.height,
+                      maxHeight: docxDimensions.height,
+                      padding: docxCustomPadding,
+                      textAlign: 'left',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      userSelect: 'text',
+                      WebkitUserSelect: 'text',
+                    }}
+                  >
+                    <div className="w-full h-full text-left select-text">
+                      <DocxLiveRenderer
+                        key={`docx_batch_renderer_${pIdx}`}
+                        htmlContent={pageHtml}
+                        styles={docxStyles}
+                        isEditable={false}
+                        pageIndex={pIdx}
+                        totalPages={mergedDocxPages.length}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         ) : effectiveDocs ? (
           <div className="flex flex-col items-center gap-8 print:gap-0 print:block">
@@ -683,6 +609,15 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
           </div>
         )}
       </DocLabCanvasViewer>
+      {/* Save Canvas As Template Modal */}
+      {isSaveModalOpen && onSaveCurrentTemplate && (
+        <DocLabSaveModal
+          isOpen={isSaveModalOpen}
+          onClose={() => setIsSaveModalOpen(false)}
+          onSave={onSaveCurrentTemplate}
+          totalRecordsCount={liveData?.length || 0}
+        />
+      )}
     </main>
   );
 };
