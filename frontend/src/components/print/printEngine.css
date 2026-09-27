@@ -122,12 +122,25 @@
   overflow: hidden;
 }
 
-/* Continuous Sheet Mode (Only when Auto Page Break is explicitly switched OFF) */
-.paper-sheet[data-page-break="false"] {
-  height: auto !important;
-  max-height: none !important;
-  min-height: 1123px !important;
-  overflow: visible !important;
+/* --------------------------------------------------------------------------
+   Document Multi-Page Container & Discrete Physical Sheets
+
+   Architecture:
+   Document Container (.layout-document-renderer / #universal-print-portal)
+       ↓
+   Multiple Discrete Physical Sheets (.paper-sheet)
+
+   Each .paper-sheet represents an individual physical page with strict bounds
+   and `overflow: hidden`. The layout engine guarantees that fragments fit
+   within the content area.
+   -------------------------------------------------------------------------- */
+.layout-document-renderer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Screen Margins */
@@ -419,7 +432,8 @@ body.spr-printing-in-progress .universal-export-menu-portal {
 
   /* 3. Paper Sheet Print Rules — Exact Physical Paper Dimensions (WYSIWYG 1:1 Parity) */
   #universal-print-portal,
-  .universal-print-portal-container {
+  .universal-print-portal-container,
+  .layout-document-renderer {
     box-shadow: none !important;
     border: none !important;
     transform: none !important;

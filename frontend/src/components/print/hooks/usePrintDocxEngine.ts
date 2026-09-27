@@ -13,6 +13,7 @@ import {
   splitHtmlIntoPages,
   joinPagesIntoHtml,
 } from '../docxTemplateEngine';
+import { PaginationEngine } from '../layout/pagination/PaginationEngine';
 import {
   getDefaultTemplateForScope,
   setDefaultTemplateForScope,
@@ -25,11 +26,7 @@ import { PrintOptions, PrintMetaItem } from '../types';
 import { examStore } from '../../../stores/examStore';
 import { buildSubjectRoutineReportData } from '../../../modules/examinations/exam-schedules/subject-routine/subjectRoutineDocLabKeys';
 
-export const BLANK_PAGE_HTML = `
-  <div class="docx-blank-canvas font-sans leading-relaxed" style="min-height: 720px; outline: none;">
-    <p><br /></p>
-  </div>
-`;
+export const BLANK_PAGE_HTML = '<p><br /></p>';
 
 export function createBlankDocumentTemplate(): any {
   return {
@@ -556,18 +553,34 @@ export function usePrintDocxEngine({
       }
     }
 
-    // 1. Template Design Mode: Split by page breaks or auto-paginate into discrete paper sheets
+    // 1. Template Design Mode: Paginate via discrete geometry-driven layout engine
     if (docxRenderMode === 'template') {
       const activeBody = templateBodyContent;
-      const pages = splitHtmlIntoPages(activeBody);
+      const layoutResult = PaginationEngine.paginate(activeBody, {
+        pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+        orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
+        margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+        customMarginsMm: options.customMarginsMm,
+        density: options.density,
+        styles: docxStyles,
+      });
+      const pages = layoutResult.pages.map((p) => p.htmlContent);
       return pages.length > 0 ? pages : [activeBody];
     }
 
     // 0. Pre-Generated Document: If it is already a saved generated document in Batch view
     if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
       const genContent = customDocxTemplate.body || customDocxTemplate.rawHtml || customDocxTemplate.html || '';
-      const pages = splitHtmlIntoPages(genContent);
-      const styles = customDocxTemplate.styles;
+      const styles = customDocxTemplate.styles || docxStyles;
+      const layoutResult = PaginationEngine.paginate(genContent, {
+        pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+        orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
+        margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+        customMarginsMm: options.customMarginsMm,
+        density: options.density,
+        styles,
+      });
+      const pages = layoutResult.pages.map((p) => p.htmlContent);
       return pages.map((p: string) => (styles && !p.includes('<style') ? `${styles}\n${p.trim()}` : p.trim()));
     }
 
@@ -601,12 +614,24 @@ export function usePrintDocxEngine({
   }, [
     customDocxTemplate,
     docxRenderMode,
+    docxStyles,
+    options.pageSize,
+    options.orientation,
+    options.margin,
+    options.customMarginsMm,
+    options.density,
     enrichedRecords,
     contextEnrichedBaseRecord,
     scopeId,
     savedWordTemplates,
     combinedTemplates,
   ]);
+
+  // Derived total pages for DocLab custom template reflecting both manual and automatic breaks
+  const docxTotalPages = useMemo<number>(() => {
+    if (!customDocxTemplate) return 1;
+    return Math.max(1, mergedDocxPages.length);
+  }, [customDocxTemplate, mergedDocxPages]);
 
   // Handle template selection
   const handleTemplateSelection = useCallback(
@@ -1097,6 +1122,7 @@ export function usePrintDocxEngine({
     contextEnrichedBaseRecord,
     enrichedRecords,
     mergedDocxPages,
+    docxTotalPages,
     handleTemplateSelection,
     handleApplyDocxTemplate,
     handleDeleteDocxTemplate,

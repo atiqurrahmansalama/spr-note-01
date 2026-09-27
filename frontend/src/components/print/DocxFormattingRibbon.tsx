@@ -219,7 +219,7 @@ export default function DocxFormattingRibbon({
   };
 
   const handleInsertPageBreak = useCallback(() => {
-    executeCommand('insertHTML', '<div class="spr-page-break" style="page-break-after: always;"><!-- spr-page-break --></div><p><br></p>');
+    executeCommand('insertHTML', '<div class="spr-page-break" data-manual-break="true" style="page-break-after: always;"><!-- spr-page-break --></div><p><br></p>');
   }, [executeCommand]);
 
   // Global Ctrl+Enter shortcut for inserting a page break in active document

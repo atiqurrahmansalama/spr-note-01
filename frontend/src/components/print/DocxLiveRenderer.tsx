@@ -1,5 +1,5 @@
 import React, { useRef, memo, useCallback, useEffect, useMemo } from 'react';
-import { separateDocxStylesAndBody } from './docxTemplateEngine';
+import { separateDocxStylesAndBody } from './docxStyleUtils';
 
 export interface DocxLiveRendererProps {
   htmlContent: string;
@@ -21,6 +21,9 @@ interface CaretBookmark {
   leafOffset: number;
   tagName?: string;
 }
+
+const ELEMENT_NODE_TYPE = typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1;
+const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 
 /**
  * Calculates absolute character offset and DOM hierarchy path of active caret
@@ -59,7 +62,7 @@ function getCaretBookmark(root: HTMLElement): CaretBookmark | null {
 
   const leafOffset = range.startOffset;
   const tagName =
-    range.startContainer.nodeType === Node.ELEMENT_NODE
+    range.startContainer.nodeType === ELEMENT_NODE_TYPE
       ? (range.startContainer as HTMLElement).tagName
       : range.startContainer.parentElement?.tagName;
 
@@ -90,7 +93,7 @@ function restoreCaretBookmark(root: HTMLElement, bookmark: CaretBookmark | null)
     if (targetNode) {
       try {
         const range = document.createRange();
-        if (targetNode.nodeType === Node.TEXT_NODE) {
+        if ((targetNode as any).nodeType === TEXT_NODE_TYPE) {
           const maxLen = targetNode.textContent?.length || 0;
           range.setStart(targetNode, Math.min(bookmark.leafOffset, maxLen));
         } else {
@@ -117,7 +120,7 @@ function restoreCaretBookmark(root: HTMLElement, bookmark: CaretBookmark | null)
 
     function traverse(node: Node) {
       if (found) return;
-      if (node.nodeType === Node.TEXT_NODE) {
+      if ((node as any).nodeType === TEXT_NODE_TYPE) {
         const textLen = node.textContent?.length || 0;
         if (currentOffset + textLen >= offset) {
           targetNode = node;
@@ -139,7 +142,7 @@ function restoreCaretBookmark(root: HTMLElement, bookmark: CaretBookmark | null)
     if (targetNode) {
       try {
         const range = document.createRange();
-        if (targetNode.nodeType === Node.TEXT_NODE) {
+        if ((targetNode as any).nodeType === TEXT_NODE_TYPE) {
           range.setStart(targetNode, targetOffset);
         } else {
           range.selectNodeContents(targetNode);
@@ -298,158 +301,11 @@ function DocxLiveRendererComponent({
     };
   }, []);
 
-  /**
-   * Splits a single overflowing paragraph at the exact text boundary crossing page bottom
-   */
-  const splitParagraphAtHeight = useCallback(
-    (pEl: HTMLElement, maxBottom: number): HTMLElement | null => {
-      if (typeof document === 'undefined' || !pEl) return null;
+  // Note: Automatic DOM overflow pagination has been migrated to DocumentLayoutEngine & PaginationEngine.
+  // The contentEditable DOM remains a continuous logical document, preventing ghost/stale breaks
+  // and corruption upon text deletion or margin/font changes.
+  // Manual page breaks (via Ctrl+Enter / toolbar) remain explicit semantic elements.
 
-      const textNodes: Node[] = [];
-      function collectText(n: Node) {
-        if (n.nodeType === Node.TEXT_NODE) textNodes.push(n);
-        else n.childNodes.forEach(collectText);
-      }
-      collectText(pEl);
-      if (textNodes.length === 0) return null;
-
-      const range = document.createRange();
-      let splitNode: Node | null = null;
-      let splitOffset = -1;
-
-      for (const tNode of textNodes) {
-        const len = tNode.textContent?.length || 0;
-        if (len === 0) continue;
-        for (let o = 0; o < len; o += 6) {
-          try {
-            range.setStart(tNode, o);
-            range.setEnd(tNode, Math.min(o + 1, len));
-            const rects = range.getClientRects();
-            if (rects.length > 0 && rects[0].bottom > maxBottom) {
-              splitNode = tNode;
-              splitOffset = o;
-              break;
-            }
-          } catch (e) {
-            // ignore range errors
-          }
-        }
-        if (splitNode) break;
-      }
-
-      if (splitNode && splitOffset > 0) {
-        const content = splitNode.textContent || '';
-        const lastSpace = content.lastIndexOf(' ', splitOffset);
-        const safeOffset = lastSpace > 10 ? lastSpace : splitOffset;
-
-        try {
-          const postRange = document.createRange();
-          postRange.setStart(splitNode, safeOffset);
-          postRange.setEnd(pEl, pEl.childNodes.length);
-          const postFrag = postRange.extractContents();
-
-          const p2 = document.createElement(pEl.tagName.toLowerCase());
-          Array.from(pEl.attributes).forEach((attr) => {
-            p2.setAttribute(attr.name, attr.value);
-          });
-          p2.appendChild(postFrag);
-          return p2;
-        } catch (err) {
-          console.warn('splitParagraphAtHeight error', err);
-        }
-      }
-
-      return null;
-    },
-    []
-  );
-
-  /**
-   * Automatically paginates content across discrete visual paper pages by inserting
-   * page-breaks directly into the unified DOM stream when height exceeds printable limits.
-   */
-  const autoPaginateOverflowInDom = useCallback(
-    (root: HTMLElement, pageHeightPx: number = 930): boolean => {
-      if (typeof document === 'undefined' || !root || !root.isConnected) return false;
-
-      const children = Array.from(root.children) as HTMLElement[];
-      if (children.length === 0) return false;
-
-      const rootRect = root.getBoundingClientRect();
-      let currentPageTop = rootRect.top;
-      let modified = false;
-
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-
-        if (child.classList.contains('spr-page-break')) {
-          const breakRect = child.getBoundingClientRect();
-          currentPageTop = breakRect.bottom;
-          continue;
-        }
-
-        const childRect = child.getBoundingClientRect();
-        const currentHeightFromPageTop = childRect.bottom - currentPageTop;
-
-        if (currentHeightFromPageTop > pageHeightPx) {
-          const prevSibling = child.previousElementSibling as HTMLElement | null;
-          if (prevSibling && prevSibling.classList.contains('spr-page-break')) {
-            continue;
-          }
-
-          const maxBottom = currentPageTop + pageHeightPx;
-          const tag = child.tagName.toLowerCase();
-
-          // In-paragraph split
-          if (
-            (tag === 'p' || tag === 'div' || tag.startsWith('h')) &&
-            (child.textContent?.length || 0) > 80
-          ) {
-            const p2 = splitParagraphAtHeight(child, maxBottom);
-            if (p2) {
-              const pageBreak = document.createElement('div');
-              pageBreak.className = 'spr-page-break';
-              pageBreak.contentEditable = 'false';
-              pageBreak.style.pageBreakAfter = 'always';
-              pageBreak.style.breakAfter = 'page';
-              pageBreak.innerHTML =
-                '<hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span>';
-
-              if (child.nextSibling) {
-                root.insertBefore(pageBreak, child.nextSibling);
-                root.insertBefore(p2, pageBreak.nextSibling);
-              } else {
-                root.appendChild(pageBreak);
-                root.appendChild(p2);
-              }
-
-              modified = true;
-              currentPageTop = pageBreak.getBoundingClientRect().bottom;
-              continue;
-            }
-          }
-
-          // Block-level boundary split
-          if (i > 0) {
-            const pageBreak = document.createElement('div');
-            pageBreak.className = 'spr-page-break';
-            pageBreak.contentEditable = 'false';
-            pageBreak.style.pageBreakAfter = 'always';
-            pageBreak.style.breakAfter = 'page';
-            pageBreak.innerHTML =
-              '<hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span>';
-
-            root.insertBefore(pageBreak, child);
-            modified = true;
-            currentPageTop = pageBreak.getBoundingClientRect().bottom;
-          }
-        }
-      }
-
-      return modified;
-    },
-    [splitParagraphAtHeight]
-  );
 
   const handleBlur = useCallback(() => {
     if (!isEditable) return;
@@ -482,48 +338,38 @@ function DocxLiveRendererComponent({
     debounceTimerRef.current = setTimeout(() => {
       if (!containerRef.current) return;
 
-      // Auto-paginate overflow into discrete visual sheets
-      const hasSplit = autoPaginateOverflowInDom(containerRef.current);
-      if (hasSplit && savedBookmarkRef.current) {
-        restoreCaretBookmark(containerRef.current, savedBookmarkRef.current);
-      }
-
       const currentHtml = containerRef.current.innerHTML;
       lastKnownHtmlRef.current = currentHtml;
       const finalExportHtml = activeStyles ? `<style>${activeStyles}</style>\n${currentHtml}` : currentHtml;
       onContentChange?.(finalExportHtml);
     }, 280);
-  }, [onContentChange, saveSelection, activeStyles, isEditable, autoPaginateOverflowInDom]);
+  }, [onContentChange, saveSelection, activeStyles, isEditable]);
 
-  // Paste handling: clean HTML, check overflow, and trigger automatic pagination
+  // Paste handling: clean HTML and emit update without destructive in-DOM splitting
   const handlePaste = useCallback(() => {
     if (!isEditable || !containerRef.current) return;
     setTimeout(() => {
       if (!containerRef.current) return;
       saveSelection();
-      const hasSplit = autoPaginateOverflowInDom(containerRef.current);
-      if (hasSplit && savedBookmarkRef.current) {
-        restoreCaretBookmark(containerRef.current, savedBookmarkRef.current);
-      }
       handleInput();
     }, 40);
-  }, [isEditable, autoPaginateOverflowInDom, saveSelection, handleInput]);
+  }, [isEditable, saveSelection, handleInput]);
 
   // Keyboard navigation, shortcuts, and page break insertion
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!isEditable || !containerRef.current) return;
 
-      // 1. Ctrl+Enter / Cmd+Enter: Insert explicit visual Page Break (Standard Word / Google Docs shortcut)
+      // 1. Ctrl+Enter / Cmd+Enter: Insert explicit semantic manual Page Break
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         try {
           const pageBreakHtml =
-            '<div class="spr-page-break" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+            '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
           document.execCommand('insertHTML', false, pageBreakHtml);
           handleInput();
         } catch (err) {
-          console.warn('Page break insertion error', err);
+          console.warn('Manual page break insertion error', err);
         }
         return;
       }
@@ -597,7 +443,7 @@ function DocxLiveRendererComponent({
       containerRef.current.focus({ preventScroll: true });
 
       const pageBreakHtml =
-        '<div class="spr-page-break" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+        '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && containerRef.current.contains(sel.anchorNode)) {
@@ -635,28 +481,23 @@ function DocxLiveRendererComponent({
       {/* Active Document CSS Style Element */}
       {activeStyles && <style dangerouslySetInnerHTML={{ __html: activeStyles }} />}
 
-      {/* Visual Page Break Styles */}
+      {/* Visual Manual Page Break Styles (Discrete Sheet Mode) */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
             .spr-page-break {
               display: block;
-              page-break-after: always;
-              break-after: page;
-              margin: 40px -42px 40px -42px;
+              margin: 16px 0;
               position: relative;
               user-select: none;
               -webkit-user-select: none;
-              background: #090d16;
-              padding: 20px 0;
-              border-top: 1.5px solid rgba(0, 0, 0, 0.4);
-              border-bottom: 1.5px solid rgba(0, 0, 0, 0.4);
-              box-shadow: inset 0 8px 16px -4px rgba(0, 0, 0, 0.75), inset 0 -8px 16px -4px rgba(0, 0, 0, 0.75);
+              padding: 6px 0;
               cursor: default;
             }
             .spr-page-break-divider {
               border: none;
-              border-top: 1px dashed rgba(255, 255, 255, 0.2);
+              border-top: 1px dashed var(--accent-main, #3b82f6);
+              opacity: 0.5;
               margin: 0;
             }
             .spr-page-break-badge {
@@ -664,32 +505,19 @@ function DocxLiveRendererComponent({
               top: 50%;
               left: 50%;
               transform: translate(-50%, -50%);
-              background: #1e293b;
-              padding: 3px 14px;
-              font-size: 10px;
+              background: var(--bg-elevated, #1e293b);
+              padding: 2px 10px;
+              font-size: 9.5px;
               font-weight: 700;
-              color: #94a3b8;
-              border: 1px solid rgba(255, 255, 255, 0.15);
+              color: var(--text-secondary, #94a3b8);
+              border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
               border-radius: 9999px;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-              letter-spacing: 0.06em;
+              letter-spacing: 0.05em;
               text-transform: uppercase;
               pointer-events: none;
             }
             @media print {
               .spr-page-break {
-                display: block !important;
-                page-break-after: always !important;
-                break-after: page !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                height: 0 !important;
-                border: none !important;
-                background: transparent !important;
-                box-shadow: none !important;
-              }
-              .spr-page-break-divider,
-              .spr-page-break-badge {
                 display: none !important;
               }
             }
@@ -738,4 +566,5 @@ function DocxLiveRendererComponent({
 }
 
 const DocxLiveRenderer = memo(DocxLiveRendererComponent);
+export { DocxLiveRenderer };
 export default DocxLiveRenderer;

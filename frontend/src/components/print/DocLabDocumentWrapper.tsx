@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { useTenant } from '../../context/TenantContext';
 import { BuildingOfficeIcon } from '../ui/Icons';
 import { PrintMetaItem, PrintOptions, PrintSignatureLine } from './types';
+import { RunningHeader, RunningFooter } from './layout/chrome';
+import { RuntimeLayoutVariables } from './layout/chrome/headerFooterTypes';
 
 export interface DocLabDocumentWrapperProps {
   title?: string;
@@ -361,16 +363,22 @@ export const DocLabDocumentWrapper: React.FC<DocLabDocumentWrapperProps> = ({
           </div>
         )}
 
-        {/* 6. Document Footer & Timestamp */}
+        {/* 6. Dynamic Running Footer & Page Numbering */}
         {showFooter && (
-          <div className="pt-1.5 border-t-[0.5px] border-slate-300 flex items-center justify-between text-[9.5px] text-slate-500 font-medium print:pt-1 print:text-[9px]">
-            <span>
-              Generated via SPR Note System • {printDate}, {printTime}
-            </span>
-            <span>
-              Page {pageIndex + 1} of {totalPages}
-            </span>
-          </div>
+          <RunningFooter
+            variables={{
+              pageIndex,
+              pageNumber: pageIndex + 1,
+              totalPages,
+              documentTitle: resolvedTitle,
+              documentSubtitle: resolvedSubtitle,
+              institutionName,
+              institutionAddress,
+              currentDate: printDate,
+              currentTime: printTime,
+            }}
+            customFooterText={options.customFooterText}
+          />
         )}
       </div>
     </div>

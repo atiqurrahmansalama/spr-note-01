@@ -4,6 +4,10 @@ import JSZip from 'jszip';
 
 import type { PrintPageSize, PrintOrientation, PrintMargin } from './types';
 import { parseTokenDirective, formatMultiValueData, type TokenDirectiveOptions } from './docLabDirectiveEngine';
+import { separateDocxStylesAndBody, sanitizeDocxStyles } from './docxStyleUtils';
+import { PaginationEngine } from './layout/pagination/PaginationEngine';
+
+export { separateDocxStylesAndBody, sanitizeDocxStyles };
 
 export type DocxTemplateType = 'template' | 'generated';
 
@@ -190,178 +194,38 @@ export function splitHtmlIntoPages(rawHtml: string): string[] {
 }
 
 /**
- * Intelligently paginates a single continuous HTML block across multiple pages
- * if its content (large tables, many paragraphs) exceeds the printable page height.
+ * @deprecated Use `PaginationEngine.paginate()` or `DocumentLayoutEngine` directly.
+ * Backward-compatible adapter for legacy callers requesting automated multi-page splitting.
  */
 export function autoPaginateHtmlSection(htmlSection: string, maxPageHeightPx: number = 960): string[] {
   if (!htmlSection || !htmlSection.trim()) return [''];
   if (typeof document === 'undefined') return [htmlSection];
 
   try {
-    const sandbox = document.createElement('div');
-    sandbox.innerHTML = htmlSection.trim();
+    const layout = PaginationEngine.paginate(htmlSection, {
+      pageSize: 'A4',
+      orientation: 'PORTRAIT',
+      margin: 'NORMAL',
+    });
 
-    // Check if the content is contained in a single wrapper (e.g. section.docx or docx-preview-content)
-    let rootEl: HTMLElement = sandbox;
-    const directChild = sandbox.firstElementChild as HTMLElement | null;
-    if (
-      directChild &&
-      sandbox.children.length === 1 &&
-      (directChild.tagName.toLowerCase() === 'section' ||
-        directChild.classList.contains('docx') ||
-        directChild.classList.contains('docx-preview-content') ||
-        directChild.classList.contains('docx-parsed-body'))
-    ) {
-      rootEl = directChild;
-    }
-
-    const childNodes = Array.from(rootEl.children) as HTMLElement[];
-    if (childNodes.length <= 1 && childNodes[0]?.tagName?.toLowerCase() !== 'table') {
-      return [htmlSection];
-    }
-
-    // Measure total estimated height of elements
-    let estimatedTotalHeight = 0;
-    const itemHeights: number[] = [];
-
-    for (let i = 0; i < childNodes.length; i++) {
-      const el = childNodes[i];
-      const tag = el.tagName.toLowerCase();
-      let h = 32;
-
-      if (tag === 'table') {
-        const trs = el.querySelectorAll('tr');
-        h = Math.max(60, trs.length * 36 + 16);
-      } else if (tag.startsWith('h')) {
-        h = 44;
-      } else if (tag === 'hr') {
-        h = 24;
-      } else {
-        const textLen = el.textContent?.trim().length || 0;
-        const lineCount = Math.max(1, Math.ceil(textLen / 75));
-        h = Math.max(28, lineCount * 22 + 12);
-      }
-
-      itemHeights.push(h);
-      estimatedTotalHeight += h;
-    }
-
-    // If total content fits within single page, return original section intact
-    if (estimatedTotalHeight <= maxPageHeightPx + 40) {
-      return [htmlSection];
-    }
-
-    // Otherwise, perform deterministic pagination across discrete page sheets
-    const pages: string[] = [];
-    let currentPageHtmlParts: string[] = [];
-    let currentAccumulatedHeight = 0;
-
-    for (let i = 0; i < childNodes.length; i++) {
-      const el = childNodes[i];
-      const tag = el.tagName.toLowerCase();
-      const elHeight = itemHeights[i];
-
-      // Handle large tables that need row-level splitting
-      if (tag === 'table' && currentAccumulatedHeight + elHeight > maxPageHeightPx) {
-        const tableEl = el as HTMLTableElement;
-        const trs = Array.from(tableEl.querySelectorAll('tr')) as HTMLTableRowElement[];
-
-        if (trs.length > 3) {
-          // Identify header row(s)
-          const thead = tableEl.querySelector('thead');
-          let headerTrs: HTMLTableRowElement[] = [];
-          let dataTrs: HTMLTableRowElement[] = [];
-
-          if (thead) {
-            headerTrs = Array.from(thead.querySelectorAll('tr')) as HTMLTableRowElement[];
-            dataTrs = (Array.from(tableEl.querySelectorAll('tbody tr, :scope > tr')) as HTMLTableRowElement[]).filter(
-              (r) => !headerTrs.includes(r)
-            );
-          } else {
-            // First row treated as header if it has <th> or is top row
-            const firstTr = trs[0];
-            headerTrs = [firstTr];
-            dataTrs = trs.slice(1);
-          }
-
-          const headerHtml = headerTrs.map((r) => r.outerHTML).join('');
-          const tableAttrs = getElementAttributesString(tableEl);
-
-          let tableCurrentRows: HTMLTableRowElement[] = [];
-          const headerHeight = headerTrs.length * 36;
-          let availableSpace = maxPageHeightPx - currentAccumulatedHeight - headerHeight;
-
-          if (availableSpace < 90 && currentPageHtmlParts.length > 0) {
-            // Flush current page and start table fresh on next page
-            pages.push(wrapPageHtml(currentPageHtmlParts, rootEl));
-            currentPageHtmlParts = [];
-            currentAccumulatedHeight = 0;
-            availableSpace = maxPageHeightPx - headerHeight;
-          }
-
-          for (let rIdx = 0; rIdx < dataTrs.length; rIdx++) {
-            const row = dataTrs[rIdx];
-            const rowHeight = 36;
-
-            if (availableSpace - rowHeight < 0 && tableCurrentRows.length > 0) {
-              // Flush current page table slice
-              const currentTableSlice = `<table ${tableAttrs}><thead>${headerHtml}</thead><tbody>${tableCurrentRows.map((r) => r.outerHTML).join('')}</tbody></table>`;
-              currentPageHtmlParts.push(currentTableSlice);
-              pages.push(wrapPageHtml(currentPageHtmlParts, rootEl));
-
-              // Reset for next page
-              currentPageHtmlParts = [];
-              tableCurrentRows = [row];
-              currentAccumulatedHeight = headerHeight + rowHeight;
-              availableSpace = maxPageHeightPx - currentAccumulatedHeight;
-            } else {
-              tableCurrentRows.push(row);
-              availableSpace -= rowHeight;
-              currentAccumulatedHeight += rowHeight;
-            }
-          }
-
-          if (tableCurrentRows.length > 0) {
-            const lastTableSlice = `<table ${tableAttrs}><thead>${headerHtml}</thead><tbody>${tableCurrentRows.map((r) => r.outerHTML).join('')}</tbody></table>`;
-            currentPageHtmlParts.push(lastTableSlice);
-          }
-          continue;
-        }
-      }
-
-      // Standard non-table block element
-      if (currentAccumulatedHeight + elHeight > maxPageHeightPx && currentPageHtmlParts.length > 0) {
-        pages.push(wrapPageHtml(currentPageHtmlParts, rootEl));
-        currentPageHtmlParts = [el.outerHTML];
-        currentAccumulatedHeight = elHeight;
-      } else {
-        currentPageHtmlParts.push(el.outerHTML);
-        currentAccumulatedHeight += elHeight;
+    if (layout && layout.pages && layout.pages.length > 0) {
+      const renderedPages = layout.pages.map((p) =>
+        p.fragments
+          .map((f) => f.htmlContent || f.textContent || '')
+          .filter((c) => c && c.trim())
+          .join('\n')
+      );
+      if (renderedPages.length > 0) {
+        return renderedPages;
       }
     }
-
-    if (currentPageHtmlParts.length > 0) {
-      pages.push(wrapPageHtml(currentPageHtmlParts, rootEl));
-    }
-
-    return pages.length > 0 ? pages : [htmlSection];
   } catch (err) {
-    console.warn('Auto-pagination error fallback:', err);
-    return [htmlSection];
+    console.warn('Auto-pagination layout engine adapter fallback:', err);
   }
+
+  return [htmlSection];
 }
 
-/**
- * Helper to preserve wrapper tags (such as section.docx) if original document had them
- */
-function wrapPageHtml(innerParts: string[], rootEl: HTMLElement): string {
-  const content = innerParts.join('\n');
-  if (rootEl.tagName.toLowerCase() === 'section') {
-    const attrs = getElementAttributesString(rootEl);
-    return `<section ${attrs}>${content}</section>`;
-  }
-  return content;
-}
 
 /**
  * Extracts element attributes as a clean string for element reconstruction
@@ -627,32 +491,7 @@ export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
 ];
 
 /**
- * Sanitizes and strips heavy GPU burdens from extracted Word (.docx) CSS.
- * Removes massive base64 font blobs, @font-face declarations, @keyframes, and GPU raster filters.
- */
-export function sanitizeDocxStyles(rawStyles: string): string {
-  if (!rawStyles) return '';
-  let cleanStyles = rawStyles;
-
-  // 1. Strip all @font-face declarations and base64 font blobs (massive GPU text cache hog)
-  cleanStyles = cleanStyles.replace(/@font-face\s*\{[\s\S]*?\}/gi, '');
-
-  // 2. Strip any base64 data URLs in styles
-  cleanStyles = cleanStyles.replace(/url\s*\(['"]?data:[^'"\)]+['"]?\)/gi, 'none');
-
-  // 3. Strip any @keyframes or infinite CSS animations
-  cleanStyles = cleanStyles.replace(/@keyframes[\s\S]*?\}\s*\}/gi, '');
-
-  // 4. Strip GPU raster filters, backdrop filters, will-change triggers
-  cleanStyles = cleanStyles.replace(/(?:filter|backdrop-filter|will-change)\s*:\s*[^;\}]+;?/gi, '');
-
-  // 5. Neutralize fixed section.docx / .docx-wrapper rules
-  cleanStyles = cleanStyles
-    .replace(/section\.docx\s*\{[^}]*\}/gi, 'section.docx { width: 100% !important; max-width: 100% !important; min-height: auto !important; height: auto !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; background-color: #ffffff !important; color: #0f172a !important; }')
-    .replace(/\.docx-wrapper\s*\{[^}]*\}/gi, '.docx-wrapper { padding: 0 !important; background-color: transparent !important; }');
-
-  return cleanStyles;
-}
+export { sanitizeDocxStyles, separateDocxStylesAndBody } from './docxStyleUtils';
 
 /**
  * Normalizes all SVG vector drawings, lines, and shapes in the parsed docx sandbox.
@@ -2157,26 +1996,7 @@ function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, any> 
 }
 
 /**
- * Splits docx HTML into distinct <style> blocks and body HTML content to prevent
- * massive style tag duplication when rendering multiple student pages.
- */
-export function separateDocxStylesAndBody(html: string): { styles: string; body: string } {
-  if (!html) return { styles: '', body: '' };
 
-  const styleRegex = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
-  const styles: string[] = [];
-  let match;
-  while ((match = styleRegex.exec(html)) !== null) {
-    const cleaned = sanitizeDocxStyles(match[0]);
-    if (cleaned) styles.push(cleaned);
-  }
-
-  const body = html.replace(styleRegex, '').trim();
-  return {
-    styles: styles.join('\n'),
-    body,
-  };
-}
 
 /**
  * Detects if a template is a Tabular Template (Type 1) containing repeating table rows or loop tags.

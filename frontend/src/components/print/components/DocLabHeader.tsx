@@ -100,9 +100,24 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
           DOC
         </div>
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-extrabold theme-text-primary text-base tracking-tight truncate leading-tight">
               DocLab
+            </span>
+            {title && (
+              <>
+                <span className="theme-text-muted text-xs hidden sm:inline">&bull;</span>
+                <span className="text-xs font-semibold theme-text-secondary truncate max-w-[160px] sm:max-w-[260px] hidden sm:inline" title={title}>
+                  {title}
+                </span>
+              </>
+            )}
+            {/* Dynamic Total Page Counter Pill / Badge */}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-2xs shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
+              <span>
+                {totalPages} {totalPages === 1 ? 'Page' : 'Pages'}
+              </span>
             </span>
           </div>
         </div>

@@ -171,6 +171,7 @@ export default function UniversalPrintStudio({
     docxRenderMode,
     setDocxRenderMode,
     mergedDocxPages,
+    docxTotalPages,
     handleTemplateSelection,
     handleApplyDocxTemplate,
     handleDeleteDocxTemplate,
@@ -336,7 +337,7 @@ export default function UniversalPrintStudio({
           subtitle={subtitle}
           totalPages={
             customDocxTemplate
-              ? Math.max(1, mergedDocxPages.length)
+              ? (docxTotalPages || Math.max(1, mergedDocxPages.length))
               : documents && documents.length > 0
               ? documents.length
               : batchDocuments && batchDocuments.length > 0

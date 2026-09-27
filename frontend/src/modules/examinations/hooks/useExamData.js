@@ -196,7 +196,7 @@ export default function useExamData() {
         value: id,
         label: name,
         departmentId: deptId !== null && deptId !== undefined ? String(deptId) : null,
-        departmentName: c.department_name || (typeof c.department === 'object' ? c.department.name : '') || '',
+        departmentName: c.department_name || (typeof c.department === 'object' ? c.department?.name : '') || '',
         code,
         classObj: c,
       });

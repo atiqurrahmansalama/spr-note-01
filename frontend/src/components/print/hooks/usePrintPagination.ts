@@ -16,9 +16,14 @@ interface UsePrintPaginationParams {
 }
 
 /**
- * usePrintPagination
- * Computes active visible rows (respecting mandatory rules) and performs
- * deterministic multi-page pagination with extra blank rows.
+ * usePrintPagination (MODE A — Native / Tabular Print Pagination Engine)
+ *
+ * Dedicated strictly to Mode A: structured grid / tabular printing.
+ * Performs deterministic row-based slicing based on page size and density,
+ * interleaving active data, mandatory rows, and blank lines.
+ *
+ * (Note: Mode B — Custom Word/DocLab continuous documents uses geometry-based
+ * DocumentLayoutEngine & PaginationEngine instead).
  */
 export function usePrintPagination({
   liveData,
