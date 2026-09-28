@@ -1,12 +1,6 @@
-/**
- * MeasurementEngine
- * Unified high-level measurement facade for DocLab Layout Architecture.
- *
- * Core Concept:
- * measure(node, context) -> NodeMeasurementResult
- */
-
 import { SourceNode } from '../types/documentTypes';
+import { CanonicalDocument, BlockNode } from '../../model/types';
+import { HtmlExporter } from '../../model/serialization/htmlExporter';
 import { DomMeasurementEngine } from './DomMeasurementEngine';
 import { MeasurementCache } from './MeasurementCache';
 import {
@@ -18,10 +12,10 @@ const ELEMENT_NODE_TYPE = typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1;
 
 export class MeasurementEngine {
   /**
-   * Primary entrypoint: measures any DOM element, SourceNode, or HTML snippet with optional caching
+   * Primary entrypoint: measures any DOM element, BlockNode, SourceNode, or HTML snippet with optional caching
    */
   public static measure(
-    target: HTMLElement | SourceNode | string,
+    target: HTMLElement | BlockNode | SourceNode | string,
     context: MeasurementContext,
     useCache: boolean = true
   ): NodeMeasurementResult {
@@ -30,6 +24,78 @@ export class MeasurementEngine {
     // 1. Direct HTMLElement input
     if (typeof target === 'object' && target !== null && 'nodeType' in target && (target as any).nodeType === ELEMENT_NODE_TYPE) {
       return DomMeasurementEngine.measureElement(target as HTMLElement, context);
+    }
+
+    // 2. Canonical Model BlockNode input
+    if (typeof target === 'object' && target !== null && 'type' in target && !('rawHtml' in target) && !('nodeType' in target)) {
+      const block = target as BlockNode;
+      if (block.type === 'manual-page-break') {
+        return {
+          nodeId: block.id,
+          type: 'manual-page-break',
+          width: context.containerWidth || 700,
+          height: 1,
+          boundingRect: { x: 0, y: 0, width: context.containerWidth || 700, height: 1 },
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          totalOuterHeight: 1,
+          breakOpportunities: [],
+          isAtomic: false,
+          isManualBreak: true,
+          keepTogether: false,
+          keepWithNext: false,
+        };
+      }
+
+      if (block.type === 'table') {
+        const table = block as any;
+        const rows = table.rows || [];
+        const fontSize = context.fontSizePx || 14;
+        const rowHeight = Math.max(28, fontSize * 2.2);
+        const totalHeight = Math.max(rowHeight, rows.length * rowHeight);
+        return {
+          nodeId: block.id,
+          type: 'table',
+          width: context.containerWidth || 700,
+          height: totalHeight,
+          boundingRect: { x: 0, y: 0, width: context.containerWidth || 700, height: totalHeight },
+          marginTop: 0,
+          marginBottom: 12,
+          paddingTop: 0,
+          paddingBottom: 0,
+          totalOuterHeight: totalHeight + 12,
+          breakOpportunities: [],
+          isAtomic: false,
+          isManualBreak: false,
+          keepTogether: false,
+          keepWithNext: false,
+        };
+      }
+
+      const html = HtmlExporter.serializeBlock(block, { tokenFormat: 'mustache' });
+      const cacheKey = useCache ? cache.generateKey(block.id, html, context) : null;
+      if (cacheKey) {
+        const cached = cache.get(cacheKey);
+        if (cached) return cached;
+      }
+
+      const results = DomMeasurementEngine.measureHtmlNodes(html, context);
+      const measured = results.length > 0
+        ? {
+            ...results[0],
+            nodeId: block.id,
+            type: block.type as any,
+            isAtomic: block.type === 'image',
+            isManualBreak: false,
+            keepTogether: block.type === 'image',
+            keepWithNext: block.type === 'heading',
+          }
+        : this.createFallbackMeasurement(block.id, block.type, context);
+
+      if (cacheKey) cache.set(cacheKey, measured);
+      return measured;
     }
 
     // 2. Raw HTML string
@@ -77,10 +143,23 @@ export class MeasurementEngine {
    * Measures a batch of nodes in a single layout pass to prevent layout thrashing
    */
   public static measureBatch(
-    nodes: Array<HTMLElement | SourceNode | string>,
-    context: MeasurementContext
+    nodes: Array<HTMLElement | BlockNode | SourceNode | string>,
+    context: MeasurementContext,
+    useCache: boolean = true
   ): NodeMeasurementResult[] {
-    return nodes.map((node) => this.measure(node, context));
+    return nodes.map((node) => this.measure(node, context, useCache));
+  }
+
+  /**
+   * Measures an entire CanonicalDocument AST in an optimized layout pass
+   */
+  public static measureDocument(
+    doc: CanonicalDocument,
+    context: MeasurementContext,
+    useCache: boolean = true
+  ): NodeMeasurementResult[] {
+    if (!doc || !doc.body) return [];
+    return this.measureBatch(doc.body, context, useCache);
   }
 
   /**

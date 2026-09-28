@@ -174,7 +174,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
       const container = document.createElement('div');
       container.innerHTML = rawHtml;
       const runtimeElements = container.querySelectorAll(
-        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer'
+        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper'
       );
       runtimeElements.forEach((el) => el.parentNode?.removeChild(el));
       return container.innerHTML;
@@ -185,7 +185,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
 
   return rawHtml
     .replace(
-      /<div\b[^>]*?(?:data-spr-runtime-pagination="true"|class=["'][^"']*?(?:spr-runtime-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer)[^"']*?["']|data-runtime-spacer="true"|data-runtime-guide="true")[^>]*?>[\s\S]*?<\/div>/gi,
+      /<div\b[^>]*?(?:data-spr-runtime-pagination="true"|class=["'][^"']*?(?:spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper)[^"']*?["']|data-runtime-spacer="true"|data-runtime-guide="true")[^>]*?>[\s\S]*?<\/div>/gi,
       ''
     )
     .replace(/<!--\s*spr-page-break:runtime[\s\S]*?-->/gi, '');
@@ -359,10 +359,14 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         else if (tag === 'ul' || tag === 'ol') type = 'list';
         else if (tag === 'img' || tag === 'figure') type = 'image';
         else if (tag === 'blockquote') type = 'paragraph';
-        else if (tag === 'div') type = 'container' as any;
+        const explicitId =
+          (block.match(/data-node-id=["']([^"']+)["']/i)?.[1]) ||
+          (block.match(/data-source-id=["']([^"']+)["']/i)?.[1]) ||
+          (block.match(/id=["']([^"']+)["']/i)?.[1]) ||
+          `node_${idx}`;
 
         return {
-          id: `node_${idx}`,
+          id: explicitId,
           type,
           rawHtml: block,
           textContent: block.replace(/<[^>]+>/g, ''),
@@ -527,8 +531,14 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         const isAvoidBreak = el.classList.contains('print-avoid-break') || el.classList.contains('keep-together');
         const isKeepNext = el.classList.contains('keep-with-next');
 
+        const explicitElId =
+          el.getAttribute('data-node-id') ||
+          el.getAttribute('data-source-id') ||
+          el.id ||
+          `block_${idx}`;
+
         nodes.push({
-          id: `block_${idx}`,
+          id: explicitElId,
           type: tag === 'ul' || tag === 'ol' ? 'list' : 'paragraph',
           rawHtml: el.outerHTML,
           textContent: el.textContent || '',

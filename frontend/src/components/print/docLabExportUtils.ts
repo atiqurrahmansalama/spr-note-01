@@ -1,10 +1,21 @@
 import React from 'react';
 import html2canvas from 'html2canvas-pro';
-import { exportToNativeDocx, compileNativeDocxDocument, compileCanvasToNativeDocx } from './vectorDocxCompiler';
-import { compileVectorPDFDocument, getSafeFilename } from './vectorPDFCompiler';
+import {
+  exportToNativeDocx,
+  compileNativeDocxDocument,
+  compileCanvasToNativeDocx,
+  compileCanonicalDocumentToDocx,
+  compileLayoutDocumentToDocx,
+} from './vectorDocxCompiler';
+import {
+  compileVectorPDFDocument,
+  compileLayoutDocumentToPDF,
+  getSafeFilename,
+} from './vectorPDFCompiler';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
-
 import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
+import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
+import { CanonicalDocument } from './model/types';
 
 export { getSafeFilename };
 
@@ -92,6 +103,7 @@ function collectDocumentStyles(): string {
 }
 
 export interface ExportToPDFParams {
+  layoutDocument?: LayoutDocument;
   targetId?: string;
   title?: string;
   subtitle?: string;
@@ -113,6 +125,7 @@ export interface ExportToPDFParams {
  * 2. Client-Side Vector PDF Exporter (100% True Vector PDF)
  */
 export async function exportToPDF({
+  layoutDocument,
   targetId = 'universal-print-portal',
   title = 'Official_Document',
   subtitle = '',
@@ -142,6 +155,18 @@ export async function exportToPDF({
     pageSize: (pageSize || options.pageSize || 'A4') as any,
     margin: (margin || options.margin || 'NORMAL') as any,
   };
+
+  // Priority 1: LayoutDocument Vector PDF compiler
+  if (layoutDocument) {
+    try {
+      const doc = compileLayoutDocumentToPDF(layoutDocument, effectiveOptions);
+      doc.save(getSafeFilename(title || layoutDocument.title || 'Document', 'pdf'));
+      showToast?.('Vector PDF downloaded successfully!', 'success');
+      return;
+    } catch (layoutPdfErr) {
+      console.warn('Layout Vector PDF compilation fallback:', layoutPdfErr);
+    }
+  }
 
   const hasTabularData = Array.isArray(columns) && columns.length > 0 && Array.isArray(data) && data.length > 0;
 
@@ -333,15 +358,17 @@ export function exportToExcel({
     }
 
     const csvContent = '\uFEFF' + csvLines.join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', getSafeFilename(title, 'csv'));
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (typeof document !== 'undefined') {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', getSafeFilename(title, 'csv'));
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
     showToast?.('Excel spreadsheet (.csv) downloaded successfully!', 'success');
   } catch (err) {
     console.error('Excel export error:', err);
@@ -437,15 +464,17 @@ export function exportToPlainText({
       });
     }
 
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getSafeFilename(title, 'txt');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (typeof document !== 'undefined') {
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = getSafeFilename(title, 'txt');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
     showToast?.('Plain text file (.txt) downloaded successfully!', 'success');
   } catch (err) {
     console.error('Plain text export error:', err);
@@ -463,7 +492,67 @@ export async function exportToWord(params: any = {}): Promise<void> {
   });
 }
 
-export { exportToNativeDocx, compileNativeDocxDocument, compileCanvasToNativeDocx };
+export {
+  exportToNativeDocx,
+  compileNativeDocxDocument,
+  compileCanvasToNativeDocx,
+  compileCanonicalDocumentToDocx,
+  compileLayoutDocumentToDocx,
+};
+
+/**
+ * Exports a computed LayoutDocument directly to a multi-page Vector PDF.
+ */
+export async function exportLayoutDocumentToPDF(
+  layoutDocument: LayoutDocument,
+  options: Partial<PrintOptions> = {},
+  title: string = 'Official_Document',
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void
+): Promise<void> {
+  showToast?.('Generating Layout Vector PDF...', 'info');
+  try {
+    const doc = compileLayoutDocumentToPDF(layoutDocument, options);
+    doc.save(getSafeFilename(title || layoutDocument.title || 'Document', 'pdf'));
+    showToast?.('Vector PDF downloaded successfully!', 'success');
+  } catch (err: any) {
+    console.error('Layout PDF export failed:', err);
+    showToast?.('Failed to export PDF: ' + (err?.message || 'Unknown error'), 'error');
+  }
+}
+
+/**
+ * Exports a computed LayoutDocument directly to an OpenXML DOCX file.
+ */
+export async function exportLayoutDocumentToDocx(
+  layoutDocument: LayoutDocument,
+  options: any = {},
+  title: string = 'Official_Document',
+  showToast?: (msg: string, type?: string) => void
+): Promise<void> {
+  return exportToNativeDocx({
+    layoutDocument,
+    title: title || layoutDocument.title || 'Document',
+    options,
+    showToast,
+  });
+}
+
+/**
+ * Exports a CanonicalDocument AST directly to an OpenXML DOCX file.
+ */
+export async function exportCanonicalDocumentToDocx(
+  canonicalDocument: CanonicalDocument,
+  options: any = {},
+  title: string = 'Official_Document',
+  showToast?: (msg: string, type?: string) => void
+): Promise<void> {
+  return exportToNativeDocx({
+    canonicalDocument,
+    title: title || canonicalDocument.title || 'Document',
+    options,
+    showToast,
+  });
+}
 
 /**
  * 6 & 7. Lossless PNG & JPEG Image Exporter (300+ DPI Ultra HD)
@@ -536,6 +625,82 @@ export async function exportToImage({
   }
 }
 
+export interface ExportLayoutImagesParams {
+  layoutDocument?: LayoutDocument;
+  targetId?: string;
+  title?: string;
+  format?: 'png' | 'jpg' | 'jpeg';
+  quality?: number;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}
+
+/**
+ * Discrete Multi-Page Image Exporter consuming LayoutDocument
+ */
+export async function exportLayoutDocumentToImages({
+  layoutDocument,
+  targetId = 'universal-print-portal',
+  title = 'Official_Document',
+  format = 'png',
+  quality = 1.0,
+  showToast,
+  onCustomExport,
+}: ExportLayoutImagesParams): Promise<void> {
+  if (onCustomExport) {
+    onCustomExport();
+    return;
+  }
+
+  const isPng = format.toLowerCase() === 'png';
+  showToast?.(`Generating high-resolution ${isPng ? 'PNG' : 'JPG'} images...`, 'info');
+
+  const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
+  if (!portalEl) {
+    showToast?.('Canvas element not available for image generation.', 'error');
+    return;
+  }
+
+  try {
+    const sheetEls = Array.from(portalEl.querySelectorAll('.paper-sheet')) as HTMLElement[];
+    if (sheetEls.length === 0) {
+      await exportToImage({ targetId, title, format, quality, showToast });
+      return;
+    }
+
+    const mimeType = isPng ? 'image/png' : 'image/jpeg';
+    const effectiveExt = isPng ? 'png' : 'jpg';
+
+    for (let i = 0; i < sheetEls.length; i++) {
+      const sheet = sheetEls[i];
+      const pageCanvas = await html2canvas(sheet, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const dataUrl = pageCanvas.toDataURL(mimeType, isPng ? 1.0 : (quality || 0.98));
+      const pageTitle = sheetEls.length > 1 ? `${title}_Page_${i + 1}` : title;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = getSafeFilename(pageTitle, effectiveExt);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    showToast?.(
+      `High-resolution ${isPng ? 'PNG' : 'JPG'} ${sheetEls.length > 1 ? 'pages' : 'image'} downloaded successfully!`,
+      'success'
+    );
+  } catch (err: any) {
+    console.error('Image export failed:', err);
+    showToast?.(`Failed to export ${isPng ? 'PNG' : 'JPG'}: ` + (err?.message || 'Unknown error'), 'error');
+  }
+}
+
 /**
  * 8. Standalone Vector SVG (.svg) Document Exporter
  */
@@ -566,7 +731,6 @@ export async function exportToSVG({
   try {
     const clone = portalEl.cloneNode(true) as HTMLElement;
 
-    // Clean up unwanted non-printable elements in clone
     const removeSelectors = [
       '.print\\:hidden',
       '.print-studio-no-print',
@@ -584,10 +748,7 @@ export async function exportToSVG({
     const width = Math.max(Math.round(rect.width) || 794, 794);
     const height = Math.max(Math.round(rect.height) || 1123, 1123);
 
-    // Collect all document styles
     const styles = collectDocumentStyles();
-
-    // Serialize cleaned inner content into self-contained XML SVG
     const serializer = new XMLSerializer();
     const serializedHtml = serializer.serializeToString(clone);
 
@@ -623,4 +784,248 @@ export async function exportToSVG({
     showToast?.('Failed to export vector SVG: ' + (err?.message || 'Unknown error'), 'error');
   }
 }
+
+export interface ExportLayoutSVGParams {
+  layoutDocument?: LayoutDocument;
+  targetId?: string;
+  title?: string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+}
+
+/**
+ * Standalone Vector SVG Document Exporter consuming LayoutDocument
+ */
+export async function exportLayoutDocumentToSVG({
+  layoutDocument,
+  targetId = 'universal-print-portal',
+  title = 'Official_Document',
+  showToast,
+  onCustomExport,
+}: ExportLayoutSVGParams): Promise<void> {
+  if (onCustomExport) {
+    onCustomExport();
+    return;
+  }
+
+  showToast?.('Generating standalone vector SVG document...', 'info');
+
+  const styles = collectDocumentStyles();
+
+  if (layoutDocument && layoutDocument.pages && layoutDocument.pages.length > 0) {
+    try {
+      const pages = layoutDocument.pages;
+      pages.forEach((page, pIdx) => {
+        const pageW = page.width || 794;
+        const pageH = page.height || 1123;
+        const pageHtml = page.htmlContent || '';
+        const pageTitle = pages.length > 1 ? `${title}_Page_${pIdx + 1}` : title;
+
+        const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+  <defs>
+    <style type="text/css"><![CDATA[
+      ${styles}
+      body { margin: 0; padding: 0; background: #ffffff; font-family: Inter, system-ui, sans-serif; }
+    ]]></style>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <foreignObject width="100%" height="100%" x="0" y="0">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width: 100%; height: 100%; background: #ffffff; padding: ${page.margins?.top ?? 48}px ${page.margins?.right ?? 48}px ${page.margins?.bottom ?? 48}px ${page.margins?.left ?? 48}px; box-sizing: border-box;">
+      ${pageHtml}
+    </div>
+  </foreignObject>
+</svg>`;
+
+        if (typeof document !== 'undefined') {
+          const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = getSafeFilename(pageTitle, 'svg');
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+      });
+
+      showToast?.('Vector SVG (.svg) document downloaded successfully!', 'success');
+      return;
+    } catch (svgErr: any) {
+      console.warn('Direct Layout SVG export error, falling back to DOM SVG:', svgErr);
+    }
+  }
+
+  await exportToSVG({ targetId, title, showToast });
+}
+
+export interface UnifiedExportParams {
+  format: 'screen' | 'print' | 'pdf' | 'docx' | 'png' | 'jpg' | 'jpeg' | 'svg' | 'excel' | 'csv' | 'txt';
+  layoutDocument?: LayoutDocument;
+  canonicalDocument?: CanonicalDocument;
+  targetId?: string;
+  title?: string;
+  subtitle?: string;
+  options?: Partial<PrintOptions>;
+  columns?: PrintColumn[];
+  visibleColumnKeys?: string[];
+  data?: Array<Record<string, any>>;
+  metaItems?: PrintMetaItem[];
+  summaryMetrics?: PrintSummaryMetric[];
+  extraBlankRows?: number | string;
+  showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onCustomExport?: (() => void) | null;
+  onExportCsv?: (() => void) | null;
+}
+
+/**
+ * Unified Master Exporter Pipeline Dispatcher.
+ * Guarantees that Screen, Print, PDF, DOCX, Images, and SVG all consume
+ * the exact same computed LayoutDocument or CanonicalDocument structure.
+ */
+export async function exportDocument(params: UnifiedExportParams): Promise<void> {
+  const {
+    format,
+    layoutDocument,
+    canonicalDocument,
+    targetId = 'universal-print-portal',
+    title = 'Official_Document',
+    subtitle = '',
+    options = {},
+    columns = [],
+    visibleColumnKeys = [],
+    data = [],
+    metaItems = [],
+    summaryMetrics = [],
+    extraBlankRows = 0,
+    showToast,
+    onCustomExport,
+    onExportCsv,
+  } = params;
+
+  if (onCustomExport) {
+    onCustomExport();
+    return;
+  }
+
+  const normFormat = (format || '').toLowerCase().trim();
+
+  switch (normFormat) {
+    case 'screen':
+      // Screen rendering consumes LayoutDocument directly in React
+      return;
+
+    case 'print':
+      printDocument(options);
+      return;
+
+    case 'pdf':
+      if (layoutDocument) {
+        await exportLayoutDocumentToPDF(layoutDocument, options, title, showToast);
+      } else {
+        await exportToPDF({
+          targetId,
+          title,
+          subtitle,
+          options,
+          columns,
+          visibleColumnKeys,
+          data,
+          metaItems,
+          summaryMetrics,
+          extraBlankRows,
+          showToast,
+        });
+      }
+      return;
+
+    case 'docx':
+    case 'word':
+    case 'doc':
+      if (canonicalDocument) {
+        await exportCanonicalDocumentToDocx(canonicalDocument, options, title, showToast);
+      } else if (layoutDocument) {
+        await exportLayoutDocumentToDocx(layoutDocument, options, title, showToast);
+      } else {
+        await exportToWord({
+          targetId,
+          title,
+          subtitle,
+          options,
+          columns,
+          visibleColumnKeys,
+          data,
+          metaItems,
+          summaryMetrics,
+          extraBlankRows,
+          showToast,
+        });
+      }
+      return;
+
+    case 'png':
+      await exportLayoutDocumentToImages({
+        layoutDocument,
+        targetId,
+        title,
+        format: 'png',
+        showToast,
+      });
+      return;
+
+    case 'jpg':
+    case 'jpeg':
+      await exportLayoutDocumentToImages({
+        layoutDocument,
+        targetId,
+        title,
+        format: 'jpg',
+        showToast,
+      });
+      return;
+
+    case 'svg':
+      await exportLayoutDocumentToSVG({
+        layoutDocument,
+        targetId,
+        title,
+        showToast,
+      });
+      return;
+
+    case 'excel':
+    case 'csv':
+      exportToExcel({
+        columns,
+        visibleColumnKeys,
+        data,
+        summaryMetrics,
+        metaItems,
+        subtitle,
+        title,
+        showToast,
+        onExportCsv,
+      });
+      return;
+
+    case 'txt':
+    case 'text':
+      exportToPlainText({
+        columns,
+        visibleColumnKeys,
+        data,
+        summaryMetrics,
+        metaItems,
+        subtitle,
+        title,
+        showToast,
+      });
+      return;
+
+    default:
+      console.warn(`Unsupported export format: ${format}`);
+  }
+}
+
 

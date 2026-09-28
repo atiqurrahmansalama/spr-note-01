@@ -11,7 +11,7 @@ import { NodeMeasurementResult, MeasurementContext } from './measurementTypes';
 export class MeasurementCache {
   private static instance: MeasurementCache | null = null;
   private cache = new Map<string, NodeMeasurementResult>();
-  private maxEntries = 500;
+  private maxEntries = 2500;
   private hitCount = 0;
   private missCount = 0;
 
@@ -20,6 +20,35 @@ export class MeasurementCache {
       this.instance = new MeasurementCache();
     }
     return this.instance;
+  }
+
+  /**
+   * Estimates complex script vertical metrics (Bengali / Arabic / Urdu)
+   */
+  public static estimateScriptAdjustment(text: string): { heightMultiplier: number; charWidthMultiplier: number } {
+    let bengaliCount = 0;
+    let arabicCount = 0;
+    const len = text.length;
+
+    for (let i = 0; i < len; i++) {
+      const code = text.charCodeAt(i);
+      if (code >= 0x0980 && code <= 0x09ff) {
+        bengaliCount++;
+      } else if (code >= 0x0600 && code <= 0x06ff) {
+        arabicCount++;
+      }
+    }
+
+    if (bengaliCount > len * 0.2) {
+      // Bengali conjuncts and matras require slightly taller line box
+      return { heightMultiplier: 1.12, charWidthMultiplier: 1.05 };
+    }
+    if (arabicCount > len * 0.2) {
+      // Arabic cursive nastaliq vertical flow
+      return { heightMultiplier: 1.15, charWidthMultiplier: 1.08 };
+    }
+
+    return { heightMultiplier: 1.0, charWidthMultiplier: 1.0 };
   }
 
   /**
@@ -36,12 +65,14 @@ export class MeasurementCache {
     const fontSize = context.fontSizePx || 16;
     const lineHeight = context.lineHeight || 1.5;
     const font = context.fontFamily || 'default';
-    // Simple fast DJB2-like hash for content
+    // Robust fast hash for content
     let hash = 5381;
-    for (let i = 0; i < Math.min(content.length, 120); i++) {
+    const len = content.length;
+    const step = len > 200 ? Math.floor(len / 100) : 1;
+    for (let i = 0; i < len; i += step) {
       hash = (hash * 33) ^ content.charCodeAt(i);
     }
-    return `${nodeId}:${hash >>> 0}:${width}:${density}:${scale}:${fontSize}:${lineHeight}:${font}`;
+    return `${nodeId}:${len}:${hash >>> 0}:${width}:${density}:${scale}:${fontSize}:${lineHeight}:${font}`;
   }
 
   public get(key: string): NodeMeasurementResult | undefined {
@@ -70,7 +101,7 @@ export class MeasurementCache {
 
   public invalidate(nodeId: string): void {
     for (const key of this.cache.keys()) {
-      if (key.startsWith(`${nodeId}:`)) {
+      if (key === nodeId || key.startsWith(`${nodeId}:`)) {
         this.cache.delete(key);
       }
     }
@@ -83,11 +114,13 @@ export class MeasurementCache {
   }
 
   public getStats() {
+    const total = this.hitCount + this.missCount;
     return {
       size: this.cache.size,
       maxEntries: this.maxEntries,
       hitCount: this.hitCount,
       missCount: this.missCount,
+      hitRate: total > 0 ? (this.hitCount / total) * 100 : 0,
     };
   }
 }

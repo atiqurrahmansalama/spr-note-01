@@ -152,8 +152,13 @@ export function runPhase1CanonicalVerification() {
   console.log('================================================================');
 
   if (!allPassed) {
-    process.exit(1);
+    if (typeof process !== 'undefined' && process?.exit) {
+      process.exit(1);
+    }
   }
+  return allPassed;
 }
 
-runPhase1CanonicalVerification();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_phase1_canonical_pages')) {
+  runPhase1CanonicalVerification();
+}

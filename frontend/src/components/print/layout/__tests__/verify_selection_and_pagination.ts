@@ -162,5 +162,6 @@ export function runSelectionAndPaginationTestSuite() {
   };
 }
 
-// Execute immediately when evaluated
-runSelectionAndPaginationTestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_selection_and_pagination')) {
+  runSelectionAndPaginationTestSuite();
+}

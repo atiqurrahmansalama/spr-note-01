@@ -211,5 +211,6 @@ export function runPhase5ManualBreakTestSuite() {
   return results;
 }
 
-// Execute immediately when run
-runPhase5ManualBreakTestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_phase5_manual_breaks')) {
+  runPhase5ManualBreakTestSuite();
+}

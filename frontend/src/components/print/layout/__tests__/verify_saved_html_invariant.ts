@@ -169,5 +169,6 @@ export function runSavedHtmlInvariantTestSuite() {
   return results;
 }
 
-// Execute immediately when evaluated
-runSavedHtmlInvariantTestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_saved_html_invariant')) {
+  runSavedHtmlInvariantTestSuite();
+}

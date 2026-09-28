@@ -10,11 +10,9 @@ import {
   mergeTabularTemplateWithData,
   isTabularTemplate,
   separateDocxStylesAndBody,
-  splitHtmlIntoPages,
-  joinPagesIntoHtml,
 } from '../docxTemplateEngine';
 import { PaginationEngine } from '../layout/pagination/PaginationEngine';
-import { stripRuntimePaginationSpacers, sanitizeLogicalDocumentHtml } from '../layout/logicalDocument';
+import { sanitizeLogicalDocumentHtml } from '../layout/logicalDocument';
 import {
   getDefaultTemplateForScope,
   setDefaultTemplateForScope,

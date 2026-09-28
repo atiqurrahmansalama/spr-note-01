@@ -4,6 +4,11 @@
  *
  * Sits in the reserved header zone outside the continuous document flow.
  * Interpolates runtime variables without mutating persistent template storage.
+ * Supports:
+ * - Full Institutional branding header on Page 1 (or all pages)
+ * - Compact running continuation subheader on Pages 2+
+ * - Custom running header text with token interpolation
+ * - Section-aware header title display
  */
 
 import React from 'react';
@@ -38,6 +43,21 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
         className={`print-running-header w-full print:block ${className}`}
         dangerouslySetInnerHTML={{ __html: resolvedHtml }}
       />
+    );
+  }
+
+  // Custom Running Header Text Pattern (e.g. "{{document.title}} • {{institution.name}}")
+  if (config.runningHeaderText && (!isFirstPage || !config.showFirstPageHeader)) {
+    const resolvedText = RuntimeVariableResolver.resolve(config.runningHeaderText, variables);
+    return (
+      <header className={`print-running-continuation-header pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold ${className}`}>
+        <span className="uppercase tracking-wide text-slate-800">
+          {resolvedText}
+        </span>
+        <span className="font-mono text-[11px] text-slate-500 font-medium">
+          Page {variables.pageNumber} of {variables.totalPages}
+        </span>
+      </header>
     );
   }
 
@@ -91,10 +111,11 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
   }
 
   // Subsequent Pages (Page 2+) Continuation Subheader
+  const sectionPart = variables.sectionTitle ? ` • ${variables.sectionTitle}` : '';
   return (
     <header className={`print-running-continuation-header pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold ${className}`}>
       <span className="uppercase tracking-wide text-slate-900">
-        {variables.documentTitle} (Continued)
+        {variables.documentTitle}{sectionPart} (Continued)
       </span>
       <span className="font-mono text-[11px] text-slate-500 font-medium">
         Page {variables.pageNumber} of {variables.totalPages}

@@ -17,10 +17,16 @@ import {
   exportToWord,
   exportToImage,
   exportToSVG,
+  exportLayoutDocumentToImages,
+  exportLayoutDocumentToSVG,
 } from './docLabExportUtils';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
+import { LayoutDocument } from './layout/types/paginationTypes';
+import { CanonicalDocument } from './model/types';
 
 export interface DocLabExportMenuProps {
+  layoutDocument?: LayoutDocument;
+  canonicalDocument?: CanonicalDocument;
   title?: string;
   subtitle?: string;
   metaItems?: PrintMetaItem[];
@@ -61,6 +67,8 @@ export interface DocLabExportMenuProps {
  * Fully switchable format support (Print, PDF, Excel, Text, Word, PNG, JPG).
  */
 export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
+  layoutDocument,
+  canonicalDocument,
   title = 'Official Document',
   subtitle = '',
   metaItems = [],
@@ -157,6 +165,7 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
         badge: '.pdf',
         onClick: () =>
           exportToPDF({
+            layoutDocument,
             title,
             subtitle,
             metaItems,
@@ -235,6 +244,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
         badge: '.docx',
         onClick: () =>
           exportToWord({
+            layoutDocument,
+            canonicalDocument,
             title,
             subtitle,
             metaItems,
@@ -264,7 +275,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
         icon: ImageIcon,
         badge: '.png',
         onClick: () =>
-          exportToImage({
+          exportLayoutDocumentToImages({
+            layoutDocument,
             title,
             format: 'png',
             showToast,
@@ -281,7 +293,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
         icon: ImageIcon,
         badge: '.jpg',
         onClick: () =>
-          exportToImage({
+          exportLayoutDocumentToImages({
+            layoutDocument,
             title,
             format: 'jpg',
             showToast,
@@ -298,7 +311,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
         icon: SvgIcon,
         badge: '.svg',
         onClick: () =>
-          exportToSVG({
+          exportLayoutDocumentToSVG({
+            layoutDocument,
             title,
             showToast,
             onCustomExport: onExportSvg,
@@ -317,6 +331,8 @@ export const DocLabExportMenu: React.FC<DocLabExportMenuProps> = ({
     isPngActive,
     isJpgActive,
     isSvgActive,
+    layoutDocument,
+    canonicalDocument,
     title,
     subtitle,
     metaItems,

@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
+import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
+import { LayoutDocumentOptions } from './layout/types/documentTypes';
 
 const PAGE_DIMENSIONS_PT: Record<string, { width: number; height: number }> = {
   a4: { width: 595.28, height: 841.89 },
@@ -507,3 +509,212 @@ export function compileVectorPDFDocument({
 
   return doc;
 }
+
+/**
+ * Compiles a computed LayoutDocument directly into a multi-page Vector PDF.
+ * Consumes the exact layout geometry, page count, fragments, margins, watermarks,
+ * headers, footers, and signatures calculated by PaginationEngine.
+ *
+ * Guaranteed Invariant: The PDF page count and fragment order matches the Screen renderer 1:1.
+ */
+export function compileLayoutDocumentToPDF(
+  layoutDoc: LayoutDocument,
+  options: Partial<PrintOptions> = {}
+): jsPDF {
+  const pages: LayoutPage[] = layoutDoc.pages && layoutDoc.pages.length > 0
+    ? layoutDoc.pages
+    : [
+        {
+          index: 0,
+          pageNumber: 1,
+          width: layoutDoc.width || 794,
+          height: layoutDoc.height || 1123,
+          margins: { top: 48, right: 48, bottom: 48, left: 48 },
+          contentArea: { x: 48, y: 48, width: 698, height: 1027 },
+          fragments: [],
+          htmlContent: '',
+          usedHeight: 0,
+          availableHeight: 1027,
+          isFirstPage: true,
+          isLastPage: true,
+        },
+      ];
+
+  const totalPages = layoutDoc.totalPages || pages.length;
+  const mergedOptions: LayoutDocumentOptions & Partial<PrintOptions> = {
+    ...layoutDoc.options,
+    ...options,
+  };
+
+  const isLandscape = String(mergedOptions.orientation || '').toUpperCase() === 'LANDSCAPE';
+  // Standard conversion from CSS px (96 dpi) to PDF pt (72 pt/inch): pt = px * 0.75
+  const defaultWidthPt = (layoutDoc.width || 794) * 0.75;
+  const defaultHeightPt = (layoutDoc.height || 1123) * 0.75;
+
+  const doc = new jsPDF({
+    orientation: isLandscape ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: [defaultWidthPt, defaultHeightPt],
+    compress: true,
+  });
+
+  pages.forEach((page, pIdx) => {
+    const pageWidthPt = (page.width || layoutDoc.width || 794) * 0.75;
+    const pageHeightPt = (page.height || layoutDoc.height || 1123) * 0.75;
+
+    if (pIdx > 0) {
+      doc.addPage([pageWidthPt, pageHeightPt], isLandscape ? 'landscape' : 'portrait');
+    }
+
+    const marginL = (page.margins?.left ?? 48) * 0.75;
+    const marginR = (page.margins?.right ?? 48) * 0.75;
+    const marginT = (page.margins?.top ?? 48) * 0.75;
+    const marginB = (page.margins?.bottom ?? 48) * 0.75;
+    const contentW = pageWidthPt - marginL - marginR;
+
+    // 1. Watermark Layer
+    const watermarkText = page.watermarkText || mergedOptions.watermarkText;
+    const watermarkConfig = page.watermarkConfig || mergedOptions.watermarkConfig;
+    if ((mergedOptions.showWatermark || watermarkConfig) && watermarkText) {
+      doc.saveGraphicsState();
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(watermarkConfig?.fontSizePx ? watermarkConfig.fontSizePx * 0.75 : 44);
+      try {
+        doc.setGState(new (doc.GState as any)({ opacity: watermarkConfig?.opacity ?? 0.05 }));
+      } catch {
+        // Safe fallback in environments without GState
+      }
+      doc.text(String(watermarkText).toUpperCase(), pageWidthPt / 2, pageHeightPt / 2, {
+        align: 'center',
+        angle: watermarkConfig?.rotationAngle ?? -30,
+      });
+      doc.restoreGraphicsState();
+    }
+
+    // 2. Running Header
+    const showHeader = mergedOptions.showHeader !== false;
+    const isFirst = page.isFirstPage || pIdx === 0;
+    const shouldDrawHeader = showHeader && (!isFirst || mergedOptions.headerConfig?.showFirstPageHeader !== false);
+
+    if (shouldDrawHeader) {
+      const headerY = marginT - 12;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 23, 42);
+
+      const instName = (mergedOptions.institutionName || 'SPR Note Official').toUpperCase();
+      doc.text(instName, marginL, headerY);
+
+      if (mergedOptions.title) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(mergedOptions.title, pageWidthPt - marginR, headerY, { align: 'right' });
+      }
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(marginL, headerY + 4, pageWidthPt - marginR, headerY + 4);
+    }
+
+    // 3. Page Content / Fragments
+    const contentX = marginL;
+    let cursorY = marginT;
+
+    if (Array.isArray(page.fragments) && page.fragments.length > 0) {
+      page.fragments.forEach((frag) => {
+        const text = (frag.textContent || '').trim();
+        if (!text) return;
+
+        if (frag.type === 'heading') {
+          const headingLevel = frag.data?.headingLevel || 2;
+          const headingSize = headingLevel === 1 ? 14 : headingLevel === 2 ? 12 : 10.5;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(headingSize);
+          doc.setTextColor(15, 23, 42);
+          const lines = doc.splitTextToSize(text, contentW);
+          doc.text(lines, contentX, cursorY + headingSize);
+          cursorY += lines.length * (headingSize + 4) + 6;
+        } else if (frag.type === 'table') {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(30, 41, 59);
+          const lines = doc.splitTextToSize(text, contentW);
+          doc.text(lines, contentX, cursorY + 10);
+          cursorY += lines.length * 12 + 6;
+        } else {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(15, 23, 42);
+          const lines = doc.splitTextToSize(text, contentW);
+          doc.text(lines, contentX, cursorY + 11);
+          cursorY += lines.length * 13 + 4;
+        }
+      });
+    } else if (page.htmlContent) {
+      const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleanText) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        const lines = doc.splitTextToSize(cleanText, contentW);
+        doc.text(lines, contentX, cursorY + 12);
+        cursorY += lines.length * 13 + 6;
+      }
+    }
+
+    // 4. Dedicated Signatures Block
+    const hasSigConfig = Boolean(page.signatureConfig || mergedOptions.signatureConfig);
+    const shouldDrawSigs = hasSigConfig && (page.isLastPage || mergedOptions.showSignaturesOnAllPages);
+
+    if (shouldDrawSigs) {
+      const sigColumns = page.signatureConfig?.columns || mergedOptions.signatureConfig?.columns || [
+        { id: 'sig1', label: 'Prepared By' },
+        { id: 'sig2', label: 'Authorized Officer' },
+      ];
+      if (sigColumns.length > 0) {
+        const sigBlockY = pageHeightPt - marginB - 34;
+        const colWidth = contentW / sigColumns.length;
+
+        sigColumns.forEach((sig: any, sIdx: number) => {
+          const colCenterX = marginL + sIdx * colWidth + colWidth / 2;
+          const lineWidth = Math.min(colWidth * 0.7, 110);
+          const lineLeft = colCenterX - lineWidth / 2;
+          const lineRight = colCenterX + lineWidth / 2;
+
+          doc.setDrawColor(15, 23, 42);
+          doc.setLineWidth(0.6);
+          doc.line(lineLeft, sigBlockY, lineRight, sigBlockY);
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.5);
+          doc.setTextColor(15, 23, 42);
+          doc.text(sig.label || 'Signatory', colCenterX, sigBlockY + 10, { align: 'center' });
+        });
+      }
+    }
+
+    // 5. Running Footer & Page Numbering
+    const showFooter = mergedOptions.showFooter !== false;
+    if (showFooter) {
+      const footerY = pageHeightPt - marginB + 16;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(marginL, footerY - 8, pageWidthPt - marginR, footerY - 8);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      const printDate = new Date().toLocaleDateString('en-GB');
+      doc.text(`Official Document • ${printDate}`, marginL, footerY);
+
+      doc.text(`Page ${page.pageNumber} of ${totalPages}`, pageWidthPt - marginR, footerY, {
+        align: 'right',
+      });
+    }
+  });
+
+  return doc;
+}
+

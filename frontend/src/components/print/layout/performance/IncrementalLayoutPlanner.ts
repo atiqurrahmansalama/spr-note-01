@@ -26,18 +26,18 @@ export class IncrementalLayoutPlanner {
    * Identifies dirty node IDs by comparing previous and next source nodes
    */
   public static identifyDirtyNodes(
-    prevNodes: SourceNode[],
-    nextNodes: SourceNode[]
+    prevNodes: Array<SourceNode | any>,
+    nextNodes: Array<SourceNode | any>
   ): { dirtyNodeIds: string[]; firstAffectedIndex: number } {
     const dirtyNodeIds: string[] = [];
     let firstAffectedIndex = -1;
 
-    const prevMap = new Map<string, SourceNode>();
+    const prevMap = new Map<string, any>();
     prevNodes.forEach((node) => {
       if (node.id) prevMap.set(node.id, node);
     });
 
-    const nextMap = new Map<string, SourceNode>();
+    const nextMap = new Map<string, any>();
     nextNodes.forEach((node) => {
       if (node.id) nextMap.set(node.id, node);
     });
@@ -47,12 +47,18 @@ export class IncrementalLayoutPlanner {
       const nextNode = nextNodes[i];
       const prevNode = prevNodes[i];
 
-      const isDifferent =
-        !prevNode ||
-        prevNode.id !== nextNode.id ||
-        prevNode.rawHtml !== nextNode.rawHtml ||
-        prevNode.textContent !== nextNode.textContent ||
-        prevNode.type !== nextNode.type;
+      let isDifferent = false;
+      if (!prevNode) {
+        isDifferent = true;
+      } else if (prevNode.id !== nextNode.id || prevNode.type !== nextNode.type) {
+        isDifferent = true;
+      } else if (prevNode.rawHtml !== nextNode.rawHtml || prevNode.textContent !== nextNode.textContent) {
+        isDifferent = true;
+      } else if ('content' in prevNode || 'content' in nextNode) {
+        isDifferent = JSON.stringify(prevNode.content) !== JSON.stringify(nextNode.content);
+      } else if ('rows' in prevNode || 'rows' in nextNode) {
+        isDifferent = JSON.stringify(prevNode.rows) !== JSON.stringify(nextNode.rows);
+      }
 
       if (isDifferent) {
         if (firstAffectedIndex === -1) {

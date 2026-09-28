@@ -308,5 +308,6 @@ export function runEditingTestSuite() {
   return results;
 }
 
-// Execute immediately when run
-runEditingTestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_editing_flow')) {
+  runEditingTestSuite();
+}

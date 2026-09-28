@@ -20,6 +20,8 @@ import {
   PageBreak,
 } from 'docx';
 import { isExplicitManualBreak, parseContinuousHtmlToLogicalNodes } from './layout/logicalDocument';
+import { CanonicalDocument, BlockNode, InlineNode, ParagraphNode, HeadingNode, ListNode, TableNode, ManualPageBreakNode } from './model/types';
+import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
 
 /**
  * Universal OpenXML DOCX Document Compiler for SPR Note Print Studio
@@ -1435,9 +1437,378 @@ export function compileNativeDocxDocument({
 }
 
 /**
+ * Compiles a CanonicalDocument AST directly into a native OpenXML DOCX Document.
+ * Converts semantic nodes (Paragraphs, Headings, Lists, Tables, Dividers, ManualPageBreaks)
+ * directly into OpenXML Word structures without relying on DOM serialization or CSS hacks.
+ */
+export function compileCanonicalDocumentToDocx(
+  canonicalDoc: CanonicalDocument,
+  options: any = {}
+): Document {
+  const {
+    pageSize = 'A4',
+    orientation = 'PORTRAIT',
+    margin = 'NORMAL',
+    showFooter = true,
+  } = options;
+
+  const isLandscape = String(orientation || '').toUpperCase() === 'LANDSCAPE';
+  const sizeKey = String(pageSize || 'a4').toLowerCase();
+  const rawDims = PAGE_DIMENSIONS_TWIP[sizeKey] || PAGE_DIMENSIONS_TWIP.a4;
+
+  const pageWidth = isLandscape ? rawDims.height : rawDims.width;
+  const pageHeight = isLandscape ? rawDims.width : rawDims.height;
+  const pageMargins = MARGIN_TWIP[String(margin || 'NORMAL').toUpperCase()] || MARGIN_TWIP.NORMAL;
+
+  const docxBlocks: (Paragraph | Table)[] = [];
+
+  function convertInlineNodes(nodes: InlineNode[], parentFormatting: InlineFormatting = {}): TextRun[] {
+    const runs: TextRun[] = [];
+    if (!Array.isArray(nodes)) return runs;
+
+    nodes.forEach((n) => {
+      if (n.type === 'text') {
+        runs.push(
+          new TextRun({
+            text: n.text,
+            bold: n.marks?.bold ?? parentFormatting.bold,
+            italics: n.marks?.italic ?? parentFormatting.italics,
+            underline: (n.marks?.underline ?? parentFormatting.underline) ? {} : undefined,
+            strike: n.marks?.strike ?? parentFormatting.strike,
+            color: normalizeColorToHex(n.marks?.color) || parentFormatting.color,
+            size: n.marks?.fontSize ? Math.round(n.marks.fontSize * 2) : parentFormatting.size || 22,
+            font: n.marks?.fontFamily || parentFormatting.font || FONT_PRIMARY,
+          })
+        );
+      } else if (n.type === 'token') {
+        runs.push(
+          new TextRun({
+            text: n.defaultValue || `{{${n.key}}}`,
+            bold: n.marks?.bold ?? true,
+            color: normalizeColorToHex(n.marks?.color) || '2563EB',
+            size: 22,
+            font: FONT_PRIMARY,
+          })
+        );
+      } else if (n.type === 'hard-break') {
+        runs.push(new TextRun({ break: 1 }));
+      } else if (n.type === 'link') {
+        runs.push(...convertInlineNodes(n.content, parentFormatting));
+      }
+    });
+    return runs;
+  }
+
+  function resolveBlockAlignment(align?: string): (typeof AlignmentType)[keyof typeof AlignmentType] {
+    if (align === 'center') return AlignmentType.CENTER;
+    if (align === 'right') return AlignmentType.RIGHT;
+    if (align === 'justify') return AlignmentType.JUSTIFIED;
+    return AlignmentType.LEFT;
+  }
+
+  (canonicalDoc.body || []).forEach((block: BlockNode) => {
+    if (block.type === 'manual-page-break') {
+      docxBlocks.push(
+        new Paragraph({
+          children: [new PageBreak()],
+        })
+      );
+    } else if (block.type === 'heading') {
+      const headingSizes: Record<number, number> = { 1: 32, 2: 28, 3: 24, 4: 22, 5: 20, 6: 18 };
+      const size = headingSizes[block.level] || 24;
+      const runs = convertInlineNodes(block.content, { bold: true, size });
+      docxBlocks.push(
+        new Paragraph({
+          alignment: resolveBlockAlignment(block.attributes?.alignment),
+          spacing: { before: 120, after: 60 },
+          children: runs.length > 0 ? runs : [new TextRun({ text: '', bold: true, size })],
+        })
+      );
+    } else if (block.type === 'paragraph') {
+      const runs = convertInlineNodes(block.content);
+      docxBlocks.push(
+        new Paragraph({
+          alignment: resolveBlockAlignment(block.attributes?.alignment),
+          spacing: { before: 0, after: 40 },
+          children: runs.length > 0 ? runs : [new TextRun({ text: '' })],
+        })
+      );
+    } else if (block.type === 'list') {
+      const isOl = block.listType === 'ordered';
+      block.items.forEach((item, idx) => {
+        const prefix = isOl ? `${(block.start || 1) + idx}. ` : '• ';
+        const itemRuns: TextRun[] = [];
+        item.content.forEach((c) => {
+          if ('content' in c && Array.isArray(c.content)) {
+            itemRuns.push(...convertInlineNodes(c.content as InlineNode[]));
+          } else if ('text' in c) {
+            itemRuns.push(new TextRun({ text: (c as any).text, size: 20 }));
+          }
+        });
+        docxBlocks.push(
+          new Paragraph({
+            spacing: { before: 20, after: 30 },
+            children: [
+              new TextRun({ text: prefix, bold: true, font: FONT_PRIMARY, size: 20 }),
+              ...itemRuns,
+            ],
+          })
+        );
+      });
+    } else if (block.type === 'table') {
+      const tableRows: TableRow[] = [];
+      block.rows.forEach((r) => {
+        const cells: TableCell[] = [];
+        r.cells.forEach((cell) => {
+          const cellParagraphs: Paragraph[] = [];
+          (cell.content || []).forEach((cb) => {
+            if (cb.type === 'paragraph' || cb.type === 'heading') {
+              const runs = convertInlineNodes(cb.content);
+              cellParagraphs.push(
+                new Paragraph({
+                  spacing: { before: 20, after: 20 },
+                  children: runs.length > 0 ? runs : [new TextRun({ text: '' })],
+                })
+              );
+            }
+          });
+          if (cellParagraphs.length === 0) {
+            cellParagraphs.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+          }
+          cells.push(
+            new TableCell({
+              columnSpan: cell.colSpan && cell.colSpan > 1 ? cell.colSpan : undefined,
+              rowSpan: cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : undefined,
+              shading: cell.shading
+                ? { fill: normalizeColorToHex(cell.shading) || 'F8FAFC', type: ShadingType.CLEAR }
+                : r.isHeader
+                ? { fill: 'F1F5F9', type: ShadingType.CLEAR }
+                : undefined,
+              margins: { top: 60, bottom: 60, left: 90, right: 90 },
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' },
+                bottom: { style: BorderStyle.SINGLE, size: r.isHeader ? 8 : 4, color: r.isHeader ? '94A3B8' : 'E2E8F0' },
+                left: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+                right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+              },
+              children: cellParagraphs,
+            })
+          );
+        });
+        tableRows.push(new TableRow({ tableHeader: r.isHeader, children: cells }));
+      });
+      docxBlocks.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: tableRows.length > 0 ? tableRows : [new TableRow({ children: [new TableCell({ children: [new Paragraph('')] })] })],
+        })
+      );
+    } else if (block.type === 'divider') {
+      docxBlocks.push(
+        new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CBD5E1' } },
+          spacing: { before: 80, after: 80 },
+          children: [],
+        })
+      );
+    }
+  });
+
+  if (docxBlocks.length === 0) {
+    docxBlocks.push(
+      new Paragraph({
+        children: [new TextRun({ text: canonicalDoc.title || 'Official Document', bold: true, size: 28 })],
+      })
+    );
+  }
+
+  return new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: FONT_PRIMARY,
+            size: 22,
+            color: '0F172A',
+          },
+        },
+      },
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            size: {
+              width: pageWidth,
+              height: pageHeight,
+              orientation: isLandscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
+            },
+            margin: {
+              top: pageMargins.top,
+              bottom: pageMargins.bottom,
+              left: pageMargins.left,
+              right: pageMargins.right,
+            },
+          },
+        },
+        footers: showFooter
+          ? {
+              default: new Footer({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [
+                      new TextRun({ text: 'Page ', size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ children: [PageNumber.CURRENT], size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ text: ' of ', size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
+        children: docxBlocks,
+      },
+    ],
+  });
+}
+
+/**
+ * Compiles a computed LayoutDocument directly into a native OpenXML DOCX Document.
+ * Converts each computed LayoutPage's fragments into Word sections / page breaks,
+ * preserving identical page count, header/footer chrome, and fragment order.
+ */
+export function compileLayoutDocumentToDocx(
+  layoutDoc: LayoutDocument,
+  options: any = {}
+): Document {
+  const mergedOptions = { ...layoutDoc.options, ...options };
+  const {
+    pageSize = 'A4',
+    orientation = 'PORTRAIT',
+    margin = 'NORMAL',
+    showFooter = true,
+  } = mergedOptions;
+
+  const isLandscape = String(orientation || '').toUpperCase() === 'LANDSCAPE';
+  const sizeKey = String(pageSize || 'a4').toLowerCase();
+  const rawDims = PAGE_DIMENSIONS_TWIP[sizeKey] || PAGE_DIMENSIONS_TWIP.a4;
+
+  const pageWidth = isLandscape ? rawDims.height : rawDims.width;
+  const pageHeight = isLandscape ? rawDims.width : rawDims.height;
+  const pageMargins = MARGIN_TWIP[String(margin || 'NORMAL').toUpperCase()] || MARGIN_TWIP.NORMAL;
+
+  const allBlocks: (Paragraph | Table)[] = [];
+  const pages = layoutDoc.pages || [];
+
+  pages.forEach((page, pIdx) => {
+    if (page.fragments && page.fragments.length > 0) {
+      page.fragments.forEach((frag) => {
+        const text = (frag.textContent || '').trim();
+        if (!text) return;
+
+        if (frag.type === 'heading') {
+          allBlocks.push(
+            new Paragraph({
+              spacing: { before: 120, after: 60 },
+              children: [new TextRun({ text, bold: true, size: 28, font: FONT_PRIMARY })],
+            })
+          );
+        } else if (frag.type === 'table') {
+          allBlocks.push(
+            new Paragraph({
+              spacing: { before: 40, after: 40 },
+              children: [new TextRun({ text, font: FONT_PRIMARY, size: 20 })],
+            })
+          );
+        } else {
+          allBlocks.push(
+            new Paragraph({
+              spacing: { before: 0, after: 40 },
+              children: [new TextRun({ text, font: FONT_PRIMARY, size: 22 })],
+            })
+          );
+        }
+      });
+    } else if (page.htmlContent) {
+      const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleanText) {
+        allBlocks.push(
+          new Paragraph({
+            spacing: { before: 0, after: 40 },
+            children: [new TextRun({ text: cleanText, font: FONT_PRIMARY, size: 22 })],
+          })
+        );
+      }
+    }
+
+    if (pIdx < pages.length - 1) {
+      allBlocks.push(new Paragraph({ children: [new PageBreak()] }));
+    }
+  });
+
+  if (allBlocks.length === 0) {
+    allBlocks.push(
+      new Paragraph({
+        children: [new TextRun({ text: layoutDoc.title || 'Official Document', bold: true, size: 28 })],
+      })
+    );
+  }
+
+  return new Document({
+    styles: {
+      default: {
+        document: {
+          run: { font: FONT_PRIMARY, size: 22, color: '0F172A' },
+        },
+      },
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            size: {
+              width: pageWidth,
+              height: pageHeight,
+              orientation: isLandscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
+            },
+            margin: {
+              top: pageMargins.top,
+              bottom: pageMargins.bottom,
+              left: pageMargins.left,
+              right: pageMargins.right,
+            },
+          },
+        },
+        footers: showFooter
+          ? {
+              default: new Footer({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [
+                      new TextRun({ text: 'Page ', size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ children: [PageNumber.CURRENT], size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ text: ' of ', size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                      new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 18, font: FONT_PRIMARY, color: '64748B' }),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
+        children: allBlocks,
+      },
+    ],
+  });
+}
+
+/**
  * High-Level Helper to Export directly to Native .docx file in client browser.
- * Priority 1: Compiles whatever is currently open on the live canvas DOM or template pages.
- * Priority 2: Compiles tabular parameters cleanly without any hardcoded fake signatures.
+ * Priority 1: Canonical AST or LayoutDocument (Zero DOM translation artifacts)
+ * Priority 2: Compiles whatever is currently open on the live canvas DOM or template pages.
+ * Priority 3: Compiles tabular parameters cleanly without any hardcoded fake signatures.
  */
 export async function exportToNativeDocx({
   targetId = 'universal-print-portal',
@@ -1453,11 +1824,15 @@ export async function exportToNativeDocx({
   footerRows = [],
   options = {},
   customPages = [],
+  canonicalDocument,
+  layoutDocument,
   showToast,
   onCustomExport,
 }: NativeDocxCompilerParams & {
   targetId?: string;
   customPages?: string[];
+  canonicalDocument?: CanonicalDocument;
+  layoutDocument?: LayoutDocument;
   showToast?: (msg: string, type?: string) => void;
   onCustomExport?: () => void;
 }) {
@@ -1471,47 +1846,57 @@ export async function exportToNativeDocx({
   try {
     let doc: Document;
 
-    const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
-    const hasCanvasDOM = Boolean(
-      portalEl &&
-        (portalEl.querySelectorAll('.paper-sheet').length > 0 || portalEl.children.length > 0)
-    );
-    const hasCustomPages = Array.isArray(customPages) && customPages.length > 0;
-
-    if (hasCanvasDOM || hasCustomPages) {
-      // 1. Live Canvas Export: exports whatever is open on the canvas, exactly as it appears
-      doc = compileCanvasToNativeDocx({
-        targetId,
-        title,
-        customPages,
-        options,
-      });
+    if (canonicalDocument) {
+      // Priority 1A: Canonical AST directly to DOCX
+      doc = compileCanonicalDocumentToDocx(canonicalDocument, options);
+    } else if (layoutDocument) {
+      // Priority 1B: LayoutDocument directly to DOCX
+      doc = compileLayoutDocumentToDocx(layoutDocument, options);
     } else {
-      // 2. Headless programmatic table export (clean data without fake signatures)
-      doc = compileNativeDocxDocument({
-        title,
-        subtitle,
-        metaItems,
-        columns,
-        visibleColumnKeys,
-        data,
-        extraBlankRows,
-        summaryMetrics,
-        footerRow,
-        footerRows,
-        options,
-      });
+      const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
+      const hasCanvasDOM = Boolean(
+        portalEl &&
+          (portalEl.querySelectorAll('.paper-sheet').length > 0 || portalEl.children.length > 0)
+      );
+      const hasCustomPages = Array.isArray(customPages) && customPages.length > 0;
+
+      if (hasCanvasDOM || hasCustomPages) {
+        // Priority 2: Live Canvas Export
+        doc = compileCanvasToNativeDocx({
+          targetId,
+          title,
+          customPages,
+          options,
+        });
+      } else {
+        // Priority 3: Headless programmatic table export
+        doc = compileNativeDocxDocument({
+          title,
+          subtitle,
+          metaItems,
+          columns,
+          visibleColumnKeys,
+          data,
+          extraBlankRows,
+          summaryMetrics,
+          footerRow,
+          footerRows,
+          options,
+        });
+      }
     }
 
     const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getSafeFilename(title, 'docx');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (typeof document !== 'undefined') {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = getSafeFilename(title, 'docx');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
 
     showToast?.('Word document (.docx) downloaded successfully!', 'success');
   } catch (err: any) {
@@ -1519,3 +1904,4 @@ export async function exportToNativeDocx({
     showToast?.('Failed to export Word document: ' + (err.message || 'Unknown error'), 'error');
   }
 }
+

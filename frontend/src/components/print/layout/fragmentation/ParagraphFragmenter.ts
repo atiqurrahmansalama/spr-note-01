@@ -2,66 +2,107 @@
  * ParagraphFragmenter
  * Line-boundary text and rich paragraph fragmentation engine.
  *
- * Splits multi-line paragraphs at exact browser line boundaries crossing page breaks
- * using Range.getClientRects() geometry, preserving font formatting, inline spans,
- * and CSS classes across both page fragments.
+ * Part of SPR Note DocLab Enterprise Layout Architecture.
+ *
+ * Slices multi-line paragraphs at exact browser line boundaries crossing page breaks,
+ * preserving font formatting, inline spans, hyperlinks, dynamic tokens, direction,
+ * indentation, and CSS classes across both page fragments.
  */
 
 import { TextMeasurement } from '../measurement/TextMeasurement';
 import { MeasurementContext } from '../measurement/measurementTypes';
+import { MeasurementCache } from '../measurement/MeasurementCache';
+import { ParagraphNode, InlineNode, TextNode, LinkNode, TokenNode } from '../../model/types';
+import { HtmlExporter } from '../../model/serialization/htmlExporter';
+import { HtmlImporter } from '../../model/serialization/htmlImporter';
+import { FragmentationRules } from './fragmentationRules';
 
 export interface ParagraphSplitResult {
   firstFragmentHtml: string;
   remainingFragmentHtml: string | null;
   firstFragmentHeight: number;
   remainingFragmentHeight: number;
+  firstFragmentNode?: ParagraphNode;
+  remainingFragmentNode?: ParagraphNode | null;
   isSplit: boolean;
 }
 
 export class ParagraphFragmenter {
   /**
-   * Splits a paragraph or rich text block at the exact line boundary fitting availableHeightPx
+   * Splits a canonical ParagraphNode AST at a calculated character/line split point
    */
-  public static splitParagraph(
-    el: HTMLElement,
+  public static splitParagraphNode(
+    para: ParagraphNode,
     availableHeightPx: number,
     context?: MeasurementContext
   ): ParagraphSplitResult {
+    const html = HtmlExporter.serializeBlock(para, { tokenFormat: 'mustache' });
+    const domSplit = this.splitParagraph(html, availableHeightPx, context);
+
+    if (!domSplit.isSplit) {
+      return {
+        ...domSplit,
+        firstFragmentNode: domSplit.firstFragmentHtml ? para : undefined,
+        remainingFragmentNode: domSplit.remainingFragmentHtml ? para : null,
+      };
+    }
+
+    // Parse the split HTML slices back to canonical ParagraphNode fragments
+    let firstNode: ParagraphNode | undefined;
+    let remainingNode: ParagraphNode | null = null;
+
+    if (domSplit.firstFragmentHtml) {
+      const parsed1 = HtmlImporter.parseHtml(domSplit.firstFragmentHtml);
+      firstNode = parsed1.body[0] && parsed1.body[0].type === 'paragraph'
+        ? (parsed1.body[0] as ParagraphNode)
+        : { ...para, id: `${para.id}_p1` };
+    }
+
+    if (domSplit.remainingFragmentHtml) {
+      const parsed2 = HtmlImporter.parseHtml(domSplit.remainingFragmentHtml);
+      remainingNode = parsed2.body[0] && parsed2.body[0].type === 'paragraph'
+        ? (parsed2.body[0] as ParagraphNode)
+        : { ...para, id: `${para.id}_p2` };
+    }
+
+    return {
+      ...domSplit,
+      firstFragmentNode: firstNode,
+      remainingFragmentNode: remainingNode,
+    };
+  }
+
+  /**
+   * Splits a paragraph element or HTML string at the exact line boundary fitting availableHeightPx
+   */
+  public static splitParagraph(
+    target: HTMLElement | string | any,
+    availableHeightPx: number,
+    context?: MeasurementContext
+  ): ParagraphSplitResult {
+    let el: HTMLElement;
+    let isCreatedTemp = false;
+
+    if (typeof target === 'string') {
+      if (typeof document !== 'undefined') {
+        const dummy = document.createElement('div');
+        dummy.innerHTML = target.trim();
+        el = (dummy.firstElementChild as HTMLElement) || dummy;
+        isCreatedTemp = true;
+      } else {
+        return this.splitParagraphSSR(target, availableHeightPx, context);
+      }
+    } else if (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement) {
+      el = target;
+    } else {
+      const raw = (target && (target.rawHtml || target.outerHTML || target.textContent)) || '';
+      return this.splitParagraphSSR(raw, availableHeightPx, context);
+    }
+
     return TextMeasurement.withConnectedElement(el, context, (connectedEl) => {
       if (typeof document === 'undefined' || !connectedEl || !connectedEl.getBoundingClientRect) {
-        const text = (el as any).textContent || (el as any).rawHtml || '';
-        const approxHeight = Math.max(24, Math.ceil((text.length * 8.5) / (context?.containerWidth || 602)) * 24);
-        if (approxHeight > availableHeightPx && availableHeightPx > 50) {
-          const splitRatio = Math.max(0.1, Math.min(0.9, (availableHeightPx - 16) / approxHeight));
-          const splitCharIdx = Math.floor(text.length * splitRatio);
-          const lastSpace = text.lastIndexOf(' ', splitCharIdx);
-          const cutIdx = lastSpace > 0 ? lastSpace : splitCharIdx;
-          const text1 = text.slice(0, cutIdx).trim();
-          const text2 = text.slice(cutIdx).trim();
-          return {
-            firstFragmentHtml: `<p>${text1}</p>`,
-            remainingFragmentHtml: `<p>${text2}</p>`,
-            firstFragmentHeight: availableHeightPx,
-            remainingFragmentHeight: Math.max(24, approxHeight - availableHeightPx),
-            isSplit: true,
-          };
-        }
-        if (approxHeight <= availableHeightPx) {
-          return {
-            firstFragmentHtml: (el as any).rawHtml || `<p>${text}</p>`,
-            remainingFragmentHtml: null,
-            firstFragmentHeight: approxHeight,
-            remainingFragmentHeight: 0,
-            isSplit: false,
-          };
-        }
-        return {
-          firstFragmentHtml: '',
-          remainingFragmentHtml: (el as any).rawHtml || `<p>${text}</p>`,
-          firstFragmentHeight: 0,
-          remainingFragmentHeight: approxHeight,
-          isSplit: false,
-        };
+        const text = (target as any).textContent || (target as any).rawHtml || (typeof target === 'string' ? target : '');
+        return this.splitParagraphSSR(text, availableHeightPx, context);
       }
 
       const elRect = connectedEl.getBoundingClientRect();
@@ -95,7 +136,24 @@ export class ParagraphFragmenter {
           }
         }
 
-        // If at least one line fits on the current page
+        // Evaluate orphan and widow rules
+        if (lastFittingLineIdx >= 0) {
+          const orphanWidowEval = FragmentationRules.evaluateOrphanWidow(lines.length, lastFittingLineIdx);
+          if (orphanWidowEval.isValid && orphanWidowEval.adjustedSplitIndex >= 0) {
+            lastFittingLineIdx = orphanWidowEval.adjustedSplitIndex;
+          } else {
+            // Cannot satisfy orphan/widow constraints -> push entire paragraph to next page
+            return {
+              firstFragmentHtml: '',
+              remainingFragmentHtml: connectedEl.outerHTML,
+              firstFragmentHeight: 0,
+              remainingFragmentHeight: elHeight,
+              isSplit: false,
+            };
+          }
+        }
+
+        // If a valid split point was found
         if (lastFittingLineIdx >= 0 && lastFittingLineIdx < lines.length - 1) {
           const splitLine = lines[lastFittingLineIdx];
           const splitCharOffset = splitLine.charEnd;
@@ -116,60 +174,7 @@ export class ParagraphFragmenter {
         }
       }
 
-      // 3. Range-based sub-character offset measurement for continuous blocks
-      const splitData = TextMeasurement.findTextSplitOffsetForHeight(connectedEl, availableHeightPx, context);
-
-      if (splitData && splitData.splitNode && splitData.splitOffset > 0) {
-        try {
-          const clone = connectedEl.cloneNode(true) as HTMLElement;
-          const postRange = document.createRange();
-
-          // Trace splitNode in cloned DOM
-          const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null);
-          let curr = walker.nextNode() as Text | null;
-          let targetCloneNode: Text | null = null;
-          let targetCloneOffset = 0;
-
-          const targetText = splitData.splitNode.textContent || '';
-          const targetSubstring = targetText.slice(0, splitData.splitOffset);
-
-          while (curr) {
-            if (curr.textContent?.includes(targetSubstring) || curr.textContent === targetText) {
-              targetCloneNode = curr;
-              targetCloneOffset = splitData.splitOffset;
-              break;
-            }
-            curr = walker.nextNode() as Text | null;
-          }
-
-          if (targetCloneNode) {
-            postRange.setStart(targetCloneNode, targetCloneOffset);
-            postRange.setEnd(clone, clone.childNodes.length);
-
-            const postFragment = postRange.extractContents();
-
-            // Create second paragraph fragment with identical tag and attributes
-            const p2 = document.createElement(connectedEl.tagName.toLowerCase());
-            Array.from(connectedEl.attributes).forEach((attr) => {
-              p2.setAttribute(attr.name, attr.value);
-            });
-            p2.appendChild(postFragment);
-
-            return {
-              firstFragmentHtml: clone.outerHTML,
-              remainingFragmentHtml: p2.outerHTML,
-              firstFragmentHeight: availableHeightPx,
-              remainingFragmentHeight: Math.max(16, elHeight - availableHeightPx),
-              isSplit: true,
-            };
-          }
-        } catch (err) {
-          console.warn('ParagraphFragmenter Range split error:', err);
-        }
-      }
-
-      // 4. Fallback for non-splittable single line or small available height:
-      // If availableHeightPx cannot even fit the first line, signal to push to next page
+      // 3. Fallback for single non-splittable line or small available height: push to next page
       return {
         firstFragmentHtml: '',
         remainingFragmentHtml: connectedEl.outerHTML,
@@ -181,7 +186,8 @@ export class ParagraphFragmenter {
   }
 
   /**
-   * Splits a DOM element tree cleanly at a global character offset
+   * Splits a DOM element tree cleanly at a global character offset, preserving all tags,
+   * inline formatting marks, links, and element attributes across both halves.
    */
   private static splitElementAtCharOffset(
     el: HTMLElement,
@@ -232,5 +238,70 @@ export class ParagraphFragmenter {
       return null;
     }
   }
-}
 
+  /**
+   * SSR fallback for Node.js / unit tests
+   */
+  private static splitParagraphSSR(
+    htmlOrText: string,
+    availableHeightPx: number,
+    context?: MeasurementContext
+  ): ParagraphSplitResult {
+    const raw = htmlOrText.trim();
+    const tagMatch = raw.match(/^<([a-z0-9]+)([^>]*)>([\s\S]*)<\/\1>$/i);
+    const tagName = tagMatch ? tagMatch[1] : 'p';
+    const tagAttrs = tagMatch ? tagMatch[2] : '';
+    const innerContent = tagMatch ? tagMatch[3] : raw;
+    const plainText = innerContent.replace(/<[^>]+>/g, '');
+
+    const scriptAdj = MeasurementCache.estimateScriptAdjustment(plainText);
+    const fontSize = context?.fontSizePx || 16;
+    const lineHeight = fontSize * (context?.lineHeight ? Number(context.lineHeight) : 1.5) * scriptAdj.heightMultiplier;
+    const containerWidth = context?.containerWidth || 602;
+    const avgCharWidth = fontSize * 0.55 * scriptAdj.charWidthMultiplier;
+    const charsPerLine = Math.max(20, Math.floor(containerWidth / avgCharWidth));
+    const totalLines = Math.max(1, Math.ceil(plainText.length / charsPerLine));
+    const approxHeight = Math.max(lineHeight, totalLines * lineHeight);
+
+    if (approxHeight <= availableHeightPx) {
+      return {
+        firstFragmentHtml: raw,
+        remainingFragmentHtml: null,
+        firstFragmentHeight: approxHeight,
+        remainingFragmentHeight: 0,
+        isSplit: false,
+      };
+    }
+
+    const fittingLines = Math.floor(availableHeightPx / lineHeight);
+
+    // Check orphan & widow rules
+    if (fittingLines < 2 || totalLines - fittingLines < 2) {
+      return {
+        firstFragmentHtml: '',
+        remainingFragmentHtml: raw,
+        firstFragmentHeight: 0,
+        remainingFragmentHeight: approxHeight,
+        isSplit: false,
+      };
+    }
+
+    const splitCharIdx = fittingLines * charsPerLine;
+    const lastSpace = plainText.lastIndexOf(' ', splitCharIdx);
+    const cutIdx = lastSpace > splitCharIdx * 0.7 ? lastSpace : splitCharIdx;
+
+    const part1 = plainText.slice(0, cutIdx).trim();
+    const part2 = plainText.slice(cutIdx).trim();
+
+    const firstH = fittingLines * lineHeight;
+    const remH = (totalLines - fittingLines) * lineHeight;
+
+    return {
+      firstFragmentHtml: `<${tagName}${tagAttrs}>${part1}</${tagName}>`,
+      remainingFragmentHtml: `<${tagName}${tagAttrs}>${part2}</${tagName}>`,
+      firstFragmentHeight: firstH,
+      remainingFragmentHeight: remH,
+      isSplit: true,
+    };
+  }
+}

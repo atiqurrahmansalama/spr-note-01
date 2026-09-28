@@ -13,12 +13,14 @@ export class PageBuilder {
   private currentPage: LayoutPage;
   private options: LayoutDocumentOptions;
   private bounds: ComputedPageBounds;
+  private pageDecisions: Map<number, Array<{ nodeId: string; type: string; action: 'PLACE' | 'FRAGMENT' | 'MOVE_TO_NEXT_PAGE' | 'MANUAL_BREAK'; heightPx: number; reason?: string }>> = new Map();
 
   constructor(options: LayoutDocumentOptions = {}) {
     this.options = options;
     this.bounds = DocumentLayoutEngine.calculatePageBounds(options);
     this.currentPage = DocumentLayoutEngine.createLayoutPage(0, 1, options, this.bounds);
     this.pages.push(this.currentPage);
+    this.pageDecisions.set(0, []);
   }
 
   /**
@@ -64,6 +66,29 @@ export class PageBuilder {
   }
 
   /**
+   * Records a layout decision for the current page diagnostics
+   */
+  public recordDecision(
+    nodeId: string,
+    type: string,
+    action: 'PLACE' | 'FRAGMENT' | 'MOVE_TO_NEXT_PAGE' | 'MANUAL_BREAK',
+    heightPx: number,
+    reason?: string
+  ): void {
+    const pageIdx = this.currentPage.index;
+    if (!this.pageDecisions.has(pageIdx)) {
+      this.pageDecisions.set(pageIdx, []);
+    }
+    this.pageDecisions.get(pageIdx)!.push({
+      nodeId,
+      type,
+      action,
+      heightPx,
+      reason,
+    });
+  }
+
+  /**
    * Finalizes current page and advances to a new clean page
    */
   public advanceToNextPage(): LayoutPage {
@@ -72,12 +97,13 @@ export class PageBuilder {
 
     this.currentPage = newPage;
     this.pages.push(newPage);
+    this.pageDecisions.set(nextIndex, []);
 
     return newPage;
   }
 
   /**
-   * Finalizes all pages, updates totalPages, isFirstPage, isLastPage flags, and returns pages array
+   * Finalizes all pages, updates totalPages, isFirstPage, isLastPage flags, and builds diagnostics
    */
   public finalize(): { pages: LayoutPage[]; totalPages: number } {
     // If the last page is completely empty and we have at least 1 previous page, pop it
@@ -101,6 +127,22 @@ export class PageBuilder {
       page.htmlContent =
         page.fragments.map((frag) => frag.htmlContent || frag.textContent || '').join('\n') ||
         '<p><br></p>';
+
+      const decisions = this.pageDecisions.get(idx) || [];
+      const hasManualBreak = decisions.some((d) => d.action === 'MANUAL_BREAK') || page.fragments.some((f) => f.isManualBreak);
+      const hasAutomaticBreak = decisions.some((d) => d.action === 'FRAGMENT') || page.fragments.some((f) => f.isAutomaticBreak);
+
+      page.diagnostics = {
+        pageIndex: idx,
+        pageNumber: idx + 1,
+        fragmentCount: page.fragments.length,
+        usedHeightPx: page.usedHeight,
+        availableHeightPx: page.availableHeight,
+        remainingSpacePx: Math.max(0, this.bounds.contentArea.height - page.usedHeight),
+        hasManualBreak,
+        hasAutomaticBreak,
+        decisions,
+      };
     });
 
     return {

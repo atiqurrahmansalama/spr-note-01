@@ -8,4 +8,5 @@ export * from './ParagraphFragmenter';
 export * from './TableFragmenter';
 export * from './ListFragmenter';
 export * from './ImageFragmenter';
+export * from './NestedBlockFragmenter';
 export * from './FragmentationEngine';

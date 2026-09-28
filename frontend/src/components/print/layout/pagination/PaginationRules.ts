@@ -4,6 +4,7 @@
  */
 
 import { SourceNode } from '../types/documentTypes';
+import { BlockNode } from '../../model/types';
 import { isExplicitManualBreak } from '../logicalDocument';
 
 export type BreakValue = 'auto' | 'always' | 'avoid' | 'page';
@@ -22,10 +23,33 @@ export interface PaginationNodeRules {
 
 export class PaginationRules {
   /**
-   * Extracts pagination rules and constraint metadata from an HTMLElement or SourceNode
+   * Extracts pagination rules and constraint metadata from an HTMLElement, SourceNode, or BlockNode
    */
-  public static extractRules(node: HTMLElement | SourceNode): PaginationNodeRules {
-    if ('tagName' in node) {
+  public static extractRules(node: HTMLElement | SourceNode | BlockNode | any): PaginationNodeRules {
+    if (!node) {
+      return { breakBefore: 'auto', breakAfter: 'auto', breakInside: 'auto', keepWithNext: false };
+    }
+
+    // Canonical AST BlockNode
+    if (typeof node === 'object' && 'type' in node && !('nodeType' in node) && !('rawHtml' in node)) {
+      const block = node as BlockNode;
+      const isManual = block.type === 'manual-page-break' || (block as any).explicitBreak;
+      const isKeepTogether = block.type === 'image' || block.type === 'divider';
+      const isKeepWithNext = block.type === 'heading';
+
+      return {
+        breakBefore: isManual ? 'always' : 'auto',
+        breakAfter: isManual ? 'always' : 'auto',
+        breakInside: isKeepTogether ? 'avoid' : 'auto',
+        keepWithNext: isKeepWithNext,
+        widowControl: true,
+        orphanControl: true,
+        minOrphanLines: 2,
+        minWidowLines: 2,
+      };
+    }
+
+    if (typeof node === 'object' && 'tagName' in node) {
       const el = node as HTMLElement;
       const tag = el.tagName.toLowerCase();
       const style = el.getAttribute('style') || '';

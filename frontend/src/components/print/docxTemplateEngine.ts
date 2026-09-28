@@ -96,102 +96,6 @@ export function getDocxPaperPadding(
 }
 
 /**
- * Splits document HTML into discrete printable page sheets based on:
- * 1. Standard SPR page break markers (<!-- spr-page-break -->)
- * 2. Page break classes & style tags (<div class="spr-page-break">, page-break-after: always)
- * 3. OpenXML multi-section Word outputs (<section class="docx">...)
- */
-export function splitHtmlIntoPages(rawHtml: string): string[] {
-  if (!rawHtml || !rawHtml.trim()) return [''];
-
-  const trimmed = rawHtml.trim();
-
-  // 1. Explicit SPR comment page breaks (User-defined / Real-time split boundaries)
-  if (trimmed.includes('<!-- spr-page-break -->')) {
-    const parts = trimmed
-      .split('<!-- spr-page-break -->')
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
-    if (parts.length > 0) {
-      return parts;
-    }
-  }
-
-  // 2. Explicit spr-page-break div or page-break-after/before style
-  if (
-    trimmed.includes('spr-page-break') ||
-    /page-break-(?:after|before)\s*:\s*always/i.test(trimmed)
-  ) {
-    const parts = trimmed.split(
-      /(?:<div[^>]*class=["'][^"']*spr-page-break[^"']*["'][^>]*>[\s\S]*?<\/div>|<(?:div|p|hr)[^>]*style=["'][^"']*page-break-(?:after|before)\s*:\s*always[^"']*["'][^>]*>[\s\S]*?<\/(?:div|p|hr)>|<hr[^>]*class=["'][^"']*page-break[^"']*["'][^>]*\/?>)/gi
-    );
-    const cleaned = parts.map((p) => p.trim()).filter((p) => p.length > 0);
-    if (cleaned.length > 1) {
-      return cleaned;
-    }
-  }
-
-  // 3. Multi-section Word documents (docx-preview output: <section class="docx">...)
-  if (typeof document !== 'undefined' && trimmed.includes('<section')) {
-    try {
-      const parser = document.createElement('div');
-      parser.innerHTML = trimmed;
-      const sections = parser.querySelectorAll('section.docx, .docx-wrapper > section.docx, section');
-      if (sections.length > 1) {
-        const pageList: string[] = [];
-        sections.forEach((sec) => {
-          const outer = (sec as HTMLElement).outerHTML;
-          if (outer && outer.trim()) {
-            pageList.push(outer.trim());
-          }
-        });
-        if (pageList.length > 1) {
-          return pageList;
-        }
-      }
-    } catch (e) {
-      // Fallback
-    }
-  }
-
-  return [trimmed];
-}
-
-/**
- * @deprecated Use `PaginationEngine.paginate()` or `DocumentLayoutEngine` directly.
- * Backward-compatible adapter for legacy callers requesting automated multi-page splitting.
- */
-export function autoPaginateHtmlSection(htmlSection: string, maxPageHeightPx: number = 960): string[] {
-  if (!htmlSection || !htmlSection.trim()) return [''];
-  if (typeof document === 'undefined') return [htmlSection];
-
-  try {
-    const layout = PaginationEngine.paginate(htmlSection, {
-      pageSize: 'A4',
-      orientation: 'PORTRAIT',
-      margin: 'NORMAL',
-    });
-
-    if (layout && layout.pages && layout.pages.length > 0) {
-      const renderedPages = layout.pages.map((p) =>
-        p.fragments
-          .map((f) => f.htmlContent || f.textContent || '')
-          .filter((c) => c && c.trim())
-          .join('\n')
-      );
-      if (renderedPages.length > 0) {
-        return renderedPages;
-      }
-    }
-  } catch (err) {
-    console.warn('Auto-pagination layout engine adapter fallback:', err);
-  }
-
-  return [htmlSection];
-}
-
-
-/**
  * Extracts element attributes as a clean string for element reconstruction
  */
 export function getElementAttributesString(el: HTMLElement): string {
@@ -201,15 +105,6 @@ export function getElementAttributesString(el: HTMLElement): string {
     attrs.push(`${attr.name}="${attr.value}"`);
   }
   return attrs.join(' ');
-}
-
-/**
- * Re-joins discrete page sheets back into a single persistent document HTML string.
- */
-export function joinPagesIntoHtml(pages: string[]): string {
-  if (!pages || pages.length === 0) return '';
-  if (pages.length === 1) return pages[0];
-  return pages.join('\n<!-- spr-page-break -->\n');
 }
 
 /**

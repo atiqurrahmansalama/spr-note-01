@@ -6,6 +6,7 @@
 import { Rect, Insets } from './layoutTypes';
 import { LayoutDocumentOptions } from './documentTypes';
 import { LayoutFragment } from './fragmentTypes';
+import { WatermarkConfig, SignatureBlockConfig } from '../chrome/headerFooterTypes';
 
 /**
  * A single discrete physical/visual page in the paginated document
@@ -53,11 +54,54 @@ export interface LayoutPage {
   /** True if this is the final page of the document */
   isLastPage: boolean;
 
-  /** Page-level custom watermark or background overlay */
+  /** Section identifier this page belongs to */
+  sectionId?: string;
+
+  /** 0-based section index */
+  sectionIndex?: number;
+
+  /** 1-based page number within active section */
+  sectionPageNumber?: number;
+
+  /** Total pages within active section */
+  sectionTotalPages?: number;
+
+  /** Section title if defined */
+  sectionTitle?: string;
+
+  /** Page-level custom watermark configuration or text */
   watermarkText?: string;
+  watermarkConfig?: WatermarkConfig;
+
+  /** Page-level custom signature configuration */
+  signatureConfig?: SignatureBlockConfig;
 
   /** Pre-rendered combined HTML content string of all fragments placed on this page */
   htmlContent?: string;
+
+  /** Detailed layout diagnostics for this specific page */
+  diagnostics?: PageDiagnostics;
+}
+
+/**
+ * Diagnostic metrics for a single layout page
+ */
+export interface PageDiagnostics {
+  pageIndex: number;
+  pageNumber: number;
+  fragmentCount: number;
+  usedHeightPx: number;
+  availableHeightPx: number;
+  remainingSpacePx: number;
+  hasManualBreak: boolean;
+  hasAutomaticBreak: boolean;
+  decisions: Array<{
+    nodeId: string;
+    type: string;
+    action: 'PLACE' | 'FRAGMENT' | 'MOVE_TO_NEXT_PAGE' | 'MANUAL_BREAK';
+    heightPx: number;
+    reason?: string;
+  }>;
 }
 
 /**
@@ -69,6 +113,9 @@ export interface LayoutDocument {
 
   /** Document title */
   title?: string;
+
+  /** Document subtitle */
+  subtitle?: string;
 
   /** Total paper sheet width in pixels */
   width: number;
@@ -90,6 +137,9 @@ export interface LayoutDocument {
 
   /** Time taken in milliseconds to compute the layout */
   calculationDurationMs?: number;
+
+  /** Canonical AST blocks or source nodes that generated this layout */
+  sourceBlocks?: any[];
 }
 
 import { LayoutDebugTrace } from '../debug/layoutDebugTypes';

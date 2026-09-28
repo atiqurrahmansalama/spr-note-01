@@ -72,16 +72,18 @@ export class PageGeometryCalculator {
     let widthMm = customMm?.width !== undefined ? customMm.width : base.widthMm;
     let heightMm = customMm?.height !== undefined ? customMm.height : base.heightMm;
 
-    if (isLandscape && widthMm < heightMm) {
-      // Swap for landscape
-      const temp = widthMm;
-      widthMm = heightMm;
-      heightMm = temp;
-    } else if (!isLandscape && widthMm > heightMm && pageSize !== 'ID_CARD') {
-      // Swap for portrait
-      const temp = widthMm;
-      widthMm = heightMm;
-      heightMm = temp;
+    if (pageSize !== 'CUSTOM') {
+      if (isLandscape && widthMm < heightMm) {
+        // Swap for landscape
+        const temp = widthMm;
+        widthMm = heightMm;
+        heightMm = temp;
+      } else if (!isLandscape && widthMm > heightMm && pageSize !== 'ID_CARD') {
+        // Swap for portrait
+        const temp = widthMm;
+        widthMm = heightMm;
+        heightMm = temp;
+      }
     }
 
     const mm: Dimensions = { width: widthMm, height: heightMm };

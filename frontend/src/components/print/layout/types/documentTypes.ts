@@ -7,6 +7,7 @@
  */
 
 import { PageSizeId, PageOrientation, MarginPreset, DensityPreset, Insets, ColorMode } from './layoutTypes';
+import { HeaderFooterConfig, WatermarkConfig, SignatureBlockConfig } from '../chrome/headerFooterTypes';
 
 export type SourceNodeType =
   | 'paragraph'
@@ -19,8 +20,14 @@ export type SourceNodeType =
   | 'card'
   | 'signature'
   | 'spacer'
+  | 'section'
   | 'manual-page-break'
   | 'custom-block';
+
+/**
+ * Image anchoring and placement mode
+ */
+export type ImageAnchorMode = 'inline' | 'block-center' | 'block-left' | 'block-right' | 'full-width';
 
 /**
  * Layout and fragmentation constraints specified on a source node
@@ -49,6 +56,14 @@ export interface NodeLayoutConstraint {
 
   /** Whether table headers should automatically clone and repeat on each subsequent fragment */
   repeatTableHeader?: boolean;
+
+  /** Image anchoring mode */
+  anchorMode?: ImageAnchorMode;
+
+  /** Section break settings */
+  sectionBreak?: boolean;
+  restartPageNumbering?: boolean;
+  sectionTitle?: string;
 }
 
 /**
@@ -107,6 +122,26 @@ export interface LayoutDocumentOptions {
 
   /** Custom styling to inject into layout sandbox */
   styles?: string;
+
+  /** Header configuration */
+  headerConfig?: HeaderFooterConfig;
+
+  /** Footer configuration */
+  footerConfig?: HeaderFooterConfig;
+
+  /** Document-level watermark text or full config */
+  watermarkText?: string;
+  watermarkConfig?: WatermarkConfig;
+
+  /** Signature block configuration */
+  signatureConfig?: SignatureBlockConfig;
+  signaturesOnLastPageOnly?: boolean;
+
+  /** Numeral system for page numbers */
+  numeralSystem?: 'latin' | 'bengali' | 'arabic';
+
+  /** Whether page numbering restarts at 1 for each section */
+  restartPageNumberingPerSection?: boolean;
 
   /** Enable internal layout developer debug decision tracing */
   debugLayout?: boolean;

@@ -95,9 +95,37 @@ export class DomMeasurementEngine {
     const paddingBottom = parseFloat(style.paddingBottom) || 0;
 
     const elRect = el.getBoundingClientRect();
-    // Use true subpixel bounding rect height; fallback to offsetHeight only if element is disconnected
+    // Use true subpixel bounding rect height; fallback to offsetHeight or content estimation if in headless DOM
     const width = elRect.width > 0 ? elRect.width : (el.offsetWidth || Math.max(100, context.containerWidth));
-    const height = elRect.height > 0 ? elRect.height : (el.offsetHeight || 28);
+    let measuredHeight = elRect.height > 0 ? elRect.height : el.offsetHeight;
+
+    if (!measuredHeight || measuredHeight === 0) {
+      if (tag === 'table') {
+        const tableGeom = TableMeasurement.measureTable(el as HTMLTableElement, context);
+        measuredHeight = tableGeom.totalHeight;
+      } else if (tag === 'ul' || tag === 'ol') {
+        const lis = Array.from(el.querySelectorAll('li'));
+        let lH = 12;
+        lis.forEach((li) => {
+          const textLen = (li.textContent || '').length;
+          const lines = Math.max(1, Math.ceil(textLen / 45));
+          lH += Math.max(28, lines * 24);
+        });
+        measuredHeight = Math.max(28, lH);
+      } else if (tag === 'img' || tag === 'figure' || tag === 'svg') {
+        measuredHeight = 220;
+      } else {
+        const text = (el.textContent || '').trim();
+        const fSize = context.fontSizePx || 16;
+        const avgCharWidth = fSize * 0.55;
+        const charsPerLine = Math.max(20, Math.floor(width / avgCharWidth));
+        const lineCount = Math.max(1, Math.ceil(text.length / charsPerLine));
+        const lineHeight = fSize * (context.lineHeight ? Number(context.lineHeight) : 1.5);
+        measuredHeight = Math.max(lineHeight, lineCount * lineHeight);
+      }
+    }
+
+    const height = measuredHeight;
     const totalOuterHeight = height + marginTop + marginBottom;
 
     const boundingRect: Rect = {
@@ -212,14 +240,15 @@ export class DomMeasurementEngine {
     // Measure each top-level child block accounting for exact rendered flow and margin collapsing
     const childElements = Array.from(contentHost.children) as HTMLElement[];
     const results: NodeMeasurementResult[] = childElements.map((child, idx) => {
+      const nextChild = childElements[idx + 1] as HTMLElement | undefined;
       const measurement = this.measureElement(child, context);
-      const nextChild = idx < childElements.length - 1 ? childElements[idx + 1] : null;
       const childRect = child.getBoundingClientRect();
-
       const flowOffsetTop = child.offsetTop;
-      const effectiveFlowHeight = nextChild
-        ? Math.max(0, nextChild.offsetTop - child.offsetTop)
-        : (childRect.height + measurement.marginBottom);
+      const childH = childRect.height > 0 ? childRect.height : measurement.height;
+      const offsetDiff = nextChild ? nextChild.offsetTop - child.offsetTop : 0;
+      const effectiveFlowHeight = offsetDiff > 0
+        ? offsetDiff
+        : (childH + measurement.marginBottom);
 
       return {
         ...measurement,
@@ -280,9 +309,17 @@ export class DomMeasurementEngine {
       }
 
       if (isTable) {
-        const rowCount = (block.match(/<tr/gi) || []).length || 5;
-        const rowHeight = 36;
-        const height = customHeight !== undefined ? customHeight : rowCount * rowHeight;
+        const trMatches = block.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+        let computedTableHeight = 0;
+        if (trMatches.length > 0) {
+          for (const tr of trMatches) {
+            const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
+            computedTableHeight += trH ? parseInt(trH[1], 10) : 36;
+          }
+        } else {
+          computedTableHeight = 140;
+        }
+        const height = customHeight !== undefined && !block.startsWith('<table') ? customHeight : computedTableHeight;
         const marginBottom = customMb !== undefined ? customMb : 8;
         return {
           nodeId: `ssr_table_${idx}`,
@@ -295,6 +332,47 @@ export class DomMeasurementEngine {
           paddingTop: 0,
           paddingBottom: 0,
           totalOuterHeight: height + 8 + marginBottom,
+          breakOpportunities: [],
+          isAtomic: false,
+          isManualBreak: false,
+          keepTogether: false,
+          keepWithNext: false,
+        };
+      }
+
+      const isList = /<ul|<ol/i.test(block);
+
+      if (isList) {
+        const liMatches = block.match(/<li[\s\S]*?<\/li>/gi) || [];
+        let listHeight = 12;
+        const avgCharWidth = fontSize * 0.55;
+        const charsPerLine = Math.max(20, Math.floor(width / avgCharWidth));
+        const lineHeight = fontSize * (context.lineHeight ? Number(context.lineHeight) : 1.5);
+
+        if (liMatches.length > 0) {
+          for (const li of liMatches) {
+            const liText = li.replace(/<[^>]+>/g, '').trim();
+            const lines = Math.max(1, Math.ceil(liText.length / charsPerLine));
+            listHeight += Math.max(lineHeight, lines * lineHeight) + 4;
+          }
+        } else {
+          listHeight = 80;
+        }
+
+        const height = customHeight !== undefined ? customHeight : listHeight;
+        const marginBottom = customMb !== undefined ? customMb : 8;
+
+        return {
+          nodeId: `ssr_list_${idx}`,
+          type: 'list' as SourceNodeType,
+          width,
+          height,
+          boundingRect: { x: 0, y: 0, width, height },
+          marginTop: 6,
+          marginBottom,
+          paddingTop: 0,
+          paddingBottom: 0,
+          totalOuterHeight: height + 6 + marginBottom,
           breakOpportunities: [],
           isAtomic: false,
           isManualBreak: false,

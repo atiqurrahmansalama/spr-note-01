@@ -15,9 +15,9 @@ import {
   LayoutDebugOverlay,
   LayoutPageRenderer,
   LayoutDocumentRenderer,
+  PaginatedDocumentEditor,
   stripRuntimePaginationSpacers,
   sanitizeLogicalDocumentHtml,
-  projectCanonicalDocumentWithRuntimeSpacers,
 } from '../layout';
 import {
   PrintOptions,
@@ -200,28 +200,6 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
 
   const liveTotalPagesCount = computedLayout ? Math.max(1, computedLayout.totalPages) : 1;
 
-  // Projected continuous document with non-persistent runtime page spacers across page boundaries
-  const projectedHtmlContent = React.useMemo(() => {
-    const rawContent =
-      customDocxTemplate?.templateBody ||
-      customDocxTemplate?.body ||
-      customDocxTemplate?.rawHtml ||
-      '<p><br></p>';
-
-    return projectCanonicalDocumentWithRuntimeSpacers(rawContent, computedLayout, {
-      paperDimensionsPx: pageGeometry.paperDimensionsPx,
-      marginsPx: pageGeometry.marginsPx,
-      pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
-      orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
-    });
-  }, [
-    customDocxTemplate,
-    computedLayout,
-    pageGeometry,
-    options.pageSize,
-    options.orientation,
-  ]);
-
   return (
     <main className="flex-1 flex flex-col overflow-hidden relative universal-print-workbench print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:overflow-visible">
       {/* 1. Top Template Workbench Sub-Header (Visible when Custom Template is active) */}
@@ -338,172 +316,60 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
               />
             )}
             {docxRenderMode === 'template' ? (
-              /* Continuous Unified Document Editor with Real Discrete Visual Paper Sheets */
-              <div
-                id="docx-live-template-container"
-                className="relative doclab-multi-page-workbench flex flex-col items-center mb-8 print:mb-0 print:block"
-                style={{
-                  width: `${pageGeometry.paperDimensionsPx.width}px`,
+              /* Genuine Word-Like Paginated Document Editor with Real Discrete Visual Paper Sheets */
+              <PaginatedDocumentEditor
+                key="doclab_master_paginated_editor"
+                htmlContent={
+                  customDocxTemplate.templateBody ||
+                  customDocxTemplate.body ||
+                  customDocxTemplate.rawHtml ||
+                  '<p><br></p>'
+                }
+                styles={docxStyles}
+                isEditable={true}
+                options={{
+                  pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+                  orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
+                  margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+                  customMarginsMm: options.customMarginsMm,
+                  pageProperties: customDocxTemplate?.pageProperties || customDocxTemplate?.templateMeta?.pageProperties,
+                  density: options.density,
+                  fontSizePx: options.fontSizePx,
+                  fontFamily: options.fontFamily,
+                  lineHeight: options.lineHeight,
+                  styles: docxStyles,
                 }}
-              >
-                {/* ------------------------------------------------------------------ */}
-                {/* LAYER 1: REAL DISCRETE VISUAL PAPER SHEETS PROJECTION               */}
-                {/* ------------------------------------------------------------------ */}
-                <div className="doclab-visual-sheets-layer flex flex-col items-center pointer-events-none select-none print:hidden w-full">
-                  {Array.from({ length: liveTotalPagesCount }, (_, i) => (
-                    <div
-                      key={`visual_sheet_frame_${i}`}
-                      className="flex flex-col items-center w-full"
-                      style={{
-                        marginBottom: i < liveTotalPagesCount - 1 ? `${pageGeometry.pageGapPx}px` : '0px',
-                      }}
-                    >
-                      {/* Discrete Screen Page Header */}
-                      <div
-                        style={{
-                          width: `${pageGeometry.paperDimensionsPx.width}px`,
-                          height: '26px',
-                        }}
-                        className="flex items-center justify-between px-2 py-1 mb-1.5 text-xs theme-text-secondary select-none"
-                      >
-                        <div className="flex items-center gap-2 font-medium">
-                          <span className="w-2 h-2 rounded-full theme-bg-accent" />
-                          <span className="font-bold theme-text-primary font-mono text-[11.5px]">
-                            Page {i + 1} of {liveTotalPagesCount} ({options.pageSize || customDocxTemplate?.pageSize || 'A4'} &bull; {options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'})
-                          </span>
-                          <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
-                            {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
-                          </span>
-                        </div>
+                debugLayout={isDebugOverlayOpen}
+                onContentChange={(newHtml) => {
+                  const cleanWithoutSpacers = sanitizeLogicalDocumentHtml(newHtml);
+                  const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(cleanWithoutSpacers);
+                  const cleanNewHtml = sanitizeLogicalDocumentHtml(incomingBody || cleanWithoutSpacers);
 
-                        <div className="flex items-center gap-2">
-                          {i === 0 && (
-                            <span className="text-[11px] theme-text-muted hidden md:inline">
-                              Press <kbd className="px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono text-[10px]">Ctrl+Enter</kbd> for new page
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (typeof window !== 'undefined') {
-                                window.dispatchEvent(new CustomEvent('spr_doclab_insert_page_break'));
-                              }
-                            }}
-                            className="px-2.5 py-1 text-xs font-semibold rounded-md theme-bg-accent text-white hover:opacity-95 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 pointer-events-auto"
-                            title="Insert a manual page break to create a new physical page (Ctrl + Enter)"
-                          >
-                            <PageBreakIcon className="w-3.5 h-3.5" />
-                            <span>+ Add Page</span>
-                          </button>
-                        </div>
-                      </div>
+                  const updater = (prev: any) => {
+                    if (!prev) return null;
+                    const preservedStyles =
+                      incomingStyles ||
+                      prev.styles ||
+                      separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
+                      '';
 
-                      {/* Real Physical Discrete Paper Sheet with Full Box Shadow & Margins */}
-                      <div
-                        className="paper-sheet docx-paper-sheet rounded-xs shadow-xl relative"
-                        data-size={options.pageSize || customDocxTemplate?.pageSize || 'A4'}
-                        data-orientation={options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'}
-                        data-margin={options.margin || customDocxTemplate?.margin || 'NORMAL'}
-                        data-density={options.density || 'NORMAL'}
-                        data-color-mode={options.colorMode || 'FULL_COLOR'}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          color: '#0f172a',
-                          width: `${pageGeometry.paperDimensionsPx.width}px`,
-                          maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-                          height: `${pageGeometry.paperDimensionsPx.height}px`,
-                          minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                          maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                          boxSizing: 'border-box',
-                          overflow: 'hidden',
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
+                    return {
+                      ...prev,
+                      styles: preservedStyles,
+                      templateBody: cleanNewHtml,
+                      body: cleanNewHtml,
+                      html: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+                      rawHtml: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+                    };
+                  };
 
-                {/* ------------------------------------------------------------------ */}
-                {/* LAYER 2: CONTINUOUS CONTENT EDITOR (Overlay Aligned to Sheet Layout) */}
-                {/* ------------------------------------------------------------------ */}
-                <div
-                  className="doclab-continuous-editor-overlay absolute top-0 left-0 right-0 bottom-0 flex flex-col items-center z-10 cursor-text"
-                  style={{
-                    pointerEvents: 'auto',
-                    minHeight: '100%',
-                  }}
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('[contenteditable="true"]') && !target.closest('button')) {
-                      const editor = document.querySelector('#docx-live-template-container [contenteditable="true"]') as HTMLElement;
-                      if (editor) {
-                        editor.focus();
-                        const sel = window.getSelection();
-                        if (sel && (sel.rangeCount === 0 || sel.isCollapsed)) {
-                          const leafNodes = Array.from(editor.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')) as HTMLElement[];
-                          const targetNode = leafNodes[leafNodes.length - 1] || editor;
-                          const range = document.createRange();
-                          range.selectNodeContents(targetNode);
-                          range.collapse(false);
-                          sel.removeAllRanges();
-                          sel.addRange(range);
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${pageGeometry.paperDimensionsPx.width}px`,
-                      maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-                      minHeight: '100%',
-                      paddingTop: `calc(${pageGeometry.screenPageHeaderHeightPx}px + ${pageGeometry.marginsPx.top}px)`,
-                      paddingBottom: `${pageGeometry.marginsPx.bottom}px`,
-                      paddingLeft: `${pageGeometry.marginsPx.left}px`,
-                      paddingRight: `${pageGeometry.marginsPx.right}px`,
-                      boxSizing: 'border-box',
-                    }}
-                    className="w-full h-full text-left select-text cursor-text"
-                  >
-                    <DocxLiveRenderer
-                      key="docx_live_unified_editor"
-                      htmlContent={projectedHtmlContent}
-                      styles={docxStyles}
-                      isEditable={true}
-                      transparentBackground={true}
-                      totalPages={liveTotalPagesCount}
-                      onContentChange={(newHtml) => {
-                        const cleanWithoutSpacers = sanitizeLogicalDocumentHtml(newHtml);
-                        const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(cleanWithoutSpacers);
-                        const cleanNewHtml = sanitizeLogicalDocumentHtml(incomingBody || cleanWithoutSpacers);
-
-                        const updater = (prev: any) => {
-                          if (!prev) return null;
-                          const preservedStyles =
-                            incomingStyles ||
-                            prev.styles ||
-                            separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
-                            '';
-
-                          return {
-                            ...prev,
-                            styles: preservedStyles,
-                            templateBody: cleanNewHtml,
-                            body: cleanNewHtml,
-                            html: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
-                            rawHtml: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
-                          };
-                        };
-
-                        if (updateCustomDocxTemplateWithHistory) {
-                          updateCustomDocxTemplateWithHistory(updater);
-                        } else {
-                          setCustomDocxTemplate(updater);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+                  if (updateCustomDocxTemplateWithHistory) {
+                    updateCustomDocxTemplateWithHistory(updater);
+                  } else {
+                    setCustomDocxTemplate(updater);
+                  }
+                }}
+              />
             ) : (
               /* Discrete Multi-Record Sheets in Batch Generation Mode ('all' or 'sample') */
               mergedDocxPages.map((pageHtml, pIdx) => (

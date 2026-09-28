@@ -7,8 +7,12 @@ import {
   CloseIcon,
 } from '../../ui/Icons';
 import { PrintOptions, PrintColumn, PrintMetaItem, PrintSummaryMetric } from '../types';
+import { LayoutDocument } from '../layout/types/paginationTypes';
+import { CanonicalDocument } from '../model/types';
 
 export interface DocLabHeaderProps {
+  layoutDocument?: LayoutDocument;
+  canonicalDocument?: CanonicalDocument;
   title: string;
   subtitle?: string;
   totalPages: number;
@@ -55,6 +59,8 @@ export interface DocLabHeaderProps {
  * Zoom controls, Universal Export menu, Fullscreen toggle, and Sidebar toggler.
  */
 export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
+  layoutDocument,
+  canonicalDocument,
   title,
   subtitle,
   totalPages,
@@ -134,6 +140,8 @@ export const DocLabHeader: React.FC<DocLabHeaderProps> = ({
 
         {/* Master Universal Export Button & Dropdown Menu */}
         <DocLabExportMenu
+          layoutDocument={layoutDocument}
+          canonicalDocument={canonicalDocument}
           title={title}
           subtitle={subtitle}
           metaItems={liveMetaItems}

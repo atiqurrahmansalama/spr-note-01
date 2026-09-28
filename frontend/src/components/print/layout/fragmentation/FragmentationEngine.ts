@@ -2,7 +2,10 @@
  * FragmentationEngine
  * Master coordinator for content fragmentation across discrete visual page sheets.
  *
- * Slices continuous logical nodes into page-bounded fragments with 100% fidelity.
+ * Part of SPR Note DocLab Enterprise Layout Architecture.
+ *
+ * Slices continuous logical nodes and Canonical AST BlockNodes into page-bounded
+ * fragments with 100% typographic fidelity, repeating headers, and zero source mutation.
  */
 
 import { SourceNode } from '../types/documentTypes';
@@ -10,23 +13,236 @@ import { LayoutFragment } from '../types/fragmentTypes';
 import { MeasurementContext } from '../measurement/measurementTypes';
 import { MeasurementEngine } from '../measurement/MeasurementEngine';
 import { DocumentLayoutEngine } from '../DocumentLayoutEngine';
+import { BlockNode, CanonicalDocument } from '../../model/types';
+import { HtmlExporter } from '../../model/serialization/htmlExporter';
 import { FragmentationRules } from './fragmentationRules';
 import { ParagraphFragmenter } from './ParagraphFragmenter';
 import { TableFragmenter } from './TableFragmenter';
 import { ListFragmenter } from './ListFragmenter';
 import { ImageFragmenter } from './ImageFragmenter';
+import { NestedBlockFragmenter } from './NestedBlockFragmenter';
+import { FragmentCache } from '../performance/FragmentCache';
 
 export interface NodeFragmentationResult {
   fitsCurrentPage: boolean;
   pushedToNextPage: boolean;
   firstFragment?: LayoutFragment;
   remainingNode?: HTMLElement | SourceNode | null;
+  firstBlockNode?: BlockNode;
+  remainingBlockNode?: BlockNode | null;
   usedHeight: number;
 }
 
 export class FragmentationEngine {
   /**
-   * Slices or allocates an element within the available page height
+   * Primary entry point for fragmenting a Canonical AST BlockNode
+   */
+  public static fragmentBlockNode(
+    block: BlockNode,
+    pageIndex: number,
+    availableHeightPx: number,
+    context?: MeasurementContext
+  ): NodeFragmentationResult {
+    const mCtx = context || { containerWidth: 602, fontSizePx: 16 };
+
+    // 1. Manual Page Break
+    if (block.type === 'manual-page-break') {
+      return {
+        fitsCurrentPage: false,
+        pushedToNextPage: true,
+        remainingBlockNode: null,
+        usedHeight: 0,
+      };
+    }
+
+    // Cache lookup
+    const cache = FragmentCache.getInstance();
+    const content = 'content' in block ? JSON.stringify(block) : (block as any).rawHtml || '';
+    const cacheKey = cache.generateKey(block.id, content, availableHeightPx, mCtx.containerWidth, mCtx.density);
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return {
+        ...cached,
+        firstFragment: cached.firstFragment
+          ? { ...cached.firstFragment, pageIndex, id: `frag_${pageIndex}_${block.id}` }
+          : undefined,
+      };
+    }
+
+    const result = this._fragmentBlockNodeInternal(block, pageIndex, availableHeightPx, mCtx);
+    cache.set(cacheKey, result);
+    return result;
+  }
+
+  private static _fragmentBlockNodeInternal(
+    block: BlockNode,
+    pageIndex: number,
+    availableHeightPx: number,
+    mCtx: MeasurementContext
+  ): NodeFragmentationResult {
+
+    // 2. Measure block
+    const measured = MeasurementEngine.measure(block, mCtx);
+    const blockHeight = measured.totalOuterHeight || measured.height || 28;
+
+    // 3. Evaluate fragmentation and keep-together/keep-with-next rules
+    const decision = FragmentationRules.evaluateFragmentation(block, availableHeightPx, blockHeight);
+    if (decision.requiresNewPage) {
+      return {
+        fitsCurrentPage: false,
+        pushedToNextPage: true,
+        remainingBlockNode: block,
+        usedHeight: 0,
+      };
+    }
+
+    // 4. If whole block fits within available budget and rules allow
+    if (!decision.canFragment && blockHeight <= availableHeightPx) {
+      const html = HtmlExporter.serializeBlock(block);
+      const text = 'content' in block && Array.isArray((block as any).content)
+        ? (block as any).content.map((c: any) => c.text || c.label || '').join('')
+        : '';
+      const fragment = DocumentLayoutEngine.createFragment({
+        id: `frag_${pageIndex}_${block.id}`,
+        sourceNodeId: block.id,
+        type: block.type as any,
+        pageIndex,
+        rect: { x: 0, y: 0, width: mCtx.containerWidth, height: blockHeight },
+        htmlContent: html,
+        textContent: text,
+        isFirstFragment: true,
+        isLastFragment: true,
+      });
+
+      return {
+        fitsCurrentPage: true,
+        pushedToNextPage: false,
+        firstFragment: fragment,
+        firstBlockNode: block,
+        remainingBlockNode: null,
+        usedHeight: blockHeight,
+      };
+    }
+
+    // 5. Table Block Fragmentation
+    if (block.type === 'table') {
+      const split = TableFragmenter.splitTableNode(block, availableHeightPx, mCtx);
+      if (split.isSplit && split.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `table_frag_${pageIndex}_${block.id}`,
+          sourceNodeId: block.id,
+          type: 'table',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
+          htmlContent: split.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !split.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
+
+        return {
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          firstBlockNode: split.firstFragmentNode,
+          remainingBlockNode: split.remainingFragmentNode,
+          usedHeight: split.firstFragmentHeight,
+        };
+      }
+    }
+
+    // 6. List Block Fragmentation
+    if (block.type === 'list') {
+      const split = ListFragmenter.splitListNode(block, availableHeightPx, mCtx);
+      if (split.isSplit && split.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `list_frag_${pageIndex}_${block.id}`,
+          sourceNodeId: block.id,
+          type: 'list',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
+          htmlContent: split.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !split.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
+
+        return {
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          firstBlockNode: split.firstFragmentNode,
+          remainingBlockNode: split.remainingFragmentNode,
+          usedHeight: split.firstFragmentHeight,
+        };
+      }
+    }
+
+    // 7. Section / Nested Container Fragmentation
+    if (block.type === 'section') {
+      const split = NestedBlockFragmenter.splitSectionNode(block, availableHeightPx, mCtx);
+      if (split.isSplit && split.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `sec_frag_${pageIndex}_${block.id}`,
+          sourceNodeId: block.id,
+          type: 'paragraph',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
+          htmlContent: split.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !split.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
+
+        return {
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          firstBlockNode: split.firstFragmentNode,
+          remainingBlockNode: split.remainingFragmentNode,
+          usedHeight: split.firstFragmentHeight,
+        };
+      }
+    }
+
+    // 8. Paragraph Block Fragmentation
+    if (block.type === 'paragraph') {
+      const split = ParagraphFragmenter.splitParagraphNode(block, availableHeightPx, mCtx);
+      if (split.isSplit && split.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `p_frag_${pageIndex}_${block.id}`,
+          sourceNodeId: block.id,
+          type: 'paragraph',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
+          htmlContent: split.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !split.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
+
+        return {
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          firstBlockNode: split.firstFragmentNode,
+          remainingBlockNode: split.remainingFragmentNode,
+          usedHeight: split.firstFragmentHeight,
+        };
+      }
+    }
+
+    // Fallback: push to next page
+    return {
+      fitsCurrentPage: false,
+      pushedToNextPage: true,
+      remainingBlockNode: block,
+      usedHeight: 0,
+    };
+  }
+
+  /**
+   * Slices or allocates an element or source node within the available page height
    */
   public static fragmentNode(
     el: HTMLElement | SourceNode | any,
@@ -43,126 +259,8 @@ export class FragmentationEngine {
       };
     }
 
-    const rawHtml = el.outerHTML || el.rawHtml || '';
-    const textContent = el.textContent || '';
-    const isTable = (el.tagName && el.tagName.toLowerCase() === 'table') || el.type === 'table' || /<table/i.test(rawHtml);
-    const isParagraph = (el.tagName && el.tagName.toLowerCase() === 'p') || el.type === 'paragraph';
-
-    // SSR / Node environment fallback
-    if (typeof document === 'undefined') {
-      if (isTable) {
-        const tableSplit = TableFragmenter.splitTable(el, availableHeightPx, context);
-        if (tableSplit.isSplit && tableSplit.firstFragmentHtml) {
-          const fragment = DocumentLayoutEngine.createFragment({
-            id: `table_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-            sourceNodeId: el.id || 'table',
-            type: 'table',
-            pageIndex,
-            rect: { x: 0, y: 0, width: context?.containerWidth || 602, height: tableSplit.firstFragmentHeight },
-            htmlContent: tableSplit.firstFragmentHtml,
-            textContent: '',
-            isFirstFragment: true,
-            isLastFragment: false,
-          });
-
-          return {
-            fitsCurrentPage: false,
-            pushedToNextPage: false,
-            firstFragment: fragment,
-            remainingNode: tableSplit.remainingFragmentHtml
-              ? {
-                  id: `${el.id || 'table'}_cont`,
-                  type: 'table',
-                  rawHtml: tableSplit.remainingFragmentHtml,
-                  textContent: '',
-                }
-              : null,
-            usedHeight: tableSplit.firstFragmentHeight,
-          };
-        } else {
-          return {
-            fitsCurrentPage: false,
-            pushedToNextPage: true,
-            remainingNode: el,
-            usedHeight: 0,
-          };
-        }
-      } else if (isParagraph) {
-        const pSplit = ParagraphFragmenter.splitParagraph(el, availableHeightPx, context);
-        if (pSplit.isSplit && pSplit.firstFragmentHtml) {
-          const fragment = DocumentLayoutEngine.createFragment({
-            id: `para_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-            sourceNodeId: el.id || 'p',
-            type: 'paragraph',
-            pageIndex,
-            rect: { x: 0, y: 0, width: context?.containerWidth || 602, height: pSplit.firstFragmentHeight },
-            htmlContent: pSplit.firstFragmentHtml,
-            textContent: '',
-            isFirstFragment: true,
-            isLastFragment: false,
-          });
-
-          return {
-            fitsCurrentPage: false,
-            pushedToNextPage: false,
-            firstFragment: fragment,
-            remainingNode: pSplit.remainingFragmentHtml
-              ? {
-                  id: `${el.id || 'p'}_cont`,
-                  type: 'paragraph',
-                  rawHtml: pSplit.remainingFragmentHtml,
-                  textContent: '',
-                }
-              : null,
-            usedHeight: pSplit.firstFragmentHeight,
-          };
-        } else {
-          return {
-            fitsCurrentPage: false,
-            pushedToNextPage: true,
-            remainingNode: el,
-            usedHeight: 0,
-          };
-        }
-      } else {
-        // Atomic or container block (div, figure, image, etc.) in SSR mode
-        const measured = MeasurementEngine.measure(el, context || { containerWidth: 602, fontSizePx: 16 });
-        const blockHeight = measured.totalOuterHeight || measured.height || 200;
-        if (blockHeight <= availableHeightPx) {
-          const fragment = DocumentLayoutEngine.createFragment({
-            id: `frag_${pageIndex}_${el.id || Math.random().toString(36).slice(2, 7)}`,
-            sourceNodeId: el.id || 'block',
-            type: el.type || 'paragraph',
-            pageIndex,
-            rect: { x: 0, y: 0, width: context?.containerWidth || 602, height: blockHeight },
-            htmlContent: el.rawHtml || el.outerHTML || '',
-            textContent: el.textContent || '',
-            isFirstFragment: true,
-            isLastFragment: true,
-          });
-          return {
-            fitsCurrentPage: true,
-            pushedToNextPage: false,
-            firstFragment: fragment,
-            remainingNode: null,
-            usedHeight: blockHeight,
-          };
-        } else {
-          return {
-            fitsCurrentPage: false,
-            pushedToNextPage: true,
-            remainingNode: el,
-            usedHeight: 0,
-          };
-        }
-      }
-    }
-
-    const elHeight = Math.max(el.offsetHeight || 0, el.getBoundingClientRect ? el.getBoundingClientRect().height : 0, 1);
-    const tag = el.tagName ? el.tagName.toLowerCase() : 'div';
-
-    // 1. Manual Page Break -> forces fresh page
-    if (DocumentLayoutEngine.isManualBreak(el)) {
+    // 1. Manual Page Break
+    if (FragmentationRules.isManualBreak(el)) {
       return {
         fitsCurrentPage: false,
         pushedToNextPage: true,
@@ -171,17 +269,64 @@ export class FragmentationEngine {
       };
     }
 
-    // 2. Fits on current page entirely
-    if (elHeight <= availableHeightPx) {
+    const mCtx = context || { containerWidth: 602, fontSizePx: 16 };
+    const rawHtml = el.outerHTML || el.rawHtml || el.textContent || '';
+    const nodeId = el.id || 'node';
+    const cache = FragmentCache.getInstance();
+    const cacheKey = cache.generateKey(nodeId, rawHtml, availableHeightPx, mCtx.containerWidth, mCtx.density);
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return {
+        ...cached,
+        firstFragment: cached.firstFragment
+          ? { ...cached.firstFragment, pageIndex, id: `frag_${pageIndex}_${nodeId}` }
+          : undefined,
+      };
+    }
+
+    const result = this._fragmentNodeInternal(el, pageIndex, availableHeightPx, mCtx, rawHtml);
+    cache.set(cacheKey, result);
+    return result;
+  }
+
+  private static _fragmentNodeInternal(
+    el: HTMLElement | SourceNode | any,
+    pageIndex: number,
+    availableHeightPx: number,
+    mCtx: MeasurementContext,
+    rawHtml: string
+  ): NodeFragmentationResult {
+    const tag = el.tagName ? el.tagName.toLowerCase() : el.type || 'div';
+    const isTable = tag === 'table' || /<table/i.test(rawHtml);
+    const isList = tag === 'ul' || tag === 'ol' || /<[uo]l/i.test(rawHtml);
+    const isParagraph = tag === 'p' || tag === 'paragraph' || /^h[1-6]$/.test(tag);
+
+    // Measure node
+    const measured = MeasurementEngine.measure(el, mCtx);
+    const nodeHeight = measured.totalOuterHeight || measured.height || 28;
+
+    // 2. Evaluate fragmentation and keep-together/keep-with-next rules
+    const decision = FragmentationRules.evaluateFragmentation(el, availableHeightPx, nodeHeight);
+    if (decision.requiresNewPage) {
+      return {
+        fitsCurrentPage: false,
+        pushedToNextPage: true,
+        remainingNode: el,
+        usedHeight: 0,
+      };
+    }
+
+    // 3. Fits on current page entirely and rules allow
+    if (!decision.canFragment && nodeHeight <= availableHeightPx) {
       const fragment = DocumentLayoutEngine.createFragment({
         id: `frag_${pageIndex}_${el.id || Math.random().toString(36).slice(2, 7)}`,
         sourceNodeId: el.id || 'node',
-        type: tag === 'table' ? 'table' : /^h[1-6]$/.test(tag) ? 'heading' : 'paragraph',
+        type: isTable ? 'table' : isList ? 'list' : isParagraph ? 'paragraph' : 'paragraph',
         pageIndex,
-        rect: { x: 0, y: 0, width: context?.containerWidth || el.offsetWidth, height: elHeight },
-        htmlContent: el.outerHTML,
-        textContent: el.textContent || '',
-        domNode: el,
+        rect: { x: 0, y: 0, width: mCtx.containerWidth, height: nodeHeight },
+        htmlContent: rawHtml || el.outerHTML || '',
+        textContent: el.textContent || (rawHtml ? rawHtml.replace(/<[^>]+>/g, '').trim() : ''),
+        domNode: typeof HTMLElement !== 'undefined' && el instanceof HTMLElement ? el : undefined,
         isFirstFragment: true,
         isLastFragment: true,
       });
@@ -191,94 +336,123 @@ export class FragmentationEngine {
         pushedToNextPage: false,
         firstFragment: fragment,
         remainingNode: null,
-        usedHeight: elHeight,
-      };
-    }
-
-    // 3. Evaluate fragmentation rules
-    const decision = FragmentationRules.evaluateFragmentation(el, availableHeightPx, elHeight);
-
-    // If atomic or cannot fragment -> push to next page
-    if (!decision.canFragment || decision.requiresNewPage) {
-      return {
-        fitsCurrentPage: false,
-        pushedToNextPage: true,
-        remainingNode: el,
-        usedHeight: 0,
+        usedHeight: nodeHeight,
       };
     }
 
     // 4. Table Fragmentation
-    if (tag === 'table') {
-      const tableSplit = TableFragmenter.splitTable(el as HTMLTableElement, availableHeightPx, context);
+    if (isTable) {
+      const tableSplit = TableFragmenter.splitTable(el, availableHeightPx, mCtx);
+      if (tableSplit.isSplit && tableSplit.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `table_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
+          sourceNodeId: el.id || 'table',
+          type: 'table',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: tableSplit.firstFragmentHeight },
+          htmlContent: tableSplit.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !tableSplit.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
 
-      if (!tableSplit.isSplit || !tableSplit.firstFragmentHtml) {
+        let remainingEl: any = null;
+        if (tableSplit.remainingFragmentHtml) {
+          if (typeof document !== 'undefined') {
+            const dummy = document.createElement('div');
+            dummy.innerHTML = tableSplit.remainingFragmentHtml;
+            remainingEl = dummy.firstElementChild as HTMLElement;
+          } else {
+            remainingEl = {
+              id: `${el.id || 'table'}_cont`,
+              type: 'table',
+              rawHtml: tableSplit.remainingFragmentHtml,
+              textContent: '',
+            };
+          }
+        }
+
         return {
-          fitsCurrentPage: false,
-          pushedToNextPage: true,
-          remainingNode: el,
-          usedHeight: 0,
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          remainingNode: remainingEl,
+          usedHeight: tableSplit.firstFragmentHeight,
         };
       }
-
-      const fragment = DocumentLayoutEngine.createFragment({
-        id: `table_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-        sourceNodeId: el.id || 'table',
-        type: 'table',
-        pageIndex,
-        rect: { x: 0, y: 0, width: context?.containerWidth || el.offsetWidth, height: tableSplit.firstFragmentHeight },
-        htmlContent: tableSplit.firstFragmentHtml,
-        isFirstFragment: true,
-        isLastFragment: !tableSplit.remainingFragmentHtml,
-        isAutomaticBreak: true,
-      });
-
-      let remainingEl: HTMLElement | null = null;
-      if (tableSplit.remainingFragmentHtml) {
-        const dummy = document.createElement('div');
-        dummy.innerHTML = tableSplit.remainingFragmentHtml;
-        remainingEl = dummy.firstElementChild as HTMLElement;
-      }
-
-      return {
-        fitsCurrentPage: true,
-        pushedToNextPage: false,
-        firstFragment: fragment,
-        remainingNode: remainingEl,
-        usedHeight: tableSplit.firstFragmentHeight,
-      };
     }
 
     // 5. List Fragmentation
-    if (tag === 'ul' || tag === 'ol') {
+    if (isList) {
       const listSplit = ListFragmenter.splitList(el, availableHeightPx);
+      if (listSplit.isSplit && listSplit.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `list_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
+          sourceNodeId: el.id || 'list',
+          type: 'list',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: listSplit.firstFragmentHeight },
+          htmlContent: listSplit.firstFragmentHtml,
+          isFirstFragment: true,
+          isLastFragment: !listSplit.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
 
-      if (!listSplit.isSplit || !listSplit.firstFragmentHtml) {
+        let remainingEl: any = null;
+        if (listSplit.remainingFragmentHtml) {
+          if (typeof document !== 'undefined') {
+            const dummy = document.createElement('div');
+            dummy.innerHTML = listSplit.remainingFragmentHtml;
+            remainingEl = dummy.firstElementChild as HTMLElement;
+          } else {
+            remainingEl = {
+              id: `${el.id || 'list'}_cont`,
+              type: 'list',
+              rawHtml: listSplit.remainingFragmentHtml,
+              textContent: '',
+            };
+          }
+        }
+
         return {
-          fitsCurrentPage: false,
-          pushedToNextPage: true,
-          remainingNode: el,
-          usedHeight: 0,
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          remainingNode: remainingEl,
+          usedHeight: listSplit.firstFragmentHeight,
         };
       }
+    }
 
+    // 6. Paragraph Fragmentation
+    const pSplit = ParagraphFragmenter.splitParagraph(el, availableHeightPx, mCtx);
+    if (pSplit.isSplit && pSplit.firstFragmentHtml) {
       const fragment = DocumentLayoutEngine.createFragment({
-        id: `list_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-        sourceNodeId: el.id || 'list',
-        type: 'list',
+        id: `p_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
+        sourceNodeId: el.id || 'p',
+        type: 'paragraph',
         pageIndex,
-        rect: { x: 0, y: 0, width: context?.containerWidth || el.offsetWidth, height: listSplit.firstFragmentHeight },
-        htmlContent: listSplit.firstFragmentHtml,
+        rect: { x: 0, y: 0, width: mCtx.containerWidth, height: pSplit.firstFragmentHeight },
+        htmlContent: pSplit.firstFragmentHtml,
         isFirstFragment: true,
-        isLastFragment: !listSplit.remainingFragmentHtml,
+        isLastFragment: !pSplit.remainingFragmentHtml,
         isAutomaticBreak: true,
       });
 
-      let remainingEl: HTMLElement | null = null;
-      if (listSplit.remainingFragmentHtml) {
-        const dummy = document.createElement('div');
-        dummy.innerHTML = listSplit.remainingFragmentHtml;
-        remainingEl = dummy.firstElementChild as HTMLElement;
+      let remainingEl: any = null;
+      if (pSplit.remainingFragmentHtml) {
+        if (typeof document !== 'undefined') {
+          const dummy = document.createElement('div');
+          dummy.innerHTML = pSplit.remainingFragmentHtml;
+          remainingEl = dummy.firstElementChild as HTMLElement;
+        } else {
+          remainingEl = {
+            id: `${el.id || 'p'}_cont`,
+            type: 'paragraph',
+            rawHtml: pSplit.remainingFragmentHtml,
+            textContent: '',
+          };
+        }
       }
 
       return {
@@ -286,47 +460,17 @@ export class FragmentationEngine {
         pushedToNextPage: false,
         firstFragment: fragment,
         remainingNode: remainingEl,
-        usedHeight: listSplit.firstFragmentHeight,
+        usedHeight: pSplit.firstFragmentHeight,
       };
     }
 
-    // 6. Paragraph / Text Block Fragmentation
-    const pSplit = ParagraphFragmenter.splitParagraph(el, availableHeightPx, context);
-
-    if (!pSplit.isSplit || !pSplit.firstFragmentHtml) {
-      return {
-        fitsCurrentPage: false,
-        pushedToNextPage: true,
-        remainingNode: el,
-        usedHeight: 0,
-      };
-    }
-
-    const fragment = DocumentLayoutEngine.createFragment({
-      id: `p_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-      sourceNodeId: el.id || 'p',
-      type: 'paragraph',
-      pageIndex,
-      rect: { x: 0, y: 0, width: context?.containerWidth || el.offsetWidth, height: pSplit.firstFragmentHeight },
-      htmlContent: pSplit.firstFragmentHtml,
-      isFirstFragment: true,
-      isLastFragment: !pSplit.remainingFragmentHtml,
-      isAutomaticBreak: true,
-    });
-
-    let remainingEl: HTMLElement | null = null;
-    if (pSplit.remainingFragmentHtml) {
-      const dummy = document.createElement('div');
-      dummy.innerHTML = pSplit.remainingFragmentHtml;
-      remainingEl = dummy.firstElementChild as HTMLElement;
-    }
-
+    // Fallback: push to next page
     return {
-      fitsCurrentPage: true,
-      pushedToNextPage: false,
-      firstFragment: fragment,
-      remainingNode: remainingEl,
-      usedHeight: pSplit.firstFragmentHeight,
+      fitsCurrentPage: false,
+      pushedToNextPage: true,
+      firstFragment: null,
+      remainingNode: null,
+      usedHeight: 0,
     };
   }
 }

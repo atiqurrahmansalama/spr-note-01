@@ -34,27 +34,41 @@ export class TableMeasurement {
         const dataTrs = trMatches.slice(headerTrs.length);
 
         const width = context?.containerWidth || 602;
-        const headerMeasurements = headerTrs.map((tr, idx) => ({
-          rowIndex: idx,
-          height: 36,
-          rect: { x: 0, y: idx * 36, width, height: 36 },
-          isHeader: true,
-          isFooter: false,
-          isKeepTogether: true,
-          rawHtml: tr,
-        }));
+        let runningHeaderY = 0;
+        const headerMeasurements = headerTrs.map((tr, idx) => {
+          const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
+          const h = trH ? parseInt(trH[1], 10) : 36;
+          const rect = { x: 0, y: runningHeaderY, width, height: h };
+          runningHeaderY += h;
+          return {
+            rowIndex: idx,
+            height: h,
+            rect,
+            isHeader: true,
+            isFooter: false,
+            isKeepTogether: true,
+            rawHtml: tr,
+          };
+        });
 
-        const headerHeight = headerMeasurements.reduce((sum, r) => sum + r.height, 0);
+        const headerHeight = runningHeaderY;
+        let runningDataY = headerHeight;
 
-        const dataMeasurements = dataTrs.map((tr, idx) => ({
-          rowIndex: idx,
-          height: 36,
-          rect: { x: 0, y: headerHeight + idx * 36, width, height: 36 },
-          isHeader: false,
-          isFooter: false,
-          isKeepTogether: false,
-          rawHtml: tr,
-        }));
+        const dataMeasurements = dataTrs.map((tr, idx) => {
+          const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
+          const h = trH ? parseInt(trH[1], 10) : 36;
+          const rect = { x: 0, y: runningDataY, width, height: h };
+          runningDataY += h;
+          return {
+            rowIndex: idx,
+            height: h,
+            rect,
+            isHeader: false,
+            isFooter: false,
+            isKeepTogether: false,
+            rawHtml: tr,
+          };
+        });
 
         const totalHeight = headerHeight + dataMeasurements.reduce((sum, r) => sum + r.height, 0);
 
@@ -88,14 +102,17 @@ export class TableMeasurement {
 
       const headerMeasurements: TableRowMeasurement[] = headerTrs.map((tr, idx) => {
         const rect = tr.getBoundingClientRect();
+        const textLen = (tr.textContent || '').length;
+        const fallbackH = Math.max(32, Math.ceil(textLen / 35) * 22);
+        const rowH = rect.height > 0 ? rect.height : fallbackH;
         return {
           rowIndex: idx,
-          height: Math.max(24, rect.height),
+          height: rowH,
           rect: {
             x: Math.max(0, rect.left - tableRect.left),
             y: Math.max(0, rect.top - tableRect.top),
             width: rect.width || tableRect.width,
-            height: Math.max(24, rect.height),
+            height: rowH,
           },
           isHeader: true,
           isFooter: false,
@@ -115,6 +132,9 @@ export class TableMeasurement {
 
       const dataMeasurements: TableRowMeasurement[] = dataTrs.map((tr, idx) => {
         const rect = tr.getBoundingClientRect();
+        const textLen = (tr.textContent || '').length;
+        const fallbackH = Math.max(36, Math.ceil(textLen / 35) * 22);
+        const rowH = rect.height > 0 ? rect.height : fallbackH;
         const isKeepTogether =
           tr.classList.contains('print-avoid-break') ||
           tr.classList.contains('keep-together') ||
@@ -122,12 +142,12 @@ export class TableMeasurement {
 
         return {
           rowIndex: idx,
-          height: Math.max(20, rect.height),
+          height: rowH,
           rect: {
             x: Math.max(0, rect.left - tableRect.left),
             y: Math.max(0, rect.top - tableRect.top),
             width: rect.width || tableRect.width,
-            height: Math.max(20, rect.height),
+            height: rowH,
           },
           isHeader: false,
           isFooter: false,
@@ -140,14 +160,17 @@ export class TableMeasurement {
       // 3. Identify and measure Footer Rows
       const footerMeasurements: TableRowMeasurement[] = footerTrs.map((tr, idx) => {
         const rect = tr.getBoundingClientRect();
+        const textLen = (tr.textContent || '').length;
+        const fallbackH = Math.max(32, Math.ceil(textLen / 35) * 22);
+        const rowH = rect.height > 0 ? rect.height : fallbackH;
         return {
           rowIndex: idx,
-          height: Math.max(24, rect.height),
+          height: rowH,
           rect: {
             x: Math.max(0, rect.left - tableRect.left),
             y: Math.max(0, rect.top - tableRect.top),
             width: rect.width || tableRect.width,
-            height: Math.max(24, rect.height),
+            height: rowH,
           },
           isHeader: false,
           isFooter: true,

@@ -366,5 +366,6 @@ export function runPhase7BrowserDOMQATestSuite(): Record<string, boolean> {
   return results;
 }
 
-// Execute immediately when run
-runPhase7BrowserDOMQATestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_phase7_browser_dom_qa')) {
+  runPhase7BrowserDOMQATestSuite();
+}

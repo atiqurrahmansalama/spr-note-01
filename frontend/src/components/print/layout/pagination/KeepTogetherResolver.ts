@@ -4,6 +4,7 @@
  */
 
 import { SourceNode } from '../types/documentTypes';
+import { BlockNode } from '../../model/types';
 import { PaginationRules } from './PaginationRules';
 import { MIN_PARAGRAPH_SPLIT_SPACE_PX, MIN_TABLE_SPLIT_SPACE_PX } from '../fragmentation/fragmentationRules';
 
@@ -11,7 +12,7 @@ export class KeepTogetherResolver {
   /**
    * Evaluates if a node must be kept whole on a single page
    */
-  public static isKeepTogether(node: HTMLElement | SourceNode): boolean {
+  public static isKeepTogether(node: HTMLElement | SourceNode | BlockNode | any): boolean {
     const rules = PaginationRules.extractRules(node);
     return rules.breakInside === 'avoid';
   }
@@ -20,8 +21,8 @@ export class KeepTogetherResolver {
    * Protects headings from being orphaned at the bottom of a page without their following content
    */
   public static shouldPushWithNext(
-    currentNode: HTMLElement | SourceNode,
-    nextNode: HTMLElement | SourceNode | null | undefined,
+    currentNode: HTMLElement | SourceNode | BlockNode | any,
+    nextNode: HTMLElement | SourceNode | BlockNode | any,
     currentHeightPx: number,
     availableHeightPx: number
   ): boolean {

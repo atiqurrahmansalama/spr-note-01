@@ -4,6 +4,7 @@
  */
 
 import { SourceNode } from '../types/documentTypes';
+import { BlockNode } from '../../model/types';
 import { PaginationRules, BreakValue } from './PaginationRules';
 import { isExplicitManualBreak } from '../logicalDocument';
 
@@ -19,7 +20,7 @@ export class BreakResolver {
    * Evaluates break conditions for a node relative to current page placement
    */
   public static evaluateBreaks(
-    node: HTMLElement | SourceNode,
+    node: HTMLElement | SourceNode | BlockNode | any,
     currentPageUsedHeight: number
   ): BreakEvaluationResult {
     const rules = PaginationRules.extractRules(node);

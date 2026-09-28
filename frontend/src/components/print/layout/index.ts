@@ -12,10 +12,10 @@ export * from './chrome';
 export * from './logicalDocument';
 export * from './DocumentLayoutEngine';
 export * from './LayoutContext';
-export * from './__tests__';
 export * from './debug';
 export * from './performance';
 export * from './render';
+export * from './editor';
 
 
 

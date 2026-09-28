@@ -171,5 +171,6 @@ export function runPhase6OutputPipelinesTestSuite() {
   return results;
 }
 
-// Execute immediately when run
-runPhase6OutputPipelinesTestSuite();
+if (typeof process !== 'undefined' && process?.argv?.[1]?.includes('verify_phase6_output_pipelines')) {
+  runPhase6OutputPipelinesTestSuite();
+}

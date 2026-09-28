@@ -6,14 +6,23 @@
  * - Exact physical width & height (e.g. 794px × 1123px for A4 portrait)
  * - Exact margin padding insets
  * - Realistic box shadow, background, and rounded corners
- * - Clean screen header indicator (Page X of Y, Dimensions, Add Page)
+ * - Clean screen header indicator (Page X of Y, Dimensions, Section info)
+ * - Watermark layer overlay
+ * - Running Header & Running Footer chrome
+ * - Dedicated Signature Block zone on final page
  * - Safe fragment / children rendering with zero DOM mutation
  */
 
 import React from 'react';
 import { LayoutPage } from '../types/paginationTypes';
 import { LayoutDocumentOptions } from '../types/documentTypes';
-import { PageBreakIcon } from '../../../ui/Icons';
+import {
+  RunningHeader,
+  RunningFooter,
+  WatermarkLayer,
+  SignatureBlockRenderer,
+  RuntimeVariableResolver,
+} from '../chrome';
 import DocxLiveRenderer from '../../DocxLiveRenderer';
 
 export interface LayoutPageRendererProps {
@@ -42,6 +51,26 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
 
   const marginPadding = `${page.margins.top}px ${page.margins.right}px ${page.margins.bottom}px ${page.margins.left}px`;
 
+  // Construct runtime variables for this page
+  const runtimeVars = RuntimeVariableResolver.buildVariables(page.index, effectiveTotalPages, {
+    documentTitle: options.title || 'Official Document',
+    documentSubtitle: options.subtitle,
+    institutionName: options.institutionName || 'SPR Note Academy',
+    institutionAddress: options.institutionAddress,
+    sectionId: page.sectionId,
+    sectionIndex: page.sectionIndex,
+    sectionNumber: (page.sectionIndex !== undefined ? page.sectionIndex + 1 : 1),
+    sectionTitle: page.sectionTitle,
+    sectionPageNumber: page.sectionPageNumber,
+    sectionTotalPages: page.sectionTotalPages,
+  });
+
+  const watermarkConfig = page.watermarkConfig || options.watermarkConfig;
+  const watermarkText = page.watermarkText || options.watermarkText;
+  const headerConfig = options.headerConfig;
+  const footerConfig = options.footerConfig;
+  const signatureConfig = page.signatureConfig || options.signatureConfig;
+
   return (
     <div
       id={`docx-live-page-${page.index}`}
@@ -60,6 +89,11 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
           <span className="font-bold theme-text-primary font-mono text-[11.5px]">
             Page {page.pageNumber} of {effectiveTotalPages} ({pageSize} &bull; {orientation})
           </span>
+          {page.sectionTitle && (
+            <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-sm font-sans">
+              {page.sectionTitle} (p. {page.sectionPageNumber}/{page.sectionTotalPages})
+            </span>
+          )}
           <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
             {Math.round(page.width)} × {Math.round(page.height)}px
           </span>
@@ -73,7 +107,7 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
 
       {/* Actual Physical Visual Paper Sheet Container */}
       <div
-        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl select-text"
+        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl select-text flex flex-col justify-between"
         data-size={pageSize}
         data-orientation={orientation}
         data-margin={marginPreset}
@@ -96,7 +130,27 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
           WebkitUserSelect: 'text',
         }}
       >
-        <div className="w-full h-full text-left select-text">
+        {/* Background Watermark Layer */}
+        {(watermarkConfig || watermarkText) && (
+          <WatermarkLayer
+            config={watermarkConfig}
+            text={watermarkText}
+            variables={runtimeVars}
+          />
+        )}
+
+        {/* Running Header Zone */}
+        {headerConfig && (
+          <div className="w-full relative z-10 shrink-0">
+            <RunningHeader
+              variables={runtimeVars}
+              config={headerConfig}
+            />
+          </div>
+        )}
+
+        {/* Printable Flow Content Area */}
+        <div className="w-full flex-1 relative z-10 text-left select-text overflow-hidden">
           {children ? (
             children
           ) : (
@@ -109,7 +163,25 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
               totalPages={effectiveTotalPages}
             />
           )}
+
+          {/* Signature Block (if placed inside flow on target page) */}
+          {signatureConfig && (page.isLastPage || options.showSignaturesOnAllPages) && (
+            <SignatureBlockRenderer
+              config={signatureConfig}
+            />
+          )}
         </div>
+
+        {/* Running Footer Zone */}
+        {footerConfig && (
+          <div className="w-full relative z-10 shrink-0">
+            <RunningFooter
+              variables={runtimeVars}
+              config={footerConfig}
+              numeralSystem={options.numeralSystem}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
