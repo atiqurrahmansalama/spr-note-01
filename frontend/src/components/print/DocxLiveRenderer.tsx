@@ -247,34 +247,32 @@ function DocxLiveRendererComponent({
       return;
     }
 
-    // While user is actively typing inside this container, don't overwrite if the body matches what was typed
-    if (isInternalChangeRef.current) {
-      isInternalChangeRef.current = false;
-      lastKnownHtmlRef.current = cleanBody || '';
-      return;
-    }
-
     const isCurrentActive =
       typeof document !== 'undefined' &&
       (document.activeElement === containerRef.current ||
         containerRef.current.contains(document.activeElement));
 
-    // External change: update DOM if different
-    if (containerRef.current.innerHTML !== cleanBody && lastKnownHtmlRef.current !== cleanBody) {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      const targetBookmark = savedBookmarkRef.current;
-      containerRef.current.innerHTML = cleanBody || '';
+    // If DOM already matches cleanBody (including all runtime spacers), nothing to update
+    if (containerRef.current.innerHTML === cleanBody) {
       lastKnownHtmlRef.current = cleanBody || '';
+      return;
+    }
 
-      if (isCurrentActive && targetBookmark) {
-        requestAnimationFrame(() => {
-          if (containerRef.current) {
-            restoreCaretBookmark(containerRef.current, targetBookmark);
-          }
-        });
-      }
+    // Capture caret bookmark before updating DOM
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    const targetBookmark = savedBookmarkRef.current || (isCurrentActive ? getCaretBookmark(containerRef.current) : null);
+
+    containerRef.current.innerHTML = cleanBody || '';
+    lastKnownHtmlRef.current = cleanBody || '';
+
+    if (isCurrentActive && targetBookmark) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          restoreCaretBookmark(containerRef.current, targetBookmark);
+        }
+      });
     }
   }, [cleanBody, isEditable]);
 

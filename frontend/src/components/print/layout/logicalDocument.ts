@@ -36,9 +36,11 @@ export function createRuntimePageSpacerHtml(options: {
   orientation?: string;
   dimensionsPx?: { width: number; height: number };
   marginsPx?: { top: number; right: number; bottom: number; left: number };
+  remainingHeightPx?: number;
 }): string {
   const {
     marginsPx = { top: 48, right: 48, bottom: 48, left: 48 },
+    remainingHeightPx = 0,
   } = options;
 
   const topMargin = Math.round(marginsPx.top);
@@ -48,11 +50,81 @@ export function createRuntimePageSpacerHtml(options: {
   const pageGapPx = 32; // Gap between discrete visual sheets
   const headerHeightPx = 32; // Header + margin-bottom of sheet header
 
-  const totalSpacerHeight = bottomMargin + pageGapPx + headerHeightPx + topMargin;
+  const totalSpacerHeight = Math.max(0, Math.round(remainingHeightPx)) + bottomMargin + pageGapPx + headerHeightPx + topMargin;
 
   return (
     `<div class="spr-runtime-page-spacer not-prose select-none print:hidden" data-spr-runtime-pagination="true" contenteditable="false" style="margin-left: -${leftMargin}px; margin-right: -${rightMargin}px; height: ${totalSpacerHeight}px; min-height: ${totalSpacerHeight}px; display: block; user-select: none; pointer-events: none; -webkit-user-select: none; box-sizing: border-box;"></div>`
   );
+}
+
+/**
+ * Projects a continuous canonical HTML document with runtime page spacers across page boundaries.
+ *
+ * ARCHITECTURAL INVARIANT:
+ * - Every logical block (Paragraph, Heading, Table) remains 100% untouched and un-sliced.
+ * - Runtime spacers are inserted ONLY between blocks across page boundaries.
+ * - Spacers bridge: remaining page height + bottom margin + 32px canvas gap + 32px header + top margin.
+ * - The next page's content starts cleanly inside the next physical sheet's content box.
+ */
+/**
+ * Projects a continuous canonical HTML document with runtime page spacers across page boundaries.
+ *
+ * ARCHITECTURAL INVARIANT:
+ * - Content is cleanly visualised across discrete physical sheets.
+ * - Runtime spacers are inserted between pages across page boundaries.
+ * - Spacers bridge: remaining page height + bottom margin + 32px canvas gap + 32px header + top margin.
+ * - The next page's content starts cleanly inside the next physical sheet's content area.
+ * - Saved document content remains 100% pure canonical HTML (zero spacers persisted).
+ */
+export function projectCanonicalDocumentWithRuntimeSpacers(
+  canonicalHtml: string,
+  paginationResult: any | null,
+  options: {
+    paperDimensionsPx?: { width: number; height: number };
+    marginsPx?: { top: number; right: number; bottom: number; left: number };
+    pageSize?: string;
+    orientation?: string;
+  }
+): string {
+  const cleanHtml = sanitizeLogicalDocumentHtml(canonicalHtml);
+  if (!cleanHtml || !cleanHtml.trim() || cleanHtml.trim() === '<p></p>') return '<p><br></p>';
+
+  if (!paginationResult || !paginationResult.pages || paginationResult.pages.length <= 1) {
+    return cleanHtml;
+  }
+
+  const pages = paginationResult.pages;
+  const totalPages = paginationResult.totalPages || pages.length;
+
+  const projectedPieces: string[] = [];
+
+  pages.forEach((page: any, pIdx: number) => {
+    const pageHtml =
+      page.htmlContent ||
+      (page.fragments && page.fragments.length > 0
+        ? page.fragments.map((f: any) => f.htmlContent || f.textContent || '').join('\n')
+        : '<p><br></p>');
+
+    projectedPieces.push(pageHtml);
+
+    // If there is a subsequent page, insert the runtime spacer bridging the gap
+    if (pIdx < pages.length - 1) {
+      const remainingHeight = page.availableHeight !== undefined ? page.availableHeight : 0;
+      projectedPieces.push(
+        createRuntimePageSpacerHtml({
+          pageNumber: pIdx + 2,
+          totalPages,
+          pageSize: options.pageSize,
+          orientation: options.orientation,
+          dimensionsPx: options.paperDimensionsPx,
+          marginsPx: options.marginsPx,
+          remainingHeightPx: remainingHeight,
+        })
+      );
+    }
+  });
+
+  return projectedPieces.join('\n');
 }
 
 /**
@@ -181,7 +253,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
   const cleanHtml = stripRuntimePaginationSpacers(rawHtml);
 
   if (typeof document === 'undefined') {
-    let raw = rawHtml.trim();
+    let raw = cleanHtml.trim();
     // Recursively strip outer document wrappers (e.g. .docx-blank-canvas, section.docx, etc.)
     while (true) {
       const match = raw.match(/^<(?:div|section|article)\s+[^>]*class=["'](?:docx-blank-canvas|docx-parsed-body|docx-preview-content|docx)[^"']*["'][^>]*>([\s\S]*)<\/(?:div|section|article)>$/i);
@@ -194,7 +266,20 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
 
     const tagMatches = raw.match(/<table[\s\S]*?<\/table>|<h[1-6][\s\S]*?<\/h[1-6]>|<p[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<div[\s\S]*?<\/div>|<ul[\s\S]*?<\/ul>|<ol[\s\S]*?<\/ol>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<article[\s\S]*?<\/article>|<figure[\s\S]*?<\/figure>|<img[\s\S]*?>/gi);
     if (tagMatches && tagMatches.length > 0) {
-      return tagMatches.map((block, idx) => {
+      const filteredMatches = tagMatches.filter((block) => {
+        if (block.includes('spr-runtime-page-spacer') || block.includes('data-spr-runtime-pagination')) {
+          return false;
+        }
+        const isManual = isExplicitManualBreak(block);
+        const isImg = /<img|<figure|<svg/i.test(block);
+        const isTable = /<table/i.test(block);
+        const text = block.replace(/<[^>]+>/g, '').trim();
+        if (!isManual && !isImg && !isTable && text.length === 0) {
+          return false;
+        }
+        return true;
+      });
+      return filteredMatches.map((block, idx) => {
         const isManual = isExplicitManualBreak(block);
         if (isManual) {
           return {

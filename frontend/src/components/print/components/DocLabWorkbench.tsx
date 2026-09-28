@@ -17,7 +17,7 @@ import {
   LayoutDocumentRenderer,
   stripRuntimePaginationSpacers,
   sanitizeLogicalDocumentHtml,
-  createRuntimePageSpacerHtml,
+  projectCanonicalDocumentWithRuntimeSpacers,
 } from '../layout';
 import {
   PrintOptions,
@@ -191,46 +191,26 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
 
   const liveTotalPagesCount = computedLayout ? Math.max(1, computedLayout.totalPages) : 1;
 
-  // Project continuous content with non-persistent visual runtime page spacers across page boundaries
-  const projectedHtmlWithSpacers = React.useMemo(() => {
+  // Projected continuous document with non-persistent runtime page spacers across page boundaries
+  const projectedHtmlContent = React.useMemo(() => {
     const rawContent =
       customDocxTemplate?.templateBody ||
       customDocxTemplate?.body ||
       customDocxTemplate?.rawHtml ||
       '<p><br></p>';
-    const cleanContent = sanitizeLogicalDocumentHtml(rawContent);
 
-    if (!computedLayout || computedLayout.pages.length <= 1) {
-      return cleanContent;
-    }
-
-    const pages = computedLayout.pages;
-    const totalPages = computedLayout.totalPages;
-    const pageHtmlSlices: string[] = [];
-
-    pages.forEach((page, idx) => {
-      pageHtmlSlices.push(page.htmlContent || '<p><br></p>');
-      if (idx < pages.length - 1) {
-        pageHtmlSlices.push(
-          createRuntimePageSpacerHtml({
-            pageNumber: idx + 2,
-            totalPages,
-            pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
-            orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
-            dimensionsPx: pageGeometry.paperDimensionsPx,
-            marginsPx: pageGeometry.marginsPx,
-          })
-        );
-      }
+    return projectCanonicalDocumentWithRuntimeSpacers(rawContent, computedLayout, {
+      paperDimensionsPx: pageGeometry.paperDimensionsPx,
+      marginsPx: pageGeometry.marginsPx,
+      pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+      orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
     });
-
-    return pageHtmlSlices.join('\n');
   }, [
     customDocxTemplate,
     computedLayout,
+    pageGeometry,
     options.pageSize,
     options.orientation,
-    pageGeometry,
   ]);
 
   return (
@@ -474,7 +454,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                   >
                     <DocxLiveRenderer
                       key="docx_live_unified_editor"
-                      htmlContent={projectedHtmlWithSpacers}
+                      htmlContent={projectedHtmlContent}
                       styles={docxStyles}
                       isEditable={true}
                       transparentBackground={true}
