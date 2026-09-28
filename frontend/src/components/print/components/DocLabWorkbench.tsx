@@ -303,100 +303,151 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
               />
             )}
             {docxRenderMode === 'template' ? (
-              /* Dynamic Multi-Sheet Visual Pages in Template Design Mode */
-              (computedLayout?.pages && computedLayout.pages.length > 0
-                ? computedLayout.pages
-                : [
-                    {
-                      index: 0,
-                      pageNumber: 1,
-                      width: pageGeometry.paperDimensionsPx.width,
-                      height: pageGeometry.paperDimensionsPx.height,
-                      margins: pageGeometry.marginsPx,
-                      contentArea: pageGeometry.contentAreaPx,
-                      fragments: [],
-                      htmlContent:
+              /* Continuous Unified Document Editor in Template Design Mode */
+              <div
+                id="docx-live-template-container"
+                className="relative paper-sheet-wrapper group flex flex-col items-center mb-8 print:mb-0 print:block"
+              >
+                {/* Screen-only Physical Page Header Controls */}
+                <div
+                  style={{
+                    width: `${pageGeometry.paperDimensionsPx.width}px`,
+                    maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+                  }}
+                  className="flex items-center justify-between px-2 py-1 mb-1.5 text-xs theme-text-secondary select-none print:hidden"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="w-2 h-2 rounded-full theme-bg-accent" />
+                    <span className="font-bold theme-text-primary font-mono text-[11.5px]">
+                      {liveTotalPagesCount === 1
+                        ? 'Page 1 of 1'
+                        : `Page 1–${liveTotalPagesCount} of ${liveTotalPagesCount}`} ({options.pageSize || customDocxTemplate?.pageSize || 'A4'} &bull; {options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'})
+                    </span>
+                    <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
+                      {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px / page
+                    </span>
+                    {isDebugOverlayOpen && (
+                      <span className="text-[10px] font-semibold text-amber-500 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-sm font-mono">
+                        Used: {Math.round(computedLayout?.pages?.[0]?.usedHeight || 0)}px &bull; Pages: {liveTotalPagesCount}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] theme-text-muted hidden md:inline">
+                      Press <kbd className="px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono text-[10px]">Ctrl+Enter</kbd> for new page
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('spr_doclab_insert_page_break'));
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-md theme-bg-accent text-white hover:opacity-95 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                      title="Insert a manual page break to create a new physical page (Ctrl + Enter)"
+                    >
+                      <PageBreakIcon className="w-3.5 h-3.5" />
+                      <span>+ Add Page</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Actual Physical Visual Paper Sheet Container (Expands continuously for N pages) */}
+                <div
+                  className="paper-sheet docx-paper-sheet docx-continuous-paper rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl cursor-text select-text transition-all duration-150"
+                  data-size={options.pageSize || customDocxTemplate?.pageSize || 'A4'}
+                  data-orientation={options.orientation || customDocxTemplate?.orientation || 'PORTRAIT'}
+                  data-margin={options.margin || customDocxTemplate?.margin || 'NORMAL'}
+                  data-density={options.density || 'NORMAL'}
+                  data-color-mode={options.colorMode || 'FULL_COLOR'}
+                  data-page-break="true"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    width: `${pageGeometry.paperDimensionsPx.width}px`,
+                    maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+                    minHeight: `${liveTotalPagesCount * pageGeometry.paperDimensionsPx.height}px`,
+                    height: 'auto',
+                    maxHeight: 'none',
+                    padding: pageGeometry.cssMarginString,
+                    textAlign: 'left',
+                    boxSizing: 'border-box',
+                    overflow: 'visible',
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Dynamic Visual Page Boundary Overlays for Multi-Page Projection */}
+                  {liveTotalPagesCount > 1 && (
+                    <div className="absolute inset-0 pointer-events-none select-none print:hidden z-10" aria-hidden="true">
+                      {Array.from({ length: liveTotalPagesCount - 1 }, (_, i) => i + 1).map((pageNum) => (
+                        <div
+                          key={`page_boundary_guide_${pageNum}`}
+                          style={{
+                            top: `${pageNum * pageGeometry.paperDimensionsPx.height}px`,
+                            left: 0,
+                            right: 0,
+                          }}
+                          className="absolute flex items-center justify-between border-t-2 border-dashed border-blue-400/40 px-3 py-0.5 transform -translate-y-1/2"
+                        >
+                          <span className="bg-slate-800/90 text-white text-[9.5px] font-mono px-2 py-0.5 rounded-full shadow-xs border border-white/20">
+                            Page {pageNum} &uarr; | &darr; Page {pageNum + 1}
+                          </span>
+                          <span className="text-[9px] text-blue-500/80 font-mono bg-blue-50/90 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-sm">
+                            {Math.round(pageNum * pageGeometry.paperDimensionsPx.height)}px
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Single Unified Continuous Content Editor */}
+                  <div className="w-full h-full text-left select-text relative z-0">
+                    <DocxLiveRenderer
+                      key="docx_live_unified_editor"
+                      htmlContent={
                         customDocxTemplate.templateBody ||
                         customDocxTemplate.body ||
                         customDocxTemplate.rawHtml ||
-                        '<p><br></p>',
-                      usedHeight: 0,
-                      availableHeight: pageGeometry.availableContentHeightPx,
-                      isFirstPage: true,
-                      isLastPage: true,
-                    },
-                  ]
-              ).map((page: any, pIdx: number) => {
-                const isSinglePage = liveTotalPagesCount === 1;
-                const pageHtml = isSinglePage
-                  ? customDocxTemplate.templateBody ||
-                    customDocxTemplate.body ||
-                    customDocxTemplate.rawHtml ||
-                    '<p><br></p>'
-                  : page.htmlContent || '<p><br></p>';
-
-                return (
-                  <LayoutPageRenderer
-                    key={`docx_live_visual_page_${pIdx}`}
-                    page={{
-                      ...page,
-                      width: page.width || pageGeometry.paperDimensionsPx.width,
-                      height: page.height || pageGeometry.paperDimensionsPx.height,
-                      margins: page.margins || pageGeometry.marginsPx,
-                      htmlContent: pageHtml,
-                    }}
-                    totalPages={liveTotalPagesCount}
-                    options={{
-                      pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
-                      orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
-                      margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
-                      density: options.density || 'NORMAL',
-                      colorMode: options.colorMode || 'FULL_COLOR',
-                    }}
-                    styles={docxStyles}
-                    isEditable={true}
-                    onContentChange={(newHtml) => {
-                      const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(newHtml);
-                      const cleanNewHtml = incomingBody || newHtml;
-
-                      const updater = (prev: any) => {
-                        if (!prev) return null;
-                        const preservedStyles =
-                          incomingStyles ||
-                          prev.styles ||
-                          separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
-                          '';
-
-                        let combinedHtml = cleanNewHtml;
-                        if (computedLayout && computedLayout.pages.length > 1) {
-                          const pageHtmls = computedLayout.pages.map((p, i) =>
-                            i === pIdx ? cleanNewHtml : (p.htmlContent || '')
-                          );
-                          const hadManualMarkers = Boolean(
-                            prev?.templateBody?.includes('<!-- spr-page-break:manual -->') ||
-                            prev?.templateBody?.includes('data-manual-break="true"')
-                          );
-                          combinedHtml = pageHtmls.join(hadManualMarkers ? '\n<!-- spr-page-break:manual -->\n' : '\n');
-                        }
-
-                        return {
-                          ...prev,
-                          styles: preservedStyles,
-                          templateBody: combinedHtml,
-                          body: combinedHtml,
-                          html: preservedStyles ? `${preservedStyles}\n${combinedHtml}` : combinedHtml,
-                          rawHtml: preservedStyles ? `${preservedStyles}\n${combinedHtml}` : combinedHtml,
-                        };
-                      };
-                      if (updateCustomDocxTemplateWithHistory) {
-                        updateCustomDocxTemplateWithHistory(updater);
-                      } else {
-                        setCustomDocxTemplate(updater);
+                        '<p><br></p>'
                       }
-                    }}
-                  />
-                );
-              })
+                      styles={docxStyles}
+                      isEditable={true}
+                      totalPages={liveTotalPagesCount}
+                      onContentChange={(newHtml) => {
+                        const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(newHtml);
+                        const cleanNewHtml = incomingBody || newHtml;
+
+                        const updater = (prev: any) => {
+                          if (!prev) return null;
+                          const preservedStyles =
+                            incomingStyles ||
+                            prev.styles ||
+                            separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
+                            '';
+
+                          return {
+                            ...prev,
+                            styles: preservedStyles,
+                            templateBody: cleanNewHtml,
+                            body: cleanNewHtml,
+                            html: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+                            rawHtml: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+                          };
+                        };
+
+                        if (updateCustomDocxTemplateWithHistory) {
+                          updateCustomDocxTemplateWithHistory(updater);
+                        } else {
+                          setCustomDocxTemplate(updater);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             ) : (
               /* Discrete Multi-Record Sheets in Batch Generation Mode ('all' or 'sample') */
               mergedDocxPages.map((pageHtml, pIdx) => (

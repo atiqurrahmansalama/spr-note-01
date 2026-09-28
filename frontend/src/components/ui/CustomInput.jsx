@@ -82,6 +82,7 @@ const CustomInput = forwardRef(function CustomInput(
     onEnter,
     onShiftEnter,
     onEmptyBackspace,
+    onAdd,
     onAddShift,
     label,
     subLabel,

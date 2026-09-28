@@ -122,6 +122,13 @@
   overflow: hidden;
 }
 
+/* Continuous Dynamic Multi-Page Editor Canvas */
+.paper-sheet.docx-continuous-paper {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 /* --------------------------------------------------------------------------
    Document Multi-Page Container & Discrete Physical Sheets
 
