@@ -202,7 +202,7 @@ export class DomMeasurementEngine {
 
     // Mount content container
     const contentHost = document.createElement('div');
-    contentHost.className = 'spr-measurement-content-host docx-parsed-body docx-preview-content';
+    contentHost.className = 'spr-measurement-content-host docx-parsed-body docx-preview-content docx-live-container font-sans text-xs sm:text-sm leading-relaxed';
     contentHost.style.width = '100%';
     contentHost.style.boxSizing = 'border-box';
     contentHost.innerHTML = html.trim();
@@ -251,7 +251,8 @@ export class DomMeasurementEngine {
       const isManual = block.includes('data-manual-break="true"') || block.includes('spr-page-break');
 
       const width = context.containerWidth || 602;
-      const fontSize = context.fontSizePx || 16;
+      const inlineFontSizeMatch = block.match(/font-size:\s*(\d+)px/i);
+      const fontSize = inlineFontSizeMatch ? parseInt(inlineFontSizeMatch[1], 10) : (context.fontSizePx || 16);
 
       const inlineHeightMatch = block.match(/(?:min-)?height:\s*(\d+)px/i);
       const inlineMbMatch = block.match(/margin-bottom:\s*(\d+)px/i);

@@ -4,17 +4,16 @@ import { exportToNativeDocx, compileNativeDocxDocument, compileCanvasToNativeDoc
 import { compileVectorPDFDocument, getSafeFilename } from './vectorPDFCompiler';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 
+import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
+
 export { getSafeFilename };
 
 /**
  * Helper to get exact page margin CSS string for @page rule
  */
-export function getPageMarginCSS(margin?: string): string {
-  const norm = String(margin || 'NORMAL').toUpperCase();
-  if (norm === 'NARROW') return '5mm 6mm 5mm 6mm';
-  if (norm === 'WIDE') return '14mm 16mm 14mm 16mm';
-  if (norm === 'NONE') return '0';
-  return '8mm 10mm 8mm 10mm';
+export function getPageMarginCSS(margin?: string, customMarginsMm?: any): string {
+  const { css } = PageGeometryCalculator.resolveMargins((margin || 'NORMAL') as any, customMarginsMm);
+  return css;
 }
 
 /**
@@ -22,8 +21,12 @@ export function getPageMarginCSS(margin?: string): string {
  */
 export function updatePrintPageStyle(options: Partial<PrintOptions> = {}): void {
   if (typeof document === 'undefined') return;
-  const pageSize = String(options.pageSize || 'A4').toLowerCase();
-  const orientation = String(options.orientation || 'PORTRAIT').toLowerCase();
+  const geom = PageGeometryCalculator.calculate({
+    pageSize: options.pageSize as any,
+    orientation: options.orientation as any,
+    margin: options.margin as any,
+    customMarginsMm: options.customMarginsMm,
+  });
 
   let styleEl = document.getElementById('spr-dynamic-print-page-style');
   if (!styleEl) {
@@ -34,10 +37,7 @@ export function updatePrintPageStyle(options: Partial<PrintOptions> = {}): void 
 
   styleEl.textContent = `
     @media print {
-      @page {
-        size: ${pageSize} ${orientation};
-        margin: ${getPageMarginCSS(options.margin)};
-      }
+      ${geom.cssPageRule}
     }
   `;
 }
@@ -136,74 +136,109 @@ export async function exportToPDF({
 
   showToast?.('Generating Vector PDF...', 'info');
 
-  try {
-    const effectiveOptions = {
-      ...options,
-      orientation: (orientation || options.orientation || 'PORTRAIT') as any,
-      pageSize: (pageSize || options.pageSize || 'A4') as any,
-      margin: (margin || options.margin || 'NORMAL') as any,
-    };
+  const effectiveOptions = {
+    ...options,
+    orientation: (orientation || options.orientation || 'PORTRAIT') as any,
+    pageSize: (pageSize || options.pageSize || 'A4') as any,
+    margin: (margin || options.margin || 'NORMAL') as any,
+  };
 
-    const doc = compileVectorPDFDocument({
-      title,
-      subtitle,
-      metaItems,
-      columns,
-      visibleColumnKeys,
-      data,
-      extraBlankRows,
-      summaryMetrics,
-      options: effectiveOptions,
-    });
+  const hasTabularData = Array.isArray(columns) && columns.length > 0 && Array.isArray(data) && data.length > 0;
 
-    doc.save(getSafeFilename(title, 'pdf'));
-    showToast?.('Vector PDF downloaded successfully!', 'success');
-    return;
-  } catch (clientCompilerErr) {
-    console.warn('Client vector compiler fallback, attempting server-side engine:', clientCompilerErr);
-  }
-
-  // Tier 2: Server-Side Fallback
-  const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
-  if (portalEl) {
+  if (hasTabularData) {
     try {
-      const customCss = collectDocumentStyles();
-      const payload = {
-        html: portalEl.outerHTML,
-        title: title || 'Official_Document',
-        pageSize: pageSize || 'A4',
-        orientation: orientation || 'PORTRAIT',
-        margin: margin || 'NORMAL',
-        customCss,
-      };
-
-      const response = await fetch('/api/v1/export/vector-pdf/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const doc = compileVectorPDFDocument({
+        title,
+        subtitle,
+        metaItems,
+        columns,
+        visibleColumnKeys,
+        data,
+        extraBlankRows,
+        summaryMetrics,
+        options: effectiveOptions,
       });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = getSafeFilename(title, 'pdf');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showToast?.('Vector PDF downloaded successfully!', 'success');
-        return;
-      }
-    } catch (serverErr) {
-      console.warn('Server vector export unavailable:', serverErr);
+      doc.save(getSafeFilename(title, 'pdf'));
+      showToast?.('Vector PDF downloaded successfully!', 'success');
+      return;
+    } catch (clientCompilerErr) {
+      console.warn('Client tabular vector compiler fallback:', clientCompilerErr);
     }
   }
 
-  // Tier 3: Native Browser Print Fallback
+  // DocLab Custom Multi-Page Freeform Document Canvas Export
+  const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
+  if (portalEl) {
+    try {
+      const geom = PageGeometryCalculator.calculate({
+        pageSize: effectiveOptions.pageSize,
+        orientation: effectiveOptions.orientation,
+        margin: effectiveOptions.margin,
+        customMarginsMm: (effectiveOptions as any).customMarginsMm,
+      });
+
+      const isLandscape = geom.orientation === 'LANDSCAPE';
+      const pdfWidthMm = geom.paperDimensionsMm.width;
+      const pdfHeightMm = geom.paperDimensionsMm.height;
+
+      const { jsPDF } = await import('jspdf');
+      const pdfDoc = new jsPDF({
+        orientation: isLandscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pdfWidthMm, pdfHeightMm],
+        compress: true,
+      });
+
+      // Capture clean paper sheet elements
+      const sheets = Array.from(portalEl.querySelectorAll('.paper-sheet')) as HTMLElement[];
+      if (sheets.length > 0) {
+        const canvas = await html2canvas(portalEl, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          onclone: (clonedDoc) => {
+            const clonedPortal = clonedDoc.getElementById(targetId);
+            if (clonedPortal) {
+              const hideEls = clonedPortal.querySelectorAll('.print\\:hidden, .print-studio-no-print, .paper-sheet-header');
+              hideEls.forEach((el) => ((el as HTMLElement).style.display = 'none'));
+            }
+          },
+        });
+
+        const pageCount = sheets.length;
+        for (let pIdx = 0; pIdx < pageCount; pIdx++) {
+          if (pIdx > 0) {
+            pdfDoc.addPage([pdfWidthMm, pdfHeightMm], isLandscape ? 'landscape' : 'portrait');
+          }
+
+          const pageCanvas = document.createElement('canvas');
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = Math.round(canvas.height / pageCount);
+          const ctx = pageCanvas.getContext('2d');
+          if (ctx) {
+            const sourceY = Math.round((pIdx * canvas.height) / pageCount);
+            const sourceH = Math.round(canvas.height / pageCount);
+            ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, pageCanvas.width, pageCanvas.height);
+            const imgData = pageCanvas.toDataURL('image/jpeg', 0.98);
+            pdfDoc.addImage(imgData, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm, undefined, 'FAST');
+          }
+        }
+
+        pdfDoc.save(getSafeFilename(title, 'pdf'));
+        showToast?.('High-fidelity PDF downloaded successfully!', 'success');
+        return;
+      }
+    } catch (pdfErr) {
+      console.warn('Direct canvas PDF export fallback, trying browser print dialog:', pdfErr);
+    }
+  }
+
+  // Native Browser Print Dialog Fallback
   showToast?.('Switched to direct Vector Print dialog...', 'info');
-  printDocument();
+  printDocument(effectiveOptions);
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useRef, memo, useCallback, useEffect, useMemo } from 'react';
 import { separateDocxStylesAndBody } from './docxStyleUtils';
-import { stripRuntimePaginationSpacers } from './layout/logicalDocument';
+import { stripRuntimePaginationSpacers, createManualPageBreakHtml } from './layout/logicalDocument';
 
 export interface DocxLiveRendererProps {
   htmlContent: string;
@@ -374,8 +374,7 @@ function DocxLiveRendererComponent({
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         try {
-          const pageBreakHtml =
-            '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+          const pageBreakHtml = createManualPageBreakHtml();
           document.execCommand('insertHTML', false, pageBreakHtml);
           handleInput();
         } catch (err) {
@@ -452,8 +451,7 @@ function DocxLiveRendererComponent({
       if (!isEditable || !containerRef.current) return;
       containerRef.current.focus({ preventScroll: true });
 
-      const pageBreakHtml =
-        '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+      const pageBreakHtml = createManualPageBreakHtml();
 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && containerRef.current.contains(sel.anchorNode)) {

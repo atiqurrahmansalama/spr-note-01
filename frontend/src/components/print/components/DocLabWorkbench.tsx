@@ -176,7 +176,12 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
       pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
       orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
       margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+      customMarginsMm: options.customMarginsMm,
+      pageProperties: customDocxTemplate?.pageProperties || customDocxTemplate?.templateMeta?.pageProperties,
       density: options.density,
+      fontSizePx: options.fontSizePx,
+      fontFamily: options.fontFamily,
+      lineHeight: options.lineHeight,
       styles: docxStyles,
       debugLayout: true,
     });
@@ -185,7 +190,11 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
     options.pageSize,
     options.orientation,
     options.margin,
+    options.customMarginsMm,
     options.density,
+    options.fontSizePx,
+    options.fontFamily,
+    options.lineHeight,
     docxStyles,
   ]);
 
@@ -344,7 +353,10 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                   {Array.from({ length: liveTotalPagesCount }, (_, i) => (
                     <div
                       key={`visual_sheet_frame_${i}`}
-                      className="flex flex-col items-center mb-8 w-full"
+                      className="flex flex-col items-center w-full"
+                      style={{
+                        marginBottom: i < liveTotalPagesCount - 1 ? `${pageGeometry.pageGapPx}px` : '0px',
+                      }}
                     >
                       {/* Discrete Screen Page Header */}
                       <div
@@ -444,7 +456,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
                       width: `${pageGeometry.paperDimensionsPx.width}px`,
                       maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
                       minHeight: '100%',
-                      paddingTop: `calc(32px + ${pageGeometry.marginsPx.top}px)`,
+                      paddingTop: `calc(${pageGeometry.screenPageHeaderHeightPx}px + ${pageGeometry.marginsPx.top}px)`,
                       paddingBottom: `${pageGeometry.marginsPx.bottom}px`,
                       paddingLeft: `${pageGeometry.marginsPx.left}px`,
                       paddingRight: `${pageGeometry.marginsPx.right}px`,

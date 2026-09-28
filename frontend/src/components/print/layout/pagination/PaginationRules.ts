@@ -4,6 +4,7 @@
  */
 
 import { SourceNode } from '../types/documentTypes';
+import { isExplicitManualBreak } from '../logicalDocument';
 
 export type BreakValue = 'auto' | 'always' | 'avoid' | 'page';
 export type BreakInsideValue = 'auto' | 'avoid';
@@ -45,6 +46,13 @@ export class PaginationRules {
       // 2. Break After
       let breakAfter: BreakValue = 'auto';
       if (
+        classList.contains('spr-runtime-page-spacer') ||
+        el.getAttribute('data-spr-runtime-pagination') === 'true' ||
+        el.getAttribute('data-runtime-spacer') === 'true'
+      ) {
+        breakAfter = 'auto';
+      } else if (
+        isExplicitManualBreak(el) ||
         /page-break-after\s*:\s*always/i.test(style) ||
         /break-after\s*:\s*(?:page|always)/i.test(style) ||
         classList.contains('spr-page-break') ||

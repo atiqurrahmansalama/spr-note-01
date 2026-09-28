@@ -19,6 +19,7 @@ import {
   PageOrientation,
   PageBreak,
 } from 'docx';
+import { isExplicitManualBreak, parseContinuousHtmlToLogicalNodes } from './layout/logicalDocument';
 
 /**
  * Universal OpenXML DOCX Document Compiler for SPR Note Print Studio
@@ -144,6 +145,14 @@ function shouldSkipElement(el: Element): boolean {
   if (el.nodeType !== 1) return false;
   const tag = el.tagName.toLowerCase();
   if (['script', 'style', 'noscript', 'template', 'button'].includes(tag)) return true;
+
+  if (
+    el.getAttribute('data-spr-runtime-pagination') === 'true' ||
+    el.getAttribute('data-runtime-spacer') === 'true' ||
+    el.classList.contains('spr-runtime-page-spacer')
+  ) {
+    return true;
+  }
 
   const cls = (el.className || '').toString();
   if (
@@ -448,6 +457,16 @@ function domToDocxBlocks(containerEl: HTMLElement): (Paragraph | Table)[] {
   function processElement(el: HTMLElement) {
     if (shouldSkipElement(el)) return;
 
+    // 0. Manual Page Break
+    if (isExplicitManualBreak(el)) {
+      blocks.push(
+        new Paragraph({
+          children: [new PageBreak()],
+        })
+      );
+      return;
+    }
+
     const tag = el.tagName.toLowerCase();
 
     // Table
@@ -701,34 +720,75 @@ export function compileCanvasToNativeDocx({
   const allDocxBlocks: (Paragraph | Table)[] = [];
 
   // Strategy A: Custom template HTML pages array passed directly
-  if (Array.isArray(customPages) && customPages.length > 0 && typeof window !== 'undefined' && window.DOMParser) {
-    const parser = new DOMParser();
-    customPages.forEach((pageHtml, pIdx) => {
-      const doc = parser.parseFromString(pageHtml, 'text/html');
-      const pageBlocks = domToDocxBlocks(doc.body);
-      allDocxBlocks.push(...pageBlocks);
-      if (pIdx < customPages.length - 1) {
-        allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
-      }
-    });
+  if (Array.isArray(customPages) && customPages.length > 0) {
+    const DOMParserClass =
+      typeof DOMParser !== 'undefined'
+        ? DOMParser
+        : typeof window !== 'undefined' && window.DOMParser
+        ? window.DOMParser
+        : null;
+
+    if (DOMParserClass) {
+      const parser = new DOMParserClass();
+      customPages.forEach((pageHtml, pIdx) => {
+        const doc = parser.parseFromString(pageHtml, 'text/html');
+        const pageBlocks = domToDocxBlocks(doc.body);
+        allDocxBlocks.push(...pageBlocks);
+        if (pIdx < customPages.length - 1) {
+          allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
+        }
+      });
+    } else {
+      customPages.forEach((pageHtml, pIdx) => {
+        const nodes = parseContinuousHtmlToLogicalNodes(pageHtml);
+        nodes.forEach((node) => {
+          if (node.type === 'manual-page-break' || node.isManualBreak) {
+            allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
+          } else {
+            allDocxBlocks.push(
+              new Paragraph({
+                spacing: { before: 0, after: 40 },
+                children: [
+                  new TextRun({
+                    text: node.textContent || '',
+                    size: 22,
+                    font: FONT_PRIMARY,
+                  }),
+                ],
+              })
+            );
+          }
+        });
+        if (pIdx < customPages.length - 1) {
+          allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
+        }
+      });
+    }
   } else {
     // Strategy B: Read from live canvas DOM element
     const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
     if (portalEl) {
-      const sheetEls = Array.from(portalEl.querySelectorAll('.paper-sheet')) as HTMLElement[];
-      if (sheetEls.length > 0) {
-        sheetEls.forEach((sheet, sIdx) => {
-          const editableBody = sheet.querySelector('[contenteditable="true"], .docx-parsed-body') as HTMLElement | null;
-          const targetContent = editableBody || sheet;
-          const sheetBlocks = domToDocxBlocks(targetContent);
-          allDocxBlocks.push(...sheetBlocks);
-          if (sIdx < sheetEls.length - 1) {
-            allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
-          }
-        });
+      const liveEditor = portalEl.querySelector('.docx-live-container') as HTMLElement | null;
+      if (liveEditor) {
+        // Direct parse of single continuous document editor DOM with embedded manual breaks
+        const editorBlocks = domToDocxBlocks(liveEditor);
+        allDocxBlocks.push(...editorBlocks);
       } else {
-        const portalBlocks = domToDocxBlocks(portalEl);
-        allDocxBlocks.push(...portalBlocks);
+        const sheetEls = Array.from(portalEl.querySelectorAll('.paper-sheet')) as HTMLElement[];
+        if (sheetEls.length > 0) {
+          sheetEls.forEach((sheet, sIdx) => {
+            const editableBody = sheet.querySelector('[contenteditable="true"], .docx-parsed-body') as HTMLElement | null;
+            const targetContent = editableBody || sheet;
+            const sheetBlocks = domToDocxBlocks(targetContent);
+            allDocxBlocks.push(...sheetBlocks);
+            if (sIdx < sheetEls.length - 1) {
+              allDocxBlocks.push(new Paragraph({ children: [new PageBreak()] }));
+            }
+          });
+        } else {
+          const portalBlocks = domToDocxBlocks(portalEl);
+          allDocxBlocks.push(...portalBlocks);
+        }
       }
     }
   }

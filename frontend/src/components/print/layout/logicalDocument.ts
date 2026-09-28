@@ -78,8 +78,8 @@ export function createRuntimePageSpacerHtml(options: {
  */
 export function projectCanonicalDocumentWithRuntimeSpacers(
   canonicalHtml: string,
-  paginationResult: any | null,
-  options: {
+  paginationResult?: any | null,
+  options?: {
     paperDimensionsPx?: { width: number; height: number };
     marginsPx?: { top: number; right: number; bottom: number; left: number };
     pageSize?: string;
@@ -96,31 +96,67 @@ export function projectCanonicalDocumentWithRuntimeSpacers(
   const pages = paginationResult.pages;
   const totalPages = paginationResult.totalPages || pages.length;
 
+  // Extract logical source nodes from the canonical HTML
+  const nodes = parseContinuousHtmlToLogicalNodes(cleanHtml);
+  if (nodes.length === 0) return cleanHtml;
+
+  // Build a map of nodeId to node
+  const nodeMap = new Map<string, SourceNode>();
+  nodes.forEach((n) => nodeMap.set(n.id, n));
+
   const projectedPieces: string[] = [];
+  const processedNodeIds = new Set<string>();
 
   pages.forEach((page: any, pIdx: number) => {
-    const pageHtml =
-      page.htmlContent ||
-      (page.fragments && page.fragments.length > 0
-        ? page.fragments.map((f: any) => f.htmlContent || f.textContent || '').join('\n')
-        : '<p><br></p>');
+    // Collect raw HTML for nodes on this page
+    const pageNodeHtmls: string[] = [];
 
-    projectedPieces.push(pageHtml);
+    if (page.fragments && page.fragments.length > 0) {
+      page.fragments.forEach((frag: any) => {
+        const srcId = frag.sourceNodeId;
+        if (srcId && !processedNodeIds.has(srcId)) {
+          const originalNode = nodeMap.get(srcId);
+          if (originalNode) {
+            processedNodeIds.add(srcId);
+            if (originalNode.type === 'manual-page-break') {
+              pageNodeHtmls.push(createManualPageBreakHtml());
+            } else {
+              pageNodeHtmls.push(originalNode.rawHtml || `<p>${originalNode.textContent || ''}</p>`);
+            }
+          }
+        }
+      });
+    }
 
-    // If there is a subsequent page, insert the runtime spacer bridging the gap
+    if (pageNodeHtmls.length > 0) {
+      projectedPieces.push(pageNodeHtmls.join('\n'));
+    }
+
+    // Insert runtime spacer between pages
     if (pIdx < pages.length - 1) {
       const remainingHeight = page.availableHeight !== undefined ? page.availableHeight : 0;
       projectedPieces.push(
         createRuntimePageSpacerHtml({
           pageNumber: pIdx + 2,
           totalPages,
-          pageSize: options.pageSize,
-          orientation: options.orientation,
-          dimensionsPx: options.paperDimensionsPx,
-          marginsPx: options.marginsPx,
+          pageSize: options?.pageSize,
+          orientation: options?.orientation,
+          dimensionsPx: options?.paperDimensionsPx,
+          marginsPx: options?.marginsPx,
           remainingHeightPx: remainingHeight,
         })
       );
+    }
+  });
+
+  // If any remaining nodes were not captured, append them
+  nodes.forEach((n) => {
+    if (!processedNodeIds.has(n.id)) {
+      if (n.type === 'manual-page-break') {
+        projectedPieces.push(createManualPageBreakHtml());
+      } else {
+        projectedPieces.push(n.rawHtml || `<p>${n.textContent || ''}</p>`);
+      }
     }
   });
 
@@ -159,6 +195,8 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
  * Determines whether an element or comment represents an intentional manual page break
  */
 export function isExplicitManualBreak(node: HTMLElement | Node | string): boolean {
+  if (!node) return false;
+
   if (typeof node === 'string') {
     if (
       node.includes('data-spr-runtime-pagination="true"') ||
@@ -171,8 +209,15 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
     return (
       node.includes('data-manual-break="true"') ||
       node.includes('data-manual="true"') ||
+      node.includes('data-page-break="manual"') ||
       node.includes(MANUAL_PAGE_BREAK_MARKER) ||
-      node.includes(LEGACY_PAGE_BREAK_MARKER)
+      node.includes(LEGACY_PAGE_BREAK_MARKER) ||
+      node.includes('spr-page-break') ||
+      node.includes('docx_page_break') ||
+      node.includes('docx-page-break') ||
+      /class=["'][^"']*?\bpage-break\b[^"']*?["']/i.test(node) ||
+      /page-break-(?:after|before)\s*:\s*always/i.test(node) ||
+      /break-(?:after|before)\s*:\s*page/i.test(node)
     );
   }
 
@@ -191,14 +236,34 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
     ) {
       return false;
     }
-    if (el.classList && (el.classList.contains('spr-runtime-page-spacer') || el.classList.contains('spr-runtime-page-guide'))) {
+    if (
+      el.classList &&
+      (el.classList.contains('spr-runtime-page-spacer') || el.classList.contains('spr-runtime-page-guide'))
+    ) {
       return false;
     }
-    if (el.getAttribute && (el.getAttribute('data-manual-break') === 'true' || el.getAttribute('data-manual') === 'true')) {
+    if (
+      el.getAttribute &&
+      (el.getAttribute('data-manual-break') === 'true' ||
+        el.getAttribute('data-manual') === 'true' ||
+        el.getAttribute('data-page-break') === 'manual')
+    ) {
       return true;
     }
-    if (el.classList && el.classList.contains('spr-page-break')) {
-      // If it has explicit manual attribute or was inserted via user action
+    if (
+      el.classList &&
+      (el.classList.contains('spr-page-break') ||
+        el.classList.contains('docx_page_break') ||
+        el.classList.contains('docx-page-break') ||
+        el.classList.contains('page-break'))
+    ) {
+      return true;
+    }
+    const style = (el.getAttribute && el.getAttribute('style')) || '';
+    if (
+      /page-break-(?:after|before)\s*:\s*always/i.test(style) ||
+      /break-(?:after|before)\s*:\s*page/i.test(style)
+    ) {
       return true;
     }
   }
@@ -216,7 +281,7 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
   const clean = stripRuntimePaginationSpacers(rawHtml);
   if (typeof document === 'undefined') {
     return clean.replace(
-      /<div\b(?![^>]*?(?:data-manual-break="true"|data-manual="true"))[^>]*?class=["'][^"']*?spr-page-break[^"']*?["'][^>]*?>[\s\S]*?<\/div>/gi,
+      /<div\b(?![^>]*?(?:data-manual-break="true"|data-manual="true"|data-page-break="manual"))[^>]*?class=["'][^"']*?spr-page-break[^"']*?["'][^>]*?>[\s\S]*?<\/div>/gi,
       ''
     );
   }
@@ -225,13 +290,10 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
     const container = document.createElement('div');
     container.innerHTML = clean;
 
-    // Identify transient auto-break artifacts (break elements without data-manual-break="true")
-    const breakElements = container.querySelectorAll('.spr-page-break, [data-page-break]');
+    // Identify transient auto-break artifacts (break elements without explicit manual marker)
+    const breakElements = container.querySelectorAll('.spr-page-break, [data-page-break], .docx_page_break');
     breakElements.forEach((el) => {
-      const isManual =
-        el.getAttribute('data-manual-break') === 'true' ||
-        el.getAttribute('data-manual') === 'true' ||
-        el.getAttribute('data-page-break') === 'manual';
+      const isManual = isExplicitManualBreak(el);
 
       if (!isManual) {
         // Remove transient auto-break wrapper

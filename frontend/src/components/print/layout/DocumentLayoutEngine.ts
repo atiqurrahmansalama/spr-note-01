@@ -39,6 +39,7 @@ import {
 } from './types/paginationTypes';
 
 import { PageGeometryCalculator } from './geometry/PageGeometry';
+import { isExplicitManualBreak } from './logicalDocument';
 
 export interface ComputedPageBounds {
   paperDimensions: Dimensions;
@@ -204,16 +205,6 @@ export class DocumentLayoutEngine {
    * Evaluates if an element represents an explicit manual page break
    */
   public static isManualBreak(node: HTMLElement | SourceNode): boolean {
-    if ('classList' in node) {
-      const el = node as HTMLElement;
-      if (el.classList.contains('spr-page-break') || el.getAttribute('data-page-break') === 'manual' || el.getAttribute('data-manual-break') === 'true') {
-        return true;
-      }
-      const style = el.getAttribute('style') || '';
-      return /page-break-(?:after|before)\s*:\s*always/i.test(style) || /break-(?:after|before)\s*:\s*page/i.test(style);
-    }
-
-    const srcNode = node as SourceNode;
-    return Boolean(srcNode.isManualBreak || srcNode.type === 'manual-page-break' || srcNode.constraints?.breakAfter || srcNode.constraints?.breakBefore);
+    return isExplicitManualBreak(node as any);
   }
 }

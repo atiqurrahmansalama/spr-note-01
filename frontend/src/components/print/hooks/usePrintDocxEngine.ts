@@ -557,19 +557,9 @@ export function usePrintDocxEngine({
       }
     }
 
-    // 1. Template Design Mode: Paginate via discrete geometry-driven layout engine
+    // 1. Template Design Mode: In Phase 1, the canonical editor is ONE continuous document
     if (docxRenderMode === 'template') {
-      const activeBody = templateBodyContent;
-      const layoutResult = PaginationEngine.paginate(activeBody, {
-        pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
-        orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
-        margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
-        customMarginsMm: options.customMarginsMm,
-        density: options.density,
-        styles: docxStyles,
-      });
-      const pages = layoutResult.pages.map((p) => p.htmlContent);
-      return pages.length > 0 ? pages : [activeBody];
+      return [templateBodyContent];
     }
 
     // 0. Pre-Generated Document: If it is already a saved generated document in Batch view

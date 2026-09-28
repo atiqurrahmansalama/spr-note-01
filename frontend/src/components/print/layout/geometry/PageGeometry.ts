@@ -46,6 +46,11 @@ export interface PageGeometry {
 
   availableContentWidthPx: number;
   availableContentHeightPx: number;
+  contentWidthPx: number;
+  contentHeightPx: number;
+
+  pageGapPx: number;
+  screenPageHeaderHeightPx: number;
 
   cssMarginString: string;
   cssPageRule: string;
@@ -195,6 +200,9 @@ export class PageGeometryCalculator {
       boxSizing: 'border-box',
     };
 
+    const pageGapPx = 32;
+    const screenPageHeaderHeightPx = 32;
+
     return {
       pageSize,
       orientation,
@@ -208,6 +216,10 @@ export class PageGeometryCalculator {
       signatureAreaPx,
       availableContentWidthPx,
       availableContentHeightPx,
+      contentWidthPx: availableContentWidthPx,
+      contentHeightPx: availableContentHeightPx,
+      pageGapPx,
+      screenPageHeaderHeightPx,
       cssMarginString,
       cssPageRule,
       cssPaperStyle,
