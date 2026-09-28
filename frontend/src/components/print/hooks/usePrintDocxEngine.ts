@@ -14,6 +14,7 @@ import {
   joinPagesIntoHtml,
 } from '../docxTemplateEngine';
 import { PaginationEngine } from '../layout/pagination/PaginationEngine';
+import { stripRuntimePaginationSpacers, sanitizeLogicalDocumentHtml } from '../layout/logicalDocument';
 import {
   getDefaultTemplateForScope,
   setDefaultTemplateForScope,
@@ -337,11 +338,13 @@ export function usePrintDocxEngine({
       '';
 
     if (!body || body === BLANK_PAGE_HTML) return null;
-    const fullHtml = styles ? `${styles}\n${body}` : body;
+    const cleanBody = sanitizeLogicalDocumentHtml(body);
+    const fullHtml = styles ? `${styles}\n${cleanBody}` : cleanBody;
 
     return {
       targetId,
       fullHtml,
+      cleanBody,
       name: customDocxTemplate.name,
       description: customDocxTemplate.description,
       scopeId: customDocxTemplate.scopeId || scopeId,
@@ -369,17 +372,18 @@ export function usePrintDocxEngine({
       if (!payload || !payload.targetId || !payload.fullHtml) return;
 
       const { targetId, fullHtml } = payload;
+      const cleanFullHtml = sanitizeLogicalDocumentHtml(fullHtml);
       const allSaved = getSavedDocxTemplates();
       const existing = allSaved.find((t) => t.id === targetId);
       const scopeDef = getScopeById(scopeId as any);
-      const detectedKeys = extractTagsFromText(fullHtml);
+      const detectedKeys = extractTagsFromText(cleanFullHtml);
 
       const templateToSave: CustomDocxTemplate = {
         id: targetId,
         name: payload.name || existing?.name || `${scopeDef?.name || 'Custom'} Template`,
         description: payload.description || existing?.description || `Custom Template for ${scopeDef?.name || scopeId}`,
         scopeId: payload.scopeId || existing?.scopeId || scopeId,
-        rawHtml: fullHtml,
+        rawHtml: cleanFullHtml,
         detectedPlaceholders: detectedKeys,
         isTableDocument: Boolean(payload.isTableDocument || existing?.isTableDocument),
         sampleColumns: payload.columns || existing?.sampleColumns || [],
@@ -960,11 +964,11 @@ export function usePrintDocxEngine({
         return normalized;
       } else {
         // Saving as Template Blueprint (holding pure {{tokens}})
-        let templateBodyToSave = baseTemplateBody;
+        let templateBodyToSave = sanitizeLogicalDocumentHtml(baseTemplateBody);
         if (docxRenderMode === 'template') {
           const container = document.querySelector('.docx-live-container');
           if (container && container.innerHTML) {
-            templateBodyToSave = container.innerHTML;
+            templateBodyToSave = sanitizeLogicalDocumentHtml(container.innerHTML);
           }
         }
 
@@ -1067,9 +1071,11 @@ export function usePrintDocxEngine({
       }
 
       if (!existing) return;
+      const cleanRawHtml = updates.rawHtml ? sanitizeLogicalDocumentHtml(updates.rawHtml) : undefined;
       const updated: CustomDocxTemplate = {
         ...existing,
         ...updates,
+        ...(cleanRawHtml ? { rawHtml: cleanRawHtml } : {}),
         updatedAt: new Date().toISOString(),
       };
       saveDocxTemplate(updated);
@@ -1080,10 +1086,11 @@ export function usePrintDocxEngine({
             ...prev,
             name: updates.name ?? prev.name,
             description: updates.description !== undefined ? updates.description : prev.description,
-            ...(updates.rawHtml ? { rawHtml: updates.rawHtml, html: updates.rawHtml } : {}),
+            ...(cleanRawHtml ? { rawHtml: cleanRawHtml, html: cleanRawHtml } : {}),
             templateMeta: {
               ...prev.templateMeta,
               ...updates,
+              ...(cleanRawHtml ? { rawHtml: cleanRawHtml } : {}),
             },
           };
         }

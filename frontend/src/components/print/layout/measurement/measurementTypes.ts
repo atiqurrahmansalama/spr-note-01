@@ -120,6 +120,12 @@ export interface NodeMeasurementResult {
   /** Total outer height including vertical margins */
   totalOuterHeight: number;
 
+  /** Rendered offsetTop within continuous document flow */
+  flowOffsetTop?: number;
+
+  /** True vertical space consumed in flow accounting for margin collapsing */
+  effectiveFlowHeight?: number;
+
   /** Line-level metrics for text blocks */
   lines?: LineMetric[];
   firstLineHeight?: number;

@@ -21,9 +21,6 @@ export interface LayoutPageRendererProps {
   totalPages?: number;
   options?: LayoutDocumentOptions;
   styles?: string;
-  isEditable?: boolean;
-  onContentChange?: (newHtml: string) => void;
-  onAddPageBreak?: () => void;
   className?: string;
   children?: React.ReactNode;
 }
@@ -33,9 +30,6 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
   totalPages,
   options = {},
   styles = '',
-  isEditable = false,
-  onContentChange,
-  onAddPageBreak,
   className = '',
   children,
 }) => {
@@ -75,36 +69,11 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
             </span>
           )}
         </div>
-
-        <div className="flex items-center gap-2">
-          {page.index === 0 && (
-            <span className="text-[11px] theme-text-muted hidden md:inline">
-              Press <kbd className="px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono text-[10px]">Ctrl+Enter</kbd> for new page
-            </span>
-          )}
-          {isEditable && (
-            <button
-              type="button"
-              onClick={() => {
-                if (onAddPageBreak) {
-                  onAddPageBreak();
-                } else if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('spr_doclab_insert_page_break'));
-                }
-              }}
-              className="px-2.5 py-1 text-xs font-semibold rounded-md theme-bg-accent text-white hover:opacity-95 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
-              title="Insert a manual page break to create a new physical page (Ctrl + Enter)"
-            >
-              <PageBreakIcon className="w-3.5 h-3.5" />
-              <span>+ Add Page</span>
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Actual Physical Visual Paper Sheet Container */}
       <div
-        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl cursor-text select-text"
+        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl select-text"
         data-size={pageSize}
         data-orientation={orientation}
         data-margin={marginPreset}
@@ -132,13 +101,12 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
             children
           ) : (
             <DocxLiveRenderer
-              key={`docx_live_page_renderer_${page.index}`}
+              key={`docx_read_only_page_${page.index}`}
               htmlContent={page.htmlContent || '<p><br></p>'}
               styles={styles}
-              isEditable={isEditable}
+              isEditable={false}
               pageIndex={page.index}
               totalPages={effectiveTotalPages}
-              onContentChange={onContentChange}
             />
           )}
         </div>

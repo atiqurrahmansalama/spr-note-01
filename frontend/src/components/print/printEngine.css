@@ -122,11 +122,20 @@
   overflow: hidden;
 }
 
-/* Continuous Dynamic Multi-Page Editor Canvas */
-.paper-sheet.docx-continuous-paper {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
+/* Runtime Visual Page Spacers (Screen-only projection) */
+.spr-runtime-page-spacer {
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  position: relative;
+  z-index: 10;
+}
+
+@media print {
+  .spr-runtime-page-spacer {
+    display: none !important;
+  }
 }
 
 /* --------------------------------------------------------------------------

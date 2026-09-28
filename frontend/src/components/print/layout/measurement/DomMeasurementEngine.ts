@@ -46,10 +46,20 @@ export class DomMeasurementEngine {
       document.body.appendChild(sandbox);
     }
 
-    sandbox.style.width = `${Math.max(100, context.containerWidth)}px`;
-    sandbox.style.maxWidth = `${Math.max(100, context.containerWidth)}px`;
+    const containerWidth = Math.max(100, Math.round(context.containerWidth));
+    sandbox.style.width = `${containerWidth}px`;
+    sandbox.style.minWidth = `${containerWidth}px`;
+    sandbox.style.maxWidth = `${containerWidth}px`;
     sandbox.style.boxSizing = 'border-box';
-    sandbox.style.fontFamily = context.fontFamily || 'sans-serif';
+    sandbox.style.fontFamily =
+      context.fontFamily ||
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Bengali', 'SolaimanLipi', 'Kalpurush', sans-serif";
+    sandbox.style.wordBreak = 'normal';
+    sandbox.style.overflowWrap = 'break-word';
+    sandbox.style.whiteSpace = 'normal';
+    sandbox.style.textRendering = 'optimizeLegibility';
+    sandbox.style.fontFeatureSettings = '"kern" 1, "liga" 1, "clig" 1';
+
     if (context.fontSizePx) {
       sandbox.style.fontSize = `${context.fontSizePx}px`;
     }
@@ -70,7 +80,8 @@ export class DomMeasurementEngine {
   ): NodeMeasurementResult {
     if (this.measurementCache.has(el)) {
       const cached = this.measurementCache.get(el)!;
-      if (cached.width === el.offsetWidth && cached.height === el.offsetHeight) {
+      const currentRect = el.getBoundingClientRect();
+      if (Math.abs(cached.width - currentRect.width) < 0.5 && Math.abs(cached.height - currentRect.height) < 0.5) {
         return cached;
       }
     }
@@ -84,8 +95,9 @@ export class DomMeasurementEngine {
     const paddingBottom = parseFloat(style.paddingBottom) || 0;
 
     const elRect = el.getBoundingClientRect();
-    const width = Math.max(el.offsetWidth, elRect.width);
-    const height = Math.max(el.offsetHeight, elRect.height, 1);
+    // Use true subpixel bounding rect height; fallback to offsetHeight only if element is disconnected
+    const width = elRect.width > 0 ? elRect.width : (el.offsetWidth || Math.max(100, context.containerWidth));
+    const height = elRect.height > 0 ? elRect.height : (el.offsetHeight || 28);
     const totalOuterHeight = height + marginTop + marginBottom;
 
     const boundingRect: Rect = {
@@ -145,6 +157,7 @@ export class DomMeasurementEngine {
       paddingTop,
       paddingBottom,
       totalOuterHeight,
+      flowOffsetTop: el.offsetTop,
       lines,
       firstLineHeight,
       lastLineHeight,
@@ -196,11 +209,24 @@ export class DomMeasurementEngine {
 
     sandbox.appendChild(contentHost);
 
-    // Measure each top-level child block
+    // Measure each top-level child block accounting for exact rendered flow and margin collapsing
     const childElements = Array.from(contentHost.children) as HTMLElement[];
-    const results: NodeMeasurementResult[] = childElements.map((child) =>
-      this.measureElement(child, context)
-    );
+    const results: NodeMeasurementResult[] = childElements.map((child, idx) => {
+      const measurement = this.measureElement(child, context);
+      const nextChild = idx < childElements.length - 1 ? childElements[idx + 1] : null;
+      const childRect = child.getBoundingClientRect();
+
+      const flowOffsetTop = child.offsetTop;
+      const effectiveFlowHeight = nextChild
+        ? Math.max(0, nextChild.offsetTop - child.offsetTop)
+        : (childRect.height + measurement.marginBottom);
+
+      return {
+        ...measurement,
+        flowOffsetTop,
+        effectiveFlowHeight,
+      };
+    });
 
     // Cleanup sandbox host
     sandbox.removeChild(contentHost);

@@ -33,12 +33,15 @@ export class MeasurementCache {
     const width = Math.round(context.containerWidth);
     const density = context.density || 'NORMAL';
     const scale = context.scale || 1;
+    const fontSize = context.fontSizePx || 16;
+    const lineHeight = context.lineHeight || 1.5;
+    const font = context.fontFamily || 'default';
     // Simple fast DJB2-like hash for content
     let hash = 5381;
     for (let i = 0; i < Math.min(content.length, 120); i++) {
       hash = (hash * 33) ^ content.charCodeAt(i);
     }
-    return `${nodeId}:${hash >>> 0}:${width}:${density}:${scale}`;
+    return `${nodeId}:${hash >>> 0}:${width}:${density}:${scale}:${fontSize}:${lineHeight}:${font}`;
   }
 
   public get(key: string): NodeMeasurementResult | undefined {

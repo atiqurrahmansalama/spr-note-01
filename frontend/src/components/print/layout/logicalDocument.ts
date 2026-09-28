@@ -27,10 +27,75 @@ export function createManualPageBreakHtml(): string {
 }
 
 /**
+ * Standard runtime visual spacer HTML for projection across page boundaries
+ */
+export function createRuntimePageSpacerHtml(options: {
+  pageNumber: number;
+  totalPages: number;
+  pageSize?: string;
+  orientation?: string;
+  dimensionsPx?: { width: number; height: number };
+  marginsPx?: { top: number; right: number; bottom: number; left: number };
+}): string {
+  const {
+    marginsPx = { top: 48, right: 48, bottom: 48, left: 48 },
+  } = options;
+
+  const topMargin = Math.round(marginsPx.top);
+  const bottomMargin = Math.round(marginsPx.bottom);
+  const leftMargin = Math.round(marginsPx.left);
+  const rightMargin = Math.round(marginsPx.right);
+  const pageGapPx = 32; // Gap between discrete visual sheets
+  const headerHeightPx = 32; // Header + margin-bottom of sheet header
+
+  const totalSpacerHeight = bottomMargin + pageGapPx + headerHeightPx + topMargin;
+
+  return (
+    `<div class="spr-runtime-page-spacer not-prose select-none print:hidden" data-spr-runtime-pagination="true" contenteditable="false" style="margin-left: -${leftMargin}px; margin-right: -${rightMargin}px; height: ${totalSpacerHeight}px; min-height: ${totalSpacerHeight}px; display: block; user-select: none; pointer-events: none; -webkit-user-select: none; box-sizing: border-box;"></div>`
+  );
+}
+
+/**
+ * Strips all transient runtime pagination spacers and visual guides from HTML string
+ */
+export function stripRuntimePaginationSpacers(rawHtml: string): string {
+  if (!rawHtml || !rawHtml.trim()) return '';
+
+  if (typeof document !== 'undefined') {
+    try {
+      const container = document.createElement('div');
+      container.innerHTML = rawHtml;
+      const runtimeElements = container.querySelectorAll(
+        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer'
+      );
+      runtimeElements.forEach((el) => el.parentNode?.removeChild(el));
+      return container.innerHTML;
+    } catch {
+      // Fallback to regex
+    }
+  }
+
+  return rawHtml
+    .replace(
+      /<div\b[^>]*?(?:data-spr-runtime-pagination="true"|class=["'][^"']*?(?:spr-runtime-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer)[^"']*?["']|data-runtime-spacer="true"|data-runtime-guide="true")[^>]*?>[\s\S]*?<\/div>/gi,
+      ''
+    )
+    .replace(/<!--\s*spr-page-break:runtime[\s\S]*?-->/gi, '');
+}
+
+/**
  * Determines whether an element or comment represents an intentional manual page break
  */
 export function isExplicitManualBreak(node: HTMLElement | Node | string): boolean {
   if (typeof node === 'string') {
+    if (
+      node.includes('data-spr-runtime-pagination="true"') ||
+      node.includes('spr-runtime-page-spacer') ||
+      node.includes('data-runtime-spacer="true"') ||
+      node.includes('data-runtime-guide="true"')
+    ) {
+      return false;
+    }
     return (
       node.includes('data-manual-break="true"') ||
       node.includes('data-manual="true"') ||
@@ -41,11 +106,22 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
 
   if (node && (node as any).nodeType === COMMENT_NODE_TYPE) {
     const val = (node as any).nodeValue || '';
-    return val.includes('spr-page-break');
+    return val.includes('spr-page-break') && !val.includes('runtime');
   }
 
   if (node && (node as any).nodeType === ELEMENT_NODE_TYPE) {
     const el = node as HTMLElement;
+    if (
+      el.getAttribute &&
+      (el.getAttribute('data-spr-runtime-pagination') === 'true' ||
+        el.getAttribute('data-runtime-spacer') === 'true' ||
+        el.getAttribute('data-runtime-guide') === 'true')
+    ) {
+      return false;
+    }
+    if (el.classList && (el.classList.contains('spr-runtime-page-spacer') || el.classList.contains('spr-runtime-page-guide'))) {
+      return false;
+    }
     if (el.getAttribute && (el.getAttribute('data-manual-break') === 'true' || el.getAttribute('data-manual') === 'true')) {
       return true;
     }
@@ -65,13 +141,17 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
 export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
   if (!rawHtml || !rawHtml.trim()) return '';
 
+  const clean = stripRuntimePaginationSpacers(rawHtml);
   if (typeof document === 'undefined') {
-    return rawHtml;
+    return clean.replace(
+      /<div\b(?![^>]*?(?:data-manual-break="true"|data-manual="true"))[^>]*?class=["'][^"']*?spr-page-break[^"']*?["'][^>]*?>[\s\S]*?<\/div>/gi,
+      ''
+    );
   }
 
   try {
     const container = document.createElement('div');
-    container.innerHTML = rawHtml;
+    container.innerHTML = clean;
 
     // Identify transient auto-break artifacts (break elements without data-manual-break="true")
     const breakElements = container.querySelectorAll('.spr-page-break, [data-page-break]');
@@ -89,7 +169,7 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
 
     return container.innerHTML;
   } catch (err) {
-    return rawHtml;
+    return clean;
   }
 }
 
@@ -98,6 +178,7 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
  */
 export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[] {
   if (!rawHtml || !rawHtml.trim()) return [];
+  const cleanHtml = stripRuntimePaginationSpacers(rawHtml);
 
   if (typeof document === 'undefined') {
     let raw = rawHtml.trim();

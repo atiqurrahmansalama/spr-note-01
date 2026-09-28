@@ -15,9 +15,6 @@ export interface LayoutDocumentRendererProps {
   document: LayoutDocument;
   options?: LayoutDocumentOptions;
   styles?: string;
-  isEditable?: boolean;
-  onPageContentChange?: (pageIndex: number, updatedHtml: string) => void;
-  onAddPageBreak?: () => void;
   className?: string;
 }
 
@@ -25,9 +22,6 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
   document,
   options = {},
   styles = '',
-  isEditable = false,
-  onPageContentChange,
-  onAddPageBreak,
   className = '',
 }) => {
   const pages: LayoutPage[] =
@@ -75,13 +69,6 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
           totalPages={totalPages}
           options={mergedOptions}
           styles={effectiveStyles}
-          isEditable={isEditable}
-          onContentChange={(newHtml) => {
-            if (onPageContentChange) {
-              onPageContentChange(page.index, newHtml);
-            }
-          }}
-          onAddPageBreak={onAddPageBreak}
         />
       ))}
     </div>

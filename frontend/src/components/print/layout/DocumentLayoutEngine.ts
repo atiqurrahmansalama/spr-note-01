@@ -58,16 +58,7 @@ export class DocumentLayoutEngine {
     pageSize: PageSizeId = 'A4',
     orientation: PageOrientation = 'PORTRAIT'
   ): Dimensions {
-    const paper = PAPER_SIZE_METRICS_MM[pageSize] || PAPER_SIZE_METRICS_MM.A4;
-    const isLandscape = orientation === 'LANDSCAPE';
-
-    const widthMm = isLandscape ? paper.heightMm : paper.widthMm;
-    const heightMm = isLandscape ? paper.widthMm : paper.heightMm;
-
-    return {
-      width: mmToPx(widthMm),
-      height: mmToPx(heightMm),
-    };
+    return PageGeometryCalculator.resolveDimensions(pageSize, orientation).px;
   }
 
   /**
@@ -77,18 +68,7 @@ export class DocumentLayoutEngine {
     marginPreset: MarginPreset = 'NORMAL',
     customMarginsMm?: Partial<Insets>
   ): Insets {
-    const baseMm = MARGIN_PRESET_METRICS_MM[marginPreset] || MARGIN_PRESET_METRICS_MM.NORMAL;
-    const topMm = customMarginsMm?.top !== undefined ? customMarginsMm.top : baseMm.top;
-    const rightMm = customMarginsMm?.right !== undefined ? customMarginsMm.right : baseMm.right;
-    const bottomMm = customMarginsMm?.bottom !== undefined ? customMarginsMm.bottom : baseMm.bottom;
-    const leftMm = customMarginsMm?.left !== undefined ? customMarginsMm.left : baseMm.left;
-
-    return {
-      top: mmToPx(topMm),
-      right: mmToPx(rightMm),
-      bottom: mmToPx(bottomMm),
-      left: mmToPx(leftMm),
-    };
+    return PageGeometryCalculator.resolveMargins(marginPreset, customMarginsMm).px;
   }
 
   /**

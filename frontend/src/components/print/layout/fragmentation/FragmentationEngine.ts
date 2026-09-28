@@ -79,6 +79,13 @@ export class FragmentationEngine {
               : null,
             usedHeight: tableSplit.firstFragmentHeight,
           };
+        } else {
+          return {
+            fitsCurrentPage: false,
+            pushedToNextPage: true,
+            remainingNode: el,
+            usedHeight: 0,
+          };
         }
       } else if (isParagraph) {
         const pSplit = ParagraphFragmenter.splitParagraph(el, availableHeightPx, context);
@@ -108,6 +115,13 @@ export class FragmentationEngine {
                 }
               : null,
             usedHeight: pSplit.firstFragmentHeight,
+          };
+        } else {
+          return {
+            fitsCurrentPage: false,
+            pushedToNextPage: true,
+            remainingNode: el,
+            usedHeight: 0,
           };
         }
       } else {

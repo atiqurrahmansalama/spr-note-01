@@ -113,6 +113,12 @@ export class TextMeasurement {
       const range = document.createRange();
       const lineRects: Array<{ rect: Rect; top: number; bottom: number; text: string; charStart: number; charEnd: number }> = [];
 
+      // Use native Intl.Segmenter for complex scripts (Bengali, Arabic, Urdu, etc.) if supported
+      const graphemeSegmenter =
+        typeof Intl !== 'undefined' && (Intl as any).Segmenter
+          ? new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
+          : null;
+
       let runningCharOffset = 0;
       let currentLineTop = -1;
       let currentLineBottom = -1;
@@ -123,12 +129,18 @@ export class TextMeasurement {
 
       for (const tNode of textNodes) {
         const text = tNode.textContent || '';
-        const len = text.length;
+        if (!text) continue;
 
-        for (let i = 0; i < len; i++) {
+        const segments: Array<{ index: number; segment: string }> = graphemeSegmenter
+          ? Array.from(graphemeSegmenter.segment(text))
+          : Array.from(text).map((ch, idx) => ({ index: idx, segment: ch }));
+
+        for (const seg of segments) {
+          const segStart = seg.index;
+          const segLen = seg.segment.length;
           try {
-            range.setStart(tNode, i);
-            range.setEnd(tNode, i + 1);
+            range.setStart(tNode, segStart);
+            range.setEnd(tNode, segStart + segLen);
             const rects = range.getClientRects();
 
             if (rects.length > 0) {
@@ -136,15 +148,15 @@ export class TextMeasurement {
               const charTop = r.top;
               const charBottom = r.bottom;
 
-              // Check if this character is on a new line (threshold > 4px vertical delta)
+              // Check if this cluster is on a new line (threshold > 4px vertical delta)
               if (currentLineTop === -1) {
                 currentLineTop = charTop;
                 currentLineBottom = charBottom;
-                currentLineText = text[i];
-                currentLineStart = runningCharOffset + i;
+                currentLineText = seg.segment;
+                currentLineStart = runningCharOffset + segStart;
                 currentLineLeft = r.left;
                 currentLineRight = r.right;
-              } else if (Math.abs(charTop - currentLineTop) > 5) {
+              } else if (Math.abs(charTop - currentLineTop) > 4) {
                 // Flush completed line
                 lineRects.push({
                   rect: {
@@ -157,19 +169,19 @@ export class TextMeasurement {
                   bottom: currentLineBottom - elRect.top,
                   text: currentLineText,
                   charStart: currentLineStart,
-                  charEnd: runningCharOffset + i,
+                  charEnd: runningCharOffset + segStart,
                 });
 
                 // Start new line
                 currentLineTop = charTop;
                 currentLineBottom = charBottom;
-                currentLineText = text[i];
-                currentLineStart = runningCharOffset + i;
+                currentLineText = seg.segment;
+                currentLineStart = runningCharOffset + segStart;
                 currentLineLeft = r.left;
                 currentLineRight = r.right;
               } else {
                 // Same line continuation
-                currentLineText += text[i];
+                currentLineText += seg.segment;
                 currentLineBottom = Math.max(currentLineBottom, charBottom);
                 currentLineLeft = Math.min(currentLineLeft, r.left);
                 currentLineRight = Math.max(currentLineRight, r.right);
@@ -179,7 +191,7 @@ export class TextMeasurement {
             // ignore transient range errors
           }
         }
-        runningCharOffset += len;
+        runningCharOffset += text.length;
       }
 
       // Flush last line
@@ -207,7 +219,7 @@ export class TextMeasurement {
         text: l.text,
       }));
 
-      const totalHeight = Math.max(connectedEl.offsetHeight, elRect.height, lines.length * 20);
+      const totalHeight = elRect.height > 0 ? elRect.height : (connectedEl.offsetHeight || Math.max(lines.length * 20, 24));
       const firstLineHeight = lines.length > 0 ? lines[0].rect.height : totalHeight;
       const lastLineHeight = lines.length > 0 ? lines[lines.length - 1].rect.height : totalHeight;
 
@@ -276,27 +288,58 @@ export class TextMeasurement {
 
       if (textNodes.length === 0) return null;
 
+      const wordSegmenter =
+        typeof Intl !== 'undefined' && (Intl as any).Segmenter
+          ? new (Intl as any).Segmenter(undefined, { granularity: 'word' })
+          : null;
+
       const range = document.createRange();
       let targetNode: Text | null = null;
       let targetOffset = -1;
 
       for (const tNode of textNodes) {
-        const len = tNode.textContent?.length || 0;
-        for (let o = 0; o < len; o += 3) {
-          try {
-            range.setStart(tNode, o);
-            range.setEnd(tNode, Math.min(o + 1, len));
-            const rects = range.getClientRects();
-            if (rects.length > 0) {
-              const relBottom = rects[0].bottom - elRect.top;
-              if (relBottom > maxAllowedHeightPx) {
-                targetNode = tNode;
-                targetOffset = o;
-                break;
+        const text = tNode.textContent || '';
+        if (!text) continue;
+
+        if (wordSegmenter) {
+          const words = Array.from(wordSegmenter.segment(text));
+          for (const w of words) {
+            const wStart = (w as any).index;
+            const wLen = (w as any).segment.length;
+            try {
+              range.setStart(tNode, wStart);
+              range.setEnd(tNode, wStart + wLen);
+              const rects = range.getClientRects();
+              if (rects.length > 0) {
+                const relBottom = rects[0].bottom - elRect.top;
+                if (relBottom > maxAllowedHeightPx) {
+                  targetNode = tNode;
+                  targetOffset = wStart;
+                  break;
+                }
               }
+            } catch (e) {
+              // ignore
             }
-          } catch (e) {
-            // ignore
+          }
+        } else {
+          const len = text.length;
+          for (let o = 0; o < len; o += 3) {
+            try {
+              range.setStart(tNode, o);
+              range.setEnd(tNode, Math.min(o + 1, len));
+              const rects = range.getClientRects();
+              if (rects.length > 0) {
+                const relBottom = rects[0].bottom - elRect.top;
+                if (relBottom > maxAllowedHeightPx) {
+                  targetNode = tNode;
+                  targetOffset = o;
+                  break;
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
           }
         }
         if (targetNode) break;

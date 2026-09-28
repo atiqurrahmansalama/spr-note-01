@@ -46,11 +46,20 @@ export class ParagraphFragmenter {
             isSplit: true,
           };
         }
+        if (approxHeight <= availableHeightPx) {
+          return {
+            firstFragmentHtml: (el as any).rawHtml || `<p>${text}</p>`,
+            remainingFragmentHtml: null,
+            firstFragmentHeight: approxHeight,
+            remainingFragmentHeight: 0,
+            isSplit: false,
+          };
+        }
         return {
-          firstFragmentHtml: (el as any).rawHtml || `<p>${text}</p>`,
-          remainingFragmentHtml: null,
-          firstFragmentHeight: approxHeight,
-          remainingFragmentHeight: 0,
+          firstFragmentHtml: '',
+          remainingFragmentHtml: (el as any).rawHtml || `<p>${text}</p>`,
+          firstFragmentHeight: 0,
+          remainingFragmentHeight: approxHeight,
           isSplit: false,
         };
       }

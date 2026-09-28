@@ -6,6 +6,7 @@ import type { PrintPageSize, PrintOrientation, PrintMargin } from './types';
 import { parseTokenDirective, formatMultiValueData, type TokenDirectiveOptions } from './docLabDirectiveEngine';
 import { separateDocxStylesAndBody, sanitizeDocxStyles } from './docxStyleUtils';
 import { PaginationEngine } from './layout/pagination/PaginationEngine';
+import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
 
 export { separateDocxStylesAndBody, sanitizeDocxStyles };
 
@@ -74,26 +75,13 @@ export function getDocxPaperDimensions(
   pageSize: PrintPageSize = 'A4',
   orientation: PrintOrientation = 'PORTRAIT'
 ): DocxPaperDimensions {
-  const isLandscape = orientation === 'LANDSCAPE';
-  if (pageSize === 'LEGAL') {
-    return isLandscape
-      ? { width: '1344px', minHeight: '816px', height: '816px', maxWidth: '1344px' }
-      : { width: '816px', minHeight: '1344px', height: '1344px', maxWidth: '816px' };
-  }
-  if (pageSize === 'LETTER') {
-    return isLandscape
-      ? { width: '1056px', minHeight: '816px', height: '816px', maxWidth: '1056px' }
-      : { width: '816px', minHeight: '1056px', height: '1056px', maxWidth: '816px' };
-  }
-  if (pageSize === 'ID_CARD') {
-    return isLandscape
-      ? { width: '512px', minHeight: '324px', height: '324px', maxWidth: '512px' }
-      : { width: '324px', minHeight: '512px', height: '512px', maxWidth: '324px' };
-  }
-  // Default A4
-  return isLandscape
-    ? { width: '1123px', minHeight: '794px', height: '794px', maxWidth: '1123px' }
-    : { width: '794px', minHeight: '1123px', height: '1123px', maxWidth: '794px' };
+  const { px } = PageGeometryCalculator.resolveDimensions(pageSize as any, orientation as any);
+  return {
+    width: `${px.width}px`,
+    minHeight: `${px.height}px`,
+    height: `${px.height}px`,
+    maxWidth: `${px.width}px`,
+  };
 }
 
 /**
@@ -103,32 +91,8 @@ export function getDocxPaperPadding(
   pageProperties?: Partial<DocxPageProperties> | null,
   marginPreset: PrintMargin = 'NORMAL'
 ): string {
-  if (
-    pageProperties &&
-    (pageProperties.marginTopMm !== undefined ||
-      pageProperties.marginRightMm !== undefined ||
-      pageProperties.marginBottomMm !== undefined ||
-      pageProperties.marginLeftMm !== undefined)
-  ) {
-    const top = pageProperties.marginTopMm !== undefined ? `${pageProperties.marginTopMm}mm` : '20mm';
-    const right = pageProperties.marginRightMm !== undefined ? `${pageProperties.marginRightMm}mm` : '20mm';
-    const bottom = pageProperties.marginBottomMm !== undefined ? `${pageProperties.marginBottomMm}mm` : '20mm';
-    const left = pageProperties.marginLeftMm !== undefined ? `${pageProperties.marginLeftMm}mm` : '20mm';
-    return `${top} ${right} ${bottom} ${left}`;
-  }
-
-  const effectiveMargin = marginPreset || pageProperties?.margin || 'NORMAL';
-  switch (effectiveMargin) {
-    case 'NONE':
-      return '4mm';
-    case 'NARROW':
-      return '12.7mm';
-    case 'WIDE':
-      return '31.8mm';
-    case 'NORMAL':
-    default:
-      return '25.4mm';
-  }
+  const { css } = PageGeometryCalculator.resolveMargins(marginPreset as any, undefined, pageProperties);
+  return css;
 }
 
 /**

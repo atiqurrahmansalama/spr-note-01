@@ -70,6 +70,9 @@ export class PaginationEngine {
       containerHeight: pageBounds.contentArea.height,
       margins: pageBounds.margins,
       styles,
+      fontSizePx: options.fontSizePx,
+      fontFamily: options.fontFamily,
+      lineHeight: options.lineHeight,
       density: options.density,
       scale: options.scale || 1,
     };
@@ -119,6 +122,7 @@ export class PaginationEngine {
     // 5. Main Pagination Loop
     let nodeQueue: Array<HTMLElement | SourceNode> = [...nodes];
     let overflowDetected = false;
+    let prevMarginBottom = 0;
 
     while (nodeQueue.length > 0) {
       const currentNode = nodeQueue.shift()!;
@@ -139,6 +143,7 @@ export class PaginationEngine {
           });
         }
         builder.advanceToNextPage();
+        prevMarginBottom = 0;
       }
 
       // If it's a pure manual page break element
@@ -164,13 +169,25 @@ export class PaginationEngine {
         }
         if (builder.usedHeight > 0) {
           builder.advanceToNextPage();
+          prevMarginBottom = 0;
         }
         continue;
       }
 
       // Measure current node
       const measured = MeasurementEngine.measure(currentNode, measurementContext);
-      const currentHeight = measured.totalOuterHeight || measured.height || 28;
+
+      // Compute true vertical space in block flow accounting for margin collapsing
+      let currentHeight = measured.height || 28;
+      if (builder.usedHeight === 0) {
+        // First block on a fresh page: top margin is collapsed with page edge
+        currentHeight = measured.height;
+      } else if (measured.effectiveFlowHeight !== undefined && measured.effectiveFlowHeight > 0) {
+        currentHeight = measured.effectiveFlowHeight;
+      } else {
+        const collapsedMargin = Math.max(prevMarginBottom, measured.marginTop || 0);
+        currentHeight = collapsedMargin + measured.height;
+      }
 
       // Check heading keep-with-next protection
       const shouldPush = KeepTogetherResolver.shouldPushWithNext(
@@ -195,6 +212,8 @@ export class PaginationEngine {
         }
         // Push heading to next page to keep with its following block
         builder.advanceToNextPage();
+        prevMarginBottom = 0;
+        currentHeight = measured.height;
       }
 
       // Check if node fits on current page
@@ -222,6 +241,7 @@ export class PaginationEngine {
         });
 
         builder.addFragment(fragment, currentHeight);
+        prevMarginBottom = measured.marginBottom || 0;
 
         if (debugCollector) {
           debugCollector.recordDecision({
@@ -237,6 +257,7 @@ export class PaginationEngine {
 
         if (breakEval.shouldBreakAfter) {
           builder.advanceToNextPage();
+          prevMarginBottom = 0;
         }
       } else {
         // Node exceeds available vertical space
@@ -258,6 +279,7 @@ export class PaginationEngine {
             });
           }
           builder.advanceToNextPage();
+          prevMarginBottom = 0;
           nodeQueue.unshift(currentNode);
           continue;
         }
@@ -282,6 +304,7 @@ export class PaginationEngine {
 
         if (fragResult.firstFragment && fragResult.usedHeight > 0) {
           builder.addFragment(fragResult.firstFragment, fragResult.usedHeight);
+          prevMarginBottom = 0;
         }
 
         if (debugCollector) {
@@ -302,6 +325,7 @@ export class PaginationEngine {
 
         if (fragResult.remainingNode) {
           builder.advanceToNextPage();
+          prevMarginBottom = 0;
           nodeQueue.unshift(fragResult.remainingNode);
         } else if (fragResult.pushedToNextPage) {
           if (builder.usedHeight === 0) {
@@ -316,8 +340,10 @@ export class PaginationEngine {
               textContent: (currentNode as any).textContent || '',
             });
             builder.addFragment(forcedFrag, currentHeight);
+            prevMarginBottom = measured.marginBottom || 0;
           } else {
             builder.advanceToNextPage();
+            prevMarginBottom = 0;
             nodeQueue.unshift(currentNode);
           }
         }

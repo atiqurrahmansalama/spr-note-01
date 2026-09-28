@@ -1,5 +1,6 @@
 import React, { useRef, memo, useCallback, useEffect, useMemo } from 'react';
 import { separateDocxStylesAndBody } from './docxStyleUtils';
+import { stripRuntimePaginationSpacers } from './layout/logicalDocument';
 
 export interface DocxLiveRendererProps {
   htmlContent: string;
@@ -9,6 +10,7 @@ export interface DocxLiveRendererProps {
   className?: string;
   pageIndex?: number;
   totalPages?: number;
+  transparentBackground?: boolean;
   onAddNextPage?: () => void;
   onDeleteCurrentPage?: () => void;
   onNavigatePrevPage?: () => void;
@@ -189,6 +191,7 @@ function DocxLiveRendererComponent({
   isEditable = true,
   onContentChange,
   className = '',
+  transparentBackground = false,
 }: DocxLiveRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isFocusedRef = useRef<boolean>(false);
@@ -196,9 +199,16 @@ function DocxLiveRendererComponent({
   const savedBookmarkRef = useRef<CaretBookmark | null>(null);
 
   // Separate styles and body from htmlContent
-  const { styles: extractedStyles, body: cleanBody } = useMemo(() => {
+  const { styles: extractedStyles, body: extractedBody } = useMemo(() => {
     return separateDocxStylesAndBody(htmlContent || '');
   }, [htmlContent]);
+
+  const cleanBody = useMemo(() => {
+    if (!extractedBody || !extractedBody.trim() || extractedBody.trim() === '<p></p>') {
+      return '<p><br></p>';
+    }
+    return extractedBody;
+  }, [extractedBody]);
 
   const activeStyles = useMemo(() => {
     const raw = styles || extractedStyles || '';
@@ -315,7 +325,8 @@ function DocxLiveRendererComponent({
       clearTimeout(debounceTimerRef.current);
     }
     if (!onContentChange || !containerRef.current) return;
-    const currentHtml = containerRef.current.innerHTML;
+    const rawHtml = containerRef.current.innerHTML;
+    const currentHtml = stripRuntimePaginationSpacers(rawHtml);
     lastKnownHtmlRef.current = currentHtml;
     const finalExportHtml = activeStyles ? `<style>${activeStyles}</style>\n${currentHtml}` : currentHtml;
     onContentChange(finalExportHtml);
@@ -338,7 +349,8 @@ function DocxLiveRendererComponent({
     debounceTimerRef.current = setTimeout(() => {
       if (!containerRef.current) return;
 
-      const currentHtml = containerRef.current.innerHTML;
+      const rawHtml = containerRef.current.innerHTML;
+      const currentHtml = stripRuntimePaginationSpacers(rawHtml);
       lastKnownHtmlRef.current = currentHtml;
       const finalExportHtml = activeStyles ? `<style>${activeStyles}</style>\n${currentHtml}` : currentHtml;
       onContentChange?.(finalExportHtml);
@@ -539,25 +551,27 @@ function DocxLiveRendererComponent({
           onKeyUp={saveSelection}
           onMouseUp={saveSelection}
           onClick={handleContainerClick}
-          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full h-full text-left focus:outline-none cursor-text focus:ring-1 focus:ring-blue-500/20 rounded-xs select-text ${className}`}
+          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed ${transparentBackground ? 'bg-transparent' : '!bg-white'} !text-slate-900 w-full min-h-[400px] text-left focus:outline-none cursor-text focus:ring-1 focus:ring-blue-500/20 rounded-xs select-text ${className}`}
           style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: transparentBackground ? 'transparent' : '#ffffff',
             color: '#0f172a',
             textAlign: 'left',
             userSelect: 'text',
             WebkitUserSelect: 'text',
+            minHeight: '100%',
           }}
         />
       ) : (
         <div
           ref={containerRef}
-          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full h-full text-left select-text ${className}`}
+          className={`docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed ${transparentBackground ? 'bg-transparent' : '!bg-white'} !text-slate-900 w-full min-h-[400px] text-left select-text ${className}`}
           style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: transparentBackground ? 'transparent' : '#ffffff',
             color: '#0f172a',
             textAlign: 'left',
             userSelect: 'text',
             WebkitUserSelect: 'text',
+            minHeight: '100%',
           }}
         />
       )}

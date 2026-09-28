@@ -33,7 +33,6 @@ export function runPhase22DOMInspection() {
         page: p,
         totalPages: layout2.totalPages,
         options: { pageSize: 'A4', orientation: 'PORTRAIT', margin: 'NORMAL' },
-        isEditable: true,
       })
     );
     return {

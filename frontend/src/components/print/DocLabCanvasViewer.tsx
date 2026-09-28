@@ -206,14 +206,18 @@ export const DocLabCanvasViewer: React.FC<DocLabCanvasViewerProps> = ({
         target.closest('textarea') ||
         target.closest('a') ||
         target.isContentEditable ||
-        target.closest('[contenteditable="true"]')
+        target.closest('[contenteditable="true"]') ||
+        target.closest('.doclab-continuous-editor-overlay') ||
+        target.closest('.docx-live-container') ||
+        target.closest('.doclab-multi-page-workbench') ||
+        target.closest('.paper-sheet')
       ) {
-        return;
-      }
-
-      const isInsidePaper = Boolean(target.closest('.paper-sheet'));
-      if (effectivePointerMode === 'select' && isLeftClick && isInsidePaper) {
-        return;
+        if (effectivePointerMode === 'select' && isLeftClick) {
+          return;
+        }
+        if (!isSpacePressed && pointerMode === 'select' && isLeftClick) {
+          return;
+        }
       }
 
       e.preventDefault();
