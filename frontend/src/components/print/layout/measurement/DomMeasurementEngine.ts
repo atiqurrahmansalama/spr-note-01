@@ -16,6 +16,7 @@ import {
   MeasurementContext,
   BreakOpportunity,
 } from './measurementTypes';
+import { MeasurementMirror } from './MeasurementMirror';
 
 const SANDBOX_CONTAINER_ID = 'spr-doclab-measurement-sandbox';
 
@@ -132,173 +133,23 @@ export class DomMeasurementEngine {
   }
 
   /**
-   * Measures an already-connected or offscreen HTMLElement
+   * Measures an already-connected or offscreen HTMLElement using the authoritative MeasurementMirror
    */
   public static measureElement(
     el: HTMLElement,
     context: MeasurementContext
   ): NodeMeasurementResult {
-    if (this.measurementCache.has(el)) {
-      const cached = this.measurementCache.get(el)!;
-      const currentRect = el.getBoundingClientRect();
-      if (Math.abs(cached.width - currentRect.width) < 0.5 && Math.abs(cached.height - currentRect.height) < 0.5) {
-        return cached;
-      }
-    }
-
-    const tag = el.tagName.toLowerCase();
-    const style = window.getComputedStyle(el);
-
-    const marginTop = parseFloat(style.marginTop) || 0;
-    const marginBottom = parseFloat(style.marginBottom) || 0;
-    const paddingTop = parseFloat(style.paddingTop) || 0;
-    const paddingBottom = parseFloat(style.paddingBottom) || 0;
-
-    const elRect = el.getBoundingClientRect();
-    // Use true subpixel bounding rect height; fallback to offsetHeight or headless estimation only in headless DOM
-    const width = elRect.width > 0 ? elRect.width : (el.offsetWidth || Math.max(100, context.containerWidth));
-    let measuredHeight = elRect.height > 0 ? elRect.height : el.offsetHeight;
-
-    if (!measuredHeight || measuredHeight === 0) {
-      measuredHeight = this.estimateHeadlessFallbackDimensions(tag, el, context, width);
-    }
-
-    const height = measuredHeight;
-    const totalOuterHeight = height + marginTop + marginBottom;
-
-    const boundingRect: Rect = {
-      x: 0,
-      y: 0,
-      width,
-      height,
-    };
-
-    const isAtomic =
-      tag === 'img' ||
-      tag === 'svg' ||
-      tag === 'figure' ||
-      el.classList.contains('print-image-container') ||
-      el.classList.contains('print-signature-block') ||
-      DocumentLayoutEngine.isKeepTogether(el);
-
-    const isManualBreak = DocumentLayoutEngine.isManualBreak(el);
-    const keepTogether = DocumentLayoutEngine.isKeepTogether(el);
-    const keepWithNext = DocumentLayoutEngine.isKeepWithNext(el);
-
-    let type: SourceNodeType = 'paragraph';
-    if (/^h[1-6]$/.test(tag)) type = 'heading';
-    else if (tag === 'table') type = 'table';
-    else if (tag === 'ul' || tag === 'ol') type = 'list';
-    else if (isAtomic) type = 'image';
-    else if (isManualBreak) type = 'manual-page-break';
-
-    let lines;
-    let firstLineHeight = height;
-    let lastLineHeight = height;
-    let breakOpportunities: BreakOpportunity[] = [];
-    let tableGeometry;
-
-    // 1. Specialized measurement for tables
-    if (tag === 'table') {
-      tableGeometry = TableMeasurement.measureTable(el as HTMLTableElement, context);
-      breakOpportunities = TableMeasurement.generateTableBreakOpportunities(tableGeometry);
-    }
-    // 2. Specialized measurement for multi-line text blocks
-    else if (!isAtomic && (type === 'paragraph' || type === 'heading')) {
-      const textMetrics = TextMeasurement.measureTextLines(el, context);
-      lines = textMetrics.lines;
-      firstLineHeight = textMetrics.firstLineHeight;
-      lastLineHeight = textMetrics.lastLineHeight;
-      breakOpportunities = textMetrics.breakOpportunities;
-    }
-
-    const result: NodeMeasurementResult = {
-      nodeId: el.id || `node_${Math.random().toString(36).slice(2, 9)}`,
-      type,
-      width,
-      height,
-      boundingRect,
-      marginTop,
-      marginBottom,
-      paddingTop,
-      paddingBottom,
-      totalOuterHeight,
-      flowOffsetTop: el.offsetTop,
-      lines,
-      firstLineHeight,
-      lastLineHeight,
-      breakOpportunities,
-      tableGeometry,
-      isAtomic,
-      isManualBreak,
-      keepTogether,
-      keepWithNext,
-      domElement: el,
-    };
-
-    this.measurementCache.set(el, result);
-    return result;
+    return MeasurementMirror.measureElement(el, context);
   }
 
   /**
-   * Mounts and measures arbitrary raw HTML inside the offscreen sandbox
+   * Mounts and measures arbitrary raw HTML inside the authoritative MeasurementMirror
    */
   public static measureHtmlNodes(
     html: string,
     context: MeasurementContext
   ): NodeMeasurementResult[] {
-    if (!html || !html.trim()) return [];
-
-    if (typeof document === 'undefined') {
-      return this.measureHtmlNodesSSR(html, context);
-    }
-
-    const sandbox = this.getOrCreateSandbox(context);
-
-    // Injected stylesheet
-    let styleTag = sandbox.querySelector('style#spr-sandbox-injected-styles') as HTMLStyleElement | null;
-    if (context.styles) {
-      if (!styleTag) {
-        styleTag = document.createElement('style');
-        styleTag.id = 'spr-sandbox-injected-styles';
-        sandbox.appendChild(styleTag);
-      }
-      styleTag.textContent = context.styles.replace(/<\/?style\b[^>]*>/gi, '');
-    }
-
-    // Mount content container
-    const contentHost = document.createElement('div');
-    contentHost.className = 'spr-measurement-content-host docx-parsed-body docx-preview-content docx-live-container font-sans text-xs sm:text-sm leading-relaxed';
-    contentHost.style.width = '100%';
-    contentHost.style.boxSizing = 'border-box';
-    contentHost.innerHTML = html.trim();
-
-    sandbox.appendChild(contentHost);
-
-    // Measure each top-level child block accounting for exact rendered flow and margin collapsing
-    const childElements = Array.from(contentHost.children) as HTMLElement[];
-    const results: NodeMeasurementResult[] = childElements.map((child, idx) => {
-      const nextChild = childElements[idx + 1] as HTMLElement | undefined;
-      const measurement = this.measureElement(child, context);
-      const childRect = child.getBoundingClientRect();
-      const flowOffsetTop = child.offsetTop;
-      const childH = childRect.height > 0 ? childRect.height : measurement.height;
-      const offsetDiff = nextChild ? nextChild.offsetTop - child.offsetTop : 0;
-      const effectiveFlowHeight = offsetDiff > 0
-        ? offsetDiff
-        : (childH + measurement.marginBottom);
-
-      return {
-        ...measurement,
-        flowOffsetTop,
-        effectiveFlowHeight,
-      };
-    });
-
-    // Cleanup sandbox host
-    sandbox.removeChild(contentHost);
-
-    return results;
+    return MeasurementMirror.measureHtmlNodes(html, context);
   }
 
   /**

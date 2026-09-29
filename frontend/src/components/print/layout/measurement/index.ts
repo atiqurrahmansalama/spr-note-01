@@ -9,4 +9,6 @@ export * from './TableMeasurement';
 export * from './DomMeasurementEngine';
 export * from './MeasurementEngine';
 export * from './MeasurementCache';
-
+export * from './MeasurementMirror';
+export * from './ControlledLayoutPipeline';
+export * from './useControlledLayoutPipeline';

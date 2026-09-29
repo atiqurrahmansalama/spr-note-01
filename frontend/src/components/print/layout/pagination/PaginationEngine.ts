@@ -102,7 +102,7 @@ export class PaginationEngine {
     }
 
     // 1. Extract logical document identifier, title, styles, and nodes/blocks
-    let docId = `doc_${Date.now()}`;
+    let docId = options.documentId || 'doc_master';
     let title = 'Official Document';
     let styles = options.styles || '';
     let blocksOrNodes: Array<BlockNode | SourceNode | HTMLElement> = [];
@@ -152,6 +152,7 @@ export class PaginationEngine {
       lineHeight: options.lineHeight,
       density: options.density,
       scale: options.scale || 1,
+      pureMode: Boolean(options.pureCalculation),
     };
 
     // 3. Initialize PageBuilder with calculated bounds
@@ -161,7 +162,7 @@ export class PaginationEngine {
     if (options.enableFlowPagination === false) {
       const fullHtml = typeof input === 'string' ? input : 'rawHtml' in input ? input.rawHtml : '';
       const fragment = DocumentLayoutEngine.createFragment({
-        id: 'single_page_fragment',
+        id: 'fragment:root:0',
         sourceNodeId: 'root',
         type: 'paragraph',
         pageIndex: 0,
@@ -212,6 +213,7 @@ export class PaginationEngine {
     let queue: Array<BlockNode | SourceNode | HTMLElement> = [...blocksOrNodes];
     let overflowDetected = false;
     let prevMarginBottom = 0;
+    const fragmentIndexMap = new Map<string, number>();
 
     let currentSectionId = 'sec_0';
     let currentSectionIndex = 0;
@@ -407,6 +409,12 @@ export class PaginationEngine {
         currentHeight = measured.height;
       }
 
+      // Track deterministic fragment index for this source node
+      const sourceId =
+        ('id' in currentItem && typeof (currentItem as any).id === 'string' && (currentItem as any).id) ||
+        measured.nodeId;
+      const currentFragIdx = fragmentIndexMap.get(sourceId) || 0;
+
       // Check if item fits on current page
       if (currentHeight <= builder.availableHeight) {
         const isCanonicalBlockNode =
@@ -417,11 +425,12 @@ export class PaginationEngine {
           !('nodeType' in currentItem);
 
         const fragResult = isCanonicalBlockNode
-          ? FragmentationEngine.fragmentBlockNode(currentItem as BlockNode, builder.currentValidPageIndex, builder.availableHeight, measurementContext)
-          : FragmentationEngine.fragmentNode(currentItem, builder.currentValidPageIndex, builder.availableHeight, measurementContext);
+          ? FragmentationEngine.fragmentBlockNode(currentItem as BlockNode, builder.currentValidPageIndex, builder.availableHeight, measurementContext, currentFragIdx)
+          : FragmentationEngine.fragmentNode(currentItem, builder.currentValidPageIndex, builder.availableHeight, measurementContext, currentFragIdx);
 
         if (fragResult.fitsCurrentPage && fragResult.firstFragment) {
           builder.addFragment(fragResult.firstFragment, currentHeight);
+          fragmentIndexMap.set(sourceId, currentFragIdx + 1);
           prevMarginBottom = measured.marginBottom || 0;
           builder.recordDecision(measured.nodeId, measured.type, 'PLACE', currentHeight, 'Fits on page');
 
@@ -481,11 +490,12 @@ export class PaginationEngine {
           !('rawHtml' in currentItem) &&
           !('nodeType' in currentItem);
         const fragResult = isCanonicalBlock
-          ? FragmentationEngine.fragmentBlockNode(currentItem as BlockNode, builder.currentValidPageIndex, builder.availableHeight, measurementContext)
-          : FragmentationEngine.fragmentNode(currentItem, builder.currentValidPageIndex, builder.availableHeight, measurementContext);
+          ? FragmentationEngine.fragmentBlockNode(currentItem as BlockNode, builder.currentValidPageIndex, builder.availableHeight, measurementContext, currentFragIdx)
+          : FragmentationEngine.fragmentNode(currentItem, builder.currentValidPageIndex, builder.availableHeight, measurementContext, currentFragIdx);
 
         if (fragResult.firstFragment && fragResult.usedHeight > 0) {
           builder.addFragment(fragResult.firstFragment, fragResult.usedHeight);
+          fragmentIndexMap.set(sourceId, currentFragIdx + 1);
           builder.recordDecision(measured.nodeId, measured.type, 'FRAGMENT', fragResult.usedHeight, 'Sliced at page boundary');
           prevMarginBottom = 0;
 
@@ -528,7 +538,7 @@ export class PaginationEngine {
           if (builder.usedHeight === 0) {
             // Force place on empty page to guarantee algorithm termination
             const forcedFrag = DocumentLayoutEngine.createFragment({
-              id: `frag_${builder.currentValidPageIndex}_${measured.nodeId}`,
+              id: `fragment:${measured.nodeId}:${currentFragIdx}`,
               sourceNodeId: measured.nodeId,
               type: measured.type,
               pageIndex: builder.currentValidPageIndex,
@@ -537,6 +547,7 @@ export class PaginationEngine {
               textContent: (currentItem as any).textContent || '',
             });
             builder.addFragment(forcedFrag, currentHeight);
+            fragmentIndexMap.set(sourceId, currentFragIdx + 1);
             builder.recordDecision(measured.nodeId, measured.type, 'PLACE', currentHeight, 'Forced place on empty page');
             prevMarginBottom = measured.marginBottom || 0;
           } else {
@@ -557,6 +568,31 @@ export class PaginationEngine {
     const watermarkConfig = options.watermarkConfig || (watermarkText ? { text: watermarkText, enabled: true } : undefined);
     const signatureConfig = options.signatureConfig;
     const showSignatures = options.showSignaturesOnAllPages;
+
+    // Enrich fragments with accurate totalFragments, fragmentIndex, isFirstFragment, and isLastFragment
+    const totalFragmentsBySource = new Map<string, number>();
+    pages.forEach((page) => {
+      page.fragments.forEach((frag) => {
+        if (frag.sourceNodeId) {
+          totalFragmentsBySource.set(frag.sourceNodeId, (totalFragmentsBySource.get(frag.sourceNodeId) || 0) + 1);
+        }
+      });
+    });
+
+    const runningFragmentIndexBySource = new Map<string, number>();
+    pages.forEach((page) => {
+      page.fragments.forEach((frag) => {
+        if (frag.sourceNodeId) {
+          const total = totalFragmentsBySource.get(frag.sourceNodeId) || 1;
+          const currentIdx = runningFragmentIndexBySource.get(frag.sourceNodeId) || 0;
+          frag.fragmentIndex = currentIdx;
+          frag.totalFragments = total;
+          frag.isFirstFragment = currentIdx === 0;
+          frag.isLastFragment = currentIdx === total - 1;
+          runningFragmentIndexBySource.set(frag.sourceNodeId, currentIdx + 1);
+        }
+      });
+    });
 
     const sectionCounts: Record<number, number> = {};
     pages.forEach((page, idx) => {

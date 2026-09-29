@@ -9,7 +9,21 @@
 import { Mark, HeadingLevel, ListType, TextAlignment, TokenInsertPayload } from '../../model/types';
 import { EditorDomAdapter } from './EditorDomAdapter';
 import { EditorSerializer } from './EditorSerializer';
-import { EditorTransaction } from './editorTypes';
+import { EditorPositionMapper } from './EditorPositionMapper';
+import { EditorTransaction, EditorSelection, LogicalSelection } from './editorTypes';
+
+export function buildTransactionSelection(host?: HTMLElement, explicitSelection?: LogicalSelection | null): EditorSelection | undefined {
+  const logical = explicitSelection || (host ? EditorPositionMapper.captureLogicalSelection(host) : null);
+  if (!logical) return undefined;
+
+  return {
+    anchorOffset: logical.anchor.textOffset,
+    focusOffset: logical.head.textOffset,
+    isCollapsed: logical.isCollapsed,
+    blockId: logical.anchor.sourceNodeId || logical.anchor.nodeId,
+    logical,
+  };
+}
 
 export class EditorCommands {
   /**
@@ -23,6 +37,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'typing',
       timestamp: Date.now(),
       description: `Insert text: ${text.slice(0, 20)}`,
@@ -40,6 +55,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'typing',
       timestamp: Date.now(),
       description: 'Split block / Enter',
@@ -61,6 +77,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: `Apply mark: ${String(markType)}`,
@@ -81,6 +98,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: `Toggle block type: ${targetType}`,
@@ -101,6 +119,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: `Set alignment: ${alignment}`,
@@ -133,6 +152,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: `Insert table ${rows}x${cols}`,
@@ -160,6 +180,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: 'Insert image',
@@ -177,6 +198,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: 'Insert SVG vector shape',
@@ -204,6 +226,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: `Insert token: ${payload.key}`,
@@ -222,6 +245,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: 'Insert manual page break',
@@ -239,6 +263,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: 'Replace selection',
@@ -256,6 +281,7 @@ export class EditorCommands {
     return {
       doc,
       canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
       origin: 'command',
       timestamp: Date.now(),
       description: 'Clear formatting',

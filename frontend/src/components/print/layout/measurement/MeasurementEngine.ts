@@ -1,5 +1,5 @@
 import { SourceNode } from '../types/documentTypes';
-import { CanonicalDocument, BlockNode, TableNode } from '../../model/types';
+import { CanonicalDocument, BlockNode } from '../../model/types';
 import { HtmlExporter } from '../../model/serialization/htmlExporter';
 import { DomMeasurementEngine } from './DomMeasurementEngine';
 import { MeasurementCache } from './MeasurementCache';
@@ -49,31 +49,7 @@ export class MeasurementEngine {
         };
       }
 
-      if (block.type === 'table') {
-        const table = block as TableNode;
-        const rows = table.rows || [];
-        const fontSize = context.fontSizePx || 14;
-        const rowHeight = Math.max(28, fontSize * 2.2);
-        const totalHeight = Math.max(rowHeight, rows.length * rowHeight);
-        return {
-          nodeId: block.id,
-          type: 'table',
-          width: context.containerWidth || 700,
-          height: totalHeight,
-          boundingRect: { x: 0, y: 0, width: context.containerWidth || 700, height: totalHeight },
-          marginTop: 0,
-          marginBottom: 12,
-          paddingTop: 0,
-          paddingBottom: 0,
-          totalOuterHeight: totalHeight + 12,
-          breakOpportunities: [],
-          isAtomic: false,
-          isManualBreak: false,
-          keepTogether: false,
-          keepWithNext: false,
-        };
-      }
-
+      // Serialize canonical block (table, paragraph, heading, list, image, svg, signature) to HTML
       const html = HtmlExporter.serializeBlock(block, { tokenFormat: 'mustache' });
       const cacheKey = useCache ? cache.generateKey(block.id, html, context) : null;
       if (cacheKey) {

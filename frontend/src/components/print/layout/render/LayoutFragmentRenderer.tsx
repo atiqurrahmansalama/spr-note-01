@@ -25,12 +25,19 @@ export const LayoutFragmentRenderer: React.FC<LayoutFragmentRendererProps> = mem
   if (!fragment) return null;
 
   const html = fragment.htmlContent || (fragment.textContent ? `<p>${fragment.textContent}</p>` : '');
+  const fragmentIdx = fragment.fragmentIndex ?? 0;
+  const fragmentTotal = fragment.totalFragments ?? 1;
+  const isSplit = Boolean(fragmentTotal > 1 || fragment.isAutomaticBreak || fragmentIdx > 0);
 
   return (
     <div
       id={`fragment-${fragment.id}`}
       data-fragment-id={fragment.id}
       data-source-id={fragment.sourceNodeId}
+      data-source-node-id={fragment.sourceNodeId}
+      data-fragment-index={fragmentIdx}
+      data-fragment-total={fragmentTotal}
+      data-is-fragment={isSplit ? 'true' : 'false'}
       data-fragment-type={fragment.type}
       className={`docx-layout-fragment docx-fragment-${fragment.type} ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}

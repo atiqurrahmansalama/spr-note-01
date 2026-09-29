@@ -124,7 +124,7 @@ export class DocumentLayoutEngine {
    * Creates an empty LayoutDocument container
    */
   public static createEmptyLayoutDocument(
-    documentId: string = `doc_${Date.now()}`,
+    documentId: string = 'doc_empty',
     options: LayoutDocumentOptions = {},
     title: string = 'Untitled Document'
   ): LayoutDocument {

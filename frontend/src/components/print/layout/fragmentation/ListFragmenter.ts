@@ -34,7 +34,7 @@ export class ListFragmenter {
     availableHeightPx: number,
     context?: MeasurementContext
   ): ListSplitResult {
-    const html = HtmlExporter.serializeBlock(list, { tokenFormat: 'mustache' });
+    const html = HtmlExporter.serializeBlock(list, { tokenFormat: 'mustache', includeNodeIds: true });
     const domSplit = this.splitList(html, availableHeightPx);
 
     if (!domSplit.isSplit) {
@@ -51,15 +51,15 @@ export class ListFragmenter {
     if (domSplit.firstFragmentHtml) {
       const parsed1 = HtmlImporter.parseHtml(domSplit.firstFragmentHtml);
       firstNode = parsed1.body[0] && parsed1.body[0].type === 'list'
-        ? (parsed1.body[0] as ListNode)
-        : { ...list, id: `${list.id}_l1` };
+        ? { ...(parsed1.body[0] as ListNode), id: list.id }
+        : { ...list, id: list.id };
     }
 
     if (domSplit.remainingFragmentHtml) {
       const parsed2 = HtmlImporter.parseHtml(domSplit.remainingFragmentHtml);
       remainingNode = parsed2.body[0] && parsed2.body[0].type === 'list'
-        ? (parsed2.body[0] as ListNode)
-        : { ...list, id: `${list.id}_l2` };
+        ? { ...(parsed2.body[0] as ListNode), id: list.id }
+        : { ...list, id: list.id };
     }
 
     return {

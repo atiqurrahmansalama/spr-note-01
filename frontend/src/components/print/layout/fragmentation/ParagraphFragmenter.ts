@@ -36,7 +36,7 @@ export class ParagraphFragmenter {
     availableHeightPx: number,
     context?: MeasurementContext
   ): ParagraphSplitResult {
-    const html = HtmlExporter.serializeBlock(para, { tokenFormat: 'mustache' });
+    const html = HtmlExporter.serializeBlock(para, { tokenFormat: 'mustache', includeNodeIds: true });
     const domSplit = this.splitParagraph(html, availableHeightPx, context);
 
     if (!domSplit.isSplit) {
@@ -222,12 +222,33 @@ export class ParagraphFragmenter {
 
       const postFragment = postRange.extractContents();
 
-      // Create second paragraph fragment with identical tag and attributes
+      // Create second paragraph fragment with identical tag and attributes (avoiding duplicate DOM id)
       const p2 = document.createElement(el.tagName.toLowerCase());
       Array.from(el.attributes).forEach((attr) => {
-        p2.setAttribute(attr.name, attr.value);
+        if (attr.name.toLowerCase() !== 'id') {
+          p2.setAttribute(attr.name, attr.value);
+        }
       });
       p2.appendChild(postFragment);
+
+      const sourceId =
+        el.getAttribute('data-source-node-id') ||
+        el.getAttribute('data-source-id') ||
+        el.getAttribute('data-node-id') ||
+        el.id ||
+        'p_body';
+
+      clone.setAttribute('data-source-node-id', sourceId);
+      clone.setAttribute('data-source-id', sourceId);
+      clone.setAttribute('data-fragment-index', '0');
+      clone.setAttribute('data-fragment-total', '2');
+      clone.setAttribute('data-is-fragment', 'true');
+
+      p2.setAttribute('data-source-node-id', sourceId);
+      p2.setAttribute('data-source-id', sourceId);
+      p2.setAttribute('data-fragment-index', '1');
+      p2.setAttribute('data-fragment-total', '2');
+      p2.setAttribute('data-is-fragment', 'true');
 
       return {
         firstHtml: clone.outerHTML,
@@ -296,9 +317,16 @@ export class ParagraphFragmenter {
     const firstH = fittingLines * lineHeight;
     const remH = (totalLines - fittingLines) * lineHeight;
 
+    const sourceIdMatch = tagAttrs.match(/(?:data-source-node-id|data-source-id|data-node-id|id)=["']([^"']+)["']/i);
+    const sourceId = sourceIdMatch ? sourceIdMatch[1] : 'p_body';
+
+    const cleanAttrs = tagAttrs.replace(/\s*data-(?:source-node-id|source-id|fragment-index|fragment-total|is-fragment)=["'][^"']*["']/gi, '');
+    const firstAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="0" data-fragment-total="2" data-is-fragment="true"`;
+    const remAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="1" data-fragment-total="2" data-is-fragment="true"`;
+
     return {
-      firstFragmentHtml: `<${tagName}${tagAttrs}>${part1}</${tagName}>`,
-      remainingFragmentHtml: `<${tagName}${tagAttrs}>${part2}</${tagName}>`,
+      firstFragmentHtml: `<${tagName}${firstAttrs}>${part1}</${tagName}>`,
+      remainingFragmentHtml: `<${tagName}${remAttrs}>${part2}</${tagName}>`,
       firstFragmentHeight: firstH,
       remainingFragmentHeight: remH,
       isSplit: true,

@@ -12,6 +12,8 @@ import {
   separateDocxStylesAndBody,
 } from '../docxTemplateEngine';
 import { PaginationEngine } from '../layout/pagination/PaginationEngine';
+import { ControlledLayoutPipeline } from '../layout/measurement/ControlledLayoutPipeline';
+import { FontLoadingCoordinator } from '../layout/performance/FontLoadingCoordinator';
 import { sanitizeLogicalDocumentHtml } from '../layout/logicalDocument';
 import {
   getDefaultTemplateForScope,
@@ -630,10 +632,9 @@ export function usePrintDocxEngine({
     };
   }, [customDocxTemplate, mergedDocuments, enrichedRecords, contextEnrichedBaseRecord, scopeId]);
 
-  // 3. Downstream Paginated Layout Pages: Each logical document is paginated independently
-  const docxLayoutPages = useMemo<{ docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[]>(() => {
+  // 3. Downstream Paginated Layout Pages: Controlled layout effect pipeline
+  const [docxLayoutPages, setDocxLayoutPages] = useState<{ docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[]>(() => {
     if (!customDocxTemplate || mergedDocuments.length === 0) return [];
-
     const styles = customDocxTemplate?.styles || docxStyles;
     const paginationOpts = {
       pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
@@ -642,10 +643,9 @@ export function usePrintDocxEngine({
       customMarginsMm: options.customMarginsMm,
       density: options.density,
       styles,
+      pureCalculation: true,
     };
-
     const allPages: { docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[] = [];
-
     mergedDocuments.forEach((docHtml, docIdx) => {
       const layoutResult = PaginationEngine.paginate(docHtml, paginationOpts);
       layoutResult.pages.forEach((page) => {
@@ -658,8 +658,60 @@ export function usePrintDocxEngine({
         });
       });
     });
-
     return allPages;
+  });
+
+  const [docxTotalPages, setDocxTotalPages] = useState<number>(() => {
+    if (!customDocxTemplate) return 1;
+    if (typeof customDocxTemplate.totalPages === 'number' && customDocxTemplate.totalPages > 0) {
+      return customDocxTemplate.totalPages;
+    }
+    return Math.max(1, docxLayoutPages.length);
+  });
+
+  // Controlled Layout Pipeline: Asynchronous browser layout after DOM and web fonts settle
+  const runMergePagination = useCallback(async () => {
+    if (!customDocxTemplate || mergedDocuments.length === 0) {
+      setDocxLayoutPages([]);
+      setDocxTotalPages(1);
+      return;
+    }
+
+    await FontLoadingCoordinator.waitForFontsReady().catch(() => {});
+
+    const styles = customDocxTemplate?.styles || docxStyles;
+    const paginationOpts = {
+      pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+      orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
+      margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+      customMarginsMm: options.customMarginsMm,
+      density: options.density,
+      styles,
+    };
+
+    const allPages: { docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[] = [];
+    let calculatedTotal = 0;
+
+    mergedDocuments.forEach((docHtml, docIdx) => {
+      const layoutResult = PaginationEngine.paginate(docHtml, paginationOpts);
+      calculatedTotal += layoutResult.totalPages;
+      layoutResult.pages.forEach((page) => {
+        const pageHtml = styles && !page.htmlContent.includes('<style') ? `${styles}\n${page.htmlContent.trim()}` : page.htmlContent.trim();
+        allPages.push({
+          docIndex: docIdx,
+          pageNumber: page.pageNumber,
+          htmlContent: pageHtml,
+          totalDocPages: layoutResult.totalPages,
+        });
+      });
+    });
+
+    setDocxLayoutPages(allPages);
+    setDocxTotalPages(
+      typeof customDocxTemplate.totalPages === 'number' && customDocxTemplate.totalPages > 0
+        ? customDocxTemplate.totalPages
+        : Math.max(1, calculatedTotal || allPages.length)
+    );
   }, [
     customDocxTemplate,
     mergedDocuments,
@@ -667,20 +719,32 @@ export function usePrintDocxEngine({
     options.pageSize,
     options.orientation,
     options.margin,
-    options.customMarginsMm,
+    JSON.stringify(options.customMarginsMm),
     options.density,
   ]);
+
+  useEffect(() => {
+    const rafHandle = ControlledLayoutPipeline.scheduleLayoutPass(runMergePagination);
+    return () => {
+      rafHandle.cancel();
+    };
+  }, [runMergePagination]);
+
+  // Font Readiness & Dynamic Font Loading Subscription
+  useEffect(() => {
+    const unsubscribe = FontLoadingCoordinator.onFontsLoaded(() => {
+      ControlledLayoutPipeline.scheduleLayoutPass(runMergePagination);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [runMergePagination]);
 
   // Derived array of rendered page strings (for backward compatibility)
   const mergedDocxPages = useMemo<string[]>(() => {
     return docxLayoutPages.map((p) => p.htmlContent);
   }, [docxLayoutPages]);
-
-  // Derived total pages for DocLab custom template reflecting true multi-document pagination
-  const docxTotalPages = useMemo<number>(() => {
-    if (!customDocxTemplate) return 1;
-    return Math.max(1, docxLayoutPages.length);
-  }, [customDocxTemplate, docxLayoutPages]);
 
 
   // Handle template selection

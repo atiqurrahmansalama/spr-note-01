@@ -1,14 +1,15 @@
 /**
- * PaginatedDocumentEditor
+ * PagedEditorSurface.tsx
  *
- * Authoritative Word-Grade Document Editor for SPR Note DocLab.
+ * Dedicated Authoritative Word-Grade Single-Host Paginated Editing Surface.
  *
- * Core Architectural Invariants:
- * 1. Exactly ONE logical editing host (contentEditable="true") for the entire document.
- * 2. Visual page sheets are derived runtime layout projections rendered as real physical A4 sheets with 32px gaps.
- * 3. Native browser selection works seamlessly across all pages (Ctrl+A selects entire document).
- * 4. Zero runtime pagination artifacts, spacers, or sheet tags are saved in canonical content.
- * 5. All mutations flow through transactional editor commands.
+ * Core Architectural Invariant (SECTION 3):
+ * 1. Contains EXACTLY ONE <div contentEditable="true"> root for the entire document.
+ * 2. Visual page shells (<div data-runtime-page="0">, <div data-runtime-page="1">...)
+ *    are runtime visual containers INSIDE the ONE logical editing host.
+ * 3. Individual page shells are NEVER given independent contentEditable="true".
+ * 4. Each page shell represents an actual physical paper sheet with real dimensions and 32px gaps.
+ * 5. Extraction and serialization unwraps [data-runtime-page] shells to yield pure canonical content.
  */
 
 import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
@@ -29,7 +30,7 @@ import { PageBreakIcon } from '../../../ui/Icons';
 import { RunningHeader, RunningFooter, RuntimeVariableResolver } from '../chrome';
 import { LayoutFragmentRenderer } from '../render/LayoutFragmentRenderer';
 
-export interface PaginatedDocumentEditorProps {
+export interface PagedEditorSurfaceProps {
   /** Initial canonical HTML content or template body */
   htmlContent?: string;
   /** Shared document CSS styles */
@@ -42,19 +43,11 @@ export interface PaginatedDocumentEditorProps {
   options?: LayoutDocumentOptions;
   /** Additional container CSS class */
   className?: string;
-  /** Current page index if single-page mode */
-  pageIndex?: number;
-  /** Total pages count */
-  totalPages?: number;
-  /** Transparent background mode */
-  transparentBackground?: boolean;
-  /** Add next page callback */
-  onAddNextPage?: () => void;
   /** Debug layout inspector flag */
   debugLayout?: boolean;
 }
 
-export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorProps> = ({
+export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
   htmlContent = '<p><br></p>',
   styles = '',
   isEditable = true,
@@ -63,7 +56,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   className = '',
   debugLayout = false,
 }) => {
-  // Exactly ONE logical editing host
+  // Exactly ONE authoritative logical editing host for the whole document
   const editorHostRef = useRef<HTMLDivElement>(null);
   const isInternalChangeRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
@@ -110,10 +103,16 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
   // Cache previous layout for incremental reflow passes
   const prevLayoutRef = useRef<LayoutDocument | null>(null);
-  const rafIdRef = useRef<number | null>(null);
 
   // Logical Selection preservation across dynamic layout reflows (typing, font size, margins, orientation, page size)
   const pendingLogicalSelectionRef = useRef<any>(null);
+
+  // Synchronize web font loading to prevent FOUT and subpixel measurement glitches
+  useEffect(() => {
+    FontLoadingCoordinator.waitForFontsReady().catch(() => {});
+  }, [options.fontFamily]);
+
+  const rafIdRef = useRef<number | null>(null);
 
   // Controlled Layout State: Initial pure layout without DOM mutation during render
   const [paginationResult, setPaginationResult] = useState<PaginationEngineResult>(() => {
@@ -211,7 +210,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const layoutDoc = paginationResult.document;
   const totalPagesCount = Math.max(1, paginationResult.totalPages || layoutDoc.pages.length || 1);
 
-  // 3. Initial Mount and External Sync (e.g. template selection, undo from top toolbar)
+  // 3. Initial Mount and External Sync
   useEffect(() => {
     if (!editorHostRef.current) return;
 
@@ -466,188 +465,157 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
   return (
     <div
-      className={`paginated-document-editor relative flex flex-col items-center select-text ${className}`}
+      className={`paged-editor-surface-container relative flex flex-col items-center select-text ${className}`}
       style={{
         width: '100%',
         maxWidth: '100%',
       }}
     >
-      {/* Visual Multi-Sheet Page Projections Background / Frames */}
+      {/* Top Global Document Flow Control Bar */}
       <div
-        className="relative flex flex-col items-center gap-8 print:gap-0 print:block"
+        style={{ width: `${pageGeometry.paperDimensionsPx.width}px` }}
+        className="flex items-center justify-between px-2 py-1 mb-2 text-xs theme-text-secondary select-none print:hidden"
+      >
+        <div className="flex items-center gap-2 font-medium">
+          <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+          <span className="font-bold theme-text-primary font-mono text-[11.5px]">
+            Document Flow ({totalPagesCount} {totalPagesCount === 1 ? 'Page' : 'Pages'} • {options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
+          </span>
+          <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
+            {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
+          </span>
+          {debugLayout && (
+            <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-sm font-mono">
+              Total Pages: {totalPagesCount}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (editorHostRef.current) {
+              const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
+              dispatchTransaction(tx);
+            }
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
+          title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
+        >
+          <PageBreakIcon className="w-3.5 h-3.5" />
+          <span>+ Page Break</span>
+        </button>
+      </div>
+
+      {/* EXACTLY ONE Continuous contentEditable Editing Host Root for the Entire Document */}
+      <div
+        ref={editorHostRef}
+        contentEditable={isEditable}
+        suppressContentEditableWarning={true}
+        data-doclab-single-host="true"
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        className="paged-editor-surface doclab-single-host-editor flex flex-col items-center gap-8 print:gap-0 print:block outline-none text-left select-text cursor-text leading-relaxed font-sans"
         style={{
           width: `${pageGeometry.paperDimensionsPx.width}px`,
           maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+          outline: 'none',
+          boxSizing: 'border-box',
         }}
       >
-        {/* Render each calculated LayoutPage as an independent physical paper card */}
+        {/* RUNTIME PAGE SHELLS INSIDE THE ONE EDITABLE HOST */}
         {layoutDoc.pages.map((page, pageIndex) => {
           const pageNum = page.pageNumber || pageIndex + 1;
-          const isFirst = pageIndex === 0;
           const runtimeVars = RuntimeVariableResolver.buildVariables(pageIndex, totalPagesCount, {
             documentTitle: options.title || 'Official Document',
           });
 
           return (
             <div
-              key={`doclab_physical_sheet_${page.index}`}
+              key={`doclab_runtime_page_shell_${page.index}`}
               id={`docx-live-page-${page.index}`}
-              className="paper-sheet-wrapper flex flex-col items-center group relative mb-8 print:mb-0 print:block"
+              data-doclab-runtime-page="true"
+              data-runtime-page={page.index}
+              data-page-index={page.index}
+              className="doclab-runtime-page-shell paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col justify-between mb-8 print:mb-0"
+              data-size={options.pageSize || 'A4'}
+              data-orientation={options.orientation || 'PORTRAIT'}
+              data-margin={options.margin || 'NORMAL'}
+              data-density={options.density || 'NORMAL'}
+              data-page-break="true"
               style={{
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
                 width: `${pageGeometry.paperDimensionsPx.width}px`,
                 maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+                minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+                height: `${pageGeometry.paperDimensionsPx.height}px`,
+                maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+                padding: pageGeometry.cssMarginString,
+                boxSizing: 'border-box',
+                textAlign: 'left',
+                overflow: 'hidden',
               }}
             >
-              {/* Screen-Only Top Physical Page Header Bar */}
+              {/* Top Page Badge inside Shell */}
               <div
-                style={{ width: `${pageGeometry.paperDimensionsPx.width}px` }}
-                className="flex items-center justify-between px-2 py-1 mb-1 text-xs theme-text-secondary select-none print:hidden w-full"
+                className="w-full flex items-center justify-between pb-1.5 mb-1 border-b theme-border text-[10.5px] font-mono theme-text-muted select-none print:hidden shrink-0"
+                contentEditable={false}
               >
-                <div className="flex items-center gap-2 font-medium">
-                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
-                  <span className="font-bold theme-text-primary font-mono text-[11.5px]">
-                    Page {pageNum} of {totalPagesCount} ({options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
-                  </span>
-                  <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
-                    {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
-                  </span>
-                  {debugLayout && (
-                    <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-sm font-mono">
-                      Used: {Math.round(page.usedHeight)}px • Rem: {Math.round(page.availableHeight)}px
-                    </span>
-                  )}
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary">
+                  <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
+                  <span>Page {pageNum} of {totalPagesCount}</span>
                 </div>
-                {isFirst && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editorHostRef.current) {
-                        const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
-                        dispatchTransaction(tx);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
-                    title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
-                  >
-                    <PageBreakIcon className="w-3.5 h-3.5" />
-                    <span>+ Page Break</span>
-                  </button>
-                )}
+                <span>{Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px</span>
               </div>
 
-              {/* Physical Paper Sheet Surface */}
+              {/* 1. Running Header Zone */}
+              {options.headerConfig && (
+                <div className="w-full relative z-10 shrink-0 overflow-hidden" contentEditable={false}>
+                  <RunningHeader
+                    variables={runtimeVars}
+                    config={options.headerConfig}
+                  />
+                </div>
+              )}
+
+              {/* 2. Printable Flow Content Area for this Page */}
               <div
-                className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col justify-between"
-                data-size={options.pageSize || 'A4'}
-                data-orientation={options.orientation || 'PORTRAIT'}
-                data-margin={options.margin || 'NORMAL'}
-                data-density={options.density || 'NORMAL'}
-                data-page-index={page.index}
-                data-page-break="true"
+                className="doclab-runtime-page-content doclab-page-content-slot w-full flex-1 relative z-10 text-left select-text overflow-hidden"
                 style={{
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  width: `${pageGeometry.paperDimensionsPx.width}px`,
-                  maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-                  minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                  height: `${pageGeometry.paperDimensionsPx.height}px`,
-                  maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                  padding: pageGeometry.cssMarginString,
-                  boxSizing: 'border-box',
-                  textAlign: 'left',
-                  overflow: 'hidden',
+                  minHeight: `${page.contentArea.height}px`,
+                  maxHeight: `${page.contentArea.height}px`,
+                  height: `${page.contentArea.height}px`,
                 }}
               >
-                {/* 1. Running Header Zone */}
-                {options.headerConfig && (
-                  <div className="w-full relative z-10 shrink-0 overflow-hidden">
-                    <RunningHeader
-                      variables={runtimeVars}
-                      config={options.headerConfig}
-                    />
-                  </div>
-                )}
-
-                {/* 2. Printable Content Flow Area */}
-                <div
-                  className="w-full flex-1 relative z-10 text-left select-text overflow-hidden"
-                  style={{
-                    minHeight: `${page.contentArea.height}px`,
-                    maxHeight: `${page.contentArea.height}px`,
-                    height: `${page.contentArea.height}px`,
-                  }}
-                >
-                  {isFirst && totalPagesCount === 1 ? (
-                    /* The Single Authoritative contentEditable Host on 1-Page documents */
-                    <div
-                      ref={editorHostRef}
-                      contentEditable={isEditable}
-                      suppressContentEditableWarning={true}
-                      data-doclab-single-host="true"
-                      onInput={handleInput}
-                      onKeyDown={handleKeyDown}
-                      className="doclab-single-host-editor min-h-[400px] outline-none text-left select-text cursor-text leading-relaxed font-sans"
-                      style={{
-                        width: '100%',
-                        minHeight: '100%',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                        wordBreak: 'break-word',
-                      }}
-                    />
-                  ) : isFirst ? (
-                    /* Multi-Page Document: First Page hosts the Authoritative contentEditable Host */
-                    <div className="relative w-full h-full">
-                      <div
-                        ref={editorHostRef}
-                        contentEditable={isEditable}
-                        suppressContentEditableWarning={true}
-                        data-doclab-single-host="true"
-                        onInput={handleInput}
-                        onKeyDown={handleKeyDown}
-                        className="doclab-single-host-editor min-h-[400px] outline-none text-left select-text cursor-text leading-relaxed font-sans"
-                        style={{
-                          width: '100%',
-                          minHeight: '100%',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                          wordBreak: 'break-word',
-                        }}
+                {page.fragments && page.fragments.length > 0 ? (
+                  <div className="layout-page-fragments flex flex-col w-full text-left select-text">
+                    {page.fragments.map((fragment) => (
+                      <LayoutFragmentRenderer
+                        key={fragment.id}
+                        fragment={fragment}
+                        styles={activeStyles}
                       />
-                    </div>
-                  ) : (
-                    /* Subsequent Physical Pages render their respective layout fragments */
-                    <div className="layout-page-fragments flex flex-col w-full text-left select-text">
-                      {page.fragments && page.fragments.length > 0 ? (
-                        page.fragments.map((fragment) => (
-                          <LayoutFragmentRenderer
-                            key={fragment.id}
-                            fragment={fragment}
-                            styles={activeStyles}
-                          />
-                        ))
-                      ) : (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: page.htmlContent || '<p><br></p>',
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Running Footer Zone */}
-                {options.footerConfig && (
-                  <div className="w-full relative z-10 shrink-0 overflow-hidden">
-                    <RunningFooter
-                      variables={runtimeVars}
-                      config={options.footerConfig}
-                      numeralSystem={options.numeralSystem}
-                    />
+                    ))}
                   </div>
+                ) : (
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: page.htmlContent || '<p><br></p>',
+                    }}
+                  />
                 )}
               </div>
+
+              {/* 3. Running Footer Zone */}
+              {options.footerConfig && (
+                <div className="w-full relative z-10 shrink-0 overflow-hidden" contentEditable={false}>
+                  <RunningFooter
+                    variables={runtimeVars}
+                    config={options.footerConfig}
+                    numeralSystem={options.numeralSystem}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -656,5 +624,5 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   );
 };
 
-export const PaginatedDocumentEditor = memo(PaginatedDocumentEditorComponent);
-export default PaginatedDocumentEditor;
+export const PagedEditorSurface = memo(PagedEditorSurfaceComponent);
+export default PagedEditorSurface;

@@ -96,6 +96,9 @@ export interface LayoutDocumentOptions {
   /** Dynamic scale factor (1 = 100%) */
   scale?: number;
 
+  /** Whether to perform pure non-mutating layout calculation (zero DOM mutations) */
+  pureCalculation?: boolean;
+
   /** Reserved header height in pixels (0 if no header) */
   headerHeightPx?: number;
 

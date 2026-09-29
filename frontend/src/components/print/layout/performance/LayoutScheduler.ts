@@ -22,6 +22,7 @@ export interface SchedulerOptions {
 
 export class LayoutScheduler {
   private static activeTasks = new Map<string, boolean>();
+  private static taskSeq: number = 0;
 
   /**
    * Schedules a chunked, time-budgeted asynchronous computation
@@ -32,7 +33,7 @@ export class LayoutScheduler {
     onComplete: () => TResult,
     options: SchedulerOptions = {}
   ): ScheduledTask<TResult> {
-    const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const taskId = `task_${++this.taskSeq}`;
     this.activeTasks.set(taskId, true);
 
     const timeBudget = options.timeBudgetMs ?? 12;

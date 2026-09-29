@@ -45,7 +45,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
       const container = document.createElement('div');
       container.innerHTML = rawHtml;
       const runtimeElements = container.querySelectorAll(
-        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper, [data-layout-perf="true"], [data-debug-overlay="true"], [data-diagnostics="true"], [data-diagnostics], .doclab-diagnostics-overlay, .spr-layout-diagnostics'
+        '[data-spr-runtime-pagination="true"], [data-doclab-runtime-chrome="true"], .doclab-runtime-chrome, .doclab-runtime-page-badge, .doclab-runtime-page-header, .doclab-runtime-page-footer, .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper, [data-layout-perf="true"], [data-debug-overlay="true"], [data-diagnostics="true"], [data-diagnostics], .doclab-diagnostics-overlay, .spr-layout-diagnostics'
       );
       runtimeElements.forEach((el) => el.parentNode?.removeChild(el));
       return container.innerHTML;
@@ -56,7 +56,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
 
   return rawHtml
     .replace(
-      /<div\b[^>]*?\b(?:spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper|doclab-diagnostics-overlay|spr-layout-diagnostics|data-spr-runtime-pagination|data-runtime-spacer|data-runtime-guide|data-layout-perf|data-debug-overlay|data-diagnostics)\b[^>]*?>[\s\S]*?<\/div>/gi,
+      /<div\b[^>]*?\b(?:doclab-runtime-chrome|doclab-runtime-page-badge|doclab-runtime-page-header|doclab-runtime-page-footer|spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper|doclab-diagnostics-overlay|spr-layout-diagnostics|data-spr-runtime-pagination|data-doclab-runtime-chrome|data-runtime-spacer|data-runtime-guide|data-layout-perf|data-debug-overlay|data-diagnostics)\b[^>]*?>[\s\S]*?<\/div>/gi,
       ''
     )
     .replace(/<!--\s*[\s\S]*?(?:runtime|diagnostics)[\s\S]*?-->/gi, '');
@@ -104,57 +104,70 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
     );
   }
 
-  if (node && typeof node === 'object' && 'nodeType' in node) {
-    if (node.nodeType === COMMENT_NODE_TYPE) {
-      const val = (node.nodeValue || '').trim().toLowerCase();
-      return (
-        val === 'spr-page-break:manual' ||
-        val === 'manual-page-break' ||
-        val === 'spr-page-break' ||
-        val === 'docx_page_break' ||
-        val === 'docx-page-break' ||
-        val === 'page-break'
-      );
+  if (node && typeof node === 'object') {
+    // 1. AST BlockNode / SourceNode / Layout item object
+    if (
+      ('type' in node && (node.type === 'manual-page-break' || (node as any).type === 'manual_page_break')) ||
+      ('isManualBreak' in node && Boolean((node as any).isManualBreak)) ||
+      ('explicitBreak' in node && Boolean((node as any).explicitBreak)) ||
+      ('nodeType' in node && (node as any).nodeType === 'manual-page-break')
+    ) {
+      return true;
     }
 
-    if (node.nodeType === ELEMENT_NODE_TYPE) {
-      const el = node as HTMLElement;
-    if (
-      el.getAttribute &&
-      (el.getAttribute('data-spr-runtime-pagination') === 'true' ||
-        el.getAttribute('data-runtime-spacer') === 'true' ||
-        el.getAttribute('data-runtime-guide') === 'true' ||
-        el.getAttribute('data-page-break') === 'auto')
-    ) {
-      return false;
-    }
-    if (
-      el.classList &&
-      (el.classList.contains('spr-runtime-page-spacer') || el.classList.contains('spr-runtime-page-guide'))
-    ) {
-      return false;
-    }
-    if (
-      el.getAttribute &&
-      (el.getAttribute('data-manual-break') === 'true' ||
-        el.getAttribute('data-manual') === 'true' ||
-        el.getAttribute('data-page-break') === 'manual')
-    ) {
-      return true;
-    }
-    if (
-      el.classList &&
-      (el.classList.contains('docx_page_break') || el.classList.contains('docx-page-break'))
-    ) {
-      return true;
-    }
-    const style = (el.getAttribute && el.getAttribute('style')) || '';
-    if (
-      /page-break-(?:after|before)\s*:\s*always/i.test(style) ||
-      /break-(?:after|before)\s*:\s*page/i.test(style)
-    ) {
-      return true;
-    }
+    // 2. DOM Node
+    if ('nodeType' in node) {
+      if (node.nodeType === COMMENT_NODE_TYPE) {
+        const val = (node.nodeValue || '').trim().toLowerCase();
+        return (
+          val === 'spr-page-break:manual' ||
+          val === 'manual-page-break' ||
+          val === 'spr-page-break' ||
+          val === 'docx_page_break' ||
+          val === 'docx-page-break' ||
+          val === 'page-break'
+        );
+      }
+
+      if (node.nodeType === ELEMENT_NODE_TYPE) {
+        const el = node as HTMLElement;
+        if (
+          el.getAttribute &&
+          (el.getAttribute('data-spr-runtime-pagination') === 'true' ||
+            el.getAttribute('data-runtime-spacer') === 'true' ||
+            el.getAttribute('data-runtime-guide') === 'true' ||
+            el.getAttribute('data-page-break') === 'auto')
+        ) {
+          return false;
+        }
+        if (
+          el.classList &&
+          (el.classList.contains('spr-runtime-page-spacer') || el.classList.contains('spr-runtime-page-guide'))
+        ) {
+          return false;
+        }
+        if (
+          el.getAttribute &&
+          (el.getAttribute('data-manual-break') === 'true' ||
+            el.getAttribute('data-manual') === 'true' ||
+            el.getAttribute('data-page-break') === 'manual')
+        ) {
+          return true;
+        }
+        if (
+          el.classList &&
+          (el.classList.contains('docx_page_break') || el.classList.contains('docx-page-break'))
+        ) {
+          return true;
+        }
+        const style = (el.getAttribute && el.getAttribute('style')) || '';
+        if (
+          /page-break-(?:after|before)\s*:\s*always/i.test(style) ||
+          /break-(?:after|before)\s*:\s*page/i.test(style)
+        ) {
+          return true;
+        }
+      }
     }
   }
 
@@ -189,9 +202,9 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
     const container = document.createElement('div');
     container.innerHTML = clean;
 
-    // 1. Unwrap any paper-sheet, page-index, or fragment wrappers
+    // 1. Unwrap any paper-sheet, runtime page-shell, page-index, or fragment wrappers
     const sheetWrappers = container.querySelectorAll(
-      '.paper-sheet, [data-page-index], [data-paper-sheet="true"], .spr-page-fragment'
+      '.paper-sheet, [data-page-index], [data-paper-sheet="true"], [data-runtime-page], .doclab-runtime-page-shell, .spr-page-fragment, .docx-layout-fragment, [data-fragment-id], [data-is-fragment]'
     );
     sheetWrappers.forEach((sheet) => {
       while (sheet.firstChild) {

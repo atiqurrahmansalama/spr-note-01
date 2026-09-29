@@ -138,13 +138,22 @@ export class PageGeometryCalculator {
    * Primary Calculator: computes complete spatial page geometry
    */
   public static calculate(options: LayoutDocumentOptions = {}): PageGeometry {
-    const pageSize = options.pageSize || 'A4';
+    const rawPageSize = ((options.pageSize || (options as any).paperSize || 'A4') as string).toUpperCase();
+    const pageSize: PageSizeId = (rawPageSize as any);
     const orientation = options.orientation || 'PORTRAIT';
+    const customPaperDimensionsMm = options.customPaperDimensionsMm || (
+      (options as any).customWidthMm !== undefined || (options as any).customHeightMm !== undefined
+        ? {
+            width: (options as any).customWidthMm !== undefined ? (options as any).customWidthMm : 210,
+            height: (options as any).customHeightMm !== undefined ? (options as any).customHeightMm : 297,
+          }
+        : undefined
+    );
 
     const { mm: paperDimensionsMm, px: paperDimensionsPx } = this.resolveDimensions(
       pageSize,
       orientation,
-      options.customPaperDimensionsMm
+      customPaperDimensionsMm
     );
 
     const { mm: marginsMm, px: marginsPx, css: cssMarginString } = this.resolveMargins(

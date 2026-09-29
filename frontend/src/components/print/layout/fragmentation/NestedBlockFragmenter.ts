@@ -71,7 +71,7 @@ export class NestedBlockFragmenter {
     if (firstChildren.length === 0) {
       return {
         firstFragmentHtml: '',
-        remainingFragmentHtml: HtmlExporter.serializeBlock(section),
+        remainingFragmentHtml: HtmlExporter.serializeBlock(section, { includeNodeIds: true }),
         firstFragmentHeight: 0,
         remainingFragmentHeight: accumulatedH,
         firstFragmentNode: undefined,
@@ -82,20 +82,20 @@ export class NestedBlockFragmenter {
 
     const firstSection: SectionNode = {
       ...section,
-      id: `${section.id}_s1`,
+      id: section.id,
       content: firstChildren,
     };
 
     const remSection: SectionNode | null = remChildren.length > 0
       ? {
           ...section,
-          id: `${section.id}_s2`,
+          id: section.id,
           content: remChildren,
         }
       : null;
 
-    const firstHtml = HtmlExporter.serializeBlock(firstSection);
-    const remHtml = remSection ? HtmlExporter.serializeBlock(remSection) : null;
+    const firstHtml = HtmlExporter.serializeBlock(firstSection, { includeNodeIds: true });
+    const remHtml = remSection ? HtmlExporter.serializeBlock(remSection, { includeNodeIds: true }) : null;
 
     return {
       firstFragmentHtml: firstHtml,

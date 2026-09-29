@@ -51,7 +51,7 @@ export class TableFragmenter {
     const totalHeight = headerHeight + dataRows.length * avgRowHeight;
 
     if (totalHeight <= availableHeightPx) {
-      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache' });
+      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache', includeNodeIds: true });
       return {
         firstFragmentHtml: html,
         remainingFragmentHtml: null,
@@ -66,7 +66,7 @@ export class TableFragmenter {
     }
 
     if (availableHeightPx < headerHeight + avgRowHeight) {
-      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache' });
+      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache', includeNodeIds: true });
       return {
         firstFragmentHtml: '',
         remainingFragmentHtml: html,
@@ -98,14 +98,15 @@ export class TableFragmenter {
       rows: [...headerRows, ...remainingDataRows],
     };
 
-    const firstHtml = HtmlExporter.serializeBlock(firstTableNode, { tokenFormat: 'mustache' });
+    const firstHtml = HtmlExporter.serializeBlock(firstTableNode, { tokenFormat: 'mustache', includeNodeIds: true });
+    const remHtml = remainingDataRows.length > 0 ? HtmlExporter.serializeBlock(remainingTableNode, { tokenFormat: 'mustache', includeNodeIds: true }) : null;
 
     const firstH = headerHeight + firstDataRows.length * avgRowHeight;
     const remH = headerHeight + remainingDataRows.length * avgRowHeight;
 
     return {
       firstFragmentHtml: firstHtml,
-      remainingFragmentHtml: null,
+      remainingFragmentHtml: remHtml,
       firstFragmentHeight: firstH,
       remainingFragmentHeight: remH,
       rowsOnFirstPage: firstDataRows.length,
@@ -253,26 +254,85 @@ export class TableFragmenter {
   ): { firstPart: string; remainingPart: string } | null {
     if (!trHtml) return null;
     try {
-      const tdMatch = trHtml.match(/<td([^>]*)>([\s\S]*?)<\/td>/i);
-      if (!tdMatch) return null;
+      if (
+        trHtml.includes('keep-together') ||
+        trHtml.includes('print-avoid-break') ||
+        /page-break-inside\s*:\s*avoid/i.test(trHtml)
+      ) {
+        return null;
+      }
 
-      const cellContent = tdMatch[2];
-      const textLen = cellContent.replace(/<[^>]+>/g, '').length;
-      if (textLen < 60) return null;
+      const cellRegex = /<(td|th)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+      const cells: { tag: string; attrs: string; content: string; fullMatch: string; textLen: number }[] = [];
+      let match: RegExpExecArray | null;
 
-      // Estimate characters fitting availableSpacePx (~40 chars per 24px line)
-      const allowedLines = Math.max(1, Math.floor(availableSpacePx / 24));
-      const splitCharOffset = Math.min(textLen - 20, allowedLines * 45);
+      while ((match = cellRegex.exec(trHtml)) !== null) {
+        const tag = match[1];
+        const attrs = match[2];
+        const content = match[3];
+        const textLen = content.replace(/<[^>]+>/g, '').length;
+        cells.push({ tag, attrs, content, fullMatch: match[0], textLen });
+      }
 
-      if (splitCharOffset <= 20) return null;
+      if (cells.length === 0) return null;
 
-      const firstText = cellContent.slice(0, splitCharOffset);
-      const remText = cellContent.slice(splitCharOffset);
+      let maxIdx = 0;
+      let maxLen = 0;
+      cells.forEach((c, idx) => {
+        if (c.textLen > maxLen) {
+          maxLen = c.textLen;
+          maxIdx = idx;
+        }
+      });
 
-      const firstRow = trHtml.replace(cellContent, firstText);
-      const remRow = trHtml.replace(cellContent, remText);
+      if (maxLen < 40) return null;
 
-      return { firstPart: firstRow, remainingPart: remRow };
+      const targetCell = cells[maxIdx];
+      const allowedLines = Math.max(1, Math.floor(availableSpacePx / 22));
+      const splitCharOffset = Math.min(targetCell.textLen - 15, allowedLines * 40);
+
+      if (splitCharOffset <= 15) return null;
+
+      let cutPos = splitCharOffset;
+      const searchWindow = targetCell.content.slice(
+        Math.max(0, splitCharOffset - 20),
+        Math.min(targetCell.content.length, splitCharOffset + 20)
+      );
+      const spaceOffset = searchWindow.lastIndexOf(' ');
+      if (spaceOffset !== -1) {
+        cutPos = Math.max(0, splitCharOffset - 20) + spaceOffset;
+      }
+
+      const firstContent = targetCell.content.slice(0, cutPos).trim();
+      const remContent = targetCell.content.slice(cutPos).trim();
+
+      if (!firstContent || !remContent) return null;
+
+      const firstCellsHtml = cells
+        .map((c, idx) => {
+          if (idx === maxIdx) {
+            return `<${c.tag}${c.attrs}>${firstContent}</${c.tag}>`;
+          }
+          return c.fullMatch;
+        })
+        .join('');
+
+      const remCellsHtml = cells
+        .map((c, idx) => {
+          if (idx === maxIdx) {
+            return `<${c.tag}${c.attrs}>${remContent}</${c.tag}>`;
+          }
+          return `<${c.tag}${c.attrs}></${c.tag}>`;
+        })
+        .join('');
+
+      const trOpenMatch = trHtml.match(/<tr\b[^>]*>/i);
+      const trOpen = trOpenMatch ? trOpenMatch[0] : '<tr>';
+
+      return {
+        firstPart: `${trOpen}${firstCellsHtml}</tr>`,
+        remainingPart: `${trOpen}${remCellsHtml}</tr>`,
+      };
     } catch {
       return null;
     }
@@ -289,22 +349,38 @@ export class TableFragmenter {
     const raw = html.trim();
     const theadMatch = raw.match(/<thead[\s\S]*?<\/thead>/i);
     const headerHtml = theadMatch ? theadMatch[0] : '';
+    const tfootMatch = raw.match(/<tfoot[\s\S]*?<\/tfoot>/i);
+    const footerHtml = tfootMatch ? tfootMatch[0] : '';
+    const colgroupMatch = raw.match(/<colgroup[\s\S]*?<\/colgroup>/i);
+    const colgroupHtml = colgroupMatch ? colgroupMatch[0] : '';
+
     const trMatches = raw.match(/<tr[\s\S]*?<\/tr>/gi) || [];
     const isFirstTrHeader = !theadMatch && trMatches.length > 0 && /<th/i.test(trMatches[0]);
     const headerTrs = theadMatch ? (headerHtml.match(/<tr[\s\S]*?<\/tr>/gi) || []) : isFirstTrHeader ? [trMatches[0]] : [];
-    const dataTrs = trMatches.slice(headerTrs.length);
+    const footerTrs = tfootMatch ? (footerHtml.match(/<tr[\s\S]*?<\/tr>/gi) || []) : [];
+    const dataTrs = trMatches.filter((tr) => !headerTrs.includes(tr) && !footerTrs.includes(tr));
 
+    const fontSize = context?.fontSizePx || 14;
     let headerHeight = 0;
     for (const tr of headerTrs) {
       const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
-      headerHeight += trH ? parseInt(trH[1], 10) : 36;
+      const textLen = tr.replace(/<[^>]+>/g, '').length;
+      const dynamicH = Math.max(Math.round(fontSize * 2), Math.ceil(textLen / 35) * Math.round(fontSize * 1.5));
+      headerHeight += trH ? parseInt(trH[1], 10) : dynamicH;
     }
 
     const rowMeasurements = dataTrs.map((tr) => {
       const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
+      const textLen = tr.replace(/<[^>]+>/g, '').length;
+      const dynamicH = Math.max(Math.round(fontSize * 2), Math.ceil(textLen / 35) * Math.round(fontSize * 1.5));
+      const isKeepTogether =
+        tr.includes('print-avoid-break') ||
+        tr.includes('keep-together') ||
+        /page-break-inside\s*:\s*avoid/i.test(tr);
       return {
         html: tr,
-        height: trH ? parseInt(trH[1], 10) : 36,
+        height: trH ? parseInt(trH[1], 10) : dynamicH,
+        isKeepTogether,
       };
     });
 
@@ -318,19 +394,6 @@ export class TableFragmenter {
         remainingFragmentHeight: 0,
         rowsOnFirstPage: dataTrs.length,
         remainingRowsCount: 0,
-        isSplit: false,
-      };
-    }
-
-    const firstRowH = rowMeasurements.length > 0 ? rowMeasurements[0].height : 36;
-    if (availableHeightPx < headerHeight + firstRowH) {
-      return {
-        firstFragmentHtml: '',
-        remainingFragmentHtml: raw,
-        firstFragmentHeight: 0,
-        remainingFragmentHeight: totalHeight,
-        rowsOnFirstPage: 0,
-        remainingRowsCount: dataTrs.length,
         isSplit: false,
       };
     }
@@ -354,13 +417,53 @@ export class TableFragmenter {
       }
     }
 
+    // Handle oversized single row on first page
+    if (firstRows.length === 0 && rowMeasurements.length > 0 && availableHeightPx >= headerHeight + 36) {
+      const oversized = this.splitOversizedRow(rowMeasurements[0].html, availableHeightPx - headerHeight);
+      if (oversized) {
+        firstRows.push(oversized.firstPart);
+        remRows.unshift(oversized.remainingPart);
+        accumulatedH += (availableHeightPx - headerHeight);
+      }
+    }
+
+    if (firstRows.length === 0) {
+      return {
+        firstFragmentHtml: '',
+        remainingFragmentHtml: raw,
+        firstFragmentHeight: 0,
+        remainingFragmentHeight: totalHeight,
+        rowsOnFirstPage: 0,
+        remainingRowsCount: dataTrs.length,
+        isSplit: false,
+      };
+    }
+
     const tableAttrsMatch = raw.match(/<table([^>]*)>/i);
     const tableAttrs = tableAttrsMatch ? ` ${tableAttrsMatch[1].trim()}` : '';
-    const theadBlock = headerTrs.length > 0 ? `<thead>${headerTrs.join('')}</thead>` : '';
+    const theadBlock = headerTrs.length > 0 ? (theadMatch ? theadMatch[0] : `<thead>${headerTrs.join('')}</thead>`) : '';
+    const tfootBlock = footerHtml ? footerHtml : '';
 
-    const firstTableHtml = `<table${tableAttrs}>${theadBlock}<tbody>${firstRows.join('')}</tbody></table>`;
-    const remTableHtml = remRows.length > 0 ? `<table${tableAttrs}>${theadBlock}<tbody>${remRows.join('')}</tbody></table>` : null;
-    const remHeight = remRows.length > 0 ? headerHeight + remRows.reduce((sum, r) => sum + (r.match(/(?:min-)?height:\s*(\d+)px/i) ? parseInt(r.match(/(?:min-)?height:\s*(\d+)px/i)![1], 10) : 36), 0) : 0;
+    const firstTableHtml = `<table${tableAttrs}>${colgroupHtml}${theadBlock}<tbody>${firstRows.join('')}</tbody></table>`;
+    const remTableHtml =
+      remRows.length > 0
+        ? `<table${tableAttrs} data-table-continuation="true">${colgroupHtml}${theadBlock}<tbody>${remRows.join('')}</tbody>${tfootBlock}</table>`
+        : null;
+
+    const remHeight =
+      remRows.length > 0
+        ? headerHeight +
+          remRows.reduce((sum, r) => {
+            const matchH = r.match(/(?:min-)?height:\s*(\d+)px/i);
+            const textL = r.replace(/<[^>]+>/g, '').length;
+            return (
+              sum +
+              (matchH
+                ? parseInt(matchH[1], 10)
+                : Math.max(Math.round(fontSize * 2), Math.ceil(textL / 35) * Math.round(fontSize * 1.5)))
+            );
+          }, 0)
+        : 0;
 
     return {
       firstFragmentHtml: firstTableHtml,

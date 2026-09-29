@@ -113,23 +113,26 @@ export class HtmlImporter {
       blocks.push(...this.parseHtmlRegex(cleanHtml));
     }
 
+    // Merge split page fragments back into single logical blocks
+    const mergedBlocks = this.mergeConsecutiveFragments(blocks);
+
     // Ensure at least one paragraph exists
-    if (blocks.length === 0) {
-      blocks.push(DocumentFactory.createParagraph({ content: [DocumentFactory.createText('')] }));
+    if (mergedBlocks.length === 0) {
+      mergedBlocks.push(DocumentFactory.createParagraph({ content: [DocumentFactory.createText('')] }));
     }
 
     return DocumentFactory.createDocument({
       id: options.id,
       title: options.title,
       metadata: options.metadata,
-      body: blocks,
+      body: mergedBlocks,
     });
   }
 
   /**
    * Converts a DOM node into an AST BlockNode
    */
-  private static parseDomNodeToBlock(node: Node): BlockNode | BlockNode[] | null {
+  public static parseDomNodeToBlock(node: Node): BlockNode | BlockNode[] | null {
     if (node.nodeType === 3) {
       // Text node at top level
       const text = node.nodeValue?.trim();
@@ -178,13 +181,19 @@ export class HtmlImporter {
     }
 
     const tag = el.tagName.toLowerCase();
+    const sourceNodeId =
+      el.getAttribute('data-source-node-id') ||
+      el.getAttribute('data-source-id') ||
+      el.getAttribute('data-node-id') ||
+      el.id ||
+      undefined;
 
     // 2. Headings (H1 - H6)
     if (/^h[1-6]$/.test(tag)) {
       const level = parseInt(tag[1], 10) as HeadingLevel;
       const content = this.parseInlineContent(el);
       const attributes = this.extractBlockAttributes(el);
-      return DocumentFactory.createHeading({ level, content, attributes });
+      return DocumentFactory.createHeading({ id: sourceNodeId, level, content, attributes });
     }
 
     // 3. Lists (UL / OL)
@@ -199,18 +208,23 @@ export class HtmlImporter {
       });
 
       const attributes = this.extractBlockAttributes(el);
-      return DocumentFactory.createList({ listType, items, attributes });
+      return DocumentFactory.createList({ id: sourceNodeId, listType, items, attributes });
     }
 
     // 4. Tables
     if (tag === 'table') {
-      return this.parseTableElement(el);
+      const tbl = this.parseTableElement(el);
+      if (sourceNodeId) {
+        tbl.id = sourceNodeId;
+      }
+      return tbl;
     }
 
     // 5. Images
     if (tag === 'img') {
       const imgEl = el as HTMLImageElement;
       return DocumentFactory.createImage({
+        id: sourceNodeId,
         src: imgEl.src || imgEl.getAttribute('src') || '',
         alt: imgEl.alt || undefined,
         title: imgEl.title || undefined,
@@ -222,6 +236,7 @@ export class HtmlImporter {
     // 6. SVG Vector Shapes
     if (tag === 'svg') {
       return DocumentFactory.createSvg({
+        id: sourceNodeId,
         svgContent: el.outerHTML,
         viewBox: el.getAttribute('viewBox') || undefined,
         width: el.getAttribute('width') || el.style.width || undefined,
@@ -240,6 +255,7 @@ export class HtmlImporter {
         enabled: true,
       }));
       return DocumentFactory.createSignature({
+        id: sourceNodeId,
         columns: columns.length > 0 ? columns : undefined,
       });
     }
@@ -253,7 +269,7 @@ export class HtmlImporter {
     if (tag === 'p') {
       const content = this.parseInlineContent(el);
       const attributes = this.extractBlockAttributes(el);
-      return DocumentFactory.createParagraph({ content, attributes });
+      return DocumentFactory.createParagraph({ id: sourceNodeId, content, attributes });
     }
 
     // 8. Containers (DIV, SECTION, ARTICLE, etc.)
@@ -822,21 +838,31 @@ export class HtmlImporter {
         return;
       }
 
+      // Extract explicit sourceNodeId or ID from tag
+      const idMatch = rawBlock.match(/(?:data-source-node-id|data-source-id|data-node-id|id)=["']([^"']+)["']/i);
+      const sourceId = idMatch ? idMatch[1] : undefined;
+
       // Tables
       if (/<table/i.test(rawBlock)) {
-        blocks.push(this.parseTableHtmlString(rawBlock));
+        const tbl = this.parseTableHtmlString(rawBlock);
+        if (sourceId) tbl.id = sourceId;
+        blocks.push(tbl);
         return;
       }
 
       // Ordered Lists
       if (/<ol/i.test(rawBlock)) {
-        blocks.push(this.parseListHtmlString(rawBlock, true));
+        const lst = this.parseListHtmlString(rawBlock, true);
+        if (sourceId) lst.id = sourceId;
+        blocks.push(lst);
         return;
       }
 
       // Unordered Lists
       if (/<ul/i.test(rawBlock)) {
-        blocks.push(this.parseListHtmlString(rawBlock, false));
+        const lst = this.parseListHtmlString(rawBlock, false);
+        if (sourceId) lst.id = sourceId;
+        blocks.push(lst);
         return;
       }
 
@@ -848,7 +874,7 @@ export class HtmlImporter {
         const innerContent = hMatch[3];
         const attributes = this.extractAttributesFromTag(tagAttrs);
         const inlines = this.parseInlineHtmlString(innerContent);
-        blocks.push(DocumentFactory.createHeading({ level, content: inlines, attributes }));
+        blocks.push(DocumentFactory.createHeading({ id: sourceId, level, content: inlines, attributes }));
         return;
       }
 
@@ -865,7 +891,7 @@ export class HtmlImporter {
         const innerContent = pMatch[2];
         const attributes = this.extractAttributesFromTag(tagAttrs);
         const inlines = this.parseInlineHtmlString(innerContent);
-        blocks.push(DocumentFactory.createParagraph({ content: inlines, attributes }));
+        blocks.push(DocumentFactory.createParagraph({ id: sourceId, content: inlines, attributes }));
         return;
       }
 
@@ -873,12 +899,104 @@ export class HtmlImporter {
       if (text.length > 0) {
         blocks.push(
           DocumentFactory.createParagraph({
+            id: sourceId,
             content: this.parseInlineHtmlString(rawBlock),
           })
         );
       }
     });
 
-    return blocks;
+    return this.mergeConsecutiveFragments(blocks);
+  }
+
+  /**
+   * Merges consecutive split page fragments that share the same logical sourceNodeId
+   * back into ONE authoritative canonical BlockNode.
+   *
+   * SECTION 15 Requirement:
+   * When a paragraph/table/list crosses a page boundary, both fragments remain editable
+   * at runtime, but the canonical serializer must merge them back into ONE logical node.
+   */
+  public static mergeConsecutiveFragments(blocks: BlockNode[]): BlockNode[] {
+    if (!blocks || blocks.length <= 1) return blocks || [];
+
+    const merged: BlockNode[] = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      const curr = blocks[i];
+      const prev = merged.length > 0 ? merged[merged.length - 1] : null;
+
+      if (prev && this.shouldMergeFragments(prev, curr)) {
+        // Merge curr into prev
+        if (prev.type === 'paragraph' && curr.type === 'paragraph') {
+          prev.content = this.mergeInlineArrays(prev.content, curr.content);
+        } else if (prev.type === 'heading' && curr.type === 'heading') {
+          prev.content = this.mergeInlineArrays(prev.content, curr.content);
+        } else if (prev.type === 'table' && curr.type === 'table') {
+          // Merge rows excluding duplicated header rows from subsequent fragments
+          const newRows = curr.rows.filter((r) => !r.isHeader);
+          prev.rows.push(...newRows);
+        } else if (prev.type === 'list' && curr.type === 'list') {
+          prev.items.push(...curr.items);
+        }
+      } else {
+        merged.push(curr);
+      }
+    }
+
+    return merged;
+  }
+
+  private static shouldMergeFragments(prev: BlockNode, curr: BlockNode): boolean {
+    if (prev.type !== curr.type) return false;
+
+    // Normalize IDs to identify originating source node
+    const prevSourceId = this.normalizeSourceId(prev.id);
+    const currSourceId = this.normalizeSourceId(curr.id);
+
+    if (prevSourceId && currSourceId && prevSourceId === currSourceId) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private static normalizeSourceId(id?: string): string | undefined {
+    if (!id) return undefined;
+    if (id.startsWith('fragment:')) {
+      const parts = id.split(':');
+      if (parts.length >= 2) return parts[1];
+    }
+    return id;
+  }
+
+  private static mergeInlineArrays(a: InlineNode[], b: InlineNode[]): InlineNode[] {
+    if (!a || a.length === 0) return b || [];
+    if (!b || b.length === 0) return a || [];
+
+    const result = [...a];
+    for (const node of b) {
+      const last = result[result.length - 1];
+      if (
+        last &&
+        last.type === 'text' &&
+        node.type === 'text' &&
+        this.areMarksEqual(last.marks, node.marks)
+      ) {
+        last.text += node.text;
+      } else {
+        result.push(node);
+      }
+    }
+    return result;
+  }
+
+  private static areMarksEqual(m1?: Mark, m2?: Mark): boolean {
+    if (!m1 && !m2) return true;
+    if (!m1 || !m2) return false;
+    const k1 = Object.keys(m1);
+    const k2 = Object.keys(m2);
+    if (k1.length !== k2.length) return false;
+    return k1.every((k) => (m1 as any)[k] === (m2 as any)[k]);
   }
 }

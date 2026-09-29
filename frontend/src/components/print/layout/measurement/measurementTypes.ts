@@ -36,6 +36,9 @@ export interface MeasurementContext {
 
   /** Optional document scale */
   scale?: number;
+
+  /** When true, perform pure mathematical layout without DOM mutations */
+  pureMode?: boolean;
 }
 
 /**

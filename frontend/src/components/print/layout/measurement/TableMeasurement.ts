@@ -34,10 +34,13 @@ export class TableMeasurement {
         const dataTrs = trMatches.slice(headerTrs.length);
 
         const width = context?.containerWidth || 602;
+        const fontSize = context?.fontSizePx || 14;
         let runningHeaderY = 0;
         const headerMeasurements = headerTrs.map((tr, idx) => {
           const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
-          const h = trH ? parseInt(trH[1], 10) : 36;
+          const textLen = tr.replace(/<[^>]+>/g, '').length;
+          const dynamicH = Math.max(Math.round(fontSize * 2), Math.ceil(textLen / 35) * Math.round(fontSize * 1.5));
+          const h = trH ? parseInt(trH[1], 10) : dynamicH;
           const rect = { x: 0, y: runningHeaderY, width, height: h };
           runningHeaderY += h;
           return {
@@ -56,7 +59,14 @@ export class TableMeasurement {
 
         const dataMeasurements = dataTrs.map((tr, idx) => {
           const trH = tr.match(/(?:min-)?height:\s*(\d+)px/i);
-          const h = trH ? parseInt(trH[1], 10) : 36;
+          const textLen = tr.replace(/<[^>]+>/g, '').length;
+          const dynamicH = Math.max(Math.round(fontSize * 2), Math.ceil(textLen / 35) * Math.round(fontSize * 1.5));
+          const h = trH ? parseInt(trH[1], 10) : dynamicH;
+          const isKeepTogether =
+            tr.includes('print-avoid-break') ||
+            tr.includes('keep-together') ||
+            /page-break-inside\s*:\s*avoid/i.test(tr);
+
           const rect = { x: 0, y: runningDataY, width, height: h };
           runningDataY += h;
           return {
@@ -65,7 +75,7 @@ export class TableMeasurement {
             rect,
             isHeader: false,
             isFooter: false,
-            isKeepTogether: false,
+            isKeepTogether,
             rawHtml: tr,
           };
         });

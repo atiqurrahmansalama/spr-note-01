@@ -40,7 +40,7 @@ let idCounter = 0;
  */
 export function generateNodeId(prefix: string = 'node'): string {
   idCounter++;
-  return `${prefix}_${Date.now().toString(36)}_${idCounter.toString(36)}`;
+  return `${prefix}_${idCounter}`;
 }
 
 /**

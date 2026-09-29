@@ -2,14 +2,18 @@
  * EditorPositionMapper
  *
  * Implements authoritative Logical Selection & Cursor Mapping:
- * Logical Node Point { nodeId, textOffset } ↔ DOM Selection Range
+ * Logical Node Point { nodeId / sourceNodeId, textOffset / inlineOffset } ↔ DOM Selection Range
  *
- * Invariants:
+ * Invariants (SECTION 13):
  * 1. Works on EXACTLY ONE logical editing host.
  * 2. Selection restoration after layout reflow is strictly based on logical document positions
- *    (nodeId + textOffset), NEVER on page-index DOM coordinates.
- * 3. Supports collapsed carets, non-collapsed ranges, and scroll position preservation.
- * 4. Fully bidirectional and robust across reflows, table cells, lists, and headings.
+ *    (sourceNodeId + textOffset), NEVER on page-index DOM coordinates.
+ * 3. Supports split nodes across pages:
+ *    - sourceNodeId = same logical canonical node
+ *    - fragmentIndex = runtime projection detail
+ *    - A caret at logical offset (e.g. 850) resolves to the exact fragment and local DOM text offset.
+ * 4. ZERO DANGEROUS FALLBACKS: Never silently relocate caret to the first block or indexed block.
+ * 5. Supports collapsed carets, non-collapsed ranges, selection direction, and scroll position preservation.
  */
 
 import { LogicalPosition, LogicalSelection } from './editorTypes';
@@ -36,6 +40,8 @@ export interface EditorCaretBookmark {
   sourceNodeId?: string;
   /** Whether selection is collapsed */
   isCollapsed?: boolean;
+  /** Selection direction */
+  direction?: 'forward' | 'backward' | 'none';
   /** End page index */
   endPageIndex?: number;
   /** End page offset */
@@ -53,7 +59,7 @@ const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 
 export class EditorPositionMapper {
   /**
-   * Captures the active logical selection { anchor, head } from the single editing host.
+   * Captures the active logical selection { anchor, head, isCollapsed, direction } from the single editing host.
    */
   public static captureLogicalSelection(host: HTMLElement): LogicalSelection | null {
     if (typeof window === 'undefined' || !host) return null;
@@ -72,6 +78,19 @@ export class EditorPositionMapper {
 
     if (!startPos || !endPos) return null;
 
+    // Detect selection direction
+    let direction: 'forward' | 'backward' | 'none' = 'none';
+    if (!range.collapsed && sel.anchorNode && sel.focusNode) {
+      const cmp = sel.anchorNode.compareDocumentPosition(sel.focusNode);
+      if (cmp & Node.DOCUMENT_POSITION_PRECEDING) {
+        direction = 'backward';
+      } else if (cmp & Node.DOCUMENT_POSITION_FOLLOWING) {
+        direction = 'forward';
+      } else {
+        direction = sel.anchorOffset <= sel.focusOffset ? 'forward' : 'backward';
+      }
+    }
+
     const scrollContainer = host.closest('.universal-print-canvas-wrapper') || host.parentElement;
     const scrollTop = scrollContainer ? scrollContainer.scrollTop : (typeof window !== 'undefined' ? window.scrollY : 0);
     const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : (typeof window !== 'undefined' ? window.scrollX : 0);
@@ -80,6 +99,7 @@ export class EditorPositionMapper {
       anchor: startPos,
       head: endPos,
       isCollapsed: range.collapsed,
+      direction,
       scrollTop,
       scrollLeft,
     };
@@ -92,7 +112,7 @@ export class EditorPositionMapper {
     host: HTMLElement,
     selection: LogicalSelection | null
   ): boolean {
-    if (typeof window === 'undefined' || !host || !selection) return false;
+    if (typeof window === 'undefined' || !host || !selection || !selection.anchor) return false;
     const sel = window.getSelection();
     if (!sel) return false;
 
@@ -133,7 +153,8 @@ export class EditorPositionMapper {
   }
 
   /**
-   * Extracts a LogicalPosition (nodeId + textOffset) for a given DOM node and offset.
+   * Extracts a LogicalPosition (sourceNodeId + cumulative logical text offset) for a given DOM node and offset.
+   * Accurately accumulates text offsets across preceding fragments if the logical node is split across pages.
    */
   public static getLogicalPoint(
     host: HTMLElement,
@@ -145,76 +166,122 @@ export class EditorPositionMapper {
 
     const nodeId = this.getOrAssignNodeId(blockEl);
 
-    // Calculate text character offset from blockEl start to domNode + domOffset
-    let textOffset = 0;
+    // Find all fragment DOM elements belonging to the same logical canonical node
+    const allFragments = Array.from(
+      host.querySelectorAll<HTMLElement>(
+        `[data-source-id="${nodeId}"], [data-node-id="${nodeId}"], #${nodeId}`
+      )
+    );
+
+    let priorOffset = 0;
+    if (allFragments.length > 1) {
+      // Find which fragment contains the active blockEl
+      const activeFragmentIdx = allFragments.findIndex(
+        (frag) => frag === blockEl || frag.contains(blockEl)
+      );
+
+      if (activeFragmentIdx > 0) {
+        for (let i = 0; i < activeFragmentIdx; i++) {
+          priorOffset += allFragments[i].textContent?.length || 0;
+        }
+      }
+    }
+
+    // Calculate local text character offset inside blockEl up to domNode + domOffset
+    let localOffset = 0;
     try {
       const preRange = document.createRange();
       preRange.selectNodeContents(blockEl);
       preRange.setEnd(domNode, domOffset);
-      textOffset = preRange.toString().length;
+      localOffset = preRange.toString().length;
     } catch {
-      textOffset = 0;
+      localOffset = 0;
     }
+
+    const totalTextOffset = priorOffset + localOffset;
 
     return {
       nodeId,
-      textOffset,
+      sourceNodeId: nodeId,
+      textOffset: totalTextOffset,
+      inlineOffset: totalTextOffset,
     };
   }
 
   /**
-   * Resolves a LogicalPosition (nodeId + textOffset) to a specific DOM Node and offset within host.
+   * Resolves a LogicalPosition (sourceNodeId + logical text offset) to a specific DOM Node and local offset.
+   *
+   * For split nodes across pages:
+   * Finds the exact target fragment sheet and calculates the local DOM text offset.
+   * Example: Logical paragraph P1 with fragments across pages 1, 2, 3:
+   * Caret at logical offset 850 resolves to fragment 2 on page 3 at local offset 50.
+   *
+   * ZERO SILENT FALLBACKS:
+   * If sourceNodeId is not found in host, strictly returns null (never relocates to first block).
    */
   public static resolveLogicalPoint(
     host: HTMLElement,
     pos: LogicalPosition
   ): { node: Node; offset: number } | null {
-    if (!pos || !pos.nodeId) return null;
+    if (!pos) return null;
+    const targetId = pos.sourceNodeId || pos.nodeId;
+    if (!targetId) return null;
 
-    // 1. Match host itself or child elements by data-node-id or data-source-id or id
-    let blockEl: HTMLElement | null = null;
+    // 1. Find all DOM elements matching targetId (fragments across pages)
+    const matchingEls: HTMLElement[] = [];
     if (
-      host.getAttribute('data-node-id') === pos.nodeId ||
-      host.getAttribute('data-source-id') === pos.nodeId ||
-      host.id === pos.nodeId
+      host.getAttribute('data-source-id') === targetId ||
+      host.getAttribute('data-node-id') === targetId ||
+      host.id === targetId
     ) {
-      blockEl = host;
-    } else {
-      blockEl = host.querySelector<HTMLElement>(
-        `[data-node-id="${pos.nodeId}"], [data-source-id="${pos.nodeId}"], #${pos.nodeId}`
-      );
+      matchingEls.push(host);
     }
 
-    // 2. Fallback: If nodeId is an indexed identifier (e.g. "block_0", "p_1")
-    if (!blockEl) {
-      const allBlocks = this.getAllBlockElements(host);
-      const match = pos.nodeId.match(/(\d+)$/);
-      if (match) {
-        const idx = parseInt(match[1], 10);
-        if (idx >= 0 && idx < allBlocks.length) {
-          blockEl = allBlocks[idx];
-        }
-      }
-      if (!blockEl && allBlocks.length > 0) {
-        blockEl = allBlocks[0];
-      }
+    const childMatches = Array.from(
+      host.querySelectorAll<HTMLElement>(
+        `[data-source-id="${targetId}"], [data-node-id="${targetId}"], #${targetId}`
+      )
+    );
+    matchingEls.push(...childMatches);
+
+    // ZERO DANGEROUS FALLBACKS: If node does not exist, return null
+    if (matchingEls.length === 0) {
+      return null;
     }
 
-    if (!blockEl) return null;
+    const targetOffset = pos.inlineOffset !== undefined ? pos.inlineOffset : (pos.textOffset || 0);
 
-    // Find the text node at pos.textOffset
+    // 2. Identify target fragment element and local text offset
+    let accumulatedOffset = 0;
+    let targetElement: HTMLElement = matchingEls[0];
+    let targetLocalOffset = targetOffset;
+
+    for (let i = 0; i < matchingEls.length; i++) {
+      const el = matchingEls[i];
+      const elTextLen = el.textContent?.length || 0;
+
+      // If targetOffset falls inside this fragment or this is the last fragment
+      if (accumulatedOffset + elTextLen >= targetOffset || i === matchingEls.length - 1) {
+        targetElement = el;
+        targetLocalOffset = Math.max(0, targetOffset - accumulatedOffset);
+        break;
+      }
+      accumulatedOffset += elTextLen;
+    }
+
+    // 3. Traverse text nodes in targetElement to locate exact Node and offset
     let currentOffset = 0;
     let targetNode: Node | null = null;
-    let targetOffset = 0;
+    let finalOffset = 0;
     let found = false;
 
     const traverse = (node: Node) => {
       if (found) return;
       if (node.nodeType === TEXT_NODE_TYPE) {
         const tLen = node.textContent?.length || 0;
-        if (currentOffset + tLen >= pos.textOffset) {
+        if (currentOffset + tLen >= targetLocalOffset) {
           targetNode = node;
-          targetOffset = Math.max(0, Math.min(pos.textOffset - currentOffset, tLen));
+          finalOffset = Math.max(0, Math.min(targetLocalOffset - currentOffset, tLen));
           found = true;
           return;
         }
@@ -227,16 +294,16 @@ export class EditorPositionMapper {
       }
     };
 
-    traverse(blockEl);
+    traverse(targetElement);
 
     if (targetNode) {
-      return { node: targetNode, offset: targetOffset };
+      return { node: targetNode, offset: finalOffset };
     }
 
-    // If text offset exceeds total text length, place at end of block
+    // If text offset exceeds total text length of the fragment, place at end of targetElement
     return {
-      node: blockEl,
-      offset: blockEl.childNodes.length,
+      node: targetElement,
+      offset: targetElement.childNodes.length,
     };
   }
 
@@ -250,7 +317,9 @@ export class EditorPositionMapper {
     const logical = this.captureLogicalSelection(host);
     if (!logical) return null;
 
-    const blockEl = host.querySelector<HTMLElement>(`[data-node-id="${logical.anchor.nodeId}"]`) || host;
+    const blockEl = host.querySelector<HTMLElement>(
+      `[data-source-id="${logical.anchor.nodeId}"], [data-node-id="${logical.anchor.nodeId}"]`
+    ) || host;
     const tagName = blockEl.tagName;
 
     return {
@@ -264,6 +333,7 @@ export class EditorPositionMapper {
       tagName,
       sourceNodeId: logical.anchor.nodeId,
       isCollapsed: logical.isCollapsed,
+      direction: logical.direction,
       endPageIndex: 0,
       endPageOffset: logical.head.textOffset,
       endNodePath: [0],
@@ -288,21 +358,26 @@ export class EditorPositionMapper {
         anchor: bookmark.logicalStart,
         head: bookmark.logicalEnd || bookmark.logicalStart,
         isCollapsed: bookmark.isCollapsed !== false,
+        direction: bookmark.direction,
         scrollTop: bookmark.scrollTop,
         scrollLeft: bookmark.scrollLeft,
       });
     }
 
-    // Direct offset fallback
+    if (!bookmark.sourceNodeId) return false;
+
     const targetPos: LogicalPosition = {
-      nodeId: bookmark.sourceNodeId || 'p_0',
+      nodeId: bookmark.sourceNodeId,
+      sourceNodeId: bookmark.sourceNodeId,
       textOffset: bookmark.canonicalOffset ?? bookmark.pageOffset ?? 0,
+      inlineOffset: bookmark.canonicalOffset ?? bookmark.pageOffset ?? 0,
     };
 
     return this.restoreLogicalSelection(host, {
       anchor: targetPos,
       head: targetPos,
       isCollapsed: bookmark.isCollapsed !== false,
+      direction: bookmark.direction,
       scrollTop: bookmark.scrollTop,
       scrollLeft: bookmark.scrollLeft,
     });
@@ -317,9 +392,9 @@ export class EditorPositionMapper {
       if (curr instanceof HTMLElement) {
         const tag = curr.tagName.toLowerCase();
         if (
-          ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'th', 'blockquote', 'div'].includes(tag) ||
-          curr.hasAttribute('data-node-id') ||
-          curr.hasAttribute('data-source-id')
+          ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'th', 'blockquote', 'section', 'div'].includes(tag) ||
+          curr.hasAttribute('data-source-id') ||
+          curr.hasAttribute('data-node-id')
         ) {
           return curr;
         }
@@ -332,20 +407,20 @@ export class EditorPositionMapper {
   /**
    * Returns all top-level logical block elements in host
    */
-  private static getAllBlockElements(host: HTMLElement): HTMLElement[] {
+  public static getAllBlockElements(host: HTMLElement): HTMLElement[] {
     const blocks = Array.from(
       host.querySelectorAll<HTMLElement>(
-        'p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, [data-node-id]'
+        'p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, [data-source-id], [data-node-id]'
       )
     );
     return blocks.length > 0 ? blocks : [host];
   }
 
   /**
-   * Gets or deterministically assigns a data-node-id to a block element
+   * Gets or deterministically assigns a data-source-id and data-node-id to a block element
    */
   private static getOrAssignNodeId(el: HTMLElement): string {
-    const existing = el.getAttribute('data-node-id') || el.getAttribute('data-source-id') || el.id;
+    const existing = el.getAttribute('data-source-id') || el.getAttribute('data-node-id') || el.id;
     if (existing) return existing;
 
     const parent = el.parentElement;
@@ -353,10 +428,14 @@ export class EditorPositionMapper {
       const idx = Array.prototype.indexOf.call(parent.children, el);
       const generated = `${el.tagName.toLowerCase()}_${idx}`;
       el.setAttribute('data-node-id', generated);
+      el.setAttribute('data-source-id', generated);
       return generated;
     }
 
-    return `node_${Date.now()}`;
+    const fallback = `${el.tagName.toLowerCase()}_0`;
+    el.setAttribute('data-node-id', fallback);
+    el.setAttribute('data-source-id', fallback);
+    return fallback;
   }
 
   /**
@@ -443,3 +522,4 @@ export class EditorPositionMapper {
     }
   }
 }
+

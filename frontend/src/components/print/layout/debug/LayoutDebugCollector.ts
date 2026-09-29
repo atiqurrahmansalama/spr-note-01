@@ -23,7 +23,7 @@ export class LayoutDebugCollector {
     return this.isGlobalDebugEnabled;
   }
 
-  public startSession(documentId: string = `doc_${Date.now()}`): void {
+  public startSession(documentId: string = 'doc_debug'): void {
     this.currentTrace = {
       documentId,
       calculatedAt: Date.now(),
@@ -71,7 +71,7 @@ export class LayoutDebugCollector {
       : Math.max(0, Math.round((params.measuredHeightPx - params.availableHeightPx) * 100) / 100);
 
     const decision: LayoutDebugDecision = {
-      id: `decision_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `decision_${this.currentTrace.allDecisions.length + 1}`,
       timestamp: Date.now(),
       pageIndex: params.pageIndex,
       pageNumber: params.pageIndex + 1,

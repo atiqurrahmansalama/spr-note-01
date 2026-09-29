@@ -39,6 +39,7 @@ import { createManualPageBreakHtml } from '../../layout/logicalDocument';
 export interface HtmlExportOptions {
   tokenFormat?: 'mustache' | 'span' | 'both'; // Default: 'mustache' ({{token}})
   prettyPrint?: boolean;
+  includeNodeIds?: boolean;
 }
 
 export class HtmlExporter {
@@ -72,15 +73,15 @@ export class HtmlExporter {
       case 'table':
         return this.serializeTable(block as TableNode, options);
       case 'image':
-        return this.serializeImage(block as ImageNode);
+        return this.serializeImage(block as ImageNode, options);
       case 'svg':
-        return this.serializeSvg(block as SvgNode);
+        return this.serializeSvg(block as SvgNode, options);
       case 'signature':
-        return this.serializeSignature(block as SignatureNode);
+        return this.serializeSignature(block as SignatureNode, options);
       case 'manual-page-break':
         return createManualPageBreakHtml();
       case 'divider':
-        return this.serializeDivider(block as DividerNode);
+        return this.serializeDivider(block as DividerNode, options);
       case 'section':
         return this.serializeSection(block as SectionNode, options);
       default:
@@ -92,12 +93,13 @@ export class HtmlExporter {
    * Serializes a ParagraphNode
    */
   private static serializeParagraph(node: ParagraphNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const styleAttr = this.buildBlockStyle(node.attributes);
     const dirAttr = node.attributes?.direction ? ` dir="${node.attributes.direction}"` : '';
     const innerHtml = this.serializeInlineContent(node.content, options);
     const content = innerHtml.length > 0 ? innerHtml : '<br>';
 
-    return `<p${dirAttr}${styleAttr}>${content}</p>`;
+    return `<p${idAttr}${dirAttr}${styleAttr}>${content}</p>`;
   }
 
   /**
@@ -105,11 +107,12 @@ export class HtmlExporter {
    */
   private static serializeHeading(node: HeadingNode, options: HtmlExportOptions): string {
     const tag = `h${node.level || 1}`;
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const styleAttr = this.buildBlockStyle(node.attributes);
     const dirAttr = node.attributes?.direction ? ` dir="${node.attributes.direction}"` : '';
     const innerHtml = this.serializeInlineContent(node.content, options);
 
-    return `<${tag}${dirAttr}${styleAttr}>${innerHtml}</${tag}>`;
+    return `<${tag}${idAttr}${dirAttr}${styleAttr}>${innerHtml}</${tag}>`;
   }
 
   /**
@@ -117,12 +120,14 @@ export class HtmlExporter {
    */
   private static serializeList(node: ListNode, options: HtmlExportOptions): string {
     const tag = node.listType === 'ordered' ? 'ol' : 'ul';
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const startAttr = node.start && node.start > 1 ? ` start="${node.start}"` : '';
     const styleAttr = this.buildBlockStyle(node.attributes);
 
     const items = node.items || [];
     const itemsHtml = items
       .map((item) => {
+        const itemIdAttr = options.includeNodeIds && item.id ? ` data-node-id="${this.escapeHtml(item.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
         const content = item.content || [];
         const itemInner = content
           .map((child) => {
@@ -132,17 +137,18 @@ export class HtmlExporter {
             return this.serializeInlineNode(child as InlineNode, options);
           })
           .join('');
-        return `<li>${itemInner || '<br>'}</li>`;
+        return `<li${itemIdAttr}>${itemInner || '<br>'}</li>`;
       })
       .join(options.prettyPrint ? '\n  ' : '');
 
-    return `<${tag}${startAttr}${styleAttr}>${options.prettyPrint ? '\n  ' : ''}${itemsHtml}${options.prettyPrint ? '\n' : ''}</${tag}>`;
+    return `<${tag}${idAttr}${startAttr}${styleAttr}>${options.prettyPrint ? '\n  ' : ''}${itemsHtml}${options.prettyPrint ? '\n' : ''}</${tag}>`;
   }
 
   /**
    * Serializes a TableNode
    */
   private static serializeTable(node: TableNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const tableStyle = ['border-collapse: collapse;'];
     if (node.attributes?.width) tableStyle.push(`width: ${node.attributes.width};`);
     const styleAttr = ` style="${tableStyle.join(' ')}"`;
@@ -154,6 +160,7 @@ export class HtmlExporter {
           const cellAttrs: string[] = [];
           if (cell.colSpan && cell.colSpan > 1) cellAttrs.push(`colspan="${cell.colSpan}"`);
           if (cell.rowSpan && cell.rowSpan > 1) cellAttrs.push(`rowspan="${cell.rowSpan}"`);
+          if (options.includeNodeIds && cell.id) cellAttrs.push(`data-node-id="${this.escapeHtml(cell.id)}"`);
 
           const cellStyles: string[] = ['border: 1px solid #E2E8F0;', 'padding: 6px 10px;'];
           if (cell.width) cellStyles.push(`width: ${cell.width};`);
@@ -180,20 +187,21 @@ export class HtmlExporter {
       : '';
     const tbodyHtml = `<tbody>\n${(dataRows.length > 0 ? dataRows : node.rows).map(serializeRow).join('\n')}\n</tbody>`;
 
-    return `<table${styleAttr}>\n${theadHtml}${tbodyHtml}\n</table>`;
+    return `<table${idAttr}${styleAttr}>\n${theadHtml}${tbodyHtml}\n</table>`;
   }
 
   /**
    * Serializes an ImageNode
    */
-  private static serializeImage(node: ImageNode): string {
+  private static serializeImage(node: ImageNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const attrs: string[] = [`src="${node.src}"`];
     if (node.alt) attrs.push(`alt="${this.escapeHtml(node.alt)}"`);
     if (node.title) attrs.push(`title="${this.escapeHtml(node.title)}"`);
     if (node.width) attrs.push(`width="${node.width}"`);
     if (node.height) attrs.push(`height="${node.height}"`);
 
-    const imgTag = `<img ${attrs.join(' ')} />`;
+    const imgTag = `<img${idAttr} ${attrs.join(' ')} />`;
     if (node.alignment && node.alignment !== 'left') {
       return `<p style="text-align: ${node.alignment};">${imgTag}</p>`;
     }
@@ -203,18 +211,19 @@ export class HtmlExporter {
   /**
    * Serializes an SvgNode
    */
-  private static serializeSvg(node: SvgNode): string {
+  private static serializeSvg(node: SvgNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const rawSvg = node.svgContent || '';
     if (rawSvg.trim().startsWith('<svg')) {
       if (node.alignment && node.alignment !== 'left') {
-        return `<div style="text-align: ${node.alignment}; display: flex; justify-content: ${node.alignment === 'center' ? 'center' : 'flex-end'};">${rawSvg}</div>`;
+        return `<div${idAttr} style="text-align: ${node.alignment}; display: flex; justify-content: ${node.alignment === 'center' ? 'center' : 'flex-end'};">${rawSvg}</div>`;
       }
       return rawSvg;
     }
     const widthAttr = node.width ? ` width="${node.width}"` : '';
     const heightAttr = node.height ? ` height="${node.height}"` : '';
     const viewBoxAttr = node.viewBox ? ` viewBox="${node.viewBox}"` : '';
-    const svgWrapper = `<svg xmlns="http://www.w3.org/2000/svg"${viewBoxAttr}${widthAttr}${heightAttr}>${rawSvg}</svg>`;
+    const svgWrapper = `<svg${idAttr} xmlns="http://www.w3.org/2000/svg"${viewBoxAttr}${widthAttr}${heightAttr}>${rawSvg}</svg>`;
     if (node.alignment && node.alignment !== 'left') {
       return `<div style="text-align: ${node.alignment}; display: flex; justify-content: ${node.alignment === 'center' ? 'center' : 'flex-end'};">${svgWrapper}</div>`;
     }
@@ -224,7 +233,8 @@ export class HtmlExporter {
   /**
    * Serializes a SignatureNode
    */
-  private static serializeSignature(node: SignatureNode): string {
+  private static serializeSignature(node: SignatureNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const cols = node.columns || [];
     if (cols.length === 0) return '';
     const borderStyle = node.style === 'dashed' ? 'border-dashed' : node.style === 'dotted' ? 'border-dotted' : node.style === 'double' ? 'border-double border-t-2' : 'border-solid border-t';
@@ -240,23 +250,25 @@ export class HtmlExporter {
       )
       .join('');
 
-    return `<div class="print-signature-block keep-together" data-signature-block="true" style="display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 12px; break-inside: avoid; page-break-inside: avoid;">${colsHtml}</div>`;
+    return `<div${idAttr} class="print-signature-block keep-together" data-signature-block="true" style="display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 12px; break-inside: avoid; page-break-inside: avoid;">${colsHtml}</div>`;
   }
 
   /**
    * Serializes a DividerNode
    */
-  private static serializeDivider(node: DividerNode): string {
+  private static serializeDivider(node: DividerNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const styles = [`border: none;`, `border-top: ${node.thickness || 1}px ${node.style || 'solid'} ${node.color || '#CBD5E1'};`, `margin: 12px 0;`];
-    return `<hr style="${styles.join(' ')}" />`;
+    return `<hr${idAttr} style="${styles.join(' ')}" />`;
   }
 
   /**
    * Serializes a SectionNode
    */
   private static serializeSection(node: SectionNode, options: HtmlExportOptions): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
     const inner = node.content.map((b) => this.serializeBlock(b, options)).join('\n');
-    return `<section>\n${inner}\n</section>`;
+    return `<section${idAttr}>\n${inner}\n</section>`;
   }
 
   /**

@@ -12,13 +12,17 @@ import { LayoutDocumentOptions } from '../types/documentTypes';
 import { LayoutDocument, PaginationEngineResult } from '../types/paginationTypes';
 
 /**
- * Logical Document Point representation (nodeId + textOffset)
+ * Logical Document Point representation (sourceNodeId + inline/text offset)
  */
 export interface LogicalPosition {
   /** Canonical Node ID or semantic block identifier */
   nodeId: string;
-  /** Character offset inside the logical node */
+  /** Canonical source node ID (alias for nodeId) */
+  sourceNodeId?: string;
+  /** Character / inline offset inside the canonical logical node */
   textOffset: number;
+  /** Inline character offset inside the canonical logical node (alias for textOffset) */
+  inlineOffset?: number;
 }
 
 /**
@@ -31,6 +35,8 @@ export interface LogicalSelection {
   head: LogicalPosition;
   /** Whether selection is a collapsed caret */
   isCollapsed: boolean;
+  /** Selection direction */
+  direction?: 'forward' | 'backward' | 'none';
   /** Canvas scroll position preservation */
   scrollTop?: number;
   scrollLeft?: number;

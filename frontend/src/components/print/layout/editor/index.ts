@@ -14,3 +14,5 @@ export * from './EditorTransactionCoordinator';
 export * from './EditorPositionMapper';
 export * from './PaginatedEditorBridge';
 export * from './PaginatedDocumentEditor';
+export * from './PagedEditorSurface';
+export * from './PagedEditorPageProjector';

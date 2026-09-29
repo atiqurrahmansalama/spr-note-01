@@ -46,7 +46,8 @@ export class FragmentationEngine {
     block: BlockNode,
     pageIndex: number,
     availableHeightPx: number,
-    context?: MeasurementContext
+    context?: MeasurementContext,
+    fragmentIndex: number = 0
   ): NodeFragmentationResult {
     const mCtx = context || { containerWidth: 602, fontSizePx: 16 };
 
@@ -62,19 +63,19 @@ export class FragmentationEngine {
 
     // Cache lookup
     const cache = FragmentCache.getInstance();
-    const content = 'content' in block ? JSON.stringify(block) : (block as any).rawHtml || '';
+    const content = JSON.stringify(block);
     const cacheKey = cache.generateKey(block.id, content, availableHeightPx, mCtx.containerWidth, mCtx.density);
     const cached = cache.get(cacheKey);
     if (cached) {
       return {
         ...cached,
         firstFragment: cached.firstFragment
-          ? { ...cached.firstFragment, pageIndex, id: `frag_${pageIndex}_${block.id}` }
+          ? { ...cached.firstFragment, pageIndex, id: `fragment:${block.id}:${fragmentIndex}` }
           : undefined,
       };
     }
 
-    const result = this._fragmentBlockNodeInternal(block, pageIndex, availableHeightPx, mCtx);
+    const result = this._fragmentBlockNodeInternal(block, pageIndex, availableHeightPx, mCtx, fragmentIndex);
     cache.set(cacheKey, result);
     return result;
   }
@@ -83,7 +84,8 @@ export class FragmentationEngine {
     block: BlockNode,
     pageIndex: number,
     availableHeightPx: number,
-    mCtx: MeasurementContext
+    mCtx: MeasurementContext,
+    fragmentIndex: number = 0
   ): NodeFragmentationResult {
 
     // 2. Measure block
@@ -103,19 +105,19 @@ export class FragmentationEngine {
 
     // 4. If whole block fits within available budget and rules allow
     if (!decision.canFragment && blockHeight <= availableHeightPx) {
-      const html = HtmlExporter.serializeBlock(block);
+      const html = HtmlExporter.serializeBlock(block, { includeNodeIds: true });
       const text = 'content' in block && Array.isArray((block as any).content)
         ? (block as any).content.map((c: any) => c.text || c.label || '').join('')
         : '';
       const fragment = DocumentLayoutEngine.createFragment({
-        id: `frag_${pageIndex}_${block.id}`,
+        id: `fragment:${block.id}:${fragmentIndex}`,
         sourceNodeId: block.id,
         type: block.type as any,
         pageIndex,
         rect: { x: 0, y: 0, width: mCtx.containerWidth, height: blockHeight },
         htmlContent: html,
         textContent: text,
-        isFirstFragment: true,
+        isFirstFragment: fragmentIndex === 0,
         isLastFragment: true,
       });
 
@@ -134,13 +136,13 @@ export class FragmentationEngine {
       const split = TableFragmenter.splitTableNode(block, availableHeightPx, mCtx);
       if (split.isSplit && split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `table_frag_${pageIndex}_${block.id}`,
+          id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
           type: 'table',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
           htmlContent: split.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -161,13 +163,13 @@ export class FragmentationEngine {
       const split = ListFragmenter.splitListNode(block, availableHeightPx, mCtx);
       if (split.isSplit && split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `list_frag_${pageIndex}_${block.id}`,
+          id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
           type: 'list',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
           htmlContent: split.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -188,13 +190,13 @@ export class FragmentationEngine {
       const split = NestedBlockFragmenter.splitSectionNode(block, availableHeightPx, mCtx);
       if (split.isSplit && split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `sec_frag_${pageIndex}_${block.id}`,
+          id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
           type: 'paragraph',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
           htmlContent: split.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -215,13 +217,13 @@ export class FragmentationEngine {
       const split = ParagraphFragmenter.splitParagraphNode(block, availableHeightPx, mCtx);
       if (split.isSplit && split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `p_frag_${pageIndex}_${block.id}`,
+          id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
           type: 'paragraph',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: split.firstFragmentHeight },
           htmlContent: split.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -253,7 +255,8 @@ export class FragmentationEngine {
     el: HTMLElement | SourceNode | any,
     pageIndex: number,
     availableHeightPx: number,
-    context?: MeasurementContext
+    context?: MeasurementContext,
+    fragmentIndex: number = 0
   ): NodeFragmentationResult {
     if (!el) {
       return {
@@ -276,7 +279,10 @@ export class FragmentationEngine {
 
     const mCtx = context || { containerWidth: 602, fontSizePx: 16 };
     const rawHtml = el.outerHTML || el.rawHtml || el.textContent || '';
-    const nodeId = el.id || 'node';
+    const nodeId =
+      el.id ||
+      (typeof el.getAttribute === 'function' && (el.getAttribute('data-node-id') || el.getAttribute('data-source-id'))) ||
+      'node';
     const cache = FragmentCache.getInstance();
     const cacheKey = cache.generateKey(nodeId, rawHtml, availableHeightPx, mCtx.containerWidth, mCtx.density);
     const cached = cache.get(cacheKey);
@@ -284,12 +290,12 @@ export class FragmentationEngine {
       return {
         ...cached,
         firstFragment: cached.firstFragment
-          ? { ...cached.firstFragment, pageIndex, id: `frag_${pageIndex}_${nodeId}` }
+          ? { ...cached.firstFragment, pageIndex, id: `fragment:${nodeId}:${fragmentIndex}` }
           : undefined,
       };
     }
 
-    const result = this._fragmentNodeInternal(el, pageIndex, availableHeightPx, mCtx, rawHtml);
+    const result = this._fragmentNodeInternal(el, pageIndex, availableHeightPx, mCtx, rawHtml, fragmentIndex, nodeId);
     cache.set(cacheKey, result);
     return result;
   }
@@ -299,7 +305,9 @@ export class FragmentationEngine {
     pageIndex: number,
     availableHeightPx: number,
     mCtx: MeasurementContext,
-    rawHtml: string
+    rawHtml: string,
+    fragmentIndex: number = 0,
+    nodeId: string = 'node'
   ): NodeFragmentationResult {
     const tag = el.tagName ? el.tagName.toLowerCase() : el.type || 'div';
     const isTable = tag === 'table' || /<table/i.test(rawHtml);
@@ -324,15 +332,15 @@ export class FragmentationEngine {
     // 3. Fits on current page entirely and rules allow
     if (!decision.canFragment && nodeHeight <= availableHeightPx) {
       const fragment = DocumentLayoutEngine.createFragment({
-        id: `frag_${pageIndex}_${el.id || Math.random().toString(36).slice(2, 7)}`,
-        sourceNodeId: el.id || 'node',
+        id: `fragment:${nodeId}:${fragmentIndex}`,
+        sourceNodeId: nodeId,
         type: isTable ? 'table' : isList ? 'list' : isParagraph ? 'paragraph' : 'paragraph',
         pageIndex,
         rect: { x: 0, y: 0, width: mCtx.containerWidth, height: nodeHeight },
         htmlContent: rawHtml || el.outerHTML || '',
         textContent: el.textContent || (rawHtml ? rawHtml.replace(/<[^>]+>/g, '').trim() : ''),
         domNode: typeof HTMLElement !== 'undefined' && el instanceof HTMLElement ? el : undefined,
-        isFirstFragment: true,
+        isFirstFragment: fragmentIndex === 0,
         isLastFragment: true,
       });
 
@@ -350,13 +358,13 @@ export class FragmentationEngine {
       const tableSplit = TableFragmenter.splitTable(el, availableHeightPx, mCtx);
       if (tableSplit.isSplit && tableSplit.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `table_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-          sourceNodeId: el.id || 'table',
+          id: `fragment:${nodeId}:${fragmentIndex}`,
+          sourceNodeId: nodeId,
           type: 'table',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: tableSplit.firstFragmentHeight },
           htmlContent: tableSplit.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !tableSplit.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -367,9 +375,12 @@ export class FragmentationEngine {
             const dummy = document.createElement('div');
             dummy.innerHTML = tableSplit.remainingFragmentHtml;
             remainingEl = dummy.firstElementChild as HTMLElement;
+            if (remainingEl) {
+              remainingEl.setAttribute('data-node-id', nodeId);
+            }
           } else {
             remainingEl = {
-              id: `${el.id || 'table'}_cont`,
+              id: nodeId,
               type: 'table',
               rawHtml: tableSplit.remainingFragmentHtml,
               textContent: '',
@@ -392,13 +403,13 @@ export class FragmentationEngine {
       const listSplit = ListFragmenter.splitList(el, availableHeightPx);
       if (listSplit.isSplit && listSplit.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
-          id: `list_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-          sourceNodeId: el.id || 'list',
+          id: `fragment:${nodeId}:${fragmentIndex}`,
+          sourceNodeId: nodeId,
           type: 'list',
           pageIndex,
           rect: { x: 0, y: 0, width: mCtx.containerWidth, height: listSplit.firstFragmentHeight },
           htmlContent: listSplit.firstFragmentHtml,
-          isFirstFragment: true,
+          isFirstFragment: fragmentIndex === 0,
           isLastFragment: !listSplit.remainingFragmentHtml,
           isAutomaticBreak: true,
         });
@@ -409,9 +420,12 @@ export class FragmentationEngine {
             const dummy = document.createElement('div');
             dummy.innerHTML = listSplit.remainingFragmentHtml;
             remainingEl = dummy.firstElementChild as HTMLElement;
+            if (remainingEl) {
+              remainingEl.setAttribute('data-node-id', nodeId);
+            }
           } else {
             remainingEl = {
-              id: `${el.id || 'list'}_cont`,
+              id: nodeId,
               type: 'list',
               rawHtml: listSplit.remainingFragmentHtml,
               textContent: '',
@@ -433,13 +447,13 @@ export class FragmentationEngine {
     const pSplit = ParagraphFragmenter.splitParagraph(el, availableHeightPx, mCtx);
     if (pSplit.isSplit && pSplit.firstFragmentHtml) {
       const fragment = DocumentLayoutEngine.createFragment({
-        id: `p_frag_${pageIndex}_${Math.random().toString(36).slice(2, 7)}`,
-        sourceNodeId: el.id || 'p',
+        id: `fragment:${nodeId}:${fragmentIndex}`,
+        sourceNodeId: nodeId,
         type: 'paragraph',
         pageIndex,
         rect: { x: 0, y: 0, width: mCtx.containerWidth, height: pSplit.firstFragmentHeight },
         htmlContent: pSplit.firstFragmentHtml,
-        isFirstFragment: true,
+        isFirstFragment: fragmentIndex === 0,
         isLastFragment: !pSplit.remainingFragmentHtml,
         isAutomaticBreak: true,
       });
@@ -450,9 +464,12 @@ export class FragmentationEngine {
           const dummy = document.createElement('div');
           dummy.innerHTML = pSplit.remainingFragmentHtml;
           remainingEl = dummy.firstElementChild as HTMLElement;
+          if (remainingEl) {
+            remainingEl.setAttribute('data-node-id', nodeId);
+          }
         } else {
           remainingEl = {
-            id: `${el.id || 'p'}_cont`,
+            id: nodeId,
             type: 'paragraph',
             rawHtml: pSplit.remainingFragmentHtml,
             textContent: '',

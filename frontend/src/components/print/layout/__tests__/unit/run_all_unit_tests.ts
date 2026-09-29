@@ -25,6 +25,15 @@ import { runSaveReloadInvariantsUnitTests } from './save_reload_invariants.test'
 import { runLegacyMigrationUnitTests } from './legacy_migration.test';
 import { runTypeSafetyUnitTests } from './type_safety.test';
 import { runPerformanceArchitectureUnitTests } from './performance_architecture.test';
+import { runDeterministicPaginationUnitTests } from './deterministic_pagination.test';
+import { runCanonicalCaretArchitectureUnitTests } from './canonical_caret_architecture.test';
+import { runSelectionSurvivalMatrixUnitTests } from './selection_survival_matrix.test';
+import { runSplitFragmentMergingUnitTests } from './split_fragment_merging.test';
+import { runCanonicalSerializationFromPagedDomUnitTests } from './canonical_serialization_from_paged_dom.test';
+import { runManualPageBreaksUnitTests } from './manual_page_breaks.test';
+import { runRebuiltPaginationLoopUnitTests } from './rebuilt_pagination_loop.test';
+import { runParagraphFragmentationEngineUnitTests } from './paragraph_fragmentation_engine.test';
+import { runTableFragmentationEngineUnitTests } from './table_fragmentation_engine.test';
 
 async function main() {
   console.log('================================================================');
@@ -122,6 +131,60 @@ async function main() {
   const r15 = runPerformanceArchitectureUnitTests();
   totalPassed += r15.passed;
   totalFailed += r15.failed;
+  console.log('');
+
+  // 16. Deterministic Pagination & Stable Fragment IDs (Phase 40)
+  const r16 = runDeterministicPaginationUnitTests();
+  totalPassed += r16.passed;
+  totalFailed += r16.failed;
+  console.log('');
+
+  // 17. Canonical Node ID & Caret Architecture (Phase 41)
+  const r17 = runCanonicalCaretArchitectureUnitTests();
+  totalPassed += r17.passed;
+  totalFailed += r17.failed;
+  console.log('');
+
+  // 18. Selection Survival Across Pagination (Phase 42)
+  const r18 = runSelectionSurvivalMatrixUnitTests();
+  totalPassed += r18.passed;
+  totalFailed += r18.failed;
+  console.log('');
+
+  // 19. Split Fragment Editability & Canonical Merging (Phase 43)
+  const r19 = runSplitFragmentMergingUnitTests();
+  totalPassed += r19.passed;
+  totalFailed += r19.failed;
+  console.log('');
+
+  // 20. Canonical Serialization From Paged Editor DOM (Phase 44)
+  const r20 = runCanonicalSerializationFromPagedDomUnitTests();
+  totalPassed += r20.passed;
+  totalFailed += r20.failed;
+  console.log('');
+
+  // 21. Manual Page Breaks (Phase 45)
+  const r21 = runManualPageBreaksUnitTests();
+  totalPassed += r21.passed;
+  totalFailed += r21.failed;
+  console.log('');
+
+  // 22. Rebuilt Pagination Loop (Phase 46)
+  const r22 = runRebuiltPaginationLoopUnitTests();
+  totalPassed += r22.passed;
+  totalFailed += r22.failed;
+  console.log('');
+
+  // 23. Paragraph Fragmentation (Phase 47)
+  const r23 = runParagraphFragmentationEngineUnitTests();
+  totalPassed += r23.passed;
+  totalFailed += r23.failed;
+  console.log('');
+
+  // 24. Table Fragmentation (Phase 48)
+  const r24 = runTableFragmentationEngineUnitTests();
+  totalPassed += r24.passed;
+  totalFailed += r24.failed;
   console.log('');
 
   console.log('================================================================');

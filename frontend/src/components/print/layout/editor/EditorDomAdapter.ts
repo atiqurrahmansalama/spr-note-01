@@ -155,7 +155,7 @@ export class EditorDomAdapter {
 
     const span = document.createElement('span');
     span.className = 'doclab-token';
-    const tokenId = tokenPayload.id || `tok_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const tokenId = tokenPayload.id || `tok_${cleanKey}`;
     span.setAttribute('data-token-id', tokenId);
     span.setAttribute('data-token', cleanKey);
     span.setAttribute('data-token-key', cleanKey);

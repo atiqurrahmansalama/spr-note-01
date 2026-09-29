@@ -34,6 +34,7 @@ export class EditorTransactionCoordinator {
   private pendingTransactions: CoordinatorTransaction[] = [];
   private isReflowing: boolean = false;
   private reflowCallback: ReflowCallback;
+  private txSeq: number = 0;
 
   // Debounce thresholds
   private readonly microDebounceMs: number = 200;
@@ -49,7 +50,7 @@ export class EditorTransactionCoordinator {
   public enqueue(transaction: Omit<CoordinatorTransaction, 'id' | 'timestamp'>): void {
     const fullTx: CoordinatorTransaction = {
       ...transaction,
-      id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: `tx_${++this.txSeq}`,
       timestamp: Date.now(),
     };
 
