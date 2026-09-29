@@ -51,6 +51,7 @@ export interface PrintOptions {
   customInstitutionAddress?: string;
   customAddress?: string;
   enablePageBreak?: boolean;
+  customMarginsMm?: Partial<{ top: number; right: number; bottom: number; left: number }>;
   [key: string]: any;
 }
 

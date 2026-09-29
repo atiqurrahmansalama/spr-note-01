@@ -4,9 +4,10 @@
  */
 
 import { Rect, Insets } from './layoutTypes';
-import { LayoutDocumentOptions } from './documentTypes';
+import { LayoutDocumentOptions, SourceNode } from './documentTypes';
 import { LayoutFragment } from './fragmentTypes';
 import { WatermarkConfig, SignatureBlockConfig } from '../chrome/headerFooterTypes';
+import { BlockNode } from '../../model/types';
 
 /**
  * A single discrete physical/visual page in the paginated document
@@ -139,7 +140,7 @@ export interface LayoutDocument {
   calculationDurationMs?: number;
 
   /** Canonical AST blocks or source nodes that generated this layout */
-  sourceBlocks?: any[];
+  sourceBlocks?: (BlockNode | SourceNode | HTMLElement)[];
 }
 
 import { LayoutDebugTrace } from '../debug/layoutDebugTypes';

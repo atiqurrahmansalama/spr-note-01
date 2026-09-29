@@ -17,7 +17,7 @@ import {
  * Enterprise DocLab Studio Hub View
  * 
  * Directly mounts and orchestrates the Universal DocLab Studio,
- * powered by DocxLiveRenderer, DocxTemplateModal, and UniversalPrintEngine.
+ * powered by PaginatedDocumentEditor, LayoutDocumentRenderer, and UniversalPrintEngine.
  */
 export default function PrintStudioHubView({
   className = '',

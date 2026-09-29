@@ -72,6 +72,66 @@ export class DomMeasurementEngine {
   }
 
   /**
+   * Waits for document fonts to be fully loaded before final layout measurement passes
+   */
+  public static async waitForFonts(): Promise<void> {
+    if (typeof document !== 'undefined' && 'fonts' in document && (document as any).fonts?.ready) {
+      try {
+        await (document as any).fonts.ready;
+      } catch {
+        // Fallback gracefully if font readiness promise errors
+      }
+    }
+  }
+
+  /**
+   * Detects whether running in a true browser environment with active layout rendering
+   */
+  public static isRealBrowserEnvironment(): boolean {
+    return (
+      typeof window !== 'undefined' &&
+      typeof document !== 'undefined' &&
+      typeof window.getComputedStyle === 'function' &&
+      typeof document.createElement === 'function'
+    );
+  }
+
+  /**
+   * Explicitly isolated headless fallback dimension estimation for SSR / Node.js test runners.
+   * This is NEVER silently used when real browser DOM bounding rects are available.
+   */
+  public static estimateHeadlessFallbackDimensions(
+    tag: string,
+    el: HTMLElement,
+    context: MeasurementContext,
+    width: number
+  ): number {
+    if (tag === 'table') {
+      const tableGeom = TableMeasurement.measureTable(el as HTMLTableElement, context);
+      return tableGeom.totalHeight;
+    } else if (tag === 'ul' || tag === 'ol') {
+      const lis = Array.from(el.querySelectorAll('li'));
+      let lH = 12;
+      lis.forEach((li) => {
+        const textLen = (li.textContent || '').length;
+        const lines = Math.max(1, Math.ceil(textLen / 45));
+        lH += Math.max(28, lines * 24);
+      });
+      return Math.max(28, lH);
+    } else if (tag === 'img' || tag === 'figure' || tag === 'svg') {
+      return 220;
+    } else {
+      const text = (el.textContent || '').trim();
+      const fSize = context.fontSizePx || 16;
+      const avgCharWidth = fSize * 0.55;
+      const charsPerLine = Math.max(20, Math.floor(width / avgCharWidth));
+      const lineCount = Math.max(1, Math.ceil(text.length / charsPerLine));
+      const lineHeight = fSize * (context.lineHeight ? Number(context.lineHeight) : 1.5);
+      return Math.max(lineHeight, lineCount * lineHeight);
+    }
+  }
+
+  /**
    * Measures an already-connected or offscreen HTMLElement
    */
   public static measureElement(
@@ -95,34 +155,12 @@ export class DomMeasurementEngine {
     const paddingBottom = parseFloat(style.paddingBottom) || 0;
 
     const elRect = el.getBoundingClientRect();
-    // Use true subpixel bounding rect height; fallback to offsetHeight or content estimation if in headless DOM
+    // Use true subpixel bounding rect height; fallback to offsetHeight or headless estimation only in headless DOM
     const width = elRect.width > 0 ? elRect.width : (el.offsetWidth || Math.max(100, context.containerWidth));
     let measuredHeight = elRect.height > 0 ? elRect.height : el.offsetHeight;
 
     if (!measuredHeight || measuredHeight === 0) {
-      if (tag === 'table') {
-        const tableGeom = TableMeasurement.measureTable(el as HTMLTableElement, context);
-        measuredHeight = tableGeom.totalHeight;
-      } else if (tag === 'ul' || tag === 'ol') {
-        const lis = Array.from(el.querySelectorAll('li'));
-        let lH = 12;
-        lis.forEach((li) => {
-          const textLen = (li.textContent || '').length;
-          const lines = Math.max(1, Math.ceil(textLen / 45));
-          lH += Math.max(28, lines * 24);
-        });
-        measuredHeight = Math.max(28, lH);
-      } else if (tag === 'img' || tag === 'figure' || tag === 'svg') {
-        measuredHeight = 220;
-      } else {
-        const text = (el.textContent || '').trim();
-        const fSize = context.fontSizePx || 16;
-        const avgCharWidth = fSize * 0.55;
-        const charsPerLine = Math.max(20, Math.floor(width / avgCharWidth));
-        const lineCount = Math.max(1, Math.ceil(text.length / charsPerLine));
-        const lineHeight = fSize * (context.lineHeight ? Number(context.lineHeight) : 1.5);
-        measuredHeight = Math.max(lineHeight, lineCount * lineHeight);
-      }
+      measuredHeight = this.estimateHeadlessFallbackDimensions(tag, el, context, width);
     }
 
     const height = measuredHeight;

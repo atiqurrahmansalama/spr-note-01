@@ -20,7 +20,7 @@ import {
   PageBreak,
 } from 'docx';
 import { isExplicitManualBreak, parseContinuousHtmlToLogicalNodes } from './layout/logicalDocument';
-import { CanonicalDocument, BlockNode, InlineNode, ParagraphNode, HeadingNode, ListNode, TableNode, ManualPageBreakNode } from './model/types';
+import { CanonicalDocument, BlockNode, InlineNode, ParagraphNode, HeadingNode, ListNode, TableNode, ManualPageBreakNode, TextNode } from './model/types';
 import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
 
 /**
@@ -1541,8 +1541,8 @@ export function compileCanonicalDocumentToDocx(
         item.content.forEach((c) => {
           if ('content' in c && Array.isArray(c.content)) {
             itemRuns.push(...convertInlineNodes(c.content as InlineNode[]));
-          } else if ('text' in c) {
-            itemRuns.push(new TextRun({ text: (c as any).text, size: 20 }));
+          } else if ('text' in c && typeof (c as TextNode).text === 'string') {
+            itemRuns.push(new TextRun({ text: (c as TextNode).text, size: 20 }));
           }
         });
         docxBlocks.push(
@@ -1675,6 +1675,115 @@ export function compileCanonicalDocumentToDocx(
 }
 
 /**
+ * Converts an HTML table fragment string into a native OpenXML Table
+
+ */
+function convertHtmlFragmentToDocxTable(html: string): Table | null {
+  const tableRows: TableRow[] = [];
+  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let trMatch;
+  while ((trMatch = trRegex.exec(html)) !== null) {
+    const rowHtml = trMatch[1];
+    const isHeaderRow = /<th/i.test(rowHtml) || /data-header="true"/i.test(trMatch[0]);
+    const thMatches = [...rowHtml.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)];
+    const tdMatches = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+    const cellMatches = thMatches.length > 0 ? thMatches : tdMatches;
+
+    const cells: TableCell[] = [];
+    cellMatches.forEach((m) => {
+      const cellText = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      cells.push(
+        new TableCell({
+          shading: isHeaderRow
+            ? { fill: 'F1F5F9', type: ShadingType.CLEAR }
+            : undefined,
+          margins: { top: 60, bottom: 60, left: 90, right: 90 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' },
+            bottom: { style: BorderStyle.SINGLE, size: isHeaderRow ? 8 : 4, color: isHeaderRow ? '94A3B8' : 'E2E8F0' },
+            left: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+            right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+          },
+          children: [
+            new Paragraph({
+              spacing: { before: 20, after: 20 },
+              children: [
+                new TextRun({
+                  text: cellText,
+                  bold: isHeaderRow,
+                  font: FONT_PRIMARY,
+                  size: 20,
+                  color: isHeaderRow ? '0F172A' : '334155',
+                }),
+              ],
+            }),
+          ],
+        })
+      );
+    });
+
+    if (cells.length > 0) {
+      tableRows.push(new TableRow({ tableHeader: isHeaderRow, children: cells }));
+    }
+  }
+
+  if (tableRows.length === 0) return null;
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: tableRows,
+  });
+}
+
+/**
+ * Converts an HTML fragment into a styled OpenXML Paragraph
+ */
+function convertHtmlFragmentToDocxParagraph(
+  html: string,
+  fallbackText: string,
+  defaultSize: number = 22,
+  defaultBold: boolean = false
+): Paragraph {
+  const isBold = defaultBold || /font-weight:\s*(bold|[6-9]00)/i.test(html) || /<strong>|<b>/i.test(html);
+  const isItalic = /font-style:\s*italic/i.test(html) || /<em>|<i>/i.test(html);
+
+  let alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT;
+  if (/text-align:\s*center/i.test(html) || /align="center"/i.test(html)) {
+    alignment = AlignmentType.CENTER;
+  } else if (/text-align:\s*right/i.test(html) || /align="right"/i.test(html)) {
+    alignment = AlignmentType.RIGHT;
+  } else if (/text-align:\s*justify/i.test(html) || /align="justify"/i.test(html)) {
+    alignment = AlignmentType.JUSTIFIED;
+  }
+
+
+  const colorMatch = html.match(/color:\s*#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/i);
+  let hexColor: string = '0F172A';
+  if (colorMatch) {
+    hexColor = colorMatch[1].length === 3
+      ? colorMatch[1][0] + colorMatch[1][0] + colorMatch[1][1] + colorMatch[1][1] + colorMatch[1][2] + colorMatch[1][2]
+      : colorMatch[1];
+  }
+
+  const cleanText = (fallbackText || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).trim();
+
+  return new Paragraph({
+    alignment,
+    spacing: { before: defaultBold ? 100 : 0, after: defaultBold ? 60 : 40 },
+    children: [
+      new TextRun({
+        text: cleanText,
+        bold: isBold,
+        italics: isItalic,
+        color: hexColor,
+        font: FONT_PRIMARY,
+        size: defaultSize,
+      }),
+    ],
+  });
+}
+
+/**
  * Compiles a computed LayoutDocument directly into a native OpenXML DOCX Document.
  * Converts each computed LayoutPage's fragments into Word sections / page breaks,
  * preserving identical page count, header/footer chrome, and fragment order.
@@ -1705,41 +1814,83 @@ export function compileLayoutDocumentToDocx(
   pages.forEach((page, pIdx) => {
     if (page.fragments && page.fragments.length > 0) {
       page.fragments.forEach((frag) => {
-        const text = (frag.textContent || '').trim();
-        if (!text) return;
+        const html = frag.htmlContent || '';
+        const text = (frag.textContent || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).trim();
+        const fragType = String(frag.type);
 
-        if (frag.type === 'heading') {
-          allBlocks.push(
-            new Paragraph({
-              spacing: { before: 120, after: 60 },
-              children: [new TextRun({ text, bold: true, size: 28, font: FONT_PRIMARY })],
-            })
+        // A. Heading Fragment
+        if (fragType === 'heading' || /^h[1-6]/i.test(fragType)) {
+          const headingLevel = frag.data?.headingLevel || (fragType.startsWith('h') ? parseInt(fragType.substring(1), 10) : 2);
+          const headingSize = headingLevel === 1 ? 32 : headingLevel === 2 ? 28 : headingLevel === 3 ? 24 : 22;
+          allBlocks.push(convertHtmlFragmentToDocxParagraph(html, text, headingSize, true));
+        }
+
+        // B. Table Fragment (Semantic OpenXML Table)
+        else if (fragType === 'table' || html.includes('<table')) {
+          const docxTable = convertHtmlFragmentToDocxTable(html || text);
+          if (docxTable) {
+            allBlocks.push(docxTable);
+          } else if (text) {
+            allBlocks.push(convertHtmlFragmentToDocxParagraph(html, text, 20, false));
+          }
+        }
+
+        // C. List Fragment
+        else if (fragType === 'list' || html.includes('<li')) {
+          const isOrdered = /<ol/i.test(html);
+          const items = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) =>
+            m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
           );
-        } else if (frag.type === 'table') {
+
+          if (items.length > 0) {
+            items.forEach((item, idx) => {
+              const prefix = isOrdered ? `${idx + 1}. ` : '• ';
+              allBlocks.push(
+                new Paragraph({
+                  spacing: { before: 20, after: 20 },
+                  children: [
+                    new TextRun({ text: prefix, bold: true, font: FONT_PRIMARY, size: 22 }),
+                    new TextRun({ text: item, font: FONT_PRIMARY, size: 22 }),
+                  ],
+                })
+              );
+            });
+          } else if (text) {
+            allBlocks.push(convertHtmlFragmentToDocxParagraph(html, text, 22, false));
+          }
+        }
+
+        // D. Divider Fragment
+        else if (fragType === 'divider' || html.includes('<hr')) {
           allBlocks.push(
             new Paragraph({
-              spacing: { before: 40, after: 40 },
-              children: [new TextRun({ text, font: FONT_PRIMARY, size: 20 })],
-            })
-          );
-        } else {
-          allBlocks.push(
-            new Paragraph({
-              spacing: { before: 0, after: 40 },
-              children: [new TextRun({ text, font: FONT_PRIMARY, size: 22 })],
+              border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CBD5E1' } },
+              spacing: { before: 80, after: 80 },
+              children: [],
             })
           );
         }
+
+        // E. Default Paragraph / Rich Text Fragment
+        else {
+          if (text) {
+            allBlocks.push(convertHtmlFragmentToDocxParagraph(html, text, 22, false));
+          }
+        }
       });
     } else if (page.htmlContent) {
-      const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (cleanText) {
-        allBlocks.push(
-          new Paragraph({
-            spacing: { before: 0, after: 40 },
-            children: [new TextRun({ text: cleanText, font: FONT_PRIMARY, size: 22 })],
-          })
-        );
+      if (page.htmlContent.includes('<table')) {
+        const docxTable = convertHtmlFragmentToDocxTable(page.htmlContent);
+        if (docxTable) {
+          allBlocks.push(docxTable);
+        } else {
+          allBlocks.push(convertHtmlFragmentToDocxParagraph(page.htmlContent, '', 22, false));
+        }
+      } else {
+        const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleanText) {
+          allBlocks.push(convertHtmlFragmentToDocxParagraph(page.htmlContent, cleanText, 22, false));
+        }
       }
     }
 
@@ -1803,6 +1954,7 @@ export function compileLayoutDocumentToDocx(
     ],
   });
 }
+
 
 /**
  * High-Level Helper to Export directly to Native .docx file in client browser.

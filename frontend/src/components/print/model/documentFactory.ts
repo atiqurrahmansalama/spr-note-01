@@ -16,6 +16,9 @@ import {
   TableRowNode,
   TableCellNode,
   ImageNode,
+  SvgNode,
+  SignatureNode,
+  SignatureColumn,
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
@@ -88,13 +91,17 @@ export class DocumentFactory {
   }
 
   /**
-   * Creates a dynamic TokenNode (Placeholder)
+   * Creates a dynamic TokenNode (Placeholder / InlineToken)
    */
   public static createToken(options: {
     key: string;
     label?: string;
+    display?: string;
+    sourcePath?: string;
     category?: TokenNode['category'];
     defaultValue?: string;
+    format?: string;
+    formatting?: Mark;
     marks?: Mark;
     id?: string;
   }): TokenNode {
@@ -102,10 +109,14 @@ export class DocumentFactory {
       id: options.id || generateNodeId('tok'),
       type: 'token',
       key: options.key,
-      label: options.label || options.key,
+      label: options.label || options.display || options.key,
+      display: options.display || options.label || options.key,
+      sourcePath: options.sourcePath,
       category: options.category || 'general',
       defaultValue: options.defaultValue,
-      marks: options.marks,
+      format: options.format,
+      formatting: options.formatting || options.marks,
+      marks: options.marks || options.formatting,
     };
   }
 
@@ -288,6 +299,54 @@ export class DocumentFactory {
       width: options.width,
       height: options.height,
       alignment: options.alignment || 'left',
+    };
+  }
+
+  /**
+   * Creates an SvgNode (Vector shape / icon / diagram)
+   */
+  public static createSvg(options: {
+    svgContent: string;
+    viewBox?: string;
+    width?: number | string;
+    height?: number | string;
+    alignment?: SvgNode['alignment'];
+    title?: string;
+    style?: Record<string, string>;
+    id?: string;
+  }): SvgNode {
+    return {
+      id: options.id || generateNodeId('svg'),
+      type: 'svg',
+      svgContent: options.svgContent,
+      viewBox: options.viewBox,
+      width: options.width,
+      height: options.height,
+      alignment: options.alignment || 'left',
+      title: options.title,
+      style: options.style,
+    };
+  }
+
+  /**
+   * Creates an institutional SignatureNode
+   */
+  public static createSignature(options: {
+    columns?: SignatureColumn[];
+    style?: SignatureNode['style'];
+    alignment?: SignatureNode['alignment'];
+    id?: string;
+  } = {}): SignatureNode {
+    return {
+      id: options.id || generateNodeId('sig'),
+      type: 'signature',
+      columns: options.columns || [
+        { id: 'prepared', label: 'Prepared By', sub: 'Course Teacher', enabled: true },
+        { id: 'verified', label: 'Verified By', sub: 'Department Head', enabled: true },
+        { id: 'approved', label: 'Approved By', sub: 'Principal', enabled: true },
+      ],
+      style: options.style || 'solid',
+      alignment: options.alignment || 'center',
     };
   }
 

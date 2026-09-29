@@ -1,19 +1,19 @@
 /**
  * LayoutPageRenderer
- * Dedicated enterprise physical visual paper page renderer component.
+ * Master physical visual paper page renderer component.
  *
- * Renders an actual, discrete physical paper sheet container with:
- * - Exact physical width & height (e.g. 794px × 1123px for A4 portrait)
- * - Exact margin padding insets
- * - Realistic box shadow, background, and rounded corners
- * - Clean screen header indicator (Page X of Y, Dimensions, Section info)
- * - Watermark layer overlay
- * - Running Header & Running Footer chrome
- * - Dedicated Signature Block zone on final page
- * - Safe fragment / children rendering with zero DOM mutation
+ * ARCHITECTURAL INVARIANTS:
+ * 1. Strict Layering:
+ *    Paper Shell (exact paper dimensions, realistic shadow, margins)
+ *      → Page Chrome (WatermarkLayer, RunningHeader, RunningFooter, SignatureBlockRenderer)
+ *      → LayoutFragmentRenderer (Pre-computed layout fragments)
+ * 2. 100% Read-Only rendering of pre-paginated LayoutPage data.
+ * 3. Exact spatial height allocation for contentArea, headerArea, footerArea, and signatureArea.
+ * 4. Zero DOM mutations or in-DOM pagination heuristics.
+ * 5. Zero dependencies on deprecated DocxLiveRenderer.
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { LayoutPage } from '../types/paginationTypes';
 import { LayoutDocumentOptions } from '../types/documentTypes';
 import {
@@ -23,7 +23,8 @@ import {
   SignatureBlockRenderer,
   RuntimeVariableResolver,
 } from '../chrome';
-import DocxLiveRenderer from '../../DocxLiveRenderer';
+import { LayoutFragmentRenderer } from './LayoutFragmentRenderer';
+import { CanonicalContentRenderer } from './CanonicalContentRenderer';
 
 export interface LayoutPageRendererProps {
   page: LayoutPage;
@@ -34,7 +35,7 @@ export interface LayoutPageRendererProps {
   children?: React.ReactNode;
 }
 
-export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
+export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = memo(({
   page,
   totalPages,
   options = {},
@@ -59,7 +60,7 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
     institutionAddress: options.institutionAddress,
     sectionId: page.sectionId,
     sectionIndex: page.sectionIndex,
-    sectionNumber: (page.sectionIndex !== undefined ? page.sectionIndex + 1 : 1),
+    sectionNumber: page.sectionIndex !== undefined ? page.sectionIndex + 1 : 1,
     sectionTitle: page.sectionTitle,
     sectionPageNumber: page.sectionPageNumber,
     sectionTotalPages: page.sectionTotalPages,
@@ -107,7 +108,7 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
 
       {/* Actual Physical Visual Paper Sheet Container */}
       <div
-        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0 print:bg-white relative text-left box-border shadow-xl select-text flex flex-col justify-between"
+        className="paper-sheet docx-paper-sheet rounded-xs print:border-none print:shadow-none print:rounded-none print:w-full print:m-0 print:bg-white relative text-left box-border shadow-xl select-text flex flex-col justify-between"
         data-size={pageSize}
         data-orientation={orientation}
         data-margin={marginPreset}
@@ -139,9 +140,15 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
           />
         )}
 
-        {/* Running Header Zone */}
-        {headerConfig && (
-          <div className="w-full relative z-10 shrink-0">
+        {/* 1. Reserved Running Header Zone */}
+        {headerConfig && page.headerArea && page.headerArea.height > 0 && (
+          <div
+            className="w-full relative z-10 shrink-0 overflow-hidden flex flex-col justify-end"
+            style={{
+              height: `${page.headerArea.height}px`,
+              minHeight: `${page.headerArea.height}px`,
+            }}
+          >
             <RunningHeader
               variables={runtimeVars}
               config={headerConfig}
@@ -149,32 +156,61 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
           </div>
         )}
 
-        {/* Printable Flow Content Area */}
-        <div className="w-full flex-1 relative z-10 text-left select-text overflow-hidden">
+        {/* 2. Printable Flow Content Area (strictly bounded by contentArea geometry) */}
+        <div
+          className="w-full flex-1 relative z-10 text-left select-text overflow-hidden"
+          style={{
+            minHeight: `${page.contentArea.height}px`,
+            maxHeight: `${page.contentArea.height}px`,
+            height: `${page.contentArea.height}px`,
+          }}
+        >
           {children ? (
             children
+          ) : page.fragments && page.fragments.length > 0 ? (
+            <div className="layout-page-fragments flex flex-col w-full text-left select-text">
+              {page.fragments.map((fragment) => (
+                <LayoutFragmentRenderer
+                  key={fragment.id}
+                  fragment={fragment}
+                  styles={styles}
+                />
+              ))}
+            </div>
           ) : (
-            <DocxLiveRenderer
-              key={`docx_read_only_page_${page.index}`}
-              htmlContent={page.htmlContent || '<p><br></p>'}
+            <CanonicalContentRenderer
+              content={page.htmlContent || '<p><br></p>'}
               styles={styles}
-              isEditable={false}
               pageIndex={page.index}
               totalPages={effectiveTotalPages}
             />
           )}
+        </div>
 
-          {/* Signature Block (if placed inside flow on target page) */}
-          {signatureConfig && (page.isLastPage || options.showSignaturesOnAllPages) && (
+        {/* 3. Reserved Dedicated Signature Zone (on target pages) */}
+        {signatureConfig && (page.isLastPage || options.showSignaturesOnAllPages) && page.signatureArea && page.signatureArea.height > 0 && (
+          <div
+            className="w-full relative z-10 shrink-0 overflow-hidden"
+            style={{
+              height: `${page.signatureArea.height}px`,
+              minHeight: `${page.signatureArea.height}px`,
+            }}
+          >
             <SignatureBlockRenderer
               config={signatureConfig}
             />
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Running Footer Zone */}
-        {footerConfig && (
-          <div className="w-full relative z-10 shrink-0">
+        {/* 4. Reserved Running Footer Zone */}
+        {footerConfig && page.footerArea && page.footerArea.height > 0 && (
+          <div
+            className="w-full relative z-10 shrink-0 overflow-hidden flex flex-col justify-start"
+            style={{
+              height: `${page.footerArea.height}px`,
+              minHeight: `${page.footerArea.height}px`,
+            }}
+          >
             <RunningFooter
               variables={runtimeVars}
               config={footerConfig}
@@ -185,6 +221,8 @@ export const LayoutPageRenderer: React.FC<LayoutPageRendererProps> = ({
       </div>
     </div>
   );
-};
+});
+
+LayoutPageRenderer.displayName = 'LayoutPageRenderer';
 
 export default LayoutPageRenderer;

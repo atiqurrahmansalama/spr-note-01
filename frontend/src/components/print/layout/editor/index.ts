@@ -1,10 +1,15 @@
 /**
- * Paginated Editor Subsystem
+ * Single-Host Paginated Editor Subsystem
  *
- * Provides genuine Word-like multi-page document-centric editing across
- * physical paper sheets, exact geometry bounds, and stable caret tracking.
+ * Provides authoritative Word-grade single-host document editing across
+ * physical paper geometry, transactional commands, history, and pure canonical AST serialization.
  */
 
+export * from './editorTypes';
+export * from './EditorSerializer';
+export * from './EditorHistory';
+export * from './EditorDomAdapter';
+export * from './EditorCommands';
 export * from './EditorTransactionCoordinator';
 export * from './EditorPositionMapper';
 export * from './PaginatedEditorBridge';

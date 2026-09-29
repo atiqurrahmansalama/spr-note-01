@@ -126,10 +126,10 @@ export default function TemplateLibraryModal({
 
       // 2. Scope Filter
       if (selectedScope !== 'all') {
-        const tmplScope = (tmpl as any).scopeId || 'general_document';
+        const tmplScope = tmpl.scopeId || 'general_document';
         if (tmplScope !== selectedScope) return false;
       } else if (selectedCategory !== 'all') {
-        const scopeDef = ALL_DOCUMENT_SCOPES.find((s) => s.id === (tmpl as any).scopeId);
+        const scopeDef = ALL_DOCUMENT_SCOPES.find((s) => s.id === tmpl.scopeId);
         if (scopeDef && scopeDef.category !== selectedCategory) return false;
       }
 
@@ -145,7 +145,7 @@ export default function TemplateLibraryModal({
 
   // Handle setting a template as default for its scope
   const handleToggleDefault = (tmpl: CustomDocxTemplate) => {
-    const scopeId = (tmpl as any).scopeId || selectedScope || 'general_document';
+    const scopeId = tmpl.scopeId || selectedScope || 'general_document';
     const currentDefault = scopeDefaults[scopeId];
 
     if (currentDefault === tmpl.id) {
@@ -191,7 +191,7 @@ export default function TemplateLibraryModal({
       };
 
       // Tag template with assigned scope
-      (newTemplate as any).scopeId = targetScope;
+      newTemplate.scopeId = targetScope;
 
       saveDocxTemplate(newTemplate);
       reloadData();
@@ -375,7 +375,7 @@ export default function TemplateLibraryModal({
         {filteredTemplates.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[520px] overflow-y-auto pr-1">
             {filteredTemplates.map((tmpl) => {
-              const tmplScopeId = (tmpl as any).scopeId || 'general_document';
+              const tmplScopeId = tmpl.scopeId || 'general_document';
               const scopeDef = ALL_DOCUMENT_SCOPES.find((s) => s.id === tmplScopeId);
               const isDefault = scopeDefaults[tmplScopeId] === tmpl.id;
               const validation = validateTemplateForScope(tmpl, tmplScopeId);

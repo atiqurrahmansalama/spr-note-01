@@ -5,8 +5,9 @@ import JSZip from 'jszip';
 import type { PrintPageSize, PrintOrientation, PrintMargin } from './types';
 import { parseTokenDirective, formatMultiValueData, type TokenDirectiveOptions } from './docLabDirectiveEngine';
 import { separateDocxStylesAndBody, sanitizeDocxStyles } from './docxStyleUtils';
-import { PaginationEngine } from './layout/pagination/PaginationEngine';
 import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
+import { sanitizeLogicalDocumentHtml } from './layout/logicalDocument';
+import { LegacyMigrationNormalizer } from './layout/migration/LegacyMigrationNormalizer';
 
 export { separateDocxStylesAndBody, sanitizeDocxStyles };
 
@@ -75,7 +76,7 @@ export function getDocxPaperDimensions(
   pageSize: PrintPageSize = 'A4',
   orientation: PrintOrientation = 'PORTRAIT'
 ): DocxPaperDimensions {
-  const { px } = PageGeometryCalculator.resolveDimensions(pageSize as any, orientation as any);
+  const { px } = PageGeometryCalculator.resolveDimensions(pageSize, orientation);
   return {
     width: `${px.width}px`,
     minHeight: `${px.height}px`,
@@ -91,7 +92,7 @@ export function getDocxPaperPadding(
   pageProperties?: Partial<DocxPageProperties> | null,
   marginPreset: PrintMargin = 'NORMAL'
 ): string {
-  const { css } = PageGeometryCalculator.resolveMargins(marginPreset as any, undefined, pageProperties);
+  const { css } = PageGeometryCalculator.resolveMargins(marginPreset, undefined, pageProperties);
   return css;
 }
 
@@ -2562,7 +2563,9 @@ export function getSavedDocxTemplates(): CustomDocxTemplate[] {
     const raw = localStorage.getItem(TEMPLATES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map((t) => LegacyMigrationNormalizer.normalizeTemplate(t));
+      }
     }
   } catch (e) {
     console.warn('Failed to load saved docx templates', e);
@@ -2577,8 +2580,11 @@ export function saveDocxTemplate(template: Omit<CustomDocxTemplate, 'createdAt' 
   const existingIndex = existing.findIndex((t) => t.id === template.id);
   const existingItem = existingIndex >= 0 ? existing[existingIndex] : null;
 
+  const sanitizedHtml = template.rawHtml ? sanitizeLogicalDocumentHtml(template.rawHtml) : '';
+
   const newTemplate: CustomDocxTemplate = {
     ...template,
+    rawHtml: sanitizedHtml,
     createdAt: existingItem?.createdAt || (template as any).createdAt || now,
     updatedAt: now,
   };

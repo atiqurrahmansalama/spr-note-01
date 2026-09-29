@@ -150,6 +150,11 @@ export interface LayoutDocumentOptions {
 }
 
 /**
+ * Standard Document Options alias for LayoutDocumentOptions
+ */
+export type DocumentOptions = LayoutDocumentOptions;
+
+/**
  * Pure continuous source document (pre-layout)
  */
 export interface SourceDocument {

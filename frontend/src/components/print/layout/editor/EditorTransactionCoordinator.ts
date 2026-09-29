@@ -12,7 +12,7 @@
 
 export type TransactionType = 'micro' | 'structural' | 'geometry' | 'style';
 
-export interface EditorTransaction {
+export interface CoordinatorTransaction {
   id: string;
   type: TransactionType;
   timestamp: number;
@@ -31,7 +31,7 @@ export type ReflowCallback = (ctx: ReflowExecutionContext) => void | Promise<voi
 
 export class EditorTransactionCoordinator {
   private timer: any = null;
-  private pendingTransactions: EditorTransaction[] = [];
+  private pendingTransactions: CoordinatorTransaction[] = [];
   private isReflowing: boolean = false;
   private reflowCallback: ReflowCallback;
 
@@ -46,8 +46,8 @@ export class EditorTransactionCoordinator {
   /**
    * Enqueues an editor transaction and schedules a coalesced reflow pass
    */
-  public enqueue(transaction: Omit<EditorTransaction, 'id' | 'timestamp'>): void {
-    const fullTx: EditorTransaction = {
+  public enqueue(transaction: Omit<CoordinatorTransaction, 'id' | 'timestamp'>): void {
+    const fullTx: CoordinatorTransaction = {
       ...transaction,
       id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       timestamp: Date.now(),

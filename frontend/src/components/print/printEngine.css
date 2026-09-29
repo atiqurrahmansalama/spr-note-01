@@ -122,21 +122,6 @@
   overflow: hidden;
 }
 
-/* Runtime Visual Page Spacers (Screen-only projection) */
-.spr-runtime-page-spacer {
-  display: block;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: default;
-  position: relative;
-  z-index: 10;
-}
-
-@media print {
-  .spr-runtime-page-spacer {
-    display: none !important;
-  }
-}
 
 /* --------------------------------------------------------------------------
    Document Multi-Page Container & Discrete Physical Sheets
@@ -490,36 +475,26 @@ body.spr-printing-in-progress .universal-export-menu-portal {
     break-after: auto !important;
   }
 
-  /* Base Printable Paper Sheet */
+  /* Base Printable Paper Sheet (Exact 1:1 Physical Simulation) */
   .paper-sheet {
     box-sizing: border-box !important;
     background-color: #ffffff !important;
     color: #0f172a !important;
     position: relative !important;
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
     margin: 0 auto !important;
-    padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     zoom: 1 !important;
-  }
-
-  /* Internal Physical Margins (Padding) matching Canvas */
-  .paper-sheet[data-margin="NORMAL"],
-  .paper-sheet[data-margin="NARROW"],
-  .paper-sheet[data-margin="WIDE"],
-  .paper-sheet[data-margin="NONE"] {
-    padding: 0 !important;
   }
 
   /* Continuous non-paginated sheet override */

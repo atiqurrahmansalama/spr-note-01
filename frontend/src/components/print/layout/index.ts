@@ -16,6 +16,7 @@ export * from './debug';
 export * from './performance';
 export * from './render';
 export * from './editor';
+export * from './migration';
 
 
 

@@ -12,7 +12,7 @@ import {
   compileLayoutDocumentToPDF,
   getSafeFilename,
 } from './vectorPDFCompiler';
-import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
+import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric, PrintMargin } from './types';
 import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
 import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
 import { CanonicalDocument } from './model/types';
@@ -22,8 +22,8 @@ export { getSafeFilename };
 /**
  * Helper to get exact page margin CSS string for @page rule
  */
-export function getPageMarginCSS(margin?: string, customMarginsMm?: any): string {
-  const { css } = PageGeometryCalculator.resolveMargins((margin || 'NORMAL') as any, customMarginsMm);
+export function getPageMarginCSS(margin?: PrintMargin, customMarginsMm?: any): string {
+  const { css } = PageGeometryCalculator.resolveMargins(margin || 'NORMAL', customMarginsMm);
   return css;
 }
 
@@ -33,9 +33,9 @@ export function getPageMarginCSS(margin?: string, customMarginsMm?: any): string
 export function updatePrintPageStyle(options: Partial<PrintOptions> = {}): void {
   if (typeof document === 'undefined') return;
   const geom = PageGeometryCalculator.calculate({
-    pageSize: options.pageSize as any,
-    orientation: options.orientation as any,
-    margin: options.margin as any,
+    pageSize: options.pageSize,
+    orientation: options.orientation,
+    margin: options.margin,
     customMarginsMm: options.customMarginsMm,
   });
 
@@ -122,7 +122,7 @@ export interface ExportToPDFParams {
 }
 
 /**
- * 2. Client-Side Vector PDF Exporter (100% True Vector PDF)
+ * 2. Client-Side PDF Exporter (LayoutDocument Structured Compiler)
  */
 export async function exportToPDF({
   layoutDocument,
@@ -147,7 +147,7 @@ export async function exportToPDF({
     return;
   }
 
-  showToast?.('Generating Vector PDF...', 'info');
+  showToast?.('Generating PDF...', 'info');
 
   const effectiveOptions = {
     ...options,
@@ -156,15 +156,15 @@ export async function exportToPDF({
     margin: (margin || options.margin || 'NORMAL') as any,
   };
 
-  // Priority 1: LayoutDocument Vector PDF compiler
+  // Priority 1: LayoutDocument PDF compiler
   if (layoutDocument) {
     try {
       const doc = compileLayoutDocumentToPDF(layoutDocument, effectiveOptions);
       doc.save(getSafeFilename(title || layoutDocument.title || 'Document', 'pdf'));
-      showToast?.('Vector PDF downloaded successfully!', 'success');
+      showToast?.('PDF downloaded successfully!', 'success');
       return;
     } catch (layoutPdfErr) {
-      console.warn('Layout Vector PDF compilation fallback:', layoutPdfErr);
+      console.warn('Layout PDF compilation fallback:', layoutPdfErr);
     }
   }
 
@@ -185,12 +185,13 @@ export async function exportToPDF({
       });
 
       doc.save(getSafeFilename(title, 'pdf'));
-      showToast?.('Vector PDF downloaded successfully!', 'success');
+      showToast?.('PDF downloaded successfully!', 'success');
       return;
     } catch (clientCompilerErr) {
-      console.warn('Client tabular vector compiler fallback:', clientCompilerErr);
+      console.warn('Client tabular compiler fallback:', clientCompilerErr);
     }
   }
+
 
   // DocLab Custom Multi-Page Freeform Document Canvas Export
   const portalEl = typeof document !== 'undefined' ? document.getElementById(targetId) : null;
@@ -200,7 +201,7 @@ export async function exportToPDF({
         pageSize: effectiveOptions.pageSize,
         orientation: effectiveOptions.orientation,
         margin: effectiveOptions.margin,
-        customMarginsMm: (effectiveOptions as any).customMarginsMm,
+        customMarginsMm: effectiveOptions.customMarginsMm,
       });
 
       const isLandscape = geom.orientation === 'LANDSCAPE';
@@ -501,7 +502,7 @@ export {
 };
 
 /**
- * Exports a computed LayoutDocument directly to a multi-page Vector PDF.
+ * Exports a computed LayoutDocument directly to a multi-page PDF.
  */
 export async function exportLayoutDocumentToPDF(
   layoutDocument: LayoutDocument,
@@ -509,16 +510,17 @@ export async function exportLayoutDocumentToPDF(
   title: string = 'Official_Document',
   showToast?: (msg: string, type: 'info' | 'success' | 'warning' | 'error') => void
 ): Promise<void> {
-  showToast?.('Generating Layout Vector PDF...', 'info');
+  showToast?.('Generating Layout PDF...', 'info');
   try {
     const doc = compileLayoutDocumentToPDF(layoutDocument, options);
     doc.save(getSafeFilename(title || layoutDocument.title || 'Document', 'pdf'));
-    showToast?.('Vector PDF downloaded successfully!', 'success');
+    showToast?.('PDF downloaded successfully!', 'success');
   } catch (err: any) {
     console.error('Layout PDF export failed:', err);
     showToast?.('Failed to export PDF: ' + (err?.message || 'Unknown error'), 'error');
   }
 }
+
 
 /**
  * Exports a computed LayoutDocument directly to an OpenXML DOCX file.
@@ -702,7 +704,7 @@ export async function exportLayoutDocumentToImages({
 }
 
 /**
- * 8. Standalone Vector SVG (.svg) Document Exporter
+ * 8. Standalone SVG (.svg) Document Exporter (ForeignObject Layout Adapter)
  */
 export async function exportToSVG({
   targetId = 'universal-print-portal',
@@ -726,7 +728,7 @@ export async function exportToSVG({
     return;
   }
 
-  showToast?.('Generating standalone vector SVG document...', 'info');
+  showToast?.('Generating standalone SVG document...', 'info');
 
   try {
     const clone = portalEl.cloneNode(true) as HTMLElement;
@@ -778,10 +780,10 @@ export async function exportToSVG({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    showToast?.('Vector SVG (.svg) document downloaded successfully!', 'success');
+    showToast?.('SVG (.svg) document downloaded successfully!', 'success');
   } catch (err: any) {
     console.error('SVG export failed:', err);
-    showToast?.('Failed to export vector SVG: ' + (err?.message || 'Unknown error'), 'error');
+    showToast?.('Failed to export SVG: ' + (err?.message || 'Unknown error'), 'error');
   }
 }
 
@@ -794,7 +796,7 @@ export interface ExportLayoutSVGParams {
 }
 
 /**
- * Standalone Vector SVG Document Exporter consuming LayoutDocument
+ * Standalone SVG Document Exporter consuming LayoutDocument
  */
 export async function exportLayoutDocumentToSVG({
   layoutDocument,
@@ -808,7 +810,8 @@ export async function exportLayoutDocumentToSVG({
     return;
   }
 
-  showToast?.('Generating standalone vector SVG document...', 'info');
+  showToast?.('Generating SVG document...', 'info');
+
 
   const styles = collectDocumentStyles();
 

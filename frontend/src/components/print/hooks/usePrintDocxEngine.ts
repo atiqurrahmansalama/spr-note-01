@@ -21,6 +21,10 @@ import {
   extractTagsFromText,
   getScopeById,
 } from '../scopeTemplateStore';
+import { TemplateMergeEngine } from '../model/templates/TemplateMergeEngine';
+import { HtmlImporter } from '../model/serialization/htmlImporter';
+import { HtmlExporter } from '../model/serialization/htmlExporter';
+import { BatchDocumentPackage, BatchDocumentItem } from '../model/types';
 import { PrintOptions, PrintMetaItem } from '../types';
 import { examStore } from '../../../stores/examStore';
 import { buildSubjectRoutineReportData } from '../../../modules/examinations/exam-schedules/subject-routine/subjectRoutineDocLabKeys';
@@ -534,8 +538,8 @@ export function usePrintDocxEngine({
     }));
   }, [liveData, contextEnrichedBaseRecord]);
 
-  // Memoized merged pages for Word (.docx) mode
-  const mergedDocxPages = useMemo<string[]>(() => {
+  // 1. Logical Merged Documents (one complete logical document per record or single tabular sheet)
+  const mergedDocuments = useMemo<string[]>(() => {
     if (!customDocxTemplate?.html && !customDocxTemplate?.body && !customDocxTemplate?.rawHtml) return [];
 
     // Extract the original unmerged template body (containing {{tokens}})
@@ -563,17 +567,7 @@ export function usePrintDocxEngine({
     // 0. Pre-Generated Document: If it is already a saved generated document in Batch view
     if (customDocxTemplate.templateType === 'generated' || customDocxTemplate.id?.startsWith('gen_')) {
       const genContent = customDocxTemplate.body || customDocxTemplate.rawHtml || customDocxTemplate.html || '';
-      const styles = customDocxTemplate.styles || docxStyles;
-      const layoutResult = PaginationEngine.paginate(genContent, {
-        pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
-        orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
-        margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
-        customMarginsMm: options.customMarginsMm,
-        density: options.density,
-        styles,
-      });
-      const pages = layoutResult.pages.map((p) => p.htmlContent);
-      return pages.map((p: string) => (styles && !p.includes('<style') ? `${styles}\n${p.trim()}` : p.trim()));
+      return [genContent];
     }
 
     // Tabular check: Only true for multi-student master lists/ledgers (tabulation_sheet).
@@ -606,12 +600,6 @@ export function usePrintDocxEngine({
   }, [
     customDocxTemplate,
     docxRenderMode,
-    docxStyles,
-    options.pageSize,
-    options.orientation,
-    options.margin,
-    options.customMarginsMm,
-    options.density,
     enrichedRecords,
     contextEnrichedBaseRecord,
     scopeId,
@@ -619,11 +607,81 @@ export function usePrintDocxEngine({
     combinedTemplates,
   ]);
 
-  // Derived total pages for DocLab custom template reflecting both manual and automatic breaks
+  // 2. Strongly typed BatchDocumentPackage
+  const batchDocumentPackage = useMemo<BatchDocumentPackage | null>(() => {
+    if (!customDocxTemplate || mergedDocuments.length === 0) return null;
+    const records = enrichedRecords.length > 0 ? enrichedRecords : [contextEnrichedBaseRecord];
+
+    return {
+      id: `batch_pkg_${customDocxTemplate.id || 'curr'}`,
+      title: customDocxTemplate.name || 'Batch Document Package',
+      sourceTemplateId: customDocxTemplate.id,
+      scopeId,
+      createdAt: new Date().toISOString(),
+      documents: mergedDocuments.map((docHtml, idx) => ({
+        id: `batch_doc_${idx + 1}`,
+        title: `${customDocxTemplate.name || 'Document'} #${idx + 1}`,
+        canonicalDocument: HtmlImporter.importFromHtml(docHtml, {
+          id: `${customDocxTemplate.id}_item_${idx + 1}`,
+          title: `${customDocxTemplate.name || 'Document'} #${idx + 1}`,
+        }),
+        dataRecord: records[idx] || records[0],
+      })),
+    };
+  }, [customDocxTemplate, mergedDocuments, enrichedRecords, contextEnrichedBaseRecord, scopeId]);
+
+  // 3. Downstream Paginated Layout Pages: Each logical document is paginated independently
+  const docxLayoutPages = useMemo<{ docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[]>(() => {
+    if (!customDocxTemplate || mergedDocuments.length === 0) return [];
+
+    const styles = customDocxTemplate?.styles || docxStyles;
+    const paginationOpts = {
+      pageSize: options.pageSize || customDocxTemplate?.pageSize || 'A4',
+      orientation: options.orientation || customDocxTemplate?.orientation || 'PORTRAIT',
+      margin: options.margin || customDocxTemplate?.margin || 'NORMAL',
+      customMarginsMm: options.customMarginsMm,
+      density: options.density,
+      styles,
+    };
+
+    const allPages: { docIndex: number; pageNumber: number; htmlContent: string; totalDocPages: number }[] = [];
+
+    mergedDocuments.forEach((docHtml, docIdx) => {
+      const layoutResult = PaginationEngine.paginate(docHtml, paginationOpts);
+      layoutResult.pages.forEach((page) => {
+        const pageHtml = styles && !page.htmlContent.includes('<style') ? `${styles}\n${page.htmlContent.trim()}` : page.htmlContent.trim();
+        allPages.push({
+          docIndex: docIdx,
+          pageNumber: page.pageNumber,
+          htmlContent: pageHtml,
+          totalDocPages: layoutResult.totalPages,
+        });
+      });
+    });
+
+    return allPages;
+  }, [
+    customDocxTemplate,
+    mergedDocuments,
+    docxStyles,
+    options.pageSize,
+    options.orientation,
+    options.margin,
+    options.customMarginsMm,
+    options.density,
+  ]);
+
+  // Derived array of rendered page strings (for backward compatibility)
+  const mergedDocxPages = useMemo<string[]>(() => {
+    return docxLayoutPages.map((p) => p.htmlContent);
+  }, [docxLayoutPages]);
+
+  // Derived total pages for DocLab custom template reflecting true multi-document pagination
   const docxTotalPages = useMemo<number>(() => {
     if (!customDocxTemplate) return 1;
-    return Math.max(1, mergedDocxPages.length);
-  }, [customDocxTemplate, mergedDocxPages]);
+    return Math.max(1, docxLayoutPages.length);
+  }, [customDocxTemplate, docxLayoutPages]);
+
 
   // Handle template selection
   const handleTemplateSelection = useCallback(
@@ -895,8 +953,15 @@ export function usePrintDocxEngine({
         if (isTabular) {
           mergedFullHtml = mergeTabularTemplateWithData(baseTemplateBody, recordsToMerge, contextEnrichedBaseRecord);
         } else {
-          const pages = bulkMergeTemplate(baseTemplateBody, recordsToMerge);
-          mergedFullHtml = pages.join('\n<!-- spr-page-break -->\n');
+          // In Phase 11, multi-record documents merge at the logical AST level with explicit ManualPageBreakNodes between records
+          const templateDoc = HtmlImporter.importFromHtml(baseTemplateBody, {
+            id: customDocxTemplate?.id,
+            title: customDocxTemplate?.name || scopeDef?.name,
+          });
+          const batchDoc = TemplateMergeEngine.mergeBatch(templateDoc, recordsToMerge, {
+            insertPageBreakBetweenRecords: true,
+          });
+          mergedFullHtml = HtmlExporter.exportToHtml(batchDoc);
         }
 
         const currentHtml = styles ? `${styles}\n${mergedFullHtml}` : mergedFullHtml;
@@ -1116,6 +1181,9 @@ export function usePrintDocxEngine({
     setDocxRenderMode: handleDocxRenderModeChange,
     contextEnrichedBaseRecord,
     enrichedRecords,
+    mergedDocuments,
+    batchDocumentPackage,
+    docxLayoutPages,
     mergedDocxPages,
     docxTotalPages,
     handleTemplateSelection,

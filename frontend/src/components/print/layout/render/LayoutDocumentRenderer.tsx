@@ -1,4 +1,24 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+/**
+ * LayoutDocumentRenderer
+ * Master multi-page document renderer with intelligent viewport virtualization policy.
+ *
+ * ARCHITECTURAL INVARIANTS:
+ * 1. Viewport Policy:
+ *    - In Edit Mode (`isEditable: true`): Virtualization is strictly DISABLED to prevent unmounting
+ *      and preserve uninterrupted editor host continuity, selections, and caret mapping.
+ *    - In Read-Only Preview Mode: Virtualization is enabled for scalable 100+ page rendering at 60 FPS.
+ *    - In Printing Mode: Virtualization is disabled to guarantee full DOM output for window.print() and PDF compilers.
+ * 2. Strict Decomposition:
+ *    LayoutDocumentRenderer
+ *      → Viewport / Virtualization Policy
+ *      → LayoutPageRenderer
+ *          → Paper Shell (Physical geometry & dimensions)
+ *          → Page Chrome (RunningHeader, RunningFooter, Watermark, Signature)
+ *          → LayoutFragmentRenderer (Pre-computed layout fragments)
+ * 3. 100% Free of deprecated DocxLiveRenderer dependencies.
+ */
+
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { LayoutDocument, LayoutPage } from '../types/paginationTypes';
 import { LayoutDocumentOptions } from '../types/documentTypes';
 import { LayoutPageRenderer } from './LayoutPageRenderer';
@@ -10,14 +30,16 @@ export interface LayoutDocumentRendererProps {
   styles?: string;
   className?: string;
   enableVirtualization?: boolean;
+  isEditable?: boolean;
 }
 
-export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
+export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = memo(({
   document: layoutDocument,
   options = {},
   styles = '',
   className = '',
   enableVirtualization = true,
+  isEditable = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -48,6 +70,12 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
   const mergedOptions = { ...layoutDocument.options, ...options };
   const effectiveStyles = styles || layoutDocument.options?.styles || '';
 
+  // Determine active editing mode across props and options
+  const isEditMode = Boolean(isEditable || options.isEditable || mergedOptions.isEditable);
+
+  // Disable virtualization if in edit mode, printing, or explicitly disabled
+  const shouldVirtualize = enableVirtualization && !isEditMode && !isPrinting;
+
   // Track browser print event to disable virtualization during printing
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -64,9 +92,9 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
     };
   }, []);
 
-  // Track parent scrollable viewport
+  // Track parent scrollable viewport for virtual visibility calculations
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldVirtualize) return;
 
     const findScrollParent = (node: HTMLElement | null): HTMLElement | Window => {
       let current = node?.parentElement;
@@ -101,7 +129,7 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
       scrollTarget.removeEventListener('scroll', updateScroll);
       window.removeEventListener('resize', updateScroll);
     };
-  }, []);
+  }, [shouldVirtualize]);
 
   const pageHeights = useMemo(() => pages.map((p) => p.height || 1123), [pages]);
 
@@ -114,10 +142,10 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
       {
         overscan: 2,
         threshold: 8,
-        disabled: !enableVirtualization || isPrinting,
+        disabled: !shouldVirtualize,
       }
     );
-  }, [scrollTop, viewportHeight, pageHeights, enableVirtualization, isPrinting]);
+  }, [scrollTop, viewportHeight, pageHeights, shouldVirtualize]);
 
   const renderedSet = useMemo(() => new Set(virtualState.renderedIndices), [virtualState.renderedIndices]);
 
@@ -140,7 +168,7 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
         const shouldRenderFull = renderedSet.has(page.index);
 
         if (!shouldRenderFull) {
-          // Offscreen distant page placeholder with exact height and width
+          // Offscreen distant page placeholder with exact calculated physical dimensions
           return (
             <div
               key={`layout_page_${page.index}`}
@@ -180,6 +208,8 @@ export const LayoutDocumentRenderer: React.FC<LayoutDocumentRendererProps> = ({
       })}
     </div>
   );
-};
+});
+
+LayoutDocumentRenderer.displayName = 'LayoutDocumentRenderer';
 
 export default LayoutDocumentRenderer;

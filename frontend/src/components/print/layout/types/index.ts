@@ -7,4 +7,5 @@ export * from './documentTypes';
 export * from './fragmentTypes';
 export * from './paginationTypes';
 export * from './performanceTypes';
+export * from './modeMatrixTypes';
 

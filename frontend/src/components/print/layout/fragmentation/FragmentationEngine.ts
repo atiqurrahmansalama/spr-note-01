@@ -33,6 +33,11 @@ export interface NodeFragmentationResult {
   usedHeight: number;
 }
 
+/**
+ * Standard Fragmentation Result alias
+ */
+export type FragmentationResult = NodeFragmentationResult;
+
 export class FragmentationEngine {
   /**
    * Primary entry point for fragmenting a Canonical AST BlockNode

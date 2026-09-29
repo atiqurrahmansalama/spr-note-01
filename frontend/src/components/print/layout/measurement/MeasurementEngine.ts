@@ -1,5 +1,5 @@
 import { SourceNode } from '../types/documentTypes';
-import { CanonicalDocument, BlockNode } from '../../model/types';
+import { CanonicalDocument, BlockNode, TableNode } from '../../model/types';
 import { HtmlExporter } from '../../model/serialization/htmlExporter';
 import { DomMeasurementEngine } from './DomMeasurementEngine';
 import { MeasurementCache } from './MeasurementCache';
@@ -22,7 +22,7 @@ export class MeasurementEngine {
     const cache = MeasurementCache.getInstance();
 
     // 1. Direct HTMLElement input
-    if (typeof target === 'object' && target !== null && 'nodeType' in target && (target as any).nodeType === ELEMENT_NODE_TYPE) {
+    if (typeof target === 'object' && target !== null && 'nodeType' in target && target.nodeType === ELEMENT_NODE_TYPE) {
       return DomMeasurementEngine.measureElement(target as HTMLElement, context);
     }
 
@@ -50,7 +50,7 @@ export class MeasurementEngine {
       }
 
       if (block.type === 'table') {
-        const table = block as any;
+        const table = block as TableNode;
         const rows = table.rows || [];
         const fontSize = context.fontSizePx || 14;
         const rowHeight = Math.max(28, fontSize * 2.2);
@@ -87,9 +87,9 @@ export class MeasurementEngine {
             ...results[0],
             nodeId: block.id,
             type: block.type as any,
-            isAtomic: block.type === 'image',
+            isAtomic: block.type === 'image' || block.type === 'svg' || block.type === 'signature',
             isManualBreak: false,
-            keepTogether: block.type === 'image',
+            keepTogether: block.type === 'image' || block.type === 'svg' || block.type === 'signature',
             keepWithNext: block.type === 'heading',
           }
         : this.createFallbackMeasurement(block.id, block.type, context);
@@ -197,9 +197,9 @@ export class MeasurementEngine {
       firstLineHeight: height,
       lastLineHeight: height,
       breakOpportunities: [],
-      isAtomic: type === 'image' || type === 'signature',
+      isAtomic: type === 'image' || type === 'svg' || type === 'signature',
       isManualBreak: type === 'manual-page-break',
-      keepTogether: type === 'image' || type === 'signature',
+      keepTogether: type === 'image' || type === 'svg' || type === 'signature',
       keepWithNext: type === 'heading',
     };
   }

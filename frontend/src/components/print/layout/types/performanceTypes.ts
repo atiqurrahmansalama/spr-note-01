@@ -29,6 +29,8 @@ export interface LayoutChangeScope {
   changedAt: number;
   /** Optional hash of the modified content */
   contentHash?: string;
+  /** Optional previous layout document for incremental page reuse */
+  prevLayout?: any;
 }
 
 /**

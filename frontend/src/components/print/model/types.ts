@@ -52,16 +52,35 @@ export interface TextNode extends BaseNode {
 }
 
 /**
- * Dynamic Template Token Node (Placeholder)
- * Represents {{student_name}}, {{roll_number}}, etc.
+ * Dynamic Template Token Node (Placeholder / InlineToken)
+ * Represents {{student_name}}, {{roll_number}}, etc. with stable logical identity.
  */
 export interface TokenNode extends BaseNode {
   type: 'token';
   key: string;
   label?: string;
-  category?: 'student' | 'academic' | 'general' | 'exam' | 'custom';
+  display?: string;
+  sourcePath?: string;
+  category?: 'student' | 'academic' | 'general' | 'exam' | 'custom' | string;
   defaultValue?: string;
   format?: string;
+  formatting?: Mark;
+  marks?: Mark;
+}
+
+/**
+ * Payload contract for inserting a dynamic placeholder token
+ */
+export interface TokenInsertPayload {
+  id?: string;
+  key: string;
+  label?: string;
+  display?: string;
+  sourcePath?: string;
+  category?: 'student' | 'academic' | 'general' | 'exam' | 'custom' | string;
+  defaultValue?: string;
+  format?: string;
+  formatting?: Mark;
   marks?: Mark;
 }
 
@@ -79,7 +98,7 @@ export interface LinkNode extends BaseNode {
   type: 'link';
   href: string;
   title?: string;
-  content: (TextNode | TokenNode)[];
+  content: InlineNode[];
 }
 
 /**
@@ -127,7 +146,7 @@ export interface HeadingNode extends BaseNode {
 export interface ListItemNode extends BaseNode {
   type: 'list-item';
   checked?: boolean; // For checklist items
-  content: (ParagraphNode | InlineNode)[];
+  content: (ParagraphNode | InlineNode | BlockNode)[];
 }
 
 /**
@@ -176,6 +195,9 @@ export interface TableNode extends BaseNode {
     borderWidth?: number;
     alignment?: TextAlignment;
     cellPadding?: number;
+    loopArray?: string;
+    className?: string;
+    [key: string]: any;
   };
 }
 
@@ -193,6 +215,40 @@ export interface ImageNode extends BaseNode {
   alignment?: TextAlignment;
   anchorMode?: string;
   style?: Record<string, string>;
+}
+
+/**
+ * Vector SVG Block Node
+ * Represents pure vector shapes, icons, and diagrams.
+ */
+export interface SvgNode extends BaseNode {
+  type: 'svg';
+  svgContent: string;
+  viewBox?: string;
+  width?: number | string;
+  height?: number | string;
+  alignment?: TextAlignment;
+  title?: string;
+  style?: Record<string, string>;
+}
+
+/**
+ * Institutional Signature Block Node
+ * Represents official sign-off columns (Prepared By, Verified By, Approved By).
+ */
+export interface SignatureColumn {
+  id: string;
+  label: string;
+  sub?: string;
+  name?: string;
+  enabled?: boolean;
+}
+
+export interface SignatureNode extends BaseNode {
+  type: 'signature';
+  columns: SignatureColumn[];
+  style?: 'solid' | 'dashed' | 'dotted' | 'double';
+  alignment?: TextAlignment;
 }
 
 /**
@@ -232,6 +288,8 @@ export type BlockNode =
   | ListNode
   | TableNode
   | ImageNode
+  | SvgNode
+  | SignatureNode
   | ManualPageBreakNode
   | DividerNode
   | SectionNode;
@@ -261,3 +319,56 @@ export interface CanonicalDocument {
   styles?: DocumentStyles;
   body: BlockNode[];
 }
+
+/**
+ * Single Document within a Batch Execution
+ */
+export interface BatchDocumentItem {
+  id: string;
+  title: string;
+  canonicalDocument: CanonicalDocument;
+  dataRecord?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Type alias for single batch document item
+ */
+export type BatchDocument = BatchDocumentItem;
+
+/**
+ * Batch Document Package Model
+ * Represents a collection of distinct logical CanonicalDocuments generated from a template + data records
+ */
+export interface BatchDocumentPackage {
+  id: string;
+  title: string;
+  sourceTemplateId?: string;
+  scopeId?: string;
+  createdAt?: string;
+  documents: BatchDocumentItem[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Reusable Canonical Template Document Definition
+ */
+export interface TemplateDocument {
+  id: string;
+  name: string;
+  description?: string;
+  scopeId?: string;
+  canonicalDocument: CanonicalDocument;
+  detectedTokens: string[];
+  createdAt: string;
+  updatedAt: string;
+  isTableDocument?: boolean;
+  sampleColumns?: Array<{ id: string; header: string; label: string }>;
+  sampleData?: Array<Record<string, any>>;
+  templateType?: 'template' | 'generated';
+  recordsCount?: number;
+  sourceTemplateId?: string;
+  styles?: DocumentStyles;
+  metadata?: Record<string, any>;
+}
+

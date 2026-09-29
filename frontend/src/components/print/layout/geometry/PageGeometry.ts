@@ -153,14 +153,33 @@ export class PageGeometryCalculator {
       options.pageProperties
     );
 
-    const headerHeight = Math.max(0, options.headerHeightPx || 0);
-    const footerHeight = Math.max(0, options.footerHeightPx || 0);
-    const signatureHeight = Math.max(0, options.signatureHeightPx || 0);
+    const headerConfig = options.headerConfig;
+    const footerConfig = options.footerConfig;
+    const signatureConfig = options.signatureConfig;
+
+    const headerHeight = Math.max(
+      0,
+      options.headerHeightPx !== undefined
+        ? options.headerHeightPx
+        : (headerConfig?.headerHeightPx !== undefined ? headerConfig.headerHeightPx : (headerConfig ? 60 : 0))
+    );
+    const footerHeight = Math.max(
+      0,
+      options.footerHeightPx !== undefined
+        ? options.footerHeightPx
+        : (footerConfig?.footerHeightPx !== undefined ? footerConfig.footerHeightPx : (footerConfig ? 40 : 0))
+    );
+    const signatureHeight = Math.max(
+      0,
+      options.signatureHeightPx !== undefined
+        ? options.signatureHeightPx
+        : (signatureConfig?.heightPx !== undefined ? signatureConfig.heightPx : (signatureConfig ? 80 : 0))
+    );
 
     const availableContentWidthPx = Math.max(100, paperDimensionsPx.width - marginsPx.left - marginsPx.right);
     const availableContentHeightPx = Math.max(
       100,
-      paperDimensionsPx.height - marginsPx.top - marginsPx.bottom - headerHeight - footerHeight
+      paperDimensionsPx.height - marginsPx.top - marginsPx.bottom - headerHeight - footerHeight - signatureHeight
     );
 
     const contentAreaPx: Rect = {
@@ -191,7 +210,11 @@ export class PageGeometryCalculator {
       height: signatureHeight,
     };
 
-    const cssPageRule = `@page { size: ${String(pageSize).toLowerCase()} ${String(orientation).toLowerCase()}; margin: ${cssMarginString}; }`;
+    const sizeSpec =
+      pageSize === 'CUSTOM' && paperDimensionsMm
+        ? `${paperDimensionsMm.width}mm ${paperDimensionsMm.height}mm`
+        : `${String(pageSize).toLowerCase()} ${String(orientation).toLowerCase()}`;
+    const cssPageRule = `@page { size: ${sizeSpec}; margin: 0; }`;
 
     const cssPaperStyle: React.CSSProperties = {
       width: `${paperDimensionsPx.width}px`,

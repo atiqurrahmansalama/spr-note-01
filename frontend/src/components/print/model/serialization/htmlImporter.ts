@@ -26,6 +26,9 @@ import {
   TableRowNode,
   TableCellNode,
   ImageNode,
+  SvgNode,
+  SignatureNode,
+  SignatureColumn,
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
@@ -38,7 +41,7 @@ import {
   ListType,
 } from '../types';
 import { DocumentFactory } from '../documentFactory';
-import { isExplicitManualBreak, stripRuntimePaginationSpacers } from '../../layout/logicalDocument';
+import { isExplicitManualBreak, stripRuntimePaginationSpacers, sanitizeLogicalDocumentHtml } from '../../layout/logicalDocument';
 
 export class HtmlImporter {
   /**
@@ -59,7 +62,7 @@ export class HtmlImporter {
       metadata?: Record<string, any>;
     } = {}
   ): CanonicalDocument {
-    const cleanHtml = stripRuntimePaginationSpacers(html || '').trim();
+    const cleanHtml = sanitizeLogicalDocumentHtml(html || '').trim();
     if (!cleanHtml || cleanHtml === '<p></p>' || cleanHtml === '<p><br></p>') {
       return DocumentFactory.createDocument({
         id: options.id,
@@ -149,12 +152,22 @@ export class HtmlImporter {
 
     const el = node as HTMLElement;
 
-    // 0. Skip runtime pagination spacers & overlays
+    // 0. Skip runtime pagination spacers & overlays & diagnostics
     if (
       el.classList?.contains('spr-runtime-page-spacer') ||
       el.classList?.contains('spr-runtime-page-guide') ||
+      el.classList?.contains('doclab-runtime-overlay') ||
+      el.classList?.contains('doclab-visual-sheets-layer') ||
+      el.classList?.contains('spr-page-overlay-wrapper') ||
+      el.classList?.contains('spr-page-spacer') ||
+      el.classList?.contains('doclab-diagnostics-overlay') ||
+      el.classList?.contains('spr-layout-diagnostics') ||
       el.getAttribute?.('data-spr-runtime-pagination') === 'true' ||
-      el.getAttribute?.('data-runtime-spacer') === 'true'
+      el.getAttribute?.('data-runtime-spacer') === 'true' ||
+      el.getAttribute?.('data-runtime-guide') === 'true' ||
+      el.getAttribute?.('data-layout-perf') === 'true' ||
+      el.getAttribute?.('data-debug-overlay') === 'true' ||
+      el.getAttribute?.('data-diagnostics') === 'true'
     ) {
       return null;
     }
@@ -206,12 +219,37 @@ export class HtmlImporter {
       });
     }
 
-    // 6. Horizontal Dividers
+    // 6. SVG Vector Shapes
+    if (tag === 'svg') {
+      return DocumentFactory.createSvg({
+        svgContent: el.outerHTML,
+        viewBox: el.getAttribute('viewBox') || undefined,
+        width: el.getAttribute('width') || el.style.width || undefined,
+        height: el.getAttribute('height') || el.style.height || undefined,
+      });
+    }
+
+    // 7. Signature Block
+    if (el.classList.contains('print-signature-block') || el.getAttribute('data-signature-block') === 'true') {
+      const sigCols = Array.from(el.querySelectorAll('.print-signature-col, .print-signature-line-col')) as HTMLElement[];
+      const columns: SignatureColumn[] = sigCols.map((col, idx) => ({
+        id: `sig_${idx}`,
+        label: col.querySelector('.print-signature-label')?.textContent?.trim() || 'Signatory',
+        sub: col.querySelector('.print-signature-sub')?.textContent?.trim() || undefined,
+        name: col.querySelector('.print-signature-name')?.textContent?.trim() || undefined,
+        enabled: true,
+      }));
+      return DocumentFactory.createSignature({
+        columns: columns.length > 0 ? columns : undefined,
+      });
+    }
+
+    // 8. Horizontal Dividers
     if (tag === 'hr' || el.classList.contains('spr-svg-divider')) {
       return DocumentFactory.createDivider();
     }
 
-    // 7. Paragraph
+    // 9. Paragraph
     if (tag === 'p') {
       const content = this.parseInlineContent(el);
       const attributes = this.extractBlockAttributes(el);
@@ -332,18 +370,32 @@ export class HtmlImporter {
         return;
       }
 
-      // Explicit Token Span: <span data-token="key"> or <span class="doclab-token" data-key="key">
+      // Explicit Token Span: <span data-token="key">, <span class="doclab-token" ...>, etc.
       const tokenKey =
         el.getAttribute('data-token') ||
         el.getAttribute('data-key') ||
-        (el.classList.contains('doclab-token') ? el.getAttribute('data-token-key') || el.textContent?.replace(/[{}]/g, '').trim() : null);
+        el.getAttribute('data-token-key') ||
+        (el.classList.contains('doclab-token') ? el.textContent?.replace(/[{}]/g, '').trim() : null);
 
       if (tokenKey) {
+        const display = el.getAttribute('data-display') || el.getAttribute('data-label') || el.textContent?.trim() || tokenKey;
+        const sourcePath = el.getAttribute('data-source-path') || el.getAttribute('data-source') || undefined;
+        const defaultValue = el.getAttribute('data-default-value') || undefined;
+        const format = el.getAttribute('data-format') || undefined;
+        const tokenId = el.getAttribute('data-token-id') || el.id || undefined;
+        const category = el.getAttribute('data-category') || 'general';
+
         inlineNodes.push(
           DocumentFactory.createToken({
+            id: tokenId,
             key: tokenKey,
-            label: el.getAttribute('data-label') || el.textContent?.trim() || tokenKey,
-            category: (el.getAttribute('data-category') as any) || 'general',
+            label: display,
+            display,
+            sourcePath,
+            category,
+            defaultValue,
+            format,
+            formatting: Object.keys(currentMarks).length > 0 ? currentMarks : undefined,
             marks: Object.keys(currentMarks).length > 0 ? currentMarks : undefined,
           })
         );
@@ -462,15 +514,15 @@ export class HtmlImporter {
 
     // Alignment
     const align = (el.style.textAlign || el.getAttribute('align') || '').toLowerCase();
-    if (['left', 'center', 'right', 'justify'].includes(align)) {
-      attributes.alignment = align as any;
+    if (align === 'left' || align === 'center' || align === 'right' || align === 'justify') {
+      attributes.alignment = align;
       hasAttr = true;
     }
 
     // Direction (RTL / LTR)
     const dir = (el.getAttribute('dir') || el.style.direction || '').toLowerCase();
     if (dir === 'rtl' || dir === 'ltr') {
-      attributes.direction = dir as any;
+      attributes.direction = dir;
       hasAttr = true;
     }
 
@@ -500,14 +552,20 @@ export class HtmlImporter {
 
     const alignMatch = tagStr.match(/text-align:\s*(left|center|right|justify)/i) || tagStr.match(/align=["'](left|center|right|justify)["']/i);
     if (alignMatch) {
-      attributes.alignment = alignMatch[1].toLowerCase() as any;
-      hasAttr = true;
+      const parsedAlign = alignMatch[1].toLowerCase();
+      if (parsedAlign === 'left' || parsedAlign === 'center' || parsedAlign === 'right' || parsedAlign === 'justify') {
+        attributes.alignment = parsedAlign;
+        hasAttr = true;
+      }
     }
 
     const dirMatch = tagStr.match(/dir=["'](rtl|ltr)["']/i) || tagStr.match(/direction:\s*(rtl|ltr)/i);
     if (dirMatch) {
-      attributes.direction = dirMatch[1].toLowerCase() as any;
-      hasAttr = true;
+      const parsedDir = dirMatch[1].toLowerCase();
+      if (parsedDir === 'rtl' || parsedDir === 'ltr') {
+        attributes.direction = parsedDir;
+        hasAttr = true;
+      }
     }
 
     return hasAttr ? attributes : undefined;
@@ -524,6 +582,7 @@ export class HtmlImporter {
     const nodes: InlineNode[] = [];
 
     const marksStack: Mark[] = [{}];
+    let pendingTokenSpan: Partial<TokenNode> | null = null;
 
     tokens.forEach((segment) => {
       if (!segment) return;
@@ -549,12 +608,39 @@ export class HtmlImporter {
         const bgMatch = segment.match(/background(?:-color)?:\s*([#a-zA-Z0-9]+)/i);
         if (bgMatch) current.backgroundColor = bgMatch[1];
 
+        // Detect Token Span
+        if (lower.startsWith('<span') && (segment.includes('doclab-token') || segment.includes('data-token'))) {
+          const tokenKeyMatch = segment.match(/data-token=["']([^"']+)["']/) || segment.match(/data-token-key=["']([^"']+)["']/);
+          const idMatch = segment.match(/data-token-id=["']([^"']+)["']/);
+          const displayMatch = segment.match(/data-display=["']([^"']+)["']/) || segment.match(/data-label=["']([^"']+)["']/);
+          const sourceMatch = segment.match(/data-source-path=["']([^"']+)["']/) || segment.match(/data-source=["']([^"']+)["']/);
+          const catMatch = segment.match(/data-category=["']([^"']+)["']/);
+          const defMatch = segment.match(/data-default-value=["']([^"']+)["']/);
+          const formatMatch = segment.match(/data-format=["']([^"']+)["']/);
+
+          if (tokenKeyMatch) {
+            pendingTokenSpan = {
+              id: idMatch ? idMatch[1] : undefined,
+              key: tokenKeyMatch[1],
+              label: displayMatch ? displayMatch[1] : undefined,
+              display: displayMatch ? displayMatch[1] : undefined,
+              sourcePath: sourceMatch ? sourceMatch[1] : undefined,
+              category: catMatch ? catMatch[1] : undefined,
+              defaultValue: defMatch ? defMatch[1] : undefined,
+              format: formatMatch ? formatMatch[1] : undefined,
+            };
+          }
+        }
+
         marksStack.push(current);
         return;
       }
 
       // Closing tags
       if (lower.startsWith('</')) {
+        if (lower.startsWith('</span')) {
+          pendingTokenSpan = null;
+        }
         if (marksStack.length > 1) {
           marksStack.pop();
         }
@@ -566,14 +652,23 @@ export class HtmlImporter {
       const activeMarks = marksStack[marksStack.length - 1];
       const marks = Object.keys(activeMarks).length > 0 ? activeMarks : undefined;
 
-      if (tokenMatch) {
+      if (tokenMatch || pendingTokenSpan) {
+        const tokenKey = tokenMatch ? tokenMatch[1] : pendingTokenSpan?.key || segment.replace(/[{}]/g, '').trim();
         nodes.push(
           DocumentFactory.createToken({
-            key: tokenMatch[1],
-            label: tokenMatch[1],
+            id: pendingTokenSpan?.id,
+            key: tokenKey,
+            label: pendingTokenSpan?.label || tokenKey,
+            display: pendingTokenSpan?.display || pendingTokenSpan?.label || tokenKey,
+            sourcePath: pendingTokenSpan?.sourcePath,
+            category: pendingTokenSpan?.category || 'general',
+            defaultValue: pendingTokenSpan?.defaultValue,
+            format: pendingTokenSpan?.format,
+            formatting: marks,
             marks,
           })
         );
+        pendingTokenSpan = null;
         return;
       }
 
@@ -664,13 +759,66 @@ export class HtmlImporter {
    */
   private static parseHtmlRegex(html: string): BlockNode[] {
     const blocks: BlockNode[] = [];
-    const blockRegex = /(<table[\s\S]*?<\/table>|<h[1-6]\b[\s\S]*?<\/h[1-6]>|<p\b[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<ol\b[\s\S]*?<\/ol>|<ul\b[\s\S]*?<\/ul>|<hr[\s\S]*?>)/gi;
+    const blockRegex = /(<table[\s\S]*?<\/table>|<h[1-6]\b[\s\S]*?<\/h[1-6]>|<div[^>]*print-signature-block[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>|<div[^>]*><svg[\s\S]*?<\/svg><\/div>|<p\b[\s\S]*?<\/p>|<div\b[^>]*?(?:spr-page-break|data-manual-break|docx_page_break)[^>]*?>[\s\S]*?<\/div>|<!--[\s\S]*?-->|<ol\b[\s\S]*?<\/ol>|<ul\b[\s\S]*?<\/ul>|<hr[\s\S]*?>)/gi;
     const matches = html.match(blockRegex) || [html];
 
     matches.forEach((rawBlock) => {
+      if (rawBlock.startsWith('<!--')) {
+        const isCommentManual = isExplicitManualBreak(rawBlock);
+        if (isCommentManual) {
+          blocks.push(DocumentFactory.createManualPageBreak());
+        }
+        return;
+      }
+
       const isManual = isExplicitManualBreak(rawBlock);
       if (isManual) {
         blocks.push(DocumentFactory.createManualPageBreak());
+        return;
+      }
+
+      // Skip auto page break divs that lack manual flags
+      if (
+        /class=["'][^"']*?\b(?:spr-page-break|docx_page_break|data-page-break)\b/i.test(rawBlock) ||
+        /data-page-break/i.test(rawBlock)
+      ) {
+        return;
+      }
+
+      // SVG Vector Shapes
+      if (/<svg/i.test(rawBlock)) {
+        const svgOnlyMatch = rawBlock.match(/<svg[\s\S]*?<\/svg>/i);
+        const svgMarkup = svgOnlyMatch ? svgOnlyMatch[0] : rawBlock;
+        const viewBoxMatch = svgMarkup.match(/viewBox=["']([^"']+)["']/i);
+        const widthMatch = svgMarkup.match(/width=["']([^"']+)["']/i);
+        const heightMatch = svgMarkup.match(/height=["']([^"']+)["']/i);
+        blocks.push(
+          DocumentFactory.createSvg({
+            svgContent: svgMarkup,
+            viewBox: viewBoxMatch ? viewBoxMatch[1] : undefined,
+            width: widthMatch ? widthMatch[1] : undefined,
+            height: heightMatch ? heightMatch[1] : undefined,
+          })
+        );
+        return;
+      }
+
+      // Signature Blocks
+      if (/print-signature-block|data-signature-block/i.test(rawBlock)) {
+        const colRegex = /<div class="print-signature-col"[\s\S]*?<div class="print-signature-label"[^>]*>([\s\S]*?)<\/div>(?:[\s\S]*?<div class="print-signature-sub"[^>]*>([\s\S]*?)<\/div>)?(?:[\s\S]*?<div class="print-signature-name"[^>]*>([\s\S]*?)<\/div>)?[\s\S]*?<\/div>/gi;
+        const columns: SignatureColumn[] = [];
+        let colMatch: RegExpExecArray | null;
+        let cIdx = 0;
+        while ((colMatch = colRegex.exec(rawBlock)) !== null) {
+          columns.push({
+            id: `sig_${cIdx++}`,
+            label: colMatch[1]?.replace(/<[^>]+>/g, '').trim() || 'Signatory',
+            sub: colMatch[2]?.replace(/<[^>]+>/g, '').trim() || undefined,
+            name: colMatch[3]?.replace(/<[^>]+>/g, '').trim() || undefined,
+            enabled: true,
+          });
+        }
+        blocks.push(DocumentFactory.createSignature({ columns: columns.length > 0 ? columns : undefined }));
         return;
       }
 

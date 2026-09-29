@@ -16,10 +16,12 @@
  * Provides clean extension points for localized reflow without DOM thrashing.
  */
 
-import { SourceNode } from '../types/documentTypes';
+import { SourceNode, LayoutDocumentOptions } from '../types/documentTypes';
+import { BlockNode } from '../../model/types';
 import { LayoutDocument, LayoutPage } from '../types/paginationTypes';
 import { LayoutChangeScope, LayoutPerformanceMetrics } from '../types/performanceTypes';
 import { MeasurementCache } from '../measurement/MeasurementCache';
+import { FragmentCache } from './FragmentCache';
 
 export class IncrementalLayoutPlanner {
   /**
@@ -92,14 +94,35 @@ export class IncrementalLayoutPlanner {
    */
   public static computeChangeScope(
     prevLayout: LayoutDocument | null | undefined,
-    prevNodes: SourceNode[],
-    nextNodes: SourceNode[]
+    prevNodes: Array<SourceNode | BlockNode | HTMLElement | any>,
+    nextNodes: Array<SourceNode | BlockNode | HTMLElement | any>,
+    newOptions?: LayoutDocumentOptions
   ): LayoutChangeScope {
-    if (!prevLayout || prevLayout.pages.length === 0) {
+    if (!prevLayout || !prevLayout.pages || prevLayout.pages.length === 0) {
       return {
         type: 'full',
         changedAt: Date.now(),
       };
+    }
+
+    // If options (page size, orientation, margins, fonts) changed, force full re-layout
+    if (newOptions && prevLayout.options) {
+      const prevOpt = prevLayout.options;
+      if (
+        newOptions.pageSize !== prevOpt.pageSize ||
+        newOptions.orientation !== prevOpt.orientation ||
+        newOptions.margin !== prevOpt.margin ||
+        newOptions.density !== prevOpt.density ||
+        newOptions.fontSizePx !== prevOpt.fontSizePx ||
+        newOptions.fontFamily !== prevOpt.fontFamily ||
+        newOptions.lineHeight !== prevOpt.lineHeight ||
+        newOptions.styles !== prevOpt.styles
+      ) {
+        return {
+          type: 'full',
+          changedAt: Date.now(),
+        };
+      }
     }
 
     const { dirtyNodeIds, firstAffectedIndex } = this.identifyDirtyNodes(prevNodes, nextNodes);
@@ -111,6 +134,7 @@ export class IncrementalLayoutPlanner {
         affectedPageIndex: 0,
         affectedNodeIndex: 0,
         changedAt: Date.now(),
+        prevLayout,
       };
     }
 
@@ -146,16 +170,19 @@ export class IncrementalLayoutPlanner {
       affectedPageIndex: Math.max(0, earliestPageIndex),
       affectedNodeIndex: firstAffectedIndex,
       changedAt: Date.now(),
+      prevLayout,
     };
   }
 
   /**
-   * Invalidates measurement cache for dirty blocks so they are remeasured
+   * Invalidates measurement and fragment caches for dirty blocks so they are remeasured and re-sliced
    */
   public static invalidateDirtyNodes(dirtyNodeIds: string[]): void {
-    const cache = MeasurementCache.getInstance();
+    const measurementCache = MeasurementCache.getInstance();
+    const fragmentCache = FragmentCache.getInstance();
     for (const nodeId of dirtyNodeIds) {
-      cache.invalidate(nodeId);
+      measurementCache.invalidate(nodeId);
+      fragmentCache.invalidate(nodeId);
     }
   }
 

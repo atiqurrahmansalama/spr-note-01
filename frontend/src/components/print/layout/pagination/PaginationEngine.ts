@@ -71,16 +71,16 @@ export class PaginationEngine {
         }))
       );
 
-    let nextNodes: any[] = [];
+    let nextNodes: (BlockNode | SourceNode | HTMLElement)[] = [];
     if (typeof nextInput === 'string') {
       nextNodes = parseContinuousHtmlToLogicalNodes(nextInput);
     } else if (Array.isArray(nextInput)) {
-      nextNodes = nextInput as any;
+      nextNodes = nextInput;
     } else if (typeof nextInput === 'object' && nextInput !== null && 'body' in nextInput) {
-      nextNodes = (nextInput as any).body;
+      nextNodes = nextInput.body;
     }
 
-    const scope = IncrementalLayoutPlanner.computeChangeScope(prevLayout, prevNodes, nextNodes);
+    const scope = IncrementalLayoutPlanner.computeChangeScope(prevLayout, prevNodes, nextNodes, options);
     return this.paginate(nextInput, options, scope);
   }
 
@@ -159,7 +159,7 @@ export class PaginationEngine {
 
     // 4. Single-page continuous mode (if flow pagination is explicitly disabled)
     if (options.enableFlowPagination === false) {
-      const fullHtml = typeof input === 'string' ? input : (input as any).rawHtml || '';
+      const fullHtml = typeof input === 'string' ? input : 'rawHtml' in input ? input.rawHtml : '';
       const fragment = DocumentLayoutEngine.createFragment({
         id: 'single_page_fragment',
         sourceNodeId: 'root',
@@ -197,8 +197,19 @@ export class PaginationEngine {
       };
     }
 
+    // Fast-path: If change scope is 'none' and previous layout is valid
+    if (scope?.type === 'none' && scope.prevLayout && scope.prevLayout.pages && scope.prevLayout.pages.length > 0) {
+      return {
+        document: scope.prevLayout,
+        pages: scope.prevLayout.pages,
+        totalPages: scope.prevLayout.totalPages,
+        overflowDetected: false,
+        isComplete: true,
+      };
+    }
+
     // 5. Main Dynamic Pagination Loop
-    const queue: Array<BlockNode | SourceNode | HTMLElement> = [...blocksOrNodes];
+    let queue: Array<BlockNode | SourceNode | HTMLElement> = [...blocksOrNodes];
     let overflowDetected = false;
     let prevMarginBottom = 0;
 
@@ -206,6 +217,47 @@ export class PaginationEngine {
     let currentSectionIndex = 0;
     let currentSectionTitle = '';
     const pageSectionMap = new Map<number, { id: string; index: number; title: string }>();
+
+    // Incremental prefix page reuse optimization
+    if (
+      scope?.type === 'incremental' &&
+      scope.affectedPageIndex !== undefined &&
+      scope.affectedPageIndex > 0 &&
+      scope.prevLayout &&
+      scope.prevLayout.pages &&
+      scope.prevLayout.pages.length > scope.affectedPageIndex
+    ) {
+      const unaffectedPages = scope.prevLayout.pages.slice(0, scope.affectedPageIndex);
+      const unaffectedNodeIds = new Set<string>();
+      unaffectedPages.forEach((p: LayoutPage) => {
+        p.fragments.forEach((f) => {
+          if (f.sourceNodeId) unaffectedNodeIds.add(f.sourceNodeId);
+        });
+      });
+
+      const isCleanPrefix = !scope.dirtyNodeIds?.some((id) => unaffectedNodeIds.has(id));
+
+      if (isCleanPrefix) {
+        // Find the first block belonging to the affected page index
+        const firstAffectedFrag = scope.prevLayout.pages[scope.affectedPageIndex]?.fragments[0];
+        let startNodeIdx = -1;
+        if (firstAffectedFrag && firstAffectedFrag.sourceNodeId) {
+          startNodeIdx = blocksOrNodes.findIndex((b) => {
+            const id = 'id' in b ? b.id : undefined;
+            return id === firstAffectedFrag.sourceNodeId;
+          });
+        }
+
+        if (startNodeIdx === -1 && scope.affectedNodeIndex !== undefined) {
+          startNodeIdx = scope.affectedNodeIndex;
+        }
+
+        if (startNodeIdx > 0) {
+          builder.seedUnaffectedPages(unaffectedPages);
+          queue = blocksOrNodes.slice(startNodeIdx);
+        }
+      }
+    }
 
     while (queue.length > 0) {
       const currentItem = queue.shift()!;
@@ -215,9 +267,8 @@ export class PaginationEngine {
       const isSectionBreak =
         typeof currentItem === 'object' &&
         currentItem !== null &&
-        (('type' in currentItem && (currentItem as any).type === 'section') ||
-          ('constraints' in currentItem && (currentItem as any).constraints?.sectionBreak) ||
-          ('sectionBreak' in currentItem && (currentItem as any).sectionBreak));
+        (('type' in currentItem && currentItem.type === 'section') ||
+          ('constraints' in currentItem && Boolean((currentItem as SourceNode).constraints?.sectionBreak)));
 
       if (isSectionBreak) {
         if (builder.usedHeight > 0) {
@@ -225,8 +276,13 @@ export class PaginationEngine {
           prevMarginBottom = 0;
         }
         currentSectionIndex++;
-        currentSectionId = ('id' in currentItem && (currentItem as any).id) || `section_${currentSectionIndex}`;
-        currentSectionTitle = (currentItem as any).sectionTitle || (currentItem as any).title || (currentItem as any).constraints?.sectionTitle || '';
+        currentSectionId = ('id' in currentItem && currentItem.id) || `section_${currentSectionIndex}`;
+        currentSectionTitle =
+          ('sectionTitle' in currentItem && typeof currentItem.sectionTitle === 'string' && currentItem.sectionTitle) ||
+          ('title' in currentItem && typeof currentItem.title === 'string' && currentItem.title) ||
+          ('constraints' in currentItem && typeof (currentItem as SourceNode).constraints?.sectionTitle === 'string'
+            ? (currentItem as SourceNode).constraints?.sectionTitle || ''
+            : '');
         pageSectionMap.set(builder.currentValidPageIndex, {
           id: currentSectionId,
           index: currentSectionIndex,
@@ -272,14 +328,15 @@ export class PaginationEngine {
         breakEval.isManualBreak ||
         (typeof currentItem === 'object' &&
           currentItem !== null &&
-          (('type' in currentItem && (currentItem as any).type === 'manual-page-break') ||
-            (currentItem as any).explicitBreak ||
-            (currentItem as any).isManualBreak ||
-            (currentItem as any).id?.startsWith('manual_break')));
+          (('type' in currentItem && currentItem.type === 'manual-page-break') ||
+            ('explicitBreak' in currentItem && Boolean(currentItem.explicitBreak)) ||
+            ('isManualBreak' in currentItem && Boolean(currentItem.isManualBreak)) ||
+            ('id' in currentItem && typeof currentItem.id === 'string' && currentItem.id.startsWith('manual_break'))));
 
       if (isPureManual) {
+        const manualBreakId = ('id' in currentItem && currentItem.id) || 'manual_page_break';
         builder.recordDecision(
-          ('id' in currentItem && (currentItem as any).id) || 'manual_page_break',
+          manualBreakId,
           'manual-page-break',
           'MANUAL_BREAK',
           0,
@@ -288,7 +345,7 @@ export class PaginationEngine {
         if (debugCollector) {
           debugCollector.recordDecision({
             pageIndex: builder.currentValidPageIndex,
-            blockId: ('id' in currentItem && (currentItem as any).id) || 'manual_page_break',
+            blockId: manualBreakId,
             nodeType: 'manual-page-break',
             measuredHeightPx: 0,
             availableHeightPx: builder.availableHeight,

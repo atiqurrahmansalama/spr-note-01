@@ -269,6 +269,46 @@ export function runCanonicalDocumentModelTestSuite(): Record<string, boolean> {
   results['8_template_adapter_bridge'] = test8Passed;
 
   // --------------------------------------------------------------------------
+  // TEST 9: SVG & SIGNATURE BLOCKS SERIALIZATION AND PURITY
+  // --------------------------------------------------------------------------
+  console.log('\n--- TEST 9: SVG & SIGNATURE BLOCKS SERIALIZATION & PURITY ---');
+  const svgDoc = DocumentFactory.createDocument({
+    id: 'doc_svg_sig',
+    title: 'Certificate with Signatures',
+    body: [
+      DocumentFactory.createHeading({ level: 1, content: [DocumentFactory.createText('Institutional Certificate')] }),
+      DocumentFactory.createSvg({
+        svgContent: '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="green" stroke-width="4" fill="yellow" /></svg>',
+        width: 100,
+        height: 100,
+        alignment: 'center',
+      }),
+      DocumentFactory.createSignature({
+        columns: [
+          { id: 'sig1', label: 'Prepared By', sub: 'Teacher' },
+          { id: 'sig2', label: 'Authorized By', sub: 'Principal' },
+        ],
+      }),
+    ],
+  });
+
+  const exportedHtml = HtmlExporter.exportToHtml(svgDoc);
+  const reImportedDoc = HtmlImporter.importFromHtml(exportedHtml);
+
+  const test9Passed =
+    svgDoc.body.length === 3 &&
+    svgDoc.body[1].type === 'svg' &&
+    svgDoc.body[2].type === 'signature' &&
+    reImportedDoc.body.length === 3 &&
+    reImportedDoc.body[1].type === 'svg' &&
+    reImportedDoc.body[2].type === 'signature';
+
+  console.log('1. Exported HTML contains signature block:', exportedHtml.includes('print-signature-block'));
+  console.log('2. Exported HTML contains SVG:', exportedHtml.includes('<svg'));
+  console.log('3. Re-imported AST matches types:', test9Passed);
+  results['9_svg_and_signature_nodes_purity'] = test9Passed;
+
+  // --------------------------------------------------------------------------
   // SUMMARY
   // --------------------------------------------------------------------------
   console.log('\n================================================================');

@@ -1,11 +1,9 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   BoldIcon,
   ItalicIcon,
   UnderlineIcon,
   StrikethroughIcon,
-  SubscriptIcon,
-  SuperscriptIcon,
   TextColorIcon,
   HighlighterIcon,
   AlignLeftIcon,
@@ -14,32 +12,44 @@ import {
   AlignJustifyIcon,
   ListBulletIcon,
   ListOrderedIcon,
-  IndentIcon,
-  OutdentIcon,
   DividerIcon,
   TableIcon,
   ChevronDownIcon,
   PageBreakIcon,
   ShapesIcon,
-  PenLineIcon,
-  CircleIcon,
-  SquareIcon,
-  SvgIcon,
   UploadIcon,
-  SparklesIcon,
 } from '../ui/Icons';
 import {
   generateSvgDividerHtml,
-  generateSvgSignatureBlockHtml,
-  generateSvgBoxHtml,
-  generateSvgSealHtml,
   wrapRawSvgCode,
   SVG_PRESET_ITEMS,
 } from './svgShapeTemplates';
-import { createManualPageBreakHtml } from './layout/logicalDocument';
+
+export interface DocLabEditorCommands {
+  toggleBold: () => void;
+  toggleItalic: () => void;
+  toggleUnderline: () => void;
+  toggleStrike: () => void;
+  setFontFamily: (fontFamily: string) => void;
+  setFontSize: (fontSize: string | number) => void;
+  setTextColor: (color: string) => void;
+  setHighlightColor: (color: string) => void;
+  setBlockType: (blockType: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'ul' | 'ol' | 'blockquote') => void;
+  setAlignment: (align: 'left' | 'center' | 'right' | 'justify') => void;
+  toggleList: (listType: 'ul' | 'ol') => void;
+  insertTable: (rows?: number, cols?: number) => void;
+  insertDivider: () => void;
+  insertSvg: (svgMarkup: string) => void;
+  insertToken: (tokenKey: string, category?: string) => void;
+  insertManualPageBreak: () => void;
+  removeFormat: () => void;
+}
 
 export interface DocxFormattingRibbonProps {
-  onCommand?: (cmd: string, val?: string) => void;
+  editor?: {
+    commands: DocLabEditorCommands;
+  };
+  onCommand?: (cmd: string, val?: string, options?: any) => void;
   onInsertToken?: (token: string) => void;
   className?: string;
 }
@@ -86,8 +96,11 @@ const FONT_SIZES = [
  * Enterprise Rich-Text Formatting Ribbon for Print Studio Document Canvas
  * Positioned cleanly outside the paper sheet, with comprehensive typography,
  * alignments, color palettes, headings, tables, and divider tools.
+ * 
+ * Powered 100% by pure Editor Commands (zero deprecated execCommand, zero direct DOM mutation).
  */
 export default function DocxFormattingRibbon({
+  editor,
   onCommand,
   className = '',
 }: DocxFormattingRibbonProps) {
@@ -101,61 +114,48 @@ export default function DocxFormattingRibbon({
   const shapeMenuRef = useRef<HTMLDivElement>(null);
   const svgFileInputRef = useRef<HTMLInputElement>(null);
 
-  const executeCommand = useCallback(
-    (cmd: string, val: string = '') => {
-      try {
-        document.execCommand(cmd, false, val);
-        const activeEl = document.activeElement;
-        if (activeEl && ((activeEl as HTMLElement).isContentEditable || activeEl.getAttribute('contenteditable') === 'true')) {
-          activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        onCommand?.(cmd, val);
-      } catch (e) {
-        console.warn('Formatting command execution error', e);
+  // Unified Editor Commands Dispatcher Proxy
+  const editorCommands: DocLabEditorCommands = useMemo(() => {
+    if (editor?.commands) {
+      return editor.commands;
+    }
+
+    // Default dispatcher bridging to single-host PaginatedDocumentEditor
+    const dispatch = (command: string, value: string = '', options: any = {}) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('spr_doclab_editor_command', {
+            detail: { command, value, options },
+          })
+        );
       }
-    },
-    [onCommand]
-  );
+      onCommand?.(command, value, options);
+    };
 
-  const executeAlignment = useCallback(
-    (align: 'left' | 'center' | 'right' | 'justify') => {
-      try {
-        const cmdMap = {
-          left: 'justifyLeft',
-          center: 'justifyCenter',
-          right: 'justifyRight',
-          justify: 'justifyFull',
-        };
-        document.execCommand(cmdMap[align], false, '');
-
-        // Also set explicit text-align on enclosing table cell if cursor is inside a table
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          let node: Node | null = sel.anchorNode;
-          while (node && node !== document.body) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const el = node as HTMLElement;
-              const tag = el.tagName.toLowerCase();
-              if (tag === 'td' || tag === 'th') {
-                el.style.textAlign = align;
-                break;
-              }
-            }
-            node = node.parentNode;
-          }
-        }
-
-        const activeEl = document.activeElement;
-        if (activeEl && ((activeEl as HTMLElement).isContentEditable || activeEl.getAttribute('contenteditable') === 'true')) {
-          activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        onCommand?.(cmdMap[align], align);
-      } catch (e) {
-        console.warn('Alignment command error', e);
-      }
-    },
-    [onCommand]
-  );
+    return {
+      toggleBold: () => dispatch('bold'),
+      toggleItalic: () => dispatch('italic'),
+      toggleUnderline: () => dispatch('underline'),
+      toggleStrike: () => dispatch('strike'),
+      setFontFamily: (font: string) => dispatch('fontFamily', font),
+      setFontSize: (size: string | number) => dispatch('fontSize', String(size)),
+      setTextColor: (color: string) => dispatch('color', color),
+      setHighlightColor: (color: string) => dispatch('backgroundColor', color),
+      setBlockType: (type) => {
+        if (type === 'p') dispatch('paragraph');
+        else if (type.startsWith('h')) dispatch('heading', type.replace('h', ''));
+        else dispatch(type === 'ul' ? 'unordered-list' : 'ordered-list');
+      },
+      setAlignment: (align) => dispatch('align', align),
+      toggleList: (listType) => dispatch(listType === 'ul' ? 'unordered-list' : 'ordered-list'),
+      insertTable: (rows = 3, cols = 3) => dispatch('insertTable', '', { rows, cols }),
+      insertDivider: () => dispatch('insertSvg', generateSvgDividerHtml({ style: 'solid', thickness: 1.5, color: '#94a3b8' })),
+      insertSvg: (svgMarkup: string) => dispatch('insertSvg', svgMarkup),
+      insertToken: (tokenKey: string, category: string = 'general') => dispatch('insertToken', tokenKey, { category }),
+      insertManualPageBreak: () => dispatch('insertPageBreak'),
+      removeFormat: () => dispatch('removeFormat'),
+    };
+  }, [editor?.commands, onCommand]);
 
   // Close color & shape menus when clicking outside
   useEffect(() => {
@@ -172,29 +172,15 @@ export default function DocxFormattingRibbon({
   }, []);
 
   const handleInsertTable = (rows: number = 3, cols: number = 3) => {
-    let tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: 1px solid #cbd5e1;">';
-    tableHtml += '<thead><tr style="background-color: #f1f5f9;">';
-    for (let c = 0; c < cols; c++) {
-      tableHtml += `<th style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; text-align: left;">Header ${c + 1}</th>`;
-    }
-    tableHtml += '</tr></thead><tbody>';
-    for (let r = 0; r < rows; r++) {
-      tableHtml += '<tr>';
-      for (let c = 0; c < cols; c++) {
-        tableHtml += '<td style="border: 1px solid #cbd5e1; padding: 6px 10px;">Cell</td>';
-      }
-      tableHtml += '</tr>';
-    }
-    tableHtml += '</tbody></table><p><br></p>';
-    executeCommand('insertHTML', tableHtml);
+    editorCommands.insertTable(rows, cols);
   };
 
   const handleInsertDivider = () => {
-    executeCommand('insertHTML', generateSvgDividerHtml({ style: 'solid', thickness: 1.5, color: '#94a3b8' }));
+    editorCommands.insertDivider();
   };
 
   const handleInsertSvgItem = (htmlContent: string) => {
-    executeCommand('insertHTML', htmlContent);
+    editorCommands.insertSvg(htmlContent);
     setIsShapeMenuOpen(false);
   };
 
@@ -220,8 +206,8 @@ export default function DocxFormattingRibbon({
   };
 
   const handleInsertPageBreak = useCallback(() => {
-    executeCommand('insertHTML', createManualPageBreakHtml());
-  }, [executeCommand]);
+    editorCommands.insertManualPageBreak();
+  }, [editorCommands]);
 
   // Global Ctrl+Enter shortcut for inserting a page break in active document
   useEffect(() => {
@@ -252,12 +238,7 @@ export default function DocxFormattingRibbon({
       {/* 1. Headings & Block Format */}
       <div className="flex items-center gap-0.5 border-r theme-border pr-1 mr-0.5">
         <select
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === 'p' || val === 'h1' || val === 'h2' || val === 'h3' || val === 'blockquote' || val === 'pre') {
-              executeCommand('formatBlock', `<${val}>`);
-            }
-          }}
+          onChange={(e) => editorCommands.setBlockType(e.target.value as any)}
           defaultValue="p"
           className="px-2 py-1 rounded-lg text-xs font-semibold theme-bg-surface border theme-border theme-text-primary focus:outline-none cursor-pointer"
           title="Text Style / Heading"
@@ -266,13 +247,11 @@ export default function DocxFormattingRibbon({
           <option value="h1">Heading 1</option>
           <option value="h2">Heading 2</option>
           <option value="h3">Heading 3</option>
-          <option value="blockquote">Quote</option>
-          <option value="pre">Code Block</option>
         </select>
 
         {/* Font Family */}
         <select
-          onChange={(e) => executeCommand('fontName', e.target.value)}
+          onChange={(e) => editorCommands.setFontFamily(e.target.value)}
           defaultValue="Inter, system-ui, sans-serif"
           className="px-2 py-1 rounded-lg text-xs font-medium theme-bg-surface border theme-border theme-text-primary focus:outline-none cursor-pointer max-w-[110px] truncate"
           title="Font Family"
@@ -286,7 +265,7 @@ export default function DocxFormattingRibbon({
 
         {/* Font Size */}
         <select
-          onChange={(e) => executeCommand('fontSize', e.target.value)}
+          onChange={(e) => editorCommands.setFontSize(e.target.value)}
           defaultValue="3"
           className="px-1.5 py-1 rounded-lg text-xs font-medium theme-bg-surface border theme-border theme-text-primary focus:outline-none cursor-pointer w-[60px]"
           title="Font Size"
@@ -299,11 +278,11 @@ export default function DocxFormattingRibbon({
         </select>
       </div>
 
-      {/* 2. Text Styles: Bold, Italic, Underline, Strikethrough, Sub/Sup */}
+      {/* 2. Text Styles: Bold, Italic, Underline, Strikethrough */}
       <div className="flex items-center gap-0.5 border-r theme-border pr-1 mr-0.5">
         <button
           type="button"
-          onClick={() => executeCommand('bold')}
+          onClick={() => editorCommands.toggleBold()}
           title="Bold (Ctrl+B)"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -311,7 +290,7 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeCommand('italic')}
+          onClick={() => editorCommands.toggleItalic()}
           title="Italic (Ctrl+I)"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -319,7 +298,7 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeCommand('underline')}
+          onClick={() => editorCommands.toggleUnderline()}
           title="Underline (Ctrl+U)"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -327,27 +306,11 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeCommand('strikeThrough')}
+          onClick={() => editorCommands.toggleStrike()}
           title="Strikethrough"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
           <StrikethroughIcon className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => executeCommand('subscript')}
-          title="Subscript"
-          className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-        >
-          <SubscriptIcon className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => executeCommand('superscript')}
-          title="Superscript"
-          className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-        >
-          <SuperscriptIcon className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -372,7 +335,7 @@ export default function DocxFormattingRibbon({
                   key={c.label}
                   type="button"
                   onClick={() => {
-                    executeCommand('foreColor', c.value);
+                    editorCommands.setTextColor(c.value);
                     setActiveColorMenu(null);
                   }}
                   title={c.label}
@@ -403,7 +366,7 @@ export default function DocxFormattingRibbon({
                   key={c.label}
                   type="button"
                   onClick={() => {
-                    executeCommand('hiliteColor', c.value);
+                    editorCommands.setHighlightColor(c.value);
                     setActiveColorMenu(null);
                   }}
                   title={c.label}
@@ -419,7 +382,7 @@ export default function DocxFormattingRibbon({
       <div className="flex items-center gap-0.5 border-r theme-border pr-1 mr-0.5">
         <button
           type="button"
-          onClick={() => executeAlignment('left')}
+          onClick={() => editorCommands.setAlignment('left')}
           title="Align Left"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -427,7 +390,7 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeAlignment('center')}
+          onClick={() => editorCommands.setAlignment('center')}
           title="Align Center"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -435,7 +398,7 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeAlignment('right')}
+          onClick={() => editorCommands.setAlignment('right')}
           title="Align Right"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -443,7 +406,7 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeAlignment('justify')}
+          onClick={() => editorCommands.setAlignment('justify')}
           title="Justify"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -455,7 +418,7 @@ export default function DocxFormattingRibbon({
       <div className="flex items-center gap-0.5 border-r theme-border pr-1 mr-0.5">
         <button
           type="button"
-          onClick={() => executeCommand('insertUnorderedList')}
+          onClick={() => editorCommands.toggleList('ul')}
           title="Bullet List"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
@@ -463,27 +426,11 @@ export default function DocxFormattingRibbon({
         </button>
         <button
           type="button"
-          onClick={() => executeCommand('insertOrderedList')}
+          onClick={() => editorCommands.toggleList('ol')}
           title="Numbered List"
           className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
         >
           <ListOrderedIcon className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => executeCommand('indent')}
-          title="Increase Indent"
-          className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-        >
-          <IndentIcon className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => executeCommand('outdent')}
-          title="Decrease Indent"
-          className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition-colors cursor-pointer"
-        >
-          <OutdentIcon className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -661,7 +608,7 @@ export default function DocxFormattingRibbon({
       {/* 7. Clear Formatting */}
       <button
         type="button"
-        onClick={() => executeCommand('removeFormat')}
+        onClick={() => editorCommands.removeFormat()}
         title="Clear Formatting (Tx)"
         className="p-1.5 rounded-lg theme-text-secondary hover:text-rose-500 hover:theme-bg-elevated transition-colors text-xs font-mono font-bold cursor-pointer"
       >

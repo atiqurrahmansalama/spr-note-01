@@ -1,15 +1,21 @@
 /**
- * DocLab Layout Regression Test Suite Barrel Exports
+ * DocLab Layout Test Suite Barrel Exports
+ * Clean separation of Unit/Model test suites and Phase Regression verification suites.
  */
 
-export * from './fixtures/layoutFixtures';
-export * from './LayoutTestSuite';
-export * from './verify_phase12_browser_acceptance';
-export * from './verify_phase11_legacy_cleanup';
-export * from './verify_phase10_enterprise_performance';
-
-export * from './verify_phase9_unified_output_pipelines';
-export * from './verify_phase8_dynamic_templates';
-export * from './verify_phase7_advanced_layout';
-export * from './verify_phase6_editor_reflow';
-
+export * from './unit/canonical_document.test';
+export * from './unit/geometry.test';
+export * from './unit/fragmentation.test';
+export * from './unit/pagination_rules.test';
+export * from './unit/template_merge.test';
+export * from './unit/importers_exporters.test';
+export * from './unit/native_tabular.test';
+export * from './unit/caret_and_selection.test';
+export * from './unit/mode_matrix.test';
+export * from './unit/code_hygiene_audit.test';
+export * from './unit/content_completeness.test';
+export * from './unit/save_reload_invariants.test';
+export * from './unit/legacy_migration.test';
+export * from './unit/type_safety.test';
+export * from './unit/performance_architecture.test';
+export * from './unit/run_all_unit_tests';

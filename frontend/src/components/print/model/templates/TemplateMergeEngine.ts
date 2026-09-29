@@ -32,6 +32,8 @@
 
 import {
   CanonicalDocument,
+  BatchDocumentItem,
+  BatchDocumentPackage,
   BlockNode,
   ParagraphNode,
   HeadingNode,
@@ -164,6 +166,56 @@ export class TemplateMergeEngine {
     });
   }
 
+  /**
+   * Batch merges a template AST into a strongly-typed BatchDocumentPackage model
+   */
+  public static createBatchPackage(
+    templateDoc: CanonicalDocument,
+    records: Array<Record<string, any>>,
+    options: TemplateMergeOptions & { sourceTemplateId?: string; scopeId?: string; packageName?: string } = {}
+  ): BatchDocumentPackage {
+    const recordsList = records && records.length > 0 ? records : [{}];
+    const documents: BatchDocumentItem[] = recordsList.map((rec, idx) => {
+      const canonicalDocument = this.mergeDocument(templateDoc, rec, options);
+      const title = canonicalDocument.title || `${templateDoc.title || 'Document'} #${idx + 1}`;
+      return {
+        id: `batch_item_${idx + 1}_${Date.now()}`,
+        title,
+        canonicalDocument,
+        dataRecord: rec,
+      };
+    });
+
+    const packageName =
+      options.packageName ||
+      `${templateDoc.title || 'Batch Package'} — (${documents.length} Records)`;
+
+    return {
+      id: `batch_pkg_${Date.now()}`,
+      title: packageName,
+      sourceTemplateId: options.sourceTemplateId || templateDoc.id,
+      scopeId: options.scopeId,
+      createdAt: new Date().toISOString(),
+      documents,
+    };
+  }
+
+  /**
+   * Batch merges raw HTML template string into a strongly-typed BatchDocumentPackage model
+   */
+  public static mergeHtmlToBatchPackage(
+    htmlTemplate: string,
+    records: Array<Record<string, any>>,
+    options: TemplateMergeOptions & { sourceTemplateId?: string; scopeId?: string; packageName?: string; title?: string } = {}
+  ): BatchDocumentPackage {
+    const templateDoc = HtmlImporter.importFromHtml(htmlTemplate, {
+      id: options.sourceTemplateId,
+      title: options.title,
+    });
+    return this.createBatchPackage(templateDoc, records, options);
+  }
+
+
   // ==========================================================================
   // BLOCK EVALUATION & EXPANSION
   // ==========================================================================
@@ -267,10 +319,11 @@ export class TemplateMergeEngine {
           }
         }
 
-        // Check if paragraph is a conditional marker: `{{#if condition}}`
-        const ifMatch = textSummary.match(/^\{\{#if\s+([\s\S]+?)\}\}\s*$/i);
-        if (ifMatch) {
-          const conditionExpr = ifMatch[1].trim();
+        // Check if paragraph is a conditional marker: `{{#if condition}}` or `{{#unless condition}}`
+        const condMatch = textSummary.match(/^\{\{#(if|unless)\s+([\s\S]+?)\}\}\s*$/i);
+        if (condMatch) {
+          const isUnless = condMatch[1].toLowerCase() === 'unless';
+          const conditionExpr = condMatch[2].trim();
           const ifBlocks: BlockNode[] = [];
           const elseBlocks: BlockNode[] = [];
           let inElse = false;
@@ -281,12 +334,12 @@ export class TemplateMergeEngine {
             const nextBlock = blocks[i];
             const nextSummary = nextBlock.type === 'paragraph' ? this.getInlineTextSummary((nextBlock as ParagraphNode).content) : '';
 
-            if (nextSummary.match(/^\{\{#if\s+/i)) {
+            if (nextSummary.match(/^\{\{#(if|unless)\s+/i)) {
               nesting++;
             } else if (nextSummary.match(/^\{\{else\}\}\s*$/i) && nesting === 1) {
               inElse = true;
               continue;
-            } else if (nextSummary.match(/^\{\{/i) && nextSummary.match(/^\{\{\/if\}\}\s*$/i)) {
+            } else if (nextSummary.match(new RegExp(`^\\{\\{/(?:if|unless)\\}\\}\\s*$`, 'i'))) {
               nesting--;
               if (nesting === 0) {
                 break;
@@ -300,7 +353,8 @@ export class TemplateMergeEngine {
             }
           }
 
-          const condResult = this.evaluateCondition(conditionExpr, context, lookup);
+          const rawCondResult = this.evaluateCondition(conditionExpr, context, lookup);
+          const condResult = isUnless ? !rawCondResult : rawCondResult;
           const activeBranch = condResult ? ifBlocks : elseBlocks;
           const evaluatedBranch = this.evaluateBlocks(activeBranch, context, lookup, options);
           resultBlocks.push(...evaluatedBranch);
@@ -343,7 +397,7 @@ export class TemplateMergeEngine {
 
           evaluatedItems.push({
             ...item,
-            content: itemContent as any,
+            content: itemContent,
           });
         });
 
@@ -388,7 +442,7 @@ export class TemplateMergeEngine {
       .join(' ')
       .toLowerCase();
 
-    const explicitTableArray = table.attributes && (table.attributes as any).loopArray;
+    const explicitTableArray = table.attributes?.loopArray;
 
     table.rows.forEach((row) => {
       // If row is explicit header (isHeader: true), evaluate inlines and keep
@@ -548,7 +602,7 @@ export class TemplateMergeEngine {
         resultInlines.push({
           ...linkNode,
           href: this.interpolateString(linkNode.href, context, lookup, options),
-          content: this.evaluateInlines(linkNode.content, context, lookup, options) as any,
+          content: this.evaluateInlines(linkNode.content, context, lookup, options),
         });
         return;
       }
@@ -656,8 +710,19 @@ export class TemplateMergeEngine {
   ): string {
     if (!text || typeof text !== 'string') return text || '';
 
-    // Match {{placeholder}} or {placeholder}
-    return text.replace(/\{{1,2}\s*([a-zA-Z0-9_\-\.\s|:'",<>&;=/()#]+?)\s*\}{1,2}/g, (fullMatch, token) => {
+    // 1. Evaluate inline conditionals: `{{#if cond}}truePart{{else}}falsePart{{/if}}` or `{{#unless cond}}...{{/unless}}`
+    let processedText = text.replace(
+      /\{{#(if|unless)\s+([\s\S]+?)\}\}([\s\S]*?)(?:\{{else\}\}([\s\S]*?))?\{{\/(?:if|unless)\}\}/gi,
+      (_, condType, expr, ifBody, elseBody = '') => {
+        const isUnless = condType.toLowerCase() === 'unless';
+        const rawCond = this.evaluateCondition(expr.trim(), context, lookup);
+        const condPassed = isUnless ? !rawCond : rawCond;
+        return condPassed ? ifBody : elseBody;
+      }
+    );
+
+    // 2. Match {{placeholder}} or {placeholder}
+    return processedText.replace(/\{{1,2}\s*([a-zA-Z0-9_\-\.\s|:'",<>&;=/()#]+?)\s*\}{1,2}/g, (fullMatch, token) => {
       const resolved = this.resolveToken(token.trim(), context, lookup, options);
       if (resolved !== null) {
         return resolved;
@@ -931,8 +996,8 @@ export class TemplateMergeEngine {
           (b as ParagraphNode).content.forEach((inln) => {
             if (inln.type === 'token') tokens.push((inln as TokenNode).key);
             if (inln.type === 'text') {
-              const matches = (inln as TextNode).text.match(/\{{1,2}\s*([a-zA-Z0-9_\-\.]+)/g) || [];
-              matches.forEach((m) => tokens.push(m.replace(/[\{\}]/g, '').trim()));
+              const matches: string[] = (inln as TextNode).text.match(/\{{1,2}\s*([a-zA-Z0-9_\-\.]+)/g) || [];
+              matches.forEach((m: string) => tokens.push(m.replace(/[\{\}]/g, '').trim()));
             }
           });
         }
@@ -977,6 +1042,22 @@ export class TemplateMergeEngine {
         const num = parseFloat(value);
         if (isNaN(num)) return value;
         return `৳ ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+      case 'date': {
+        if (!value) return '';
+        try {
+          const d = new Date(value);
+          if (isNaN(d.getTime())) return value;
+          if (cleanArg === 'short' || cleanArg === 'YYYY-MM-DD') {
+            return d.toISOString().split('T')[0];
+          }
+          if (cleanArg === 'long') {
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+          }
+          return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch {
+          return value;
+        }
       }
       case 'bengali_digits':
       case 'bangla_digits':

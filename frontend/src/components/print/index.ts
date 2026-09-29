@@ -26,12 +26,12 @@ export {
 export default UniversalPrintStudio;
 
 // Document & Word Engine Modals
-export { default as DocxLiveRenderer } from './DocxLiveRenderer';
 export { default as DocxFormattingRibbon } from './DocxFormattingRibbon';
 export { default as TemplateLibraryModal } from './TemplateLibraryModal';
 export { default as KeyPaletteExplorer } from './components/sidebar/tokens/KeyPaletteExplorer';
 export { default as DocLabQuickReportModal } from './DocLabQuickReportModal';
 export { default as DocLabQuickDocumentModal } from './DocLabQuickDocumentModal';
+export * from './layout';
 
 
 // Custom Hooks & Subcomponents

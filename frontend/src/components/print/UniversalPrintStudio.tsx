@@ -170,6 +170,8 @@ export default function UniversalPrintStudio({
     docxStyles,
     docxRenderMode,
     setDocxRenderMode,
+    mergedDocuments,
+    docxLayoutPages,
     mergedDocxPages,
     docxTotalPages,
     handleTemplateSelection,
@@ -317,7 +319,7 @@ export default function UniversalPrintStudio({
             @media print {
               @page {
                 size: ${options.pageSize || 'A4'} ${(options.orientation || 'PORTRAIT').toLowerCase()};
-                margin: ${getPageMarginCSS(options.margin)};
+                margin: 0;
               }
             }
           `,
@@ -367,7 +369,7 @@ export default function UniversalPrintStudio({
           showPng={showPng}
           showJpg={showJpg}
           showSvg={showSvg}
-          enabledFormats={enabledFormats as any}
+          enabledFormats={enabledFormats}
           onPrint={onPrint}
           onExportPDF={onExportPDF}
           onExportExcel={onExportExcel}
@@ -391,8 +393,8 @@ export default function UniversalPrintStudio({
             handleMetaItemsChange={handleMetaItemsChange}
             liveColumns={liveColumns}
             visibleColumnKeys={visibleColumnKeys}
-            isColumnMandatory={isColumnMandatory ? (col: any, idx?: number) => (isColumnMandatory as any)(col, idx ?? 0) : null}
-            isColumnRequired={isColumnRequired ? (col: any, idx?: number) => (isColumnRequired as any)(col, idx ?? 0) : null}
+            isColumnMandatory={isColumnMandatory ? (col: any, idx?: number) => isColumnMandatory(col, idx ?? 0) : null}
+            isColumnRequired={isColumnRequired ? (col: any, idx?: number) => isColumnRequired(col, idx ?? 0) : null}
             requiredColumnKeys={requiredColumnKeys}
             visibleRowKeys={visibleRowKeys}
             isRowMandatory={isRowMandatory}
@@ -409,6 +411,8 @@ export default function UniversalPrintStudio({
             setCustomDocxTemplate={setCustomDocxTemplate}
             updateCustomDocxTemplateWithHistory={updateCustomDocxTemplateWithHistory}
             docxStyles={docxStyles}
+            mergedDocuments={mergedDocuments}
+            docxLayoutPages={docxLayoutPages}
             mergedDocxPages={mergedDocxPages}
             docxRenderMode={docxRenderMode}
             setDocxRenderMode={setDocxRenderMode}

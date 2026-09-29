@@ -54,15 +54,15 @@ export class ParagraphFragmenter {
     if (domSplit.firstFragmentHtml) {
       const parsed1 = HtmlImporter.parseHtml(domSplit.firstFragmentHtml);
       firstNode = parsed1.body[0] && parsed1.body[0].type === 'paragraph'
-        ? (parsed1.body[0] as ParagraphNode)
-        : { ...para, id: `${para.id}_p1` };
+        ? { ...(parsed1.body[0] as ParagraphNode), id: para.id }
+        : { ...para, id: para.id };
     }
 
     if (domSplit.remainingFragmentHtml) {
       const parsed2 = HtmlImporter.parseHtml(domSplit.remainingFragmentHtml);
       remainingNode = parsed2.body[0] && parsed2.body[0].type === 'paragraph'
-        ? (parsed2.body[0] as ParagraphNode)
-        : { ...para, id: `${para.id}_p2` };
+        ? { ...(parsed2.body[0] as ParagraphNode), id: para.id }
+        : { ...para, id: para.id };
     }
 
     return {

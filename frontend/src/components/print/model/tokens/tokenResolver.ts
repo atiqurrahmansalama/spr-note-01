@@ -12,6 +12,7 @@
 import { CanonicalDocument, BlockNode, ParagraphNode, HeadingNode, ListNode, TableNode, SectionNode, InlineNode, TextNode, TokenNode } from '../types';
 import { DocumentFactory } from '../documentFactory';
 import { TemplateMergeEngine } from '../templates/TemplateMergeEngine';
+import { CustomFilterHandler } from '../templates/types';
 
 export interface TokenExtractionResult {
   key: string;
@@ -83,12 +84,12 @@ export class TokenResolver {
     data: Record<string, any>,
     options: {
       preserveUnresolvedTokens?: boolean;
-      customFormatters?: Record<string, (val: any) => string>;
+      customFormatters?: Record<string, CustomFilterHandler>;
     } = {}
   ): CanonicalDocument {
     return TemplateMergeEngine.mergeDocument(doc, data, {
       preserveUnresolvedTokens: options.preserveUnresolvedTokens,
-      customFilters: options.customFormatters as any,
+      customFilters: options.customFormatters,
     });
   }
 }

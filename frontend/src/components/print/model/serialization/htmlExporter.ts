@@ -21,6 +21,8 @@ import {
   TableRowNode,
   TableCellNode,
   ImageNode,
+  SvgNode,
+  SignatureNode,
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
@@ -71,6 +73,10 @@ export class HtmlExporter {
         return this.serializeTable(block as TableNode, options);
       case 'image':
         return this.serializeImage(block as ImageNode);
+      case 'svg':
+        return this.serializeSvg(block as SvgNode);
+      case 'signature':
+        return this.serializeSignature(block as SignatureNode);
       case 'manual-page-break':
         return createManualPageBreakHtml();
       case 'divider':
@@ -195,6 +201,49 @@ export class HtmlExporter {
   }
 
   /**
+   * Serializes an SvgNode
+   */
+  private static serializeSvg(node: SvgNode): string {
+    const rawSvg = node.svgContent || '';
+    if (rawSvg.trim().startsWith('<svg')) {
+      if (node.alignment && node.alignment !== 'left') {
+        return `<div style="text-align: ${node.alignment}; display: flex; justify-content: ${node.alignment === 'center' ? 'center' : 'flex-end'};">${rawSvg}</div>`;
+      }
+      return rawSvg;
+    }
+    const widthAttr = node.width ? ` width="${node.width}"` : '';
+    const heightAttr = node.height ? ` height="${node.height}"` : '';
+    const viewBoxAttr = node.viewBox ? ` viewBox="${node.viewBox}"` : '';
+    const svgWrapper = `<svg xmlns="http://www.w3.org/2000/svg"${viewBoxAttr}${widthAttr}${heightAttr}>${rawSvg}</svg>`;
+    if (node.alignment && node.alignment !== 'left') {
+      return `<div style="text-align: ${node.alignment}; display: flex; justify-content: ${node.alignment === 'center' ? 'center' : 'flex-end'};">${svgWrapper}</div>`;
+    }
+    return svgWrapper;
+  }
+
+  /**
+   * Serializes a SignatureNode
+   */
+  private static serializeSignature(node: SignatureNode): string {
+    const cols = node.columns || [];
+    if (cols.length === 0) return '';
+    const borderStyle = node.style === 'dashed' ? 'border-dashed' : node.style === 'dotted' ? 'border-dotted' : node.style === 'double' ? 'border-double border-t-2' : 'border-solid border-t';
+    const colsHtml = cols
+      .map(
+        (col) => `
+      <div class="print-signature-col" style="flex: 1; text-align: center; padding: 0 8px;">
+        <div class="print-signature-line ${borderStyle}" style="border-top: 1px solid #0f172a; margin-bottom: 4px; height: 1px;"></div>
+        <div class="print-signature-label" style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #0f172a;">${this.escapeHtml(col.label)}</div>
+        ${col.sub ? `<div class="print-signature-sub" style="font-size: 9px; color: #64748b;">${this.escapeHtml(col.sub)}</div>` : ''}
+        ${col.name ? `<div class="print-signature-name" style="font-size: 9px; font-weight: 600; color: #334155;">${this.escapeHtml(col.name)}</div>` : ''}
+      </div>`
+      )
+      .join('');
+
+    return `<div class="print-signature-block keep-together" data-signature-block="true" style="display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 12px; break-inside: avoid; page-break-inside: avoid;">${colsHtml}</div>`;
+  }
+
+  /**
    * Serializes a DividerNode
    */
   private static serializeDivider(node: DividerNode): string {
@@ -235,15 +284,22 @@ export class HtmlExporter {
 
     if (node.type === 'token') {
       const tokenNode = node as TokenNode;
+      const marks = tokenNode.formatting || tokenNode.marks;
       let rawText = `{{${tokenNode.key}}}`;
 
       if (options.tokenFormat === 'span' || options.tokenFormat === 'both') {
+        const idAttr = tokenNode.id ? ` data-token-id="${this.escapeHtml(tokenNode.id)}"` : '';
         const catAttr = tokenNode.category ? ` data-category="${tokenNode.category}"` : '';
         const labelAttr = tokenNode.label ? ` data-label="${this.escapeHtml(tokenNode.label)}"` : '';
-        rawText = `<span class="doclab-token" data-token="${tokenNode.key}"${catAttr}${labelAttr}>{{${tokenNode.key}}}</span>`;
+        const displayAttr = tokenNode.display ? ` data-display="${this.escapeHtml(tokenNode.display)}"` : '';
+        const sourceAttr = tokenNode.sourcePath ? ` data-source-path="${this.escapeHtml(tokenNode.sourcePath)}"` : '';
+        const defaultAttr = tokenNode.defaultValue ? ` data-default-value="${this.escapeHtml(tokenNode.defaultValue)}"` : '';
+        const formatAttr = tokenNode.format ? ` data-format="${this.escapeHtml(tokenNode.format)}"` : '';
+
+        rawText = `<span class="doclab-token" data-token="${this.escapeHtml(tokenNode.key)}"${idAttr}${catAttr}${labelAttr}${displayAttr}${sourceAttr}${defaultAttr}${formatAttr}>{{${tokenNode.key}}}</span>`;
       }
 
-      return this.applyMarks(rawText, tokenNode.marks);
+      return this.applyMarks(rawText, marks);
     }
 
     if (node.type === 'text') {

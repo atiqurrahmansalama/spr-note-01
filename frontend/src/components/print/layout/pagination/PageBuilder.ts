@@ -24,6 +24,27 @@ export class PageBuilder {
   }
 
   /**
+   * Pre-seeds existing unaffected pages during an incremental layout pass
+   */
+  public seedUnaffectedPages(unaffectedPages: LayoutPage[]): void {
+    if (!unaffectedPages || unaffectedPages.length === 0) return;
+
+    this.pages = unaffectedPages.map((p, idx) => ({
+      ...p,
+      index: idx,
+      pageNumber: idx + 1,
+      fragments: p.fragments.map((f) => ({ ...f, pageIndex: idx })),
+    }));
+
+    // Start a fresh new page for subsequent content
+    const nextIndex = this.pages.length;
+    const newPage = DocumentLayoutEngine.createLayoutPage(nextIndex, nextIndex + 1, this.options, this.bounds);
+    this.currentPage = newPage;
+    this.pages.push(newPage);
+    this.pageDecisions.set(nextIndex, []);
+  }
+
+  /**
    * Returns current active page index (0-indexed)
    */
   public get currentValidPageIndex(): number {

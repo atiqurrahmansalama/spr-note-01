@@ -146,3 +146,8 @@ export interface NodeMeasurementResult {
   /** Optional DOM element reference */
   domElement?: HTMLElement;
 }
+
+/**
+ * Type alias for NodeMeasurementResult
+ */
+export type MeasurementResult = NodeMeasurementResult;

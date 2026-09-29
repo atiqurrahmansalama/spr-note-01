@@ -1,11 +1,24 @@
+/**
+ * NativeTabularPagination / usePrintPagination
+ * 
+ * SPR Note Universal Print Studio — MODE E: Native Tabular Pagination Engine
+ * 
+ * ARCHITECTURAL CONTRACT:
+ * 1. Strictly dedicated to MODE E: Uniform ERP Tabular Reports (Ledgers, Fee Registers, Rosters).
+ * 2. Deterministic fixed row-count slicing based on PageSize, Orientation, and Density.
+ * 3. Handles mandatory rows, lock flags, blank padding rows, and summary metrics.
+ * 4. MUST NEVER be used for DocLab Freeform documents (Modes A, B, C, D).
+ * 5. Variable-height freeform tables in DocLab use TableFragmenter + PaginationEngine.
+ */
+
 import { useMemo } from 'react';
 import { PrintPaginationResult, PrintPaginationPage } from '../types';
 
-interface UsePrintPaginationParams {
+export interface NativeTabularPaginationParams {
   liveData: Array<Record<string, any>>;
-  visibleRowKeys: string[];
-  extraBlankRows: number;
-  getRowIdentifier: (row: any, idx: number) => string;
+  visibleRowKeys?: string[];
+  extraBlankRows?: number;
+  getRowIdentifier?: (row: any, idx: number) => string;
   isRowMandatory?: ((row: any, idx: number) => boolean) | null;
   isRowRequired?: ((row: any, idx: number) => boolean) | null;
   requiredRowKeys?: (string | number)[] | null;
@@ -15,66 +28,69 @@ interface UsePrintPaginationParams {
   hasChildren?: boolean;
 }
 
+export type UsePrintPaginationParams = NativeTabularPaginationParams;
+
 /**
- * usePrintPagination (MODE A — Native / Tabular Print Pagination Engine)
- *
- * Dedicated strictly to Mode A: structured grid / tabular printing.
- * Performs deterministic row-based slicing based on page size and density,
- * interleaving active data, mandatory rows, and blank lines.
- *
- * (Note: Mode B — Custom Word/DocLab continuous documents uses geometry-based
- * DocumentLayoutEngine & PaginationEngine instead).
+ * NativeTabularPagination Service
+ * Authoritative row-based pagination calculator for Mode E tabular printing.
  */
-export function usePrintPagination({
-  liveData,
-  visibleRowKeys,
-  extraBlankRows,
-  getRowIdentifier,
-  isRowMandatory,
-  isRowRequired,
-  requiredRowKeys,
-  enablePageBreak = true,
-  pageSize = 'A4',
-  density = 'NORMAL',
-  hasChildren = false,
-}: UsePrintPaginationParams) {
-  // Filter active visible rows for accurate pagination calculation
-  const activeData = useMemo<Array<Record<string, any>>>(() => {
-    if (!visibleRowKeys || !Array.isArray(visibleRowKeys) || !Array.isArray(liveData)) {
-      return liveData || [];
+export class NativeTabularPagination {
+  /**
+   * Calculates deterministic row-sliced pages for tabular reports
+   */
+  public static paginate({
+    liveData,
+    visibleRowKeys,
+    extraBlankRows = 0,
+    getRowIdentifier = (row, idx) => row?.id ?? String(idx),
+    isRowMandatory,
+    isRowRequired,
+    requiredRowKeys,
+    enablePageBreak = true,
+    pageSize = 'A4',
+    density = 'NORMAL',
+    hasChildren = false,
+  }: NativeTabularPaginationParams): {
+    activeData: Array<Record<string, any>>;
+    paginationResult: PrintPaginationResult;
+  } {
+    // 1. Filter active visible rows according to mandatory/locked states
+    let activeData: Array<Record<string, any>> = liveData || [];
+    if (visibleRowKeys && Array.isArray(visibleRowKeys) && Array.isArray(liveData)) {
+      const visibleSet = new Set(visibleRowKeys.map(String));
+      activeData = (liveData || []).filter((row, idx) => {
+        const key = getRowIdentifier(row, idx);
+        const isMandatory =
+          (typeof isRowMandatory === 'function' && isRowMandatory(row, idx)) ||
+          (typeof isRowRequired === 'function' && isRowRequired(row, idx)) ||
+          (requiredRowKeys && Array.isArray(requiredRowKeys) && requiredRowKeys.map(String).includes(key)) ||
+          Boolean(row?.required || row?.mandatory || row?.isMandatory || row?.locked || row?.isLocked);
+
+        return isMandatory || visibleSet.has(key);
+      });
     }
-    const visibleSet = new Set(visibleRowKeys.map(String));
-    return (liveData || []).filter((row, idx) => {
-      const key = getRowIdentifier(row, idx);
-      const isMandatory =
-        (typeof isRowMandatory === 'function' && isRowMandatory(row, idx)) ||
-        (typeof isRowRequired === 'function' && isRowRequired(row, idx)) ||
-        (requiredRowKeys && Array.isArray(requiredRowKeys) && requiredRowKeys.map(String).includes(key)) ||
-        Boolean(row?.required || row?.mandatory || row?.isMandatory || row?.locked || row?.isLocked);
 
-      return isMandatory || visibleSet.has(key);
-    });
-  }, [liveData, visibleRowKeys, getRowIdentifier, isRowMandatory, isRowRequired, requiredRowKeys]);
-
-  // Dynamic Page Slicing & Pagination Engine
-  const paginationResult = useMemo<PrintPaginationResult>(() => {
+    // 2. Dynamic Page Slicing & Pagination
     const dataList = Array.isArray(activeData) ? activeData : [];
     const totalBlanks = Math.max(0, parseInt(String(extraBlankRows), 10) || 0);
 
     // If auto page break is disabled or custom children mode, keep single continuous page
     if (enablePageBreak === false || hasChildren) {
       return {
-        pages: [
-          {
-            pageIndex: 0,
-            rows: dataList,
-            extraBlanks: totalBlanks,
-            isFirstPage: true,
-            isLastPage: true,
-            startIndex: 0,
-          },
-        ],
-        totalPages: 1,
+        activeData,
+        paginationResult: {
+          pages: [
+            {
+              pageIndex: 0,
+              rows: dataList,
+              extraBlanks: totalBlanks,
+              isFirstPage: true,
+              isLastPage: true,
+              startIndex: 0,
+            },
+          ],
+          totalPages: 1,
+        },
       };
     }
 
@@ -93,17 +109,20 @@ export function usePrintPagination({
 
     if (totalItems.length === 0) {
       return {
-        pages: [
-          {
-            pageIndex: 0,
-            rows: [],
-            extraBlanks: 0,
-            isFirstPage: true,
-            isLastPage: true,
-            startIndex: 0,
-          },
-        ],
-        totalPages: 1,
+        activeData,
+        paginationResult: {
+          pages: [
+            {
+              pageIndex: 0,
+              rows: [],
+              extraBlanks: 0,
+              isFirstPage: true,
+              isLastPage: true,
+              startIndex: 0,
+            },
+          ],
+          totalPages: 1,
+        },
       };
     }
 
@@ -127,11 +146,73 @@ export function usePrintPagination({
       });
     }
 
-    return { pages, totalPages: pages.length };
-  }, [activeData, extraBlankRows, enablePageBreak, pageSize, density, hasChildren]);
-
-  return {
-    activeData,
-    paginationResult,
-  };
+    return {
+      activeData,
+      paginationResult: { pages, totalPages: pages.length },
+    };
+  }
 }
+
+/**
+ * calculatePrintPagination
+ * Direct function export alias for NativeTabularPagination.paginate.
+ */
+export const calculatePrintPagination = NativeTabularPagination.paginate;
+
+/**
+ * useNativeTabularPagination
+ * React hook wrapping NativeTabularPagination with dependency memoization.
+ */
+export function useNativeTabularPagination(params: NativeTabularPaginationParams) {
+  const {
+    liveData,
+    visibleRowKeys,
+    extraBlankRows,
+    getRowIdentifier,
+    isRowMandatory,
+    isRowRequired,
+    requiredRowKeys,
+    enablePageBreak,
+    pageSize,
+    density,
+    hasChildren,
+  } = params;
+
+  return useMemo(
+    () =>
+      NativeTabularPagination.paginate({
+        liveData,
+        visibleRowKeys,
+        extraBlankRows,
+        getRowIdentifier,
+        isRowMandatory,
+        isRowRequired,
+        requiredRowKeys,
+        enablePageBreak,
+        pageSize,
+        density,
+        hasChildren,
+      }),
+    [
+      liveData,
+      visibleRowKeys,
+      extraBlankRows,
+      getRowIdentifier,
+      isRowMandatory,
+      isRowRequired,
+      requiredRowKeys,
+      enablePageBreak,
+      pageSize,
+      density,
+      hasChildren,
+    ]
+  );
+}
+
+/**
+ * usePrintPagination
+ * Backwards compatible hook alias for useNativeTabularPagination.
+ */
+export const usePrintPagination = useNativeTabularPagination;
+
+

@@ -15,7 +15,7 @@ import {
 } from './docxTemplateEngine';
 import { convertDocumentToPlainText } from './docLabTextConverter';
 import { printDocument } from './docLabExportUtils';
-import DocxLiveRenderer from './DocxLiveRenderer';
+import { CanonicalContentRenderer } from './layout/render';
 import {
   FileIcon,
   UploadIcon,
@@ -543,9 +543,8 @@ export default function DocLabQuickDocumentModal({
                 boxSizing: 'border-box',
               }}
             >
-              <DocxLiveRenderer
-                htmlContent={mergedHtml}
-                isEditable={false}
+              <CanonicalContentRenderer
+                content={mergedHtml}
               />
             </div>
           </div>

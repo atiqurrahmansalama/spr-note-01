@@ -1,13 +1,19 @@
 /**
  * Logical Document Architecture & Sanitization
  *
- * Enforces the core architectural principle:
+ * Core Architectural Invariant:
  * DOCUMENT CONTENT != PAGE LAYOUT.
  *
- * - The Document represents pure logical flow:
- *   Document -> [Heading, Paragraph, Table, Paragraph, Image, Signature]
- * - Manual page breaks are explicit semantic instructions (data-manual-break="true").
- * - Automatic page breaks are strictly RUNTIME layout metrics and NEVER persisted into content.
+ * Responsibilities:
+ * 1. Canonical Sanitization: Guarantees zero runtime pagination spacers or fake page division divs
+ *    are ever persisted into canonical template content.
+ * 2. Manual Break Semantics: Preserves explicit manual page break instructions (data-manual-break="true")
+ *    as first-class semantic document nodes.
+ * 3. Logical Parsing Helpers: Converts continuous raw HTML into structured SourceNode AST objects
+ *    with explicit layout constraints (keepWithNext, repeatTableHeader, keepTogether, isAtomic).
+ * 4. Logical Serialization Helpers: Serializes structured SourceNode AST objects back into clean,
+ *    standard continuous HTML without fake spacers or synthetic layout wrappers.
+ * 5. Migration Normalization: Unpacks legacy docx wrappers (.docx-parsed-body, section.docx, etc.) cleanly.
  */
 
 import { SourceNode, SourceNodeType, NodeLayoutConstraint, SourceDocument } from './types/documentTypes';
@@ -20,151 +26,16 @@ const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 const COMMENT_NODE_TYPE = typeof Node !== 'undefined' ? Node.COMMENT_NODE : 8;
 
 /**
- * Standard semantic HTML for an explicit manual page break instruction
+ * Generates standard semantic HTML for an explicit manual page break instruction.
+ * Contains no runtime spacer hacks or arbitrary margin injection.
  */
 export function createManualPageBreakHtml(): string {
-  return '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div><p><br></p>';
+  return '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div>';
 }
 
 /**
- * Standard runtime visual spacer HTML for projection across page boundaries
- */
-export function createRuntimePageSpacerHtml(options: {
-  pageNumber: number;
-  totalPages: number;
-  pageSize?: string;
-  orientation?: string;
-  dimensionsPx?: { width: number; height: number };
-  marginsPx?: { top: number; right: number; bottom: number; left: number };
-  remainingHeightPx?: number;
-}): string {
-  const {
-    marginsPx = { top: 48, right: 48, bottom: 48, left: 48 },
-    remainingHeightPx = 0,
-  } = options;
-
-  const topMargin = Math.round(marginsPx.top);
-  const bottomMargin = Math.round(marginsPx.bottom);
-  const leftMargin = Math.round(marginsPx.left);
-  const rightMargin = Math.round(marginsPx.right);
-  const pageGapPx = 32; // Gap between discrete visual sheets
-  const headerHeightPx = 32; // Header + margin-bottom of sheet header
-
-  const totalSpacerHeight = Math.max(0, Math.round(remainingHeightPx)) + bottomMargin + pageGapPx + headerHeightPx + topMargin;
-
-  return (
-    `<div class="spr-runtime-page-spacer not-prose select-none print:hidden" data-spr-runtime-pagination="true" contenteditable="false" style="margin-left: -${leftMargin}px; margin-right: -${rightMargin}px; height: ${totalSpacerHeight}px; min-height: ${totalSpacerHeight}px; display: block; user-select: none; pointer-events: none; -webkit-user-select: none; box-sizing: border-box;"></div>`
-  );
-}
-
-/**
- * Projects a continuous canonical HTML document with runtime page spacers across page boundaries.
- *
- * ARCHITECTURAL INVARIANT:
- * - Every logical block (Paragraph, Heading, Table) remains 100% untouched and un-sliced.
- * - Runtime spacers are inserted ONLY between blocks across page boundaries.
- * - Spacers bridge: remaining page height + bottom margin + 32px canvas gap + 32px header + top margin.
- * - The next page's content starts cleanly inside the next physical sheet's content box.
- */
-/**
- * Projects a continuous canonical HTML document with runtime page spacers across page boundaries.
- *
- * ARCHITECTURAL INVARIANT:
- * - Content is cleanly visualised across discrete physical sheets.
- * - Runtime spacers are inserted between pages across page boundaries.
- * - Spacers bridge: remaining page height + bottom margin + 32px canvas gap + 32px header + top margin.
- * - The next page's content starts cleanly inside the next physical sheet's content area.
- * - Saved document content remains 100% pure canonical HTML (zero spacers persisted).
- */
-export function projectCanonicalDocumentWithRuntimeSpacers(
-  canonicalHtml: string,
-  paginationResult?: any | null,
-  options?: {
-    paperDimensionsPx?: { width: number; height: number };
-    marginsPx?: { top: number; right: number; bottom: number; left: number };
-    pageSize?: string;
-    orientation?: string;
-  }
-): string {
-  const cleanHtml = sanitizeLogicalDocumentHtml(canonicalHtml);
-  if (!cleanHtml || !cleanHtml.trim() || cleanHtml.trim() === '<p></p>') return '<p><br></p>';
-
-  if (!paginationResult || !paginationResult.pages || paginationResult.pages.length <= 1) {
-    return cleanHtml;
-  }
-
-  const pages = paginationResult.pages;
-  const totalPages = paginationResult.totalPages || pages.length;
-
-  // Extract logical source nodes from the canonical HTML
-  const nodes = parseContinuousHtmlToLogicalNodes(cleanHtml);
-  if (nodes.length === 0) return cleanHtml;
-
-  // Build a map of nodeId to node
-  const nodeMap = new Map<string, SourceNode>();
-  nodes.forEach((n) => nodeMap.set(n.id, n));
-
-  const projectedPieces: string[] = [];
-  const processedNodeIds = new Set<string>();
-
-  pages.forEach((page: any, pIdx: number) => {
-    // Collect raw HTML for nodes on this page
-    const pageNodeHtmls: string[] = [];
-
-    if (page.fragments && page.fragments.length > 0) {
-      page.fragments.forEach((frag: any) => {
-        const srcId = frag.sourceNodeId;
-        if (srcId && !processedNodeIds.has(srcId)) {
-          const originalNode = nodeMap.get(srcId);
-          if (originalNode) {
-            processedNodeIds.add(srcId);
-            if (originalNode.type === 'manual-page-break') {
-              pageNodeHtmls.push(createManualPageBreakHtml());
-            } else {
-              pageNodeHtmls.push(originalNode.rawHtml || `<p>${originalNode.textContent || ''}</p>`);
-            }
-          }
-        }
-      });
-    }
-
-    if (pageNodeHtmls.length > 0) {
-      projectedPieces.push(pageNodeHtmls.join('\n'));
-    }
-
-    // Insert runtime spacer between pages
-    if (pIdx < pages.length - 1) {
-      const remainingHeight = page.availableHeight !== undefined ? page.availableHeight : 0;
-      projectedPieces.push(
-        createRuntimePageSpacerHtml({
-          pageNumber: pIdx + 2,
-          totalPages,
-          pageSize: options?.pageSize,
-          orientation: options?.orientation,
-          dimensionsPx: options?.paperDimensionsPx,
-          marginsPx: options?.marginsPx,
-          remainingHeightPx: remainingHeight,
-        })
-      );
-    }
-  });
-
-  // If any remaining nodes were not captured, append them
-  nodes.forEach((n) => {
-    if (!processedNodeIds.has(n.id)) {
-      if (n.type === 'manual-page-break') {
-        projectedPieces.push(createManualPageBreakHtml());
-      } else {
-        projectedPieces.push(n.rawHtml || `<p>${n.textContent || ''}</p>`);
-      }
-    }
-  });
-
-  return projectedPieces.join('\n');
-}
-
-/**
- * Strips all transient runtime pagination spacers and visual guides from HTML string
+ * Strips all transient runtime pagination spacers and visual guides from HTML strings.
+ * Ensures clean canonical storage and zero layout artifact leakage.
  */
 export function stripRuntimePaginationSpacers(rawHtml: string): string {
   if (!rawHtml || !rawHtml.trim()) return '';
@@ -174,35 +45,50 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
       const container = document.createElement('div');
       container.innerHTML = rawHtml;
       const runtimeElements = container.querySelectorAll(
-        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper'
+        '[data-spr-runtime-pagination="true"], .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper, [data-layout-perf="true"], [data-debug-overlay="true"], [data-diagnostics="true"], [data-diagnostics], .doclab-diagnostics-overlay, .spr-layout-diagnostics'
       );
       runtimeElements.forEach((el) => el.parentNode?.removeChild(el));
       return container.innerHTML;
     } catch {
-      // Fallback to regex
+      // Fallback to regex in non-browser environment
     }
   }
 
   return rawHtml
     .replace(
-      /<div\b[^>]*?(?:data-spr-runtime-pagination="true"|class=["'][^"']*?(?:spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper)[^"']*?["']|data-runtime-spacer="true"|data-runtime-guide="true")[^>]*?>[\s\S]*?<\/div>/gi,
+      /<div\b[^>]*?\b(?:spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper|doclab-diagnostics-overlay|spr-layout-diagnostics|data-spr-runtime-pagination|data-runtime-spacer|data-runtime-guide|data-layout-perf|data-debug-overlay|data-diagnostics)\b[^>]*?>[\s\S]*?<\/div>/gi,
       ''
     )
-    .replace(/<!--\s*spr-page-break:runtime[\s\S]*?-->/gi, '');
+    .replace(/<!--\s*[\s\S]*?(?:runtime|diagnostics)[\s\S]*?-->/gi, '');
 }
 
 /**
- * Determines whether an element or comment represents an intentional manual page break
+ * Determines whether an element, DOM node, or HTML snippet represents an intentional explicit manual page break.
  */
 export function isExplicitManualBreak(node: HTMLElement | Node | string): boolean {
   if (!node) return false;
 
   if (typeof node === 'string') {
+    // 1. Explicit HTML comment markers
+    if (node.startsWith('<!--')) {
+      const inner = node.replace(/^<!--\s*|\s*-->$/g, '').trim().toLowerCase();
+      return (
+        inner === 'spr-page-break:manual' ||
+        inner === 'manual-page-break' ||
+        inner === 'spr-page-break' ||
+        inner === 'docx_page_break' ||
+        inner === 'docx-page-break' ||
+        inner === 'page-break'
+      );
+    }
+
+    // 2. Filter out transient runtime pagination spacer markers
     if (
       node.includes('data-spr-runtime-pagination="true"') ||
       node.includes('spr-runtime-page-spacer') ||
       node.includes('data-runtime-spacer="true"') ||
-      node.includes('data-runtime-guide="true"')
+      node.includes('data-runtime-guide="true"') ||
+      node.includes('data-page-break="auto"')
     ) {
       return false;
     }
@@ -211,28 +97,34 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
       node.includes('data-manual="true"') ||
       node.includes('data-page-break="manual"') ||
       node.includes(MANUAL_PAGE_BREAK_MARKER) ||
-      node.includes(LEGACY_PAGE_BREAK_MARKER) ||
-      node.includes('spr-page-break') ||
       node.includes('docx_page_break') ||
       node.includes('docx-page-break') ||
-      /class=["'][^"']*?\bpage-break\b[^"']*?["']/i.test(node) ||
       /page-break-(?:after|before)\s*:\s*always/i.test(node) ||
       /break-(?:after|before)\s*:\s*page/i.test(node)
     );
   }
 
-  if (node && (node as any).nodeType === COMMENT_NODE_TYPE) {
-    const val = (node as any).nodeValue || '';
-    return val.includes('spr-page-break') && !val.includes('runtime');
-  }
+  if (node && typeof node === 'object' && 'nodeType' in node) {
+    if (node.nodeType === COMMENT_NODE_TYPE) {
+      const val = (node.nodeValue || '').trim().toLowerCase();
+      return (
+        val === 'spr-page-break:manual' ||
+        val === 'manual-page-break' ||
+        val === 'spr-page-break' ||
+        val === 'docx_page_break' ||
+        val === 'docx-page-break' ||
+        val === 'page-break'
+      );
+    }
 
-  if (node && (node as any).nodeType === ELEMENT_NODE_TYPE) {
-    const el = node as HTMLElement;
+    if (node.nodeType === ELEMENT_NODE_TYPE) {
+      const el = node as HTMLElement;
     if (
       el.getAttribute &&
       (el.getAttribute('data-spr-runtime-pagination') === 'true' ||
         el.getAttribute('data-runtime-spacer') === 'true' ||
-        el.getAttribute('data-runtime-guide') === 'true')
+        el.getAttribute('data-runtime-guide') === 'true' ||
+        el.getAttribute('data-page-break') === 'auto')
     ) {
       return false;
     }
@@ -252,10 +144,7 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
     }
     if (
       el.classList &&
-      (el.classList.contains('spr-page-break') ||
-        el.classList.contains('docx_page_break') ||
-        el.classList.contains('docx-page-break') ||
-        el.classList.contains('page-break'))
+      (el.classList.contains('docx_page_break') || el.classList.contains('docx-page-break'))
     ) {
       return true;
     }
@@ -266,13 +155,14 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
     ) {
       return true;
     }
+    }
   }
 
   return false;
 }
 
 /**
- * Sanitizes document HTML to ensure ZERO auto-generated pagination artifacts are persisted.
+ * Sanitizes document HTML to guarantee ZERO auto-generated pagination artifacts are persisted.
  * Keeps explicit manual page breaks intact while removing transient runtime break divs.
  */
 export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
@@ -280,8 +170,17 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
 
   const clean = stripRuntimePaginationSpacers(rawHtml);
   if (typeof document === 'undefined') {
-    return clean.replace(
-      /<div\b(?![^>]*?(?:data-manual-break="true"|data-manual="true"|data-page-break="manual"))[^>]*?class=["'][^"']*?spr-page-break[^"']*?["'][^>]*?>[\s\S]*?<\/div>/gi,
+    // 1. Purge transient auto-breaks while preserving explicit manual breaks
+    const withoutAutoBreaks = clean.replace(
+      /<div\b[^>]*?\b(?:spr-page-break|docx_page_break|data-page-break)\b[^>]*?>[\s\S]*?<\/div>/gi,
+      (match) => {
+        return isExplicitManualBreak(match) ? match : '';
+      }
+    );
+
+    // 2. Remove opening synthetic wrappers (paper-sheet, spr-page-fragment, etc.)
+    return withoutAutoBreaks.replace(
+      /<div\b[^>]*?\b(?:paper-sheet|spr-page-fragment|data-page-index)\b[^>]*?>/gi,
       ''
     );
   }
@@ -290,7 +189,18 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
     const container = document.createElement('div');
     container.innerHTML = clean;
 
-    // Identify transient auto-break artifacts (break elements without explicit manual marker)
+    // 1. Unwrap any paper-sheet, page-index, or fragment wrappers
+    const sheetWrappers = container.querySelectorAll(
+      '.paper-sheet, [data-page-index], [data-paper-sheet="true"], .spr-page-fragment'
+    );
+    sheetWrappers.forEach((sheet) => {
+      while (sheet.firstChild) {
+        sheet.parentNode?.insertBefore(sheet.firstChild, sheet);
+      }
+      sheet.parentNode?.removeChild(sheet);
+    });
+
+    // 2. Identify transient auto-break artifacts (break elements without explicit manual marker)
     const breakElements = container.querySelectorAll('.spr-page-break, [data-page-break], .docx_page_break');
     breakElements.forEach((el) => {
       const isManual = isExplicitManualBreak(el);
@@ -309,6 +219,8 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
 
 /**
  * Parses continuous raw HTML into a structured array of logical source nodes.
+ * Automatically unrolls migration wrappers (.docx-parsed-body, section.docx, etc.) and
+ * tags nodes with semantic constraints (keepWithNext, repeatTableHeader, keepTogether).
  */
 export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[] {
   if (!rawHtml || !rawHtml.trim()) return [];
@@ -318,7 +230,9 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
     let raw = cleanHtml.trim();
     // Recursively strip outer document wrappers (e.g. .docx-blank-canvas, section.docx, etc.)
     while (true) {
-      const match = raw.match(/^<(?:div|section|article)\s+[^>]*class=["'](?:docx-blank-canvas|docx-parsed-body|docx-preview-content|docx)[^"']*["'][^>]*>([\s\S]*)<\/(?:div|section|article)>$/i);
+      const match = raw.match(
+        /^<(?:div|section|article)\s+[^>]*class=["'](?:docx-blank-canvas|docx-parsed-body|docx-preview-content|docx)[^"']*["'][^>]*>([\s\S]*)<\/(?:div|section|article)>$/i
+      );
       if (match && match[1]) {
         raw = match[1].trim();
       } else {
@@ -326,7 +240,10 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
       }
     }
 
-    const tagMatches = raw.match(/<table[\s\S]*?<\/table>|<h[1-6][\s\S]*?<\/h[1-6]>|<p[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<div[\s\S]*?<\/div>|<ul[\s\S]*?<\/ul>|<ol[\s\S]*?<\/ol>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<article[\s\S]*?<\/article>|<figure[\s\S]*?<\/figure>|<img[\s\S]*?>/gi);
+    const tagMatches = raw.match(
+      /<table[\s\S]*?<\/table>|<h[1-6][\s\S]*?<\/h[1-6]>|<p[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<div[\s\S]*?<\/div>|<ul[\s\S]*?<\/ul>|<ol[\s\S]*?<\/ol>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<article[\s\S]*?<\/article>|<figure[\s\S]*?<\/figure>|<img[\s\S]*?>/gi
+    );
+
     if (tagMatches && tagMatches.length > 0) {
       const filteredMatches = tagMatches.filter((block) => {
         if (block.includes('spr-runtime-page-spacer') || block.includes('data-spr-runtime-pagination')) {
@@ -341,6 +258,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         }
         return true;
       });
+
       return filteredMatches.map((block, idx) => {
         const isManual = isExplicitManualBreak(block);
         if (isManual) {
@@ -359,10 +277,11 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         else if (tag === 'ul' || tag === 'ol') type = 'list';
         else if (tag === 'img' || tag === 'figure') type = 'image';
         else if (tag === 'blockquote') type = 'paragraph';
+
         const explicitId =
-          (block.match(/data-node-id=["']([^"']+)["']/i)?.[1]) ||
-          (block.match(/data-source-id=["']([^"']+)["']/i)?.[1]) ||
-          (block.match(/id=["']([^"']+)["']/i)?.[1]) ||
+          block.match(/data-node-id=["']([^"']+)["']/i)?.[1] ||
+          block.match(/data-source-id=["']([^"']+)["']/i)?.[1] ||
+          block.match(/id=["']([^"']+)["']/i)?.[1] ||
           `node_${idx}`;
 
         return {
@@ -370,6 +289,11 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
           type,
           rawHtml: block,
           textContent: block.replace(/<[^>]+>/g, ''),
+          constraints: {
+            keepWithNext: type === 'heading',
+            repeatTableHeader: type === 'table',
+            keepTogether: type === 'image',
+          },
         };
       });
     }
@@ -412,7 +336,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
     const children = Array.from(rootEl.childNodes);
 
     children.forEach((child, idx) => {
-      if ((child as any).nodeType === COMMENT_NODE_TYPE) {
+      if (child.nodeType === COMMENT_NODE_TYPE) {
         if (isExplicitManualBreak(child)) {
           nodes.push({
             id: `manual_break_${idx}`,
@@ -424,7 +348,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         return;
       }
 
-      if ((child as any).nodeType === TEXT_NODE_TYPE) {
+      if (child.nodeType === TEXT_NODE_TYPE) {
         const text = child.textContent?.trim();
         if (text) {
           nodes.push({
@@ -437,7 +361,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
         return;
       }
 
-      if ((child as any).nodeType === ELEMENT_NODE_TYPE) {
+      if (child.nodeType === ELEMENT_NODE_TYPE) {
         const el = child as HTMLElement;
         const tag = el.tagName.toLowerCase();
 
@@ -565,7 +489,8 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
 }
 
 /**
- * Converts a structured array of logical nodes back into continuous clean HTML
+ * Converts a structured array of logical nodes back into continuous clean HTML.
+ * Produces pure, standard HTML without fake spacers or synthetic runtime breaks.
  */
 export function serializeLogicalNodesToContinuousHtml(nodes: SourceNode[]): string {
   if (!nodes || nodes.length === 0) return '';
@@ -577,4 +502,13 @@ export function serializeLogicalNodesToContinuousHtml(nodes: SourceNode[]): stri
       return node.rawHtml || `<p>${node.textContent || ''}</p>`;
     })
     .join('\n');
+}
+
+/**
+ * Normalizes continuous HTML for persistence, ensuring valid structural wrappers
+ * and stripped runtime artifacts.
+ */
+export function normalizeLogicalDocumentHtml(html: string): string {
+  if (!html || !html.trim()) return '<p><br></p>';
+  return sanitizeLogicalDocumentHtml(html).trim();
 }

@@ -2,17 +2,28 @@
  * Enterprise Caret Tracker & Universal Token Insertion Engine
  * 
  * Provides rock-solid, zero-loss caret preservation and instantaneous placeholder token insertion
- * across all Universal Print Studio workbench canvases, contentEditable containers, Word (.docx) renderers,
- * tabular ledger cells, and custom document inputs.
+ * across all Universal Print Studio workbench canvases, single-host document editors, contentEditable
+ * containers, tabular ledger cells, and custom form inputs.
  * 
- * Includes intelligent bracket deduplication (prevents `{{{{key}}}}` or duplicate keys).
+ * Invariants:
+ * 1. Inserts tokens via pure Editor Transactions on the authoritative single-host editor.
+ * 2. Token nodes maintain stable logical identity (id, key, display, sourcePath, formatting).
+ * 3. Intelligent bracket deduplication prevents `{{{{key}}}}` or double braces.
+ * 4. Caret and selection remain stable after pagination reflow.
+ * 5. Zero reliance on deprecated global execCommand or raw unmanaged DOM mutations.
  */
+
+import { TokenInsertPayload, Mark } from './model/types';
+import { EditorCommands } from './layout/editor/EditorCommands';
+import { EditorDomAdapter } from './layout/editor/EditorDomAdapter';
+import { EditorTransaction } from './layout/editor/editorTypes';
 
 export interface ActiveCaretState {
   range: Range | null;
   element: HTMLElement | null;
   isInput: boolean;
   isContentEditable: boolean;
+  isSingleHostEditor: boolean;
   selectionStart?: number;
   selectionEnd?: number;
 }
@@ -22,6 +33,7 @@ let lastActiveCaret: ActiveCaretState = {
   element: null,
   isInput: false,
   isContentEditable: false,
+  isSingleHostEditor: false,
 };
 
 /**
@@ -33,6 +45,15 @@ function isEditableNode(node: Node | null): boolean {
   if (!el) return false;
   if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return true;
   return el.isContentEditable || Boolean(el.closest('[contenteditable="true"]'));
+}
+
+/**
+ * Finds the single-host editor container if present
+ */
+function findSingleHostEditor(el: HTMLElement | null): HTMLElement | null {
+  if (!el) return null;
+  if (el.getAttribute('data-doclab-single-host') === 'true') return el;
+  return el.closest('[data-doclab-single-host="true"]') as HTMLElement | null;
 }
 
 /**
@@ -51,13 +72,14 @@ export function captureActiveCaret(): ActiveCaretState {
       element: inputEl,
       isInput: true,
       isContentEditable: false,
+      isSingleHostEditor: false,
       selectionStart: inputEl.selectionStart ?? inputEl.value.length,
       selectionEnd: inputEl.selectionEnd ?? inputEl.value.length,
     };
     return lastActiveCaret;
   }
 
-  // 2. Check DOM Selection for contentEditable
+  // 2. Check DOM Selection for contentEditable or Single-Host Editor
   const selection = window.getSelection();
   if (selection && selection.rangeCount > 0) {
     const range = selection.getRangeAt(0);
@@ -68,11 +90,15 @@ export function captureActiveCaret(): ActiveCaretState {
         ? (container as HTMLElement)
         : container.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null;
 
+      const hostEl = editableEl || (container as HTMLElement);
+      const isSingleHost = Boolean(findSingleHostEditor(hostEl));
+
       lastActiveCaret = {
         range: range.cloneRange(),
-        element: editableEl || (container as HTMLElement),
+        element: hostEl,
         isInput: false,
         isContentEditable: true,
+        isSingleHostEditor: isSingleHost,
       };
       return lastActiveCaret;
     }
@@ -103,21 +129,69 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Inserts a placeholder token (e.g. `{{student_name}}`) cleanly at the user's active caret position.
- * Intelligent deduplication prevents double braces `{{{{key}}}}` or double insertions.
+ * Inserts a token directly via an Editor Transaction on a specified host element
  */
-export function insertTokenAtActiveCaret(rawToken: string): boolean {
+export function insertTokenViaEditorTransaction(
+  host: HTMLElement,
+  tokenPayload: TokenInsertPayload
+): EditorTransaction {
+  return EditorCommands.insertToken(host, tokenPayload);
+}
+
+/**
+ * Normalizes any raw token string or payload into a standard TokenInsertPayload
+ */
+export function normalizeTokenPayload(
+  rawToken: string | TokenInsertPayload,
+  options: Partial<TokenInsertPayload> = {}
+): TokenInsertPayload {
+  if (typeof rawToken === 'object' && rawToken !== null) {
+    const cleanKey = (rawToken.key || '').trim().replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    return {
+      ...rawToken,
+      key: cleanKey,
+      display: rawToken.display || rawToken.label || cleanKey,
+      label: rawToken.label || rawToken.display || cleanKey,
+      ...options,
+    };
+  }
+
+  const strToken = String(rawToken || '').trim();
+  const isDirective = strToken.startsWith('<') || strToken.startsWith('|');
+  const cleanKey = isDirective
+    ? strToken
+    : strToken.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+
+  return {
+    key: cleanKey,
+    display: options.display || options.label || cleanKey,
+    label: options.label || options.display || cleanKey,
+    sourcePath: options.sourcePath,
+    category: options.category || 'general',
+    defaultValue: options.defaultValue,
+    format: options.format,
+    formatting: options.formatting || options.marks,
+    marks: options.marks || options.formatting,
+    ...options,
+  };
+}
+
+/**
+ * Inserts a placeholder token (e.g. `{{student_name}}` or structured TokenInsertPayload)
+ * cleanly at the user's active caret position.
+ * 
+ * Uses Editor Transaction APIs for the authoritative editor canvas, guaranteeing
+ * stable AST identity and reliable cursor restoration after reflow.
+ */
+export function insertTokenAtActiveCaret(
+  rawToken: string | TokenInsertPayload,
+  options: Partial<TokenInsertPayload> = {}
+): boolean {
   if (typeof window === 'undefined' || !rawToken) return false;
 
-  const isDirective = rawToken.trim().startsWith('<') || rawToken.trim().startsWith('|');
-
-  // Directives like `<| indent: 5>` are inserted verbatim without `{{...}}` wrappers.
-  // Standard field keys (e.g. `student-name`) are normalized strictly to `{{student-name}}`.
-  const cleanKey = String(rawToken)
-    .replace(/^\{+/, '')
-    .replace(/\}+$/, '')
-    .trim();
-  const token = isDirective ? rawToken.trim() : `{{${cleanKey}}}`;
+  const payload = normalizeTokenPayload(rawToken, options);
+  const isDirective = payload.key.startsWith('<') || payload.key.startsWith('|');
+  const tokenString = isDirective ? payload.key : `{{${payload.key}}}`;
 
   // Refresh active caret state
   captureActiveCaret();
@@ -148,11 +222,11 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
       }
     }
 
-    const nextVal = val.slice(0, start) + token + val.slice(end);
+    const nextVal = val.slice(0, start) + tokenString + val.slice(end);
     inputEl.value = nextVal;
 
     // Reposition cursor right after inserted token
-    const nextPos = start + token.length;
+    const nextPos = start + tokenString.length;
     inputEl.focus();
     inputEl.setSelectionRange(nextPos, nextPos);
 
@@ -165,63 +239,56 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
     return true;
   }
 
-  // 2. If target is a contentEditable element with active Range
+  // 2. If target is within the Single-Host Editor Canvas
+  const singleHost = findSingleHostEditor(element) || (document.querySelector('[data-doclab-single-host="true"]') as HTMLElement | null);
+
+  if (singleHost) {
+    try {
+      // Focus single host editor
+      singleHost.focus();
+
+      // Dispatch authoritative Editor Command Event (handled transactionally by PaginatedDocumentEditor)
+      window.dispatchEvent(
+        new CustomEvent('spr_doclab_editor_command', {
+          detail: {
+            command: 'insertToken',
+            value: payload.key,
+            options: payload,
+          },
+        })
+      );
+      return true;
+    } catch (err) {
+      console.warn('Single-host editor token command dispatch failed, falling back to DOM adapter:', err);
+    }
+  }
+
+  // 3. Fallback: If target is a generic contentEditable element with active Range
   if (range && element && document.body.contains(element)) {
     try {
       element.focus();
       const selection = window.getSelection();
       if (selection) {
         selection.removeAllRanges();
-
-        // Smart deduplication for ContentEditable (standard placeholder tokens only):
-        if (!isDirective && range.startContainer.nodeType === Node.TEXT_NODE) {
-          const text = range.startContainer.textContent || '';
-          const offset = range.startOffset;
-
-          const beforeText = text.slice(0, offset);
-          if (beforeText.endsWith('{{')) {
-            range.setStart(range.startContainer, offset - 2);
-          } else if (beforeText.endsWith('{')) {
-            range.setStart(range.startContainer, offset - 1);
-          }
-
-          const afterText = text.slice(range.endOffset);
-          if (afterText.startsWith('}}')) {
-            range.setEnd(range.startContainer, range.endOffset + 2);
-          } else if (afterText.startsWith('}')) {
-            range.setEnd(range.startContainer, range.endOffset + 1);
-          }
-        }
-
         selection.addRange(range);
 
-        // Pristine DOM insertion: delete any selected content and insert clean text node
-        // (Bypasses deprecated, lossy document.execCommand to guarantee zero bracket truncation)
-        range.deleteContents();
-        const textNode = document.createTextNode(token);
-        range.insertNode(textNode);
+        // Perform clean insertion using EditorDomAdapter
+        EditorDomAdapter.insertTokenAtSelection(element, payload);
 
-        // Move cursor right after the newly inserted text node
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        // Save updated range
+        // Capture updated range
         if (selection.rangeCount > 0) {
           lastActiveCaret.range = selection.getRangeAt(0).cloneRange();
         }
 
-        // Trigger input event on editable container
         element.dispatchEvent(new Event('input', { bubbles: true }));
         return true;
       }
     } catch (err) {
-      console.warn('Failed to insert token via saved range:', err);
+      console.warn('Generic contentEditable token insertion failed:', err);
     }
   }
 
-  // 3. Fallback: Find any active canvas contentEditable element on screen
+  // 4. Fallback: Find any active canvas contentEditable element on screen
   const fallbackEditable = document.querySelector(
     '.universal-print-workbench [contenteditable="true"], .paper-sheet [contenteditable="true"]'
   ) as HTMLElement | null;
@@ -229,37 +296,17 @@ export function insertTokenAtActiveCaret(rawToken: string): boolean {
   if (fallbackEditable) {
     try {
       fallbackEditable.focus();
-      const selection = window.getSelection();
-      if (selection) {
-        const range = document.createRange();
-        range.selectNodeContents(fallbackEditable);
-        range.collapse(false); // Move to end
-
-        range.deleteContents();
-        const textNode = document.createTextNode(token);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        fallbackEditable.dispatchEvent(new Event('input', { bubbles: true }));
-
-        if (selection.rangeCount > 0) {
-          lastActiveCaret.range = selection.getRangeAt(0).cloneRange();
-          lastActiveCaret.element = fallbackEditable;
-        }
-        return true;
-      }
+      EditorDomAdapter.insertTokenAtSelection(fallbackEditable, payload);
+      fallbackEditable.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
     } catch (err) {
       console.warn('Fallback canvas insertion failed:', err);
     }
   }
 
-  // 4. Fallback: Copy to clipboard if no editable canvas area was active
+  // 5. Fallback: Copy to clipboard if no editable canvas area was active
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    navigator.clipboard.writeText(token);
+    navigator.clipboard.writeText(tokenString);
   }
 
   return false;

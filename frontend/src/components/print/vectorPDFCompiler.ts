@@ -58,6 +58,13 @@ export interface CompileVectorPDFProps {
   options?: Partial<PrintOptions>;
 }
 
+interface ExtendedJsPDF extends jsPDF {
+  lastAutoTable?: {
+    finalY: number;
+    [key: string]: any;
+  };
+}
+
 /**
  * Canva / Adobe-Grade Client-Side Structured Vector PDF Document Compiler
  * Compiles document model directly into 100% Vector PDF in client RAM without rasterization.
@@ -306,7 +313,7 @@ export function compileVectorPDFDocument({
     return !visibleColumnKeys || visibleColumnKeys.length === 0 || visibleColumnKeys.includes(key);
   });
 
-  const tableHeaders = ['NO.', ...activeCols.map((c) => c.label || c.header || (c as any).title || c.id || '')];
+  const tableHeaders = ['NO.', ...activeCols.map((c) => c.label || c.header || c.title || c.id || '')];
 
   const tableRows = (data || []).map((row, rIdx) => {
     const rowValues = [String(rIdx + 1)];
@@ -379,7 +386,10 @@ export function compileVectorPDFDocument({
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(48);
         try {
-          doc.setGState(new (doc.GState as any)({ opacity: 0.04 }));
+          const GStateCtor = (doc as unknown as { GState?: new (options: { opacity: number }) => any }).GState;
+          if (GStateCtor) {
+            doc.setGState(new GStateCtor({ opacity: 0.04 }));
+          }
         } catch {
           // fallback
         }
@@ -392,7 +402,8 @@ export function compileVectorPDFDocument({
     },
   });
 
-  let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 12 : cursorY + 40;
+  const extDoc = doc as unknown as ExtendedJsPDF;
+  let finalY = extDoc.lastAutoTable ? extDoc.lastAutoTable.finalY + 12 : cursorY + 40;
 
   // 5. Summary Metrics Box
   if (showSummary && Array.isArray(summaryMetrics) && summaryMetrics.length > 0) {
@@ -511,7 +522,150 @@ export function compileVectorPDFDocument({
 }
 
 /**
- * Compiles a computed LayoutDocument directly into a multi-page Vector PDF.
+ * Utility to parse hex / rgb color string into [r, g, b] array
+ */
+function parseColorToRgb(colorStr?: string): [number, number, number] {
+  if (!colorStr) return [15, 23, 42];
+  const clean = colorStr.trim();
+  if (clean.startsWith('#')) {
+    const hex = clean.replace('#', '');
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16) || 0;
+      const g = parseInt(hex[1] + hex[1], 16) || 0;
+      const b = parseInt(hex[2] + hex[2], 16) || 0;
+      return [r, g, b];
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16) || 0;
+      const g = parseInt(hex.substring(2, 4), 16) || 0;
+      const b = parseInt(hex.substring(4, 6), 16) || 0;
+      return [r, g, b];
+    }
+  }
+  const rgbMatch = clean.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1], 10) || 0;
+    const g = parseInt(rgbMatch[2], 10) || 0;
+    const b = parseInt(rgbMatch[3], 10) || 0;
+    return [r, g, b];
+  }
+  return [15, 23, 42];
+}
+
+
+
+/**
+ * Extracts basic CSS style properties from an HTML snippet or style string
+ */
+function extractStyleProperties(html: string): {
+  isBold: boolean;
+  isItalic: boolean;
+  align: 'left' | 'center' | 'right' | 'justify';
+  colorRgb: [number, number, number];
+  fontSizePt?: number;
+} {
+  const isBold = /font-weight:\s*(bold|[6-9]00)/i.test(html) || /<strong>|<b>/i.test(html);
+  const isItalic = /font-style:\s*italic/i.test(html) || /<em>|<i>/i.test(html);
+  
+  let align: 'left' | 'center' | 'right' | 'justify' = 'left';
+  if (/text-align:\s*center/i.test(html) || /align="center"/i.test(html)) {
+    align = 'center';
+  } else if (/text-align:\s*right/i.test(html) || /align="right"/i.test(html)) {
+    align = 'right';
+  } else if (/text-align:\s*justify/i.test(html) || /align="justify"/i.test(html)) {
+    align = 'justify';
+  }
+
+  const colorMatch = html.match(/color:\s*([^;"]+)/i);
+  const colorRgb: [number, number, number] = colorMatch ? parseColorToRgb(colorMatch[1]) : [15, 23, 42];
+
+
+  let fontSizePt: number | undefined;
+  const fsMatch = html.match(/font-size:\s*([\d.]+)(px|pt)/i);
+  if (fsMatch) {
+    const val = parseFloat(fsMatch[1]);
+    fontSizePt = fsMatch[2].toLowerCase() === 'px' ? val * 0.75 : val;
+  }
+
+  return { isBold, isItalic, align, colorRgb, fontSizePt };
+}
+
+/**
+ * Renders an HTML table slice into the PDF document using autoTable
+ */
+function renderHtmlTableFragment(
+  doc: jsPDF,
+  html: string,
+  startX: number,
+  startY: number,
+  contentWidth: number
+): number {
+  let headers: string[] = [];
+  let rows: string[][] = [];
+
+  // Parse table structure
+  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let trMatch;
+  while ((trMatch = trRegex.exec(html)) !== null) {
+    const rowHtml = trMatch[1];
+    const thMatches = [...rowHtml.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)];
+    const tdMatches = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+
+    if (thMatches.length > 0 && headers.length === 0) {
+      headers = thMatches.map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    } else if (tdMatches.length > 0) {
+      rows.push(tdMatches.map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()));
+    }
+  }
+
+  if (headers.length === 0 && rows.length === 0) {
+    // Fallback if no <tr> found
+    const cleanText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 41, 59);
+      const lines = doc.splitTextToSize(cleanText, contentWidth);
+      doc.text(lines, startX, startY + 10);
+      return startY + lines.length * 12 + 6;
+    }
+    return startY;
+  }
+
+  autoTable(doc, {
+    startY: startY,
+    head: headers.length > 0 ? [headers] : undefined,
+    body: rows,
+    margin: { left: startX, right: doc.internal.pageSize.getWidth() - startX - contentWidth },
+    tableWidth: contentWidth,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.5,
+      font: 'helvetica',
+      textColor: [30, 41, 59],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.5,
+      cellPadding: 4,
+      overflow: 'linebreak',
+      valign: 'middle',
+    },
+    headStyles: {
+      fillColor: [241, 245, 249],
+      textColor: [15, 23, 42],
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.5,
+    },
+    pageBreak: 'avoid',
+  });
+
+  const extDoc = doc as unknown as ExtendedJsPDF;
+  return extDoc.lastAutoTable?.finalY ? extDoc.lastAutoTable.finalY + 8 : startY + 24;
+}
+
+/**
+ * Compiles a computed LayoutDocument directly into a multi-page PDF.
  * Consumes the exact layout geometry, page count, fragments, margins, watermarks,
  * headers, footers, and signatures calculated by PaginationEngine.
  *
@@ -581,7 +735,10 @@ export function compileLayoutDocumentToPDF(
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(watermarkConfig?.fontSizePx ? watermarkConfig.fontSizePx * 0.75 : 44);
       try {
-        doc.setGState(new (doc.GState as any)({ opacity: watermarkConfig?.opacity ?? 0.05 }));
+        const GStateCtor = (doc as unknown as { GState?: new (options: { opacity: number }) => any }).GState;
+        if (GStateCtor) {
+          doc.setGState(new GStateCtor({ opacity: watermarkConfig?.opacity ?? 0.05 }));
+        }
       } catch {
         // Safe fallback in environments without GState
       }
@@ -618,49 +775,150 @@ export function compileLayoutDocumentToPDF(
       doc.line(marginL, headerY + 4, pageWidthPt - marginR, headerY + 4);
     }
 
-    // 3. Page Content / Fragments
+    // 3. Page Content / Semantic Fragment Renderer
     const contentX = marginL;
     let cursorY = marginT;
 
     if (Array.isArray(page.fragments) && page.fragments.length > 0) {
       page.fragments.forEach((frag) => {
-        const text = (frag.textContent || '').trim();
-        if (!text) return;
+        const html = frag.htmlContent || '';
+        const text = (frag.textContent || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).trim();
+        const style = extractStyleProperties(html);
+        const fragType = String(frag.type);
 
-        if (frag.type === 'heading') {
-          const headingLevel = frag.data?.headingLevel || 2;
-          const headingSize = headingLevel === 1 ? 14 : headingLevel === 2 ? 12 : 10.5;
+
+        // A. Heading Fragment
+        if (fragType === 'heading' || /^h[1-6]/i.test(fragType)) {
+          const headingLevel = frag.data?.headingLevel || (fragType.startsWith('h') ? parseInt(fragType.substring(1), 10) : 2);
+          const headingSize = headingLevel === 1 ? 14 : headingLevel === 2 ? 12 : headingLevel === 3 ? 10.5 : 9.5;
+          
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(headingSize);
-          doc.setTextColor(15, 23, 42);
+          doc.setFontSize(style.fontSizePt || headingSize);
+          doc.setTextColor(style.colorRgb[0], style.colorRgb[1], style.colorRgb[2]);
+
           const lines = doc.splitTextToSize(text, contentW);
-          doc.text(lines, contentX, cursorY + headingSize);
-          cursorY += lines.length * (headingSize + 4) + 6;
-        } else if (frag.type === 'table') {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 41, 59);
+          const textX = style.align === 'center' ? contentX + contentW / 2 : style.align === 'right' ? contentX + contentW : contentX;
+          doc.text(lines, textX, cursorY + (style.fontSizePt || headingSize), { align: style.align === 'justify' ? 'left' : style.align });
+          cursorY += lines.length * ((style.fontSizePt || headingSize) + 4) + 6;
+        }
+
+        // B. Table Fragment
+        else if (fragType === 'table') {
+          cursorY = renderHtmlTableFragment(doc, html || text, contentX, cursorY, contentW);
+        }
+
+        // C. List Fragment
+        else if (fragType === 'list') {
+          const isOrdered = /<ol/i.test(html);
+          const items = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) =>
+            m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+          );
+
+          doc.setFont('helvetica', style.isBold ? 'bold' : style.isItalic ? 'italic' : 'normal');
+          doc.setFontSize(style.fontSizePt || 9.5);
+          doc.setTextColor(style.colorRgb[0], style.colorRgb[1], style.colorRgb[2]);
+
+          if (items.length > 0) {
+            items.forEach((item, idx) => {
+              const prefix = isOrdered ? `${idx + 1}. ` : '• ';
+              const itemLines = doc.splitTextToSize(item, contentW - 16);
+              doc.text(prefix, contentX, cursorY + 11);
+              doc.text(itemLines, contentX + 14, cursorY + 11);
+              cursorY += itemLines.length * 13 + 3;
+            });
+            cursorY += 4;
+          } else if (text) {
+            const lines = doc.splitTextToSize(text, contentW);
+            doc.text(lines, contentX, cursorY + 11);
+            cursorY += lines.length * 13 + 4;
+          }
+        }
+
+        // D. Image Fragment
+        else if (fragType === 'image') {
+          const srcMatch = html.match(/src=["']([^"']+)["']/i) || frag.data?.src || frag.data?.url;
+          const src = typeof srcMatch === 'string' ? srcMatch : srcMatch?.[1];
+
+          if (src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('blob:'))) {
+            try {
+              const imgW = Math.min(frag.rect?.width ? frag.rect.width * 0.75 : 180, contentW);
+              const imgH = frag.rect?.height ? frag.rect.height * 0.75 : 100;
+              const format = src.includes('image/png') ? 'PNG' : 'JPEG';
+              doc.addImage(src, format, contentX, cursorY, imgW, imgH);
+              cursorY += imgH + 8;
+            } catch {
+              // Fallback placeholder box
+              doc.setDrawColor(203, 213, 225);
+              doc.setLineWidth(0.5);
+              doc.rect(contentX, cursorY, 140, 60);
+              doc.setFont('helvetica', 'italic');
+              doc.setFontSize(8);
+              doc.setTextColor(100, 116, 139);
+              doc.text('[Image]', contentX + 70, cursorY + 32, { align: 'center' });
+              cursorY += 68;
+            }
+          } else {
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(0.5);
+            doc.rect(contentX, cursorY, 140, 60);
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text('[Image Container]', contentX + 70, cursorY + 32, { align: 'center' });
+            cursorY += 68;
+          }
+        }
+
+        // E. Divider Fragment
+        else if (fragType === 'divider') {
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.5);
+          doc.line(contentX, cursorY + 4, contentX + contentW, cursorY + 4);
+          cursorY += 10;
+        }
+
+        // F. SVG Vector Fragment
+        else if (fragType === 'svg') {
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.5);
+          const svgW = Math.min(frag.rect?.width ? frag.rect.width * 0.75 : 160, contentW);
+          const svgH = frag.rect?.height ? frag.rect.height * 0.75 : 60;
+          doc.rect(contentX, cursorY, svgW, svgH);
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text('[Vector SVG]', contentX + svgW / 2, cursorY + svgH / 2, { align: 'center' });
+          cursorY += svgH + 6;
+        }
+
+        // G. Default Paragraph / Rich Text Fragment
+        else {
+          if (!text) return;
+          const fontStyle = style.isBold && style.isItalic ? 'bolditalic' : style.isBold ? 'bold' : style.isItalic ? 'italic' : 'normal';
+          doc.setFont('helvetica', fontStyle);
+          doc.setFontSize(style.fontSizePt || 9.5);
+          doc.setTextColor(style.colorRgb[0], style.colorRgb[1], style.colorRgb[2]);
+
           const lines = doc.splitTextToSize(text, contentW);
-          doc.text(lines, contentX, cursorY + 10);
-          cursorY += lines.length * 12 + 6;
-        } else {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9.5);
-          doc.setTextColor(15, 23, 42);
-          const lines = doc.splitTextToSize(text, contentW);
-          doc.text(lines, contentX, cursorY + 11);
-          cursorY += lines.length * 13 + 4;
+          const textX = style.align === 'center' ? contentX + contentW / 2 : style.align === 'right' ? contentX + contentW : contentX;
+          doc.text(lines, textX, cursorY + (style.fontSizePt || 9.5) + 2, { align: style.align === 'justify' ? 'left' : style.align });
+          cursorY += lines.length * ((style.fontSizePt || 9.5) + 3.5) + 4;
         }
       });
     } else if (page.htmlContent) {
-      const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (cleanText) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.setTextColor(15, 23, 42);
-        const lines = doc.splitTextToSize(cleanText, contentW);
-        doc.text(lines, contentX, cursorY + 12);
-        cursorY += lines.length * 13 + 6;
+      // If page.fragments is empty but htmlContent is present
+      if (page.htmlContent.includes('<table')) {
+        cursorY = renderHtmlTableFragment(doc, page.htmlContent, contentX, cursorY, contentW);
+      } else {
+        const cleanText = page.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleanText) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(15, 23, 42);
+          const lines = doc.splitTextToSize(cleanText, contentW);
+          doc.text(lines, contentX, cursorY + 12);
+          cursorY += lines.length * 13 + 6;
+        }
       }
     }
 
@@ -717,4 +975,5 @@ export function compileLayoutDocumentToPDF(
 
   return doc;
 }
+
 

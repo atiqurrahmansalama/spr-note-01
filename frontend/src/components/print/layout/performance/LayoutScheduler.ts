@@ -71,7 +71,8 @@ export class LayoutScheduler {
           }
 
           if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            (window as any).requestIdleCallback(() => step(), { timeout: 20 });
+            type WindowWithIdle = Window & { requestIdleCallback: (cb: () => void, opt?: { timeout: number }) => number };
+            (window as unknown as WindowWithIdle).requestIdleCallback(() => step(), { timeout: 20 });
           } else {
             setTimeout(step, 0);
           }

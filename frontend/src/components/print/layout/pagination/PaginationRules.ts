@@ -25,7 +25,7 @@ export class PaginationRules {
   /**
    * Extracts pagination rules and constraint metadata from an HTMLElement, SourceNode, or BlockNode
    */
-  public static extractRules(node: HTMLElement | SourceNode | BlockNode | any): PaginationNodeRules {
+  public static extractRules(node: HTMLElement | SourceNode | BlockNode | null | undefined): PaginationNodeRules {
     if (!node) {
       return { breakBefore: 'auto', breakAfter: 'auto', breakInside: 'auto', keepWithNext: false };
     }
@@ -33,7 +33,7 @@ export class PaginationRules {
     // Canonical AST BlockNode
     if (typeof node === 'object' && 'type' in node && !('nodeType' in node) && !('rawHtml' in node)) {
       const block = node as BlockNode;
-      const isManual = block.type === 'manual-page-break' || (block as any).explicitBreak;
+      const isManual = block.type === 'manual-page-break' || ('explicitBreak' in block && Boolean(block.explicitBreak));
       const isKeepTogether = block.type === 'image' || block.type === 'divider';
       const isKeepWithNext = block.type === 'heading';
 
@@ -70,12 +70,6 @@ export class PaginationRules {
       // 2. Break After
       let breakAfter: BreakValue = 'auto';
       if (
-        classList.contains('spr-runtime-page-spacer') ||
-        el.getAttribute('data-spr-runtime-pagination') === 'true' ||
-        el.getAttribute('data-runtime-spacer') === 'true'
-      ) {
-        breakAfter = 'auto';
-      } else if (
         isExplicitManualBreak(el) ||
         /page-break-after\s*:\s*always/i.test(style) ||
         /break-after\s*:\s*(?:page|always)/i.test(style) ||

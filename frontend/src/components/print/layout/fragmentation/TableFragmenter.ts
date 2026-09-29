@@ -88,13 +88,13 @@ export class TableFragmenter {
 
     const firstTableNode: TableNode = {
       ...table,
-      id: `${table.id}_p1`,
+      id: table.id,
       rows: [...headerRows, ...firstDataRows],
     };
 
     const remainingTableNode: TableNode = {
       ...table,
-      id: `${table.id}_p2`,
+      id: table.id,
       rows: [...headerRows, ...remainingDataRows],
     };
 

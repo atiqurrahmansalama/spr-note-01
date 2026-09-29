@@ -1,432 +1,131 @@
 /**
  * EditorPositionMapper
  *
- * Implements the stable bidirectional mapping:
- * Logical Node ↔ Editor Position ↔ Layout Fragment ↔ Page Position
+ * Implements authoritative Logical Selection & Cursor Mapping:
+ * Logical Node Point { nodeId, textOffset } ↔ DOM Selection Range
  *
- * Provides accurate caret bookmark tracking, range selection preservation,
- * scroll position stability, and smooth cursor restoration across discrete physical
- * page DOM sheets without focus loss or jumping.
+ * Invariants:
+ * 1. Works on EXACTLY ONE logical editing host.
+ * 2. Selection restoration after layout reflow is strictly based on logical document positions
+ *    (nodeId + textOffset), NEVER on page-index DOM coordinates.
+ * 3. Supports collapsed carets, non-collapsed ranges, and scroll position preservation.
+ * 4. Fully bidirectional and robust across reflows, table cells, lists, and headings.
  */
 
-import { LayoutDocument, LayoutPage } from '../types/paginationTypes';
-import { LayoutFragment } from '../types/fragmentTypes';
-import { stripRuntimePaginationSpacers } from '../logicalDocument';
+import { LogicalPosition, LogicalSelection } from './editorTypes';
+import { LayoutDocument } from '../types/paginationTypes';
 
 export interface EditorCaretBookmark {
-  /** Target page index where selection begins (0, 1, 2, ...) */
-  pageIndex: number;
+  /** Logical start position */
+  logicalStart?: LogicalPosition;
+  /** Logical end position */
+  logicalEnd?: LogicalPosition;
   /** Global continuous character offset in the canonical document */
   canonicalOffset: number;
-  /** Local character offset within the active page content region */
+  /** Page index (0-indexed) for legacy layout projection compatibility */
+  pageIndex: number;
+  /** Local page text offset for legacy compatibility */
   pageOffset: number;
-  /** DOM node path from page editable root to the start container */
+  /** DOM index path from root */
   nodePath: number[];
-  /** Start offset inside the leaf node */
+  /** Leaf text offset */
   leafOffset: number;
-  /** Tag name of the active leaf container (e.g. 'P', 'TD', 'H1', 'SPAN') */
+  /** Tag name of active block */
   tagName?: string;
-  /** Node ID of the source canonical fragment if available */
+  /** Source node ID */
   sourceNodeId?: string;
-
-  /** Selection range expansion fields */
+  /** Whether selection is collapsed */
   isCollapsed?: boolean;
+  /** End page index */
   endPageIndex?: number;
+  /** End page offset */
   endPageOffset?: number;
+  /** End DOM index path */
   endNodePath?: number[];
+  /** End leaf offset */
   endLeafOffset?: number;
-
-  /** Scroll preservation offsets */
+  /** Canvas scroll position preservation */
   scrollTop?: number;
   scrollLeft?: number;
 }
 
-const ELEMENT_NODE_TYPE = typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1;
 const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 
 export class EditorPositionMapper {
   /**
-   * Captures the active caret/selection bookmark and scroll position from the discrete page sheet hierarchy.
+   * Captures the active logical selection { anchor, head } from the single editing host.
    */
-  static captureCaretBookmark(
-    pagesContainer: HTMLElement,
-    layoutDoc?: LayoutDocument | null
-  ): EditorCaretBookmark | null {
-    if (typeof window === 'undefined' || !pagesContainer) return null;
+  public static captureLogicalSelection(host: HTMLElement): LogicalSelection | null {
+    if (typeof window === 'undefined' || !host) return null;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
 
     const range = sel.getRangeAt(0);
-    const startContainer = range.startContainer;
-    const endContainer = range.endContainer;
-
-    // Find which discrete page content editable holds the selection start
-    const activePageEl = (startContainer as HTMLElement).closest?.(
-      '[data-page-index]'
-    ) as HTMLElement | null;
-
-    if (!activePageEl || !pagesContainer.contains(activePageEl)) {
+    if (!host.contains(range.startContainer) || !host.contains(range.endContainer)) {
       return null;
     }
 
-    const pageIndexStr = activePageEl.getAttribute('data-page-index');
-    const pageIndex = pageIndexStr !== null ? parseInt(pageIndexStr, 10) : 0;
+    const startPos = this.getLogicalPoint(host, range.startContainer, range.startOffset);
+    const endPos = range.collapsed
+      ? startPos
+      : this.getLogicalPoint(host, range.endContainer, range.endOffset);
 
-    // Find the inner editable root for this page
-    const editableRoot =
-      activePageEl.querySelector<HTMLElement>('[contenteditable="true"]') ||
-      (activePageEl.isContentEditable ? activePageEl : null);
+    if (!startPos || !endPos) return null;
 
-    if (!editableRoot) return null;
-
-    // 1. Calculate local offset within this page
-    let pageOffset = 0;
-    try {
-      const preCaretRange = range.cloneRange();
-      preCaretRange.selectNodeContents(editableRoot);
-      preCaretRange.setEnd(range.startContainer, range.startOffset);
-      pageOffset = preCaretRange.toString().length;
-    } catch {
-      pageOffset = 0;
-    }
-
-    // 2. Trace DOM index path from editableRoot down to startContainer
-    const nodePath: number[] = [];
-    let curr: Node | null = range.startContainer;
-    while (curr && curr !== editableRoot) {
-      const parent: Node | null = curr.parentNode;
-      if (!parent) break;
-      const idx = Array.prototype.indexOf.call(parent.childNodes, curr);
-      nodePath.unshift(idx);
-      curr = parent;
-    }
-
-    const leafOffset = range.startOffset;
-    const tagName =
-      range.startContainer.nodeType === ELEMENT_NODE_TYPE
-        ? (range.startContainer as HTMLElement).tagName
-        : range.startContainer.parentElement?.tagName;
-
-    // 3. Calculate canonical global offset across preceding pages
-    let canonicalOffset = pageOffset;
-    if (layoutDoc && layoutDoc.pages) {
-      for (let i = 0; i < pageIndex && i < layoutDoc.pages.length; i++) {
-        const p = layoutDoc.pages[i];
-        const pageText = p.fragments
-          ? p.fragments.map((f) => f.textContent || '').join(' ')
-          : (p.htmlContent || '').replace(/<[^>]+>/g, ' ');
-        canonicalOffset += pageText.length;
-      }
-    }
-
-    // 4. Trace source node ID
-    let sourceNodeId: string | undefined;
-    const blockEl = (range.startContainer as HTMLElement).closest?.(
-      '[data-source-id], [data-node-id]'
-    );
-    if (blockEl) {
-      sourceNodeId =
-        blockEl.getAttribute('data-source-id') ||
-        blockEl.getAttribute('data-node-id') ||
-        undefined;
-    }
-
-    // 5. Handle range selection (non-collapsed)
-    const isCollapsed = range.collapsed;
-    let endPageIndex = pageIndex;
-    let endPageOffset = pageOffset;
-    const endNodePath: number[] = [];
-    let endLeafOffset = range.endOffset;
-
-    if (!isCollapsed) {
-      const endPageEl = (endContainer as HTMLElement).closest?.(
-        '[data-page-index]'
-      ) as HTMLElement | null;
-
-      if (endPageEl && pagesContainer.contains(endPageEl)) {
-        const endIdxStr = endPageEl.getAttribute('data-page-index');
-        endPageIndex = endIdxStr !== null ? parseInt(endIdxStr, 10) : pageIndex;
-
-        const endEditableRoot =
-          endPageEl.querySelector<HTMLElement>('[contenteditable="true"]') ||
-          (endPageEl.isContentEditable ? endPageEl : null);
-
-        if (endEditableRoot) {
-          try {
-            const preEndRange = range.cloneRange();
-            preEndRange.selectNodeContents(endEditableRoot);
-            preEndRange.setEnd(range.endContainer, range.endOffset);
-            endPageOffset = preEndRange.toString().length;
-          } catch {
-            endPageOffset = pageOffset;
-          }
-
-          let endCurr: Node | null = range.endContainer;
-          while (endCurr && endCurr !== endEditableRoot) {
-            const parent: Node | null = endCurr.parentNode;
-            if (!parent) break;
-            const idx = Array.prototype.indexOf.call(parent.childNodes, endCurr);
-            endNodePath.unshift(idx);
-            endCurr = parent;
-          }
-        }
-      }
-    }
-
-    // 6. Scroll offsets of the canvas or parent wrapper
-    const scrollContainer = pagesContainer.closest('.universal-print-canvas-wrapper') || pagesContainer.parentElement;
+    const scrollContainer = host.closest('.universal-print-canvas-wrapper') || host.parentElement;
     const scrollTop = scrollContainer ? scrollContainer.scrollTop : (typeof window !== 'undefined' ? window.scrollY : 0);
     const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : (typeof window !== 'undefined' ? window.scrollX : 0);
 
     return {
-      pageIndex,
-      canonicalOffset,
-      pageOffset,
-      nodePath,
-      leafOffset,
-      tagName,
-      sourceNodeId,
-      isCollapsed,
-      endPageIndex,
-      endPageOffset,
-      endNodePath,
-      endLeafOffset,
+      anchor: startPos,
+      head: endPos,
+      isCollapsed: range.collapsed,
       scrollTop,
       scrollLeft,
     };
   }
 
   /**
-   * Restores active caret / selection range and scroll position smoothly.
+   * Restores a logical selection { anchor, head } into the single editing host.
    */
-  static restoreCaretBookmark(
-    pagesContainer: HTMLElement,
-    bookmark: EditorCaretBookmark | null,
-    layoutDoc?: LayoutDocument | null
+  public static restoreLogicalSelection(
+    host: HTMLElement,
+    selection: LogicalSelection | null
   ): boolean {
-    if (typeof window === 'undefined' || !pagesContainer || !bookmark) return false;
+    if (typeof window === 'undefined' || !host || !selection) return false;
     const sel = window.getSelection();
     if (!sel) return false;
 
-    // Determine target start page element
-    let targetPageIndex = bookmark.pageIndex;
-    const totalPages = layoutDoc?.pages?.length || 1;
-    if (targetPageIndex >= totalPages) {
-      targetPageIndex = totalPages - 1;
-    }
+    const startDomPoint = this.resolveLogicalPoint(host, selection.anchor);
+    if (!startDomPoint) return false;
 
-    let targetPageEl = pagesContainer.querySelector<HTMLElement>(
-      `[data-page-index="${targetPageIndex}"]`
-    );
-
-    if (!targetPageEl) {
-      targetPageEl = pagesContainer.querySelector<HTMLElement>('[data-page-index="0"]');
-    }
-    if (!targetPageEl) return false;
-
-    const editableRoot =
-      targetPageEl.querySelector<HTMLElement>('[contenteditable="true"]') ||
-      (targetPageEl.isContentEditable ? targetPageEl : null);
-
-    if (!editableRoot) return false;
-
-    // Attempt 0: Source Node ID Cross-Page Matching
-    if (bookmark.sourceNodeId) {
-      const sourceEl = pagesContainer.querySelector<HTMLElement>(
-        `[data-source-id="${bookmark.sourceNodeId}"], [data-node-id="${bookmark.sourceNodeId}"]`
-      );
-      if (sourceEl) {
-        try {
-          const range = document.createRange();
-          if (sourceEl.firstChild && (sourceEl.firstChild as any).nodeType === TEXT_NODE_TYPE) {
-            const maxLen = sourceEl.firstChild.textContent?.length || 0;
-            range.setStart(sourceEl.firstChild, Math.min(bookmark.leafOffset, maxLen));
-          } else {
-            range.selectNodeContents(sourceEl);
-          }
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          this.restoreScroll(pagesContainer, bookmark);
-          return true;
-        } catch {
-          // Fallback
-        }
-      }
-    }
-
-    // Attempt 1: Global Canonical Offset Cross-Page Traversal
-    if (bookmark.canonicalOffset !== undefined && bookmark.canonicalOffset >= 0) {
-      let remainingOffset = bookmark.canonicalOffset;
-      let matchedNode: Node | null = null;
-      let matchedOffset = 0;
-      let matched = false;
-
-      const pageEditables = Array.from(
-        pagesContainer.querySelectorAll<HTMLElement>('[data-page-index] [contenteditable="true"]')
-      );
-
-      for (const pEditable of pageEditables) {
-        if (matched) break;
-
-        function traverseContinuous(node: Node) {
-          if (matched) return;
-          if ((node as any).nodeType === TEXT_NODE_TYPE) {
-            const tLen = node.textContent?.length || 0;
-            if (remainingOffset <= tLen) {
-              matchedNode = node;
-              matchedOffset = Math.max(0, remainingOffset);
-              matched = true;
-              return;
-            }
-            remainingOffset -= tLen;
-          } else {
-            for (let i = 0; i < node.childNodes.length; i++) {
-              traverseContinuous(node.childNodes[i]);
-              if (matched) return;
-            }
-          }
-        }
-
-        traverseContinuous(pEditable);
-      }
-
-      if (matchedNode) {
-        try {
-          const range = document.createRange();
-          range.setStart(matchedNode, matchedOffset);
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          this.restoreScroll(pagesContainer, bookmark);
-          return true;
-        } catch {
-          // Fallback
-        }
-      }
-    }
-
-    // Attempt 2: Exact node path restoration
-    if (bookmark.nodePath && bookmark.nodePath.length > 0) {
-      let targetNode: Node | null = editableRoot;
-      for (const idx of bookmark.nodePath) {
-        if (targetNode && targetNode.childNodes && targetNode.childNodes[idx]) {
-          targetNode = targetNode.childNodes[idx];
-        } else {
-          targetNode = null;
-          break;
-        }
-      }
-
-      if (targetNode) {
-        try {
-          const range = document.createRange();
-          if ((targetNode as any).nodeType === TEXT_NODE_TYPE) {
-            const maxLen = targetNode.textContent?.length || 0;
-            range.setStart(targetNode, Math.min(bookmark.leafOffset, maxLen));
-          } else {
-            const childCount = targetNode.childNodes.length;
-            range.setStart(targetNode, Math.min(bookmark.leafOffset, childCount));
-          }
-
-          if (bookmark.isCollapsed !== false) {
-            range.collapse(true);
-          } else {
-            // Restore selection range end if present
-            let endNode: Node | null = targetNode;
-            if (bookmark.endNodePath && bookmark.endNodePath.length > 0) {
-              let currEnd: Node | null = editableRoot;
-              for (const eIdx of bookmark.endNodePath) {
-                if (currEnd && currEnd.childNodes && currEnd.childNodes[eIdx]) {
-                  currEnd = currEnd.childNodes[eIdx];
-                } else {
-                  currEnd = null;
-                  break;
-                }
-              }
-              if (currEnd) endNode = currEnd;
-            }
-
-            if (endNode) {
-              const maxEndLen = (endNode as any).nodeType === TEXT_NODE_TYPE
-                ? endNode.textContent?.length || 0
-                : endNode.childNodes.length;
-              range.setEnd(endNode, Math.min(bookmark.endLeafOffset ?? bookmark.leafOffset, maxEndLen));
-            } else {
-              range.collapse(true);
-            }
-          }
-
-          sel.removeAllRanges();
-          sel.addRange(range);
-          this.restoreScroll(pagesContainer, bookmark);
-          return true;
-        } catch {
-          // Fallback to offset traversal
-        }
-      }
-    }
-
-    // Attempt 3: Local page offset traversal
-    const offset = bookmark.pageOffset;
-    if (offset >= 0) {
-      let currentOffset = 0;
-      let targetNode: Node | null = null;
-      let targetOffset = 0;
-      let found = false;
-
-      function traverse(node: Node) {
-        if (found) return;
-        if ((node as any).nodeType === TEXT_NODE_TYPE) {
-          const textLen = node.textContent?.length || 0;
-          if (currentOffset + textLen >= offset) {
-            targetNode = node;
-            targetOffset = Math.max(0, Math.min(offset - currentOffset, textLen));
-            found = true;
-            return;
-          }
-          currentOffset += textLen;
-        } else {
-          for (let i = 0; i < node.childNodes.length; i++) {
-            traverse(node.childNodes[i]);
-            if (found) return;
-          }
-        }
-      }
-
-      traverse(editableRoot);
-
-      if (targetNode) {
-        try {
-          const range = document.createRange();
-          if ((targetNode as any).nodeType === TEXT_NODE_TYPE) {
-            range.setStart(targetNode, targetOffset);
-          } else {
-            range.selectNodeContents(targetNode);
-          }
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          this.restoreScroll(pagesContainer, bookmark);
-          return true;
-        } catch {
-          // Fallback to safe end placement
-        }
-      }
-    }
-
-    // Safe fallback: Place caret at the end of the editable root of the page
     try {
-      const leafNodes = Array.from(
-        editableRoot.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
-      ) as HTMLElement[];
-      const targetEl = leafNodes[leafNodes.length - 1] || editableRoot.lastElementChild || editableRoot;
       const range = document.createRange();
-      range.selectNodeContents(targetEl);
-      range.collapse(false);
+      range.setStart(startDomPoint.node, startDomPoint.offset);
+
+      if (selection.isCollapsed || !selection.head) {
+        range.collapse(true);
+      } else {
+        const endDomPoint = this.resolveLogicalPoint(host, selection.head);
+        if (endDomPoint) {
+          range.setEnd(endDomPoint.node, endDomPoint.offset);
+        } else {
+          range.collapse(true);
+        }
+      }
+
       sel.removeAllRanges();
       sel.addRange(range);
-      this.restoreScroll(pagesContainer, bookmark);
+
+      // Scroll position restoration
+      if (selection.scrollTop !== undefined || selection.scrollLeft !== undefined) {
+        const scrollContainer = host.closest('.universal-print-canvas-wrapper') || host.parentElement;
+        if (scrollContainer) {
+          if (selection.scrollTop !== undefined) scrollContainer.scrollTop = selection.scrollTop;
+          if (selection.scrollLeft !== undefined) scrollContainer.scrollLeft = selection.scrollLeft;
+        }
+      }
+
       return true;
     } catch {
       return false;
@@ -434,75 +133,283 @@ export class EditorPositionMapper {
   }
 
   /**
-   * Preserves and restores scroll position across layout reflow passes
+   * Extracts a LogicalPosition (nodeId + textOffset) for a given DOM node and offset.
    */
-  private static restoreScroll(pagesContainer: HTMLElement, bookmark: EditorCaretBookmark): void {
-    if (bookmark.scrollTop !== undefined || bookmark.scrollLeft !== undefined) {
-      const scrollContainer = pagesContainer.closest('.universal-print-canvas-wrapper') || pagesContainer.parentElement;
-      if (scrollContainer) {
-        if (bookmark.scrollTop !== undefined) scrollContainer.scrollTop = bookmark.scrollTop;
-        if (bookmark.scrollLeft !== undefined) scrollContainer.scrollLeft = bookmark.scrollLeft;
+  public static getLogicalPoint(
+    host: HTMLElement,
+    domNode: Node,
+    domOffset: number
+  ): LogicalPosition | null {
+    const blockEl = this.findEnclosingBlockElement(host, domNode);
+    if (!blockEl) return null;
+
+    const nodeId = this.getOrAssignNodeId(blockEl);
+
+    // Calculate text character offset from blockEl start to domNode + domOffset
+    let textOffset = 0;
+    try {
+      const preRange = document.createRange();
+      preRange.selectNodeContents(blockEl);
+      preRange.setEnd(domNode, domOffset);
+      textOffset = preRange.toString().length;
+    } catch {
+      textOffset = 0;
+    }
+
+    return {
+      nodeId,
+      textOffset,
+    };
+  }
+
+  /**
+   * Resolves a LogicalPosition (nodeId + textOffset) to a specific DOM Node and offset within host.
+   */
+  public static resolveLogicalPoint(
+    host: HTMLElement,
+    pos: LogicalPosition
+  ): { node: Node; offset: number } | null {
+    if (!pos || !pos.nodeId) return null;
+
+    // 1. Match host itself or child elements by data-node-id or data-source-id or id
+    let blockEl: HTMLElement | null = null;
+    if (
+      host.getAttribute('data-node-id') === pos.nodeId ||
+      host.getAttribute('data-source-id') === pos.nodeId ||
+      host.id === pos.nodeId
+    ) {
+      blockEl = host;
+    } else {
+      blockEl = host.querySelector<HTMLElement>(
+        `[data-node-id="${pos.nodeId}"], [data-source-id="${pos.nodeId}"], #${pos.nodeId}`
+      );
+    }
+
+    // 2. Fallback: If nodeId is an indexed identifier (e.g. "block_0", "p_1")
+    if (!blockEl) {
+      const allBlocks = this.getAllBlockElements(host);
+      const match = pos.nodeId.match(/(\d+)$/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        if (idx >= 0 && idx < allBlocks.length) {
+          blockEl = allBlocks[idx];
+        }
+      }
+      if (!blockEl && allBlocks.length > 0) {
+        blockEl = allBlocks[0];
       }
     }
+
+    if (!blockEl) return null;
+
+    // Find the text node at pos.textOffset
+    let currentOffset = 0;
+    let targetNode: Node | null = null;
+    let targetOffset = 0;
+    let found = false;
+
+    const traverse = (node: Node) => {
+      if (found) return;
+      if (node.nodeType === TEXT_NODE_TYPE) {
+        const tLen = node.textContent?.length || 0;
+        if (currentOffset + tLen >= pos.textOffset) {
+          targetNode = node;
+          targetOffset = Math.max(0, Math.min(pos.textOffset - currentOffset, tLen));
+          found = true;
+          return;
+        }
+        currentOffset += tLen;
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          traverse(node.childNodes[i]);
+          if (found) return;
+        }
+      }
+    };
+
+    traverse(blockEl);
+
+    if (targetNode) {
+      return { node: targetNode, offset: targetOffset };
+    }
+
+    // If text offset exceeds total text length, place at end of block
+    return {
+      node: blockEl,
+      offset: blockEl.childNodes.length,
+    };
   }
 
   /**
-   * Checks if the active caret is at the very beginning of a page's content.
+   * Backward-compatible Caret Bookmark capture
    */
-  static isCaretAtPageStart(pageEditableRoot: HTMLElement): boolean {
-    if (typeof window === 'undefined' || !pageEditableRoot) return false;
+  public static captureCaretBookmark(
+    host: HTMLElement,
+    layoutDoc?: LayoutDocument | null
+  ): EditorCaretBookmark | null {
+    const logical = this.captureLogicalSelection(host);
+    if (!logical) return null;
+
+    const blockEl = host.querySelector<HTMLElement>(`[data-node-id="${logical.anchor.nodeId}"]`) || host;
+    const tagName = blockEl.tagName;
+
+    return {
+      logicalStart: logical.anchor,
+      logicalEnd: logical.head,
+      canonicalOffset: logical.anchor.textOffset,
+      pageIndex: 0,
+      pageOffset: logical.anchor.textOffset,
+      nodePath: [0],
+      leafOffset: logical.anchor.textOffset,
+      tagName,
+      sourceNodeId: logical.anchor.nodeId,
+      isCollapsed: logical.isCollapsed,
+      endPageIndex: 0,
+      endPageOffset: logical.head.textOffset,
+      endNodePath: [0],
+      endLeafOffset: logical.head.textOffset,
+      scrollTop: logical.scrollTop,
+      scrollLeft: logical.scrollLeft,
+    };
+  }
+
+  /**
+   * Backward-compatible Caret Bookmark restoration
+   */
+  public static restoreCaretBookmark(
+    host: HTMLElement,
+    bookmark: EditorCaretBookmark | null,
+    layoutDoc?: LayoutDocument | null
+  ): boolean {
+    if (!bookmark) return false;
+
+    if (bookmark.logicalStart) {
+      return this.restoreLogicalSelection(host, {
+        anchor: bookmark.logicalStart,
+        head: bookmark.logicalEnd || bookmark.logicalStart,
+        isCollapsed: bookmark.isCollapsed !== false,
+        scrollTop: bookmark.scrollTop,
+        scrollLeft: bookmark.scrollLeft,
+      });
+    }
+
+    // Direct offset fallback
+    const targetPos: LogicalPosition = {
+      nodeId: bookmark.sourceNodeId || 'p_0',
+      textOffset: bookmark.canonicalOffset ?? bookmark.pageOffset ?? 0,
+    };
+
+    return this.restoreLogicalSelection(host, {
+      anchor: targetPos,
+      head: targetPos,
+      isCollapsed: bookmark.isCollapsed !== false,
+      scrollTop: bookmark.scrollTop,
+      scrollLeft: bookmark.scrollLeft,
+    });
+  }
+
+  /**
+   * Helper to find enclosing block element within host
+   */
+  private static findEnclosingBlockElement(host: HTMLElement, node: Node): HTMLElement | null {
+    let curr: Node | null = node.nodeType === TEXT_NODE_TYPE ? node.parentElement : node;
+    while (curr && curr !== host && host.contains(curr)) {
+      if (curr instanceof HTMLElement) {
+        const tag = curr.tagName.toLowerCase();
+        if (
+          ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'th', 'blockquote', 'div'].includes(tag) ||
+          curr.hasAttribute('data-node-id') ||
+          curr.hasAttribute('data-source-id')
+        ) {
+          return curr;
+        }
+      }
+      curr = curr.parentNode;
+    }
+    return host;
+  }
+
+  /**
+   * Returns all top-level logical block elements in host
+   */
+  private static getAllBlockElements(host: HTMLElement): HTMLElement[] {
+    const blocks = Array.from(
+      host.querySelectorAll<HTMLElement>(
+        'p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, [data-node-id]'
+      )
+    );
+    return blocks.length > 0 ? blocks : [host];
+  }
+
+  /**
+   * Gets or deterministically assigns a data-node-id to a block element
+   */
+  private static getOrAssignNodeId(el: HTMLElement): string {
+    const existing = el.getAttribute('data-node-id') || el.getAttribute('data-source-id') || el.id;
+    if (existing) return existing;
+
+    const parent = el.parentElement;
+    if (parent) {
+      const idx = Array.prototype.indexOf.call(parent.children, el);
+      const generated = `${el.tagName.toLowerCase()}_${idx}`;
+      el.setAttribute('data-node-id', generated);
+      return generated;
+    }
+
+    return `node_${Date.now()}`;
+  }
+
+  /**
+   * Checks if caret is at the beginning of host or element
+   */
+  public static isCaretAtPageStart(host: HTMLElement): boolean {
+    if (typeof window === 'undefined' || !host) return false;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return false;
-
     const range = sel.getRangeAt(0);
     if (!range.collapsed) return false;
 
     try {
-      const preCaretRange = range.cloneRange();
-      preCaretRange.selectNodeContents(pageEditableRoot);
-      preCaretRange.setEnd(range.startContainer, range.startOffset);
-      return preCaretRange.toString().length === 0;
+      const preRange = range.cloneRange();
+      preRange.selectNodeContents(host);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      return preRange.toString().length === 0;
     } catch {
       return false;
     }
   }
 
   /**
-   * Checks if the active caret is at the very end of a page's content.
+   * Checks if caret is at the end of host or element
    */
-  static isCaretAtPageEnd(pageEditableRoot: HTMLElement): boolean {
-    if (typeof window === 'undefined' || !pageEditableRoot) return false;
+  public static isCaretAtPageEnd(host: HTMLElement): boolean {
+    if (typeof window === 'undefined' || !host) return false;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return false;
-
     const range = sel.getRangeAt(0);
     if (!range.collapsed) return false;
 
     try {
-      const postCaretRange = range.cloneRange();
-      postCaretRange.selectNodeContents(pageEditableRoot);
-      postCaretRange.setStart(range.endContainer, range.endOffset);
-      return postCaretRange.toString().length === 0;
+      const postRange = range.cloneRange();
+      postRange.selectNodeContents(host);
+      postRange.setStart(range.endContainer, range.endOffset);
+      return postRange.toString().length === 0;
     } catch {
       return false;
     }
   }
 
   /**
-   * Moves caret to the beginning of the specified page editable container.
+   * Moves caret to the start of the host
    */
-  static moveCaretToPageStart(pageEditableRoot: HTMLElement): boolean {
-    if (typeof window === 'undefined' || !pageEditableRoot) return false;
+  public static moveCaretToPageStart(host: HTMLElement): boolean {
+    if (typeof window === 'undefined' || !host) return false;
     const sel = window.getSelection();
     if (!sel) return false;
 
     try {
-      pageEditableRoot.focus({ preventScroll: true });
-      const firstEl =
-        pageEditableRoot.querySelector('p, h1, h2, h3, h4, h5, h6, td, li') ||
-        pageEditableRoot.firstElementChild ||
-        pageEditableRoot;
-
+      host.focus({ preventScroll: true });
+      const firstEl = host.firstElementChild || host;
       const range = document.createRange();
       range.selectNodeContents(firstEl);
       range.collapse(true);
@@ -515,20 +422,16 @@ export class EditorPositionMapper {
   }
 
   /**
-   * Moves caret to the end of the specified page editable container.
+   * Moves caret to the end of the host
    */
-  static moveCaretToPageEnd(pageEditableRoot: HTMLElement): boolean {
-    if (typeof window === 'undefined' || !pageEditableRoot) return false;
+  public static moveCaretToPageEnd(host: HTMLElement): boolean {
+    if (typeof window === 'undefined' || !host) return false;
     const sel = window.getSelection();
     if (!sel) return false;
 
     try {
-      pageEditableRoot.focus({ preventScroll: true });
-      const lastEl =
-        pageEditableRoot.querySelector('p:last-of-type, h1:last-of-type, table:last-of-type, li:last-of-type') ||
-        pageEditableRoot.lastElementChild ||
-        pageEditableRoot;
-
+      host.focus({ preventScroll: true });
+      const lastEl = host.lastElementChild || host;
       const range = document.createRange();
       range.selectNodeContents(lastEl);
       range.collapse(false);
