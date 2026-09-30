@@ -212,6 +212,7 @@ export default function DocxFormattingRibbon({
   // Global Ctrl+Enter shortcut for inserting a page break in active document
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         const active = document.activeElement;
         if (active && ((active as HTMLElement).isContentEditable || active.getAttribute('contenteditable') === 'true')) {

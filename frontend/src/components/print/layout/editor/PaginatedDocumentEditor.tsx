@@ -1,18 +1,20 @@
 /**
  * PaginatedDocumentEditor
  *
- * Authoritative Single-Host Continuous Document Editor for SPR Note DocLab.
+ * Authoritative Single-Host Real Browser Automatic Pagination Document Editor for SPR Note DocLab.
  *
  * Core Principles:
- * 1. Exactly ONE single authoritative editing host (contentEditable="true").
- * 2. Visual continuous paper sheet simulation canvas sized according to PageGeometry.
- * 3. 100% native browser typing, selection, caret stability, and clipboard flow.
- * 4. Zero fragment splitting, zero synthetic projection layers, zero height clipping.
- * 5. Full support for ribbon commands, tokens, headings, lists, tables, images, and undo/redo.
+ * 1. Exactly ONE single authoritative editing host (contentEditable="true") for all pages.
+ * 2. Visual physical A4/Letter paper cards rendered beneath the continuous editing host.
+ * 3. Real DOM measurement algorithm that detects when blocks cross printable page boundaries
+ *    and inserts non-canonical runtime page-jump spacers.
+ * 4. 100% native browser typing, selection, caret survival, and clipboard flow across all pages.
+ * 5. Persistent canonical HTML remains 100% pure and clean of runtime spacers or page shells.
+ * 6. Full support for ribbon commands, tokens, headings, lists, tables, images, and undo/redo.
  */
 
 import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { PageGeometryCalculator } from '../geometry/PageGeometry';
+import { PageGeometryCalculator, PageGeometry } from '../geometry/PageGeometry';
 import { LayoutDocumentOptions } from '../types/documentTypes';
 import { separateDocxStylesAndBody } from '../../docxStyleUtils';
 import { EditorSerializer } from './EditorSerializer';
@@ -48,6 +50,135 @@ export interface PaginatedDocumentEditorProps {
   debugLayout?: boolean;
 }
 
+const PAGE_GAP_PX = 32;
+const SCREEN_HEADER_HEIGHT_PX = 32;
+
+/**
+ * Measures real browser DOM blocks inside the single contentEditable host
+ * and places runtime page-jump spacers so content flows onto sequential physical pages.
+ */
+function repaginateHostDOM(
+  host: HTMLElement,
+  geometry: PageGeometry
+): { totalPages: number } {
+  if (!host || typeof window === 'undefined') {
+    return { totalPages: 1 };
+  }
+
+  const paperHeight = geometry.paperDimensionsPx.height;
+  const marginTop = geometry.marginsPx.top;
+  const marginBottom = geometry.marginsPx.bottom;
+  const availHeight = Math.max(120, paperHeight - marginTop - marginBottom);
+  const baseJump = marginBottom + PAGE_GAP_PX + SCREEN_HEADER_HEIGHT_PX + marginTop;
+
+  const children = Array.from(host.children) as HTMLElement[];
+  if (children.length === 0) {
+    return { totalPages: 1 };
+  }
+
+  let currentPage = 1;
+  let currentY = 0;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    // If child is a runtime spacer we previously created, skip its height accumulation
+    if (child.getAttribute('data-spr-runtime-pagination') === 'true') {
+      continue;
+    }
+
+    // Check if child is an explicit manual page break (Ctrl+Enter)
+    const isManualBreak =
+      child.getAttribute('data-manual-break') === 'true' ||
+      child.classList.contains('spr-page-break') ||
+      child.querySelector?.('[data-manual-break="true"], .spr-page-break') !== null;
+
+    if (isManualBreak) {
+      const remainingOnPage = Math.max(0, availHeight - currentY);
+      const spacerHeight = remainingOnPage + baseJump;
+
+      // Ensure runtime spacer immediately follows the manual page break if more content exists
+      const nextSibling = child.nextElementSibling as HTMLElement | null;
+      if (nextSibling && nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+        nextSibling.style.height = `${spacerHeight}px`;
+      } else if (nextSibling) {
+        const spacer = createRuntimeSpacer(spacerHeight);
+        child.parentNode?.insertBefore(spacer, nextSibling);
+      }
+
+      currentPage += 1;
+      currentY = 0;
+      continue;
+    }
+
+    // Measure actual rendered block height in the real browser DOM
+    const rect = child.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(child);
+    const mTop = parseFloat(computedStyle.marginTop) || 0;
+    const mBottom = parseFloat(computedStyle.marginBottom) || 0;
+    const blockHeight = (child.offsetHeight || rect.height || 24) + mTop + mBottom;
+
+    // Check if this block fits on the current page
+    const fitsOnCurrentPage = currentY + blockHeight <= availHeight || currentY === 0;
+
+    if (fitsOnCurrentPage) {
+      // Block fits on current page.
+      // Remove any preceding runtime spacer if it was left from a previous state
+      const prevSibling = child.previousElementSibling as HTMLElement | null;
+      if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+        // Only remove if previous block was NOT a manual break
+        const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
+        const isPrevManualBreak =
+          prevPrevSibling &&
+          (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
+            prevPrevSibling.classList.contains('spr-page-break'));
+        if (!isPrevManualBreak) {
+          prevSibling.remove();
+        }
+      }
+      currentY += blockHeight;
+    } else {
+      // Block overflows current page! Push it cleanly to the top of the next page.
+      const remainingOnPage = Math.max(0, availHeight - currentY);
+      const spacerHeight = remainingOnPage + baseJump;
+
+      const prevSibling = child.previousElementSibling as HTMLElement | null;
+      if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+        prevSibling.style.height = `${spacerHeight}px`;
+      } else {
+        const spacer = createRuntimeSpacer(spacerHeight);
+        child.parentNode?.insertBefore(spacer, child);
+      }
+
+      currentPage += 1;
+      currentY = blockHeight;
+    }
+  }
+
+  // Remove any trailing spacer at the very end of host
+  const lastChild = host.lastElementChild as HTMLElement | null;
+  if (lastChild && lastChild.getAttribute('data-spr-runtime-pagination') === 'true') {
+    lastChild.remove();
+  }
+
+  return { totalPages: Math.max(1, currentPage) };
+}
+
+function createRuntimeSpacer(heightPx: number): HTMLElement {
+  const spacer = document.createElement('div');
+  spacer.setAttribute('data-spr-runtime-pagination', 'true');
+  spacer.setAttribute('contenteditable', 'false');
+  spacer.className = 'spr-runtime-page-spacer select-none pointer-events-none print:hidden';
+  spacer.style.height = `${Math.max(0, heightPx)}px`;
+  spacer.style.width = '100%';
+  spacer.style.display = 'block';
+  spacer.style.userSelect = 'none';
+  spacer.style.pointerEvents = 'none';
+  spacer.style.margin = '0';
+  spacer.style.padding = '0';
+  return spacer;
+}
+
 export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorProps> = ({
   htmlContent = '<p><br></p>',
   styles = '',
@@ -61,8 +192,12 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const isInternalChangeRef = useRef<boolean>(false);
   const isFocusedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
+  const repaginateTimerRef = useRef<any>(null);
   const lastExportedHtmlRef = useRef<string | null>(null);
   const savedSelectionBookmarkRef = useRef<any>(null);
+
+  // Total pages derived from real DOM geometry
+  const [totalPagesCount, setTotalPagesCount] = useState<number>(1);
 
   // 1. Separate styles and clean canonical body
   const { styles: extractedStyles, body: extractedBody } = useMemo(() => {
@@ -114,17 +249,27 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     }
   }, []);
 
-  // Restore saved selection bookmark
-  const restoreSelection = useCallback(() => {
-    if (!editorHostRef.current || !savedSelectionBookmarkRef.current) return;
+  // Real DOM Pagination trigger
+  const runPaginationPass = useCallback(() => {
+    if (!editorHostRef.current) return;
     try {
-      EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, savedSelectionBookmarkRef.current);
-    } catch {
-      // ignore
+      const res = repaginateHostDOM(editorHostRef.current, pageGeometry);
+      setTotalPagesCount(res.totalPages);
+    } catch (e) {
+      console.warn('Pagination calculation error:', e);
     }
-  }, []);
+  }, [pageGeometry]);
 
-  // Sync external HTML changes to DOM host
+  const schedulePaginationPass = useCallback(() => {
+    if (repaginateTimerRef.current) {
+      clearTimeout(repaginateTimerRef.current);
+    }
+    repaginateTimerRef.current = setTimeout(() => {
+      runPaginationPass();
+    }, 40);
+  }, [runPaginationPass]);
+
+  // Initial mount and external sync
   useEffect(() => {
     if (!editorHostRef.current) return;
 
@@ -144,10 +289,25 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       if (currentCleanDom !== cleanCanonicalBody) {
         editorHostRef.current.innerHTML = cleanCanonicalBody;
         historyRef.current.reset(cleanCanonicalBody);
+        schedulePaginationPass();
       }
     }
     isInternalChangeRef.current = false;
-  }, [cleanCanonicalBody]);
+  }, [cleanCanonicalBody, schedulePaginationPass]);
+
+  // Geometry or styles change -> recalculate pagination
+  useEffect(() => {
+    runPaginationPass();
+  }, [runPaginationPass]);
+
+  // Font loading readiness listener
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        runPaginationPass();
+      });
+    }
+  }, [runPaginationPass]);
 
   // Centralized Transaction Dispatcher
   const dispatchTransaction = useCallback(
@@ -166,8 +326,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         : cleanHtml;
 
       onContentChange?.(finalExportHtml);
+      schedulePaginationPass();
     },
-    [activeStyles, onContentChange]
+    [activeStyles, onContentChange, schedulePaginationPass]
   );
 
   // Focus & Blur Handlers
@@ -196,13 +357,17 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       : cleanHtml;
 
     onContentChange?.(finalExportHtml);
-  }, [isEditable, saveSelection, activeStyles, onContentChange]);
+    runPaginationPass();
+  }, [isEditable, saveSelection, activeStyles, onContentChange, runPaginationPass]);
 
   // Native Input Handler with Debounced Synchronization
   const handleInput = useCallback(() => {
     if (!isEditable || !editorHostRef.current) return;
     isInternalChangeRef.current = true;
     saveSelection();
+
+    // Trigger immediate micro-pass for fast visual feedback
+    schedulePaginationPass();
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -222,7 +387,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         description: 'Typing input',
       });
     }, 150);
-  }, [isEditable, saveSelection, dispatchTransaction]);
+  }, [isEditable, saveSelection, schedulePaginationPass, dispatchTransaction]);
 
   // Native Keydown Handler (Enter, Ctrl+Enter, Ctrl+Z, Ctrl+Y, Tab)
   const handleKeyDown = useCallback(
@@ -232,6 +397,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       // Ctrl+Enter or Cmd+Enter: Insert explicit manual page break
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
+        e.stopPropagation();
         const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
         dispatchTransaction(tx);
         return;
@@ -240,6 +406,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       // Enter (normal): Split block or create logical paragraph
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
+        e.stopPropagation();
         const tx = EditorCommands.insertParagraph(editorHostRef.current);
         dispatchTransaction(tx);
         return;
@@ -248,12 +415,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       // Ctrl+Z: Undo
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
+        e.stopPropagation();
         const prevHtml = historyRef.current.undo();
         if (prevHtml !== null && editorHostRef.current) {
           editorHostRef.current.innerHTML = prevHtml;
           isInternalChangeRef.current = true;
           lastExportedHtmlRef.current = prevHtml;
           onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${prevHtml}` : prevHtml);
+          schedulePaginationPass();
         }
         return;
       }
@@ -264,12 +433,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
       ) {
         e.preventDefault();
+        e.stopPropagation();
         const nextHtml = historyRef.current.redo();
         if (nextHtml !== null && editorHostRef.current) {
           editorHostRef.current.innerHTML = nextHtml;
           isInternalChangeRef.current = true;
           lastExportedHtmlRef.current = nextHtml;
           onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${nextHtml}` : nextHtml);
+          schedulePaginationPass();
         }
         return;
       }
@@ -281,7 +452,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         handleInput();
       }
     },
-    [isEditable, dispatchTransaction, onContentChange, activeStyles, handleInput]
+    [isEditable, dispatchTransaction, onContentChange, activeStyles, schedulePaginationPass, handleInput]
   );
 
   // Paste Handler
@@ -289,10 +460,11 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     saveSelection();
     setTimeout(() => {
       handleInput();
+      runPaginationPass();
     }, 10);
-  }, [saveSelection, handleInput]);
+  }, [saveSelection, handleInput, runPaginationPass]);
 
-  // Click on empty canvas margin to focus editor at end
+  // Click on empty canvas margin to focus editor at end without collapsing selection
   const handleSheetClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!isEditable || !editorHostRef.current) return;
@@ -339,6 +511,13 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     },
     [isEditable, saveSelection]
   );
+
+  // Insert Manual Page Break Handler
+  const handleManualPageBreak = useCallback(() => {
+    if (!editorHostRef.current) return;
+    const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
+    dispatchTransaction(tx);
+  }, [dispatchTransaction]);
 
   // Global Command Listener (for Formatting Ribbon, Sidebar, and Shortcuts)
   useEffect(() => {
@@ -485,7 +664,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       {/* Active Document CSS Style Element */}
       {activeStyles && <style dangerouslySetInnerHTML={{ __html: activeStyles }} />}
 
-      {/* Visual Page Break Styles */}
+      {/* Visual Page Break & Pagination Spacer Styles */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -493,12 +672,15 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               display: block;
               page-break-after: always;
               break-after: page;
-              margin: 40px -42px 40px -42px;
+              margin: 16px 0;
               position: relative;
               user-select: none;
               -webkit-user-select: none;
               background: #090d16;
-              padding: 20px 0;
+              padding: 10px 0;
+              min-height: 24px;
+              height: 24px;
+              box-sizing: border-box;
               border-top: 1.5px solid rgba(0, 0, 0, 0.4);
               border-bottom: 1.5px solid rgba(0, 0, 0, 0.4);
               box-shadow: inset 0 8px 16px -4px rgba(0, 0, 0, 0.75), inset 0 -8px 16px -4px rgba(0, 0, 0, 0.75);
@@ -526,6 +708,13 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               text-transform: uppercase;
               pointer-events: none;
             }
+            .spr-runtime-page-spacer {
+              display: block;
+              user-select: none;
+              -webkit-user-select: none;
+              pointer-events: none;
+              background: transparent;
+            }
             @media print {
               .spr-page-break {
                 display: block !important;
@@ -539,7 +728,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
                 box-shadow: none !important;
               }
               .spr-page-break-divider,
-              .spr-page-break-badge {
+              .spr-page-break-badge,
+              .spr-runtime-page-spacer {
                 display: none !important;
               }
             }
@@ -547,93 +737,126 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         }}
       />
 
-      {/* Physical Paper Sheet Canvas */}
+      {/* Main Container Positioning Underlying Physical Sheets and Overlaid Single Host */}
       <div
-        className="paper-sheet-wrapper flex flex-col items-center group relative mb-8 print:mb-0 print:block"
+        className="relative flex flex-col items-center select-text"
         style={{
           width: `${pageGeometry.paperDimensionsPx.width}px`,
           maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
         }}
       >
-        {/* Screen-Only Top Physical Page Header Bar */}
+        {/* 1. Underlying Visual Physical Paper Cards Layer (Sequential A4 Sheets) */}
         <div
-          style={{ width: `${pageGeometry.paperDimensionsPx.width}px` }}
-          className="flex items-center justify-between px-2 py-1 mb-1 text-xs theme-text-secondary select-none print:hidden w-full"
-        >
-          <div className="flex items-center gap-2 font-medium">
-            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
-            <span className="font-bold theme-text-primary font-mono text-[11.5px]">
-              Document Canvas ({options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
-            </span>
-            <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
-              {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (editorHostRef.current) {
-                const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
-                dispatchTransaction(tx);
-              }
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
-            title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
-          >
-            <PageBreakIcon className="w-3.5 h-3.5" />
-            <span>+ Page Break</span>
-          </button>
-        </div>
-
-        {/* Physical Paper Sheet Surface */}
-        <div
-          onClick={handleSheetClick}
-          className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col cursor-text select-text"
-          data-size={options.pageSize || 'A4'}
-          data-orientation={options.orientation || 'PORTRAIT'}
-          data-margin={options.margin || 'NORMAL'}
-          data-density={options.density || 'NORMAL'}
-          data-page-break="true"
+          className="absolute inset-0 pointer-events-none flex flex-col items-center select-none"
           style={{
-            backgroundColor: '#ffffff',
-            color: '#0f172a',
             width: `${pageGeometry.paperDimensionsPx.width}px`,
-            maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-            minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-            padding: pageGeometry.cssMarginString,
-            boxSizing: 'border-box',
-            textAlign: 'left',
+            zIndex: 0,
           }}
         >
-          {/* The Authoritative Single contentEditable Host */}
-          <div
-            ref={editorHostRef}
-            contentEditable={isEditable}
-            suppressContentEditableWarning={true}
-            data-doclab-single-host="true"
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            onKeyDown={handleKeyDown}
-            onKeyUp={saveSelection}
-            onMouseUp={saveSelection}
-            className="doclab-single-host-editor docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full min-h-[500px] outline-none text-left select-text cursor-text focus:outline-none"
-            style={{
-              width: '100%',
-              minHeight: '100%',
-              boxSizing: 'border-box',
-              outline: 'none',
-              wordBreak: 'break-word',
-              textAlign: 'left',
-              backgroundColor: '#ffffff',
-              color: '#0f172a',
-              userSelect: 'text',
-              WebkitUserSelect: 'text',
-            }}
-          />
+          {Array.from({ length: totalPagesCount }).map((_, pageIdx) => {
+            const pageNum = pageIdx + 1;
+            const isFirst = pageIdx === 0;
+
+            return (
+              <div
+                key={`visual_page_sheet_${pageIdx}`}
+                id={`docx-visual-sheet-${pageIdx}`}
+                className="paper-sheet-wrapper flex flex-col items-center mb-8 print:mb-0"
+                style={{
+                  width: `${pageGeometry.paperDimensionsPx.width}px`,
+                  maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+                }}
+              >
+                {/* Screen-Only Top Physical Page Header Bar */}
+                <div
+                  style={{
+                    width: `${pageGeometry.paperDimensionsPx.width}px`,
+                    height: `${SCREEN_HEADER_HEIGHT_PX}px`,
+                  }}
+                  className="flex items-center justify-between px-2 py-1 text-xs theme-text-secondary select-none print:hidden w-full pointer-events-auto box-border"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+                    <span className="font-bold theme-text-primary font-mono text-[11.5px]">
+                      Page {pageNum} of {totalPagesCount} ({options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
+                    </span>
+                    <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
+                      {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
+                    </span>
+                  </div>
+
+                  {isFirst && (
+                    <button
+                      type="button"
+                      onClick={handleManualPageBreak}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
+                      title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
+                    >
+                      <PageBreakIcon className="w-3.5 h-3.5" />
+                      <span>+ Page Break</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Physical Paper Sheet White Surface with Shadow */}
+                <div
+                  className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white"
+                  data-size={options.pageSize || 'A4'}
+                  data-orientation={options.orientation || 'PORTRAIT'}
+                  data-margin={options.margin || 'NORMAL'}
+                  data-density={options.density || 'NORMAL'}
+                  data-page-index={pageIdx}
+                  data-page-break="true"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    width: `${pageGeometry.paperDimensionsPx.width}px`,
+                    maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+                    height: `${pageGeometry.paperDimensionsPx.height}px`,
+                    minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+                    maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
+
+        {/* 2. Top-Level Authoritative contentEditable Host */}
+        <div
+          ref={editorHostRef}
+          contentEditable={isEditable}
+          suppressContentEditableWarning={true}
+          data-doclab-single-host="true"
+          onClick={handleSheetClick}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onInput={handleInput}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          onKeyUp={saveSelection}
+          onMouseUp={saveSelection}
+          className="doclab-single-host-editor docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !text-slate-900 w-full text-left focus:outline-none cursor-text select-text relative z-10"
+          style={{
+            width: `${pageGeometry.paperDimensionsPx.width}px`,
+            maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+            marginTop: `${SCREEN_HEADER_HEIGHT_PX}px`,
+            paddingTop: `${pageGeometry.marginsPx.top}px`,
+            paddingBottom: `${pageGeometry.marginsPx.bottom}px`,
+            paddingLeft: `${pageGeometry.marginsPx.left}px`,
+            paddingRight: `${pageGeometry.marginsPx.right}px`,
+            minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+            boxSizing: 'border-box',
+            outline: 'none',
+            wordBreak: 'break-word',
+            textAlign: 'left',
+            backgroundColor: 'transparent',
+            color: '#0f172a',
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
+          }}
+        />
       </div>
     </div>
   );

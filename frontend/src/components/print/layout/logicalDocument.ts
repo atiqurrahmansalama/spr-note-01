@@ -30,7 +30,7 @@ const COMMENT_NODE_TYPE = typeof Node !== 'undefined' ? Node.COMMENT_NODE : 8;
  * Contains no runtime spacer hacks or arbitrary margin injection.
  */
 export function createManualPageBreakHtml(): string {
-  return '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div>';
+  return '<div class="spr-page-break" data-manual-break="true" contenteditable="false" style="display: block; min-height: 24px; height: 24px; page-break-after: always; break-after: page;"><hr class="spr-page-break-divider" /><span class="spr-page-break-badge">Page Break</span></div>';
 }
 
 /**

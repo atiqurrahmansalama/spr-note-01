@@ -1145,19 +1145,21 @@ body.spr-printing-in-progress .universal-export-menu-portal {
   color: inherit;
 }
 
-/* Page Break Divider & Multi-Page Split Rules */
-.spr-page-break,
-div.spr-page-break,
-hr.page-break {
-  display: block !important;
-  clear: both !important;
-  page-break-after: always !important;
-  break-after: page !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  visibility: hidden !important;
+/* Print Page Break Rules */
+@media print {
+  .spr-page-break,
+  div.spr-page-break,
+  hr.page-break {
+    display: block !important;
+    clear: both !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    visibility: hidden !important;
+  }
 }
 
 
