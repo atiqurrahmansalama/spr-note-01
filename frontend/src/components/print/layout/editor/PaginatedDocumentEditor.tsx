@@ -1,21 +1,19 @@
 /**
  * PaginatedDocumentEditor
  *
- * Authoritative Word-Grade Document Editor for SPR Note DocLab.
+ * Authoritative Single-Host Continuous Document Editor for SPR Note DocLab.
  *
- * Core Architectural Invariants:
- * 1. Exactly ONE logical editing host (contentEditable="true") for the entire document.
- * 2. Visual page sheets are derived runtime layout projections rendered as real physical A4 sheets with 32px gaps.
- * 3. Native browser selection works seamlessly across all pages (Ctrl+A selects entire document).
- * 4. Zero runtime pagination artifacts, spacers, or sheet tags are saved in canonical content.
- * 5. All mutations flow through transactional editor commands.
+ * Core Principles:
+ * 1. Exactly ONE single authoritative editing host (contentEditable="true").
+ * 2. Visual continuous paper sheet simulation canvas sized according to PageGeometry.
+ * 3. 100% native browser typing, selection, caret stability, and clipboard flow.
+ * 4. Zero fragment splitting, zero synthetic projection layers, zero height clipping.
+ * 5. Full support for ribbon commands, tokens, headings, lists, tables, images, and undo/redo.
  */
 
 import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { PageGeometryCalculator } from '../geometry/PageGeometry';
-import { PaginationEngine } from '../pagination/PaginationEngine';
 import { LayoutDocumentOptions } from '../types/documentTypes';
-import { LayoutDocument, PaginationEngineResult } from '../types/paginationTypes';
 import { separateDocxStylesAndBody } from '../../docxStyleUtils';
 import { EditorSerializer } from './EditorSerializer';
 import { EditorHistory } from './EditorHistory';
@@ -23,11 +21,7 @@ import { EditorCommands } from './EditorCommands';
 import { EditorDomAdapter } from './EditorDomAdapter';
 import { EditorPositionMapper } from './EditorPositionMapper';
 import { EditorTransaction } from './editorTypes';
-import { FontLoadingCoordinator } from '../performance/FontLoadingCoordinator';
-import { ControlledLayoutPipeline } from '../measurement/ControlledLayoutPipeline';
 import { PageBreakIcon } from '../../../ui/Icons';
-import { RunningHeader, RunningFooter, RuntimeVariableResolver } from '../chrome';
-import { LayoutFragmentRenderer } from '../render/LayoutFragmentRenderer';
 
 export interface PaginatedDocumentEditorProps {
   /** Initial canonical HTML content or template body */
@@ -61,12 +55,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   onContentChange,
   options = {},
   className = '',
-  debugLayout = false,
 }) => {
-  // Exactly ONE logical editing host
+  // Authoritative logical editing host ref
   const editorHostRef = useRef<HTMLDivElement>(null);
   const isInternalChangeRef = useRef<boolean>(false);
+  const isFocusedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
+  const lastExportedHtmlRef = useRef<string | null>(null);
+  const savedSelectionBookmarkRef = useRef<any>(null);
 
   // 1. Separate styles and clean canonical body
   const { styles: extractedStyles, body: extractedBody } = useMemo(() => {
@@ -83,11 +79,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     return raw.replace(/<\/?style\b[^>]*>/gi, '').trim();
   }, [styles, extractedStyles]);
 
-  // History Manager (Single-Host Transactional History)
+  // History Manager
   const historyRef = useRef<EditorHistory>(new EditorHistory(cleanCanonicalBody));
-
-  // Current canonical HTML state
-  const [canonicalHtml, setCanonicalHtml] = useState<string>(cleanCanonicalBody);
 
   // Page geometry from centralized PageGeometryCalculator
   const pageGeometry = useMemo(() => {
@@ -108,142 +101,40 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     options.density,
   ]);
 
-  // Cache previous layout for incremental reflow passes
-  const prevLayoutRef = useRef<LayoutDocument | null>(null);
-  const rafIdRef = useRef<number | null>(null);
-
-  // Logical Selection preservation across dynamic layout reflows (typing, font size, margins, orientation, page size)
-  const pendingLogicalSelectionRef = useRef<any>(null);
-
-  // Controlled Layout State: Initial pure layout without DOM mutation during render
-  const [paginationResult, setPaginationResult] = useState<PaginationEngineResult>(() => {
-    return ControlledLayoutPipeline.computePureInitialLayout(cleanCanonicalBody, {
-      pageSize: options.pageSize || 'A4',
-      orientation: options.orientation || 'PORTRAIT',
-      margin: options.margin || 'NORMAL',
-      customMarginsMm: options.customMarginsMm,
-      pageProperties: options.pageProperties,
-      density: options.density || 'NORMAL',
-      fontSizePx: options.fontSizePx,
-      fontFamily: options.fontFamily,
-      lineHeight: options.lineHeight,
-      styles: activeStyles,
-      debugLayout,
-    });
-  });
-
-  const runLayoutPass = useCallback(async () => {
-    // 1. Capture active logical selection before pagination / reconciliation
-    if (editorHostRef.current) {
-      const activeSel = EditorPositionMapper.captureLogicalSelection(editorHostRef.current);
-      if (activeSel) {
-        pendingLogicalSelectionRef.current = activeSel;
+  // Save current logical selection bookmark
+  const saveSelection = useCallback(() => {
+    if (!editorHostRef.current) return;
+    try {
+      const bookmark = EditorPositionMapper.captureLogicalSelection(editorHostRef.current);
+      if (bookmark) {
+        savedSelectionBookmarkRef.current = bookmark;
       }
+    } catch {
+      // ignore
     }
+  }, []);
 
-    const result = await ControlledLayoutPipeline.executeAuthoritativeLayout(
-      canonicalHtml,
-      {
-        pageSize: options.pageSize || 'A4',
-        orientation: options.orientation || 'PORTRAIT',
-        margin: options.margin || 'NORMAL',
-        customMarginsMm: options.customMarginsMm,
-        pageProperties: options.pageProperties,
-        density: options.density || 'NORMAL',
-        fontSizePx: options.fontSizePx,
-        fontFamily: options.fontFamily,
-        lineHeight: options.lineHeight,
-        styles: activeStyles,
-        debugLayout,
-      },
-      prevLayoutRef.current
-    );
-
-    prevLayoutRef.current = result.document;
-    setPaginationResult(result);
-  }, [
-    canonicalHtml,
-    options.pageSize,
-    options.orientation,
-    options.margin,
-    JSON.stringify(options.customMarginsMm),
-    JSON.stringify(options.pageProperties),
-    options.density,
-    options.fontSizePx,
-    options.fontFamily,
-    options.lineHeight,
-    activeStyles,
-    debugLayout,
-  ]);
-
-  // Controlled Layout Pipeline: Schedule actual browser measurement when DOM/fonts/styles are ready
-  useEffect(() => {
-    const handle = ControlledLayoutPipeline.scheduleLayoutPass(runLayoutPass);
-    return () => {
-      handle.cancel();
-    };
-  }, [runLayoutPass]);
-
-  // Font Readiness & Dynamic Web Font Subscription: guarantees repagination when fonts become ready
-  useEffect(() => {
-    const unsubscribe = FontLoadingCoordinator.onFontsLoaded(() => {
-      ControlledLayoutPipeline.scheduleLayoutPass(runLayoutPass);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [runLayoutPass]);
-
-  // 2. Restore logical selection after layout document changes and DOM renders
-  useEffect(() => {
-    if (!editorHostRef.current || !pendingLogicalSelectionRef.current) return;
-
-    // If the host is actively focused and contains the user's active live selection,
-    // do not disrupt the user's live typing caret with a background layout snapshot
-    const isHostActive =
-      typeof document !== 'undefined' &&
-      (document.activeElement === editorHostRef.current || editorHostRef.current.contains(document.activeElement));
-
-    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
-    const hasActiveCaret = Boolean(sel && sel.rangeCount > 0 && editorHostRef.current.contains(sel.anchorNode));
-
-    if (isHostActive && hasActiveCaret && !pendingLogicalSelectionRef.current.forceRestore) {
-      pendingLogicalSelectionRef.current = null;
-      return;
+  // Restore saved selection bookmark
+  const restoreSelection = useCallback(() => {
+    if (!editorHostRef.current || !savedSelectionBookmarkRef.current) return;
+    try {
+      EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, savedSelectionBookmarkRef.current);
+    } catch {
+      // ignore
     }
+  }, []);
 
-    const restored = EditorPositionMapper.restoreLogicalSelection(
-      editorHostRef.current,
-      pendingLogicalSelectionRef.current
-    );
-    if (restored) {
-      pendingLogicalSelectionRef.current = null;
-    }
-  }, [paginationResult]);
-
-  const layoutDoc = paginationResult.document;
-  const totalPagesCount = Math.max(1, paginationResult.totalPages || layoutDoc.pages.length || 1);
-
-  const lastExportedHtmlRef = useRef<string | null>(null);
-
-  // 3. Initial Mount and External Sync (e.g. template selection, undo from top toolbar)
+  // Sync external HTML changes to DOM host
   useEffect(() => {
     if (!editorHostRef.current) return;
 
-    // If the editor host is actively focused and receiving live typing,
-    // NEVER overwrite host DOM nodes or caret from asynchronous prop echoes
-    const isHostFocused =
-      typeof document !== 'undefined' &&
-      (document.activeElement === editorHostRef.current || editorHostRef.current.contains(document.activeElement));
-
-    if (isHostFocused) {
+    // Do NOT clobber the user's DOM if actively focused and typing
+    if (isFocusedRef.current) {
       isInternalChangeRef.current = false;
       return;
     }
 
     if (lastExportedHtmlRef.current === cleanCanonicalBody) {
-      // Echo from our own dispatchTransaction/onContentChange - do not reset DOM
       isInternalChangeRef.current = false;
       return;
     }
@@ -251,81 +142,67 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     if (!isInternalChangeRef.current) {
       const currentCleanDom = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
       if (currentCleanDom !== cleanCanonicalBody) {
-        const savedSel = EditorPositionMapper.captureLogicalSelection(editorHostRef.current);
         editorHostRef.current.innerHTML = cleanCanonicalBody;
-        setCanonicalHtml(cleanCanonicalBody);
         historyRef.current.reset(cleanCanonicalBody);
-        if (savedSel) {
-          EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, savedSel);
-        }
       }
     }
     isInternalChangeRef.current = false;
   }, [cleanCanonicalBody]);
 
-  // 4. Centralized Transaction Dispatcher
+  // Centralized Transaction Dispatcher
   const dispatchTransaction = useCallback(
     (tx: EditorTransaction) => {
       isInternalChangeRef.current = true;
-      if (tx.selection?.logical) {
-        pendingLogicalSelectionRef.current = tx.selection.logical;
-      } else if (editorHostRef.current) {
-        const activeSel = EditorPositionMapper.captureLogicalSelection(editorHostRef.current);
-        if (activeSel) {
-          pendingLogicalSelectionRef.current = activeSel;
-        }
-      }
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
       const cleanHtml = EditorSerializer.sanitize(tx.canonicalHtml);
-      setCanonicalHtml(cleanHtml);
       historyRef.current.push(tx);
-
-      // Compute immediate synchronous layout so UI updates immediately without waiting for RAF cancellation
-      const syncLayoutResult = ControlledLayoutPipeline.computePureInitialLayout(cleanHtml, {
-        pageSize: options.pageSize || 'A4',
-        orientation: options.orientation || 'PORTRAIT',
-        margin: options.margin || 'NORMAL',
-        customMarginsMm: options.customMarginsMm,
-        pageProperties: options.pageProperties,
-        density: options.density || 'NORMAL',
-        fontSizePx: options.fontSizePx,
-        fontFamily: options.fontFamily,
-        lineHeight: options.lineHeight,
-        styles: activeStyles,
-        debugLayout,
-      });
-      prevLayoutRef.current = syncLayoutResult.document;
-      setPaginationResult(syncLayoutResult);
-
       lastExportedHtmlRef.current = cleanHtml;
+
       const finalExportHtml = activeStyles
         ? `<style>${activeStyles}</style>\n${cleanHtml}`
         : cleanHtml;
 
       onContentChange?.(finalExportHtml);
     },
-    [
-      activeStyles,
-      onContentChange,
-      options.pageSize,
-      options.orientation,
-      options.margin,
-      JSON.stringify(options.customMarginsMm),
-      JSON.stringify(options.pageProperties),
-      options.density,
-      options.fontSizePx,
-      options.fontFamily,
-      options.lineHeight,
-      debugLayout,
-    ]
+    [activeStyles, onContentChange]
   );
 
-  // 4. Native Input Handler on Single Host
+  // Focus & Blur Handlers
+  const handleFocus = useCallback(() => {
+    if (!isEditable) return;
+    isFocusedRef.current = true;
+    saveSelection();
+  }, [isEditable, saveSelection]);
+
+  const handleBlur = useCallback(() => {
+    if (!isEditable || !editorHostRef.current) return;
+    isFocusedRef.current = false;
+    saveSelection();
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const currentRaw = editorHostRef.current.innerHTML;
+    const cleanHtml = EditorSerializer.sanitize(currentRaw);
+    lastExportedHtmlRef.current = cleanHtml;
+
+    const finalExportHtml = activeStyles
+      ? `<style>${activeStyles}</style>\n${cleanHtml}`
+      : cleanHtml;
+
+    onContentChange?.(finalExportHtml);
+  }, [isEditable, saveSelection, activeStyles, onContentChange]);
+
+  // Native Input Handler with Debounced Synchronization
   const handleInput = useCallback(() => {
-    if (!editorHostRef.current) return;
+    if (!isEditable || !editorHostRef.current) return;
+    isInternalChangeRef.current = true;
+    saveSelection();
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -344,10 +221,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         timestamp: Date.now(),
         description: 'Typing input',
       });
-    }, 180);
-  }, [dispatchTransaction]);
+    }, 150);
+  }, [isEditable, saveSelection, dispatchTransaction]);
 
-  // 5. Native Keydown Handler (Enter, Ctrl+Enter, Ctrl+Z, Ctrl+Y, Tab)
+  // Native Keydown Handler (Enter, Ctrl+Enter, Ctrl+Z, Ctrl+Y, Tab)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!isEditable || !editorHostRef.current) return;
@@ -375,7 +252,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         if (prevHtml !== null && editorHostRef.current) {
           editorHostRef.current.innerHTML = prevHtml;
           isInternalChangeRef.current = true;
-          setCanonicalHtml(prevHtml);
+          lastExportedHtmlRef.current = prevHtml;
           onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${prevHtml}` : prevHtml);
         }
         return;
@@ -391,7 +268,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         if (nextHtml !== null && editorHostRef.current) {
           editorHostRef.current.innerHTML = nextHtml;
           isInternalChangeRef.current = true;
-          setCanonicalHtml(nextHtml);
+          lastExportedHtmlRef.current = nextHtml;
           onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${nextHtml}` : nextHtml);
         }
         return;
@@ -407,7 +284,63 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     [isEditable, dispatchTransaction, onContentChange, activeStyles, handleInput]
   );
 
-  // 6. Global Command Listener (for Formatting Ribbon, Sidebar, and Shortcuts)
+  // Paste Handler
+  const handlePaste = useCallback(() => {
+    saveSelection();
+    setTimeout(() => {
+      handleInput();
+    }, 10);
+  }, [saveSelection, handleInput]);
+
+  // Click on empty canvas margin to focus editor at end
+  const handleSheetClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isEditable || !editorHostRef.current) return;
+
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (sel && !sel.isCollapsed) return;
+
+      const target = e.target as HTMLElement;
+      if (target !== editorHostRef.current && editorHostRef.current.contains(target)) {
+        saveSelection();
+        return;
+      }
+
+      // If clicked on empty sheet padding/margin:
+      try {
+        editorHostRef.current.focus({ preventScroll: true });
+        const leafElements = Array.from(
+          editorHostRef.current.querySelectorAll('p, td, th, div.docx_p, h1, h2, h3, h4, h5, h6, li')
+        ) as HTMLElement[];
+
+        if (leafElements.length === 0) {
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          editorHostRef.current.appendChild(p);
+          const range = document.createRange();
+          range.setStart(p, 0);
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+          saveSelection();
+          return;
+        }
+
+        const lastEl = leafElements[leafElements.length - 1];
+        const range = document.createRange();
+        range.selectNodeContents(lastEl);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        saveSelection();
+      } catch (err) {
+        console.warn('Click focus error', err);
+      }
+    },
+    [isEditable, saveSelection]
+  );
+
+  // Global Command Listener (for Formatting Ribbon, Sidebar, and Shortcuts)
   useEffect(() => {
     const handleCommandEvent = (e: CustomEvent) => {
       if (!isEditable || !editorHostRef.current) return;
@@ -549,165 +482,158 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         maxWidth: '100%',
       }}
     >
-      {/* Visual Multi-Sheet Page Projections Background / Frames */}
+      {/* Active Document CSS Style Element */}
+      {activeStyles && <style dangerouslySetInnerHTML={{ __html: activeStyles }} />}
+
+      {/* Visual Page Break Styles */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .spr-page-break {
+              display: block;
+              page-break-after: always;
+              break-after: page;
+              margin: 40px -42px 40px -42px;
+              position: relative;
+              user-select: none;
+              -webkit-user-select: none;
+              background: #090d16;
+              padding: 20px 0;
+              border-top: 1.5px solid rgba(0, 0, 0, 0.4);
+              border-bottom: 1.5px solid rgba(0, 0, 0, 0.4);
+              box-shadow: inset 0 8px 16px -4px rgba(0, 0, 0, 0.75), inset 0 -8px 16px -4px rgba(0, 0, 0, 0.75);
+              cursor: default;
+            }
+            .spr-page-break-divider {
+              border: none;
+              border-top: 1px dashed rgba(255, 255, 255, 0.2);
+              margin: 0;
+            }
+            .spr-page-break-badge {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: #1e293b;
+              padding: 3px 14px;
+              font-size: 10px;
+              font-weight: 700;
+              color: #94a3b8;
+              border: 1px solid rgba(255, 255, 255, 0.15);
+              border-radius: 9999px;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+              letter-spacing: 0.06em;
+              text-transform: uppercase;
+              pointer-events: none;
+            }
+            @media print {
+              .spr-page-break {
+                display: block !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+              }
+              .spr-page-break-divider,
+              .spr-page-break-badge {
+                display: none !important;
+              }
+            }
+          `,
+        }}
+      />
+
+      {/* Physical Paper Sheet Canvas */}
       <div
-        className="relative flex flex-col items-center gap-8 print:gap-0 print:block"
+        className="paper-sheet-wrapper flex flex-col items-center group relative mb-8 print:mb-0 print:block"
         style={{
           width: `${pageGeometry.paperDimensionsPx.width}px`,
           maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
         }}
       >
-        {/* Render each calculated LayoutPage as an independent physical paper card */}
-        {layoutDoc.pages.map((page, pageIndex) => {
-          const pageNum = page.pageNumber || pageIndex + 1;
-          const isFirst = pageIndex === 0;
-          const runtimeVars = RuntimeVariableResolver.buildVariables(pageIndex, totalPagesCount, {
-            documentTitle: options.title || 'Official Document',
-          });
+        {/* Screen-Only Top Physical Page Header Bar */}
+        <div
+          style={{ width: `${pageGeometry.paperDimensionsPx.width}px` }}
+          className="flex items-center justify-between px-2 py-1 mb-1 text-xs theme-text-secondary select-none print:hidden w-full"
+        >
+          <div className="flex items-center gap-2 font-medium">
+            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
+            <span className="font-bold theme-text-primary font-mono text-[11.5px]">
+              Document Canvas ({options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
+            </span>
+            <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
+              {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
+            </span>
+          </div>
 
-          return (
-            <div
-              key={`doclab_physical_sheet_${page.index}`}
-              id={`docx-live-page-${page.index}`}
-              className="paper-sheet-wrapper flex flex-col items-center group relative mb-8 print:mb-0 print:block"
-              style={{
-                width: `${pageGeometry.paperDimensionsPx.width}px`,
-                maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-              }}
-            >
-              {/* Screen-Only Top Physical Page Header Bar */}
-              <div
-                style={{ width: `${pageGeometry.paperDimensionsPx.width}px` }}
-                className="flex items-center justify-between px-2 py-1 mb-1 text-xs theme-text-secondary select-none print:hidden w-full"
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
-                  <span className="font-bold theme-text-primary font-mono text-[11.5px]">
-                    Page {pageNum} of {totalPagesCount} ({options.pageSize || 'A4'} • {options.orientation || 'PORTRAIT'})
-                  </span>
-                  <span className="text-[10px] font-semibold theme-text-muted px-1.5 py-0.5 rounded-sm theme-bg-sub border theme-border font-mono">
-                    {Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px
-                  </span>
-                  {debugLayout && (
-                    <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-sm font-mono">
-                      Used: {Math.round(page.usedHeight)}px • Rem: {Math.round(page.availableHeight)}px
-                    </span>
-                  )}
-                </div>
-                {isFirst && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editorHostRef.current) {
-                        const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
-                        dispatchTransaction(tx);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
-                    title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
-                  >
-                    <PageBreakIcon className="w-3.5 h-3.5" />
-                    <span>+ Page Break</span>
-                  </button>
-                )}
-              </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (editorHostRef.current) {
+                const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
+                dispatchTransaction(tx);
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated theme-text-secondary hover:theme-accent transition-colors border theme-border cursor-pointer shadow-2xs"
+            title="Insert an explicit manual page break at cursor (Ctrl+Enter)"
+          >
+            <PageBreakIcon className="w-3.5 h-3.5" />
+            <span>+ Page Break</span>
+          </button>
+        </div>
 
-              {/* Physical Paper Sheet Surface */}
-              <div
-                className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col justify-between"
-                data-size={options.pageSize || 'A4'}
-                data-orientation={options.orientation || 'PORTRAIT'}
-                data-margin={options.margin || 'NORMAL'}
-                data-density={options.density || 'NORMAL'}
-                data-page-index={page.index}
-                data-page-break="true"
-                style={{
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  width: `${pageGeometry.paperDimensionsPx.width}px`,
-                  maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-                  minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                  height: `${pageGeometry.paperDimensionsPx.height}px`,
-                  maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                  padding: pageGeometry.cssMarginString,
-                  boxSizing: 'border-box',
-                  textAlign: 'left',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* 1. Running Header Zone */}
-                {options.headerConfig && (
-                  <div className="w-full relative z-10 shrink-0 overflow-hidden">
-                    <RunningHeader
-                      variables={runtimeVars}
-                      config={options.headerConfig}
-                    />
-                  </div>
-                )}
-
-                {/* 2. Printable Content Flow Area */}
-                <div
-                  className="w-full flex-1 relative z-10 text-left select-text overflow-hidden"
-                  style={{
-                    minHeight: `${page.contentArea.height}px`,
-                    maxHeight: `${page.contentArea.height}px`,
-                    height: `${page.contentArea.height}px`,
-                  }}
-                >
-                  {isFirst ? (
-                    /* The Authoritative Single contentEditable Host across 1-page and multi-page documents */
-                    <div
-                      ref={editorHostRef}
-                      contentEditable={isEditable}
-                      suppressContentEditableWarning={true}
-                      data-doclab-single-host="true"
-                      onInput={handleInput}
-                      onKeyDown={handleKeyDown}
-                      className="doclab-single-host-editor min-h-[400px] outline-none text-left select-text cursor-text leading-relaxed font-sans"
-                      style={{
-                        width: '100%',
-                        minHeight: '100%',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                        wordBreak: 'break-word',
-                      }}
-                    />
-                  ) : (
-                    /* Subsequent Physical Pages render their respective layout fragments */
-                    <div className="layout-page-fragments flex flex-col w-full text-left select-text">
-                      {page.fragments && page.fragments.length > 0 ? (
-                        page.fragments.map((fragment) => (
-                          <LayoutFragmentRenderer
-                            key={fragment.id}
-                            fragment={fragment}
-                            styles={activeStyles}
-                          />
-                        ))
-                      ) : (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: page.htmlContent || '<p><br></p>',
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Running Footer Zone */}
-                {options.footerConfig && (
-                  <div className="w-full relative z-10 shrink-0 overflow-hidden">
-                    <RunningFooter
-                      variables={runtimeVars}
-                      config={options.footerConfig}
-                      numeralSystem={options.numeralSystem}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {/* Physical Paper Sheet Surface */}
+        <div
+          onClick={handleSheetClick}
+          className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col cursor-text select-text"
+          data-size={options.pageSize || 'A4'}
+          data-orientation={options.orientation || 'PORTRAIT'}
+          data-margin={options.margin || 'NORMAL'}
+          data-density={options.density || 'NORMAL'}
+          data-page-break="true"
+          style={{
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            width: `${pageGeometry.paperDimensionsPx.width}px`,
+            maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
+            minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+            padding: pageGeometry.cssMarginString,
+            boxSizing: 'border-box',
+            textAlign: 'left',
+          }}
+        >
+          {/* The Authoritative Single contentEditable Host */}
+          <div
+            ref={editorHostRef}
+            contentEditable={isEditable}
+            suppressContentEditableWarning={true}
+            data-doclab-single-host="true"
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onInput={handleInput}
+            onPaste={handlePaste}
+            onKeyDown={handleKeyDown}
+            onKeyUp={saveSelection}
+            onMouseUp={saveSelection}
+            className="doclab-single-host-editor docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !bg-white !text-slate-900 w-full min-h-[500px] outline-none text-left select-text cursor-text focus:outline-none"
+            style={{
+              width: '100%',
+              minHeight: '100%',
+              boxSizing: 'border-box',
+              outline: 'none',
+              wordBreak: 'break-word',
+              textAlign: 'left',
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
+              userSelect: 'text',
+              WebkitUserSelect: 'text',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
