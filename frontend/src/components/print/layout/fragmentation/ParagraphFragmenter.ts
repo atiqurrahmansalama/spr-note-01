@@ -6,7 +6,7 @@
  *
  * Slices multi-line paragraphs at exact browser line boundaries crossing page breaks,
  * preserving font formatting, inline spans, hyperlinks, dynamic tokens, direction,
- * indentation, and CSS classes across both page fragments.
+ * indentation, alignment, and CSS classes across both page fragments.
  */
 
 import { TextMeasurement } from '../measurement/TextMeasurement';
@@ -25,6 +25,17 @@ export interface ParagraphSplitResult {
   firstFragmentNode?: ParagraphNode;
   remainingFragmentNode?: ParagraphNode | null;
   isSplit: boolean;
+}
+
+export interface MultiPageParagraphFragment {
+  pageIndex: number;
+  fragmentIndex: number;
+  totalFragments: number;
+  html: string;
+  height: number;
+  node?: ParagraphNode;
+  isFirstFragment: boolean;
+  isLastFragment: boolean;
 }
 
 export class ParagraphFragmenter {
@@ -186,6 +197,78 @@ export class ParagraphFragmenter {
   }
 
   /**
+   * Slices a continuous paragraph across multiple pages (e.g. 2, 3, 5+ pages)
+   */
+  public static fragmentParagraphAcrossPages(
+    target: HTMLElement | string | ParagraphNode,
+    pageAvailableHeights: number[],
+    context?: MeasurementContext
+  ): MultiPageParagraphFragment[] {
+    let currentHtml = typeof target === 'string'
+      ? target
+      : typeof HTMLElement !== 'undefined' && target instanceof HTMLElement
+      ? target.outerHTML
+      : HtmlExporter.serializeBlock(target as ParagraphNode, { tokenFormat: 'mustache', includeNodeIds: true });
+
+    const fragments: MultiPageParagraphFragment[] = [];
+    let pageIdx = 0;
+    const defaultHeight = pageAvailableHeights.length > 0 ? pageAvailableHeights[pageAvailableHeights.length - 1] : 800;
+    let safetyCounter = 0;
+
+    while (currentHtml && currentHtml.trim() && safetyCounter < 5000) {
+      safetyCounter++;
+      const availH = pageIdx < pageAvailableHeights.length ? pageAvailableHeights[pageIdx] : defaultHeight;
+      const splitRes = this.splitParagraph(currentHtml, availH, context);
+
+      if (!splitRes.isSplit) {
+        if (splitRes.firstFragmentHtml && splitRes.firstFragmentHtml.trim()) {
+          fragments.push({
+            pageIndex: pageIdx,
+            fragmentIndex: fragments.length,
+            totalFragments: fragments.length + 1,
+            html: splitRes.firstFragmentHtml,
+            height: splitRes.firstFragmentHeight,
+            node: splitRes.firstFragmentNode,
+            isFirstFragment: fragments.length === 0,
+            isLastFragment: true,
+          });
+          currentHtml = '';
+        } else if (splitRes.remainingFragmentHtml && splitRes.remainingFragmentHtml.trim()) {
+          // Pushed completely to next page
+          pageIdx++;
+          continue;
+        } else {
+          break;
+        }
+      } else {
+        fragments.push({
+          pageIndex: pageIdx,
+          fragmentIndex: fragments.length,
+          totalFragments: fragments.length + 2,
+          html: splitRes.firstFragmentHtml,
+          height: splitRes.firstFragmentHeight,
+          node: splitRes.firstFragmentNode,
+          isFirstFragment: fragments.length === 0,
+          isLastFragment: false,
+        });
+
+        currentHtml = splitRes.remainingFragmentHtml || '';
+        pageIdx++;
+      }
+    }
+
+    // Update totalFragments count accurately across all collected fragments
+    const total = fragments.length;
+    return fragments.map((f, idx) => ({
+      ...f,
+      fragmentIndex: idx,
+      totalFragments: total,
+      isFirstFragment: idx === 0,
+      isLastFragment: idx === total - 1,
+    }));
+  }
+
+  /**
    * Splits a DOM element tree cleanly at a global character offset, preserving all tags,
    * inline formatting marks, links, and element attributes across both halves.
    */
@@ -249,6 +332,7 @@ export class ParagraphFragmenter {
       p2.setAttribute('data-fragment-index', '1');
       p2.setAttribute('data-fragment-total', '2');
       p2.setAttribute('data-is-fragment', 'true');
+      p2.setAttribute('data-is-continuation', 'true');
 
       return {
         firstHtml: clone.outerHTML,
@@ -320,9 +404,9 @@ export class ParagraphFragmenter {
     const sourceIdMatch = tagAttrs.match(/(?:data-source-node-id|data-source-id|data-node-id|id)=["']([^"']+)["']/i);
     const sourceId = sourceIdMatch ? sourceIdMatch[1] : 'p_body';
 
-    const cleanAttrs = tagAttrs.replace(/\s*data-(?:source-node-id|source-id|fragment-index|fragment-total|is-fragment)=["'][^"']*["']/gi, '');
+    const cleanAttrs = tagAttrs.replace(/\s*data-(?:source-node-id|source-id|fragment-index|fragment-total|is-fragment|is-continuation)=["'][^"']*["']/gi, '');
     const firstAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="0" data-fragment-total="2" data-is-fragment="true"`;
-    const remAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="1" data-fragment-total="2" data-is-fragment="true"`;
+    const remAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="1" data-fragment-total="2" data-is-fragment="true" data-is-continuation="true"`;
 
     return {
       firstFragmentHtml: `<${tagName}${firstAttrs}>${part1}</${tagName}>`,
@@ -333,3 +417,4 @@ export class ParagraphFragmenter {
     };
   }
 }
+

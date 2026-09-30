@@ -10,9 +10,11 @@ import { EditorSerializer } from './EditorSerializer';
 
 export interface HistoryCheckpoint {
   canonicalHtml: string;
+  html: string;
   timestamp: number;
   origin: string;
   description?: string;
+  selection?: any;
 }
 
 export class EditorHistory {
@@ -25,7 +27,7 @@ export class EditorHistory {
   constructor(initialHtml: string = '<p><br></p>', maxHistorySize: number = 60) {
     this.maxHistorySize = maxHistorySize;
     const clean = EditorSerializer.sanitize(initialHtml);
-    this.undoStack = [{ canonicalHtml: clean, timestamp: Date.now(), origin: 'init' }];
+    this.undoStack = [{ canonicalHtml: clean, html: clean, timestamp: Date.now(), origin: 'init' }];
   }
 
   /**
@@ -41,6 +43,8 @@ export class EditorHistory {
       return;
     }
 
+    const checkpointSelection = transaction.selection?.logical || transaction.selection || null;
+
     // Coalesce rapid typing events within 400ms window
     if (
       transaction.origin === 'typing' &&
@@ -50,7 +54,9 @@ export class EditorHistory {
     ) {
       // Update top of stack in-place
       currentTop.canonicalHtml = cleanHtml;
+      currentTop.html = cleanHtml;
       currentTop.timestamp = now;
+      currentTop.selection = checkpointSelection;
       this.lastTypingTimestamp = now;
       this.redoStack = [];
       return;
@@ -59,9 +65,11 @@ export class EditorHistory {
     // Push new checkpoint
     this.undoStack.push({
       canonicalHtml: cleanHtml,
+      html: cleanHtml,
       timestamp: now,
       origin: transaction.origin,
       description: transaction.description,
+      selection: checkpointSelection,
     });
 
     if (this.undoStack.length > this.maxHistorySize) {
@@ -73,28 +81,45 @@ export class EditorHistory {
   }
 
   /**
-   * Performs an Undo operation
+   * Performs an Undo operation returning the canonical HTML string
    */
   public undo(): string | null {
+    const cp = this.undoCheckpoint();
+    return cp ? cp.canonicalHtml : null;
+  }
+
+  /**
+   * Performs an Undo operation returning the full checkpoint with selection
+   */
+  public undoCheckpoint(): HistoryCheckpoint | null {
     if (this.undoStack.length <= 1) return null;
 
     const current = this.undoStack.pop()!;
     this.redoStack.push(current);
 
     const previous = this.undoStack[this.undoStack.length - 1];
-    return previous ? previous.canonicalHtml : null;
+    return previous || null;
   }
 
   /**
-   * Performs a Redo operation
+   * Performs a Redo operation returning the canonical HTML string
    */
   public redo(): string | null {
+    const cp = this.redoCheckpoint();
+    return cp ? cp.canonicalHtml : null;
+  }
+
+  /**
+   * Performs a Redo operation returning the full checkpoint with selection
+   */
+  public redoCheckpoint(): HistoryCheckpoint | null {
     if (this.redoStack.length === 0) return null;
 
     const next = this.redoStack.pop()!;
     this.undoStack.push(next);
-    return next.canonicalHtml;
+    return next;
   }
+
 
   /**
    * Checks if undo is available
@@ -103,11 +128,26 @@ export class EditorHistory {
     return this.undoStack.length > 1;
   }
 
+  public hasUndo(): boolean {
+    return this.canUndo;
+  }
+
   /**
    * Checks if redo is available
    */
   public get canRedo(): boolean {
     return this.redoStack.length > 0;
+  }
+
+  public hasRedo(): boolean {
+    return this.canRedo;
+  }
+
+  /**
+   * Returns current stack depth
+   */
+  public getDepth(): number {
+    return this.undoStack.length;
   }
 
   /**
@@ -118,12 +158,16 @@ export class EditorHistory {
     return top ? top.canonicalHtml : '<p><br></p>';
   }
 
+  public getCurrent(): string {
+    return this.current;
+  }
+
   /**
    * Resets history stack with new initial HTML
    */
   public reset(initialHtml: string): void {
     const clean = EditorSerializer.sanitize(initialHtml);
-    this.undoStack = [{ canonicalHtml: clean, timestamp: Date.now(), origin: 'init' }];
+    this.undoStack = [{ canonicalHtml: clean, html: clean, timestamp: Date.now(), origin: 'init' }];
     this.redoStack = [];
     this.lastTypingTimestamp = 0;
   }

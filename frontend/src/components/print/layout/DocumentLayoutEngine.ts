@@ -148,14 +148,51 @@ export class DocumentLayoutEngine {
    * Helper factory to create a LayoutFragment
    */
   public static createFragment(params: Partial<LayoutFragment> & { id: string; sourceNodeId: string; pageIndex: number; rect: Rect }): LayoutFragment {
+    const width = params.width ?? params.rect.width;
+    const height = params.height ?? params.rect.height;
+    const fragmentIndex = params.fragmentIndex ?? 0;
+    const fragmentOrder = params.fragmentOrder ?? fragmentIndex;
+    const totalFragments = params.totalFragments ?? 1;
+    const type = params.type || 'paragraph';
+    const sourceType = params.sourceType || type;
+    const isFirstFragment = params.isFirstFragment ?? (fragmentIndex === 0);
+    const isLastFragment = params.isLastFragment ?? (fragmentIndex === totalFragments - 1);
+    const isAutomaticBreak = params.isAutomaticBreak ?? false;
+    const isManualBreak = params.isManualBreak ?? false;
+
     return {
-      type: params.type || 'paragraph',
-      fragmentIndex: 0,
-      totalFragments: 1,
-      isFirstFragment: true,
-      isLastFragment: true,
-      isAutomaticBreak: false,
-      isManualBreak: false,
+      id: params.id,
+      sourceNodeId: params.sourceNodeId,
+      type,
+      sourceType,
+      pageIndex: params.pageIndex,
+      fragmentIndex,
+      fragmentOrder,
+      totalFragments,
+      rect: {
+        x: params.rect.x,
+        y: params.rect.y,
+        width,
+        height,
+      },
+      width,
+      height,
+      isFirstFragment,
+      isLastFragment,
+      isAutomaticBreak,
+      isManualBreak,
+      breakMetadata: params.breakMetadata ?? {
+        isManual: isManualBreak,
+        isAutomatic: isAutomaticBreak,
+        breakType: isManualBreak ? 'page' : isAutomaticBreak ? 'overflow' : undefined,
+      },
+      logicalRange: params.logicalRange,
+      logicalStart: params.logicalStart ?? params.logicalRange?.startOffset,
+      logicalEnd: params.logicalEnd ?? params.logicalRange?.endOffset,
+      htmlContent: params.htmlContent,
+      textContent: params.textContent,
+      domNode: params.domNode,
+      data: params.data,
       ...params,
     };
   }

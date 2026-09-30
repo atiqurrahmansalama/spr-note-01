@@ -6,8 +6,9 @@
  * Interpolates runtime variables without mutating persistent template storage.
  * Supports:
  * - Full Institutional branding header on Page 1 (or all pages)
+ * - Different first-page header variation (per-section or per-document)
  * - Compact running continuation subheader on Pages 2+
- * - Custom running header text with token interpolation
+ * - Custom running header text with token interpolation (Page X of Y, Roman, Bengali, Arabic)
  * - Section-aware header title display
  */
 
@@ -33,9 +34,41 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
   titleLineStyle = 'SOLID',
   className = '',
 }) => {
-  const isFirstPage = variables.pageIndex === 0;
+  const isDocFirstPage = variables.pageIndex === 0;
+  const isSectionFirst = variables.isSectionFirstPage ?? (variables.sectionPageNumber === 1);
+  const isTargetFirstPage = config.differentFirstPage ? (isDocFirstPage || isSectionFirst) : isDocFirstPage;
 
-  // Custom Raw HTML Header Template
+  // 1. Different First Page: Custom First Page Header HTML
+  if (config.differentFirstPage && isTargetFirstPage) {
+    if (config.firstPageHeaderHtml !== undefined) {
+      if (!config.firstPageHeaderHtml.trim()) {
+        return null; // Empty first page header
+      }
+      const resolvedFirstHtml = RuntimeVariableResolver.resolve(config.firstPageHeaderHtml, variables);
+      return (
+        <header
+          className={`print-running-header print-first-page-header w-full print:block ${className}`}
+          dangerouslySetInnerHTML={{ __html: resolvedFirstHtml }}
+        />
+      );
+    }
+
+    if (config.firstPageRunningHeaderText) {
+      const resolvedText = RuntimeVariableResolver.resolve(config.firstPageRunningHeaderText, variables);
+      return (
+        <header className={`print-running-continuation-header pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold ${className}`}>
+          <span className="uppercase tracking-wide text-slate-800">
+            {resolvedText}
+          </span>
+          <span className="font-mono text-[11px] text-slate-500 font-medium">
+            Page {variables.pageNumberFormatted || variables.pageNumber} of {variables.totalPagesFormatted || variables.totalPages}
+          </span>
+        </header>
+      );
+    }
+  }
+
+  // 2. Custom Raw HTML Header Template
   if (config.headerHtml) {
     const resolvedHtml = RuntimeVariableResolver.resolve(config.headerHtml, variables);
     return (
@@ -46,8 +79,8 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
     );
   }
 
-  // Custom Running Header Text Pattern (e.g. "{{document.title}} • {{institution.name}}")
-  if (config.runningHeaderText && (!isFirstPage || !config.showFirstPageHeader)) {
+  // 3. Custom Running Header Text Pattern (e.g. "{{document.title}} • {{institution.name}}")
+  if (config.runningHeaderText && (!isTargetFirstPage || !config.showFirstPageHeader)) {
     const resolvedText = RuntimeVariableResolver.resolve(config.runningHeaderText, variables);
     return (
       <header className={`print-running-continuation-header pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold ${className}`}>
@@ -55,14 +88,14 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
           {resolvedText}
         </span>
         <span className="font-mono text-[11px] text-slate-500 font-medium">
-          Page {variables.pageNumber} of {variables.totalPages}
+          Page {variables.pageNumberFormatted || variables.pageNumber} of {variables.totalPagesFormatted || variables.totalPages}
         </span>
       </header>
     );
   }
 
-  // Page 1 Full Branding Header
-  if (isFirstPage || config.showSubsequentPageHeaders) {
+  // 4. Page 1 Full Branding Header
+  if (isDocFirstPage || config.showSubsequentPageHeaders) {
     return (
       <header className={`print-document-header pb-2 mb-2 border-b-2 border-slate-900 bg-transparent print:pb-2 print:mb-2 ${className}`}>
         <div className="flex items-center justify-between gap-4">
@@ -110,7 +143,7 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
     );
   }
 
-  // Subsequent Pages (Page 2+) Continuation Subheader
+  // 5. Subsequent Pages (Page 2+) Continuation Subheader
   const sectionPart = variables.sectionTitle ? ` • ${variables.sectionTitle}` : '';
   return (
     <header className={`print-running-continuation-header pb-1.5 mb-2 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-bold ${className}`}>
@@ -118,7 +151,7 @@ export const RunningHeader: React.FC<RunningHeaderProps> = ({
         {variables.documentTitle}{sectionPart} (Continued)
       </span>
       <span className="font-mono text-[11px] text-slate-500 font-medium">
-        Page {variables.pageNumber} of {variables.totalPages}
+        Page {variables.pageNumberFormatted || variables.pageNumber} of {variables.totalPagesFormatted || variables.totalPages}
       </span>
     </header>
   );

@@ -26,6 +26,8 @@ import {
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
+  SectionBreakNode,
+  CustomBlockNode,
   InlineNode,
   TextNode,
   TokenNode,
@@ -84,6 +86,10 @@ export class HtmlExporter {
         return this.serializeDivider(block as DividerNode, options);
       case 'section':
         return this.serializeSection(block as SectionNode, options);
+      case 'section-break':
+        return this.serializeSectionBreak(block as SectionBreakNode, options);
+      case 'custom-block':
+        return this.serializeCustomBlock(block as CustomBlockNode, options);
       default:
         return '';
     }
@@ -168,9 +174,21 @@ export class HtmlExporter {
           if (cell.verticalAlign) cellStyles.push(`vertical-align: ${cell.verticalAlign};`);
 
           const styleString = cellStyles.length > 0 ? ` style="${cellStyles.join(' ')}"` : '';
-          const cellContentHtml = cell.content
-            .map((b) => this.serializeBlock(b, options))
-            .join(options.prettyPrint ? '\n' : '');
+          const cellContentHtml = Array.isArray(cell.content)
+            ? cell.content
+                .map((b: any) => {
+                  if (b && typeof b === 'object') {
+                    if (b.type === 'text' || b.type === 'token' || b.type === 'link' || b.type === 'hard-break') {
+                      return this.serializeInlineNode(b as InlineNode, options);
+                    }
+                    return this.serializeBlock(b as BlockNode, options);
+                  }
+                  return '';
+                })
+                .join(options.prettyPrint ? '\n' : '')
+            : Array.isArray((cell as any).children)
+            ? this.serializeInlineContent((cell as any).children, options)
+            : '';
 
           return `<${cellTag}${cellAttrs.length > 0 ? ' ' + cellAttrs.join(' ') : ''}${styleString}>${cellContentHtml || '<p><br></p>'}</${cellTag}>`;
         })
@@ -267,8 +285,51 @@ export class HtmlExporter {
    */
   private static serializeSection(node: SectionNode, options: HtmlExportOptions): string {
     const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
-    const inner = node.content.map((b) => this.serializeBlock(b, options)).join('\n');
-    return `<section${idAttr}>\n${inner}\n</section>`;
+    const titleAttr = node.sectionTitle ? ` data-section-title="${this.escapeHtml(node.sectionTitle)}"` : '';
+    const sizeAttr = node.pageSize ? ` data-page-size="${this.escapeHtml(node.pageSize)}"` : '';
+    const orientAttr = node.orientation ? ` data-orientation="${this.escapeHtml(node.orientation)}"` : '';
+    const restartAttr = node.restartPageNumbering ? ` data-restart-numbering="true"` : '';
+
+    const inner = (node.content || []).map((b) => this.serializeBlock(b, options)).join('\n');
+    return `<section${idAttr}${titleAttr}${sizeAttr}${orientAttr}${restartAttr}>\n${inner}\n</section>`;
+  }
+
+  /**
+   * Serializes an explicit SectionBreakNode
+   */
+  private static serializeSectionBreak(node: SectionBreakNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
+    const titleAttr = node.sectionTitle ? ` data-section-title="${this.escapeHtml(node.sectionTitle)}"` : '';
+    const sizeAttr = node.pageSize ? ` data-page-size="${this.escapeHtml(node.pageSize)}"` : '';
+    const orientAttr = node.orientation ? ` data-orientation="${this.escapeHtml(node.orientation)}"` : '';
+    const marginAttr = node.margin ? ` data-margin="${this.escapeHtml(node.margin)}"` : '';
+    const customMarginsAttr = node.customMarginsMm ? ` data-custom-margins="${this.escapeHtml(JSON.stringify(node.customMarginsMm))}"` : '';
+    const headerHeightAttr = node.headerHeightPx !== undefined ? ` data-header-height="${node.headerHeightPx}"` : '';
+    const footerHeightAttr = node.footerHeightPx !== undefined ? ` data-footer-height="${node.footerHeightPx}"` : '';
+    const headerDistAttr = node.headerDistanceMm !== undefined ? ` data-header-distance="${node.headerDistanceMm}"` : '';
+    const footerDistAttr = node.footerDistanceMm !== undefined ? ` data-footer-distance="${node.footerDistanceMm}"` : '';
+    const diffFirstAttr = node.differentFirstPage ? ` data-different-first-page="true"` : '';
+    const formatAttr = node.pageNumberFormat ? ` data-page-number-format="${this.escapeHtml(node.pageNumberFormat)}"` : '';
+    const startAttr = node.pageNumberStart !== undefined ? ` data-page-number-start="${node.pageNumberStart}"` : '';
+    const restartAttr = (node.restartPageNumbering || node.pageNumberRestart) ? ` data-restart-numbering="true"` : '';
+    const headerHtmlAttr = node.headerHtml ? ` data-header-html="${this.escapeHtml(node.headerHtml)}"` : '';
+    const footerHtmlAttr = node.footerHtml ? ` data-footer-html="${this.escapeHtml(node.footerHtml)}"` : '';
+    const firstHeaderAttr = node.firstPageHeaderHtml ? ` data-first-page-header-html="${this.escapeHtml(node.firstPageHeaderHtml)}"` : '';
+    const firstFooterAttr = node.firstPageFooterHtml ? ` data-first-page-footer-html="${this.escapeHtml(node.firstPageFooterHtml)}"` : '';
+
+    return `<div${idAttr} class="spr-section-break" data-section-break="true"${titleAttr}${sizeAttr}${orientAttr}${marginAttr}${customMarginsAttr}${headerHeightAttr}${footerHeightAttr}${headerDistAttr}${footerDistAttr}${diffFirstAttr}${formatAttr}${startAttr}${restartAttr}${headerHtmlAttr}${footerHtmlAttr}${firstHeaderAttr}${firstFooterAttr} contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-section-break-divider" /><span class="spr-section-break-badge">Section Break${node.sectionTitle ? `: ${this.escapeHtml(node.sectionTitle)}` : ''}</span></div>`;
+  }
+
+  /**
+   * Serializes a CustomBlockNode (generic container / nested block)
+   */
+  private static serializeCustomBlock(node: CustomBlockNode, options: HtmlExportOptions = {}): string {
+    const idAttr = options.includeNodeIds && node.id ? ` data-node-id="${this.escapeHtml(node.id)}" data-source-id="${this.escapeHtml(node.id)}"` : '';
+    if (node.rawHtml) {
+      return node.rawHtml;
+    }
+    const inner = (node.content || []).map((b) => this.serializeBlock(b, options)).join('\n');
+    return `<div${idAttr} class="spr-custom-block">\n${inner}\n</div>`;
   }
 
   /**

@@ -253,6 +253,28 @@ export class EditorCommands {
   }
 
   /**
+   * 10.1 Inserts an explicit section break
+   */
+  public static insertSectionBreak(
+    host: HTMLElement,
+    options: Parameters<typeof EditorSerializer.createSectionBreakHtml>[0] = {}
+  ): EditorTransaction {
+    const breakHtml = `${EditorSerializer.createSectionBreakHtml(options)}<p><br></p>`;
+    EditorDomAdapter.insertHtmlAtSelection(host, breakHtml);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Insert section break${options.sectionTitle ? `: ${options.sectionTitle}` : ''}`,
+    };
+  }
+
+  /**
    * 11. Replaces current selection with arbitrary content
    */
   public static replaceSelection(host: HTMLElement, contentHtml: string): EditorTransaction {
@@ -287,5 +309,278 @@ export class EditorCommands {
       description: 'Clear formatting',
     };
   }
+
+  /**
+   * 13. Deletes selection or performs boundary-aware character deletion (Backspace / Delete)
+   */
+  public static delete(host: HTMLElement, forward: boolean = false): EditorTransaction {
+    EditorDomAdapter.deleteAtSelection(host, forward);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'typing',
+      timestamp: Date.now(),
+      description: forward ? 'Delete / forward merge' : 'Backspace / backward merge',
+    };
+  }
+
+  /**
+   * 14. Copies logical content from active selection
+   */
+  public static copy(host: HTMLElement): { text: string; html: string } | null {
+    return EditorDomAdapter.copySelection(host);
+  }
+
+  /**
+   * 15. Cuts logical content from active selection across multi-page boundaries
+   */
+  public static cut(host: HTMLElement): { transaction: EditorTransaction; payload: { text: string; html: string } } | null {
+    const payload = EditorDomAdapter.cutSelection(host);
+    if (!payload) return null;
+
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    const transaction: EditorTransaction = {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Cut selection across boundaries',
+    };
+
+    return { transaction, payload };
+  }
+
+  /**
+   * 16. Pastes content cleanly into active selection caret
+   */
+  public static paste(host: HTMLElement, payload: { text?: string; html?: string }): EditorTransaction {
+    EditorDomAdapter.pasteContent(host, payload);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Paste content',
+    };
+  }
+
+  /**
+   * 17. Inserts a row in active table
+   */
+  public static insertTableRow(host: HTMLElement, position: 'above' | 'below' = 'below'): EditorTransaction {
+    EditorDomAdapter.insertTableRow(host, position);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Insert table row ${position}`,
+    };
+  }
+
+  /**
+   * 18. Deletes the active table row
+   */
+  public static deleteTableRow(host: HTMLElement): EditorTransaction {
+    EditorDomAdapter.deleteTableRow(host);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Delete table row',
+    };
+  }
+
+  /**
+   * 19. Inserts a column in active table
+   */
+  public static insertTableColumn(host: HTMLElement, position: 'left' | 'right' = 'right'): EditorTransaction {
+    EditorDomAdapter.insertTableColumn(host, position);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Insert table column ${position}`,
+    };
+  }
+
+  /**
+   * 20. Deletes the active table column
+   */
+  public static deleteTableColumn(host: HTMLElement): EditorTransaction {
+    EditorDomAdapter.deleteTableColumn(host);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Delete table column',
+    };
+  }
+
+  /**
+   * 21. Deletes the active table
+   */
+  public static deleteTable(host: HTMLElement): EditorTransaction {
+    EditorDomAdapter.deleteTable(host);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Delete table',
+    };
+  }
+
+  /**
+   * 22. Sets image alignment
+   */
+  public static setImageAlignment(host: HTMLElement, alignment: 'left' | 'center' | 'right'): EditorTransaction {
+    EditorDomAdapter.setImageAlignment(host, alignment);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Set image alignment: ${alignment}`,
+    };
+  }
+
+  /**
+   * 23. Sets image dimensions
+   */
+  public static setImageDimensions(
+    host: HTMLElement,
+    width: number | string,
+    height?: number | string
+  ): EditorTransaction {
+    EditorDomAdapter.setImageDimensions(host, width, height);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Set image dimensions: ${width}x${height || 'auto'}`,
+    };
+  }
+
+  /**
+   * 24. Updates dynamic template token
+   */
+  public static updateToken(
+    host: HTMLElement,
+    tokenIdOrKey: string,
+    newPayload: Partial<TokenInsertPayload>
+  ): EditorTransaction {
+    EditorDomAdapter.updateToken(host, tokenIdOrKey, newPayload);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Update token: ${tokenIdOrKey}`,
+    };
+  }
+
+  /**
+   * 25. Deletes dynamic template token
+   */
+  public static deleteToken(host: HTMLElement, tokenIdOrKey?: string): EditorTransaction {
+    EditorDomAdapter.deleteToken(host, tokenIdOrKey);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: `Delete token: ${tokenIdOrKey || 'active'}`,
+    };
+  }
+
+  /**
+   * 26. Removes manual page break
+   */
+  public static removeManualPageBreak(
+    host: HTMLElement,
+    breakNodeOrId?: HTMLElement | string
+  ): EditorTransaction {
+    EditorDomAdapter.removeManualPageBreak(host, breakNodeOrId);
+    const cleanHtml = EditorSerializer.sanitize(host.innerHTML);
+    const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+    return {
+      doc,
+      canonicalHtml: cleanHtml,
+      selection: buildTransactionSelection(host),
+      origin: 'command',
+      timestamp: Date.now(),
+      description: 'Remove manual page break',
+    };
+  }
+
+  /**
+   * 27. Sets heading level (0 for paragraph, 1-6 for h1-h6)
+   */
+  public static setHeading(host: HTMLElement, level: number): EditorTransaction {
+    const targetTag = level === 0 ? 'p' : ((`h${level}`) as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6');
+    return this.toggleBlockType(host, targetTag);
+  }
+
+  /**
+   * 28. Sets list type ('ul' or 'ol')
+   */
+  public static setList(host: HTMLElement, listType: 'ul' | 'ol'): EditorTransaction {
+    return this.toggleBlockType(host, listType);
+  }
 }
+
+
 

@@ -103,8 +103,8 @@ export class FragmentationEngine {
       };
     }
 
-    // 4. If whole block fits within available budget and rules allow
-    if (!decision.canFragment && blockHeight <= availableHeightPx) {
+    // 4. If whole block fits within available budget
+    if (blockHeight <= availableHeightPx) {
       const html = HtmlExporter.serializeBlock(block, { includeNodeIds: true });
       const text = 'content' in block && Array.isArray((block as any).content)
         ? (block as any).content.map((c: any) => c.text || c.label || '').join('')
@@ -134,7 +134,7 @@ export class FragmentationEngine {
     // 5. Table Block Fragmentation
     if (block.type === 'table') {
       const split = TableFragmenter.splitTableNode(block, availableHeightPx, mCtx);
-      if (split.isSplit && split.firstFragmentHtml) {
+      if (split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
           id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
@@ -144,14 +144,14 @@ export class FragmentationEngine {
           htmlContent: split.firstFragmentHtml,
           isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
-          isAutomaticBreak: true,
+          isAutomaticBreak: split.isSplit,
         });
 
         return {
           fitsCurrentPage: true,
           pushedToNextPage: false,
           firstFragment: fragment,
-          firstBlockNode: split.firstFragmentNode,
+          firstBlockNode: split.firstFragmentNode || block,
           remainingBlockNode: split.remainingFragmentNode,
           usedHeight: split.firstFragmentHeight,
         };
@@ -186,9 +186,9 @@ export class FragmentationEngine {
     }
 
     // 7. Section / Nested Container Fragmentation
-    if (block.type === 'section') {
+    if (block.type === 'section' || block.type === 'custom-block') {
       const split = NestedBlockFragmenter.splitSectionNode(block, availableHeightPx, mCtx);
-      if (split.isSplit && split.firstFragmentHtml) {
+      if (split.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
           id: `fragment:${block.id}:${fragmentIndex}`,
           sourceNodeId: block.id,
@@ -198,7 +198,7 @@ export class FragmentationEngine {
           htmlContent: split.firstFragmentHtml,
           isFirstFragment: fragmentIndex === 0,
           isLastFragment: !split.remainingFragmentHtml,
-          isAutomaticBreak: true,
+          isAutomaticBreak: split.isSplit,
         });
 
         return {
@@ -329,8 +329,8 @@ export class FragmentationEngine {
       };
     }
 
-    // 3. Fits on current page entirely and rules allow
-    if (!decision.canFragment && nodeHeight <= availableHeightPx) {
+    // 3. Fits on current page entirely
+    if (nodeHeight <= availableHeightPx) {
       const fragment = DocumentLayoutEngine.createFragment({
         id: `fragment:${nodeId}:${fragmentIndex}`,
         sourceNodeId: nodeId,
@@ -356,7 +356,7 @@ export class FragmentationEngine {
     // 4. Table Fragmentation
     if (isTable) {
       const tableSplit = TableFragmenter.splitTable(el, availableHeightPx, mCtx);
-      if (tableSplit.isSplit && tableSplit.firstFragmentHtml) {
+      if (tableSplit.firstFragmentHtml) {
         const fragment = DocumentLayoutEngine.createFragment({
           id: `fragment:${nodeId}:${fragmentIndex}`,
           sourceNodeId: nodeId,
@@ -366,7 +366,7 @@ export class FragmentationEngine {
           htmlContent: tableSplit.firstFragmentHtml,
           isFirstFragment: fragmentIndex === 0,
           isLastFragment: !tableSplit.remainingFragmentHtml,
-          isAutomaticBreak: true,
+          isAutomaticBreak: tableSplit.isSplit,
         });
 
         let remainingEl: any = null;
@@ -439,6 +439,50 @@ export class FragmentationEngine {
           firstFragment: fragment,
           remainingNode: remainingEl,
           usedHeight: listSplit.firstFragmentHeight,
+        };
+      }
+    }
+
+    // 5.1 Blockquote & Nested Container Fragmentation
+    const isBlockquote = tag === 'blockquote' || /<blockquote/i.test(rawHtml);
+    if (isBlockquote) {
+      const bqSplit = NestedBlockFragmenter.splitBlockquote(rawHtml, availableHeightPx, mCtx);
+      if (bqSplit.isSplit && bqSplit.firstFragmentHtml) {
+        const fragment = DocumentLayoutEngine.createFragment({
+          id: `fragment:${nodeId}:${fragmentIndex}`,
+          sourceNodeId: nodeId,
+          type: 'paragraph',
+          pageIndex,
+          rect: { x: 0, y: 0, width: mCtx.containerWidth, height: bqSplit.firstFragmentHeight },
+          htmlContent: bqSplit.firstFragmentHtml,
+          isFirstFragment: fragmentIndex === 0,
+          isLastFragment: !bqSplit.remainingFragmentHtml,
+          isAutomaticBreak: true,
+        });
+
+        let remainingEl: any = null;
+        if (bqSplit.remainingFragmentHtml) {
+          if (typeof document !== 'undefined') {
+            const dummy = document.createElement('div');
+            dummy.innerHTML = bqSplit.remainingFragmentHtml;
+            remainingEl = dummy.firstElementChild as HTMLElement;
+            if (remainingEl) remainingEl.setAttribute('data-node-id', nodeId);
+          } else {
+            remainingEl = {
+              id: nodeId,
+              type: 'paragraph',
+              rawHtml: bqSplit.remainingFragmentHtml,
+              textContent: '',
+            };
+          }
+        }
+
+        return {
+          fitsCurrentPage: true,
+          pushedToNextPage: false,
+          firstFragment: fragment,
+          remainingNode: remainingEl,
+          usedHeight: bqSplit.firstFragmentHeight,
         };
       }
     }

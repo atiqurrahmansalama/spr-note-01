@@ -19,6 +19,9 @@ import {
   Dimensions,
   Insets,
   Rect,
+  ContentArea,
+  HeaderArea,
+  FooterArea,
   PageSizeId,
   PageOrientation,
   MarginPreset,
@@ -26,6 +29,8 @@ import {
   MARGIN_PRESET_METRICS_MM,
   mmToPx,
   pxToMm,
+  inchesToPx,
+  ptToPx,
 } from '../types/layoutTypes';
 import { LayoutDocumentOptions } from '../types/documentTypes';
 
@@ -39,10 +44,24 @@ export interface PageGeometry {
   marginsMm: Insets;
   marginsPx: Insets;
 
+  paperRect: Rect;
+  marginRect: Rect;
+  headerRect: Rect;
+  bodyContentRect: Rect;
+  footerRect: Rect;
+
   contentAreaPx: Rect;
+  contentArea: ContentArea;
   headerAreaPx: Rect;
+  headerArea?: HeaderArea;
   footerAreaPx: Rect;
+  footerArea?: FooterArea;
   signatureAreaPx: Rect;
+  signatureArea?: Rect;
+
+  headerTopY: number;
+  bodyTopY: number;
+  footerTopY: number;
 
   availableContentWidthPx: number;
   availableContentHeightPx: number;
@@ -55,30 +74,33 @@ export interface PageGeometry {
   cssMarginString: string;
   cssPageRule: string;
   cssPaperStyle: React.CSSProperties;
+  scale: number;
 }
 
 export class PageGeometryCalculator {
   /**
-   * Resolves physical paper dimensions in mm and CSS pixels (96 DPI)
+   * Resolves physical paper dimensions in mm and CSS pixels (derived from 96 DPI and scale)
    */
   public static resolveDimensions(
     pageSize: PageSizeId = 'A4',
     orientation: PageOrientation = 'PORTRAIT',
-    customMm?: Partial<Dimensions>
+    customMm?: Partial<Dimensions>,
+    scale: number = 1
   ): { mm: Dimensions; px: Dimensions } {
-    const base = PAPER_SIZE_METRICS_MM[pageSize] || PAPER_SIZE_METRICS_MM.A4;
+    const upperSize = (String(pageSize || 'A4').toUpperCase()) as PageSizeId;
+    const base = PAPER_SIZE_METRICS_MM[upperSize] || PAPER_SIZE_METRICS_MM.A4;
     const isLandscape = orientation === 'LANDSCAPE';
 
     let widthMm = customMm?.width !== undefined ? customMm.width : base.widthMm;
     let heightMm = customMm?.height !== undefined ? customMm.height : base.heightMm;
 
-    if (pageSize !== 'CUSTOM') {
+    if (upperSize !== 'CUSTOM') {
       if (isLandscape && widthMm < heightMm) {
         // Swap for landscape
         const temp = widthMm;
         widthMm = heightMm;
         heightMm = temp;
-      } else if (!isLandscape && widthMm > heightMm && pageSize !== 'ID_CARD') {
+      } else if (!isLandscape && widthMm > heightMm && upperSize !== 'ID_CARD') {
         // Swap for portrait
         const temp = widthMm;
         widthMm = heightMm;
@@ -87,18 +109,22 @@ export class PageGeometryCalculator {
     }
 
     const mm: Dimensions = { width: widthMm, height: heightMm };
-    const px: Dimensions = { width: mmToPx(widthMm), height: mmToPx(heightMm) };
+    const px: Dimensions = {
+      width: mmToPx(widthMm, scale),
+      height: mmToPx(heightMm, scale),
+    };
 
     return { mm, px };
   }
 
   /**
-   * Resolves exact margin insets in millimeters, CSS pixels, and CSS padding string
+   * Resolves exact margin insets in millimeters, CSS pixels (with scale), and CSS padding string
    */
   public static resolveMargins(
     marginPreset: MarginPreset = 'NORMAL',
     customMarginsMm?: Partial<Insets>,
-    pageProperties?: any
+    pageProperties?: any,
+    scale: number = 1
   ): { mm: Insets; px: Insets; css: string } {
     // Check if OpenXML pageProperties provide explicit millimeter margins
     if (pageProperties) {
@@ -114,33 +140,46 @@ export class PageGeometryCalculator {
         const leftMm = left !== undefined ? left : 20;
 
         const mm: Insets = { top: topMm, right: rightMm, bottom: bottomMm, left: leftMm };
-        const px: Insets = { top: mmToPx(topMm), right: mmToPx(rightMm), bottom: mmToPx(bottomMm), left: mmToPx(leftMm) };
+        const px: Insets = {
+          top: mmToPx(topMm, scale),
+          right: mmToPx(rightMm, scale),
+          bottom: mmToPx(bottomMm, scale),
+          left: mmToPx(leftMm, scale),
+        };
         const css = `${topMm}mm ${rightMm}mm ${bottomMm}mm ${leftMm}mm`;
 
         return { mm, px, css };
       }
     }
 
-    const baseMm = MARGIN_PRESET_METRICS_MM[marginPreset] || MARGIN_PRESET_METRICS_MM.NORMAL;
+    const upperPreset = (String(marginPreset || 'NORMAL').toUpperCase()) as MarginPreset;
+    const baseMm = MARGIN_PRESET_METRICS_MM[upperPreset] || MARGIN_PRESET_METRICS_MM.NORMAL;
     const topMm = customMarginsMm?.top !== undefined ? customMarginsMm.top : baseMm.top;
     const rightMm = customMarginsMm?.right !== undefined ? customMarginsMm.right : baseMm.right;
     const bottomMm = customMarginsMm?.bottom !== undefined ? customMarginsMm.bottom : baseMm.bottom;
     const leftMm = customMarginsMm?.left !== undefined ? customMarginsMm.left : baseMm.left;
 
     const mm: Insets = { top: topMm, right: rightMm, bottom: bottomMm, left: leftMm };
-    const px: Insets = { top: mmToPx(topMm), right: mmToPx(rightMm), bottom: mmToPx(bottomMm), left: mmToPx(leftMm) };
+    const px: Insets = {
+      top: mmToPx(topMm, scale),
+      right: mmToPx(rightMm, scale),
+      bottom: mmToPx(bottomMm, scale),
+      left: mmToPx(leftMm, scale),
+    };
     const css = `${topMm}mm ${rightMm}mm ${bottomMm}mm ${leftMm}mm`;
 
     return { mm, px, css };
   }
 
   /**
-   * Primary Calculator: computes complete spatial page geometry
+   * Primary Calculator: computes authoritative and deterministic page geometry
    */
   public static calculate(options: LayoutDocumentOptions = {}): PageGeometry {
     const rawPageSize = ((options.pageSize || (options as any).paperSize || 'A4') as string).toUpperCase();
     const pageSize: PageSizeId = (rawPageSize as any);
-    const orientation = options.orientation || 'PORTRAIT';
+    const orientation: PageOrientation = options.orientation || 'PORTRAIT';
+    const scale = options.scale || 1;
+
     const customPaperDimensionsMm = options.customPaperDimensionsMm || (
       (options as any).customWidthMm !== undefined || (options as any).customHeightMm !== undefined
         ? {
@@ -153,13 +192,15 @@ export class PageGeometryCalculator {
     const { mm: paperDimensionsMm, px: paperDimensionsPx } = this.resolveDimensions(
       pageSize,
       orientation,
-      customPaperDimensionsMm
+      customPaperDimensionsMm,
+      scale
     );
 
     const { mm: marginsMm, px: marginsPx, css: cssMarginString } = this.resolveMargins(
       options.margin,
       options.customMarginsMm,
-      options.pageProperties
+      options.pageProperties,
+      scale
     );
 
     const headerConfig = options.headerConfig;
@@ -170,47 +211,96 @@ export class PageGeometryCalculator {
       0,
       options.headerHeightPx !== undefined
         ? options.headerHeightPx
-        : (headerConfig?.headerHeightPx !== undefined ? headerConfig.headerHeightPx : (headerConfig ? 60 : 0))
+        : (headerConfig?.headerHeightPx !== undefined
+            ? headerConfig.headerHeightPx
+            : (headerConfig ? mmToPx(15, scale) : 0))
     );
     const footerHeight = Math.max(
       0,
       options.footerHeightPx !== undefined
         ? options.footerHeightPx
-        : (footerConfig?.footerHeightPx !== undefined ? footerConfig.footerHeightPx : (footerConfig ? 40 : 0))
+        : (footerConfig?.footerHeightPx !== undefined
+            ? footerConfig.footerHeightPx
+            : (footerConfig ? mmToPx(12, scale) : 0))
     );
     const signatureHeight = Math.max(
       0,
       options.signatureHeightPx !== undefined
         ? options.signatureHeightPx
-        : (signatureConfig?.heightPx !== undefined ? signatureConfig.heightPx : (signatureConfig ? 80 : 0))
+        : (signatureConfig?.heightPx !== undefined
+            ? signatureConfig.heightPx
+            : (signatureConfig ? mmToPx(25, scale) : 0))
     );
 
-    const availableContentWidthPx = Math.max(100, paperDimensionsPx.width - marginsPx.left - marginsPx.right);
+    // Calculate header top Y coordinate
+    const headerTopY = options.headerDistancePx !== undefined
+      ? options.headerDistancePx
+      : (options.headerDistanceMm !== undefined
+          ? mmToPx(options.headerDistanceMm, scale)
+          : marginsPx.top);
+
+    // Body content starts below top margin and header
+    const bodyTopY = Math.max(marginsPx.top, headerTopY + headerHeight);
+
+    // Calculate footer distance & top Y coordinate
+    const footerBottomDistancePx = options.footerDistancePx !== undefined
+      ? options.footerDistancePx
+      : (options.footerDistanceMm !== undefined
+          ? mmToPx(options.footerDistanceMm, scale)
+          : marginsPx.bottom);
+
+    const footerTopY = paperDimensionsPx.height - footerBottomDistancePx - footerHeight;
+
+    const availableContentWidthPx = Math.max(50, paperDimensionsPx.width - marginsPx.left - marginsPx.right);
     const availableContentHeightPx = Math.max(
-      100,
+      50,
       paperDimensionsPx.height - marginsPx.top - marginsPx.bottom - headerHeight - footerHeight - signatureHeight
     );
 
-    const contentAreaPx: Rect = {
-      x: marginsPx.left,
-      y: marginsPx.top + headerHeight,
-      width: availableContentWidthPx,
-      height: availableContentHeightPx,
+    const paperRect: Rect = {
+      x: 0,
+      y: 0,
+      width: paperDimensionsPx.width,
+      height: paperDimensionsPx.height,
     };
 
-    const headerAreaPx: Rect = {
+    const marginRect: Rect = {
       x: marginsPx.left,
       y: marginsPx.top,
+      width: availableContentWidthPx,
+      height: Math.max(0, paperDimensionsPx.height - marginsPx.top - marginsPx.bottom),
+    };
+
+    const headerRect: Rect = {
+      x: marginsPx.left,
+      y: headerTopY,
       width: availableContentWidthPx,
       height: headerHeight,
     };
 
-    const footerAreaPx: Rect = {
+    const bodyContentRect: Rect = {
       x: marginsPx.left,
-      y: paperDimensionsPx.height - marginsPx.bottom - footerHeight,
+      y: bodyTopY,
+      width: availableContentWidthPx,
+      height: availableContentHeightPx,
+    };
+
+    const footerRect: Rect = {
+      x: marginsPx.left,
+      y: footerTopY,
       width: availableContentWidthPx,
       height: footerHeight,
     };
+
+    const contentAreaPx: Rect = {
+      x: marginsPx.left,
+      y: bodyTopY,
+      width: availableContentWidthPx,
+      height: availableContentHeightPx,
+    };
+
+    const headerAreaPx: Rect = headerRect;
+    const footerAreaPx: Rect = footerRect;
 
     const signatureAreaPx: Rect = {
       x: marginsPx.left,
@@ -237,6 +327,23 @@ export class PageGeometryCalculator {
     const pageGapPx = 32;
     const screenPageHeaderHeightPx = 32;
 
+    const contentArea: ContentArea = {
+      ...contentAreaPx,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    };
+
+    const headerArea: HeaderArea = {
+      ...headerAreaPx,
+      isVisible: headerHeight > 0,
+      reserveHeight: headerHeight,
+    };
+
+    const footerArea: FooterArea = {
+      ...footerAreaPx,
+      isVisible: footerHeight > 0,
+      reserveHeight: footerHeight,
+    };
+
     return {
       pageSize,
       orientation,
@@ -244,10 +351,22 @@ export class PageGeometryCalculator {
       paperDimensionsPx,
       marginsMm,
       marginsPx,
+      paperRect,
+      marginRect,
+      headerRect,
+      bodyContentRect,
+      footerRect,
       contentAreaPx,
+      contentArea,
       headerAreaPx,
+      headerArea,
       footerAreaPx,
+      footerArea,
       signatureAreaPx,
+      signatureArea: signatureAreaPx,
+      headerTopY,
+      bodyTopY,
+      footerTopY,
       availableContentWidthPx,
       availableContentHeightPx,
       contentWidthPx: availableContentWidthPx,
@@ -257,6 +376,36 @@ export class PageGeometryCalculator {
       cssMarginString,
       cssPageRule,
       cssPaperStyle,
+      scale,
     };
+  }
+
+  /**
+   * Calculates section-specific page geometry with overrides from SectionNode or SectionBreakNode
+   */
+  public static calculateSectionGeometry(
+    sectionOrBreak: any,
+    documentOptions: LayoutDocumentOptions = {}
+  ): PageGeometry {
+    if (!sectionOrBreak) {
+      return this.calculate(documentOptions);
+    }
+
+    const sectionProps = sectionOrBreak.properties || sectionOrBreak.sectionProperties || sectionOrBreak;
+    const mergedOptions: LayoutDocumentOptions = {
+      ...documentOptions,
+      pageSize: sectionProps.pageSize || sectionProps.paperSize || documentOptions.pageSize,
+      orientation: sectionProps.orientation || documentOptions.orientation,
+      margin: sectionProps.margin || sectionProps.marginPreset || documentOptions.margin,
+      customMarginsMm: sectionProps.customMarginsMm || sectionProps.marginsMm || documentOptions.customMarginsMm,
+      customPaperDimensionsMm: sectionProps.customPaperDimensionsMm || documentOptions.customPaperDimensionsMm,
+      headerHeightPx: sectionProps.headerHeightPx !== undefined ? sectionProps.headerHeightPx : documentOptions.headerHeightPx,
+      footerHeightPx: sectionProps.footerHeightPx !== undefined ? sectionProps.footerHeightPx : documentOptions.footerHeightPx,
+      headerDistanceMm: sectionProps.headerDistanceMm !== undefined ? sectionProps.headerDistanceMm : documentOptions.headerDistanceMm,
+      footerDistanceMm: sectionProps.footerDistanceMm !== undefined ? sectionProps.footerDistanceMm : documentOptions.footerDistanceMm,
+      scale: sectionProps.scale !== undefined ? sectionProps.scale : documentOptions.scale,
+    };
+
+    return this.calculate(mergedOptions);
   }
 }

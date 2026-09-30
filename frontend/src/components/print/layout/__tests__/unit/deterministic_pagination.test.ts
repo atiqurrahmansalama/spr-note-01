@@ -48,7 +48,7 @@ export function runDeterministicPaginationUnitTests(): { passed: number; failed:
           DocumentFactory.createTableCell({ content: [DocumentFactory.createParagraph({ content: [DocumentFactory.createText('Course Title')] })] }),
         ],
       }),
-      ...Array.from({ length: 28 }, (_, idx) =>
+      ...Array.from({ length: 45 }, (_, idx) =>
         DocumentFactory.createTableRow({
           cells: [
             DocumentFactory.createTableCell({ content: [DocumentFactory.createParagraph({ content: [DocumentFactory.createText(`CSE-${100 + idx}`)] })] }),

@@ -18,6 +18,7 @@
 
 import { LogicalPosition, LogicalSelection } from './editorTypes';
 import { LayoutDocument } from '../types/paginationTypes';
+import { LayoutFragment } from '../types/fragmentTypes';
 
 export interface EditorCaretBookmark {
   /** Logical start position */
@@ -53,6 +54,13 @@ export interface EditorCaretBookmark {
   /** Canvas scroll position preservation */
   scrollTop?: number;
   scrollLeft?: number;
+}
+
+export interface FragmentPosition {
+  pageIndex: number;
+  fragmentId: string;
+  fragmentIndex?: number;
+  localOffset: number;
 }
 
 const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
@@ -161,23 +169,24 @@ export class EditorPositionMapper {
     domNode: Node,
     domOffset: number
   ): LogicalPosition | null {
+    if (!host || !domNode) return null;
     const blockEl = this.findEnclosingBlockElement(host, domNode);
     if (!blockEl) return null;
 
     const nodeId = this.getOrAssignNodeId(blockEl);
 
-    // Find all fragment DOM elements belonging to the same logical canonical node
+    // Find all distinct fragment DOM elements belonging to the same logical canonical node
     const allFragments = Array.from(
       host.querySelectorAll<HTMLElement>(
-        `[data-source-id="${nodeId}"], [data-node-id="${nodeId}"], #${nodeId}`
+        `[data-source-id="${nodeId}"], [data-source-node-id="${nodeId}"], [data-node-id="${nodeId}"], #${nodeId}`
       )
-    );
+    ).filter((el, idx, arr) => !arr.some((other, oIdx) => oIdx !== idx && other.contains(el)));
 
     let priorOffset = 0;
     if (allFragments.length > 1) {
-      // Find which fragment contains the active blockEl
+      // Find which fragment contains the active blockEl / domNode
       const activeFragmentIdx = allFragments.findIndex(
-        (frag) => frag === blockEl || frag.contains(blockEl)
+        (frag) => frag === blockEl || frag.contains(blockEl) || frag.contains(domNode)
       );
 
       if (activeFragmentIdx > 0) {
@@ -217,7 +226,7 @@ export class EditorPositionMapper {
    * Caret at logical offset 850 resolves to fragment 2 on page 3 at local offset 50.
    *
    * ZERO SILENT FALLBACKS:
-   * If sourceNodeId is not found in host, strictly returns null (never relocates to first block).
+   * If sourceNodeId is not found in host, strictly returns null (never relocates to document start/end).
    */
   public static resolveLogicalPoint(
     host: HTMLElement,
@@ -231,6 +240,7 @@ export class EditorPositionMapper {
     const matchingEls: HTMLElement[] = [];
     if (
       host.getAttribute('data-source-id') === targetId ||
+      host.getAttribute('data-source-node-id') === targetId ||
       host.getAttribute('data-node-id') === targetId ||
       host.id === targetId
     ) {
@@ -239,29 +249,53 @@ export class EditorPositionMapper {
 
     const childMatches = Array.from(
       host.querySelectorAll<HTMLElement>(
-        `[data-source-id="${targetId}"], [data-node-id="${targetId}"], #${targetId}`
+        `[data-source-id="${targetId}"], [data-source-node-id="${targetId}"], [data-node-id="${targetId}"], #${targetId}`
       )
     );
     matchingEls.push(...childMatches);
+
+    // Positional Tag & Block Index Fallback for newly created or serialized elements
+    if (matchingEls.length === 0) {
+      const tagIndexMatch = targetId.match(/^([a-z0-9]+)_(\d+)$/i);
+      if (tagIndexMatch) {
+        const tagName = tagIndexMatch[1].toLowerCase();
+        const blockIdx = parseInt(tagIndexMatch[2], 10);
+        const allMatchingTags = Array.from(host.querySelectorAll<HTMLElement>(tagName));
+        if (allMatchingTags[blockIdx]) {
+          matchingEls.push(allMatchingTags[blockIdx]);
+        } else {
+          const allBlocks = this.getAllBlockElements(host);
+          if (allBlocks[blockIdx]) {
+            matchingEls.push(allBlocks[blockIdx]);
+          }
+        }
+      }
+    }
 
     // ZERO DANGEROUS FALLBACKS: If node does not exist, return null
     if (matchingEls.length === 0) {
       return null;
     }
 
+    // Filter out nested duplicates so each distinct fragment is visited exactly once
+    const filteredMatches = matchingEls.filter(
+      (el, idx, arr) => !arr.some((other, oIdx) => oIdx !== idx && other.contains(el))
+    );
+
+    const candidates = filteredMatches.length > 0 ? filteredMatches : matchingEls;
     const targetOffset = pos.inlineOffset !== undefined ? pos.inlineOffset : (pos.textOffset || 0);
 
     // 2. Identify target fragment element and local text offset
     let accumulatedOffset = 0;
-    let targetElement: HTMLElement = matchingEls[0];
+    let targetElement: HTMLElement = candidates[0];
     let targetLocalOffset = targetOffset;
 
-    for (let i = 0; i < matchingEls.length; i++) {
-      const el = matchingEls[i];
+    for (let i = 0; i < candidates.length; i++) {
+      const el = candidates[i];
       const elTextLen = el.textContent?.length || 0;
 
       // If targetOffset falls inside this fragment or this is the last fragment
-      if (accumulatedOffset + elTextLen >= targetOffset || i === matchingEls.length - 1) {
+      if (accumulatedOffset + elTextLen >= targetOffset || i === candidates.length - 1) {
         targetElement = el;
         targetLocalOffset = Math.max(0, targetOffset - accumulatedOffset);
         break;
@@ -277,7 +311,7 @@ export class EditorPositionMapper {
 
     const traverse = (node: Node) => {
       if (found) return;
-      if (node.nodeType === TEXT_NODE_TYPE) {
+      if (node.nodeType === 3 || (typeof Node !== 'undefined' && node.nodeType === Node.TEXT_NODE)) {
         const tLen = node.textContent?.length || 0;
         if (currentOffset + tLen >= targetLocalOffset) {
           targetNode = node;
@@ -287,7 +321,7 @@ export class EditorPositionMapper {
         }
         currentOffset += tLen;
       } else {
-        for (let i = 0; i < node.childNodes.length; i++) {
+        for (let i = 0; i < (node.childNodes?.length || 0); i++) {
           traverse(node.childNodes[i]);
           if (found) return;
         }
@@ -300,10 +334,147 @@ export class EditorPositionMapper {
       return { node: targetNode, offset: finalOffset };
     }
 
-    // If text offset exceeds total text length of the fragment, place at end of targetElement
+    // If text offset exceeds total text length of the fragment, place at start for empty/br elements or end
+    const isOnlyBrOrEmpty =
+      targetElement.childNodes.length === 0 ||
+      (targetElement.childNodes.length === 1 && targetElement.firstChild?.nodeName?.toLowerCase() === 'br');
+
     return {
       node: targetElement,
-      offset: targetElement.childNodes.length,
+      offset: isOnlyBrOrEmpty ? 0 : targetElement.childNodes.length,
+    };
+  }
+
+  /**
+   * Maps LogicalPosition to FragmentPosition using LayoutDocument
+   */
+  public static logicalToFragmentPosition(
+    layoutDoc: LayoutDocument,
+    logical: LogicalPosition
+  ): FragmentPosition | null {
+    if (!layoutDoc || !layoutDoc.pages || !logical) return null;
+    const targetId = logical.sourceNodeId || logical.nodeId;
+    if (!targetId) return null;
+
+    const matchingFragments: { pageIndex: number; fragment: LayoutFragment }[] = [];
+    layoutDoc.pages.forEach((page, pageIdx) => {
+      (page.fragments || []).forEach((frag) => {
+        if (frag.sourceNodeId === targetId || frag.id === targetId) {
+          matchingFragments.push({ pageIndex: page.index ?? pageIdx, fragment: frag });
+        }
+      });
+    });
+
+    if (matchingFragments.length === 0) return null;
+
+    const targetOffset = logical.textOffset ?? logical.inlineOffset ?? 0;
+    let accumulatedOffset = 0;
+
+    for (let i = 0; i < matchingFragments.length; i++) {
+      const { pageIndex, fragment } = matchingFragments[i];
+      const fragLen =
+        fragment.logicalRange && fragment.logicalRange.endOffset !== undefined && fragment.logicalRange.startOffset !== undefined
+          ? Math.max(0, fragment.logicalRange.endOffset - fragment.logicalRange.startOffset)
+          : (fragment.textContent?.length || 0);
+
+      if (accumulatedOffset + fragLen >= targetOffset || i === matchingFragments.length - 1) {
+        const localOffset = Math.max(0, targetOffset - accumulatedOffset);
+        return {
+          pageIndex,
+          fragmentId: fragment.id,
+          fragmentIndex: fragment.fragmentIndex,
+          localOffset,
+        };
+      }
+      accumulatedOffset += fragLen;
+    }
+
+    return null;
+  }
+
+  /**
+   * Maps FragmentPosition to LogicalPosition using LayoutDocument
+   */
+  public static fragmentToLogicalPosition(
+    layoutDoc: LayoutDocument,
+    pageIndex: number,
+    fragmentId: string,
+    localOffset: number
+  ): LogicalPosition | null {
+    if (!layoutDoc || !layoutDoc.pages) return null;
+
+    let targetFrag: LayoutFragment | null = null;
+    for (const page of layoutDoc.pages) {
+      const found = (page.fragments || []).find((f) => f.id === fragmentId);
+      if (found) {
+        targetFrag = found;
+        break;
+      }
+    }
+
+    if (!targetFrag) return null;
+    const sourceNodeId = targetFrag.sourceNodeId || targetFrag.id;
+
+    // Accumulate offsets of preceding fragments for the same source node
+    let priorOffset = 0;
+    for (const page of layoutDoc.pages) {
+      for (const frag of page.fragments || []) {
+        if (frag.id === targetFrag.id) {
+          break;
+        }
+        if (frag.sourceNodeId === sourceNodeId) {
+          const fLen =
+            frag.logicalRange && frag.logicalRange.endOffset !== undefined && frag.logicalRange.startOffset !== undefined
+              ? Math.max(0, frag.logicalRange.endOffset - frag.logicalRange.startOffset)
+              : (frag.textContent?.length || 0);
+          priorOffset += fLen;
+        }
+      }
+    }
+
+    const totalOffset = priorOffset + localOffset;
+    return {
+      nodeId: sourceNodeId,
+      sourceNodeId,
+      textOffset: totalOffset,
+      inlineOffset: totalOffset,
+    };
+  }
+
+  /**
+   * Maps a DOM node + offset to its FragmentPosition
+   */
+  public static domToFragmentPosition(
+    host: HTMLElement,
+    domNode: Node,
+    domOffset: number
+  ): FragmentPosition | null {
+    if (!host || !domNode) return null;
+
+    const fragEl = (domNode instanceof HTMLElement ? domNode : domNode.parentElement)?.closest<HTMLElement>(
+      '[data-fragment-id], .docx-layout-fragment'
+    );
+    if (!fragEl) return null;
+
+    const fragmentId = fragEl.getAttribute('data-fragment-id') || fragEl.id.replace('fragment-', '');
+    const pageEl = fragEl.closest<HTMLElement>('[data-runtime-page], [data-page-index]');
+    const pageIndexStr = pageEl?.getAttribute('data-runtime-page') || pageEl?.getAttribute('data-page-index');
+    const pageIndex = pageIndexStr ? parseInt(pageIndexStr, 10) : 0;
+
+    let localOffset = 0;
+    try {
+      const preRange = document.createRange();
+      preRange.selectNodeContents(fragEl);
+      preRange.setEnd(domNode, domOffset);
+      localOffset = preRange.toString().length;
+    } catch {
+      localOffset = 0;
+    }
+
+    return {
+      pageIndex,
+      fragmentId,
+      localOffset,
     };
   }
 
@@ -387,16 +558,21 @@ export class EditorPositionMapper {
    * Helper to find enclosing block element within host
    */
   private static findEnclosingBlockElement(host: HTMLElement, node: Node): HTMLElement | null {
-    let curr: Node | null = node.nodeType === TEXT_NODE_TYPE ? node.parentElement : node;
+    if (!node || !host) return null;
+    let curr: Node | null = node.nodeType === 3 || node.nodeType === TEXT_NODE_TYPE ? node.parentElement : node;
     while (curr && curr !== host && host.contains(curr)) {
-      if (curr instanceof HTMLElement) {
-        const tag = curr.tagName.toLowerCase();
+      if (curr.nodeType === 1 || (curr as any).tagName) {
+        const el = curr as HTMLElement;
+        const tag = (el.tagName || '').toLowerCase();
         if (
           ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'td', 'th', 'blockquote', 'section', 'div'].includes(tag) ||
-          curr.hasAttribute('data-source-id') ||
-          curr.hasAttribute('data-node-id')
+          (typeof el.hasAttribute === 'function' && (
+            el.hasAttribute('data-source-id') ||
+            el.hasAttribute('data-source-node-id') ||
+            el.hasAttribute('data-node-id')
+          ))
         ) {
-          return curr;
+          return el;
         }
       }
       curr = curr.parentNode;
@@ -410,7 +586,7 @@ export class EditorPositionMapper {
   public static getAllBlockElements(host: HTMLElement): HTMLElement[] {
     const blocks = Array.from(
       host.querySelectorAll<HTMLElement>(
-        'p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, [data-source-id], [data-node-id]'
+        'p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, [data-source-id], [data-source-node-id], [data-node-id]'
       )
     );
     return blocks.length > 0 ? blocks : [host];
@@ -420,21 +596,51 @@ export class EditorPositionMapper {
    * Gets or deterministically assigns a data-source-id and data-node-id to a block element
    */
   private static getOrAssignNodeId(el: HTMLElement): string {
-    const existing = el.getAttribute('data-source-id') || el.getAttribute('data-node-id') || el.id;
+    const existing =
+      el.getAttribute('data-source-id') ||
+      el.getAttribute('data-source-node-id') ||
+      el.getAttribute('data-node-id') ||
+      (el.id && !el.id.startsWith('fragment-') && !el.id.startsWith('docx-live-page-') ? el.id : null);
     if (existing) return existing;
 
-    const parent = el.parentElement;
-    if (parent) {
-      const idx = Array.prototype.indexOf.call(parent.children, el);
-      const generated = `${el.tagName.toLowerCase()}_${idx}`;
-      el.setAttribute('data-node-id', generated);
-      el.setAttribute('data-source-id', generated);
+    // Look up ancestor chain for source node id
+    let parent = el.parentElement;
+    while (parent && parent.getAttribute('data-doclab-single-host') !== 'true') {
+      const parentId =
+        parent.getAttribute('data-source-id') ||
+        parent.getAttribute('data-source-node-id') ||
+        parent.getAttribute('data-node-id');
+      if (parentId) return parentId;
+      parent = parent.parentElement;
+    }
+
+    // Look inside child for source node id
+    const childWithId = el.querySelector<HTMLElement>('[data-source-id], [data-source-node-id], [data-node-id]');
+    if (childWithId) {
+      const childId =
+        childWithId.getAttribute('data-source-id') ||
+        childWithId.getAttribute('data-source-node-id') ||
+        childWithId.getAttribute('data-node-id');
+      if (childId) return childId;
+    }
+
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const children = parentEl.children || parentEl.childNodes || [];
+      const idx = Array.prototype.indexOf.call(children, el);
+      const generated = `${(el.tagName || 'block').toLowerCase()}_${idx >= 0 ? idx : 0}`;
+      if (typeof el.setAttribute === 'function') {
+        el.setAttribute('data-node-id', generated);
+        el.setAttribute('data-source-id', generated);
+      }
       return generated;
     }
 
-    const fallback = `${el.tagName.toLowerCase()}_0`;
-    el.setAttribute('data-node-id', fallback);
-    el.setAttribute('data-source-id', fallback);
+    const fallback = `${(el.tagName || 'block').toLowerCase()}_0`;
+    if (typeof el.setAttribute === 'function') {
+      el.setAttribute('data-node-id', fallback);
+      el.setAttribute('data-source-id', fallback);
+    }
     return fallback;
   }
 
@@ -522,4 +728,5 @@ export class EditorPositionMapper {
     }
   }
 }
+
 

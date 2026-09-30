@@ -6,6 +6,8 @@
 import { Rect, Insets, DensityPreset } from '../types/layoutTypes';
 import { SourceNodeType } from '../types/documentTypes';
 
+export type MeasurementMethod = 'BROWSER_DOM' | 'ESTIMATED_SSR_FALLBACK';
+
 /**
  * Context provided to measurement functions defining container boundaries and styling
  */
@@ -25,11 +27,20 @@ export interface MeasurementContext {
   /** Primary font family */
   fontFamily?: string;
 
+  /** Primary font weight */
+  fontWeight?: string | number;
+
   /** Primary font size in pixels */
   fontSizePx?: number;
 
   /** Line height multiplier or pixel value */
   lineHeight?: number | string;
+
+  /** Text directionality */
+  direction?: 'ltr' | 'rtl';
+
+  /** Writing mode */
+  writingMode?: 'horizontal-tb' | 'vertical-rl' | 'vertical-lr';
 
   /** Density preset */
   density?: DensityPreset;
@@ -37,20 +48,120 @@ export interface MeasurementContext {
   /** Optional document scale */
   scale?: number;
 
+  /** When true, wait for fonts and images to load before measuring */
+  waitForResources?: boolean;
+
   /** When true, perform pure mathematical layout without DOM mutations */
   pureMode?: boolean;
 }
 
 /**
- * Spatial and character range metrics for a single rendered line of text
+ * Formatting parameters applied to an inline text run
  */
-export interface LineMetric {
-  index: number;
-  rect: Rect;
+export interface InlineRunFormatting {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  color?: string;
+  backgroundColor?: string;
+  isLink?: boolean;
+  linkHref?: string;
+  isToken?: boolean;
+  tokenId?: string;
+  isBadge?: boolean;
+  direction?: 'ltr' | 'rtl';
+}
+
+/**
+ * Geometric and formatting metric for an inline segment within a line
+ */
+export interface InlineRunMetric {
+  text: string;
   charStart: number;
   charEnd: number;
-  text: string;
+  rect: Rect;
+  formatting: InlineRunFormatting;
 }
+
+/**
+ * Aggregate formatting characteristics of a visual line
+ */
+export interface InlineFormattingContext {
+  hasBold?: boolean;
+  hasItalic?: boolean;
+  hasUnderline?: boolean;
+  hasLinks?: boolean;
+  hasTokens?: boolean;
+  hasMixedFonts?: boolean;
+  hasMixedSizes?: boolean;
+  hasMixedDirection?: boolean;
+  fontFamilies: string[];
+  fontSizes: number[];
+  dominantDirection: 'ltr' | 'rtl';
+}
+
+/**
+ * True Line Model: Authoritative spatial and logical metrics for a single rendered line of text
+ */
+export interface LineMetric {
+  /** Visual line index (0-based) */
+  index: number;
+  lineIndex?: number;
+
+  /** Spatial bounding rect relative to the parent block element */
+  rect: Rect;
+
+  /** Top offset in pixels relative to block element top */
+  top?: number;
+
+  /** Bottom offset in pixels relative to block element top */
+  bottom?: number;
+
+  /** Left offset in pixels relative to block element left */
+  left?: number;
+
+  /** Right offset in pixels relative to block element left */
+  right?: number;
+
+  /** Rendered line width in pixels */
+  width?: number;
+
+  /** Rendered line height in pixels */
+  height?: number;
+
+  /** Logical text start offset within block */
+  charStart: number;
+
+  /** Logical text end offset within block */
+  charEnd: number;
+
+  /** Full text content rendered on this line */
+  text: string;
+
+  /** Primary text direction for this visual line */
+  direction?: 'ltr' | 'rtl';
+
+  /** Writing mode for this visual line */
+  writingMode?: 'horizontal-tb' | 'vertical-rl' | 'vertical-lr';
+
+  /** Fine-grained inline run metrics across formatting boundaries */
+  runs?: InlineRunMetric[];
+
+  /** Rich inline formatting summary */
+  formattingContext?: InlineFormattingContext;
+
+  /** Baseline offset in pixels from the top of the line box */
+  baseline?: number;
+}
+
+/**
+ * TrueLineModel alias for LineMetric
+ */
+export type TrueLineModel = LineMetric;
 
 /**
  * Spatial opportunity point where a block element can cleanly split across pages
@@ -146,8 +257,46 @@ export interface NodeMeasurementResult {
   keepTogether: boolean;
   keepWithNext: boolean;
 
+  /** Method used for measurement */
+  measurementMethod?: MeasurementMethod;
+
+  /** Whether this measurement comes from an authoritative real browser DOM pass */
+  isAuthoritative?: boolean;
+
+  /** Normalized bounding rect relative to container/sandbox top-left */
+  localRect?: Rect;
+
+  /** Raw un-normalized viewport bounding client rect */
+  viewportRect?: Rect;
+
   /** Optional DOM element reference */
   domElement?: HTMLElement;
+}
+
+/**
+ * Line-level spatial and text measurement (alias for LineMetric with extended metrics)
+ */
+export interface LineMeasurement extends LineMetric {
+  lineIndex: number;
+  startOffset?: number;
+  endOffset?: number;
+  width?: number;
+  height?: number;
+  baseline?: number;
+}
+
+/**
+ * Complete node-level geometric measurement (alias for NodeMeasurementResult)
+ */
+export interface NodeMeasurement extends NodeMeasurementResult {
+  sourceType?: SourceNodeType;
+  rect?: Rect;
+  naturalHeight?: number;
+  contentHeight?: number;
+  rowHeights?: number[];
+  headerHeight?: number;
+  isSplittable?: boolean;
+  minFragmentHeight?: number;
 }
 
 /**

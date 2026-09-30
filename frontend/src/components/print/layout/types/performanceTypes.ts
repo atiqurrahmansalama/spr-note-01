@@ -25,12 +25,24 @@ export interface LayoutChangeScope {
   affectedPageIndex?: number;
   /** Earliest source node index affected by the change (0-indexed) */
   affectedNodeIndex?: number;
+  /** Latest source node index affected by the change (0-indexed) */
+  lastDirtyNodeIndex?: number;
   /** Timestamp of the change trigger */
   changedAt: number;
   /** Optional hash of the modified content */
   contentHash?: string;
   /** Optional previous layout document for incremental page reuse */
   prevLayout?: any;
+  /** Whether layout convergence was achieved during forward reflow */
+  converged?: boolean;
+  /** Page index where convergence was detected */
+  convergedAtPageIndex?: number;
+  /** Number of pages that were actively re-measured and reflowed */
+  reflowedPagesCount?: number;
+  /** Number of prefix pages preserved intact without re-pagination */
+  reusedPrefixPagesCount?: number;
+  /** Number of suffix pages preserved intact after convergence */
+  reusedSuffixPagesCount?: number;
 }
 
 /**
@@ -52,5 +64,8 @@ export interface LayoutPerformanceMetrics {
   cacheMissCount: number;
   remeasuredNodesCount: number;
   reflowedPagesCount: number;
+  reusedPrefixPagesCount?: number;
+  reusedSuffixPagesCount?: number;
+  converged?: boolean;
   isIncremental: boolean;
 }

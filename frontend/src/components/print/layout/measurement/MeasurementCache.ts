@@ -11,7 +11,7 @@ import { NodeMeasurementResult, MeasurementContext } from './measurementTypes';
 export class MeasurementCache {
   private static instance: MeasurementCache | null = null;
   private cache = new Map<string, NodeMeasurementResult>();
-  private maxEntries = 2500;
+  private maxEntries = 25000;
   private hitCount = 0;
   private missCount = 0;
 
@@ -63,8 +63,13 @@ export class MeasurementCache {
     const density = context.density || 'NORMAL';
     const scale = context.scale || 1;
     const fontSize = context.fontSizePx || 16;
+    const fontWeight = context.fontWeight || 'normal';
     const lineHeight = context.lineHeight || 1.5;
     const font = context.fontFamily || 'default';
+    const direction = context.direction || 'ltr';
+    const writingMode = context.writingMode || 'horizontal-tb';
+    const styleHash = context.styles ? (context.styles.length * 31 + context.styles.charCodeAt(0)) : 0;
+
     // Robust fast hash for content
     let hash = 5381;
     const len = content.length;
@@ -72,7 +77,7 @@ export class MeasurementCache {
     for (let i = 0; i < len; i += step) {
       hash = (hash * 33) ^ content.charCodeAt(i);
     }
-    return `${nodeId}:${len}:${hash >>> 0}:${width}:${density}:${scale}:${fontSize}:${lineHeight}:${font}`;
+    return `${nodeId}:${len}:${hash >>> 0}:${width}:${density}:${scale}:${fontSize}:${fontWeight}:${lineHeight}:${font}:${direction}:${writingMode}:${styleHash}`;
   }
 
   public get(key: string): NodeMeasurementResult | undefined {

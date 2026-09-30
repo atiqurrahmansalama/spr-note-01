@@ -2,7 +2,7 @@ import React from 'react';
 import { CustomDocxTemplate, DocxTemplateType } from './docxTemplateEngine';
 import { KeyTaxonomyItem, DocumentScopeId } from './keyLibrary/types';
 
-export type PrintPageSize = 'A4' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
+export type PrintPageSize = 'A3' | 'A4' | 'A5' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
 export type PrintOrientation = 'PORTRAIT' | 'LANDSCAPE';
 export type PrintMargin = 'NONE' | 'TIGHT' | 'NARROW' | 'NORMAL' | 'WIDE' | 'CUSTOM';
 export type PrintDensity = 'ULTRA_COMPACT' | 'COMPACT' | 'NORMAL' | 'RELAXED' | 'SPACIOUS';

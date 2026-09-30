@@ -197,23 +197,56 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
   // 2. Restore logical selection after layout document changes and DOM renders
   useEffect(() => {
-    if (editorHostRef.current && pendingLogicalSelectionRef.current) {
-      const restored = EditorPositionMapper.restoreLogicalSelection(
-        editorHostRef.current,
-        pendingLogicalSelectionRef.current
-      );
-      if (restored) {
-        pendingLogicalSelectionRef.current = null;
-      }
+    if (!editorHostRef.current || !pendingLogicalSelectionRef.current) return;
+
+    // If the host is actively focused and contains the user's active live selection,
+    // do not disrupt the user's live typing caret with a background layout snapshot
+    const isHostActive =
+      typeof document !== 'undefined' &&
+      (document.activeElement === editorHostRef.current || editorHostRef.current.contains(document.activeElement));
+
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    const hasActiveCaret = Boolean(sel && sel.rangeCount > 0 && editorHostRef.current.contains(sel.anchorNode));
+
+    if (isHostActive && hasActiveCaret && !pendingLogicalSelectionRef.current.forceRestore) {
+      pendingLogicalSelectionRef.current = null;
+      return;
+    }
+
+    const restored = EditorPositionMapper.restoreLogicalSelection(
+      editorHostRef.current,
+      pendingLogicalSelectionRef.current
+    );
+    if (restored) {
+      pendingLogicalSelectionRef.current = null;
     }
   }, [paginationResult]);
 
   const layoutDoc = paginationResult.document;
   const totalPagesCount = Math.max(1, paginationResult.totalPages || layoutDoc.pages.length || 1);
 
+  const lastExportedHtmlRef = useRef<string | null>(null);
+
   // 3. Initial Mount and External Sync (e.g. template selection, undo from top toolbar)
   useEffect(() => {
     if (!editorHostRef.current) return;
+
+    // If the editor host is actively focused and receiving live typing,
+    // NEVER overwrite host DOM nodes or caret from asynchronous prop echoes
+    const isHostFocused =
+      typeof document !== 'undefined' &&
+      (document.activeElement === editorHostRef.current || editorHostRef.current.contains(document.activeElement));
+
+    if (isHostFocused) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+
+    if (lastExportedHtmlRef.current === cleanCanonicalBody) {
+      // Echo from our own dispatchTransaction/onContentChange - do not reset DOM
+      isInternalChangeRef.current = false;
+      return;
+    }
 
     if (!isInternalChangeRef.current) {
       const currentCleanDom = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
@@ -242,17 +275,52 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
           pendingLogicalSelectionRef.current = activeSel;
         }
       }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       const cleanHtml = EditorSerializer.sanitize(tx.canonicalHtml);
       setCanonicalHtml(cleanHtml);
       historyRef.current.push(tx);
 
+      // Compute immediate synchronous layout so UI updates immediately without waiting for RAF cancellation
+      const syncLayoutResult = ControlledLayoutPipeline.computePureInitialLayout(cleanHtml, {
+        pageSize: options.pageSize || 'A4',
+        orientation: options.orientation || 'PORTRAIT',
+        margin: options.margin || 'NORMAL',
+        customMarginsMm: options.customMarginsMm,
+        pageProperties: options.pageProperties,
+        density: options.density || 'NORMAL',
+        fontSizePx: options.fontSizePx,
+        fontFamily: options.fontFamily,
+        lineHeight: options.lineHeight,
+        styles: activeStyles,
+        debugLayout,
+      });
+      prevLayoutRef.current = syncLayoutResult.document;
+      setPaginationResult(syncLayoutResult);
+
+      lastExportedHtmlRef.current = cleanHtml;
       const finalExportHtml = activeStyles
         ? `<style>${activeStyles}</style>\n${cleanHtml}`
         : cleanHtml;
 
       onContentChange?.(finalExportHtml);
     },
-    [activeStyles, onContentChange]
+    [
+      activeStyles,
+      onContentChange,
+      options.pageSize,
+      options.orientation,
+      options.margin,
+      JSON.stringify(options.customMarginsMm),
+      JSON.stringify(options.pageProperties),
+      options.density,
+      options.fontSizePx,
+      options.fontFamily,
+      options.lineHeight,
+      debugLayout,
+    ]
   );
 
   // 4. Native Input Handler on Single Host
@@ -265,7 +333,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
     debounceTimerRef.current = setTimeout(() => {
       if (!editorHostRef.current) return;
-      const cleanHtml = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+      const rawDom = editorHostRef.current.innerHTML;
+      const cleanHtml = EditorSerializer.sanitize(rawDom);
       const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
 
       dispatchTransaction({
@@ -287,6 +356,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
+        dispatchTransaction(tx);
+        return;
+      }
+
+      // Enter (normal): Split block or create logical paragraph
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        const tx = EditorCommands.insertParagraph(editorHostRef.current);
         dispatchTransaction(tx);
         return;
       }
@@ -577,8 +654,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
                     height: `${page.contentArea.height}px`,
                   }}
                 >
-                  {isFirst && totalPagesCount === 1 ? (
-                    /* The Single Authoritative contentEditable Host on 1-Page documents */
+                  {isFirst ? (
+                    /* The Authoritative Single contentEditable Host across 1-page and multi-page documents */
                     <div
                       ref={editorHostRef}
                       contentEditable={isEditable}
@@ -595,26 +672,6 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
                         wordBreak: 'break-word',
                       }}
                     />
-                  ) : isFirst ? (
-                    /* Multi-Page Document: First Page hosts the Authoritative contentEditable Host */
-                    <div className="relative w-full h-full">
-                      <div
-                        ref={editorHostRef}
-                        contentEditable={isEditable}
-                        suppressContentEditableWarning={true}
-                        data-doclab-single-host="true"
-                        onInput={handleInput}
-                        onKeyDown={handleKeyDown}
-                        className="doclab-single-host-editor min-h-[400px] outline-none text-left select-text cursor-text leading-relaxed font-sans"
-                        style={{
-                          width: '100%',
-                          minHeight: '100%',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                          wordBreak: 'break-word',
-                        }}
-                      />
-                    </div>
                   ) : (
                     /* Subsequent Physical Pages render their respective layout fragments */
                     <div className="layout-page-fragments flex flex-col w-full text-left select-text">

@@ -32,59 +32,44 @@ export interface TableSplitResult {
   isSplit: boolean;
 }
 
+export interface MultiPageTableFragment {
+  pageIndex: number;
+  fragmentIndex: number;
+  totalFragments: number;
+  html: string;
+  height: number;
+  rowCount: number;
+  isFirstFragment: boolean;
+  isLastFragment: boolean;
+  node?: TableNode;
+}
+
 export class TableFragmenter {
   /**
-   * Splits a canonical TableNode AST across page boundaries
+   * Splits a canonical TableNode AST across page boundaries using authoritative measurement
    */
   public static splitTableNode(
     table: TableNode,
     availableHeightPx: number,
     context?: MeasurementContext
   ): TableSplitResult {
+    const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache', includeNodeIds: true });
+    const domSplit = this.splitTable(html, availableHeightPx, context);
+
+    if (!domSplit.isSplit) {
+      return {
+        ...domSplit,
+        firstFragmentNode: domSplit.firstFragmentHtml ? table : undefined,
+        remainingFragmentNode: domSplit.remainingFragmentHtml ? table : null,
+      };
+    }
+
     const headerRows = table.rows.filter((r) => r.isHeader);
     const dataRows = table.rows.filter((r) => !r.isHeader);
+    const rowsOnFirst = Math.min(dataRows.length, domSplit.rowsOnFirstPage);
 
-    // Dynamic row height estimation based on font size / context
-    const fontSize = context?.fontSizePx || 14;
-    const avgRowHeight = Math.max(28, fontSize * 2.2);
-    const headerHeight = Math.max(1, headerRows.length) * avgRowHeight;
-    const totalHeight = headerHeight + dataRows.length * avgRowHeight;
-
-    if (totalHeight <= availableHeightPx) {
-      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache', includeNodeIds: true });
-      return {
-        firstFragmentHtml: html,
-        remainingFragmentHtml: null,
-        firstFragmentHeight: totalHeight,
-        remainingFragmentHeight: 0,
-        rowsOnFirstPage: dataRows.length,
-        remainingRowsCount: 0,
-        firstFragmentNode: table,
-        remainingFragmentNode: null,
-        isSplit: false,
-      };
-    }
-
-    if (availableHeightPx < headerHeight + avgRowHeight) {
-      const html = HtmlExporter.serializeBlock(table, { tokenFormat: 'mustache', includeNodeIds: true });
-      return {
-        firstFragmentHtml: '',
-        remainingFragmentHtml: html,
-        firstFragmentHeight: 0,
-        remainingFragmentHeight: totalHeight,
-        rowsOnFirstPage: 0,
-        remainingRowsCount: dataRows.length,
-        firstFragmentNode: undefined,
-        remainingFragmentNode: table,
-        isSplit: false,
-      };
-    }
-
-    const availableForData = availableHeightPx - headerHeight;
-    const fittingCount = Math.max(1, Math.min(dataRows.length, Math.floor(availableForData / avgRowHeight)));
-
-    const firstDataRows = dataRows.slice(0, fittingCount);
-    const remainingDataRows = dataRows.slice(fittingCount);
+    const firstDataRows = dataRows.slice(0, rowsOnFirst);
+    const remainingDataRows = dataRows.slice(rowsOnFirst);
 
     const firstTableNode: TableNode = {
       ...table,
@@ -98,23 +83,84 @@ export class TableFragmenter {
       rows: [...headerRows, ...remainingDataRows],
     };
 
-    const firstHtml = HtmlExporter.serializeBlock(firstTableNode, { tokenFormat: 'mustache', includeNodeIds: true });
-    const remHtml = remainingDataRows.length > 0 ? HtmlExporter.serializeBlock(remainingTableNode, { tokenFormat: 'mustache', includeNodeIds: true }) : null;
-
-    const firstH = headerHeight + firstDataRows.length * avgRowHeight;
-    const remH = headerHeight + remainingDataRows.length * avgRowHeight;
-
     return {
-      firstFragmentHtml: firstHtml,
-      remainingFragmentHtml: remHtml,
-      firstFragmentHeight: firstH,
-      remainingFragmentHeight: remH,
-      rowsOnFirstPage: firstDataRows.length,
-      remainingRowsCount: remainingDataRows.length,
+      ...domSplit,
       firstFragmentNode: firstTableNode,
       remainingFragmentNode: remainingDataRows.length > 0 ? remainingTableNode : null,
-      isSplit: true,
     };
+  }
+
+  /**
+   * Slices a table across multiple sequential pages (e.g. 2, 5, 10, 50, 100+ pages)
+   */
+  public static fragmentTableAcrossPages(
+    target: HTMLTableElement | string | TableNode,
+    pageAvailableHeights: number[],
+    context?: MeasurementContext
+  ): MultiPageTableFragment[] {
+    let currentHtml = typeof target === 'string'
+      ? target
+      : typeof HTMLElement !== 'undefined' && target instanceof HTMLTableElement
+      ? target.outerHTML
+      : HtmlExporter.serializeBlock(target as TableNode, { tokenFormat: 'mustache', includeNodeIds: true });
+
+    const fragments: MultiPageTableFragment[] = [];
+    let pageIdx = 0;
+    const defaultHeight = pageAvailableHeights.length > 0 ? pageAvailableHeights[pageAvailableHeights.length - 1] : 800;
+    let safetyCounter = 0;
+
+    while (currentHtml && currentHtml.trim() && safetyCounter < 5000) {
+      safetyCounter++;
+      const availH = pageIdx < pageAvailableHeights.length ? pageAvailableHeights[pageIdx] : defaultHeight;
+      const splitRes = this.splitTable(currentHtml, availH, context);
+
+      if (!splitRes.isSplit) {
+        if (splitRes.firstFragmentHtml && splitRes.firstFragmentHtml.trim()) {
+          fragments.push({
+            pageIndex: pageIdx,
+            fragmentIndex: fragments.length,
+            totalFragments: fragments.length + 1,
+            html: splitRes.firstFragmentHtml,
+            height: splitRes.firstFragmentHeight,
+            rowCount: splitRes.rowsOnFirstPage,
+            node: splitRes.firstFragmentNode,
+            isFirstFragment: fragments.length === 0,
+            isLastFragment: true,
+          });
+          currentHtml = '';
+        } else if (splitRes.remainingFragmentHtml && splitRes.remainingFragmentHtml.trim()) {
+          pageIdx++;
+          continue;
+        } else {
+          break;
+        }
+      } else {
+        fragments.push({
+          pageIndex: pageIdx,
+          fragmentIndex: fragments.length,
+          totalFragments: fragments.length + 2,
+          html: splitRes.firstFragmentHtml,
+          height: splitRes.firstFragmentHeight,
+          rowCount: splitRes.rowsOnFirstPage,
+          node: splitRes.firstFragmentNode,
+          isFirstFragment: fragments.length === 0,
+          isLastFragment: false,
+        });
+
+        currentHtml = splitRes.remainingFragmentHtml || '';
+        pageIdx++;
+      }
+    }
+
+    // Update totalFragments count accurately across all collected fragments
+    const total = fragments.length;
+    return fragments.map((f, idx) => ({
+      ...f,
+      fragmentIndex: idx,
+      totalFragments: total,
+      isFirstFragment: idx === 0,
+      isLastFragment: idx === total - 1,
+    }));
   }
 
   /**
@@ -127,19 +173,23 @@ export class TableFragmenter {
     context?: MeasurementContext
   ): TableSplitResult {
     let tableEl: HTMLTableElement;
+    const isRealBrowser = typeof document !== 'undefined' && typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' && Boolean(document.body);
 
     if (typeof target === 'string') {
-      if (typeof document !== 'undefined') {
+      if (isRealBrowser && !context?.pureMode) {
         const dummy = document.createElement('div');
         dummy.innerHTML = target.trim();
         tableEl = (dummy.querySelector('table') as HTMLTableElement) || (dummy.firstElementChild as HTMLTableElement);
+        if (!tableEl) {
+          return this.splitTableSSR(target, availableHeightPx, context);
+        }
       } else {
         return this.splitTableSSR(target, availableHeightPx, context);
       }
-    } else if (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement) {
+    } else if (typeof HTMLElement !== 'undefined' && isRealBrowser && target instanceof HTMLElement) {
       tableEl = target as HTMLTableElement;
     } else {
-      const raw = (target && (target.rawHtml || target.outerHTML)) || '';
+      const raw = (target && (target.rawHtml || target.outerHTML)) || (typeof target === 'string' ? target : '');
       return this.splitTableSSR(raw, availableHeightPx, context);
     }
 

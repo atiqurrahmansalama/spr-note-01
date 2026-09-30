@@ -34,6 +34,55 @@ export function createManualPageBreakHtml(): string {
 }
 
 /**
+ * Generates standard semantic HTML for an explicit section break instruction.
+ */
+export function createSectionBreakHtml(options: {
+  sectionTitle?: string;
+  pageSize?: string;
+  orientation?: string;
+  margin?: string;
+  differentFirstPage?: boolean;
+  pageNumberFormat?: string;
+  pageNumberStart?: number;
+  restartPageNumbering?: boolean;
+  headerHeightPx?: number;
+  footerHeightPx?: number;
+} = {}): string {
+  const titleAttr = options.sectionTitle ? ` data-section-title="${options.sectionTitle}"` : '';
+  const sizeAttr = options.pageSize ? ` data-page-size="${options.pageSize}"` : '';
+  const orientAttr = options.orientation ? ` data-orientation="${options.orientation}"` : '';
+  const marginAttr = options.margin ? ` data-margin="${options.margin}"` : '';
+  const restartAttr = options.restartPageNumbering ? ` data-restart-numbering="true"` : '';
+  const formatAttr = options.pageNumberFormat ? ` data-page-number-format="${options.pageNumberFormat}"` : '';
+  const startAttr = options.pageNumberStart !== undefined ? ` data-page-number-start="${options.pageNumberStart}"` : '';
+  const diffFirstAttr = options.differentFirstPage ? ` data-different-first-page="true"` : '';
+  const headerHeightAttr = options.headerHeightPx !== undefined ? ` data-header-height="${options.headerHeightPx}"` : '';
+  const footerHeightAttr = options.footerHeightPx !== undefined ? ` data-footer-height="${options.footerHeightPx}"` : '';
+
+  return `<div class="spr-section-break" data-section-break="true"${titleAttr}${sizeAttr}${orientAttr}${marginAttr}${restartAttr}${formatAttr}${startAttr}${diffFirstAttr}${headerHeightAttr}${footerHeightAttr} contenteditable="false" style="page-break-after: always; break-after: page;"><hr class="spr-section-break-divider" /><span class="spr-section-break-badge">Section Break${options.sectionTitle ? `: ${options.sectionTitle}` : ''}</span></div>`;
+}
+
+/**
+ * Determines whether an element or string represents an intentional explicit section break.
+ */
+export function isExplicitSectionBreak(node: HTMLElement | Node | string): boolean {
+  if (!node) return false;
+  if (typeof node === 'string') {
+    return node.includes('data-section-break="true"') || node.includes('class="spr-section-break"');
+  }
+  if (typeof node === 'object') {
+    if ('type' in node && (node.type === 'section-break' || (node as any).type === 'section')) {
+      return true;
+    }
+    if ('nodeType' in node && (node as any).nodeType === ELEMENT_NODE_TYPE) {
+      const el = node as HTMLElement;
+      return el.getAttribute?.('data-section-break') === 'true' || el.classList?.contains('spr-section-break');
+    }
+  }
+  return false;
+}
+
+/**
  * Strips all transient runtime pagination spacers and visual guides from HTML strings.
  * Ensures clean canonical storage and zero layout artifact leakage.
  */
@@ -96,6 +145,8 @@ export function isExplicitManualBreak(node: HTMLElement | Node | string): boolea
       node.includes('data-manual-break="true"') ||
       node.includes('data-manual="true"') ||
       node.includes('data-page-break="manual"') ||
+      node.includes('data-section-break') ||
+      node.includes('spr-section-break') ||
       node.includes(MANUAL_PAGE_BREAK_MARKER) ||
       node.includes('docx_page_break') ||
       node.includes('docx-page-break') ||
@@ -224,6 +275,19 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
       }
     });
 
+    // 3. Normalize any loose top-level text nodes into standard <p> tags
+    Array.from(container.childNodes).forEach((child) => {
+      if (child.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+        const text = child.textContent?.trim();
+        if (text) {
+          const p = document.createElement('p');
+          p.textContent = child.textContent;
+          container.insertBefore(p, child);
+          container.removeChild(child);
+        }
+      }
+    });
+
     return container.innerHTML;
   } catch (err) {
     return clean;
@@ -241,6 +305,16 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
 
   if (typeof document === 'undefined') {
     let raw = cleanHtml.trim();
+    // Wrap any leading or trailing bare text into <p>
+    if (!raw.startsWith('<') && raw.length > 0) {
+      const firstTagIdx = raw.indexOf('<');
+      if (firstTagIdx > 0) {
+        raw = `<p>${raw.slice(0, firstTagIdx)}</p>${raw.slice(firstTagIdx)}`;
+      } else {
+        raw = `<p>${raw}</p>`;
+      }
+    }
+
     // Recursively strip outer document wrappers (e.g. .docx-blank-canvas, section.docx, etc.)
     while (true) {
       const match = raw.match(
@@ -386,6 +460,25 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
             isManualBreak: true,
             rawHtml: el.outerHTML,
             constraints: { breakAfter: true },
+          });
+          return;
+        }
+
+        // 1.1 Section Break element
+        if (
+          el.getAttribute('data-section-break') === 'true' ||
+          el.classList.contains('spr-section-break')
+        ) {
+          nodes.push({
+            id: `section_break_${idx}`,
+            type: 'section',
+            isManualBreak: false,
+            rawHtml: el.outerHTML,
+            constraints: {
+              sectionBreak: true,
+              sectionTitle: el.getAttribute('data-section-title') || undefined,
+              restartPageNumbering: el.getAttribute('data-restart-numbering') === 'true',
+            },
           });
           return;
         }

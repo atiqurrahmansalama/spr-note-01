@@ -29,6 +29,9 @@ export class TemplateAdapter {
     }
 
     if (source && typeof source === 'object') {
+      if ('version' in source && 'body' in source && Array.isArray(source.body)) {
+        return source as CanonicalDocument;
+      }
       const htmlBody = source.rawHtml || source.templateBody || '';
       return HtmlImporter.importFromHtml(htmlBody, {
         id: source.id || options.id,

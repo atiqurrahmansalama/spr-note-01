@@ -277,7 +277,7 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
     }, 180);
   }, [dispatchTransaction]);
 
-  // 5. Native Keydown Handler (Enter, Ctrl+Enter, Ctrl+Z, Ctrl+Y, Tab)
+  // 5. Native Keydown Handler (Enter, Ctrl+Enter, Backspace, Delete, Ctrl+Z, Ctrl+Y, Arrows, Tab)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!isEditable || !editorHostRef.current) return;
@@ -290,15 +290,54 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
         return;
       }
 
+      // Enter (normal): Split block or create logical paragraph (Zero fake pagination artifacts)
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        const tx = EditorCommands.insertParagraph(editorHostRef.current);
+        dispatchTransaction(tx);
+        return;
+      }
+
+      // Backspace: Boundary-aware deletion and cross-page block merging
+      if (e.key === 'Backspace' && !e.ctrlKey && !e.metaKey) {
+        const range = EditorDomAdapter.getSelectionRange(editorHostRef.current);
+        const isStart = EditorDomAdapter.isAtStartOfBlock(editorHostRef.current, range);
+        const isCrossBlock = EditorDomAdapter.isCrossBlockSelection(editorHostRef.current, range);
+
+        if (isStart || isCrossBlock) {
+          e.preventDefault();
+          const tx = EditorCommands.delete(editorHostRef.current, false);
+          dispatchTransaction(tx);
+          return;
+        }
+      }
+
+      // Delete: Boundary-aware forward deletion and cross-page block pulling
+      if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey) {
+        const range = EditorDomAdapter.getSelectionRange(editorHostRef.current);
+        const isEnd = EditorDomAdapter.isAtEndOfBlock(editorHostRef.current, range);
+        const isCrossBlock = EditorDomAdapter.isCrossBlockSelection(editorHostRef.current, range);
+
+        if (isEnd || isCrossBlock) {
+          e.preventDefault();
+          const tx = EditorCommands.delete(editorHostRef.current, true);
+          dispatchTransaction(tx);
+          return;
+        }
+      }
+
       // Ctrl+Z: Undo
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
-        const prevHtml = historyRef.current.undo();
-        if (prevHtml !== null && editorHostRef.current) {
-          editorHostRef.current.innerHTML = prevHtml;
+        const checkpoint = historyRef.current.undoCheckpoint();
+        if (checkpoint && editorHostRef.current) {
+          editorHostRef.current.innerHTML = checkpoint.html;
           isInternalChangeRef.current = true;
-          setCanonicalHtml(prevHtml);
-          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${prevHtml}` : prevHtml);
+          if (checkpoint.selection) {
+            pendingLogicalSelectionRef.current = checkpoint.selection.logical || checkpoint.selection;
+          }
+          setCanonicalHtml(checkpoint.html);
+          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
         }
         return;
       }
@@ -309,14 +348,33 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
         (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
       ) {
         e.preventDefault();
-        const nextHtml = historyRef.current.redo();
-        if (nextHtml !== null && editorHostRef.current) {
-          editorHostRef.current.innerHTML = nextHtml;
+        const checkpoint = historyRef.current.redoCheckpoint();
+        if (checkpoint && editorHostRef.current) {
+          editorHostRef.current.innerHTML = checkpoint.html;
           isInternalChangeRef.current = true;
-          setCanonicalHtml(nextHtml);
-          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${nextHtml}` : nextHtml);
+          if (checkpoint.selection) {
+            pendingLogicalSelectionRef.current = checkpoint.selection.logical || checkpoint.selection;
+          }
+          setCanonicalHtml(checkpoint.html);
+          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
         }
         return;
+      }
+
+      // Arrow navigation across page boundaries
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        const dirMap: Record<string, 'left' | 'right' | 'up' | 'down'> = {
+          ArrowLeft: 'left',
+          ArrowRight: 'right',
+          ArrowUp: 'up',
+          ArrowDown: 'down',
+        };
+        const direction = dirMap[e.key];
+        const bridged = EditorDomAdapter.navigateBoundary(editorHostRef.current, direction, e.shiftKey, e.ctrlKey || e.metaKey);
+        if (bridged) {
+          e.preventDefault();
+          return;
+        }
       }
 
       // Tab key: Indent
@@ -328,6 +386,44 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
     },
     [isEditable, dispatchTransaction, onContentChange, activeStyles, handleInput]
   );
+
+  // 6. Authoritative Clipboard Handlers (Copy, Cut, Paste across page boundaries)
+  const handleCopy = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!editorHostRef.current) return;
+    const result = EditorDomAdapter.copySelection(editorHostRef.current);
+    if (result) {
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', result.text);
+      e.clipboardData.setData('text/html', result.html);
+    }
+  }, []);
+
+  const handleCut = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      if (!isEditable || !editorHostRef.current) return;
+      const cutResult = EditorCommands.cut(editorHostRef.current);
+      if (cutResult) {
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', cutResult.payload.text);
+        e.clipboardData.setData('text/html', cutResult.payload.html);
+        dispatchTransaction(cutResult.transaction);
+      }
+    },
+    [isEditable, dispatchTransaction]
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      if (!isEditable || !editorHostRef.current) return;
+      e.preventDefault();
+      const html = e.clipboardData.getData('text/html');
+      const text = e.clipboardData.getData('text/plain');
+      const tx = EditorCommands.paste(editorHostRef.current, { html, text });
+      dispatchTransaction(tx);
+    },
+    [isEditable, dispatchTransaction]
+  );
+
 
   // 6. Global Command Listener (for Formatting Ribbon, Sidebar, and Shortcuts)
   useEffect(() => {
@@ -428,6 +524,77 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
           dispatchTransaction(tx);
           break;
         }
+        case 'undo': {
+          const checkpoint = historyRef.current.undoCheckpoint();
+          if (checkpoint && editorHostRef.current) {
+            editorHostRef.current.innerHTML = checkpoint.html;
+            isInternalChangeRef.current = true;
+            if (checkpoint.selection) {
+              pendingLogicalSelectionRef.current = checkpoint.selection.logical || checkpoint.selection;
+            }
+            setCanonicalHtml(checkpoint.html);
+            onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
+          }
+          break;
+        }
+        case 'redo': {
+          const checkpoint = historyRef.current.redoCheckpoint();
+          if (checkpoint && editorHostRef.current) {
+            editorHostRef.current.innerHTML = checkpoint.html;
+            isInternalChangeRef.current = true;
+            if (checkpoint.selection) {
+              pendingLogicalSelectionRef.current = checkpoint.selection.logical || checkpoint.selection;
+            }
+            setCanonicalHtml(checkpoint.html);
+            onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
+          }
+          break;
+        }
+        case 'insertTableRow': {
+          const tx = EditorCommands.insertTableRow(editorHostRef.current, value || cmdOpts?.position || 'below');
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'deleteTableRow': {
+          const tx = EditorCommands.deleteTableRow(editorHostRef.current);
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'insertTableColumn': {
+          const tx = EditorCommands.insertTableColumn(editorHostRef.current, value || cmdOpts?.position || 'right');
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'deleteTableColumn': {
+          const tx = EditorCommands.deleteTableColumn(editorHostRef.current);
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'deleteTable': {
+          const tx = EditorCommands.deleteTable(editorHostRef.current);
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'setImageAlignment': {
+          const tx = EditorCommands.setImageAlignment(editorHostRef.current, value || cmdOpts?.alignment || 'left');
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'setImageDimensions': {
+          const tx = EditorCommands.setImageDimensions(editorHostRef.current, value || cmdOpts?.width, cmdOpts?.height);
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'updateToken': {
+          const tx = EditorCommands.updateToken(editorHostRef.current, value || cmdOpts?.key, cmdOpts || {});
+          dispatchTransaction(tx);
+          break;
+        }
+        case 'deleteToken': {
+          const tx = EditorCommands.deleteToken(editorHostRef.current, value || cmdOpts?.key);
+          dispatchTransaction(tx);
+          break;
+        }
         default:
           break;
       }
@@ -436,6 +603,12 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
     const handlePageBreakEvent = () => {
       if (!isEditable || !editorHostRef.current) return;
       const tx = EditorCommands.insertManualPageBreak(editorHostRef.current);
+      dispatchTransaction(tx);
+    };
+
+    const handleSectionBreakEvent = (e: CustomEvent) => {
+      if (!isEditable || !editorHostRef.current) return;
+      const tx = EditorCommands.insertSectionBreak(editorHostRef.current, e.detail || {});
       dispatchTransaction(tx);
     };
 
@@ -451,6 +624,7 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
     if (typeof window !== 'undefined') {
       window.addEventListener('spr_doclab_editor_command' as any, handleCommandEvent);
       window.addEventListener('spr_doclab_insert_page_break' as any, handlePageBreakEvent);
+      window.addEventListener('spr_doclab_insert_section_break' as any, handleSectionBreakEvent);
       window.addEventListener('spr_doclab_insert_token' as any, handleTokenInsertEvent);
     }
 
@@ -458,6 +632,7 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
       if (typeof window !== 'undefined') {
         window.removeEventListener('spr_doclab_editor_command' as any, handleCommandEvent);
         window.removeEventListener('spr_doclab_insert_page_break' as any, handlePageBreakEvent);
+        window.removeEventListener('spr_doclab_insert_section_break' as any, handleSectionBreakEvent);
         window.removeEventListener('spr_doclab_insert_token' as any, handleTokenInsertEvent);
       }
     };
@@ -514,6 +689,9 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
         data-doclab-single-host="true"
         onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onCopy={handleCopy}
+        onCut={handleCut}
+        onPaste={handlePaste}
         className="paged-editor-surface doclab-single-host-editor flex flex-col items-center gap-8 print:gap-0 print:block outline-none text-left select-text cursor-text leading-relaxed font-sans"
         style={{
           width: `${pageGeometry.paperDimensionsPx.width}px`,
@@ -525,8 +703,20 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
         {/* RUNTIME PAGE SHELLS INSIDE THE ONE EDITABLE HOST */}
         {layoutDoc.pages.map((page, pageIndex) => {
           const pageNum = page.pageNumber || pageIndex + 1;
+          const pageGeo = page.geometry || pageGeometry;
+          const headerCfg = page.headerConfig || options.headerConfig;
+          const footerCfg = page.footerConfig || options.footerConfig;
+          const pageNumFormat = page.pageNumberFormat || options.pageNumberFormat || 'decimal';
+
           const runtimeVars = RuntimeVariableResolver.buildVariables(pageIndex, totalPagesCount, {
             documentTitle: options.title || 'Official Document',
+            sectionId: page.sectionId,
+            sectionIndex: page.sectionIndex,
+            sectionTitle: page.sectionTitle,
+            sectionPageNumber: page.sectionPageNumber,
+            sectionTotalPages: page.sectionTotalPages,
+            pageNumberFormat: pageNumFormat,
+            isSectionFirstPage: page.isSectionFirstPage,
           });
 
           return (
@@ -537,20 +727,33 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
               data-runtime-page={page.index}
               data-page-index={page.index}
               className="doclab-runtime-page-shell paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col justify-between mb-8 print:mb-0"
-              data-size={options.pageSize || 'A4'}
-              data-orientation={options.orientation || 'PORTRAIT'}
+              data-size={pageGeo.pageSize || options.pageSize || 'A4'}
+              data-orientation={pageGeo.orientation || options.orientation || 'PORTRAIT'}
               data-margin={options.margin || 'NORMAL'}
               data-density={options.density || 'NORMAL'}
+              data-section-id={page.sectionId || 'sec_0'}
+              data-section-index={page.sectionIndex || 0}
               data-page-break="true"
+              onClick={(e) => {
+                if (!isEditable || !editorHostRef.current) return;
+                const target = e.target as HTMLElement;
+                if (
+                  target.classList.contains('doclab-runtime-page-shell') ||
+                  target.classList.contains('doclab-runtime-page-content') ||
+                  target.classList.contains('layout-page-fragments')
+                ) {
+                  EditorDomAdapter.focusPage(editorHostRef.current, page.index ?? pageIndex, 'end');
+                }
+              }}
               style={{
                 backgroundColor: '#ffffff',
                 color: '#0f172a',
-                width: `${pageGeometry.paperDimensionsPx.width}px`,
-                maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
-                minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                height: `${pageGeometry.paperDimensionsPx.height}px`,
-                maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
-                padding: pageGeometry.cssMarginString,
+                width: `${pageGeo.paperDimensionsPx.width}px`,
+                maxWidth: `${pageGeo.paperDimensionsPx.width}px`,
+                minHeight: `${pageGeo.paperDimensionsPx.height}px`,
+                height: `${pageGeo.paperDimensionsPx.height}px`,
+                maxHeight: `${pageGeo.paperDimensionsPx.height}px`,
+                padding: pageGeo.cssMarginString,
                 boxSizing: 'border-box',
                 textAlign: 'left',
                 overflow: 'hidden',
@@ -563,17 +766,24 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
               >
                 <div className="flex items-center gap-1.5 font-bold theme-text-primary">
                   <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
-                  <span>Page {pageNum} of {totalPagesCount}</span>
+                  <span>
+                    Page {runtimeVars.pageNumberFormatted || pageNum} of {runtimeVars.totalPagesFormatted || totalPagesCount}
+                    {page.sectionIndex !== undefined && page.sectionIndex > 0 && (
+                      <span className="ml-1 text-[10px] theme-text-muted font-normal">
+                        (Sec {page.sectionIndex + 1}: p.{runtimeVars.sectionPageNumberFormatted || page.sectionPageNumber})
+                      </span>
+                    )}
+                  </span>
                 </div>
-                <span>{Math.round(pageGeometry.paperDimensionsPx.width)} × {Math.round(pageGeometry.paperDimensionsPx.height)}px</span>
+                <span>{Math.round(pageGeo.paperDimensionsPx.width)} × {Math.round(pageGeo.paperDimensionsPx.height)}px</span>
               </div>
 
               {/* 1. Running Header Zone */}
-              {options.headerConfig && (
+              {headerCfg && (
                 <div className="w-full relative z-10 shrink-0 overflow-hidden" contentEditable={false}>
                   <RunningHeader
                     variables={runtimeVars}
-                    config={options.headerConfig}
+                    config={headerCfg}
                   />
                 </div>
               )}
@@ -607,12 +817,12 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
               </div>
 
               {/* 3. Running Footer Zone */}
-              {options.footerConfig && (
+              {footerCfg && (
                 <div className="w-full relative z-10 shrink-0 overflow-hidden" contentEditable={false}>
                   <RunningFooter
                     variables={runtimeVars}
-                    config={options.footerConfig}
-                    numeralSystem={options.numeralSystem}
+                    config={footerCfg}
+                    numeralSystem={options.numeralSystem || (pageNumFormat as any)}
                   />
                 </div>
               )}

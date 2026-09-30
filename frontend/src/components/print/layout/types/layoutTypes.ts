@@ -27,11 +27,35 @@ export interface Insets {
   left: number;
 }
 
-export type PageSizeId = 'A4' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
+/**
+ * Printable content area within page boundaries
+ */
+export interface ContentArea extends Rect {
+  padding?: Insets;
+}
+
+/**
+ * Reserved header bounding area on a page
+ */
+export interface HeaderArea extends Rect {
+  isVisible: boolean;
+  reserveHeight: number;
+}
+
+/**
+ * Reserved footer bounding area on a page
+ */
+export interface FooterArea extends Rect {
+  isVisible: boolean;
+  reserveHeight: number;
+}
+
+export type PageSizeId = 'A3' | 'A4' | 'A5' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
 export type PageOrientation = 'PORTRAIT' | 'LANDSCAPE';
 export type MarginPreset = 'NONE' | 'TIGHT' | 'NARROW' | 'NORMAL' | 'WIDE' | 'CUSTOM';
 export type DensityPreset = 'ULTRA_COMPACT' | 'COMPACT' | 'NORMAL' | 'RELAXED' | 'SPACIOUS';
 export type ColorMode = 'FULL_COLOR' | 'INK_SAVER' | 'GRAYSCALE' | 'MONOCHROME' | 'HIGH_CONTRAST';
+export type PhysicalUnit = 'mm' | 'in' | 'pt' | 'px';
 
 /**
  * Physical paper size definitions in millimeters (mm)
@@ -43,7 +67,9 @@ export interface PhysicalPaperMetrics {
 }
 
 export const PAPER_SIZE_METRICS_MM: Record<PageSizeId, PhysicalPaperMetrics> = {
+  A3: { widthMm: 297, heightMm: 420, name: 'A3 Standard' },
   A4: { widthMm: 210, heightMm: 297, name: 'A4 Standard' },
+  A5: { widthMm: 148, heightMm: 210, name: 'A5 Standard' },
   LETTER: { widthMm: 215.9, heightMm: 279.4, name: 'US Letter' },
   LEGAL: { widthMm: 215.9, heightMm: 355.6, name: 'US Legal' },
   ID_CARD: { widthMm: 85.6, heightMm: 53.98, name: 'Standard ID Card (CR80)' },
@@ -53,15 +79,48 @@ export const PAPER_SIZE_METRICS_MM: Record<PageSizeId, PhysicalPaperMetrics> = {
 /**
  * Standard CSS/Screen DPI pixel conversions (96 CSS pixels per inch)
  * 1 inch = 25.4 mm => 1 mm ≈ 3.7795275591 px
+ * 1 pt = 1/72 inch => 1 pt = 96 / 72 px ≈ 1.3333333333 px
  */
 export const MM_TO_PX_RATIO = 96 / 25.4;
+export const INCH_TO_PX_RATIO = 96;
+export const PT_TO_PX_RATIO = 96 / 72;
 
-export function mmToPx(mm: number): number {
-  return Math.round(mm * MM_TO_PX_RATIO * 100) / 100;
+export function mmToPx(mm: number, scale: number = 1): number {
+  return Math.round(mm * MM_TO_PX_RATIO * scale * 100) / 100;
 }
 
-export function pxToMm(px: number): number {
-  return Math.round((px / MM_TO_PX_RATIO) * 100) / 100;
+export function pxToMm(px: number, scale: number = 1): number {
+  return Math.round((px / (MM_TO_PX_RATIO * scale)) * 100) / 100;
+}
+
+export function inchesToPx(inches: number, scale: number = 1): number {
+  return Math.round(inches * INCH_TO_PX_RATIO * scale * 100) / 100;
+}
+
+export function pxToInches(px: number, scale: number = 1): number {
+  return Math.round((px / (INCH_TO_PX_RATIO * scale)) * 100) / 100;
+}
+
+export function ptToPx(pt: number, scale: number = 1): number {
+  return Math.round(pt * PT_TO_PX_RATIO * scale * 100) / 100;
+}
+
+export function pxToPt(px: number, scale: number = 1): number {
+  return Math.round((px / (PT_TO_PX_RATIO * scale)) * 100) / 100;
+}
+
+export function convertUnitToPx(value: number, unit: PhysicalUnit = 'mm', scale: number = 1): number {
+  switch (unit) {
+    case 'mm':
+      return mmToPx(value, scale);
+    case 'in':
+      return inchesToPx(value, scale);
+    case 'pt':
+      return ptToPx(value, scale);
+    case 'px':
+    default:
+      return Math.round(value * scale * 100) / 100;
+  }
 }
 
 /**

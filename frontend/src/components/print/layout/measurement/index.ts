@@ -12,3 +12,5 @@ export * from './MeasurementCache';
 export * from './MeasurementMirror';
 export * from './ControlledLayoutPipeline';
 export * from './useControlledLayoutPipeline';
+export * from './CoordinateTransformer';
+export * from './TrueLineModel';

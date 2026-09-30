@@ -276,7 +276,51 @@ export interface DividerNode extends BaseNode {
 export interface SectionNode extends BaseNode {
   type: 'section';
   content: BlockNode[];
+  sectionTitle?: string;
+  pageSize?: string;
+  orientation?: 'portrait' | 'landscape' | 'PORTRAIT' | 'LANDSCAPE';
+  restartPageNumbering?: boolean;
   attributes?: Record<string, any>;
+}
+
+/**
+ * Explicit Section Break Node
+ * Represents an intentional user-defined section boundary with independent page geometry / header / numbering.
+ */
+export interface SectionBreakNode extends BaseNode {
+  type: 'section-break';
+  sectionBreak: true;
+  sectionTitle?: string;
+  pageSize?: string;
+  orientation?: 'portrait' | 'landscape' | 'PORTRAIT' | 'LANDSCAPE';
+  margin?: string;
+  customMarginsMm?: { top?: number; right?: number; bottom?: number; left?: number };
+  customPaperDimensionsMm?: { width: number; height: number };
+  headerHeightPx?: number;
+  footerHeightPx?: number;
+  headerDistanceMm?: number;
+  footerDistanceMm?: number;
+  headerHtml?: string;
+  footerHtml?: string;
+  firstPageHeaderHtml?: string;
+  firstPageFooterHtml?: string;
+  differentFirstPage?: boolean;
+  pageNumberFormat?: 'decimal' | 'roman-upper' | 'roman-lower' | 'bengali' | 'arabic';
+  pageNumberStart?: number;
+  pageNumberRestart?: boolean;
+  restartPageNumbering?: boolean;
+  properties?: Record<string, any>;
+}
+
+/**
+ * Generic Nested Block / Container Node
+ */
+export interface CustomBlockNode extends BaseNode {
+  type: 'custom-block';
+  rawHtml?: string;
+  content?: BlockNode[];
+  attributes?: Record<string, any>;
+  style?: Record<string, string>;
 }
 
 /**
@@ -292,7 +336,9 @@ export type BlockNode =
   | SignatureNode
   | ManualPageBreakNode
   | DividerNode
-  | SectionNode;
+  | SectionNode
+  | SectionBreakNode
+  | CustomBlockNode;
 
 /**
  * Global Document Styling Defaults

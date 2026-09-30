@@ -6,7 +6,7 @@
  * Document content holds zero auto-generated page breaks or layout artifacts.
  */
 
-import { PageSizeId, PageOrientation, MarginPreset, DensityPreset, Insets, ColorMode } from './layoutTypes';
+import { Dimensions, PageSizeId, PageOrientation, MarginPreset, DensityPreset, Insets, ColorMode } from './layoutTypes';
 import { HeaderFooterConfig, WatermarkConfig, SignatureBlockConfig } from '../chrome/headerFooterTypes';
 
 export type SourceNodeType =
@@ -90,6 +90,7 @@ export interface LayoutDocumentOptions {
   orientation?: PageOrientation;
   margin?: MarginPreset;
   customMarginsMm?: Partial<Insets>;
+  customPaperDimensionsMm?: Dimensions;
   density?: DensityPreset;
   colorMode?: ColorMode;
 
@@ -104,6 +105,14 @@ export interface LayoutDocumentOptions {
 
   /** Reserved footer height in pixels (0 if no footer) */
   footerHeightPx?: number;
+
+  /** Header distance from top edge in mm or px */
+  headerDistanceMm?: number;
+  headerDistancePx?: number;
+
+  /** Footer distance from bottom edge in mm or px */
+  footerDistanceMm?: number;
+  footerDistancePx?: number;
 
   /** Whether header appears on all pages or only page 1 */
   showHeaderOnAllPages?: boolean;

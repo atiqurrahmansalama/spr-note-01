@@ -14,6 +14,33 @@ export interface RuntimeLayoutVariables {
   /** Total pages in layout result (e.g. 12) */
   totalPages: number;
 
+  /** Whether this is the first page of the document */
+  isFirstPage?: boolean;
+
+  /** Whether this is the first page of the active section */
+  isSectionFirstPage?: boolean;
+
+  /** Page number numeral format */
+  pageNumberFormat?: 'decimal' | 'roman-upper' | 'roman-lower' | 'bengali' | 'arabic';
+
+  /** Formatted page number based on active format */
+  pageNumberFormatted?: string;
+
+  /** Formatted total pages based on active format */
+  totalPagesFormatted?: string;
+
+  /** Roman uppercase formatted page number (e.g. III) */
+  pageNumberRomanUpper?: string;
+
+  /** Roman lowercase formatted page number (e.g. iii) */
+  pageNumberRomanLower?: string;
+
+  /** Roman uppercase formatted total pages (e.g. XII) */
+  totalPagesRomanUpper?: string;
+
+  /** Roman lowercase formatted total pages (e.g. xii) */
+  totalPagesRomanLower?: string;
+
   /** Bengali formatted page number (e.g. ৩) */
   pageNumberBengali?: string;
 
@@ -44,6 +71,36 @@ export interface RuntimeLayoutVariables {
   /** Total pages within active section */
   sectionTotalPages?: number;
 
+  /** Formatted section page number based on active section format */
+  sectionPageNumberFormatted?: string;
+
+  /** Formatted section total pages based on active section format */
+  sectionTotalPagesFormatted?: string;
+
+  /** Section Bengali formatted page number */
+  sectionPageNumberBengali?: string;
+
+  /** Section Bengali formatted total pages */
+  sectionTotalPagesBengali?: string;
+
+  /** Section Arabic formatted page number */
+  sectionPageNumberArabic?: string;
+
+  /** Section Arabic formatted total pages */
+  sectionTotalPagesArabic?: string;
+
+  /** Section Roman uppercase formatted page number */
+  sectionPageNumberRomanUpper?: string;
+
+  /** Section Roman lowercase formatted page number */
+  sectionPageNumberRomanLower?: string;
+
+  /** Section Roman uppercase formatted total pages */
+  sectionTotalPagesRomanUpper?: string;
+
+  /** Section Roman lowercase formatted total pages */
+  sectionTotalPagesRomanLower?: string;
+
   /** Document title */
   documentTitle: string;
 
@@ -73,11 +130,26 @@ export interface HeaderFooterConfig {
   /** Custom raw HTML template for footer */
   footerHtml?: string;
 
+  /** Custom raw HTML template for first page header (when differentFirstPage is true) */
+  firstPageHeaderHtml?: string;
+
+  /** Custom raw HTML template for first page footer (when differentFirstPage is true) */
+  firstPageFooterHtml?: string;
+
+  /** Whether to use a different header/footer on the first page of document/section */
+  differentFirstPage?: boolean;
+
   /** Fixed or measured height reserved for header (e.g. 60px) */
   headerHeightPx?: number;
 
   /** Fixed or measured height reserved for footer (e.g. 40px) */
   footerHeightPx?: number;
+
+  /** Header distance from top of paper sheet (in mm) */
+  headerDistanceMm?: number;
+
+  /** Footer distance from bottom of paper sheet (in mm) */
+  footerDistanceMm?: number;
 
   /** Whether branding header renders on page 1 (default: true) */
   showFirstPageHeader?: boolean;
@@ -99,6 +171,18 @@ export interface HeaderFooterConfig {
 
   /** Custom running footer text (supports tokens) */
   runningFooterText?: string;
+
+  /** Custom running header text for first page */
+  firstPageRunningHeaderText?: string;
+
+  /** Custom running footer text for first page */
+  firstPageRunningFooterText?: string;
+
+  /** Page number format */
+  pageNumberFormat?: 'decimal' | 'roman-upper' | 'roman-lower' | 'bengali' | 'arabic';
+
+  /** Numeral system for standard footer rendering */
+  numeralSystem?: 'latin' | 'bengali' | 'arabic' | 'roman-upper' | 'roman-lower';
 
   /** Whether signature lines appear exclusively on final page */
   signaturesOnLastPageOnly?: boolean;

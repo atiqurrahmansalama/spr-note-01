@@ -22,6 +22,8 @@ import {
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
+  SectionBreakNode,
+  CustomBlockNode,
   TextNode,
   TokenNode,
   HardBreakNode,
@@ -93,18 +95,23 @@ export class DocumentFactory {
   /**
    * Creates a dynamic TokenNode (Placeholder / InlineToken)
    */
-  public static createToken(options: {
-    key: string;
-    label?: string;
-    display?: string;
-    sourcePath?: string;
-    category?: TokenNode['category'];
-    defaultValue?: string;
-    format?: string;
-    formatting?: Mark;
-    marks?: Mark;
-    id?: string;
-  }): TokenNode {
+  public static createToken(
+    optionsOrKey:
+      | string
+      | {
+          key: string;
+          label?: string;
+          display?: string;
+          sourcePath?: string;
+          category?: TokenNode['category'];
+          defaultValue?: string;
+          format?: string;
+          formatting?: Mark;
+          marks?: Mark;
+          id?: string;
+        }
+  ): TokenNode {
+    const options = typeof optionsOrKey === 'string' ? { key: optionsOrKey } : optionsOrKey;
     return {
       id: options.id || generateNodeId('tok'),
       type: 'token',
@@ -167,12 +174,23 @@ export class DocumentFactory {
   /**
    * Creates a HeadingNode
    */
-  public static createHeading(options: {
-    level: HeadingLevel;
-    content?: InlineNode[];
-    attributes?: BlockAttributes;
-    id?: string;
-  }): HeadingNode {
+  public static createHeading(
+    optionsOrLevel:
+      | HeadingLevel
+      | {
+          level: HeadingLevel;
+          content?: InlineNode[];
+          attributes?: BlockAttributes;
+          id?: string;
+        },
+    content?: InlineNode[],
+    id?: string
+  ): HeadingNode {
+    const options =
+      typeof optionsOrLevel === 'number'
+        ? { level: optionsOrLevel, content, id }
+        : optionsOrLevel;
+
     return {
       id: options.id || generateNodeId('h'),
       type: 'heading',
@@ -285,6 +303,7 @@ export class DocumentFactory {
     src: string;
     alt?: string;
     title?: string;
+    caption?: string;
     width?: number | string;
     height?: number | string;
     alignment?: ImageNode['alignment'];
@@ -296,6 +315,7 @@ export class DocumentFactory {
       src: options.src,
       alt: options.alt,
       title: options.title,
+      caption: options.caption,
       width: options.width,
       height: options.height,
       alignment: options.alignment || 'left',
@@ -384,6 +404,10 @@ export class DocumentFactory {
    */
   public static createSection(options: {
     content?: BlockNode[];
+    sectionTitle?: string;
+    pageSize?: string;
+    orientation?: 'portrait' | 'landscape' | 'PORTRAIT' | 'LANDSCAPE';
+    restartPageNumbering?: boolean;
     attributes?: Record<string, any>;
     id?: string;
   } = {}): SectionNode {
@@ -391,7 +415,63 @@ export class DocumentFactory {
       id: options.id || generateNodeId('sec'),
       type: 'section',
       content: options.content || [],
+      sectionTitle: options.sectionTitle,
+      pageSize: options.pageSize,
+      orientation: options.orientation,
+      restartPageNumbering: options.restartPageNumbering,
       attributes: options.attributes,
     };
   }
+
+  /**
+   * Creates an explicit SectionBreakNode
+   */
+  public static createSectionBreak(options: Partial<SectionBreakNode> = {}): SectionBreakNode {
+    return {
+      id: options.id || generateNodeId('sec_brk'),
+      type: 'section-break',
+      sectionBreak: true,
+      sectionTitle: options.sectionTitle,
+      pageSize: options.pageSize,
+      orientation: options.orientation,
+      margin: options.margin,
+      customMarginsMm: options.customMarginsMm,
+      customPaperDimensionsMm: options.customPaperDimensionsMm,
+      headerHeightPx: options.headerHeightPx,
+      footerHeightPx: options.footerHeightPx,
+      headerDistanceMm: options.headerDistanceMm,
+      footerDistanceMm: options.footerDistanceMm,
+      headerHtml: options.headerHtml,
+      footerHtml: options.footerHtml,
+      firstPageHeaderHtml: options.firstPageHeaderHtml,
+      firstPageFooterHtml: options.firstPageFooterHtml,
+      differentFirstPage: options.differentFirstPage,
+      pageNumberFormat: options.pageNumberFormat,
+      pageNumberStart: options.pageNumberStart,
+      pageNumberRestart: options.pageNumberRestart,
+      restartPageNumbering: options.restartPageNumbering,
+      properties: options.properties,
+    };
+  }
+
+  /**
+   * Creates a CustomBlockNode (generic container / nested block)
+   */
+  public static createCustomBlock(options: {
+    rawHtml?: string;
+    content?: BlockNode[];
+    attributes?: Record<string, any>;
+    style?: Record<string, string>;
+    id?: string;
+  } = {}): CustomBlockNode {
+    return {
+      id: options.id || generateNodeId('blk'),
+      type: 'custom-block',
+      rawHtml: options.rawHtml,
+      content: options.content,
+      attributes: options.attributes,
+      style: options.style,
+    };
+  }
 }
+

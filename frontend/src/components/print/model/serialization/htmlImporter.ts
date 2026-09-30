@@ -32,6 +32,8 @@ import {
   ManualPageBreakNode,
   DividerNode,
   SectionNode,
+  SectionBreakNode,
+  CustomBlockNode,
   InlineNode,
   TextNode,
   TokenNode,
@@ -74,8 +76,18 @@ export class HtmlImporter {
 
     const blocks: BlockNode[] = [];
 
-    if (typeof document !== 'undefined' || typeof DOMParser !== 'undefined' || (typeof window !== 'undefined' && window.DOMParser)) {
-      const DOMParserClass = typeof DOMParser !== 'undefined' ? DOMParser : window.DOMParser;
+    const hasDOMParser =
+      typeof DOMParser !== 'undefined' ||
+      (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') ||
+      (typeof globalThis !== 'undefined' && typeof (globalThis as any).DOMParser !== 'undefined');
+
+    if (hasDOMParser) {
+      const DOMParserClass =
+        typeof DOMParser !== 'undefined'
+          ? DOMParser
+          : typeof window !== 'undefined' && window.DOMParser
+          ? window.DOMParser
+          : (globalThis as any).DOMParser;
       const parser = new DOMParserClass();
       const doc = parser.parseFromString(cleanHtml, 'text/html');
 
@@ -175,11 +187,6 @@ export class HtmlImporter {
       return null;
     }
 
-    // 1. Manual Page Break
-    if (isExplicitManualBreak(el)) {
-      return DocumentFactory.createManualPageBreak();
-    }
-
     const tag = el.tagName.toLowerCase();
     const sourceNodeId =
       el.getAttribute('data-source-node-id') ||
@@ -187,6 +194,55 @@ export class HtmlImporter {
       el.getAttribute('data-node-id') ||
       el.id ||
       undefined;
+
+    // 1. Manual Page Break
+    if (isExplicitManualBreak(el)) {
+      return DocumentFactory.createManualPageBreak(sourceNodeId);
+    }
+
+    // 1.1 Explicit Section Break
+    if (
+      el.getAttribute('data-section-break') === 'true' ||
+      el.classList?.contains('spr-section-break')
+    ) {
+      let customMarginsMm: any = undefined;
+      const customMarginsStr = el.getAttribute('data-custom-margins');
+      if (customMarginsStr) {
+        try {
+          customMarginsMm = JSON.parse(customMarginsStr);
+        } catch {
+          // Ignore JSON parse error
+        }
+      }
+
+      const headerHeightAttr = el.getAttribute('data-header-height');
+      const footerHeightAttr = el.getAttribute('data-footer-height');
+      const headerDistAttr = el.getAttribute('data-header-distance');
+      const footerDistAttr = el.getAttribute('data-footer-distance');
+      const pageNumStartAttr = el.getAttribute('data-page-number-start');
+
+      return DocumentFactory.createSectionBreak({
+        id: sourceNodeId,
+        sectionTitle: el.getAttribute('data-section-title') || undefined,
+        pageSize: el.getAttribute('data-page-size') || undefined,
+        orientation: (el.getAttribute('data-orientation') as any) || undefined,
+        margin: el.getAttribute('data-margin') || undefined,
+        customMarginsMm,
+        headerHeightPx: headerHeightAttr ? parseFloat(headerHeightAttr) : undefined,
+        footerHeightPx: footerHeightAttr ? parseFloat(footerHeightAttr) : undefined,
+        headerDistanceMm: headerDistAttr ? parseFloat(headerDistAttr) : undefined,
+        footerDistanceMm: footerDistAttr ? parseFloat(footerDistAttr) : undefined,
+        differentFirstPage: el.getAttribute('data-different-first-page') === 'true',
+        pageNumberFormat: (el.getAttribute('data-page-number-format') as any) || undefined,
+        pageNumberStart: pageNumStartAttr ? parseInt(pageNumStartAttr, 10) : undefined,
+        restartPageNumbering: el.getAttribute('data-restart-numbering') === 'true',
+        pageNumberRestart: el.getAttribute('data-restart-numbering') === 'true',
+        headerHtml: el.getAttribute('data-header-html') || undefined,
+        footerHtml: el.getAttribute('data-footer-html') || undefined,
+        firstPageHeaderHtml: el.getAttribute('data-first-page-header-html') || undefined,
+        firstPageFooterHtml: el.getAttribute('data-first-page-footer-html') || undefined,
+      });
+    }
 
     // 2. Headings (H1 - H6)
     if (/^h[1-6]$/.test(tag)) {
@@ -220,7 +276,35 @@ export class HtmlImporter {
       return tbl;
     }
 
-    // 5. Images
+    // 5. Images & Figures with Captions
+    if (tag === 'figure' || el.classList?.contains('doclab-figure') || el.classList?.contains('print-image-container')) {
+      const imgEl = el.querySelector('img') as HTMLImageElement | null;
+      const svgEl = el.querySelector('svg') as SVGElement | null;
+      const figcaptionEl = el.querySelector('figcaption, .doclab-image-caption') as HTMLElement | null;
+      const caption = figcaptionEl ? figcaptionEl.textContent?.trim() : undefined;
+
+      if (imgEl) {
+        return DocumentFactory.createImage({
+          id: sourceNodeId,
+          src: imgEl.src || imgEl.getAttribute('src') || '',
+          alt: imgEl.alt || undefined,
+          title: imgEl.title || undefined,
+          caption,
+          width: imgEl.width || imgEl.style.width || el.style.width || undefined,
+          height: imgEl.height || imgEl.style.height || el.style.height || undefined,
+        });
+      } else if (svgEl) {
+        return DocumentFactory.createSvg({
+          id: sourceNodeId,
+          svgContent: svgEl.outerHTML,
+          viewBox: svgEl.getAttribute('viewBox') || undefined,
+          title: caption,
+          width: svgEl.getAttribute('width') || svgEl.style.width || el.style.width || undefined,
+          height: svgEl.getAttribute('height') || svgEl.style.height || el.style.height || undefined,
+        });
+      }
+    }
+
     if (tag === 'img') {
       const imgEl = el as HTMLImageElement;
       return DocumentFactory.createImage({
@@ -230,6 +314,28 @@ export class HtmlImporter {
         title: imgEl.title || undefined,
         width: imgEl.width || imgEl.style.width || undefined,
         height: imgEl.height || imgEl.style.height || undefined,
+      });
+    }
+
+    // 5.1 Blockquotes
+    if (tag === 'blockquote') {
+      const childBlocks: BlockNode[] = [];
+      Array.from(el.childNodes).forEach((child) => {
+        const parsed = this.parseDomNodeToBlock(child);
+        if (parsed) {
+          if (Array.isArray(parsed)) childBlocks.push(...parsed);
+          else childBlocks.push(parsed);
+        }
+      });
+      if (childBlocks.length === 0) {
+        const content = this.parseInlineContent(el);
+        childBlocks.push(DocumentFactory.createParagraph({ content }));
+      }
+      return DocumentFactory.createSection({
+        id: sourceNodeId,
+        content: childBlocks,
+        sectionTitle: 'Blockquote',
+        attributes: { isBlockquote: true, className: el.className || 'blockquote' },
       });
     }
 
@@ -272,7 +378,27 @@ export class HtmlImporter {
       return DocumentFactory.createParagraph({ id: sourceNodeId, content, attributes });
     }
 
-    // 8. Containers (DIV, SECTION, ARTICLE, etc.)
+    // 10. Explicit Section Containers
+    if (tag === 'section') {
+      const childBlocks: BlockNode[] = [];
+      Array.from(el.childNodes).forEach((child) => {
+        const parsed = this.parseDomNodeToBlock(child);
+        if (parsed) {
+          if (Array.isArray(parsed)) childBlocks.push(...parsed);
+          else childBlocks.push(parsed);
+        }
+      });
+      return DocumentFactory.createSection({
+        id: sourceNodeId,
+        content: childBlocks,
+        sectionTitle: el.getAttribute('data-section-title') || undefined,
+        pageSize: el.getAttribute('data-page-size') || undefined,
+        orientation: (el.getAttribute('data-orientation') as any) || undefined,
+        restartPageNumbering: el.getAttribute('data-restart-numbering') === 'true',
+      });
+    }
+
+    // 11. Containers (DIV, ARTICLE, etc.)
     const hasBlockChildren = Array.from(el.children).some((c) =>
       ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'table', 'hr', 'div', 'section', 'article'].includes(
         c.tagName.toLowerCase()
@@ -775,7 +901,7 @@ export class HtmlImporter {
    */
   private static parseHtmlRegex(html: string): BlockNode[] {
     const blocks: BlockNode[] = [];
-    const blockRegex = /(<table[\s\S]*?<\/table>|<h[1-6]\b[\s\S]*?<\/h[1-6]>|<div[^>]*print-signature-block[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>|<div[^>]*><svg[\s\S]*?<\/svg><\/div>|<p\b[\s\S]*?<\/p>|<div\b[^>]*?(?:spr-page-break|data-manual-break|docx_page_break)[^>]*?>[\s\S]*?<\/div>|<!--[\s\S]*?-->|<ol\b[\s\S]*?<\/ol>|<ul\b[\s\S]*?<\/ul>|<hr[\s\S]*?>)/gi;
+    const blockRegex = /(<table[\s\S]*?<\/table>|<figure[\s\S]*?<\/figure>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<h[1-6]\b[\s\S]*?<\/h[1-6]>|<div[^>]*print-signature-block[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>|<div[^>]*><svg[\s\S]*?<\/svg><\/div>|<p\b[\s\S]*?<\/p>|<div\b[^>]*?(?:spr-page-break|data-manual-break|docx_page_break|data-section-break|spr-section-break)[^>]*?>[\s\S]*?<\/div>|<!--[\s\S]*?-->|<ol\b[\s\S]*?<\/ol>|<ul\b[\s\S]*?<\/ul>|<img[^>]*>|<hr[\s\S]*?>)/gi;
     const matches = html.match(blockRegex) || [html];
 
     matches.forEach((rawBlock) => {
@@ -784,6 +910,63 @@ export class HtmlImporter {
         if (isCommentManual) {
           blocks.push(DocumentFactory.createManualPageBreak());
         }
+        return;
+      }
+
+      // Section Break
+      if (
+        /data-section-break=["']true["']/i.test(rawBlock) ||
+        /class=["'][^"']*?\bspr-section-break\b/i.test(rawBlock)
+      ) {
+        const titleMatch = rawBlock.match(/data-section-title=["']([^"']+)["']/i);
+        const sizeMatch = rawBlock.match(/data-page-size=["']([^"']+)["']/i);
+        const orientMatch = rawBlock.match(/data-orientation=["']([^"']+)["']/i);
+        const marginMatch = rawBlock.match(/data-margin=["']([^"']+)["']/i);
+        const customMarginsMatch = rawBlock.match(/data-custom-margins=["']([^"']+)["']/i);
+        const headerHeightMatch = rawBlock.match(/data-header-height=["']([^"']+)["']/i);
+        const footerHeightMatch = rawBlock.match(/data-footer-height=["']([^"']+)["']/i);
+        const headerDistMatch = rawBlock.match(/data-header-distance=["']([^"']+)["']/i);
+        const footerDistMatch = rawBlock.match(/data-footer-distance=["']([^"']+)["']/i);
+        const diffFirstMatch = rawBlock.match(/data-different-first-page=["']true["']/i);
+        const formatMatch = rawBlock.match(/data-page-number-format=["']([^"']+)["']/i);
+        const startMatch = rawBlock.match(/data-page-number-start=["']([^"']+)["']/i);
+        const restartMatch = rawBlock.match(/data-restart-numbering=["']true["']/i);
+        const headerHtmlMatch = rawBlock.match(/data-header-html=["']([^"']+)["']/i);
+        const footerHtmlMatch = rawBlock.match(/data-footer-html=["']([^"']+)["']/i);
+        const firstHeaderMatch = rawBlock.match(/data-first-page-header-html=["']([^"']+)["']/i);
+        const firstFooterMatch = rawBlock.match(/data-first-page-footer-html=["']([^"']+)["']/i);
+
+        let customMarginsMm: any = undefined;
+        if (customMarginsMatch) {
+          try {
+            customMarginsMm = JSON.parse(customMarginsMatch[1].replace(/&quot;/g, '"'));
+          } catch {
+            // Ignore error
+          }
+        }
+
+        blocks.push(
+          DocumentFactory.createSectionBreak({
+            sectionTitle: titleMatch ? titleMatch[1] : undefined,
+            pageSize: sizeMatch ? sizeMatch[1] : undefined,
+            orientation: (orientMatch ? orientMatch[1] : undefined) as any,
+            margin: marginMatch ? marginMatch[1] : undefined,
+            customMarginsMm,
+            headerHeightPx: headerHeightMatch ? parseFloat(headerHeightMatch[1]) : undefined,
+            footerHeightPx: footerHeightMatch ? parseFloat(footerHeightMatch[1]) : undefined,
+            headerDistanceMm: headerDistMatch ? parseFloat(headerDistMatch[1]) : undefined,
+            footerDistanceMm: footerDistMatch ? parseFloat(footerDistMatch[1]) : undefined,
+            differentFirstPage: Boolean(diffFirstMatch),
+            pageNumberFormat: (formatMatch ? formatMatch[1] : undefined) as any,
+            pageNumberStart: startMatch ? parseInt(startMatch[1], 10) : undefined,
+            restartPageNumbering: Boolean(restartMatch),
+            pageNumberRestart: Boolean(restartMatch),
+            headerHtml: headerHtmlMatch ? headerHtmlMatch[1] : undefined,
+            footerHtml: footerHtmlMatch ? footerHtmlMatch[1] : undefined,
+            firstPageHeaderHtml: firstHeaderMatch ? firstHeaderMatch[1] : undefined,
+            firstPageFooterHtml: firstFooterMatch ? firstFooterMatch[1] : undefined,
+          })
+        );
         return;
       }
 
@@ -841,6 +1024,62 @@ export class HtmlImporter {
       // Extract explicit sourceNodeId or ID from tag
       const idMatch = rawBlock.match(/(?:data-source-node-id|data-source-id|data-node-id|id)=["']([^"']+)["']/i);
       const sourceId = idMatch ? idMatch[1] : undefined;
+
+      // Figures with Image and Caption
+      if (/<figure/i.test(rawBlock)) {
+        const srcMatch = rawBlock.match(/src=["']([^"']+)["']/i);
+        const altMatch = rawBlock.match(/alt=["']([^"']+)["']/i);
+        const captionMatch = rawBlock.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
+        const caption = captionMatch ? captionMatch[1].replace(/<[^>]+>/g, '').trim() : undefined;
+        const widthMatch = rawBlock.match(/width=["']([^"']+)["']/i);
+        const heightMatch = rawBlock.match(/height=["']([^"']+)["']/i);
+
+        blocks.push(
+          DocumentFactory.createImage({
+            id: sourceId,
+            src: srcMatch ? srcMatch[1] : '',
+            alt: altMatch ? altMatch[1] : undefined,
+            caption,
+            width: widthMatch ? widthMatch[1] : undefined,
+            height: heightMatch ? heightMatch[1] : undefined,
+          })
+        );
+        return;
+      }
+
+      // Standalone Image
+      if (/<img/i.test(rawBlock) && !/<figure/i.test(rawBlock)) {
+        const srcMatch = rawBlock.match(/src=["']([^"']+)["']/i);
+        const altMatch = rawBlock.match(/alt=["']([^"']+)["']/i);
+        const widthMatch = rawBlock.match(/width=["']([^"']+)["']/i);
+        const heightMatch = rawBlock.match(/height=["']([^"']+)["']/i);
+
+        blocks.push(
+          DocumentFactory.createImage({
+            id: sourceId,
+            src: srcMatch ? srcMatch[1] : '',
+            alt: altMatch ? altMatch[1] : undefined,
+            width: widthMatch ? widthMatch[1] : undefined,
+            height: heightMatch ? heightMatch[1] : undefined,
+          })
+        );
+        return;
+      }
+
+      // Blockquotes
+      if (/<blockquote/i.test(rawBlock)) {
+        const innerContent = rawBlock.replace(/^<blockquote[^>]*>/i, '').replace(/<\/blockquote>$/i, '').trim();
+        const innerBlocks = this.parseHtmlRegex(innerContent);
+        blocks.push(
+          DocumentFactory.createSection({
+            id: sourceId,
+            content: innerBlocks.length > 0 ? innerBlocks : [DocumentFactory.createParagraph({ content: this.parseInlineHtmlString(innerContent) })],
+            sectionTitle: 'Blockquote',
+            attributes: { isBlockquote: true, className: 'blockquote' },
+          })
+        );
+        return;
+      }
 
       // Tables
       if (/<table/i.test(rawBlock)) {

@@ -34,6 +34,23 @@ import { runManualPageBreaksUnitTests } from './manual_page_breaks.test';
 import { runRebuiltPaginationLoopUnitTests } from './rebuilt_pagination_loop.test';
 import { runParagraphFragmentationEngineUnitTests } from './paragraph_fragmentation_engine.test';
 import { runTableFragmentationEngineUnitTests } from './table_fragmentation_engine.test';
+import { runCanonicalSourceOfTruthUnitTests } from './canonical_source_of_truth.test';
+import { runUnifiedLayoutContractTests } from './unified_layout_contract.test';
+import { runExactPageGeometryUnitTests } from './exact_page_geometry.test';
+import { runBrowserMeasurementEngineUnitTests } from './browser_measurement_engine.test';
+import { runTrueLineModelUnitTests } from './true_line_model.test';
+import { runParagraphFragmentationPhase06UnitTests } from './paragraph_fragmentation_engine_phase06.test';
+import { runTableFragmentationPhase07UnitTests } from './table_fragmentation_engine_phase07.test';
+import { runListsNestedImagesPhase08UnitTests } from './lists_nested_images_phase08.test';
+import { runPaginationRulesEnginePhase09UnitTests } from './pagination_rules_engine_phase09.test';
+import { runRealMultiPageEditorPhase10UnitTests } from './real_multi_page_editor_phase10.test';
+import { runCrossPageEditingSemanticsUnitTests } from './cross_page_editing_semantics_phase11.test';
+import { runClipboardUndoRedoFormattingTransactionsPhase12UnitTests } from './clipboard_undo_redo_formatting_transactions_phase12.test';
+import { runSectionsHeadersFootersPhase13UnitTests } from './sections_headers_footers_phase13.test';
+import { runDynamicTemplateDataEnginePhase14UnitTests } from './dynamic_template_data_engine_phase14.test';
+import { runIncrementalReflowPerformancePhase15UnitTests } from './incremental_reflow_performance_phase15.test';
+import { runRenderingArchitectureScreenPrintParityPhase16UnitTests } from './rendering_architecture_screen_print_parity_phase16.test';
+import { runTortureTestCorpusPhase18UnitTests } from './torture_test_corpus_phase18.test';
 
 async function main() {
   console.log('================================================================');
@@ -43,149 +60,70 @@ async function main() {
   let totalPassed = 0;
   let totalFailed = 0;
 
-  // 1. Canonical Document
-  const r1 = runCanonicalDocumentUnitTests();
-  totalPassed += r1.passed;
-  totalFailed += r1.failed;
-  console.log('');
+  const suites: [string, () => any][] = [
+    ['1. Canonical Document', runCanonicalDocumentUnitTests],
+    ['2. Geometry', runGeometryUnitTests],
+    ['3. Fragmentation', runFragmentationUnitTests],
+    ['4. Pagination Rules', runPaginationRulesUnitTests],
+    ['5. Template Merge', runTemplateMergeUnitTests],
+    ['6. Importers & Exporters', runImportersExportersUnitTests],
+    ['7. Native Tabular', runNativeTabularUnitTests],
+    ['8. Caret & Selection', runCaretAndSelectionUnitTests],
+    ['9. Mode Matrix', runModeMatrixUnitTests],
+    ['10. Code Hygiene', runCodeHygieneAuditUnitTests],
+    ['11. Content Completeness', runContentCompletenessUnitTests],
+    ['12. Save / Reload Invariants', runSaveReloadInvariantsUnitTests],
+    ['13. Legacy Migration', runLegacyMigrationUnitTests],
+    ['14. Type Safety', runTypeSafetyUnitTests],
+    ['15. Performance Architecture', runPerformanceArchitectureUnitTests],
+    ['16. Deterministic Pagination', runDeterministicPaginationUnitTests],
+    ['17. Canonical Caret', runCanonicalCaretArchitectureUnitTests],
+    ['18. Selection Survival', runSelectionSurvivalMatrixUnitTests],
+    ['19. Split Fragment Merging', runSplitFragmentMergingUnitTests],
+    ['20. Canonical Serialization', runCanonicalSerializationFromPagedDomUnitTests],
+    ['21. Manual Page Breaks', runManualPageBreaksUnitTests],
+    ['22. Rebuilt Pagination Loop', runRebuiltPaginationLoopUnitTests],
+    ['23. Paragraph Fragmentation (P47)', runParagraphFragmentationEngineUnitTests],
+    ['24. Table Fragmentation (P48)', runTableFragmentationEngineUnitTests],
+    ['25. Canonical Source of Truth', runCanonicalSourceOfTruthUnitTests],
+    ['26. Unified Layout Contract', runUnifiedLayoutContractTests],
+    ['27. Exact Page Geometry', runExactPageGeometryUnitTests],
+    ['28. Browser Measurement Engine', runBrowserMeasurementEngineUnitTests],
+    ['29. True Line Model', runTrueLineModelUnitTests],
+    ['30. Paragraph Fragmentation (P06)', runParagraphFragmentationPhase06UnitTests],
+    ['31. Table Fragmentation (P07)', runTableFragmentationPhase07UnitTests],
+    ['32. Lists, Nested Blocks, Images (P08)', runListsNestedImagesPhase08UnitTests],
+    ['33. Pagination Rules Engine (P09)', runPaginationRulesEnginePhase09UnitTests],
+    ['34. Real Multi-Page Editor (P10)', runRealMultiPageEditorPhase10UnitTests],
+    ['35. Cross-Page Editing Semantics (P11)', runCrossPageEditingSemanticsUnitTests],
+    ['36. Clipboard, Undo/Redo & Transactions (P12)', runClipboardUndoRedoFormattingTransactionsPhase12UnitTests],
+    ['37. Sections, Headers, Footers & Numbering (P13)', runSectionsHeadersFootersPhase13UnitTests],
+    ['38. Dynamic Template Data Engine (P14)', runDynamicTemplateDataEnginePhase14UnitTests],
+    ['39. Incremental Reflow & Performance (P15)', runIncrementalReflowPerformancePhase15UnitTests],
+    ['40. Rendering Architecture & Parity (P16)', runRenderingArchitectureScreenPrintParityPhase16UnitTests],
+    ['41. Torture Test Corpus (Phase 18)', runTortureTestCorpusPhase18UnitTests]
+  ];
 
-  // 2. Geometry
-  const r2 = runGeometryUnitTests();
-  totalPassed += r2.passed;
-  totalFailed += r2.failed;
-  console.log('');
+  const originalLog = console.log;
+  for (const [name, fn] of suites) {
+    // Suppress verbose assert logging to keep master runner crystal clear
+    console.log = () => {};
+    const res = await fn();
+    console.log = originalLog;
 
-  // 3. Fragmentation
-  const r3 = runFragmentationUnitTests();
-  totalPassed += r3.passed;
-  totalFailed += r3.failed;
-  console.log('');
-
-  // 4. Pagination Rules
-  const r4 = runPaginationRulesUnitTests();
-  totalPassed += r4.passed;
-  totalFailed += r4.failed;
-  console.log('');
-
-  // 5. Template Merge
-  const r5 = runTemplateMergeUnitTests();
-  totalPassed += r5.passed;
-  totalFailed += r5.failed;
-  console.log('');
-
-  // 6. Importers & Exporters
-  const r6 = await runImportersExportersUnitTests();
-  totalPassed += r6.passed;
-  totalFailed += r6.failed;
-  console.log('');
-
-  // 7. Native Tabular
-  const r7 = runNativeTabularUnitTests();
-  totalPassed += r7.passed;
-  totalFailed += r7.failed;
-  console.log('');
-
-  // 8. Caret & Selection
-  const r8 = runCaretAndSelectionUnitTests();
-  totalPassed += r8.passed;
-  totalFailed += r8.failed;
-  console.log('');
-
-  // 9. Mode Matrix & Viewport Policies
-  const r9 = runModeMatrixUnitTests();
-  totalPassed += r9.passed;
-  totalFailed += r9.failed;
-  console.log('');
-
-  // 10. Code Hygiene & Obsolete Symbol Audit
-  const r10 = runCodeHygieneAuditUnitTests();
-  totalPassed += r10.passed;
-  totalFailed += r10.failed;
-  console.log('');
-
-  // 11. Content Completeness & Monotonic Order
-  const r11 = runContentCompletenessUnitTests();
-  totalPassed += r11.passed;
-  totalFailed += r11.failed;
-  console.log('');
-
-  // 12. Save / Reload Invariants (Phase 36)
-  const r12 = runSaveReloadInvariantsUnitTests();
-  totalPassed += r12.passed;
-  totalFailed += r12.failed;
-  console.log('');
-
-  // 13. Legacy Migration Safety (Phase 37)
-  const r13 = runLegacyMigrationUnitTests();
-  totalPassed += r13.passed;
-  totalFailed += r13.failed;
-  console.log('');
-
-  // 14. Type Safety & Core Contracts (Phase 38)
-  const r14 = runTypeSafetyUnitTests();
-  totalPassed += r14.passed;
-  totalFailed += r14.failed;
-  console.log('');
-
-  // 15. Performance Architecture & Incremental Reflow (Phase 39)
-  const r15 = runPerformanceArchitectureUnitTests();
-  totalPassed += r15.passed;
-  totalFailed += r15.failed;
-  console.log('');
-
-  // 16. Deterministic Pagination & Stable Fragment IDs (Phase 40)
-  const r16 = runDeterministicPaginationUnitTests();
-  totalPassed += r16.passed;
-  totalFailed += r16.failed;
-  console.log('');
-
-  // 17. Canonical Node ID & Caret Architecture (Phase 41)
-  const r17 = runCanonicalCaretArchitectureUnitTests();
-  totalPassed += r17.passed;
-  totalFailed += r17.failed;
-  console.log('');
-
-  // 18. Selection Survival Across Pagination (Phase 42)
-  const r18 = runSelectionSurvivalMatrixUnitTests();
-  totalPassed += r18.passed;
-  totalFailed += r18.failed;
-  console.log('');
-
-  // 19. Split Fragment Editability & Canonical Merging (Phase 43)
-  const r19 = runSplitFragmentMergingUnitTests();
-  totalPassed += r19.passed;
-  totalFailed += r19.failed;
-  console.log('');
-
-  // 20. Canonical Serialization From Paged Editor DOM (Phase 44)
-  const r20 = runCanonicalSerializationFromPagedDomUnitTests();
-  totalPassed += r20.passed;
-  totalFailed += r20.failed;
-  console.log('');
-
-  // 21. Manual Page Breaks (Phase 45)
-  const r21 = runManualPageBreaksUnitTests();
-  totalPassed += r21.passed;
-  totalFailed += r21.failed;
-  console.log('');
-
-  // 22. Rebuilt Pagination Loop (Phase 46)
-  const r22 = runRebuiltPaginationLoopUnitTests();
-  totalPassed += r22.passed;
-  totalFailed += r22.failed;
-  console.log('');
-
-  // 23. Paragraph Fragmentation (Phase 47)
-  const r23 = runParagraphFragmentationEngineUnitTests();
-  totalPassed += r23.passed;
-  totalFailed += r23.failed;
-  console.log('');
-
-  // 24. Table Fragmentation (Phase 48)
-  const r24 = runTableFragmentationEngineUnitTests();
-  totalPassed += r24.passed;
-  totalFailed += r24.failed;
-  console.log('');
+    totalPassed += res.passed;
+    totalFailed += res.failed;
+    if (res.failed > 0) {
+      console.error(`❌ [FAILED] ${name}: ${res.failed} failed, ${res.passed} passed`);
+      if (res.results) {
+        res.results.filter((r: any) => !r.passed).forEach((r: any) => {
+          console.error(`   - ${r.name}: ${r.error}`);
+        });
+      }
+    } else {
+      console.log(`✓ [PASSED] ${name}: ${res.passed} passed`);
+    }
+  }
 
   console.log('================================================================');
   console.log(`TOTAL UNIT TEST RESULTS: ${totalPassed} Passed, ${totalFailed} Failed`);

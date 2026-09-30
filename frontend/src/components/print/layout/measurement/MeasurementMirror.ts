@@ -151,7 +151,8 @@ export class MeasurementMirror {
    * Prepares or retrieves the authoritative offscreen measurement mirror element
    */
   public static getOrCreateMirror(context: MeasurementContext): HTMLDivElement {
-    if (typeof document === 'undefined' || !document.body) {
+    const isRealBrowser = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' && typeof document !== 'undefined' && Boolean(document.body);
+    if (!isRealBrowser) {
       throw new Error('MeasurementMirror requires a valid browser DOM environment');
     }
 
@@ -183,8 +184,14 @@ export class MeasurementMirror {
     mirror.style.wordBreak = 'normal';
     mirror.style.overflowWrap = 'break-word';
     mirror.style.whiteSpace = 'normal';
-    mirror.style.direction = (context.styles && context.styles.includes('rtl')) ? 'rtl' : 'ltr';
+    mirror.style.direction = context.direction || ((context.styles && /direction\s*:\s*rtl/i.test(context.styles)) ? 'rtl' : 'ltr');
 
+    if (context.fontWeight) {
+      mirror.style.fontWeight = String(context.fontWeight);
+    }
+    if (context.writingMode) {
+      mirror.style.writingMode = context.writingMode;
+    }
     if (context.fontSizePx) {
       mirror.style.fontSize = `${context.fontSizePx}px`;
     }
@@ -206,6 +213,42 @@ export class MeasurementMirror {
     this.mirrorContainer = mirror;
     this.styleTag = styleTag;
     return mirror;
+  }
+
+  /**
+   * Waits for document fonts, images, and layout stabilization inside a container
+   */
+  public static async waitForResources(container?: HTMLElement): Promise<void> {
+    if (typeof document === 'undefined') return;
+
+    // 1. Wait for document fonts
+    if ('fonts' in document && (document as any).fonts?.ready) {
+      try {
+        await (document as any).fonts.ready;
+      } catch {}
+    }
+
+    // 2. Wait for image resource decoding
+    if (container) {
+      const images = Array.from(container.querySelectorAll('img'));
+      if (images.length > 0) {
+        const imagePromises = images.map((img) => {
+          if (img.complete) return Promise.resolve();
+          if ('decode' in img && typeof img.decode === 'function') {
+            return img.decode().catch(() => {});
+          }
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            setTimeout(resolve, 500);
+          });
+        });
+        await Promise.all(imagePromises);
+      }
+
+      // 3. Force layout stabilization reflow
+      void container.offsetHeight;
+    }
   }
 
   /**
@@ -288,6 +331,27 @@ export class MeasurementMirror {
       breakOpportunities = textMetrics.breakOpportunities;
     }
 
+    const mirror = this.mirrorContainer || (typeof document !== 'undefined' ? document.getElementById(MEASUREMENT_MIRROR_ID) : null);
+    const mirrorRect = mirror ? mirror.getBoundingClientRect() : { left: 0, top: 0, width: context.containerWidth, height: 0 };
+
+    const localRect: Rect = {
+      x: Math.round((elRect.left - mirrorRect.left) * 100) / 100,
+      y: Math.round((elRect.top - mirrorRect.top) * 100) / 100,
+      width,
+      height,
+    };
+
+    const viewportRect: Rect = {
+      x: Math.round(elRect.left * 100) / 100,
+      y: Math.round(elRect.top * 100) / 100,
+      width: Math.round(elRect.width * 100) / 100,
+      height: Math.round(elRect.height * 100) / 100,
+    };
+
+    const isRealBrowser = typeof window !== 'undefined' && elRect.height > 0;
+    const measurementMethod = isRealBrowser ? 'BROWSER_DOM' : 'ESTIMATED_SSR_FALLBACK';
+    const isAuthoritative = isRealBrowser;
+
     const assignedNodeId =
       el.id ||
       (typeof el.getAttribute === 'function' && (el.getAttribute('data-node-id') || el.getAttribute('data-source-id'))) ||
@@ -299,6 +363,10 @@ export class MeasurementMirror {
       width,
       height,
       boundingRect,
+      localRect,
+      viewportRect,
+      measurementMethod,
+      isAuthoritative,
       marginTop,
       marginBottom,
       paddingTop,
@@ -330,7 +398,8 @@ export class MeasurementMirror {
   ): NodeMeasurementResult[] {
     if (!html || !html.trim()) return [];
 
-    if (typeof document === 'undefined' || !document.body || context.pureMode) {
+    const isRealBrowser = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' && typeof document !== 'undefined' && Boolean(document.body);
+    if (!isRealBrowser || context.pureMode) {
       return this.measureHtmlNodesPure(html, context);
     }
 
@@ -343,6 +412,19 @@ export class MeasurementMirror {
     contentHost.style.width = '100%';
     contentHost.style.boxSizing = 'border-box';
     contentHost.innerHTML = html.trim();
+
+    // Normalize any loose text nodes into <p> tags so they are measured properly
+    Array.from(contentHost.childNodes).forEach((child) => {
+      if (child.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+        const text = child.textContent?.trim();
+        if (text) {
+          const p = document.createElement('p');
+          p.textContent = child.textContent;
+          contentHost.insertBefore(p, child);
+          contentHost.removeChild(child);
+        }
+      }
+    });
 
     mirror.appendChild(contentHost);
 
@@ -379,14 +461,18 @@ export class MeasurementMirror {
     context: MeasurementContext
   ): NodeMeasurementResult[] {
     const blockRegex =
-      /(<table[\s\S]*?<\/table>|<h[1-6][\s\S]*?<\/h[1-6]>|<p[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<div[\s\S]*?<\/div>|<ul[\s\S]*?<\/ul>|<ol[\s\S]*?<\/ol>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<figure[\s\S]*?<\/figure>|<img[\s\S]*?>)/gi;
+      /(<table[\s\S]*?<\/table>|<h[1-6][\s\S]*?<\/h[1-6]>|<p[\s\S]*?<\/p>|<div class="spr-page-break"[\s\S]*?<\/div>|<div class="spr-section-break"[\s\S]*?<\/div>|<!--[\s\S]*?-->|<ul[\s\S]*?<\/ul>|<ol[\s\S]*?<\/ol>|<blockquote[\s\S]*?<\/blockquote>|<section[\s\S]*?<\/section>|<figure[\s\S]*?<\/figure>|<img[\s\S]*?>|<div[\s\S]*?<\/div>)/gi;
     const matches = html.match(blockRegex) || [html];
 
     return matches.map((block, idx) => {
       const isTable = /<table/i.test(block);
       const isHeading = /<h[1-6]/i.test(block);
       const isImg = /<img/i.test(block) || /<figure/i.test(block);
-      const isManual = block.includes('data-manual-break="true"') || block.includes('spr-page-break');
+      const isManual =
+        block.includes('data-manual-break="true"') ||
+        block.includes('spr-page-break') ||
+        block.includes('spr-section-break') ||
+        block.includes('data-section-break');
 
       const width = context.containerWidth || 602;
       const inlineFontSizeMatch = block.match(/font-size:\s*(\d+)px/i);
@@ -398,12 +484,17 @@ export class MeasurementMirror {
       const customMb = inlineMbMatch ? parseInt(inlineMbMatch[1], 10) : undefined;
 
       if (isManual) {
+        const boundingRect = { x: 0, y: 0, width, height: 1 };
         return {
           nodeId: `pure_node_${idx}`,
           type: 'manual-page-break' as SourceNodeType,
           width,
           height: 1,
-          boundingRect: { x: 0, y: 0, width, height: 1 },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 0,
           marginBottom: 0,
           paddingTop: 0,
@@ -430,12 +521,17 @@ export class MeasurementMirror {
         }
         const height = customHeight !== undefined && !block.startsWith('<table') ? customHeight : computedTableHeight;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `pure_table_${idx}`,
           type: 'table' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 8,
           marginBottom,
           paddingTop: 0,
@@ -469,13 +565,18 @@ export class MeasurementMirror {
 
         const height = customHeight !== undefined ? customHeight : listHeight;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
 
         return {
           nodeId: `pure_list_${idx}`,
           type: 'list' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 6,
           marginBottom,
           paddingTop: 0,
@@ -492,12 +593,17 @@ export class MeasurementMirror {
       if (isHeading) {
         const height = customHeight !== undefined ? customHeight : 40;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `pure_heading_${idx}`,
           type: 'heading' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 12,
           marginBottom,
           paddingTop: 0,
@@ -514,12 +620,17 @@ export class MeasurementMirror {
       if (isImg) {
         const height = customHeight !== undefined ? customHeight : 220;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `pure_img_${idx}`,
           type: 'image' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 8,
           marginBottom,
           paddingTop: 0,
@@ -542,13 +653,18 @@ export class MeasurementMirror {
       const computedHeight = Math.max(lineHeight, lineCount * lineHeight);
       const height = customHeight !== undefined ? customHeight : computedHeight;
       const marginBottom = customMb !== undefined ? customMb : 6;
+      const boundingRect = { x: 0, y: 0, width, height };
 
       return {
         nodeId: `pure_p_${idx}`,
         type: 'paragraph' as SourceNodeType,
         width,
         height,
-        boundingRect: { x: 0, y: 0, width, height },
+        boundingRect,
+        localRect: boundingRect,
+        viewportRect: boundingRect,
+        measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+        isAuthoritative: false,
         marginTop: 6,
         marginBottom,
         paddingTop: 0,

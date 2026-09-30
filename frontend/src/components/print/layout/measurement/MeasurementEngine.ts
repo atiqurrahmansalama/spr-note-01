@@ -30,12 +30,17 @@ export class MeasurementEngine {
     if (typeof target === 'object' && target !== null && 'type' in target && !('rawHtml' in target) && !('nodeType' in target)) {
       const block = target as BlockNode;
       if (block.type === 'manual-page-break') {
+        const boundingRect = { x: 0, y: 0, width: context.containerWidth || 700, height: 1 };
         return {
           nodeId: block.id,
           type: 'manual-page-break',
           width: context.containerWidth || 700,
           height: 1,
-          boundingRect: { x: 0, y: 0, width: context.containerWidth || 700, height: 1 },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'BROWSER_DOM',
+          isAuthoritative: true,
           marginTop: 0,
           marginBottom: 0,
           paddingTop: 0,
@@ -158,13 +163,17 @@ export class MeasurementEngine {
   ): NodeMeasurementResult {
     const width = context.containerWidth || 700;
     const height = type === 'table' ? 120 : type === 'heading' ? 44 : 32;
-
+    const boundingRect = { x: 0, y: 0, width, height };
     return {
       nodeId,
       type: type || 'paragraph',
       width,
       height,
-      boundingRect: { x: 0, y: 0, width, height },
+      boundingRect,
+      localRect: boundingRect,
+      viewportRect: boundingRect,
+      measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+      isAuthoritative: false,
       marginTop: 8,
       marginBottom: 8,
       paddingTop: 0,

@@ -6,6 +6,20 @@
 import { Rect } from './layoutTypes';
 import { SourceNodeType } from './documentTypes';
 
+export interface FragmentRange {
+  startOffset: number;
+  endOffset: number;
+  unit?: 'char' | 'line' | 'row' | 'item' | 'block';
+  total?: number;
+}
+
+export interface FragmentBreakMetadata {
+  isManual: boolean;
+  isAutomatic: boolean;
+  breakType?: 'page' | 'section' | 'overflow' | 'column';
+  breakReason?: string;
+}
+
 export interface LayoutFragment {
   /** Unique ID for this specific page fragment instance */
   id: string;
@@ -16,14 +30,26 @@ export interface LayoutFragment {
   /** Type of element being rendered */
   type: SourceNodeType;
 
+  /** Source node type (canonical alias for type) */
+  sourceType?: SourceNodeType;
+
   /** Zero-based page index where this fragment is placed */
   pageIndex: number;
 
   /** Exact geometric box bounding rectangle relative to page content area */
   rect: Rect;
 
+  /** Fragment width in CSS pixels (mirrors rect.width) */
+  width?: number;
+
+  /** Fragment height in CSS pixels (mirrors rect.height) */
+  height?: number;
+
   /** Fragment index (e.g. 0 for first part of a split paragraph/table, 1 for second part) */
   fragmentIndex?: number;
+
+  /** Order of fragment in sequence */
+  fragmentOrder?: number;
 
   /** Total fragments produced for the source node */
   totalFragments?: number;
@@ -39,6 +65,18 @@ export interface LayoutFragment {
 
   /** True if this page break was explicitly commanded by user (Ctrl+Enter / break tag) */
   isManualBreak?: boolean;
+
+  /** Full automatic/manual break metadata */
+  breakMetadata?: FragmentBreakMetadata;
+
+  /** Logical range slice within source node (e.g. characters or rows) */
+  logicalRange?: FragmentRange;
+
+  /** Logical start position (character, line, or row offset) */
+  logicalStart?: number;
+
+  /** Logical end position (character, line, or row offset) */
+  logicalEnd?: number;
 
   /** Rendered HTML string slice for this fragment */
   htmlContent?: string;

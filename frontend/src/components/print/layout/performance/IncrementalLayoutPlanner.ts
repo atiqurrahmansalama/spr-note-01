@@ -30,18 +30,19 @@ export class IncrementalLayoutPlanner {
   public static identifyDirtyNodes(
     prevNodes: Array<SourceNode | any>,
     nextNodes: Array<SourceNode | any>
-  ): { dirtyNodeIds: string[]; firstAffectedIndex: number } {
+  ): { dirtyNodeIds: string[]; firstAffectedIndex: number; lastAffectedIndex: number } {
     const dirtyNodeIds: string[] = [];
     let firstAffectedIndex = -1;
+    let lastAffectedIndex = -1;
 
     const prevMap = new Map<string, any>();
     prevNodes.forEach((node) => {
-      if (node.id) prevMap.set(node.id, node);
+      if (node && node.id) prevMap.set(node.id, node);
     });
 
     const nextMap = new Map<string, any>();
     nextNodes.forEach((node) => {
-      if (node.id) nextMap.set(node.id, node);
+      if (node && node.id) nextMap.set(node.id, node);
     });
 
     // Check for modifications and additions
@@ -66,7 +67,8 @@ export class IncrementalLayoutPlanner {
         if (firstAffectedIndex === -1) {
           firstAffectedIndex = i;
         }
-        if (nextNode.id) {
+        lastAffectedIndex = i;
+        if (nextNode && nextNode.id) {
           dirtyNodeIds.push(nextNode.id);
         }
       }
@@ -75,9 +77,12 @@ export class IncrementalLayoutPlanner {
     // Check for removed nodes
     for (let i = 0; i < prevNodes.length; i++) {
       const prevNode = prevNodes[i];
-      if (prevNode.id && !nextMap.has(prevNode.id)) {
+      if (prevNode && prevNode.id && !nextMap.has(prevNode.id)) {
         if (firstAffectedIndex === -1 || i < firstAffectedIndex) {
           firstAffectedIndex = i;
+        }
+        if (i > lastAffectedIndex) {
+          lastAffectedIndex = i;
         }
         dirtyNodeIds.push(prevNode.id);
       }
@@ -86,6 +91,7 @@ export class IncrementalLayoutPlanner {
     return {
       dirtyNodeIds: Array.from(new Set(dirtyNodeIds)),
       firstAffectedIndex: firstAffectedIndex === -1 ? 0 : firstAffectedIndex,
+      lastAffectedIndex: lastAffectedIndex === -1 ? (nextNodes.length - 1) : lastAffectedIndex,
     };
   }
 
@@ -125,7 +131,7 @@ export class IncrementalLayoutPlanner {
       }
     }
 
-    const { dirtyNodeIds, firstAffectedIndex } = this.identifyDirtyNodes(prevNodes, nextNodes);
+    const { dirtyNodeIds, firstAffectedIndex, lastAffectedIndex } = this.identifyDirtyNodes(prevNodes, nextNodes);
 
     if (dirtyNodeIds.length === 0 && prevNodes.length === nextNodes.length) {
       return {
@@ -133,8 +139,11 @@ export class IncrementalLayoutPlanner {
         dirtyNodeIds: [],
         affectedPageIndex: 0,
         affectedNodeIndex: 0,
+        lastDirtyNodeIndex: 0,
         changedAt: Date.now(),
         prevLayout,
+        reusedPrefixPagesCount: prevLayout.pages.length,
+        reflowedPagesCount: 0,
       };
     }
 
@@ -145,7 +154,7 @@ export class IncrementalLayoutPlanner {
     for (let pageIdx = 0; pageIdx < prevLayout.pages.length; pageIdx++) {
       const page = prevLayout.pages[pageIdx];
       const hasDirtyFragment = page.fragments.some((f) =>
-        dirtyNodeIds.includes(f.sourceNodeId)
+        dirtyNodeIds.includes(f.sourceNodeId || f.id)
       );
 
       if (hasDirtyFragment) {
@@ -164,13 +173,26 @@ export class IncrementalLayoutPlanner {
       );
     }
 
+    // Determine the exact node index to resume layout queue from
+    let startNodeIndex = firstAffectedIndex;
+    if (earliestPageIndex > 0 && prevLayout.pages[earliestPageIndex]?.fragments.length > 0) {
+      const firstFragOnPage = prevLayout.pages[earliestPageIndex].fragments[0];
+      const firstNodeId = firstFragOnPage.sourceNodeId || firstFragOnPage.id;
+      const foundIdx = nextNodes.findIndex((n) => n && n.id === firstNodeId);
+      if (foundIdx !== -1 && foundIdx <= firstAffectedIndex) {
+        startNodeIndex = foundIdx;
+      }
+    }
+
     return {
       type: 'incremental',
       dirtyNodeIds,
       affectedPageIndex: Math.max(0, earliestPageIndex),
-      affectedNodeIndex: firstAffectedIndex,
+      affectedNodeIndex: Math.max(0, startNodeIndex),
+      lastDirtyNodeIndex: lastAffectedIndex,
       changedAt: Date.now(),
       prevLayout,
+      reusedPrefixPagesCount: Math.max(0, earliestPageIndex),
     };
   }
 

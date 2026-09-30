@@ -2,11 +2,24 @@
  * TextMeasurement
  * High-precision browser text measurement engine using native Range client rects.
  *
- * Replaces naive character-count heuristics with exact DOM line-box geometry.
+ * Implements the True Line Model for SPR Note DocLab Layout Architecture:
+ * - Visual line index
+ * - Logical text start and end offsets
+ * - Exact spatial bounding box (top, bottom, left, right, width, height)
+ * - Text direction (LTR / RTL) and writing mode
+ * - Inline formatting context (bold, italic, underline, links, tokens, mixed fonts, mixed sizes, script detection)
+ * - Break opportunities on true visual line boundaries
  */
 
 import { Rect } from '../types/layoutTypes';
-import { LineMetric, BreakOpportunity, MeasurementContext } from './measurementTypes';
+import {
+  LineMetric,
+  BreakOpportunity,
+  MeasurementContext,
+  InlineRunFormatting,
+  InlineRunMetric,
+  InlineFormattingContext,
+} from './measurementTypes';
 
 export class TextMeasurement {
   /**
@@ -17,7 +30,8 @@ export class TextMeasurement {
     context: MeasurementContext | undefined,
     callback: (connectedEl: HTMLElement) => T
   ): T {
-    if (typeof document === 'undefined' || !el) {
+    const isRealBrowser = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' && typeof document !== 'undefined' && Boolean(document.body);
+    if (!isRealBrowser || !el) {
       return callback(el);
     }
 
@@ -64,7 +78,136 @@ export class TextMeasurement {
   }
 
   /**
-   * Measures text lines and line boxes inside a paragraph/heading using DOM Range APIs
+   * Extracts inline formatting marks and attributes for a given DOM text node
+   */
+  public static extractInlineFormatting(node: Node, root: HTMLElement): InlineRunFormatting {
+    const formatting: InlineRunFormatting = {};
+    let curr: Node | null = node.parentElement;
+
+    while (curr && curr !== root) {
+      if (curr.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)) {
+        const el = curr as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+
+        // 1. Semantic Formatting Marks
+        if (tag === 'b' || tag === 'strong') {
+          formatting.bold = true;
+        }
+        if (tag === 'i' || tag === 'em') {
+          formatting.italic = true;
+        }
+        if (tag === 'u') {
+          formatting.underline = true;
+        }
+        if (tag === 's' || tag === 'del' || tag === 'strike') {
+          formatting.strikethrough = true;
+        }
+
+        // 2. Hyperlinks
+        if (tag === 'a') {
+          formatting.isLink = true;
+          formatting.linkHref = el.getAttribute('href') || undefined;
+        }
+
+        // 3. Dynamic Tokens and Fields
+        if (
+          el.classList.contains('spr-token') ||
+          el.classList.contains('doclab-token') ||
+          el.hasAttribute('data-token') ||
+          el.hasAttribute('data-dynamic-field')
+        ) {
+          formatting.isToken = true;
+          formatting.tokenId = el.getAttribute('data-token') || el.getAttribute('data-dynamic-field') || undefined;
+        }
+
+        if (el.classList.contains('badge') || el.classList.contains('spr-badge')) {
+          formatting.isBadge = true;
+        }
+
+        // 4. Inline CSS Properties
+        if (el.style) {
+          if (el.style.fontWeight && (el.style.fontWeight === 'bold' || parseInt(el.style.fontWeight, 10) >= 600)) {
+            formatting.bold = true;
+            formatting.fontWeight = el.style.fontWeight;
+          }
+          if (el.style.fontStyle === 'italic') {
+            formatting.italic = true;
+          }
+          if (el.style.textDecoration && el.style.textDecoration.includes('underline')) {
+            formatting.underline = true;
+          }
+          if (el.style.fontSize) {
+            formatting.fontSize = parseFloat(el.style.fontSize);
+          }
+          if (el.style.fontFamily) {
+            formatting.fontFamily = el.style.fontFamily;
+          }
+          if (el.style.color) {
+            formatting.color = el.style.color;
+          }
+          if (el.style.backgroundColor) {
+            formatting.backgroundColor = el.style.backgroundColor;
+          }
+          if (el.style.direction === 'rtl' || el.getAttribute('dir') === 'rtl') {
+            formatting.direction = 'rtl';
+          } else if (el.style.direction === 'ltr' || el.getAttribute('dir') === 'ltr') {
+            formatting.direction = 'ltr';
+          }
+        }
+      }
+      curr = curr.parentNode;
+    }
+
+    return formatting;
+  }
+
+  /**
+   * Analyzes text characters to detect primary script and directionality
+   */
+  public static analyzeScriptDirection(text: string): {
+    dominantDirection: 'ltr' | 'rtl';
+    hasMixedDirection: boolean;
+    isArabic: boolean;
+    isBengali: boolean;
+  } {
+    let rtlCount = 0;
+    let ltrCount = 0;
+    let arabicCount = 0;
+    let bengaliCount = 0;
+
+    const len = text.length;
+    for (let i = 0; i < len; i++) {
+      const code = text.charCodeAt(i);
+      // Arabic, Hebrew, Persian unicode ranges
+      if ((code >= 0x0590 && code <= 0x05ff) || (code >= 0x0600 && code <= 0x06ff) || (code >= 0x0750 && code <= 0x077f)) {
+        rtlCount++;
+        if (code >= 0x0600 && code <= 0x06ff) arabicCount++;
+      }
+      // Bengali unicode range
+      else if (code >= 0x0980 && code <= 0x09ff) {
+        ltrCount++;
+        bengaliCount++;
+      }
+      // Standard Latin / Greek / Cyrillic
+      else if ((code >= 0x0041 && code <= 0x005a) || (code >= 0x0061 && code <= 0x007a) || (code >= 0x00c0 && code <= 0x024f)) {
+        ltrCount++;
+      }
+    }
+
+    const totalLetters = rtlCount + ltrCount;
+    const dominantDirection: 'ltr' | 'rtl' = totalLetters > 0 && rtlCount > ltrCount ? 'rtl' : 'ltr';
+    const hasMixedDirection = totalLetters > 0 && rtlCount > 0 && ltrCount > 0 && (rtlCount / totalLetters > 0.15 && ltrCount / totalLetters > 0.15);
+
+    return {
+      dominantDirection,
+      hasMixedDirection,
+      isArabic: arabicCount > 0,
+      isBengali: bengaliCount > 0,
+    };
+  }
+
+  /**
+   * Builds an authoritative True Line Model for any paragraph or heading element
    */
   public static measureTextLines(el: HTMLElement, context?: MeasurementContext): {
     lines: LineMetric[];
@@ -85,20 +228,24 @@ export class TextMeasurement {
         };
       }
 
-      const textNodes: Text[] = [];
+      const textNodes: Array<{ node: Text; formatting: InlineRunFormatting }> = [];
       const showTextFilter = typeof NodeFilter !== 'undefined' ? NodeFilter.SHOW_TEXT : 4;
       const textNodeType = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
       const walker = typeof document !== 'undefined' && document.createTreeWalker ? document.createTreeWalker(connectedEl, showTextFilter, null) : null;
       let curr = walker ? walker.nextNode() : null;
+
       while (curr) {
         if ((curr as any).nodeType === textNodeType && (curr.textContent?.length || 0) > 0) {
-          textNodes.push(curr as Text);
+          const tNode = curr as Text;
+          const formatting = this.extractInlineFormatting(tNode, connectedEl);
+          textNodes.push({ node: tNode, formatting });
         }
         curr = walker ? walker.nextNode() : null;
       }
 
+      const elRect = connectedEl.getBoundingClientRect();
+
       if (textNodes.length === 0) {
-        const elRect = connectedEl.getBoundingClientRect();
         const h = Math.max(connectedEl.offsetHeight, elRect.height, 24);
         return {
           lines: [],
@@ -109,11 +256,20 @@ export class TextMeasurement {
         };
       }
 
-      const elRect = connectedEl.getBoundingClientRect();
       const range = document.createRange();
-      const lineRects: Array<{ rect: Rect; top: number; bottom: number; text: string; charStart: number; charEnd: number }> = [];
+      const rawLines: Array<{
+        rect: Rect;
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+        text: string;
+        charStart: number;
+        charEnd: number;
+        runs: InlineRunMetric[];
+      }> = [];
 
-      // Use native Intl.Segmenter for complex scripts (Bengali, Arabic, Urdu, etc.) if supported
+      // Native segmenter for script boundary fidelity
       const graphemeSegmenter =
         typeof Intl !== 'undefined' && (Intl as any).Segmenter
           ? new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
@@ -126,8 +282,41 @@ export class TextMeasurement {
       let currentLineStart = 0;
       let currentLineLeft = Infinity;
       let currentLineRight = -Infinity;
+      let currentLineRuns: InlineRunMetric[] = [];
+      let currentRunText = '';
+      let currentRunStart = 0;
+      let currentRunFormatting: InlineRunFormatting = {};
+      let currentRunLeft = Infinity;
+      let currentRunRight = -Infinity;
+      let currentRunTop = Infinity;
+      let currentRunBottom = -Infinity;
 
-      for (const tNode of textNodes) {
+      const flushCurrentRun = (lineTop: number, charEndOffset: number) => {
+        if (currentRunText.length > 0) {
+          const runRect: Rect = {
+            x: Math.max(0, currentRunLeft - elRect.left),
+            y: Math.max(0, currentRunTop - elRect.top),
+            width: Math.max(4, currentRunRight - currentRunLeft),
+            height: Math.max(12, currentRunBottom - currentRunTop),
+          };
+          currentLineRuns.push({
+            text: currentRunText,
+            charStart: currentRunStart,
+            charEnd: charEndOffset,
+            rect: runRect,
+            formatting: { ...currentRunFormatting },
+          });
+          currentRunText = '';
+          currentRunLeft = Infinity;
+          currentRunRight = -Infinity;
+          currentRunTop = Infinity;
+          currentRunBottom = -Infinity;
+        }
+      };
+
+      for (const item of textNodes) {
+        const tNode = item.node;
+        const formatting = item.formatting;
         const text = tNode.textContent || '';
         if (!text) continue;
 
@@ -138,6 +327,8 @@ export class TextMeasurement {
         for (const seg of segments) {
           const segStart = seg.index;
           const segLen = seg.segment.length;
+          const globalCharPos = runningCharOffset + segStart;
+
           try {
             range.setStart(tNode, segStart);
             range.setEnd(tNode, segStart + segLen);
@@ -148,17 +339,28 @@ export class TextMeasurement {
               const charTop = r.top;
               const charBottom = r.bottom;
 
-              // Check if this cluster is on a new line (threshold > 4px vertical delta)
+              // Check if this cluster starts a new visual line (threshold > 4px vertical delta)
               if (currentLineTop === -1) {
                 currentLineTop = charTop;
                 currentLineBottom = charBottom;
                 currentLineText = seg.segment;
-                currentLineStart = runningCharOffset + segStart;
+                currentLineStart = globalCharPos;
                 currentLineLeft = r.left;
                 currentLineRight = r.right;
+
+                currentRunText = seg.segment;
+                currentRunStart = globalCharPos;
+                currentRunFormatting = formatting;
+                currentRunLeft = r.left;
+                currentRunRight = r.right;
+                currentRunTop = r.top;
+                currentRunBottom = r.bottom;
               } else if (Math.abs(charTop - currentLineTop) > 4) {
-                // Flush completed line
-                lineRects.push({
+                // 1. Flush active run
+                flushCurrentRun(currentLineTop, globalCharPos);
+
+                // 2. Flush completed line
+                rawLines.push({
                   rect: {
                     x: Math.max(0, currentLineLeft - elRect.left),
                     y: Math.max(0, currentLineTop - elRect.top),
@@ -167,36 +369,67 @@ export class TextMeasurement {
                   },
                   top: currentLineTop - elRect.top,
                   bottom: currentLineBottom - elRect.top,
+                  left: currentLineLeft - elRect.left,
+                  right: currentLineRight - elRect.left,
                   text: currentLineText,
                   charStart: currentLineStart,
-                  charEnd: runningCharOffset + segStart,
+                  charEnd: globalCharPos,
+                  runs: [...currentLineRuns],
                 });
 
-                // Start new line
+                // 3. Start new visual line
+                currentLineRuns = [];
                 currentLineTop = charTop;
                 currentLineBottom = charBottom;
                 currentLineText = seg.segment;
-                currentLineStart = runningCharOffset + segStart;
+                currentLineStart = globalCharPos;
                 currentLineLeft = r.left;
                 currentLineRight = r.right;
+
+                currentRunText = seg.segment;
+                currentRunStart = globalCharPos;
+                currentRunFormatting = formatting;
+                currentRunLeft = r.left;
+                currentRunRight = r.right;
+                currentRunTop = r.top;
+                currentRunBottom = r.bottom;
               } else {
-                // Same line continuation
+                // Continuation of current line
                 currentLineText += seg.segment;
                 currentLineBottom = Math.max(currentLineBottom, charBottom);
                 currentLineLeft = Math.min(currentLineLeft, r.left);
                 currentLineRight = Math.max(currentLineRight, r.right);
+
+                // Check formatting run boundary
+                if (currentRunFormatting !== formatting) {
+                  flushCurrentRun(currentLineTop, globalCharPos);
+                  currentRunText = seg.segment;
+                  currentRunStart = globalCharPos;
+                  currentRunFormatting = formatting;
+                  currentRunLeft = r.left;
+                  currentRunRight = r.right;
+                  currentRunTop = r.top;
+                  currentRunBottom = r.bottom;
+                } else {
+                  currentRunText += seg.segment;
+                  currentRunLeft = Math.min(currentRunLeft, r.left);
+                  currentRunRight = Math.max(currentRunRight, r.right);
+                  currentRunTop = Math.min(currentRunTop, r.top);
+                  currentRunBottom = Math.max(currentRunBottom, r.bottom);
+                }
               }
             }
-          } catch (e) {
-            // ignore transient range errors
+          } catch {
+            // ignore transient DOM range errors
           }
         }
         runningCharOffset += text.length;
       }
 
-      // Flush last line
+      // Flush remaining run and last line
       if (currentLineTop !== -1) {
-        lineRects.push({
+        flushCurrentRun(currentLineTop, runningCharOffset);
+        rawLines.push({
           rect: {
             x: Math.max(0, currentLineLeft - elRect.left),
             y: Math.max(0, currentLineTop - elRect.top),
@@ -205,19 +438,71 @@ export class TextMeasurement {
           },
           top: currentLineTop - elRect.top,
           bottom: currentLineBottom - elRect.top,
+          left: currentLineLeft - elRect.left,
+          right: currentLineRight - elRect.left,
           text: currentLineText,
           charStart: currentLineStart,
           charEnd: runningCharOffset,
+          runs: [...currentLineRuns],
         });
       }
 
-      const lines: LineMetric[] = lineRects.map((l, idx) => ({
-        index: idx,
-        rect: l.rect,
-        charStart: l.charStart,
-        charEnd: l.charEnd,
-        text: l.text,
-      }));
+      const defaultDirection = context?.direction || ((context?.styles && /direction\s*:\s*rtl/i.test(context.styles)) ? 'rtl' : 'ltr');
+      const writingMode = context?.writingMode || 'horizontal-tb';
+
+      const lines: LineMetric[] = rawLines.map((l, idx) => {
+        const scriptInfo = this.analyzeScriptDirection(l.text);
+        const lineDir = scriptInfo.dominantDirection || defaultDirection;
+
+        const fontFamilies = Array.from(
+          new Set(
+            l.runs
+              .map((r) => r.formatting.fontFamily)
+              .filter(Boolean) as string[]
+          )
+        );
+        const fontSizes = Array.from(
+          new Set(
+            l.runs
+              .map((r) => r.formatting.fontSize)
+              .filter((sz): sz is number => typeof sz === 'number')
+          )
+        );
+
+        const formattingContext: InlineFormattingContext = {
+          hasBold: l.runs.some((r) => r.formatting.bold),
+          hasItalic: l.runs.some((r) => r.formatting.italic),
+          hasUnderline: l.runs.some((r) => r.formatting.underline),
+          hasLinks: l.runs.some((r) => r.formatting.isLink),
+          hasTokens: l.runs.some((r) => r.formatting.isToken),
+          hasMixedFonts: fontFamilies.length > 1,
+          hasMixedSizes: fontSizes.length > 1,
+          hasMixedDirection: scriptInfo.hasMixedDirection,
+          fontFamilies: fontFamilies.length > 0 ? fontFamilies : [context?.fontFamily || 'sans-serif'],
+          fontSizes: fontSizes.length > 0 ? fontSizes : [context?.fontSizePx || 16],
+          dominantDirection: lineDir,
+        };
+
+        return {
+          index: idx,
+          lineIndex: idx,
+          rect: l.rect,
+          top: l.top,
+          bottom: l.bottom,
+          left: l.left,
+          right: l.right,
+          width: l.rect.width,
+          height: l.rect.height,
+          charStart: l.charStart,
+          charEnd: l.charEnd,
+          text: l.text,
+          direction: lineDir,
+          writingMode,
+          runs: l.runs,
+          formattingContext,
+          baseline: Math.round(l.rect.height * 0.8),
+        };
+      });
 
       const totalHeight = elRect.height > 0 ? elRect.height : (connectedEl.offsetHeight || Math.max(lines.length * 20, 24));
       const firstLineHeight = lines.length > 0 ? lines[0].rect.height : totalHeight;
@@ -256,7 +541,8 @@ export class TextMeasurement {
   }
 
   /**
-   * Finds the exact text split boundary for an element that exceeds available height
+   * Finds the exact text split boundary for an element that exceeds available height,
+   * guaranteeing splitting on an authoritative visual line boundary.
    */
   public static findTextSplitOffsetForHeight(
     el: HTMLElement,
@@ -274,92 +560,34 @@ export class TextMeasurement {
       const elRect = connectedEl.getBoundingClientRect();
       if (elRect.height <= maxAllowedHeightPx) return null;
 
-      const textNodes: Text[] = [];
-      const showTextFilter = typeof NodeFilter !== 'undefined' ? NodeFilter.SHOW_TEXT : 4;
-      const textNodeType = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
-      const walker = typeof document !== 'undefined' && document.createTreeWalker ? document.createTreeWalker(connectedEl, showTextFilter, null) : null;
-      let curr = walker ? walker.nextNode() : null;
-      while (curr) {
-        if ((curr as any).nodeType === textNodeType && (curr.textContent?.length || 0) > 0) {
-          textNodes.push(curr as Text);
-        }
-        curr = walker ? walker.nextNode() : null;
-      }
+      const metrics = this.measureTextLines(connectedEl, context);
+      const lines = metrics.lines;
 
-      if (textNodes.length === 0) return null;
-
-      const wordSegmenter =
-        typeof Intl !== 'undefined' && (Intl as any).Segmenter
-          ? new (Intl as any).Segmenter(undefined, { granularity: 'word' })
-          : null;
-
-      const range = document.createRange();
-      let targetNode: Text | null = null;
-      let targetOffset = -1;
-
-      for (const tNode of textNodes) {
-        const text = tNode.textContent || '';
-        if (!text) continue;
-
-        if (wordSegmenter) {
-          const words = Array.from(wordSegmenter.segment(text));
-          for (const w of words) {
-            const wStart = (w as any).index;
-            const wLen = (w as any).segment.length;
-            try {
-              range.setStart(tNode, wStart);
-              range.setEnd(tNode, wStart + wLen);
-              const rects = range.getClientRects();
-              if (rects.length > 0) {
-                const relBottom = rects[0].bottom - elRect.top;
-                if (relBottom > maxAllowedHeightPx) {
-                  targetNode = tNode;
-                  targetOffset = wStart;
-                  break;
-                }
-              }
-            } catch (e) {
-              // ignore
-            }
-          }
-        } else {
-          const len = text.length;
-          for (let o = 0; o < len; o += 3) {
-            try {
-              range.setStart(tNode, o);
-              range.setEnd(tNode, Math.min(o + 1, len));
-              const rects = range.getClientRects();
-              if (rects.length > 0) {
-                const relBottom = rects[0].bottom - elRect.top;
-                if (relBottom > maxAllowedHeightPx) {
-                  targetNode = tNode;
-                  targetOffset = o;
-                  break;
-                }
-              }
-            } catch (e) {
-              // ignore
-            }
+      if (lines.length > 1) {
+        let lastFittingIdx = -1;
+        for (let i = 0; i < lines.length; i++) {
+          const lineBottom = lines[i].rect.y + lines[i].rect.height;
+          if (lineBottom <= maxAllowedHeightPx + 1) {
+            lastFittingIdx = i;
+          } else {
+            break;
           }
         }
-        if (targetNode) break;
-      }
 
-      if (targetNode && targetOffset > 0) {
-        // Find nearest preceding space for a clean word boundary
-        const text = targetNode.textContent || '';
-        const lastSpace = text.lastIndexOf(' ', targetOffset);
-        const safeOffset = lastSpace > 0 ? lastSpace : targetOffset;
-
-        return {
-          splitOffset: safeOffset,
-          splitNode: targetNode,
-          sliceHeight: maxAllowedHeightPx,
-          remainingHeight: elRect.height - maxAllowedHeightPx,
-        };
+        if (lastFittingIdx >= 0) {
+          const splitLine = lines[lastFittingIdx];
+          const sliceHeight = splitLine.rect.y + splitLine.rect.height;
+          return {
+            splitOffset: splitLine.charEnd,
+            splitNode: null,
+            sliceHeight,
+            remainingHeight: Math.max(16, elRect.height - sliceHeight),
+          };
+        }
       }
 
       return null;
     });
   }
 }
+

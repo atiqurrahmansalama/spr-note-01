@@ -28,7 +28,8 @@ export class DomMeasurementEngine {
    * Returns or creates a persistent hidden sandbox in DOM
    */
   public static getOrCreateSandbox(context: MeasurementContext): HTMLDivElement {
-    if (typeof document === 'undefined') {
+    const isRealBrowser = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' && typeof document !== 'undefined' && Boolean(document.body);
+    if (!isRealBrowser) {
       throw new Error('DomMeasurementEngine requires a browser DOM environment');
     }
 
@@ -178,12 +179,17 @@ export class DomMeasurementEngine {
       const customMb = inlineMbMatch ? parseInt(inlineMbMatch[1], 10) : undefined;
 
       if (isManual) {
+        const boundingRect = { x: 0, y: 0, width, height: 1 };
         return {
           nodeId: `ssr_node_${idx}`,
           type: 'manual-page-break' as SourceNodeType,
           width,
           height: 1,
-          boundingRect: { x: 0, y: 0, width, height: 1 },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 0,
           marginBottom: 0,
           paddingTop: 0,
@@ -210,12 +216,17 @@ export class DomMeasurementEngine {
         }
         const height = customHeight !== undefined && !block.startsWith('<table') ? customHeight : computedTableHeight;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `ssr_table_${idx}`,
           type: 'table' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 8,
           marginBottom,
           paddingTop: 0,
@@ -250,13 +261,18 @@ export class DomMeasurementEngine {
 
         const height = customHeight !== undefined ? customHeight : listHeight;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
 
         return {
           nodeId: `ssr_list_${idx}`,
           type: 'list' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 6,
           marginBottom,
           paddingTop: 0,
@@ -273,12 +289,17 @@ export class DomMeasurementEngine {
       if (isHeading) {
         const height = customHeight !== undefined ? customHeight : 40;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `ssr_heading_${idx}`,
           type: 'heading' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 12,
           marginBottom,
           paddingTop: 0,
@@ -295,12 +316,17 @@ export class DomMeasurementEngine {
       if (isImg) {
         const height = customHeight !== undefined ? customHeight : 220;
         const marginBottom = customMb !== undefined ? customMb : 8;
+        const boundingRect = { x: 0, y: 0, width, height };
         return {
           nodeId: `ssr_img_${idx}`,
           type: 'image' as SourceNodeType,
           width,
           height,
-          boundingRect: { x: 0, y: 0, width, height },
+          boundingRect,
+          localRect: boundingRect,
+          viewportRect: boundingRect,
+          measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+          isAuthoritative: false,
           marginTop: 8,
           marginBottom,
           paddingTop: 0,
@@ -323,13 +349,18 @@ export class DomMeasurementEngine {
       const computedHeight = Math.max(lineHeight, lineCount * lineHeight);
       const height = customHeight !== undefined ? customHeight : computedHeight;
       const marginBottom = customMb !== undefined ? customMb : 6;
+      const boundingRect = { x: 0, y: 0, width, height };
 
       return {
         nodeId: `ssr_p_${idx}`,
         type: 'paragraph' as SourceNodeType,
         width,
         height,
-        boundingRect: { x: 0, y: 0, width, height },
+        boundingRect,
+        localRect: boundingRect,
+        viewportRect: boundingRect,
+        measurementMethod: 'ESTIMATED_SSR_FALLBACK',
+        isAuthoritative: false,
         marginTop: 6,
         marginBottom,
         paddingTop: 0,

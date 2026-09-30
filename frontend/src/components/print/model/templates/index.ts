@@ -4,5 +4,6 @@
 
 export * from './types';
 export * from './TemplateMergeEngine';
+export * from './TemplateDataEngine';
 export * from './ErpDataProvider';
 export * from './institutionalSampleData';

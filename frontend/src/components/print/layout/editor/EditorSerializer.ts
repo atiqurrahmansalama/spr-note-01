@@ -18,7 +18,9 @@ import {
   sanitizeLogicalDocumentHtml,
   stripRuntimePaginationSpacers,
   createManualPageBreakHtml,
+  createSectionBreakHtml,
   isExplicitManualBreak,
+  isExplicitSectionBreak,
 } from '../logicalDocument';
 
 export class EditorSerializer {
@@ -187,17 +189,28 @@ export class EditorSerializer {
         return;
       }
 
-      // Check if this is non-editable chrome (that is NOT an explicit manual break)
+      // Check if this is non-editable chrome (that is NOT an explicit manual break or section break)
       const isNonEditable = el.getAttribute('contenteditable') === 'false';
       const isManualBreak = isExplicitManualBreak(el);
+      const isSecBreak = isExplicitSectionBreak(el);
 
-      if (isNonEditable && !isManualBreak) {
+      if (isNonEditable && !isManualBreak && !isSecBreak) {
         return;
       }
 
       // Explicit Manual Page Break
       if (isManualBreak) {
         targetArray.push(DocumentFactory.createManualPageBreak());
+        return;
+      }
+
+      // Explicit Section Break
+      if (isSecBreak) {
+        const parsed = HtmlImporter.parseDomNodeToBlock(el);
+        if (parsed) {
+          if (Array.isArray(parsed)) targetArray.push(...parsed);
+          else targetArray.push(parsed);
+        }
         return;
       }
 
@@ -266,6 +279,13 @@ export class EditorSerializer {
    */
   public static createManualPageBreakHtml(): string {
     return createManualPageBreakHtml();
+  }
+
+  /**
+   * Generates standard semantic section break HTML
+   */
+  public static createSectionBreakHtml(options: Parameters<typeof createSectionBreakHtml>[0] = {}): string {
+    return createSectionBreakHtml(options);
   }
 }
 

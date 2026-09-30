@@ -3,7 +3,7 @@
  * Master pagination orchestrator for SPR Note DocLab Enterprise Layout Architecture.
  *
  * Implements the core multi-page layout pipeline:
- * Canonical Document AST / Source Document -> Measure -> Geometry Bounds -> Try Place -> Fragment -> Next Page
+ * Canonical Document AST / Source Document -> Measure -> Geometry Bounds -> Rule Engine Decision -> Try Place -> Fragment -> Next Page
  *
  * Supports:
  * - Direct CanonicalDocument AST pagination
@@ -14,15 +14,16 @@
  * - List fragmentation with ordered continuation
  * - Keep-together & break-inside: avoid constraints
  * - Keep-with-next heading orphan protection
- * - Orphan/widow line constraints
- * - Oversized blocks & images
- * - Rich layout diagnostics per page and global debug trace
+ * - Orphan/widow line constraints (2-line minimums)
+ * - Oversized blocks & images with deterministic emergency slicing
+ * - Word-class PaginationRuleEngine with explicit precedence hierarchy
+ * - Rich layout diagnostics per page, global debug trace, and rule conflict solver
  */
 
 import { SourceDocument, SourceNode, LayoutDocumentOptions } from '../types/documentTypes';
-import { LayoutDocument, LayoutPage, PaginationEngineResult } from '../types/paginationTypes';
+import { LayoutDocument, LayoutPage, PaginationEngineResult, LayoutDiagnostics, SectionLayout } from '../types/paginationTypes';
 import { LayoutChangeScope, LayoutPerformanceMetrics } from '../types/performanceTypes';
-import { CanonicalDocument, BlockNode } from '../../model/types';
+import { CanonicalDocument, BlockNode, SectionBreakNode } from '../../model/types';
 import { PageGeometryCalculator } from '../geometry/PageGeometry';
 import { MeasurementEngine } from '../measurement/MeasurementEngine';
 import { MeasurementContext } from '../measurement/measurementTypes';
@@ -33,6 +34,7 @@ import { FragmentationEngine } from '../fragmentation/FragmentationEngine';
 import { BreakResolver } from './BreakResolver';
 import { KeepTogetherResolver } from './KeepTogetherResolver';
 import { PageBuilder } from './PageBuilder';
+import { PaginationRuleEngine, PaginationRuleDecision } from './PaginationRuleEngine';
 import { LayoutDebugCollector } from '../debug/LayoutDebugCollector';
 import { IncrementalLayoutPlanner } from '../performance/IncrementalLayoutPlanner';
 
@@ -96,6 +98,9 @@ export class PaginationEngine {
     const isDebug = Boolean(options.debugLayout || LayoutDebugCollector.isEnabled());
     const debugCollector = isDebug ? new LayoutDebugCollector() : null;
 
+    // Instantiate formal PaginationRuleEngine
+    const ruleEngine = new PaginationRuleEngine();
+
     // If incremental scope is provided, invalidate caches for dirty blocks
     if (scope?.type === 'incremental' && scope.dirtyNodeIds && scope.dirtyNodeIds.length > 0) {
       IncrementalLayoutPlanner.invalidateDirtyNodes(scope.dirtyNodeIds);
@@ -108,7 +113,7 @@ export class PaginationEngine {
     let blocksOrNodes: Array<BlockNode | SourceNode | HTMLElement> = [];
 
     // CanonicalDocument AST
-    if (typeof input === 'object' && input !== null && 'version' in input && 'body' in input) {
+    if (typeof input === 'object' && input !== null && 'body' in input && Array.isArray((input as any).body)) {
       const canonDoc = input as CanonicalDocument;
       docId = canonDoc.id || docId;
       title = canonDoc.title || title;
@@ -213,14 +218,69 @@ export class PaginationEngine {
     let queue: Array<BlockNode | SourceNode | HTMLElement> = [...blocksOrNodes];
     let overflowDetected = false;
     let prevMarginBottom = 0;
+    let previousItem: BlockNode | SourceNode | HTMLElement | null = null;
     const fragmentIndexMap = new Map<string, number>();
 
     let currentSectionId = 'sec_0';
     let currentSectionIndex = 0;
-    let currentSectionTitle = '';
+    let currentSectionTitle = options.title || 'Official Document';
     const pageSectionMap = new Map<number, { id: string; index: number; title: string }>();
 
+    interface ActiveSectionMeta {
+      id: string;
+      index: number;
+      title: string;
+      pageSize?: string;
+      orientation?: 'PORTRAIT' | 'LANDSCAPE' | 'portrait' | 'landscape';
+      margin?: string;
+      customMarginsMm?: { top?: number; right?: number; bottom?: number; left?: number };
+      customPaperDimensionsMm?: { width: number; height: number };
+      headerHeightPx?: number;
+      footerHeightPx?: number;
+      headerDistanceMm?: number;
+      footerDistanceMm?: number;
+      headerHtml?: string;
+      footerHtml?: string;
+      firstPageHeaderHtml?: string;
+      firstPageFooterHtml?: string;
+      differentFirstPage?: boolean;
+      pageNumberFormat?: 'decimal' | 'roman-upper' | 'roman-lower' | 'bengali' | 'arabic';
+      pageNumberStart?: number;
+      restartPageNumbering?: boolean;
+      geometry: PageGeometryCalculator;
+      options: LayoutDocumentOptions;
+    }
+
+    let activeSectionMeta: any = {
+      id: 'sec_0',
+      index: 0,
+      title: options.title || 'Official Document',
+      pageSize: options.pageSize || 'A4',
+      orientation: options.orientation || 'PORTRAIT',
+      margin: options.margin || 'NORMAL',
+      customMarginsMm: options.customMarginsMm,
+      customPaperDimensionsMm: options.customPaperDimensionsMm,
+      headerHeightPx: options.headerHeightPx ?? options.headerConfig?.headerHeightPx,
+      footerHeightPx: options.footerHeightPx ?? options.footerConfig?.footerHeightPx,
+      headerDistanceMm: options.headerDistanceMm ?? options.headerConfig?.headerDistanceMm,
+      footerDistanceMm: options.footerDistanceMm ?? options.footerConfig?.footerDistanceMm,
+      headerHtml: options.headerConfig?.headerHtml,
+      footerHtml: options.footerConfig?.footerHtml,
+      firstPageHeaderHtml: options.headerConfig?.firstPageHeaderHtml,
+      firstPageFooterHtml: options.headerConfig?.firstPageFooterHtml,
+      differentFirstPage: options.headerConfig?.differentFirstPage,
+      pageNumberFormat: options.pageNumberFormat || 'decimal',
+      pageNumberStart: options.pageNumberStart !== undefined ? options.pageNumberStart : 1,
+      restartPageNumbering: false,
+      geometry,
+      options: { ...options },
+    };
+
+    const sectionMetaMap = new Map<number, any>();
+    sectionMetaMap.set(0, activeSectionMeta);
+
     // Incremental prefix page reuse optimization
+    let isCleanPrefixApplied = false;
     if (
       scope?.type === 'incremental' &&
       scope.affectedPageIndex !== undefined &&
@@ -240,36 +300,161 @@ export class PaginationEngine {
       const isCleanPrefix = !scope.dirtyNodeIds?.some((id) => unaffectedNodeIds.has(id));
 
       if (isCleanPrefix) {
-        // Find the first block belonging to the affected page index
-        const firstAffectedFrag = scope.prevLayout.pages[scope.affectedPageIndex]?.fragments[0];
-        let startNodeIdx = -1;
-        if (firstAffectedFrag && firstAffectedFrag.sourceNodeId) {
-          startNodeIdx = blocksOrNodes.findIndex((b) => {
-            const id = 'id' in b ? b.id : undefined;
-            return id === firstAffectedFrag.sourceNodeId;
-          });
-        }
-
-        if (startNodeIdx === -1 && scope.affectedNodeIndex !== undefined) {
-          startNodeIdx = scope.affectedNodeIndex;
+        let startNodeIdx = scope.affectedNodeIndex !== undefined ? scope.affectedNodeIndex : -1;
+        if (startNodeIdx === -1) {
+          const firstAffectedFrag = scope.prevLayout.pages[scope.affectedPageIndex]?.fragments[0];
+          if (firstAffectedFrag && firstAffectedFrag.sourceNodeId) {
+            startNodeIdx = blocksOrNodes.findIndex((b) => {
+              const id = 'id' in b ? b.id : undefined;
+              return id === firstAffectedFrag.sourceNodeId;
+            });
+          }
         }
 
         if (startNodeIdx > 0) {
           builder.seedUnaffectedPages(unaffectedPages);
           queue = blocksOrNodes.slice(startNodeIdx);
+          isCleanPrefixApplied = true;
         }
       }
     }
 
+    // Setup Layout Convergence Detection for incremental pagination
+    const allNextNodeIds = new Set(
+      blocksOrNodes
+        .map((n) => (typeof n === 'object' && n !== null ? ('id' in n ? (n as any).id : (n as any).nodeId) : undefined))
+        .filter(Boolean)
+    );
+    const remainingDirtyNodes = new Set<string>(
+      (scope?.dirtyNodeIds || []).filter((id) => allNextNodeIds.has(id))
+    );
+
+    const prevFirstNodePageMap = new Map<string, number>();
+    const isConvergenceEligible = Boolean(
+      scope?.type === 'incremental' &&
+        scope.prevLayout?.pages &&
+        scope.prevLayout.pages.length > 0
+    );
+
+    if (isConvergenceEligible && scope?.prevLayout?.pages) {
+      scope.prevLayout.pages.forEach((p: LayoutPage, pIdx: number) => {
+        if (p.fragments && p.fragments.length > 0) {
+          const firstFrag = p.fragments[0];
+          const sId = firstFrag.sourceNodeId || firstFrag.id;
+          if (sId && firstFrag.isFirstFragment !== false && (firstFrag.fragmentIndex === 0 || firstFrag.fragmentIndex === undefined)) {
+            // Only consider pages strictly downstream of the affected page index (> 0)
+            if (pIdx > (scope.affectedPageIndex || 0) && pIdx > 0) {
+              prevFirstNodePageMap.set(sId, pIdx);
+            }
+          }
+        }
+      });
+    }
+
+    const checkLayoutConvergence = (): boolean => {
+      if (!isConvergenceEligible || remainingDirtyNodes.size > 0 || queue.length === 0) {
+        return false;
+      }
+      // Must be at a clean page boundary (fresh page with usedHeight === 0)
+      if (builder.usedHeight > 0) {
+        return false;
+      }
+
+      const nextCandidate = queue[0];
+      const candidateId =
+        typeof nextCandidate === 'object' && nextCandidate !== null
+          ? ('id' in nextCandidate ? (nextCandidate as any).id : ('sourceNodeId' in nextCandidate ? (nextCandidate as any).sourceNodeId : (nextCandidate as any).nodeId))
+          : undefined;
+
+      if (!candidateId || !prevFirstNodePageMap.has(candidateId)) {
+        return false;
+      }
+
+      const targetPrevPageIndex = prevFirstNodePageMap.get(candidateId)!;
+      const prevPages = scope!.prevLayout!.pages;
+
+      if (targetPrevPageIndex < 0 || targetPrevPageIndex >= prevPages.length) {
+        return false;
+      }
+
+      const suffixPages = prevPages.slice(targetPrevPageIndex);
+
+      // Verify that all nodes in suffixPages match the remaining queue 1:1
+      const suffixNodeIds: string[] = [];
+      for (const p of suffixPages) {
+        for (const f of p.fragments) {
+          const sId = f.sourceNodeId || f.id;
+          if (sId && !suffixNodeIds.includes(sId)) {
+            suffixNodeIds.push(sId);
+          }
+        }
+      }
+
+      const queueNodeIds = queue.map((n) =>
+        typeof n === 'object' && n !== null
+          ? ('id' in n ? (n as any).id : ('sourceNodeId' in n ? (n as any).sourceNodeId : (n as any).nodeId))
+          : undefined
+      ).filter(Boolean) as string[];
+
+      if (suffixNodeIds.length !== queueNodeIds.length) {
+        return false;
+      }
+      for (let i = 0; i < suffixNodeIds.length; i++) {
+        if (suffixNodeIds[i] !== queueNodeIds[i]) {
+          return false;
+        }
+      }
+
+      // Verify that geometry matches
+      const targetPrevPage = prevPages[targetPrevPageIndex];
+      const currentSection = sectionMetaMap.get(currentSectionIndex) || activeSectionMeta;
+      const currentWidth = currentSection.geometry.paperDimensionsPx.width;
+      const currentHeight = currentSection.geometry.paperDimensionsPx.height;
+
+      if (
+        Math.round(targetPrevPage.width) !== Math.round(currentWidth) ||
+        Math.round(targetPrevPage.height) !== Math.round(currentHeight)
+      ) {
+        return false;
+      }
+
+      // Layout has converged! Attach downstream suffix pages in O(1)
+      builder.attachSuffixPages(suffixPages);
+
+      if (scope) {
+        scope.converged = true;
+        scope.convergedAtPageIndex = builder.currentValidPageIndex;
+        scope.reusedSuffixPagesCount = suffixPages.length;
+        scope.reflowedPagesCount = Math.max(
+          1,
+          builder.currentValidPageIndex - (scope.reusedPrefixPagesCount || 0) - suffixPages.length + 1
+        );
+      }
+
+      return true;
+    };
+
     while (queue.length > 0) {
+      if (checkLayoutConvergence()) {
+        break;
+      }
+
       const currentItem = queue.shift()!;
       const nextItem = queue.length > 0 ? queue[0] : null;
+
+      const currentItemId =
+        typeof currentItem === 'object' && currentItem !== null
+          ? ('id' in currentItem ? (currentItem as any).id : ('sourceNodeId' in currentItem ? (currentItem as any).sourceNodeId : (currentItem as any).nodeId))
+          : undefined;
+      if (currentItemId) {
+        remainingDirtyNodes.delete(currentItemId);
+      }
 
       // Check section boundaries
       const isSectionBreak =
         typeof currentItem === 'object' &&
         currentItem !== null &&
-        (('type' in currentItem && currentItem.type === 'section') ||
+        (('type' in currentItem && (currentItem.type === 'section' || currentItem.type === 'section-break')) ||
           ('constraints' in currentItem && Boolean((currentItem as SourceNode).constraints?.sectionBreak)));
 
       if (isSectionBreak) {
@@ -285,11 +470,119 @@ export class PaginationEngine {
           ('constraints' in currentItem && typeof (currentItem as SourceNode).constraints?.sectionTitle === 'string'
             ? (currentItem as SourceNode).constraints?.sectionTitle || ''
             : '');
+
+        const sbNode = currentItem as Partial<SectionBreakNode>;
+        const secPageSize = sbNode.pageSize || options.pageSize || 'A4';
+        const secOrientation = sbNode.orientation || options.orientation || 'PORTRAIT';
+        const secMargin = sbNode.margin || options.margin || 'NORMAL';
+        const secCustomMargins = sbNode.customMarginsMm || options.customMarginsMm;
+        const secCustomPaper = sbNode.customPaperDimensionsMm || options.customPaperDimensionsMm;
+        const secHeaderHeight = sbNode.headerHeightPx !== undefined ? sbNode.headerHeightPx : (options.headerHeightPx ?? options.headerConfig?.headerHeightPx);
+        const secFooterHeight = sbNode.footerHeightPx !== undefined ? sbNode.footerHeightPx : (options.footerHeightPx ?? options.footerConfig?.footerHeightPx);
+        const secHeaderDist = sbNode.headerDistanceMm !== undefined ? sbNode.headerDistanceMm : (options.headerDistanceMm ?? options.headerConfig?.headerDistanceMm);
+        const secFooterDist = sbNode.footerDistanceMm !== undefined ? sbNode.footerDistanceMm : (options.footerDistanceMm ?? options.footerConfig?.footerDistanceMm);
+        const secDifferentFirst = sbNode.differentFirstPage !== undefined ? sbNode.differentFirstPage : options.headerConfig?.differentFirstPage;
+        const secPageNumFormat = sbNode.pageNumberFormat || options.pageNumberFormat || 'decimal';
+        const secPageNumStart = sbNode.pageNumberStart !== undefined ? sbNode.pageNumberStart : 1;
+        const secRestartNum = sbNode.restartPageNumbering ?? sbNode.pageNumberRestart ?? (sbNode.pageNumberStart !== undefined);
+
+        const secHeaderConfig = {
+          ...options.headerConfig,
+          headerHtml: sbNode.headerHtml !== undefined ? sbNode.headerHtml : options.headerConfig?.headerHtml,
+          firstPageHeaderHtml: sbNode.firstPageHeaderHtml !== undefined ? sbNode.firstPageHeaderHtml : options.headerConfig?.firstPageHeaderHtml,
+          differentFirstPage: secDifferentFirst,
+          headerHeightPx: secHeaderHeight,
+          headerDistanceMm: secHeaderDist,
+          pageNumberFormat: secPageNumFormat,
+        };
+
+        const secFooterConfig = {
+          ...options.footerConfig,
+          footerHtml: sbNode.footerHtml !== undefined ? sbNode.footerHtml : options.footerConfig?.footerHtml,
+          firstPageFooterHtml: sbNode.firstPageFooterHtml !== undefined ? sbNode.firstPageFooterHtml : options.footerConfig?.firstPageFooterHtml,
+          differentFirstPage: secDifferentFirst,
+          footerHeightPx: secFooterHeight,
+          footerDistanceMm: secFooterDist,
+          pageNumberFormat: secPageNumFormat,
+        };
+
+        const secOptions: LayoutDocumentOptions = {
+          ...options,
+          pageSize: secPageSize as any,
+          orientation: secOrientation as any,
+          margin: secMargin as any,
+          customMarginsMm: secCustomMargins,
+          customPaperDimensionsMm: secCustomPaper,
+          headerHeightPx: secHeaderHeight,
+          footerHeightPx: secFooterHeight,
+          headerDistanceMm: secHeaderDist,
+          footerDistanceMm: secFooterDist,
+          headerConfig: secHeaderConfig,
+          footerConfig: secFooterConfig,
+          pageNumberFormat: secPageNumFormat,
+          pageNumberStart: secPageNumStart,
+        };
+
+        const secGeometry = PageGeometryCalculator.calculate(secOptions);
+
+        activeSectionMeta = {
+          id: currentSectionId,
+          index: currentSectionIndex,
+          title: currentSectionTitle,
+          pageSize: secPageSize,
+          orientation: secOrientation,
+          margin: secMargin,
+          customMarginsMm: secCustomMargins,
+          customPaperDimensionsMm: secCustomPaper,
+          headerHeightPx: secHeaderHeight,
+          footerHeightPx: secFooterHeight,
+          headerDistanceMm: secHeaderDist,
+          footerDistanceMm: secFooterDist,
+          headerHtml: secHeaderConfig.headerHtml,
+          footerHtml: secFooterConfig.footerHtml,
+          firstPageHeaderHtml: secHeaderConfig.firstPageHeaderHtml,
+          firstPageFooterHtml: secFooterConfig.firstPageFooterHtml,
+          differentFirstPage: secDifferentFirst,
+          pageNumberFormat: secPageNumFormat,
+          pageNumberStart: secPageNumStart,
+          restartPageNumbering: secRestartNum,
+          geometry: secGeometry,
+          options: secOptions,
+        };
+
+        sectionMetaMap.set(currentSectionIndex, activeSectionMeta);
+
+        // Update PageBuilder with new section geometry
+        builder.updateActiveSectionGeometry(secGeometry, secOptions);
+
+        // Update measurementContext container bounds for subsequent blocks
+        measurementContext.containerWidth = secGeometry.availableContentWidthPx;
+        measurementContext.containerHeight = secGeometry.availableContentHeightPx;
+        measurementContext.margins = secGeometry.marginsPx;
+
         pageSectionMap.set(builder.currentValidPageIndex, {
           id: currentSectionId,
           index: currentSectionIndex,
           title: currentSectionTitle,
         });
+
+        ruleEngine.recordDiagnostic({
+          nodeId: currentSectionId,
+          nodeType: (currentItem as any).type || 'section-break',
+          rule: 'SECTION_BREAK',
+          precedence: 2,
+          availableHeight: builder.availableHeight,
+          measuredHeight: 0,
+          decision: 'SECTION_BREAK',
+          reason: `Section ${currentSectionIndex} boundary (${secPageSize} ${secOrientation})`,
+          hasConflict: false,
+          pageIndex: builder.currentValidPageIndex,
+        });
+
+        if ('type' in currentItem && currentItem.type === 'section-break') {
+          previousItem = currentItem;
+          continue;
+        }
       }
 
       if (!pageSectionMap.has(builder.currentValidPageIndex)) {
@@ -300,40 +593,15 @@ export class PaginationEngine {
         });
       }
 
-      // Check break-before rules
-      const breakEval = BreakResolver.evaluateBreaks(currentItem, builder.usedHeight);
-      if (breakEval.shouldBreakBefore) {
-        builder.recordDecision(
-          ('id' in currentItem && currentItem.id) || 'break_before',
-          'manual-page-break',
-          'MOVE_TO_NEXT_PAGE',
-          0,
-          'break-before rule'
-        );
-        if (debugCollector) {
-          debugCollector.recordDecision({
-            pageIndex: builder.currentValidPageIndex,
-            blockId: ('id' in currentItem && currentItem.id) || 'break_before',
-            nodeType: 'manual-page-break',
-            measuredHeightPx: 0,
-            availableHeightPx: builder.availableHeight,
-            decision: 'MOVE_TO_NEXT_PAGE',
-            breakType: 'MANUAL',
-          });
-        }
-        builder.advanceToNextPage();
-        prevMarginBottom = 0;
-      }
-
-      // Explicit Manual Page Break
+      // Check explicit manual page break (Precedence Tier 1)
       const isPureManual =
-        breakEval.isManualBreak ||
         (typeof currentItem === 'object' &&
           currentItem !== null &&
           (('type' in currentItem && currentItem.type === 'manual-page-break') ||
             ('explicitBreak' in currentItem && Boolean(currentItem.explicitBreak)) ||
             ('isManualBreak' in currentItem && Boolean(currentItem.isManualBreak)) ||
-            ('id' in currentItem && typeof currentItem.id === 'string' && currentItem.id.startsWith('manual_break'))));
+            ('id' in currentItem && typeof currentItem.id === 'string' && currentItem.id.startsWith('manual_break')))) ||
+        BreakResolver.evaluateBreaks(currentItem, builder.usedHeight).isManualBreak;
 
       if (isPureManual) {
         const manualBreakId = ('id' in currentItem && currentItem.id) || 'manual_page_break';
@@ -342,8 +610,21 @@ export class PaginationEngine {
           'manual-page-break',
           'MANUAL_BREAK',
           0,
-          'Explicit user page break'
+          'Explicit user page break',
+          { rule: 'MANUAL_BREAK', precedence: 1, hasConflict: false }
         );
+        ruleEngine.recordDiagnostic({
+          nodeId: manualBreakId,
+          nodeType: 'manual-page-break',
+          rule: 'MANUAL_BREAK',
+          precedence: 1,
+          availableHeight: builder.availableHeight,
+          measuredHeight: 0,
+          decision: 'MANUAL_BREAK',
+          reason: 'Explicit user page break',
+          hasConflict: false,
+          pageIndex: builder.currentValidPageIndex,
+        });
         if (debugCollector) {
           debugCollector.recordDecision({
             pageIndex: builder.currentValidPageIndex,
@@ -355,11 +636,57 @@ export class PaginationEngine {
             breakType: 'MANUAL',
           });
         }
-        if (builder.usedHeight > 0) {
+        const isConsecutiveBreak =
+          previousItem !== null &&
+          typeof previousItem === 'object' &&
+          (('type' in previousItem && previousItem.type === 'manual-page-break') ||
+            ('explicitBreak' in previousItem && Boolean((previousItem as any).explicitBreak)));
+
+        if (builder.usedHeight > 0 || isConsecutiveBreak) {
           builder.advanceToNextPage();
           prevMarginBottom = 0;
         }
+        previousItem = currentItem;
         continue;
+      }
+
+      // Check break-before rules (Precedence Tier 5)
+      const breakEval = BreakResolver.evaluateBreaks(currentItem, builder.usedHeight);
+      if (breakEval.shouldBreakBefore) {
+        const breakNodeId = ('id' in currentItem && currentItem.id) || 'break_before';
+        builder.recordDecision(
+          breakNodeId,
+          'manual-page-break',
+          'MOVE_TO_NEXT_PAGE',
+          0,
+          'break-before rule',
+          { rule: 'BREAK_BEFORE', precedence: 5, hasConflict: false }
+        );
+        ruleEngine.recordDiagnostic({
+          nodeId: breakNodeId,
+          nodeType: 'manual-page-break',
+          rule: 'BREAK_BEFORE',
+          precedence: 5,
+          availableHeight: builder.availableHeight,
+          measuredHeight: 0,
+          decision: 'MOVE_TO_NEXT_PAGE',
+          reason: 'break-before: always rule triggered',
+          hasConflict: false,
+          pageIndex: builder.currentValidPageIndex,
+        });
+        if (debugCollector) {
+          debugCollector.recordDecision({
+            pageIndex: builder.currentValidPageIndex,
+            blockId: breakNodeId,
+            nodeType: 'manual-page-break',
+            measuredHeightPx: 0,
+            availableHeightPx: builder.availableHeight,
+            decision: 'MOVE_TO_NEXT_PAGE',
+            breakType: 'MANUAL',
+          });
+        }
+        builder.advanceToNextPage();
+        prevMarginBottom = 0;
       }
 
       // Measure current item
@@ -376,22 +703,46 @@ export class PaginationEngine {
         currentHeight = collapsedMargin + measured.height;
       }
 
-      // Check heading keep-with-next protection
-      const shouldPush = KeepTogetherResolver.shouldPushWithNext(
-        currentItem,
-        nextItem,
-        currentHeight,
-        builder.availableHeight
-      );
+      // Track deterministic fragment index for this source node
+      const sourceId =
+        ('id' in currentItem && typeof (currentItem as any).id === 'string' && (currentItem as any).id) ||
+        measured.nodeId;
+      const currentFragIdx = fragmentIndexMap.get(sourceId) || 0;
 
-      if (shouldPush && builder.usedHeight > 0) {
+      // Evaluate formal pagination rules via PaginationRuleEngine
+      const ruleDecision = ruleEngine.evaluatePlacement({
+        currentNode: currentItem,
+        nextNode: nextItem,
+        previousNode: previousItem,
+        pageIndex: builder.currentValidPageIndex,
+        availableHeight: builder.availableHeight,
+        usedHeight: builder.usedHeight,
+        maxPageHeight: contentHeight,
+        measuredHeight: currentHeight,
+        isAtomic: measured.isAtomic,
+        nodeId: measured.nodeId,
+        nodeType: measured.type,
+      });
+
+      // Execute rule decision
+      if (ruleDecision.decision === 'MOVE_TO_NEXT_PAGE') {
         builder.recordDecision(
           measured.nodeId,
           measured.type,
           'MOVE_TO_NEXT_PAGE',
           currentHeight,
-          'Heading keep-with-next orphan protection'
+          ruleDecision.reason,
+          {
+            rule: ruleDecision.rule,
+            precedence: ruleDecision.precedence,
+            hasConflict: ruleDecision.hasConflict,
+            conflictDetails: ruleDecision.conflictDetails,
+            resolutionStrategy: ruleDecision.resolutionStrategy,
+            availableHeightPx: builder.availableHeight,
+            measuredHeightPx: currentHeight,
+          }
         );
+
         if (debugCollector) {
           debugCollector.recordDecision({
             pageIndex: builder.currentValidPageIndex,
@@ -400,22 +751,18 @@ export class PaginationEngine {
             measuredHeightPx: currentHeight,
             availableHeightPx: builder.availableHeight,
             decision: 'MOVE_TO_NEXT_PAGE',
-            breakType: 'KEEP_WITH_NEXT',
-            notes: 'Heading pushed to next page to stay with following block',
+            breakType: ruleDecision.rule === 'KEEP_WITH_NEXT' ? 'KEEP_WITH_NEXT' : 'KEEP_TOGETHER',
+            notes: ruleDecision.reason,
           });
         }
+
         builder.advanceToNextPage();
         prevMarginBottom = 0;
-        currentHeight = measured.height;
+        queue.unshift(currentItem);
+        continue;
       }
 
-      // Track deterministic fragment index for this source node
-      const sourceId =
-        ('id' in currentItem && typeof (currentItem as any).id === 'string' && (currentItem as any).id) ||
-        measured.nodeId;
-      const currentFragIdx = fragmentIndexMap.get(sourceId) || 0;
-
-      // Check if item fits on current page
+      // Check if item fits completely on current page
       if (currentHeight <= builder.availableHeight) {
         const isCanonicalBlockNode =
           typeof currentItem === 'object' &&
@@ -432,7 +779,22 @@ export class PaginationEngine {
           builder.addFragment(fragResult.firstFragment, currentHeight);
           fragmentIndexMap.set(sourceId, currentFragIdx + 1);
           prevMarginBottom = measured.marginBottom || 0;
-          builder.recordDecision(measured.nodeId, measured.type, 'PLACE', currentHeight, 'Fits on page');
+          builder.recordDecision(
+            measured.nodeId,
+            measured.type,
+            'PLACE',
+            currentHeight,
+            ruleDecision.reason || 'Fits on page',
+            {
+              rule: ruleDecision.rule,
+              precedence: ruleDecision.precedence,
+              hasConflict: ruleDecision.hasConflict,
+              conflictDetails: ruleDecision.conflictDetails,
+              resolutionStrategy: ruleDecision.resolutionStrategy,
+              availableHeightPx: builder.availableHeight,
+              measuredHeightPx: currentHeight,
+            }
+          );
 
           if (debugCollector) {
             debugCollector.recordDecision({
@@ -451,7 +813,14 @@ export class PaginationEngine {
             prevMarginBottom = 0;
           }
         } else if (fragResult.pushedToNextPage) {
-          builder.recordDecision(measured.nodeId, measured.type, 'MOVE_TO_NEXT_PAGE', currentHeight, 'Pushed by fragmentation rules');
+          builder.recordDecision(
+            measured.nodeId,
+            measured.type,
+            'MOVE_TO_NEXT_PAGE',
+            currentHeight,
+            'Pushed by fragmentation rules',
+            { rule: 'WIDOW_ORPHAN', precedence: 6 }
+          );
           builder.advanceToNextPage();
           prevMarginBottom = 0;
           queue.unshift(currentItem);
@@ -460,10 +829,17 @@ export class PaginationEngine {
         // Overflow: item exceeds available height on current page
         overflowDetected = true;
 
-        // If atomic and not at top of page, push intact to next page
+        // If atomic / keep-together and not at top of page, push intact to next page
         const isAtomic = measured.isAtomic || KeepTogetherResolver.isKeepTogether(currentItem);
         if (isAtomic && builder.usedHeight > 0) {
-          builder.recordDecision(measured.nodeId, measured.type, 'MOVE_TO_NEXT_PAGE', currentHeight, 'Atomic element keep-together');
+          builder.recordDecision(
+            measured.nodeId,
+            measured.type,
+            'MOVE_TO_NEXT_PAGE',
+            currentHeight,
+            'Atomic element keep-together',
+            { rule: 'KEEP_TOGETHER', precedence: 3 }
+          );
           if (debugCollector) {
             debugCollector.recordDecision({
               pageIndex: builder.currentValidPageIndex,
@@ -496,7 +872,14 @@ export class PaginationEngine {
         if (fragResult.firstFragment && fragResult.usedHeight > 0) {
           builder.addFragment(fragResult.firstFragment, fragResult.usedHeight);
           fragmentIndexMap.set(sourceId, currentFragIdx + 1);
-          builder.recordDecision(measured.nodeId, measured.type, 'FRAGMENT', fragResult.usedHeight, 'Sliced at page boundary');
+          builder.recordDecision(
+            measured.nodeId,
+            measured.type,
+            'FRAGMENT',
+            fragResult.usedHeight,
+            'Sliced at page boundary',
+            { rule: ruleDecision.rule, precedence: ruleDecision.precedence, hasConflict: ruleDecision.hasConflict, conflictDetails: ruleDecision.conflictDetails, resolutionStrategy: ruleDecision.resolutionStrategy }
+          );
           prevMarginBottom = 0;
 
           if (debugCollector) {
@@ -548,16 +931,32 @@ export class PaginationEngine {
             });
             builder.addFragment(forcedFrag, currentHeight);
             fragmentIndexMap.set(sourceId, currentFragIdx + 1);
-            builder.recordDecision(measured.nodeId, measured.type, 'PLACE', currentHeight, 'Forced place on empty page');
+            builder.recordDecision(
+              measured.nodeId,
+              measured.type,
+              'FORCE_PLACE',
+              currentHeight,
+              'Forced place on empty page',
+              { rule: ruleDecision.rule, precedence: ruleDecision.precedence, hasConflict: true, resolutionStrategy: 'FORCE_PAGE_BOUNDARY_SLICE' }
+            );
             prevMarginBottom = measured.marginBottom || 0;
           } else {
-            builder.recordDecision(measured.nodeId, measured.type, 'MOVE_TO_NEXT_PAGE', currentHeight, 'Cannot fragment, pushed to next page');
+            builder.recordDecision(
+              measured.nodeId,
+              measured.type,
+              'MOVE_TO_NEXT_PAGE',
+              currentHeight,
+              'Cannot fragment, pushed to next page',
+              { rule: ruleDecision.rule, precedence: ruleDecision.precedence }
+            );
             builder.advanceToNextPage();
             prevMarginBottom = 0;
             queue.unshift(currentItem);
           }
         }
       }
+
+      previousItem = currentItem;
     }
 
     // 6. Finalize layout document
@@ -594,7 +993,7 @@ export class PaginationEngine {
       });
     });
 
-    const sectionCounts: Record<number, number> = {};
+    const sectionLayoutsMap = new Map<number, SectionLayout>();
     pages.forEach((page, idx) => {
       const pageSection = pageSectionMap.get(idx);
       if (pageSection) {
@@ -605,18 +1004,59 @@ export class PaginationEngine {
         page.sectionId = 'sec_0';
         page.sectionIndex = 0;
       }
-      sectionCounts[page.sectionIndex] = (sectionCounts[page.sectionIndex] || 0) + 1;
+
+      const secIdx = page.sectionIndex || 0;
+      const sMeta = sectionMetaMap.get(secIdx) || activeSectionMeta;
+
+      if (!sectionLayoutsMap.has(secIdx)) {
+        sectionLayoutsMap.set(secIdx, {
+          sectionId: sMeta.id,
+          sectionIndex: secIdx,
+          title: sMeta.title,
+          startPageIndex: idx,
+          endPageIndex: idx,
+          pageCount: 0,
+          geometry: sMeta.geometry,
+          pageSize: sMeta.pageSize,
+          orientation: sMeta.orientation,
+          margin: sMeta.margin,
+          restartPageNumbering: sMeta.restartPageNumbering,
+          startPageNumber: sMeta.pageNumberStart,
+          pageNumberFormat: sMeta.pageNumberFormat,
+          headerConfig: sMeta.options.headerConfig,
+          footerConfig: sMeta.options.footerConfig,
+          differentFirstPage: sMeta.differentFirstPage,
+        });
+      }
+
+      const sLayout = sectionLayoutsMap.get(secIdx)!;
+      sLayout.endPageIndex = idx;
+      sLayout.pageCount++;
     });
+
+    const sections: SectionLayout[] = Array.from(sectionLayoutsMap.values());
 
     let currentTrackedSection = -1;
     let sectionPageCounter = 1;
+
     pages.forEach((page) => {
-      if (page.sectionIndex !== currentTrackedSection) {
-        currentTrackedSection = page.sectionIndex || 0;
-        sectionPageCounter = 1;
+      const secIdx = page.sectionIndex || 0;
+      const sMeta = sectionMetaMap.get(secIdx) || activeSectionMeta;
+      const sLayout = sectionLayoutsMap.get(secIdx);
+
+      if (secIdx !== currentTrackedSection) {
+        currentTrackedSection = secIdx;
+        sectionPageCounter = sMeta.pageNumberStart !== undefined ? sMeta.pageNumberStart : 1;
       }
+
       page.sectionPageNumber = sectionPageCounter++;
-      page.sectionTotalPages = sectionCounts[page.sectionIndex || 0] || 1;
+      page.sectionTotalPages = sLayout?.pageCount || 1;
+      page.isSectionFirstPage = page.index === sLayout?.startPageIndex;
+      page.geometry = sMeta.geometry;
+      page.headerConfig = sMeta.options.headerConfig;
+      page.footerConfig = sMeta.options.footerConfig;
+      page.differentFirstPage = sMeta.differentFirstPage;
+      page.pageNumberFormat = sMeta.pageNumberFormat;
 
       // Watermark & Signatures
       page.watermarkText = watermarkText;
@@ -697,9 +1137,68 @@ export class PaginationEngine {
       totalDurationMs: Math.round(duration * 100) / 100,
       cacheHitCount: cacheStats.hitCount,
       cacheMissCount: cacheStats.missCount,
-      remeasuredNodesCount: blocksOrNodes.length,
-      reflowedPagesCount: totalPages,
+      remeasuredNodesCount: scope?.type === 'incremental' ? (scope.dirtyNodeIds?.length || 0) : blocksOrNodes.length,
+      reflowedPagesCount: scope?.reflowedPagesCount !== undefined ? scope.reflowedPagesCount : totalPages,
+      reusedPrefixPagesCount: scope?.reusedPrefixPagesCount || 0,
+      reusedSuffixPagesCount: scope?.reusedSuffixPagesCount || 0,
+      converged: Boolean(scope?.converged),
       isIncremental: Boolean(scope && scope.type === 'incremental'),
+    };
+
+    const allDecisions = ruleEngine.getDecisions();
+    const conflicts = ruleEngine.getConflicts();
+
+    const layoutDiagnostics: LayoutDiagnostics = {
+      totalCalculatedPages: totalPages,
+      totalFragments: pages.reduce((acc, p) => acc + p.fragments.length, 0),
+      pageDiagnostics: pages.map((p) => p.diagnostics!).filter(Boolean),
+      decisions: allDecisions.map((d) => ({
+        nodeId: d.nodeId,
+        type: d.nodeType,
+        pageIndex: d.pageIndex,
+        action: d.decision,
+        heightPx: d.measuredHeight,
+        reason: d.reason,
+        rule: d.rule,
+        precedence: d.precedence,
+        hasConflict: d.hasConflict,
+        conflictDetails: d.conflictDetails,
+        resolutionStrategy: d.resolutionStrategy,
+        availableHeightPx: d.availableHeight,
+        measuredHeightPx: d.measuredHeight,
+      })),
+      ruleDecisions: allDecisions.map((d) => ({
+        nodeId: d.nodeId,
+        type: d.nodeType,
+        pageIndex: d.pageIndex,
+        action: d.decision,
+        heightPx: d.measuredHeight,
+        reason: d.reason,
+        rule: d.rule,
+        precedence: d.precedence,
+        hasConflict: d.hasConflict,
+        conflictDetails: d.conflictDetails,
+        resolutionStrategy: d.resolutionStrategy,
+        availableHeightPx: d.availableHeight,
+        measuredHeightPx: d.measuredHeight,
+      })),
+      conflicts: conflicts.map((d) => ({
+        nodeId: d.nodeId,
+        type: d.nodeType,
+        pageIndex: d.pageIndex,
+        action: d.decision,
+        heightPx: d.measuredHeight,
+        reason: d.reason,
+        rule: d.rule,
+        precedence: d.precedence,
+        hasConflict: d.hasConflict,
+        conflictDetails: d.conflictDetails,
+        resolutionStrategy: d.resolutionStrategy,
+        availableHeightPx: d.availableHeight,
+        measuredHeightPx: d.measuredHeight,
+      })),
+      calculationDurationMs: Math.round(duration * 100) / 100,
+      calculatedAt: Date.now(),
     };
 
     const layoutDoc: LayoutDocument = {
@@ -709,10 +1208,12 @@ export class PaginationEngine {
       height: geometry.paperDimensionsPx.height,
       pages,
       totalPages,
+      sections,
       options,
       calculatedAt: Date.now(),
       calculationDurationMs: Math.round(duration * 100) / 100,
       sourceBlocks: blocksOrNodes,
+      diagnostics: layoutDiagnostics,
     };
 
     const debugTrace = debugCollector ? debugCollector.finalize(totalPages, duration) : undefined;
@@ -726,6 +1227,7 @@ export class PaginationEngine {
       debugTrace,
       metrics,
       changeScope: scope,
+      diagnostics: layoutDiagnostics,
     };
   }
 }
