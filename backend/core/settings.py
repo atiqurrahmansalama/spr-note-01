@@ -28,7 +28,7 @@ if _raw_allowed_hosts.strip() == "*":
 else:
     ALLOWED_HOSTS = [h.strip() for h in _raw_allowed_hosts.split(",") if h.strip()]
 
-for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app"]:
+for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app", ".netlify.app", "spr-app.netlify.app"]:
     if default_host not in ALLOWED_HOSTS and "*" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(default_host)
 
@@ -291,20 +291,45 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-csrftoken',
 ]
 
-# In production, restrict to explicit frontend domain URLs
+# Allow global flag override from environment
+_env_cors_allow_all = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1", "t")
+
 CORS_ALLOWED_ORIGINS_STR = os.getenv("CORS_ALLOWED_ORIGINS", "")
-if CORS_ALLOWED_ORIGINS_STR:
+if _env_cors_allow_all and not CORS_ALLOWED_ORIGINS_STR:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = []
+elif CORS_ALLOWED_ORIGINS_STR:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED_ORIGINS_STR.split(",") if o.strip()]
     CORS_ALLOW_ALL_ORIGINS = False
 else:
-    # Explicit safe development origins (No wildcard allowed)
+    # Explicit safe development and production origins
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
+        "https://spr-app.netlify.app",
+        "https://spr-note.vercel.app",
     ]
     CORS_ALLOW_ALL_ORIGINS = False
+
+# Regexes for dynamic preview deployments (Netlify, Vercel, Railway)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.netlify\.app$",
+    r"^https:\/\/.*\.vercel\.app$",
+    r"^https:\/\/.*\.railway\.app$",
+]
+
+# CSRF Trusted Origins for HTTPS form submissions
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.netlify.app",
+    "https://*.vercel.app",
+    "https://*.railway.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
