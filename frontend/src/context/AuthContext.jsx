@@ -247,7 +247,15 @@ export function AuthProvider({ children }) {
       }
       return { success: false, error: 'Google OAuth exchange failed' };
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.response?.data?.detail || 'Google sign-in was cancelled or failed.';
+      const errorMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        (err.response?.status === 402
+          ? 'Backend API is disabled (402 Payment Required on Vercel). Please deploy or re-enable backend.'
+          : err.message === 'Network Error'
+          ? 'Cannot connect to backend API. Please verify server status and network.'
+          : 'Google sign-in was cancelled or failed.');
       return { success: false, error: errorMsg };
     } finally {
       setIsLoading(false);
