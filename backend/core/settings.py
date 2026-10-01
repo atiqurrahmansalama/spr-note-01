@@ -291,29 +291,29 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-csrftoken',
 ]
 
-# Allow global flag override from environment
-_env_cors_allow_all = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1", "t")
+# Allow global flag override from environment (default False for strict production security)
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False").lower() in ("true", "1", "t")
 
-CORS_ALLOWED_ORIGINS_STR = os.getenv("CORS_ALLOWED_ORIGINS", "")
-if _env_cors_allow_all and not CORS_ALLOWED_ORIGINS_STR:
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOWED_ORIGINS = []
-elif CORS_ALLOWED_ORIGINS_STR:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED_ORIGINS_STR.split(",") if o.strip()]
-    CORS_ALLOW_ALL_ORIGINS = False
-else:
-    # Explicit safe development and production origins
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-        "https://spr-app.netlify.app",
-        "https://spr-note.vercel.app",
-    ]
-    CORS_ALLOW_ALL_ORIGINS = False
+# Explicit base origins
+_default_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "https://spr-app.netlify.app",
+    "https://spr-note.vercel.app",
+]
 
-# Regexes for dynamic preview deployments (Netlify, Vercel, Railway)
+_raw_cors_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
+if _raw_cors_env:
+    for origin in _raw_cors_env.split(","):
+        clean_origin = origin.strip().rstrip("/")
+        if clean_origin and clean_origin not in _default_cors_origins:
+            _default_cors_origins.append(clean_origin)
+
+CORS_ALLOWED_ORIGINS = _default_cors_origins
+
+# Dynamic Regexes for preview deployments (Netlify, Vercel, Railway)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https:\/\/.*\.netlify\.app$",
     r"^https:\/\/.*\.vercel\.app$",
@@ -405,20 +405,6 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", f"Suffah Hifz LMS <{EMAIL_H
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
-
-# CORS & CSRF Configuration for multi-platform Web / Mobile / Native apps
-CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1")
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://spr-note.vercel.app").split(",")
-    if origin.strip()
-]
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://spr-note.vercel.app").split(",")
-    if origin.strip()
-]
 
 # Reverse proxy SSL termination settings for Vercel / Railway
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
