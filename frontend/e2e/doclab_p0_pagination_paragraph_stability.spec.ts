@@ -358,4 +358,175 @@ test.describe('DocLab P0 Pagination & Paragraph Stability Real Browser Acceptanc
     expect(finalSheets).toBe(1);
     await expect(page.locator('text=Page 1 of 1')).toBeVisible();
   });
+
+  // 9. Normal Typing: characters typed sequentially persist without loss
+  test('P0.9: Normal sequential typing persists cleanly without text corruption or caret jump', async ({ page }) => {
+    const editor = page.locator('[data-doclab-single-host="true"]');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    await editor.click();
+    await page.keyboard.type('Sequential normal typing test string in DocLab.');
+    await page.waitForTimeout(200);
+
+    const content = await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      return host.textContent || '';
+    });
+
+    expect(content).toContain('Sequential normal typing test string in DocLab.');
+  });
+
+  // 10. Rapid Typing: fast keystrokes do not drop characters or trigger premature DOM reflow glitches
+  test('P0.10: Rapid typing does not drop characters or glitch DOM', async ({ page }) => {
+    const editor = page.locator('[data-doclab-single-host="true"]');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    await editor.click();
+    const testPhrase = 'The quick brown fox jumps over the lazy dog repeatedly without dropping letters.';
+    await page.keyboard.type(testPhrase, { delay: 10 });
+    await page.waitForTimeout(300);
+
+    const content = await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      return host.textContent || '';
+    });
+
+    expect(content).toContain(testPhrase);
+  });
+
+  // 11. IME Composition: pagination deferred during composition and executes on compositionend
+  test('P0.11: IME composition lifecycle defers DOM pagination and updates accurately on compositionend', async ({ page }) => {
+    const editor = page.locator('[data-doclab-single-host="true"]');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    // 1. Initialize with near-boundary text on Page 1
+    await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      if (host) {
+        let text = 'Initial baseline paragraph near page limit. ';
+        for (let i = 1; i <= 25; i++) {
+          text += `Sentence ${i} fills page height approaching boundary. `;
+        }
+        host.innerHTML = `<p id="p_ime_target" style="font-size: 14px; line-height: 1.8;">${text}</p>`;
+        host.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+
+    await page.waitForTimeout(500);
+    const initialPages = await getVisualSheetCount(page);
+
+    // 2. Simulate IME composition start + update with massive text that WOULD cause pagination
+    await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      const targetP = document.querySelector('#p_ime_target') as HTMLElement;
+      if (host && targetP) {
+        // Dispatch compositionstart
+        const compStart = new CompositionEvent('compositionstart', { bubbles: true, cancelable: true, data: '' });
+        host.dispatchEvent(compStart);
+
+        // Dispatch compositionupdate with interim text
+        const compUpdate = new CompositionEvent('compositionupdate', { bubbles: true, cancelable: true, data: 'nihongo_composition_interim' });
+        host.dispatchEvent(compUpdate);
+
+        // Append interim text to target paragraph
+        let overflowAddition = ' [IME_INTERIM_BUFFER: ';
+        for (let i = 1; i <= 50; i++) {
+          overflowAddition += `Japanese IME candidate phrase ${i} actively composing in buffer. `;
+        }
+        overflowAddition += ']';
+
+        const span = document.createElement('span');
+        span.id = 'ime_active_span';
+        span.textContent = overflowAddition;
+        targetP.appendChild(span);
+
+        // Dispatch input event with isComposing = true
+        const inputEvt = new InputEvent('input', { bubbles: true, cancelable: true, isComposing: true });
+        host.dispatchEvent(inputEvt);
+      }
+    });
+
+    // Wait during composition - DOM pagination must NOT run and page count may stay at initial
+    await page.waitForTimeout(200);
+
+    // Verify interim text is present in DOM during composition
+    const interimPresent = await page.evaluate(() => {
+      const span = document.querySelector('#ime_active_span');
+      return span !== null;
+    });
+    expect(interimPresent).toBe(true);
+
+    // 3. Complete IME composition with compositionend
+    await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      if (host) {
+        const compEnd = new CompositionEvent('compositionend', { bubbles: true, cancelable: true, data: 'nihongo_committed' });
+        host.dispatchEvent(compEnd);
+
+        // Final commit input event
+        const inputEvt = new InputEvent('input', { bubbles: true, cancelable: true, isComposing: false });
+        host.dispatchEvent(inputEvt);
+      }
+    });
+
+    // Controlled debounced pagination pass executes now
+    await page.waitForTimeout(600);
+
+    const postCompositionPages = await getVisualSheetCount(page);
+    expect(postCompositionPages).toBeGreaterThan(initialPages);
+    await expect(page.locator('text=Page 2 of')).toBeVisible();
+
+    // Verify all composed text is intact
+    const finalContent = await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      return host.textContent || '';
+    });
+
+    expect(finalContent).toContain('IME_INTERIM_BUFFER:');
+    expect(finalContent).toContain('Japanese IME candidate phrase 1');
+  });
+
+  // 12. Multiple typing and composition cycles preserve text integrity
+  test('P0.12: Multiple consecutive typing and composition cycles never lose typed text', async ({ page }) => {
+    const editor = page.locator('[data-doclab-single-host="true"]');
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    await editor.click();
+
+    for (let round = 1; round <= 3; round++) {
+      // Normal typing
+      await page.keyboard.type(`[Round ${round} standard] `);
+      await page.waitForTimeout(50);
+
+      // Composition cycle
+      await page.evaluate((r: number) => {
+        const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+        if (host) {
+          host.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+          host.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: `comp_${r}` }));
+
+          const p = host.querySelector('p') || host;
+          const textNode = document.createTextNode(`[Round ${r} composed] `);
+          p.appendChild(textNode);
+
+          host.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: `comp_${r}` }));
+          host.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        }
+      }, round);
+
+      await page.waitForTimeout(100);
+    }
+
+    await page.waitForTimeout(400);
+
+    const allText = await page.evaluate(() => {
+      const host = document.querySelector('[data-doclab-single-host="true"]') as HTMLElement;
+      return host.textContent || '';
+    });
+
+    for (let round = 1; round <= 3; round++) {
+      expect(allText).toContain(`[Round ${round} standard]`);
+      expect(allText).toContain(`[Round ${round} composed]`);
+    }
+  });
 });

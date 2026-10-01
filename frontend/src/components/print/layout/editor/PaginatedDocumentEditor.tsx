@@ -778,6 +778,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const editorHostRef = useRef<HTMLDivElement>(null);
   const isInternalChangeRef = useRef<boolean>(false);
   const isFocusedRef = useRef<boolean>(false);
+  const isComposingRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
   const repaginateTimerRef = useRef<any>(null);
   const lastExportedHtmlRef = useRef<string | null>(null);
@@ -839,20 +840,45 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   // Real DOM Pagination trigger
   const runPaginationPass = useCallback(() => {
     if (!editorHostRef.current) return;
+    // LIVE TYPING / IME GUARD: Never mutate DOM while user is composing
+    if (isComposingRef.current) {
+      return;
+    }
+
     try {
       const host = editorHostRef.current;
       const hasFocus =
         typeof document !== 'undefined' &&
         (document.activeElement === host || host.contains(document.activeElement));
-      const savedSel = hasFocus
-        ? EditorPositionMapper.captureLogicalSelection(host)
-        : savedSelectionBookmarkRef.current;
+
+      // Selection safety check: ensure selection is valid and strictly inside host before capturing
+      let savedSel: any = null;
+      if (hasFocus) {
+        try {
+          const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            if (host.contains(range.startContainer) && host.contains(range.endContainer)) {
+              savedSel = EditorPositionMapper.captureLogicalSelection(host);
+            }
+          }
+        } catch {
+          savedSel = null;
+        }
+      } else {
+        savedSel = savedSelectionBookmarkRef.current;
+      }
 
       const res = repaginateHostDOM(host, pageGeometry);
       setTotalPagesCount(res.totalPages);
 
       if (hasFocus && savedSel) {
-        EditorPositionMapper.restoreLogicalSelection(host, savedSel);
+        try {
+          EditorPositionMapper.restoreLogicalSelection(host, savedSel);
+        } catch (selErr) {
+          // Selection restoration exception must never crash or block input
+          console.warn('Selection restoration warning:', selErr);
+        }
       }
     } catch (e) {
       console.warn('Pagination calculation error:', e);
@@ -860,6 +886,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   }, [pageGeometry]);
 
   const schedulePaginationPass = useCallback(() => {
+    // If actively composing, defer DOM pagination until compositionend
+    if (isComposingRef.current) {
+      return;
+    }
     if (repaginateTimerRef.current) {
       clearTimeout(repaginateTimerRef.current);
     }
@@ -867,63 +897,6 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       runPaginationPass();
     }, 40);
   }, [runPaginationPass]);
-
-  // Initial mount and external sync
-  useEffect(() => {
-    if (!editorHostRef.current) return;
-
-    // Do NOT clobber the user's DOM if actively focused and typing
-    if (isFocusedRef.current) {
-      isInternalChangeRef.current = false;
-      return;
-    }
-
-    if (lastExportedHtmlRef.current === cleanCanonicalBody) {
-      isInternalChangeRef.current = false;
-      return;
-    }
-
-    if (!isInternalChangeRef.current) {
-      const currentCleanDom = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
-      if (currentCleanDom !== cleanCanonicalBody) {
-        editorHostRef.current.innerHTML = cleanCanonicalBody;
-        historyRef.current.reset(cleanCanonicalBody);
-        schedulePaginationPass();
-      }
-    }
-    isInternalChangeRef.current = false;
-  }, [cleanCanonicalBody, schedulePaginationPass]);
-
-  // Geometry or styles change -> recalculate pagination
-  useEffect(() => {
-    runPaginationPass();
-  }, [runPaginationPass]);
-
-  // Font loading readiness listener
-  useEffect(() => {
-    if (typeof document !== 'undefined' && document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        runPaginationPass();
-      });
-    }
-  }, [runPaginationPass]);
-
-  // Image load listener to recalculate when images finish loading
-  useEffect(() => {
-    const host = editorHostRef.current;
-    if (!host) return;
-
-    const handleImageLoad = (e: Event) => {
-      if ((e.target as HTMLElement)?.tagName === 'IMG') {
-        schedulePaginationPass();
-      }
-    };
-
-    host.addEventListener('load', handleImageLoad, true);
-    return () => {
-      host.removeEventListener('load', handleImageLoad, true);
-    };
-  }, [schedulePaginationPass]);
 
   // Centralized Transaction Dispatcher
   const dispatchTransaction = useCallback(
@@ -946,6 +919,52 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     },
     [activeStyles, onContentChange, schedulePaginationPass]
   );
+
+  // Composition Lifecycle Event Handlers (IME / CJK / Accents / Live Typing Safety)
+  const handleCompositionStart = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+    isComposingRef.current = true;
+    if (repaginateTimerRef.current) {
+      clearTimeout(repaginateTimerRef.current);
+      repaginateTimerRef.current = null;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
+
+  const handleCompositionUpdate = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+    isComposingRef.current = false;
+    // Single controlled debounced pagination and synchronization pass after composition completes
+    saveSelection();
+    schedulePaginationPass();
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (!editorHostRef.current || isComposingRef.current) return;
+      try {
+        const rawDom = editorHostRef.current.innerHTML;
+        const cleanHtml = EditorSerializer.sanitize(rawDom);
+        const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+
+        dispatchTransaction({
+          doc,
+          canonicalHtml: cleanHtml,
+          origin: 'typing',
+          timestamp: Date.now(),
+          description: 'Composition input',
+        });
+      } catch (err) {
+        console.warn('Composition commit error:', err);
+      }
+    }, 150);
+  }, [saveSelection, schedulePaginationPass, dispatchTransaction]);
 
   // Focus & Blur Handlers
   const handleFocus = useCallback(() => {
@@ -980,6 +999,12 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const handleInput = useCallback(() => {
     if (!isEditable || !editorHostRef.current) return;
     isInternalChangeRef.current = true;
+
+    // During active IME composition, defer pagination and synchronization until compositionend
+    if (isComposingRef.current) {
+      return;
+    }
+
     saveSelection();
 
     // Trigger immediate micro-pass for fast visual feedback
@@ -990,18 +1015,22 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (!editorHostRef.current) return;
-      const rawDom = editorHostRef.current.innerHTML;
-      const cleanHtml = EditorSerializer.sanitize(rawDom);
-      const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
+      if (!editorHostRef.current || isComposingRef.current) return;
+      try {
+        const rawDom = editorHostRef.current.innerHTML;
+        const cleanHtml = EditorSerializer.sanitize(rawDom);
+        const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
 
-      dispatchTransaction({
-        doc,
-        canonicalHtml: cleanHtml,
-        origin: 'typing',
-        timestamp: Date.now(),
-        description: 'Typing input',
-      });
+        dispatchTransaction({
+          doc,
+          canonicalHtml: cleanHtml,
+          origin: 'typing',
+          timestamp: Date.now(),
+          description: 'Typing input',
+        });
+      } catch (err) {
+        console.warn('Typing input transaction error:', err);
+      }
     }, 150);
   }, [isEditable, saveSelection, schedulePaginationPass, dispatchTransaction]);
 
@@ -1009,6 +1038,11 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!isEditable || !editorHostRef.current) return;
+
+      // Do not interfere with native IME composition key events
+      if (e.nativeEvent.isComposing || isComposingRef.current) {
+        return;
+      }
 
       // Ctrl+Enter or Cmd+Enter: Insert explicit manual page break
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -1073,6 +1107,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
   // Paste Handler
   const handlePaste = useCallback(() => {
+    if (isComposingRef.current) return;
     saveSelection();
     setTimeout(() => {
       handleInput();
@@ -1517,6 +1552,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
           onKeyDown={handleKeyDown}
           onKeyUp={saveSelection}
           onMouseUp={saveSelection}
+          onCompositionStart={handleCompositionStart}
+          onCompositionUpdate={handleCompositionUpdate}
+          onCompositionEnd={handleCompositionEnd}
           className="doclab-single-host-editor docx-preview-content docx-parsed-body docx-live-container font-sans text-xs sm:text-sm leading-relaxed !text-slate-900 w-full text-left focus:outline-none cursor-text select-text relative z-10"
           style={{
             width: `${pageGeometry.paperDimensionsPx.width}px`,
