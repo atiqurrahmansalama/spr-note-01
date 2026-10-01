@@ -67,98 +67,110 @@ const SCREEN_HEADER_HEIGHT_PX = 32;
  * prior to a new measurement pass.
  */
 function mergeContinuationFragments(host: HTMLElement): void {
-  let continuation = host.querySelector(
-    '[data-is-continuation="true"], [data-table-continuation="true"], [data-list-continuation="true"]'
-  ) as HTMLElement | null;
+  const continuations = Array.from(
+    host.querySelectorAll<HTMLElement>(
+      '[data-is-continuation="true"], [data-table-continuation="true"], [data-list-continuation="true"]'
+    )
+  );
 
-  let safety = 0;
-  while (continuation && ++safety < 1000) {
-    const el = continuation;
-    const sourceId = el.getAttribute('data-source-node-id') || el.getAttribute('data-source-id');
+  for (const el of continuations) {
+    if (!el.isConnected) continue;
+
+    const sourceId =
+      el.getAttribute('data-source-node-id') ||
+      el.getAttribute('data-source-id') ||
+      el.getAttribute('data-node-id');
+
+    // Strict requirement: MUST have a source identity
+    if (!sourceId) {
+      continue;
+    }
+
     let prev = el.previousElementSibling as HTMLElement | null;
     while (prev && prev.getAttribute('data-spr-runtime-pagination') === 'true') {
       prev = prev.previousElementSibling as HTMLElement | null;
     }
 
-    if (prev) {
-      const tag = el.tagName.toLowerCase();
-      const prevTag = prev.tagName.toLowerCase();
-
-      const matchesSource =
-        sourceId &&
-        (prev.getAttribute('data-source-node-id') === sourceId ||
-          prev.getAttribute('data-source-id') === sourceId ||
-          prev.id === sourceId);
-      const matchesTag = tag === prevTag;
-
-      if (matchesSource || matchesTag) {
-        if (tag === 'table') {
-          // Table recombination:
-          // The continuation table has a repeated <thead> (skip it)
-          // and a <tbody> with rows that belong back in prev's <tbody>.
-          const prevTbody = prev.querySelector('tbody') || prev;
-          const elTbody = el.querySelector('tbody');
-          if (elTbody) {
-            while (elTbody.firstChild) {
-              prevTbody.appendChild(elTbody.firstChild);
-            }
-          } else {
-            const trs = Array.from(el.querySelectorAll('tr'));
-            const elThead = el.querySelector('thead');
-            const elTheadTrs = elThead ? Array.from(elThead.querySelectorAll('tr')) : [];
-            trs.filter((tr) => !elTheadTrs.includes(tr)).forEach((tr) => prevTbody.appendChild(tr));
-          }
-
-          const elTfoot = el.querySelector('tfoot');
-          if (elTfoot) {
-            const prevTfoot = prev.querySelector('tfoot');
-            if (prevTfoot) prevTfoot.remove();
-            prev.appendChild(elTfoot);
-          }
-
-          el.remove();
-          prev.removeAttribute('data-is-fragment');
-          prev.removeAttribute('data-table-continuation');
-          prev.removeAttribute('data-is-continuation');
-        } else if (tag === 'ul' || tag === 'ol') {
-          // List recombination:
-          // Move all top-level <li> elements from el to prev
-          const lis = Array.from(el.querySelectorAll(':scope > li'));
-          if (lis.length > 0) {
-            lis.forEach((li) => prev.appendChild(li));
-          } else {
-            while (el.firstChild) {
-              prev.appendChild(el.firstChild);
-            }
-          }
-
-          el.remove();
-          prev.removeAttribute('data-is-fragment');
-          prev.removeAttribute('data-list-continuation');
-          prev.removeAttribute('data-is-continuation');
-        } else {
-          // Paragraph or general block:
-          while (el.firstChild) {
-            prev.appendChild(el.firstChild);
-          }
-          el.remove();
-          prev.removeAttribute('data-is-fragment');
-          prev.removeAttribute('data-is-continuation');
-        }
-      } else {
-        el.removeAttribute('data-is-continuation');
-        el.removeAttribute('data-table-continuation');
-        el.removeAttribute('data-list-continuation');
-      }
-    } else {
-      el.removeAttribute('data-is-continuation');
-      el.removeAttribute('data-table-continuation');
-      el.removeAttribute('data-list-continuation');
+    if (!prev) {
+      continue;
     }
 
-    continuation = host.querySelector(
-      '[data-is-continuation="true"], [data-table-continuation="true"], [data-list-continuation="true"]'
-    ) as HTMLElement | null;
+    const prevSourceId =
+      prev.getAttribute('data-source-node-id') ||
+      prev.getAttribute('data-source-id') ||
+      prev.getAttribute('data-node-id') ||
+      prev.id;
+
+    const tag = el.tagName.toLowerCase();
+    const prevTag = prev.tagName.toLowerCase();
+
+    // Strict requirement: exact source ID match AND matching tag
+    const matchesSource = prevSourceId && sourceId === prevSourceId && tag === prevTag;
+
+    if (!matchesSource) {
+      // Source identity does not match -> leave continuation untouched
+      continue;
+    }
+
+    if (tag === 'table') {
+      // Table recombination:
+      // The continuation table has a repeated <thead> (skip it)
+      // and a <tbody> with rows that belong back in prev's <tbody>.
+      const prevTbody = prev.querySelector('tbody') || prev;
+      const elTbody = el.querySelector('tbody');
+      if (elTbody) {
+        while (elTbody.firstChild) {
+          prevTbody.appendChild(elTbody.firstChild);
+        }
+      } else {
+        const trs = Array.from(el.querySelectorAll('tr'));
+        const elThead = el.querySelector('thead');
+        const elTheadTrs = elThead ? Array.from(elThead.querySelectorAll('tr')) : [];
+        trs.filter((tr) => !elTheadTrs.includes(tr)).forEach((tr) => prevTbody.appendChild(tr));
+      }
+
+      const elTfoot = el.querySelector('tfoot');
+      if (elTfoot) {
+        const prevTfoot = prev.querySelector('tfoot');
+        if (prevTfoot) prevTfoot.remove();
+        prev.appendChild(elTfoot);
+      }
+
+      el.remove();
+      prev.removeAttribute('data-is-fragment');
+      prev.removeAttribute('data-table-continuation');
+      prev.removeAttribute('data-is-continuation');
+      prev.removeAttribute('data-fragment-index');
+      prev.removeAttribute('data-fragment-total');
+    } else if (tag === 'ul' || tag === 'ol') {
+      // List recombination:
+      // Move all top-level <li> elements from el to prev
+      const lis = Array.from(el.querySelectorAll(':scope > li'));
+      if (lis.length > 0) {
+        lis.forEach((li) => prev.appendChild(li));
+      } else {
+        while (el.firstChild) {
+          prev.appendChild(el.firstChild);
+        }
+      }
+
+      el.remove();
+      prev.removeAttribute('data-is-fragment');
+      prev.removeAttribute('data-list-continuation');
+      prev.removeAttribute('data-is-continuation');
+      prev.removeAttribute('data-fragment-index');
+      prev.removeAttribute('data-fragment-total');
+    } else {
+      // Paragraph or general block:
+      while (el.firstChild) {
+        prev.appendChild(el.firstChild);
+      }
+      el.remove();
+      prev.removeAttribute('data-is-fragment');
+      prev.removeAttribute('data-is-continuation');
+      prev.removeAttribute('data-fragment-index');
+      prev.removeAttribute('data-fragment-total');
+    }
   }
 }
 
@@ -335,18 +347,62 @@ export function repaginateHostDOM(
           }
 
           currentPage += 1;
-          currentY = blockHeight;
           i += 1; // Advance past spacer
+
+          if (blockHeight > availHeight) {
+            const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
+            currentPage += (pagesSpanned - 1);
+            const nextSibling = child.nextElementSibling as HTMLElement | null;
+            if (nextSibling) {
+              const remainingOnLastPage = (pagesSpanned * availHeight) - blockHeight;
+              const afterSpacerHeight = remainingOnLastPage + (pagesSpanned * baseJump);
+              if (nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                nextSibling.style.height = `${afterSpacerHeight}px`;
+                let dup = nextSibling.nextElementSibling as HTMLElement | null;
+                while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+                  const nextDup = dup.nextElementSibling as HTMLElement | null;
+                  dup.remove();
+                  dup = nextDup;
+                }
+              } else {
+                const afterSpacer = createRuntimeSpacer(afterSpacerHeight);
+                child.parentNode?.insertBefore(afterSpacer, nextSibling);
+              }
+              currentPage += 1;
+              currentY = 0;
+            } else {
+              currentY = blockHeight - ((pagesSpanned - 1) * availHeight);
+            }
+          } else {
+            currentY = blockHeight;
+          }
           splitSuccess = true;
         } else {
-          // currentY === 0: atomic block starts at top of page and exceeds page height
+          // currentY === 0: atomic block starts at top of page
           if (blockHeight > availHeight) {
-            let remaining = blockHeight;
-            while (remaining > availHeight) {
+            const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
+            currentPage += (pagesSpanned - 1);
+            const nextSibling = child.nextElementSibling as HTMLElement | null;
+            if (nextSibling) {
+              const remainingOnLastPage = (pagesSpanned * availHeight) - blockHeight;
+              const afterSpacerHeight = remainingOnLastPage + (pagesSpanned * baseJump);
+              if (nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                nextSibling.style.height = `${afterSpacerHeight}px`;
+                let dup = nextSibling.nextElementSibling as HTMLElement | null;
+                while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+                  const nextDup = dup.nextElementSibling as HTMLElement | null;
+                  dup.remove();
+                  dup = nextDup;
+                }
+              } else {
+                const afterSpacer = createRuntimeSpacer(afterSpacerHeight);
+                child.parentNode?.insertBefore(afterSpacer, nextSibling);
+              }
               currentPage += 1;
-              remaining -= availHeight;
+              currentY = 0;
+            } else {
+              currentY = blockHeight - ((pagesSpanned - 1) * availHeight);
             }
-            currentY = remaining;
           } else {
             currentY = blockHeight;
           }
@@ -528,11 +584,35 @@ export function repaginateHostDOM(
             const contEl = temp2.firstElementChild as HTMLElement | null;
 
             if (firstEl && contEl) {
+              const sourceId =
+                child.getAttribute('data-source-node-id') ||
+                child.getAttribute('data-source-id') ||
+                child.getAttribute('data-node-id') ||
+                (child.id && !child.id.startsWith('fragment-') ? child.id : null) ||
+                firstEl.getAttribute('data-source-node-id') ||
+                firstEl.getAttribute('data-source-id') ||
+                `p_${Date.now()}_${i}`;
+
+              const isAlreadyContinuation = child.getAttribute('data-is-continuation') === 'true';
+
               // Apply first fragment in-place to child
               child.innerHTML = firstEl.innerHTML;
               Array.from(firstEl.attributes).forEach((attr) => {
                 child.setAttribute(attr.name, attr.value);
               });
+              child.setAttribute('data-source-node-id', sourceId);
+              child.setAttribute('data-source-id', sourceId);
+              child.setAttribute('data-is-fragment', 'true');
+              if (isAlreadyContinuation) {
+                child.setAttribute('data-is-continuation', 'true');
+              } else {
+                child.removeAttribute('data-is-continuation');
+              }
+
+              contEl.setAttribute('data-source-node-id', sourceId);
+              contEl.setAttribute('data-source-id', sourceId);
+              contEl.setAttribute('data-is-fragment', 'true');
+              contEl.setAttribute('data-is-continuation', 'true');
 
               // Clean any stale spacer before child if currentY > 0 or page 1
               if (currentY > 0 || currentPage === 1) {
@@ -597,17 +677,61 @@ export function repaginateHostDOM(
           }
 
           currentPage += 1;
-          currentY = blockHeight;
           i += 1; // Advance past spacer
+
+          if (blockHeight > availHeight) {
+            const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
+            currentPage += (pagesSpanned - 1);
+            const nextSibling = child.nextElementSibling as HTMLElement | null;
+            if (nextSibling) {
+              const remainingOnLastPage = (pagesSpanned * availHeight) - blockHeight;
+              const afterSpacerHeight = remainingOnLastPage + (pagesSpanned * baseJump);
+              if (nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                nextSibling.style.height = `${afterSpacerHeight}px`;
+                let dup = nextSibling.nextElementSibling as HTMLElement | null;
+                while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+                  const nextDup = dup.nextElementSibling as HTMLElement | null;
+                  dup.remove();
+                  dup = nextDup;
+                }
+              } else {
+                const afterSpacer = createRuntimeSpacer(afterSpacerHeight);
+                child.parentNode?.insertBefore(afterSpacer, nextSibling);
+              }
+              currentPage += 1;
+              currentY = 0;
+            } else {
+              currentY = blockHeight - ((pagesSpanned - 1) * availHeight);
+            }
+          } else {
+            currentY = blockHeight;
+          }
         } else {
           // currentY === 0: atomic oversized block starting at page top
           if (blockHeight > availHeight) {
-            let remaining = blockHeight;
-            while (remaining > availHeight) {
+            const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
+            currentPage += (pagesSpanned - 1);
+            const nextSibling = child.nextElementSibling as HTMLElement | null;
+            if (nextSibling) {
+              const remainingOnLastPage = (pagesSpanned * availHeight) - blockHeight;
+              const afterSpacerHeight = remainingOnLastPage + (pagesSpanned * baseJump);
+              if (nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                nextSibling.style.height = `${afterSpacerHeight}px`;
+                let dup = nextSibling.nextElementSibling as HTMLElement | null;
+                while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+                  const nextDup = dup.nextElementSibling as HTMLElement | null;
+                  dup.remove();
+                  dup = nextDup;
+                }
+              } else {
+                const afterSpacer = createRuntimeSpacer(afterSpacerHeight);
+                child.parentNode?.insertBefore(afterSpacer, nextSibling);
+              }
               currentPage += 1;
-              remaining -= availHeight;
+              currentY = 0;
+            } else {
+              currentY = blockHeight - ((pagesSpanned - 1) * availHeight);
             }
-            currentY = remaining;
           } else {
             currentY = blockHeight;
           }

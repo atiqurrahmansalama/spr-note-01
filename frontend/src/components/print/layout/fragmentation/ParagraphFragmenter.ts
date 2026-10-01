@@ -318,14 +318,21 @@ export class ParagraphFragmenter {
         el.getAttribute('data-source-node-id') ||
         el.getAttribute('data-source-id') ||
         el.getAttribute('data-node-id') ||
-        el.id ||
+        (el.id && !el.id.startsWith('fragment-') && !el.id.startsWith('docx-live-page-') ? el.id : null) ||
         `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+      const isAlreadyContinuation = el.getAttribute('data-is-continuation') === 'true';
 
       clone.setAttribute('data-source-node-id', sourceId);
       clone.setAttribute('data-source-id', sourceId);
       clone.setAttribute('data-fragment-index', '0');
       clone.setAttribute('data-fragment-total', '2');
       clone.setAttribute('data-is-fragment', 'true');
+      if (isAlreadyContinuation) {
+        clone.setAttribute('data-is-continuation', 'true');
+      } else {
+        clone.removeAttribute('data-is-continuation');
+      }
 
       p2.setAttribute('data-source-node-id', sourceId);
       p2.setAttribute('data-source-id', sourceId);
@@ -404,8 +411,9 @@ export class ParagraphFragmenter {
     const sourceIdMatch = tagAttrs.match(/(?:data-source-node-id|data-source-id|data-node-id|id)=["']([^"']+)["']/i);
     const sourceId = sourceIdMatch ? sourceIdMatch[1] : 'p_body';
 
+    const isAlreadyContinuation = /data-is-continuation=["']true["']/i.test(tagAttrs);
     const cleanAttrs = tagAttrs.replace(/\s*data-(?:source-node-id|source-id|fragment-index|fragment-total|is-fragment|is-continuation)=["'][^"']*["']/gi, '');
-    const firstAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="0" data-fragment-total="2" data-is-fragment="true"`;
+    const firstAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="0" data-fragment-total="2" data-is-fragment="true"${isAlreadyContinuation ? ' data-is-continuation="true"' : ''}`;
     const remAttrs = `${cleanAttrs} data-source-node-id="${sourceId}" data-source-id="${sourceId}" data-fragment-index="1" data-fragment-total="2" data-is-fragment="true" data-is-continuation="true"`;
 
     return {

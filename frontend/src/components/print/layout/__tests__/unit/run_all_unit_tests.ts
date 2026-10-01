@@ -55,6 +55,7 @@ import { runDoclabP4LayoutExportParityUnitTests } from './doclab_p4_layout_expor
 import { runDocLabP5DocumentChromeSectionsUnitTests } from './doclab_p5_document_chrome_sections.test';
 import { runDocLabP6DynamicBatchPaginationUnitTests } from './doclab_p6_dynamic_batch_pagination.test';
 import { runDocLabP7PerformanceTortureUnitTests } from './doclab_p7_performance_torture.test';
+import { runDocLabP0PaginationParagraphStabilityUnitTests } from './doclab_p0_pagination_paragraph_stability.test';
 
 async function main() {
   console.log('================================================================');
@@ -110,6 +111,7 @@ async function main() {
     ['43. Document Chrome & Sections (P5)', runDocLabP5DocumentChromeSectionsUnitTests],
     ['44. Dynamic Data & Batch Pagination (P6)', runDocLabP6DynamicBatchPaginationUnitTests],
     ['45. Performance & Torture Testing (P7)', runDocLabP7PerformanceTortureUnitTests],
+    ['46. Pagination & Paragraph Stability (P0)', runDocLabP0PaginationParagraphStabilityUnitTests],
   ];
 
   const originalLog = console.log;
