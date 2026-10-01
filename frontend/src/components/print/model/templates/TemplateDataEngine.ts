@@ -327,6 +327,8 @@ export class TemplateDataEngine {
       ([_, val]) => Array.isArray(val) && val.length > 0 && typeof val[0] === 'object'
     );
 
+    const explicitLoopArray = table.attributes?.loopArray;
+
     table.rows.forEach((row, rowIdx) => {
       const stableRowId = row.id || `${tableId}_r_${rowIdx}`;
 
@@ -347,13 +349,32 @@ export class TemplateDataEngine {
       const rowTokens = this.extractTokensFromRow(row);
       let matchedArray: { key: string; items: any[] } | null = null;
 
-      for (const [arrKey, items] of arrayEntries) {
-        const hasMatchingToken = rowTokens.some(
-          (tok) => tok.startsWith(arrKey + '.') || (items[0] && typeof items[0] === 'object' && tok in items[0])
-        );
-        if (hasMatchingToken) {
-          matchedArray = { key: arrKey, items };
-          break;
+      if (explicitLoopArray && (data[explicitLoopArray] || lookup.get(explicitLoopArray))) {
+        const arr = data[explicitLoopArray] || lookup.get(explicitLoopArray);
+        if (Array.isArray(arr)) {
+          matchedArray = { key: explicitLoopArray, items: arr };
+        }
+      }
+
+      if (!matchedArray) {
+        for (const [arrKey, items] of arrayEntries) {
+          const sample = items[0] || {};
+          const sampleKeys = Object.keys(sample);
+          const hasMatchingToken = rowTokens.some((tok) => {
+            const cleanTok = tok.replace(/^(item|this|row)\./, '');
+            return (
+              tok.startsWith(arrKey + '.') ||
+              tok.startsWith('item.') ||
+              tok.startsWith('this.') ||
+              tok.startsWith('row.') ||
+              cleanTok in sample ||
+              sampleKeys.includes(cleanTok)
+            );
+          });
+          if (hasMatchingToken) {
+            matchedArray = { key: arrKey, items };
+            break;
+          }
         }
       }
 
@@ -362,6 +383,9 @@ export class TemplateDataEngine {
           const loopContext = {
             ...data,
             ...item,
+            item,
+            this: item,
+            row: item,
             '@index': itemIdx,
             '@number': itemIdx + 1,
             '@first': itemIdx === 0,

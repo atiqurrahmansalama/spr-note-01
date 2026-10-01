@@ -248,7 +248,7 @@ export class ListFragmenter {
 
     if (remainingItems.length > 0) {
       const startAttr = isOrdered ? ` start="${existingStart + firstItems.length}"` : '';
-      remainingListHtml = `<${listTag}${attrStr}${startAttr} data-list-continuation="true">${remainingItems.join('')}</${listTag}>`;
+      remainingListHtml = `<${listTag}${attrStr}${startAttr} data-list-continuation="true" data-is-continuation="true">${remainingItems.join('')}</${listTag}>`;
     }
 
     return {
@@ -341,7 +341,7 @@ export class ListFragmenter {
     const initialStartAttr = isOrdered && initialStart > 1 ? ` start="${initialStart}"` : '';
     const firstHtml = `<${listTag}${attrStr}${initialStartAttr}>${firstItems.join('')}</${listTag}>`;
     const startAttr = isOrdered ? ` start="${initialStart + firstItems.length}"` : '';
-    const remHtml = remItems.length > 0 ? `<${listTag}${attrStr}${startAttr} data-list-continuation="true">${remItems.join('')}</${listTag}>` : null;
+    const remHtml = remItems.length > 0 ? `<${listTag}${attrStr}${startAttr} data-list-continuation="true" data-is-continuation="true">${remItems.join('')}</${listTag}>` : null;
 
     return {
       firstFragmentHtml: firstHtml,

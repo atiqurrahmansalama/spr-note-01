@@ -17,6 +17,9 @@ import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from '
 import { PageGeometryCalculator, PageGeometry } from '../geometry/PageGeometry';
 import { LayoutDocumentOptions } from '../types/documentTypes';
 import { separateDocxStylesAndBody } from '../../docxStyleUtils';
+import { ParagraphFragmenter } from '../fragmentation/ParagraphFragmenter';
+import { TableFragmenter } from '../fragmentation/TableFragmenter';
+import { ListFragmenter } from '../fragmentation/ListFragmenter';
 import { EditorSerializer } from './EditorSerializer';
 import { EditorHistory } from './EditorHistory';
 import { EditorCommands } from './EditorCommands';
@@ -24,6 +27,12 @@ import { EditorDomAdapter } from './EditorDomAdapter';
 import { EditorPositionMapper } from './EditorPositionMapper';
 import { EditorTransaction } from './editorTypes';
 import { PageBreakIcon } from '../../../ui/Icons';
+import {
+  RunningHeader,
+  RunningFooter,
+  WatermarkLayer,
+  RuntimeVariableResolver,
+} from '../chrome';
 
 export interface PaginatedDocumentEditorProps {
   /** Initial canonical HTML content or template body */
@@ -54,10 +63,110 @@ const PAGE_GAP_PX = 32;
 const SCREEN_HEADER_HEIGHT_PX = 32;
 
 /**
+ * Recombines sibling continuation fragments back into their leading fragment
+ * prior to a new measurement pass.
+ */
+function mergeContinuationFragments(host: HTMLElement): void {
+  let continuation = host.querySelector(
+    '[data-is-continuation="true"], [data-table-continuation="true"], [data-list-continuation="true"]'
+  ) as HTMLElement | null;
+
+  let safety = 0;
+  while (continuation && ++safety < 1000) {
+    const el = continuation;
+    const sourceId = el.getAttribute('data-source-node-id') || el.getAttribute('data-source-id');
+    let prev = el.previousElementSibling as HTMLElement | null;
+    while (prev && prev.getAttribute('data-spr-runtime-pagination') === 'true') {
+      prev = prev.previousElementSibling as HTMLElement | null;
+    }
+
+    if (prev) {
+      const tag = el.tagName.toLowerCase();
+      const prevTag = prev.tagName.toLowerCase();
+
+      const matchesSource =
+        sourceId &&
+        (prev.getAttribute('data-source-node-id') === sourceId ||
+          prev.getAttribute('data-source-id') === sourceId ||
+          prev.id === sourceId);
+      const matchesTag = tag === prevTag;
+
+      if (matchesSource || matchesTag) {
+        if (tag === 'table') {
+          // Table recombination:
+          // The continuation table has a repeated <thead> (skip it)
+          // and a <tbody> with rows that belong back in prev's <tbody>.
+          const prevTbody = prev.querySelector('tbody') || prev;
+          const elTbody = el.querySelector('tbody');
+          if (elTbody) {
+            while (elTbody.firstChild) {
+              prevTbody.appendChild(elTbody.firstChild);
+            }
+          } else {
+            const trs = Array.from(el.querySelectorAll('tr'));
+            const elThead = el.querySelector('thead');
+            const elTheadTrs = elThead ? Array.from(elThead.querySelectorAll('tr')) : [];
+            trs.filter((tr) => !elTheadTrs.includes(tr)).forEach((tr) => prevTbody.appendChild(tr));
+          }
+
+          const elTfoot = el.querySelector('tfoot');
+          if (elTfoot) {
+            const prevTfoot = prev.querySelector('tfoot');
+            if (prevTfoot) prevTfoot.remove();
+            prev.appendChild(elTfoot);
+          }
+
+          el.remove();
+          prev.removeAttribute('data-is-fragment');
+          prev.removeAttribute('data-table-continuation');
+          prev.removeAttribute('data-is-continuation');
+        } else if (tag === 'ul' || tag === 'ol') {
+          // List recombination:
+          // Move all top-level <li> elements from el to prev
+          const lis = Array.from(el.querySelectorAll(':scope > li'));
+          if (lis.length > 0) {
+            lis.forEach((li) => prev.appendChild(li));
+          } else {
+            while (el.firstChild) {
+              prev.appendChild(el.firstChild);
+            }
+          }
+
+          el.remove();
+          prev.removeAttribute('data-is-fragment');
+          prev.removeAttribute('data-list-continuation');
+          prev.removeAttribute('data-is-continuation');
+        } else {
+          // Paragraph or general block:
+          while (el.firstChild) {
+            prev.appendChild(el.firstChild);
+          }
+          el.remove();
+          prev.removeAttribute('data-is-fragment');
+          prev.removeAttribute('data-is-continuation');
+        }
+      } else {
+        el.removeAttribute('data-is-continuation');
+        el.removeAttribute('data-table-continuation');
+        el.removeAttribute('data-list-continuation');
+      }
+    } else {
+      el.removeAttribute('data-is-continuation');
+      el.removeAttribute('data-table-continuation');
+      el.removeAttribute('data-list-continuation');
+    }
+
+    continuation = host.querySelector(
+      '[data-is-continuation="true"], [data-table-continuation="true"], [data-list-continuation="true"]'
+    ) as HTMLElement | null;
+  }
+}
+
+/**
  * Measures real browser DOM blocks inside the single contentEditable host
  * and places runtime page-jump spacers so content flows onto sequential physical pages.
  */
-function repaginateHostDOM(
+export function repaginateHostDOM(
   host: HTMLElement,
   geometry: PageGeometry
 ): { totalPages: number } {
@@ -65,33 +174,55 @@ function repaginateHostDOM(
     return { totalPages: 1 };
   }
 
+  // 1. Recombine any previous runtime continuation fragments before measuring
+  mergeContinuationFragments(host);
+
   const paperHeight = geometry.paperDimensionsPx.height;
   const marginTop = geometry.marginsPx.top;
   const marginBottom = geometry.marginsPx.bottom;
-  const availHeight = Math.max(120, paperHeight - marginTop - marginBottom);
-  const baseJump = marginBottom + PAGE_GAP_PX + SCREEN_HEADER_HEIGHT_PX + marginTop;
+  const headerHeight = Math.max(0, geometry.headerAreaPx?.height || 0);
+  const footerHeight = Math.max(0, geometry.footerAreaPx?.height || 0);
+  const availHeight = geometry.availableContentHeightPx || Math.max(120, paperHeight - marginTop - marginBottom - headerHeight - footerHeight);
+  const baseJump = marginBottom + footerHeight + PAGE_GAP_PX + SCREEN_HEADER_HEIGHT_PX + marginTop + headerHeight;
 
-  const children = Array.from(host.children) as HTMLElement[];
-  if (children.length === 0) {
-    return { totalPages: 1 };
+  // Clean any leading runtime spacers at the start (page 1 top never needs a runtime spacer)
+  let firstChild = host.firstElementChild as HTMLElement | null;
+  while (firstChild && firstChild.getAttribute('data-spr-runtime-pagination') === 'true') {
+    const next = firstChild.nextElementSibling as HTMLElement | null;
+    firstChild.remove();
+    firstChild = next;
   }
 
   let currentPage = 1;
   let currentY = 0;
+  let safetyLoop = 0;
 
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
+  for (let i = 0; i < host.children.length; i++) {
+    if (++safetyLoop > 5000) break;
+
+    const child = host.children[i] as HTMLElement;
+    if (!child) continue;
 
     // If child is a runtime spacer we previously created, skip its height accumulation
     if (child.getAttribute('data-spr-runtime-pagination') === 'true') {
       continue;
     }
 
-    // Check if child is an explicit manual page break (Ctrl+Enter)
+    // Check if child is an explicit manual page break (Ctrl+Enter) or Section Break
     const isManualBreak =
       child.getAttribute('data-manual-break') === 'true' ||
+      child.getAttribute('data-doclab-page-break') === 'true' ||
+      child.getAttribute('data-section-break') === 'true' ||
+      child.getAttribute('data-doclab-section-break') === 'true' ||
       child.classList.contains('spr-page-break') ||
-      child.querySelector?.('[data-manual-break="true"], .spr-page-break') !== null;
+      child.classList.contains('spr-section-break') ||
+      child.classList.contains('docx_page_break') ||
+      child.classList.contains('docx-page-break') ||
+      child.classList.contains('docx_section_break') ||
+      child.classList.contains('docx-section-break') ||
+      /page-break-(?:after|before)\s*:\s*always/i.test(child.getAttribute('style') || '') ||
+      /break-(?:after|before)\s*:\s*(?:page|section)/i.test(child.getAttribute('style') || '') ||
+      child.querySelector?.('[data-manual-break="true"], [data-doclab-page-break="true"], [data-section-break="true"], .spr-page-break, .spr-section-break, .docx_page_break, .docx-page-break, .docx_section_break') !== null;
 
     if (isManualBreak) {
       const remainingOnPage = Math.max(0, availHeight - currentY);
@@ -101,6 +232,13 @@ function repaginateHostDOM(
       const nextSibling = child.nextElementSibling as HTMLElement | null;
       if (nextSibling && nextSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
         nextSibling.style.height = `${spacerHeight}px`;
+        // Clean any subsequent duplicate spacers
+        let dup = nextSibling.nextElementSibling as HTMLElement | null;
+        while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+          const nextDup = dup.nextElementSibling as HTMLElement | null;
+          dup.remove();
+          dup = nextDup;
+        }
       } else if (nextSibling) {
         const spacer = createRuntimeSpacer(spacerHeight);
         child.parentNode?.insertBefore(spacer, nextSibling);
@@ -116,55 +254,380 @@ function repaginateHostDOM(
     const computedStyle = window.getComputedStyle(child);
     const mTop = parseFloat(computedStyle.marginTop) || 0;
     const mBottom = parseFloat(computedStyle.marginBottom) || 0;
-    const blockHeight = (child.offsetHeight || rect.height || 24) + mTop + mBottom;
+    const rawHeight = child.offsetHeight || rect.height;
+    const blockHeight = (rawHeight > 0 ? rawHeight : 24) + mTop + mBottom;
 
-    // Check if this block fits on the current page
-    const fitsOnCurrentPage = currentY + blockHeight <= availHeight || currentY === 0;
+    // Check if this block fits on the current page.
+    const fitsOnCurrentPage = currentY + blockHeight <= availHeight;
 
     if (fitsOnCurrentPage) {
-      // Block fits on current page.
-      // Remove any preceding runtime spacer if it was left from a previous state
-      const prevSibling = child.previousElementSibling as HTMLElement | null;
-      if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
-        // Only remove if previous block was NOT a manual break
-        const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
-        const isPrevManualBreak =
-          prevPrevSibling &&
-          (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
-            prevPrevSibling.classList.contains('spr-page-break'));
-        if (!isPrevManualBreak) {
-          prevSibling.remove();
+      // If we are partway through a page (currentY > 0) or at page 1 top,
+      // any preceding runtime spacer is stale and should be removed.
+      if (currentY > 0 || currentPage === 1) {
+        let prevSibling = child.previousElementSibling as HTMLElement | null;
+        while (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+          const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
+          const isPrevManualBreak =
+            prevPrevSibling &&
+            (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
+              prevPrevSibling.getAttribute('data-doclab-page-break') === 'true' ||
+              prevPrevSibling.getAttribute('data-section-break') === 'true' ||
+              prevPrevSibling.classList.contains('spr-page-break') ||
+              prevPrevSibling.classList.contains('spr-section-break') ||
+              prevPrevSibling.classList.contains('docx_page_break') ||
+              prevPrevSibling.classList.contains('docx-page-break') ||
+              prevPrevSibling.classList.contains('docx_section_break') ||
+              /page-break-(?:after|before)\s*:\s*always/i.test(prevPrevSibling.getAttribute('style') || '') ||
+              /break-(?:after|before)\s*:\s*(?:page|section)/i.test(prevPrevSibling.getAttribute('style') || '') ||
+              prevPrevSibling.querySelector?.('[data-manual-break="true"], [data-doclab-page-break="true"], [data-section-break="true"], .spr-page-break, .spr-section-break, .docx_page_break, .docx-page-break, .docx_section_break') !== null);
+
+          const nextToRemove = prevSibling.previousElementSibling as HTMLElement | null;
+          if (!isPrevManualBreak) {
+            prevSibling.remove();
+            prevSibling = nextToRemove;
+          } else {
+            break;
+          }
         }
       }
+
       currentY += blockHeight;
     } else {
-      // Block overflows current page! Push it cleanly to the top of the next page.
+      // Block overflows current page!
+      const tag = child.tagName.toLowerCase();
       const remainingOnPage = Math.max(0, availHeight - currentY);
-      const spacerHeight = remainingOnPage + baseJump;
+      let splitSuccess = false;
 
-      const prevSibling = child.previousElementSibling as HTMLElement | null;
-      if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
-        prevSibling.style.height = `${spacerHeight}px`;
+      // 1. Identify atomic elements (Images, SVG, Figures, Signature blocks, keep-together)
+      const isAtomic =
+        tag === 'img' ||
+        tag === 'svg' ||
+        tag === 'figure' ||
+        child.classList.contains('print-image-container') ||
+        child.classList.contains('print-signature-block') ||
+        child.classList.contains('print-signature-footer-container') ||
+        child.classList.contains('print-avoid-break') ||
+        child.classList.contains('keep-together') ||
+        child.getAttribute('data-atomic') === 'true' ||
+        /page-break-inside\s*:\s*avoid/i.test(child.getAttribute('style') || '') ||
+        (tag === 'p' &&
+          child.children.length === 1 &&
+          (child.children[0].tagName.toLowerCase() === 'img' ||
+            child.children[0].tagName.toLowerCase() === 'svg' ||
+            child.children[0].tagName.toLowerCase() === 'figure'));
+
+      if (isAtomic) {
+        // Atomic block: never split, push whole block to next page if currentY > 0
+        if (currentY > 0) {
+          const spacerHeight = remainingOnPage + baseJump;
+          const prevSibling = child.previousElementSibling as HTMLElement | null;
+          if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+            prevSibling.style.height = `${spacerHeight}px`;
+            let dup = prevSibling.previousElementSibling as HTMLElement | null;
+            while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+              const nextDup = dup.previousElementSibling as HTMLElement | null;
+              dup.remove();
+              dup = nextDup;
+            }
+          } else {
+            const spacer = createRuntimeSpacer(spacerHeight);
+            child.parentNode?.insertBefore(spacer, child);
+          }
+
+          currentPage += 1;
+          currentY = blockHeight;
+          i += 1; // Advance past spacer
+          splitSuccess = true;
+        } else {
+          // currentY === 0: atomic block starts at top of page and exceeds page height
+          if (blockHeight > availHeight) {
+            let remaining = blockHeight;
+            while (remaining > availHeight) {
+              currentPage += 1;
+              remaining -= availHeight;
+            }
+            currentY = remaining;
+          } else {
+            currentY = blockHeight;
+          }
+          splitSuccess = true;
+        }
+      } else if (tag === 'table') {
+        // 2. Table fragmentation: split at row boundaries, repeat <thead> on continuation
+        const targetHeight = currentY === 0 ? availHeight : Math.max(20, remainingOnPage - mTop - mBottom);
+        const splitRes = TableFragmenter.splitTable(child, targetHeight);
+
+        if (
+          splitRes.isSplit &&
+          splitRes.firstFragmentHtml &&
+          splitRes.remainingFragmentHtml &&
+          splitRes.rowsOnFirstPage > 0
+        ) {
+          const temp1 = document.createElement('div');
+          temp1.innerHTML = splitRes.firstFragmentHtml;
+          const firstEl = (temp1.querySelector('table') || temp1.firstElementChild) as HTMLElement | null;
+
+          const temp2 = document.createElement('div');
+          temp2.innerHTML = splitRes.remainingFragmentHtml;
+          const contEl = (temp2.querySelector('table') || temp2.firstElementChild) as HTMLElement | null;
+
+          if (firstEl && contEl) {
+            const sourceId =
+              child.getAttribute('data-source-node-id') ||
+              child.getAttribute('data-source-id') ||
+              child.id ||
+              `table_${Date.now()}_${i}`;
+
+            child.setAttribute('data-source-node-id', sourceId);
+            child.setAttribute('data-source-id', sourceId);
+            child.setAttribute('data-is-fragment', 'true');
+
+            contEl.setAttribute('data-source-node-id', sourceId);
+            contEl.setAttribute('data-source-id', sourceId);
+            contEl.setAttribute('data-is-continuation', 'true');
+            contEl.setAttribute('data-table-continuation', 'true');
+
+            // Apply first fragment in-place to child
+            child.innerHTML = firstEl.innerHTML;
+            Array.from(firstEl.attributes).forEach((attr) => {
+              child.setAttribute(attr.name, attr.value);
+            });
+
+            // Clean any stale spacer before child if currentY > 0 or page 1
+            if (currentY > 0 || currentPage === 1) {
+              let prevSibling = child.previousElementSibling as HTMLElement | null;
+              while (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
+                const isPrevManualBreak =
+                  prevPrevSibling &&
+                  (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
+                    prevPrevSibling.classList.contains('spr-page-break') ||
+                    prevPrevSibling.querySelector?.('[data-manual-break="true"], .spr-page-break') !== null);
+
+                const nextToRemove = prevSibling.previousElementSibling as HTMLElement | null;
+                if (!isPrevManualBreak) {
+                  prevSibling.remove();
+                  prevSibling = nextToRemove;
+                } else {
+                  break;
+                }
+              }
+            }
+
+            // Calculate exact spacer height after first table slice
+            const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+            const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
+            const spacerHeight = remainingAfterFirst + baseJump;
+            const spacer = createRuntimeSpacer(spacerHeight);
+
+            // Insert spacer and continuation table after child
+            child.parentNode?.insertBefore(spacer, child.nextSibling);
+            child.parentNode?.insertBefore(contEl, spacer.nextSibling);
+
+            currentPage += 1;
+            currentY = 0;
+            i += 1; // Advance loop index to spacer so next iteration visits contEl
+            splitSuccess = true;
+          }
+        }
+      } else if (tag === 'ul' || tag === 'ol') {
+        // 3. List fragmentation: split between <li> items, preserve numbering & bullets
+        const targetHeight = currentY === 0 ? availHeight : Math.max(20, remainingOnPage - mTop - mBottom);
+        const splitRes = ListFragmenter.splitList(child, targetHeight);
+
+        if (
+          splitRes.isSplit &&
+          splitRes.firstFragmentHtml &&
+          splitRes.remainingFragmentHtml &&
+          splitRes.itemsOnFirstPage > 0
+        ) {
+          const temp1 = document.createElement('div');
+          temp1.innerHTML = splitRes.firstFragmentHtml;
+          const firstEl = temp1.firstElementChild as HTMLElement | null;
+
+          const temp2 = document.createElement('div');
+          temp2.innerHTML = splitRes.remainingFragmentHtml;
+          const contEl = temp2.firstElementChild as HTMLElement | null;
+
+          if (firstEl && contEl) {
+            const sourceId =
+              child.getAttribute('data-source-node-id') ||
+              child.getAttribute('data-source-id') ||
+              child.id ||
+              `list_${Date.now()}_${i}`;
+
+            child.setAttribute('data-source-node-id', sourceId);
+            child.setAttribute('data-source-id', sourceId);
+            child.setAttribute('data-is-fragment', 'true');
+
+            contEl.setAttribute('data-source-node-id', sourceId);
+            contEl.setAttribute('data-source-id', sourceId);
+            contEl.setAttribute('data-is-continuation', 'true');
+            contEl.setAttribute('data-list-continuation', 'true');
+
+            // Apply first fragment in-place to child
+            child.innerHTML = firstEl.innerHTML;
+            Array.from(firstEl.attributes).forEach((attr) => {
+              child.setAttribute(attr.name, attr.value);
+            });
+
+            // Clean any stale spacer before child if currentY > 0 or page 1
+            if (currentY > 0 || currentPage === 1) {
+              let prevSibling = child.previousElementSibling as HTMLElement | null;
+              while (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
+                const isPrevManualBreak =
+                  prevPrevSibling &&
+                  (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
+                    prevPrevSibling.classList.contains('spr-page-break') ||
+                    prevPrevSibling.querySelector?.('[data-manual-break="true"], .spr-page-break') !== null);
+
+                const nextToRemove = prevSibling.previousElementSibling as HTMLElement | null;
+                if (!isPrevManualBreak) {
+                  prevSibling.remove();
+                  prevSibling = nextToRemove;
+                } else {
+                  break;
+                }
+              }
+            }
+
+            // Calculate exact spacer height after first list slice
+            const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+            const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
+            const spacerHeight = remainingAfterFirst + baseJump;
+            const spacer = createRuntimeSpacer(spacerHeight);
+
+            // Insert spacer and continuation list after child
+            child.parentNode?.insertBefore(spacer, child.nextSibling);
+            child.parentNode?.insertBefore(contEl, spacer.nextSibling);
+
+            currentPage += 1;
+            currentY = 0;
+            i += 1; // Advance past spacer
+            splitSuccess = true;
+          }
+        }
       } else {
-        const spacer = createRuntimeSpacer(spacerHeight);
-        child.parentNode?.insertBefore(spacer, child);
+        // 4. Paragraph / Heading / Div line-level fragmentation
+        const isSplittable =
+          ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div'].includes(tag) &&
+          !child.querySelector('table, img, svg, figure, .print-signature-block');
+
+        if (isSplittable && (remainingOnPage >= 24 || currentY === 0)) {
+          const targetHeight = currentY === 0 ? availHeight : Math.max(20, remainingOnPage - mTop - mBottom);
+          const splitRes = ParagraphFragmenter.splitParagraph(child, targetHeight);
+
+          if (splitRes.isSplit && splitRes.firstFragmentHtml && splitRes.remainingFragmentHtml) {
+            const temp1 = document.createElement('div');
+            temp1.innerHTML = splitRes.firstFragmentHtml;
+            const firstEl = temp1.firstElementChild as HTMLElement | null;
+
+            const temp2 = document.createElement('div');
+            temp2.innerHTML = splitRes.remainingFragmentHtml;
+            const contEl = temp2.firstElementChild as HTMLElement | null;
+
+            if (firstEl && contEl) {
+              // Apply first fragment in-place to child
+              child.innerHTML = firstEl.innerHTML;
+              Array.from(firstEl.attributes).forEach((attr) => {
+                child.setAttribute(attr.name, attr.value);
+              });
+
+              // Clean any stale spacer before child if currentY > 0 or page 1
+              if (currentY > 0 || currentPage === 1) {
+                let prevSibling = child.previousElementSibling as HTMLElement | null;
+                while (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+                  const prevPrevSibling = prevSibling.previousElementSibling as HTMLElement | null;
+                  const isPrevManualBreak =
+                    prevPrevSibling &&
+                    (prevPrevSibling.getAttribute('data-manual-break') === 'true' ||
+                      prevPrevSibling.getAttribute('data-doclab-page-break') === 'true' ||
+                      prevPrevSibling.getAttribute('data-section-break') === 'true' ||
+                      prevPrevSibling.classList.contains('spr-page-break') ||
+                      prevPrevSibling.classList.contains('spr-section-break') ||
+                      prevPrevSibling.querySelector?.('[data-manual-break="true"], [data-doclab-page-break="true"], [data-section-break="true"], .spr-page-break, .spr-section-break') !== null);
+
+                  const nextToRemove = prevSibling.previousElementSibling as HTMLElement | null;
+                  if (!isPrevManualBreak) {
+                    prevSibling.remove();
+                    prevSibling = nextToRemove;
+                  } else {
+                    break;
+                  }
+                }
+              }
+
+              // Calculate exact spacer height after first fragment
+              const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+              const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
+              const spacerHeight = remainingAfterFirst + baseJump;
+              const spacer = createRuntimeSpacer(spacerHeight);
+
+              // Insert spacer and continuation element after child
+              child.parentNode?.insertBefore(spacer, child.nextSibling);
+              child.parentNode?.insertBefore(contEl, spacer.nextSibling);
+
+              currentPage += 1;
+              currentY = 0;
+              i += 1; // Advance loop index to spacer so next iteration visits contEl
+              splitSuccess = true;
+            }
+          }
+        }
       }
 
-      currentPage += 1;
-      currentY = blockHeight;
+      if (!splitSuccess) {
+        // Fallback for atomic blocks / blocks where split couldn't fit: push whole block to next page
+        if (currentY > 0) {
+          const spacerHeight = remainingOnPage + baseJump;
+
+          const prevSibling = child.previousElementSibling as HTMLElement | null;
+          if (prevSibling && prevSibling.getAttribute('data-spr-runtime-pagination') === 'true') {
+            prevSibling.style.height = `${spacerHeight}px`;
+            let dup = prevSibling.previousElementSibling as HTMLElement | null;
+            while (dup && dup.getAttribute('data-spr-runtime-pagination') === 'true') {
+              const nextDup = dup.previousElementSibling as HTMLElement | null;
+              dup.remove();
+              dup = nextDup;
+            }
+          } else {
+            const spacer = createRuntimeSpacer(spacerHeight);
+            child.parentNode?.insertBefore(spacer, child);
+          }
+
+          currentPage += 1;
+          currentY = blockHeight;
+          i += 1; // Advance past spacer
+        } else {
+          // currentY === 0: atomic oversized block starting at page top
+          if (blockHeight > availHeight) {
+            let remaining = blockHeight;
+            while (remaining > availHeight) {
+              currentPage += 1;
+              remaining -= availHeight;
+            }
+            currentY = remaining;
+          } else {
+            currentY = blockHeight;
+          }
+        }
+      }
     }
   }
 
-  // Remove any trailing spacer at the very end of host
-  const lastChild = host.lastElementChild as HTMLElement | null;
-  if (lastChild && lastChild.getAttribute('data-spr-runtime-pagination') === 'true') {
+  // Remove any trailing spacers at the very end of host
+  let lastChild = host.lastElementChild as HTMLElement | null;
+  while (lastChild && lastChild.getAttribute('data-spr-runtime-pagination') === 'true') {
+    const prev = lastChild.previousElementSibling as HTMLElement | null;
     lastChild.remove();
+    lastChild = prev;
   }
 
   return { totalPages: Math.max(1, currentPage) };
 }
 
-function createRuntimeSpacer(heightPx: number): HTMLElement {
+export function createRuntimeSpacer(heightPx: number): HTMLElement {
   const spacer = document.createElement('div');
   spacer.setAttribute('data-spr-runtime-pagination', 'true');
   spacer.setAttribute('contenteditable', 'false');
@@ -253,8 +716,20 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const runPaginationPass = useCallback(() => {
     if (!editorHostRef.current) return;
     try {
-      const res = repaginateHostDOM(editorHostRef.current, pageGeometry);
+      const host = editorHostRef.current;
+      const hasFocus =
+        typeof document !== 'undefined' &&
+        (document.activeElement === host || host.contains(document.activeElement));
+      const savedSel = hasFocus
+        ? EditorPositionMapper.captureLogicalSelection(host)
+        : savedSelectionBookmarkRef.current;
+
+      const res = repaginateHostDOM(host, pageGeometry);
       setTotalPagesCount(res.totalPages);
+
+      if (hasFocus && savedSel) {
+        EditorPositionMapper.restoreLogicalSelection(host, savedSel);
+      }
     } catch (e) {
       console.warn('Pagination calculation error:', e);
     }
@@ -308,6 +783,23 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       });
     }
   }, [runPaginationPass]);
+
+  // Image load listener to recalculate when images finish loading
+  useEffect(() => {
+    const host = editorHostRef.current;
+    if (!host) return;
+
+    const handleImageLoad = (e: Event) => {
+      if ((e.target as HTMLElement)?.tagName === 'IMG') {
+        schedulePaginationPass();
+      }
+    };
+
+    host.addEventListener('load', handleImageLoad, true);
+    return () => {
+      host.removeEventListener('load', handleImageLoad, true);
+    };
+  }, [schedulePaginationPass]);
 
   // Centralized Transaction Dispatcher
   const dispatchTransaction = useCallback(
@@ -800,7 +1292,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
                 {/* Physical Paper Sheet White Surface with Shadow */}
                 <div
-                  className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white"
+                  className="paper-sheet docx-paper-sheet relative text-left box-border shadow-xl rounded-xs print:shadow-none print:border-none print:w-full print:m-0 print:bg-white flex flex-col justify-between overflow-hidden"
                   data-size={options.pageSize || 'A4'}
                   data-orientation={options.orientation || 'PORTRAIT'}
                   data-margin={options.margin || 'NORMAL'}
@@ -815,9 +1307,73 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
                     height: `${pageGeometry.paperDimensionsPx.height}px`,
                     minHeight: `${pageGeometry.paperDimensionsPx.height}px`,
                     maxHeight: `${pageGeometry.paperDimensionsPx.height}px`,
+                    padding: `${pageGeometry.marginsPx.top}px ${pageGeometry.marginsPx.right}px ${pageGeometry.marginsPx.bottom}px ${pageGeometry.marginsPx.left}px`,
                     boxSizing: 'border-box',
                   }}
-                />
+                >
+                  {/* Background Watermark */}
+                  {(options.watermarkConfig || options.watermarkText) && (
+                    <WatermarkLayer
+                      config={options.watermarkConfig}
+                      text={options.watermarkText}
+                      variables={RuntimeVariableResolver.buildVariables(pageIdx, totalPagesCount, {
+                        documentTitle: options.title || 'Official Document',
+                        documentSubtitle: options.subtitle,
+                        institutionName: options.institutionName || 'SPR Note Academy',
+                        institutionAddress: options.institutionAddress,
+                        pageNumberFormat: options.pageNumberFormat || options.headerConfig?.pageNumberFormat,
+                      })}
+                    />
+                  )}
+
+                  {/* Reserved Running Header */}
+                  {options.headerConfig && (pageGeometry.headerAreaPx?.height || 0) > 0 && (
+                    <div
+                      className="w-full relative z-10 shrink-0 overflow-hidden flex flex-col justify-end"
+                      style={{
+                        height: `${pageGeometry.headerAreaPx.height}px`,
+                        minHeight: `${pageGeometry.headerAreaPx.height}px`,
+                      }}
+                    >
+                      <RunningHeader
+                        variables={RuntimeVariableResolver.buildVariables(pageIdx, totalPagesCount, {
+                          documentTitle: options.title || 'Official Document',
+                          documentSubtitle: options.subtitle,
+                          institutionName: options.institutionName || 'SPR Note Academy',
+                          institutionAddress: options.institutionAddress,
+                          pageNumberFormat: options.pageNumberFormat || options.headerConfig?.pageNumberFormat,
+                        })}
+                        config={options.headerConfig}
+                      />
+                    </div>
+                  )}
+
+                  {/* Spacer for flow content */}
+                  <div className="flex-1" />
+
+                  {/* Reserved Running Footer */}
+                  {options.footerConfig && (pageGeometry.footerAreaPx?.height || 0) > 0 && (
+                    <div
+                      className="w-full relative z-10 shrink-0 overflow-hidden flex flex-col justify-start"
+                      style={{
+                        height: `${pageGeometry.footerAreaPx.height}px`,
+                        minHeight: `${pageGeometry.footerAreaPx.height}px`,
+                      }}
+                    >
+                      <RunningFooter
+                        variables={RuntimeVariableResolver.buildVariables(pageIdx, totalPagesCount, {
+                          documentTitle: options.title || 'Official Document',
+                          documentSubtitle: options.subtitle,
+                          institutionName: options.institutionName || 'SPR Note Academy',
+                          institutionAddress: options.institutionAddress,
+                          pageNumberFormat: options.pageNumberFormat || options.headerConfig?.pageNumberFormat,
+                        })}
+                        config={options.footerConfig}
+                        numeralSystem={options.numeralSystem}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -842,8 +1398,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
             width: `${pageGeometry.paperDimensionsPx.width}px`,
             maxWidth: `${pageGeometry.paperDimensionsPx.width}px`,
             marginTop: `${SCREEN_HEADER_HEIGHT_PX}px`,
-            paddingTop: `${pageGeometry.marginsPx.top}px`,
-            paddingBottom: `${pageGeometry.marginsPx.bottom}px`,
+            paddingTop: `${pageGeometry.marginsPx.top + (pageGeometry.headerAreaPx?.height || 0)}px`,
+            paddingBottom: `${pageGeometry.marginsPx.bottom + (pageGeometry.footerAreaPx?.height || 0)}px`,
             paddingLeft: `${pageGeometry.marginsPx.left}px`,
             paddingRight: `${pageGeometry.marginsPx.right}px`,
             minHeight: `${pageGeometry.paperDimensionsPx.height}px`,

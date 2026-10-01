@@ -97,7 +97,7 @@ export class TemplateMergeEngine {
     options: TemplateMergeOptions & { title?: string; id?: string } = {}
   ): CanonicalDocument {
     // 1. Evaluate template-level conditionals and loops in HTML/text format first if present
-    const preProcessedHtml = this.preprocessHtmlTemplate(htmlTemplate, data);
+    const preProcessedHtml = this.preprocessHtmlTemplate(htmlTemplate, data, options);
     
     // 2. Parse into CanonicalDocument AST
     const canonicalDoc = HtmlImporter.importFromHtml(preProcessedHtml, {
@@ -955,6 +955,9 @@ export class TemplateMergeEngine {
     return {
       ...parentContext,
       ...itemObj,
+      item: itemObj,
+      this: itemObj,
+      row: itemObj,
       '@index': index + 1,
       '@index0': index,
       '@first': index === 0,
@@ -1088,9 +1091,51 @@ export class TemplateMergeEngine {
     return String(str).replace(/[0-9]/g, (digit) => arabicDigits[parseInt(digit, 10)]);
   }
 
-  private static preprocessHtmlTemplate(html: string, context: Record<string, any>): string {
+  private static preprocessHtmlTemplate(
+    html: string,
+    context: Record<string, any>,
+    options: TemplateMergeOptions = {}
+  ): string {
     if (!html) return '';
-    // Normalize self-closing and unbalanced loop/condition HTML tags if any
-    return html;
+    const lookup = ErpDataProvider.buildLookupContext(context);
+    
+    let processed = html;
+
+    // 1. Evaluate template-level conditionals in HTML: {{#if cond}}...{{else}}...{{/if}} or {{#unless cond}}...{{/unless}}
+    let prev = '';
+    let iterations = 0;
+    while (processed !== prev && iterations < 10) {
+      prev = processed;
+      iterations++;
+      processed = processed.replace(
+        /\{\{#(if|unless)\s+([\s\S]+?)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/(?:if|unless)\}\}/gi,
+        (_, condType, expr, ifBody, elseBody = '') => {
+          const isUnless = condType.toLowerCase() === 'unless';
+          const rawCond = this.evaluateCondition(expr.trim(), context, lookup);
+          const condPassed = isUnless ? !rawCond : rawCond;
+          return condPassed ? ifBody : elseBody;
+        }
+      );
+    }
+
+    // 2. Evaluate template-level loops in HTML: {{#each arrayKey}}...{{/each}}
+    processed = processed.replace(
+      /\{\{#(?:each\s+)?([a-zA-Z0-9_\-\.]+)\}\}([\s\S]*?)\{\{\/(?:each|\1)\}\}/gi,
+      (_, arrayKey, loopBody) => {
+        const arrayItems = this.resolveArray(arrayKey.trim(), context, lookup);
+        if (!Array.isArray(arrayItems) || arrayItems.length === 0) {
+          return '';
+        }
+        return arrayItems
+          .map((item, itemIdx) => {
+            const loopContext = this.createLoopContext(item, itemIdx, arrayItems.length, context);
+            const loopLookup = ErpDataProvider.buildLookupContext(loopContext);
+            return this.interpolateString(loopBody, loopContext, loopLookup, options);
+          })
+          .join('\n');
+      }
+    );
+
+    return processed;
   }
 }

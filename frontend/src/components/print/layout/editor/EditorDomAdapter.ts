@@ -350,6 +350,36 @@ export class EditorDomAdapter {
       return false;
     }
 
+    // Try native browser formatting for robust multi-block / cross-page formatting
+    if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+      try {
+        if (markType === 'bold') {
+          const res = document.execCommand('bold', false);
+          if (res) return true;
+        } else if (markType === 'italic') {
+          const res = document.execCommand('italic', false);
+          if (res) return true;
+        } else if (markType === 'underline') {
+          const res = document.execCommand('underline', false);
+          if (res) return true;
+        } else if (markType === 'strike') {
+          const res = document.execCommand('strikeThrough', false);
+          if (res) return true;
+        } else if (markType === 'color' && value) {
+          const res = document.execCommand('foreColor', false, String(value));
+          if (res) return true;
+        } else if (markType === 'backgroundColor' && value) {
+          const res = document.execCommand('hiliteColor', false, String(value));
+          if (res) return true;
+        } else if (markType === 'fontFamily' && value) {
+          const res = document.execCommand('fontName', false, String(value));
+          if (res) return true;
+        }
+      } catch {
+        // Fallback to DOM range extraction below
+      }
+    }
+
     const selectedContent = range.extractContents();
     let wrapper: HTMLElement;
 

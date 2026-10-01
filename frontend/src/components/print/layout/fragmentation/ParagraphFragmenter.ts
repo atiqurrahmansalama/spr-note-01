@@ -319,7 +319,7 @@ export class ParagraphFragmenter {
         el.getAttribute('data-source-id') ||
         el.getAttribute('data-node-id') ||
         el.id ||
-        'p_body';
+        `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
       clone.setAttribute('data-source-node-id', sourceId);
       clone.setAttribute('data-source-id', sourceId);

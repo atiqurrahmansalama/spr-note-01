@@ -51,6 +51,10 @@ import { runDynamicTemplateDataEnginePhase14UnitTests } from './dynamic_template
 import { runIncrementalReflowPerformancePhase15UnitTests } from './incremental_reflow_performance_phase15.test';
 import { runRenderingArchitectureScreenPrintParityPhase16UnitTests } from './rendering_architecture_screen_print_parity_phase16.test';
 import { runTortureTestCorpusPhase18UnitTests } from './torture_test_corpus_phase18.test';
+import { runDoclabP4LayoutExportParityUnitTests } from './doclab_p4_layout_export_parity.test';
+import { runDocLabP5DocumentChromeSectionsUnitTests } from './doclab_p5_document_chrome_sections.test';
+import { runDocLabP6DynamicBatchPaginationUnitTests } from './doclab_p6_dynamic_batch_pagination.test';
+import { runDocLabP7PerformanceTortureUnitTests } from './doclab_p7_performance_torture.test';
 
 async function main() {
   console.log('================================================================');
@@ -101,7 +105,11 @@ async function main() {
     ['38. Dynamic Template Data Engine (P14)', runDynamicTemplateDataEnginePhase14UnitTests],
     ['39. Incremental Reflow & Performance (P15)', runIncrementalReflowPerformancePhase15UnitTests],
     ['40. Rendering Architecture & Parity (P16)', runRenderingArchitectureScreenPrintParityPhase16UnitTests],
-    ['41. Torture Test Corpus (Phase 18)', runTortureTestCorpusPhase18UnitTests]
+    ['41. Torture Test Corpus (Phase 18)', runTortureTestCorpusPhase18UnitTests],
+    ['42. Layout / Export Parity (P4)', runDoclabP4LayoutExportParityUnitTests],
+    ['43. Document Chrome & Sections (P5)', runDocLabP5DocumentChromeSectionsUnitTests],
+    ['44. Dynamic Data & Batch Pagination (P6)', runDocLabP6DynamicBatchPaginationUnitTests],
+    ['45. Performance & Torture Testing (P7)', runDocLabP7PerformanceTortureUnitTests],
   ];
 
   const originalLog = console.log;

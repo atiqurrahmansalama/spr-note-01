@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { PrintColumn, PrintMetaItem, PrintOptions, PrintSummaryMetric } from './types';
 import { LayoutDocument, LayoutPage } from './layout/types/paginationTypes';
 import { LayoutDocumentOptions } from './layout/types/documentTypes';
+import { RuntimeVariableResolver } from './layout/chrome/RuntimeVariableResolver';
 
 const PAGE_DIMENSIONS_PT: Record<string, { width: number; height: number }> = {
   a4: { width: 595.28, height: 841.89 },
@@ -967,9 +968,26 @@ export function compileLayoutDocumentToPDF(
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
       const printDate = new Date().toLocaleDateString('en-GB');
-      doc.text(`Official Document • ${printDate}`, marginL, footerY);
+      const footerLeft = page.sectionTitle ? `${page.sectionTitle} • ${printDate}` : `Official Document • ${printDate}`;
+      doc.text(footerLeft, marginL, footerY);
 
-      doc.text(`Page ${page.pageNumber} of ${totalPages}`, pageWidthPt - marginR, footerY, {
+      const pageNumStr = RuntimeVariableResolver.formatPageNumber(
+        page.sectionPageNumber || page.pageNumber,
+        (page.pageNumberFormat as any) || mergedOptions.pageNumberFormat || 'decimal'
+      );
+      const totalPagesStr = RuntimeVariableResolver.formatPageNumber(
+        page.sectionTotalPages || totalPages,
+        (page.pageNumberFormat as any) || mergedOptions.pageNumberFormat || 'decimal'
+      );
+      const isBn = page.pageNumberFormat === 'bengali' || mergedOptions.pageNumberFormat === 'bengali';
+      const isAr = page.pageNumberFormat === 'arabic' || mergedOptions.pageNumberFormat === 'arabic';
+      const pageLabel = isBn
+        ? `পৃষ্ঠা ${pageNumStr} / ${totalPagesStr}`
+        : isAr
+        ? `صفحة ${pageNumStr} من ${totalPagesStr}`
+        : `Page ${pageNumStr} of ${totalPagesStr}`;
+
+      doc.text(pageLabel, pageWidthPt - marginR, footerY, {
         align: 'right',
       });
     }

@@ -93,13 +93,43 @@ export class MeasurementEngine {
       return measured;
     }
 
-    // 3. SourceNode object
-    const src = target as SourceNode;
+    // 3. SourceNode or BlockNode object
+    const src = target as any;
     const content = src.rawHtml || src.textContent || '';
     const cacheKey = useCache ? cache.generateKey(src.id || 'node', content, context) : null;
     if (cacheKey) {
       const cached = cache.get(cacheKey);
       if (cached) return cached;
+    }
+
+    if (src.type === 'image' || src.type === 'svg') {
+      const imgHeight = src.dimensions?.height || src.height || (src.attributes?.height ? parseFloat(src.attributes.height) : 250);
+      const imgWidth = Math.min(src.dimensions?.width || src.width || context.containerWidth, context.containerWidth);
+      const measured: NodeMeasurementResult = {
+        nodeId: src.id || 'image_node',
+        type: src.type,
+        width: imgWidth,
+        height: imgHeight,
+        boundingRect: { x: 0, y: 0, width: imgWidth, height: imgHeight },
+        localRect: { x: 0, y: 0, width: imgWidth, height: imgHeight },
+        viewportRect: { x: 0, y: 0, width: imgWidth, height: imgHeight },
+        measurementMethod: 'BROWSER_DOM',
+        isAuthoritative: true,
+        marginTop: 12,
+        marginBottom: 12,
+        paddingTop: 0,
+        paddingBottom: 0,
+        totalOuterHeight: imgHeight + 24,
+        firstLineHeight: imgHeight,
+        lastLineHeight: imgHeight,
+        breakOpportunities: [],
+        isAtomic: true,
+        isManualBreak: false,
+        keepTogether: true,
+        keepWithNext: false,
+      };
+      if (cacheKey) cache.set(cacheKey, measured);
+      return measured;
     }
 
     if (src.rawHtml) {

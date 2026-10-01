@@ -247,7 +247,6 @@ export class TableFragmenter {
 
     // If no complete data row fits on first page
     if (firstPageRows.length === 0) {
-      // Check if the single first row is oversized and can be split at cell level
       if (dataRows.length > 0 && availableHeightPx >= headerHeight + 36) {
         const oversizedSplit = this.splitOversizedRow(dataRows[0].rawHtml || '', availableHeightPx - headerHeight);
         if (oversizedSplit) {
@@ -271,7 +270,11 @@ export class TableFragmenter {
     }
 
     // Build First Page Table Slice
-    const theadBlock = headerHtml ? `<thead>${headerHtml}</thead>` : '';
+    const theadBlock = headerHtml
+      ? headerHtml.toLowerCase().startsWith('<thead')
+        ? headerHtml
+        : `<thead>${headerHtml}</thead>`
+      : '';
     const firstTableHtml = `<table${tableAttrs}>${colgroupHtml}${theadBlock}<tbody>${firstPageRows.join('')}</tbody></table>`;
 
     // Build Remaining Page Table Slice (With REPEATED <thead>!)
@@ -280,7 +283,7 @@ export class TableFragmenter {
 
     if (remainingPageRows.length > 0) {
       const tfootBlock = geometry.footerHtml ? `<tfoot>${geometry.footerHtml}</tfoot>` : '';
-      remainingTableHtml = `<table${tableAttrs} data-table-continuation="true">${colgroupHtml}${theadBlock}<tbody>${remainingPageRows.join('')}</tbody>${tfootBlock}</table>`;
+      remainingTableHtml = `<table${tableAttrs} data-table-continuation="true" data-is-continuation="true">${colgroupHtml}${theadBlock}<tbody>${remainingPageRows.join('')}</tbody>${tfootBlock}</table>`;
       remainingHeight = headerHeight + geometry.footerHeight + dataRows.slice(firstPageRows.length).reduce((s, r) => s + r.height, 0);
     }
 
@@ -467,7 +470,6 @@ export class TableFragmenter {
       }
     }
 
-    // Handle oversized single row on first page
     if (firstRows.length === 0 && rowMeasurements.length > 0 && availableHeightPx >= headerHeight + 36) {
       const oversized = this.splitOversizedRow(rowMeasurements[0].html, availableHeightPx - headerHeight);
       if (oversized) {
@@ -497,7 +499,7 @@ export class TableFragmenter {
     const firstTableHtml = `<table${tableAttrs}>${colgroupHtml}${theadBlock}<tbody>${firstRows.join('')}</tbody></table>`;
     const remTableHtml =
       remRows.length > 0
-        ? `<table${tableAttrs} data-table-continuation="true">${colgroupHtml}${theadBlock}<tbody>${remRows.join('')}</tbody>${tfootBlock}</table>`
+        ? `<table${tableAttrs} data-table-continuation="true" data-is-continuation="true">${colgroupHtml}${theadBlock}<tbody>${remRows.join('')}</tbody>${tfootBlock}</table>`
         : null;
 
     const remHeight =

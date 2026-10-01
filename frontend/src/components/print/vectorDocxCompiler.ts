@@ -1806,7 +1806,23 @@ export function compileLayoutDocumentToDocx(
 
   const pageWidth = isLandscape ? rawDims.height : rawDims.width;
   const pageHeight = isLandscape ? rawDims.width : rawDims.height;
-  const pageMargins = MARGIN_TWIP[String(margin || 'NORMAL').toUpperCase()] || MARGIN_TWIP.NORMAL;
+
+  let pageMargins = MARGIN_TWIP[String(margin || 'NORMAL').toUpperCase()] || MARGIN_TWIP.NORMAL;
+  if (mergedOptions.customMarginsMm) {
+    pageMargins = {
+      top: Math.round((mergedOptions.customMarginsMm.top ?? 20) * 56.7),
+      bottom: Math.round((mergedOptions.customMarginsMm.bottom ?? 20) * 56.7),
+      left: Math.round((mergedOptions.customMarginsMm.left ?? 20) * 56.7),
+      right: Math.round((mergedOptions.customMarginsMm.right ?? 20) * 56.7),
+    };
+  } else if (layoutDoc.pages && layoutDoc.pages.length > 0 && layoutDoc.pages[0].margins) {
+    pageMargins = {
+      top: Math.round((layoutDoc.pages[0].margins.top ?? 48) * 15),
+      bottom: Math.round((layoutDoc.pages[0].margins.bottom ?? 48) * 15),
+      left: Math.round((layoutDoc.pages[0].margins.left ?? 48) * 15),
+      right: Math.round((layoutDoc.pages[0].margins.right ?? 48) * 15),
+    };
+  }
 
   const allBlocks: (Paragraph | Table)[] = [];
   const pages = layoutDoc.pages || [];
@@ -1860,7 +1876,26 @@ export function compileLayoutDocumentToDocx(
           }
         }
 
-        // D. Divider Fragment
+        // D. Image Fragment
+        else if (fragType === 'image' || html.includes('<img')) {
+          allBlocks.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 80, after: 80 },
+              children: [
+                new TextRun({
+                  text: text ? `[Image: ${text}]` : '[Image Figure]',
+                  italics: true,
+                  font: FONT_PRIMARY,
+                  size: 18,
+                  color: '64748B',
+                }),
+              ],
+            })
+          );
+        }
+
+        // E. Divider Fragment
         else if (fragType === 'divider' || html.includes('<hr')) {
           allBlocks.push(
             new Paragraph({
@@ -1871,7 +1906,7 @@ export function compileLayoutDocumentToDocx(
           );
         }
 
-        // E. Default Paragraph / Rich Text Fragment
+        // F. Default Paragraph / Rich Text Fragment
         else {
           if (text) {
             allBlocks.push(convertHtmlFragmentToDocxParagraph(html, text, 22, false));
@@ -1932,6 +1967,26 @@ export function compileLayoutDocumentToDocx(
             },
           },
         },
+        headers: (options.showHeader !== false && Boolean(options.headerConfig || options.title || options.institutionName))
+          ? {
+              default: new Header({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [
+                      new TextRun({
+                        text: options.headerConfig?.runningHeaderText || options.title || options.institutionName || 'SPR Note Official',
+                        size: 18,
+                        font: FONT_PRIMARY,
+                        color: '64748B',
+                        bold: true,
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
         footers: showFooter
           ? {
               default: new Footer({

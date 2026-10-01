@@ -94,7 +94,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
       const container = document.createElement('div');
       container.innerHTML = rawHtml;
       const runtimeElements = container.querySelectorAll(
-        '[data-spr-runtime-pagination="true"], [data-doclab-runtime-chrome="true"], .doclab-runtime-chrome, .doclab-runtime-page-badge, .doclab-runtime-page-header, .doclab-runtime-page-footer, .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper, [data-layout-perf="true"], [data-debug-overlay="true"], [data-diagnostics="true"], [data-diagnostics], .doclab-diagnostics-overlay, .spr-layout-diagnostics'
+        '[data-spr-runtime-pagination="true"], [data-doclab-runtime-chrome="true"], header.print-running-header, header.print-document-header, header.print-running-continuation-header, header.print-first-page-header, footer.print-running-footer, footer.print-document-footer, footer.print-first-page-footer, .doclab-runtime-chrome, .doclab-runtime-page-badge, .doclab-runtime-page-header, .doclab-runtime-page-footer, .spr-runtime-page-spacer, .spr-page-spacer, [data-runtime-spacer="true"], [data-runtime-guide="true"], .spr-runtime-page-guide, .doclab-runtime-overlay, .doclab-visual-sheets-layer, .spr-page-overlay-wrapper, [data-layout-perf="true"], [data-debug-overlay="true"], [data-diagnostics="true"], [data-diagnostics], .doclab-diagnostics-overlay, .spr-layout-diagnostics'
       );
       runtimeElements.forEach((el) => el.parentNode?.removeChild(el));
       return container.innerHTML;
@@ -105,7 +105,7 @@ export function stripRuntimePaginationSpacers(rawHtml: string): string {
 
   return rawHtml
     .replace(
-      /<div\b[^>]*?\b(?:doclab-runtime-chrome|doclab-runtime-page-badge|doclab-runtime-page-header|doclab-runtime-page-footer|spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper|doclab-diagnostics-overlay|spr-layout-diagnostics|data-spr-runtime-pagination|data-doclab-runtime-chrome|data-runtime-spacer|data-runtime-guide|data-layout-perf|data-debug-overlay|data-diagnostics)\b[^>]*?>[\s\S]*?<\/div>/gi,
+      /<(?:div|header|footer)\b[^>]*?\b(?:print-running-header|print-document-header|print-running-continuation-header|print-first-page-header|print-running-footer|print-document-footer|print-first-page-footer|doclab-runtime-chrome|doclab-runtime-page-badge|doclab-runtime-page-header|doclab-runtime-page-footer|spr-runtime-page-spacer|spr-page-spacer|spr-runtime-page-guide|doclab-runtime-overlay|doclab-visual-sheets-layer|spr-page-overlay-wrapper|doclab-diagnostics-overlay|spr-layout-diagnostics|data-spr-runtime-pagination|data-doclab-runtime-chrome|data-runtime-spacer|data-runtime-guide|data-layout-perf|data-debug-overlay|data-diagnostics)\b[^>]*?>[\s\S]*?<\/(?:div|header|footer)>/gi,
       ''
     )
     .replace(/<!--\s*[\s\S]*?(?:runtime|diagnostics)[\s\S]*?-->/gi, '');
@@ -397,7 +397,7 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
 
   try {
     const container = document.createElement('div');
-    container.innerHTML = rawHtml.trim();
+    container.innerHTML = cleanHtml.trim();
 
     // Unpack outer container wrappers (e.g. .docx-blank-canvas, section.docx, .docx-parsed-body, .docx-preview-content)
     let rootEl: HTMLElement = container;
@@ -451,6 +451,15 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
       if (child.nodeType === ELEMENT_NODE_TYPE) {
         const el = child as HTMLElement;
         const tag = el.tagName.toLowerCase();
+
+        // 0. Skip runtime spacers and non-canonical pagination markers
+        if (
+          el.getAttribute('data-spr-runtime-pagination') === 'true' ||
+          el.classList.contains('spr-runtime-page-spacer') ||
+          el.getAttribute('data-runtime-spacer') === 'true'
+        ) {
+          return;
+        }
 
         // 1. Manual Page Break element
         if (isExplicitManualBreak(el)) {
