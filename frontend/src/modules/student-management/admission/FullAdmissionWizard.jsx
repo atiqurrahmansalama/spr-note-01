@@ -33,6 +33,7 @@ import {
   students as studentStore,
 } from "../../../utils/localStore";
 import { getLocalizedValue } from "../../../i18n/localizedEntity";
+import { readJSON, writeJSON } from "../../../stores/coreStore";
 import { useTenant } from "../../../context/TenantContext";
 import { useAcademicSession } from "../../../context/AcademicSessionContext";
 import AutoSaveBadge from "../../../components/ui/AutoSaveBadge";
@@ -159,6 +160,8 @@ export default function FullAdmissionWizard({
   isPublicOnlineMode = false,
   tokenMeta = null,
   token = null,
+  isEditing: propIsEditing = false,
+  editStudentId: propEditStudentId = null,
 }) {
   const { showToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
@@ -284,13 +287,21 @@ export default function FullAdmissionWizard({
   const sharedData = propSharedData || internalSharedData;
   const setSharedData = propSetSharedData || setInternalSharedData;
 
-  // Auto-Save / Draft Persistence
+  const isEditing = Boolean(
+    propIsEditing ||
+    propEditStudentId ||
+    sharedData?.is_editing ||
+    sharedData?.edit_student_id
+  );
+  const editStudentId = propEditStudentId || sharedData?.edit_student_id;
+
+  // Auto-Save / Draft Persistence (Disabled when in edit mode to avoid draft overwrites)
   const storageKey = token ? `adm_wizard_pub_${token}` : `adm_wizard_${activeTenantId || 'default'}`;
   const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
     formData: sharedData,
     setFormData: setSharedData,
     storageKey,
-    enabled: !token && !sharedData?.is_editing && !sharedData?.edit_student_id,
+    enabled: !token && !isEditing,
   });
 
   // Institutional Branches
@@ -334,11 +345,22 @@ export default function FullAdmissionWizard({
   ];
 
   // Existing Student Lookup & Auto-fill State
-  const [studentType, setStudentType] = useState(sharedData.student_type || "NEW");
+  const [studentType, setStudentType] = useState(
+    isEditing ? "EXISTING" : (sharedData?.student_type || "NEW")
+  );
   const [existingStudentQuery, setExistingStudentQuery] = useState("");
   const [existingStudentResults, setExistingStudentResults] = useState([]);
   const [isSearchingExisting, setIsSearchingExisting] = useState(false);
   const [selectedExistingStudent, setSelectedExistingStudent] = useState(null);
+
+  // Synchronize studentType when isEditing or sharedData changes
+  useEffect(() => {
+    if (isEditing) {
+      setStudentType("EXISTING");
+    } else if (sharedData?.student_type) {
+      setStudentType(sharedData.student_type);
+    }
+  }, [isEditing, sharedData?.student_type]);
 
   const handleStudentTypeChange = (type) => {
     setStudentType(type);
@@ -633,7 +655,7 @@ export default function FullAdmissionWizard({
   const handleChange = (field, val) => {
     setSharedData((prev) => {
       const updated = { ...prev, [field]: val };
-      if (field === "name" && val) {
+      if (field === "name" && typeof val === "string" && val) {
         updated.name = val.replace(/\b\w/g, (c) => c.toUpperCase());
       }
       return updated;
@@ -703,7 +725,10 @@ export default function FullAdmissionWizard({
 
   const nextStep = () => {
     if (currentStep === 1) {
-      if (!sharedData.name?.trim()) {
+      const nameVal = typeof sharedData.name === "object"
+        ? (getLocalizedValue(sharedData.name, "en") || getLocalizedValue(sharedData.name, "bn") || Object.values(sharedData.name || {}).find(Boolean) || "")
+        : (sharedData.name || "");
+      if (!String(nameVal).trim()) {
         showToast("Student Name (English) is required", "warning");
         return;
       }
@@ -727,7 +752,7 @@ export default function FullAdmissionWizard({
       }
     }
     if (currentStep === 3) {
-      if (!sharedData.guardian_phone?.trim()) {
+      if (!sharedData.guardian_phone || !String(sharedData.guardian_phone).trim()) {
         showToast("Primary Guardian Phone is required", "warning");
         return;
       }
@@ -735,7 +760,7 @@ export default function FullAdmissionWizard({
         showToast("Guardian Phone must be a valid 11-digit mobile", "warning");
         return;
       }
-      if (!sharedData.guardian_relation?.trim()) {
+      if (!sharedData.guardian_relation || !String(sharedData.guardian_relation).trim()) {
         showToast("Relation to Student is required", "warning");
         return;
       }
@@ -834,11 +859,21 @@ export default function FullAdmissionWizard({
       emergency_contact_phone: sharedData.emergency_contact_phone || "",
     };
 
-    const selectedClassObj = classes.find((c) => c.value === sharedData.student_class);
+    const primaryName = String(
+      typeof sharedData.name === "object"
+        ? (getLocalizedValue(sharedData.name, "en") || getLocalizedValue(sharedData.name, "bn") || Object.values(sharedData.name || {}).find(Boolean) || "")
+        : (sharedData.name || "")
+    ).trim();
+    const nativeName = sharedData.bangla_name || (typeof sharedData.name === "object" ? getLocalizedValue(sharedData.name, "bn") : "");
+    const nameI18n = typeof sharedData.name === "object"
+      ? sharedData.name
+      : { en: primaryName, bn: nativeName };
 
     const payload = {
-      name: sharedData.name,
-      bangla_name: sharedData.bangla_name || "",
+      name: primaryName,
+      name_en: primaryName,
+      bangla_name: nativeName,
+      name_i18n: nameI18n,
       student_id_card_number: sharedData.student_id_card_number || null,
       gender: sharedData.gender || "MALE",
       dob: sharedData.dob || null,
@@ -849,7 +884,7 @@ export default function FullAdmissionWizard({
       longitude: sharedData.longitude != null ? sharedData.longitude : null,
       map_place_id: sharedData.map_place_id || "",
       admission_mode: "FULL",
-      status: "ACTIVE",
+      status: sharedData.status || "ACTIVE",
       target_status: sharedData.target_status || "NON_RESIDENTIAL",
       branch: sharedData.branch_id || (branches[0] ? branches[0].id : null),
       student_class: sharedData.student_class || null,
@@ -881,36 +916,59 @@ export default function FullAdmissionWizard({
     }
 
     try {
-      if (sharedData.is_editing && sharedData.edit_student_id) {
+      if (isEditing || sharedData.is_editing || editStudentId) {
+        const studentIdToUpdate = editStudentId || sharedData.edit_student_id;
+        if (!studentIdToUpdate) {
+          showToast("Cannot update student: Student ID is missing.", "error");
+          setLoading(false);
+          return;
+        }
+
         // ── 1. Submit update for existing student ──
-        const editRes = await fetchWithAuth(`/api/v1/students/${sharedData.edit_student_id}/full-profile/`, {
+        const editRes = await fetchWithAuth(`/api/v1/students/${studentIdToUpdate}/full-profile/`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
 
         if (!editRes.ok) {
-          const errorData = await editRes.json().catch(() => ({}));
-          console.error("Student profile update error:", errorData);
-          let errorMsg = "Failed to update student profile. Please review inputs.";
-          if (errorData && typeof errorData === "object") {
-            if (typeof errorData.detail === "string") {
-              errorMsg = errorData.detail;
-            } else if (typeof errorData.message === "string") {
-              errorMsg = errorData.message;
-            } else {
-              const firstVal = Object.values(errorData)[0];
-              if (typeof firstVal === "string") errorMsg = firstVal;
-              else if (Array.isArray(firstVal) && firstVal.length > 0) errorMsg = String(firstVal[0]);
+          // Fallback basic patch
+          const fallbackRes = await fetchWithAuth(`/api/v1/students/${studentIdToUpdate}/`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: primaryName,
+              name_en: primaryName,
+              bangla_name: nativeName,
+              student_class: sharedData.student_class || null,
+              section: sharedData.student_section || null,
+              student_section: sharedData.student_section || null,
+            }),
+          });
+
+          if (!fallbackRes.ok) {
+            const errorData = await editRes.json().catch(() => ({}));
+            console.error("Student profile update error:", errorData);
+            let errorMsg = "Failed to update student profile. Please review inputs.";
+            if (errorData && typeof errorData === "object") {
+              if (typeof errorData.detail === "string") {
+                errorMsg = errorData.detail;
+              } else if (typeof errorData.message === "string") {
+                errorMsg = errorData.message;
+              } else {
+                const firstVal = Object.values(errorData)[0];
+                if (typeof firstVal === "string") errorMsg = firstVal;
+                else if (Array.isArray(firstVal) && firstVal.length > 0) errorMsg = String(firstVal[0]);
+              }
             }
+            showToast(errorMsg, "error");
+            setLoading(false);
+            return;
           }
-          showToast(errorMsg, "error");
-          setLoading(false);
-          return;
         }
 
-        const resData = await editRes.json();
-        const studentId = resData.id;
+        const resData = await editRes.json().catch(() => ({ id: studentIdToUpdate }));
+        const studentId = resData.id || studentIdToUpdate;
 
         // 2. Upload photo if selected
         if (photoFile && studentId) {
@@ -930,7 +988,7 @@ export default function FullAdmissionWizard({
                 const docType = (doc.title || "STUDENT_DOCUMENT").toUpperCase().replace(/\s+/g, '_').slice(0, 30);
                 const docFormData = new FormData();
                 docFormData.append("doc_type", docType);
-                docFormData.append("title", doc.title || `Document of ${sharedData.name}`);
+                docFormData.append("title", doc.title || `Document of ${primaryName}`);
                 if (doc.file) {
                   docFormData.append("file", doc.file);
                 } else if (doc.file_url.startsWith("data:")) {
@@ -953,15 +1011,34 @@ export default function FullAdmissionWizard({
         const fullData = profileRes && profileRes.ok ? await profileRes.json() : resData;
         const enrichedData = {
           ...fullData,
+          id: String(studentId),
+          uniq_id: fullData.uniq_id || resData?.uniq_id || sharedData.uniq_id || sharedData.student_id_card_number,
+          student_id_card_number: fullData.student_id_card_number || fullData.uniq_id || sharedData.student_id_card_number || sharedData.uniq_id,
+          name: primaryName,
+          name_en: primaryName,
+          bangla_name: nativeName,
+          student_class: sharedData.student_class || fullData.student_class,
           student_class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
           education_status: fullData.education_status || selectedClassObj?.name || sharedData.education_status,
           class_name: fullData.student_class_name || selectedClassObj?.name || sharedData.education_status,
+          student_section: sharedData.student_section || fullData.student_section,
+          section_name: fullData.section_name || sharedData.section_name,
         };
+
         try {
           studentStore.update(String(studentId), enrichedData);
         } catch (stErr) {
           console.warn("Local studentStore update warning:", stErr);
         }
+
+        try {
+          const cacheKey = `spr_students_cache_${activeTenantId}`;
+          const cached = readJSON(cacheKey, []);
+          const updatedCache = cached.map((s) => String(s.id) === String(studentId) ? { ...s, ...enrichedData } : s);
+          writeJSON(cacheKey, updatedCache);
+        } catch (cErr) {}
+
+        clearDraft();
         window.dispatchEvent(new CustomEvent("spr_students_updated"));
         window.dispatchEvent(new CustomEvent("spr_student_updated", { detail: enrichedData }));
 
@@ -1117,105 +1194,107 @@ export default function FullAdmissionWizard({
             <div className="flex flex-col-reverse md:flex-row items-center md:items-end justify-between gap-6 md:gap-10 lg:gap-12">
               {/* Left Side: Admission Type Toggle, Search (if existing), and English & Native Names */}
               <div className="w-full space-y-4 sm:space-y-4.5 max-w-md">
-                {/* Applicant Admission Type Segment */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
-                      Admission Type
-                    </label>
-                    <div className="inline-flex p-1 rounded-2xl theme-bg-sub border theme-border">
-                      <button
-                        type="button"
-                        onClick={() => handleStudentTypeChange("NEW")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          studentType === "NEW"
-                            ? "theme-bg-accent theme-accent-text shadow-xs font-black"
-                            : "theme-text-secondary hover:theme-text-primary"
-                        }`}
-                      >
-                        New Student
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStudentTypeChange("EXISTING")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          studentType === "EXISTING"
-                            ? "theme-bg-accent theme-accent-text shadow-xs font-black"
-                            : "theme-text-secondary hover:theme-text-primary"
-                        }`}
-                      >
-                        Existing Student
-                      </button>
+                {/* Applicant Admission Type Segment (Hidden when editing an existing student) */}
+                {!isEditing && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
+                        Admission Type
+                      </label>
+                      <div className="inline-flex p-1 rounded-2xl theme-bg-sub border theme-border">
+                        <button
+                          type="button"
+                          onClick={() => handleStudentTypeChange("NEW")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            studentType === "NEW"
+                              ? "theme-bg-accent theme-accent-text shadow-xs font-black"
+                              : "theme-text-secondary hover:theme-text-primary"
+                          }`}
+                        >
+                          New Student
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStudentTypeChange("EXISTING")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            studentType === "EXISTING"
+                              ? "theme-bg-accent theme-accent-text shadow-xs font-black"
+                              : "theme-text-secondary hover:theme-text-primary"
+                          }`}
+                        >
+                          Existing Student
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Existing Student Search Bar & Autocomplete */}
-                  {studentType === "EXISTING" && (
-                    <div className="pt-1 space-y-2 animate-fade-in relative">
-                      <div className="relative">
-                        <CustomInput
-                          type="search"
-                          value={existingStudentQuery}
-                          onChange={(val) => setExistingStudentQuery(val)}
-                          placeholder="Search existing student by name, roll, ID..."
-                        />
-                        {isSearchingExisting && (
-                          <div className="absolute right-9 top-1/2 -translate-y-1/2 text-[10px] theme-accent animate-pulse font-bold pointer-events-none">
-                            Searching...
+                    {/* Existing Student Search Bar & Autocomplete */}
+                    {studentType === "EXISTING" && (
+                      <div className="pt-1 space-y-2 animate-fade-in relative">
+                        <div className="relative">
+                          <CustomInput
+                            type="search"
+                            value={existingStudentQuery}
+                            onChange={(val) => setExistingStudentQuery(val)}
+                            placeholder="Search existing student by name, roll, ID..."
+                          />
+                          {isSearchingExisting && (
+                            <div className="absolute right-9 top-1/2 -translate-y-1/2 text-[10px] theme-accent animate-pulse font-bold pointer-events-none">
+                              Searching...
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Autocomplete suggestions list */}
+                        {existingStudentResults.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 max-h-52 overflow-y-auto animate-fade-in custom-scrollbar">
+                            {existingStudentResults.map((stu) => (
+                              <div
+                                key={stu.id}
+                                onClick={() => handleSelectExistingStudent(stu)}
+                                className="p-2.5 rounded-xl hover:theme-bg-elevated cursor-pointer transition-all flex items-center justify-between border-b last:border-b-0 theme-border"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-bold theme-text-primary truncate">
+                                    {stu.name_en || stu.name || "Unnamed Student"}
+                                  </div>
+                                  <div className="text-[10px] theme-text-secondary flex items-center gap-1.5 mt-0.5">
+                                    <span>Roll: {stu.roll_number || "--"}</span>
+                                    <span>•</span>
+                                    <span>Class: {stu.education_status || stu.student_class_name || "--"}</span>
+                                    <span>•</span>
+                                    <span>ID: {stu.uniq_id || "--"}</span>
+                                  </div>
+                                </div>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border shrink-0 ml-2">
+                                  Load
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Loaded Confirmation Card */}
+                        {selectedExistingStudent && (
+                          <div className="p-2.5 rounded-2xl theme-bg-accent-soft border theme-border text-xs flex items-center justify-between gap-2 animate-fade-in">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
+                              <span className="font-bold theme-text-primary truncate text-xs">
+                                Loaded: {selectedExistingStudent.name_en || selectedExistingStudent.name} (Roll: {selectedExistingStudent.roll_number || "--"})
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleClearExistingStudent}
+                              className="px-2.5 py-1 rounded-xl theme-bg-surface border theme-border text-[11px] font-bold theme-text-secondary hover:theme-danger transition-colors cursor-pointer shrink-0"
+                            >
+                              Clear
+                            </button>
                           </div>
                         )}
                       </div>
-
-                      {/* Autocomplete suggestions list */}
-                      {existingStudentResults.length > 0 && (
-                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 max-h-52 overflow-y-auto animate-fade-in custom-scrollbar">
-                          {existingStudentResults.map((stu) => (
-                            <div
-                              key={stu.id}
-                              onClick={() => handleSelectExistingStudent(stu)}
-                              className="p-2.5 rounded-xl hover:theme-bg-elevated cursor-pointer transition-all flex items-center justify-between border-b last:border-b-0 theme-border"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold theme-text-primary truncate">
-                                  {stu.name_en || stu.name || "Unnamed Student"}
-                                </div>
-                                <div className="text-[10px] theme-text-secondary flex items-center gap-1.5 mt-0.5">
-                                  <span>Roll: {stu.roll_number || "--"}</span>
-                                  <span>•</span>
-                                  <span>Class: {stu.education_status || stu.student_class_name || "--"}</span>
-                                  <span>•</span>
-                                  <span>ID: {stu.uniq_id || "--"}</span>
-                                </div>
-                              </div>
-                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border theme-border shrink-0 ml-2">
-                                Load
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Loaded Confirmation Card */}
-                      {selectedExistingStudent && (
-                        <div className="p-2.5 rounded-2xl theme-bg-accent-soft border theme-border text-xs flex items-center justify-between gap-2 animate-fade-in">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
-                            <span className="font-bold theme-text-primary truncate text-xs">
-                              Loaded: {selectedExistingStudent.name_en || selectedExistingStudent.name} (Roll: {selectedExistingStudent.roll_number || "--"})
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleClearExistingStudent}
-                            className="px-2.5 py-1 rounded-xl theme-bg-surface border theme-border text-[11px] font-bold theme-text-secondary hover:theme-danger transition-colors cursor-pointer shrink-0"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <CustomInput
@@ -1224,7 +1303,7 @@ export default function FullAdmissionWizard({
                     value={typeof sharedData.name === "object" ? getLocalizedValue(sharedData.name, "en") : (sharedData.name || "")}
                     onChange={(val) => {
                       if (typeof sharedData.name === "object") {
-                        handleChange("name", { ...sharedData.name, en: val });
+                        handleChange("name", { ...sharedData.name, en: typeof val === "string" ? val : "" });
                       } else {
                         handleChange("name", val);
                       }
@@ -1240,7 +1319,7 @@ export default function FullAdmissionWizard({
                     onChange={(val) => {
                       handleChange("bangla_name", val);
                       if (typeof sharedData.name === "object") {
-                        handleChange("name", { ...sharedData.name, bn: val });
+                        handleChange("name", { ...sharedData.name, bn: typeof val === "string" ? val : "" });
                       }
                     }}
                     placeholder="e.g. Abdullah Bin Arif (In Native Script)"

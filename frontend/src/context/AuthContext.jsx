@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import apiClient from '../api/axios';
 import { auth as authStore } from '../utils/localStore';
 
@@ -367,24 +367,43 @@ export function AuthProvider({ children }) {
     window.dispatchEvent(new CustomEvent('spr_auth_updated', { detail: { userId: null } }));
   };
 
-  const value = {
-    user,
-    setUser,
-    accessToken,
-    isAuthenticated,
-    isLoading,
-    login,
-    loginWithGoogle,
-    register,
-    logout,
-    saveTokens,
-    verifyEmail,
-    resendVerification,
-    requestPasswordReset,
-    confirmPasswordReset,
-    fetchActiveSessions,
-    revokeSession,
-  };
+  const value = useMemo(
+    () => ({
+      user,
+      setUser,
+      accessToken,
+      isAuthenticated,
+      isLoading,
+      login,
+      loginWithGoogle,
+      register,
+      logout,
+      saveTokens,
+      verifyEmail,
+      resendVerification,
+      requestPasswordReset,
+      confirmPasswordReset,
+      fetchActiveSessions,
+      revokeSession,
+    }),
+    [
+      user,
+      accessToken,
+      isAuthenticated,
+      isLoading,
+      login,
+      loginWithGoogle,
+      register,
+      logout,
+      saveTokens,
+      verifyEmail,
+      resendVerification,
+      requestPasswordReset,
+      confirmPasswordReset,
+      fetchActiveSessions,
+      revokeSession,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

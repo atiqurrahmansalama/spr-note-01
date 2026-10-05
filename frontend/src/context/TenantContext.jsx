@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getInstitutions } from '../api/institutions';
 import { useAuth } from './AuthContext';
 
@@ -158,20 +158,35 @@ export function TenantProvider({ children }) {
     setPendingSwitchInstitution(null);
   }, []);
 
-  const value = {
-    institutions,
-    currentInstitution,
-    activeTenant: currentInstitution,
-    activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
-    isMultiTenantAdmin,
-    isLoadingInstitutions,
-    switchInstitution,
-    pendingSwitchInstitution,
-    requestSwitchInstitution,
-    confirmSwitchInstitution,
-    cancelSwitchInstitution,
-    refreshInstitutions: fetchInstitutionsList,
-  };
+  const value = useMemo(
+    () => ({
+      institutions,
+      currentInstitution,
+      activeTenant: currentInstitution,
+      activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
+      isMultiTenantAdmin,
+      isLoadingInstitutions,
+      switchInstitution,
+      pendingSwitchInstitution,
+      requestSwitchInstitution,
+      confirmSwitchInstitution,
+      cancelSwitchInstitution,
+      refreshInstitutions: fetchInstitutionsList,
+    }),
+    [
+      institutions,
+      currentInstitution,
+      activeTenantId,
+      isMultiTenantAdmin,
+      isLoadingInstitutions,
+      switchInstitution,
+      pendingSwitchInstitution,
+      requestSwitchInstitution,
+      confirmSwitchInstitution,
+      cancelSwitchInstitution,
+      fetchInstitutionsList,
+    ]
+  );
 
   return (
     <TenantContext.Provider value={value}>

@@ -19,7 +19,7 @@ import {
   usePrintPagination,
   usePrintStudioShortcuts,
 } from './hooks';
-import { DocLabHeader, DocLabWorkbench } from './components';
+import { DocLabHeader, DocLabWorkbench, DocLabMobileGuard } from './components';
 import { UniversalPrintStudioProps } from './types';
 import { exportToNativeDocx } from './vectorDocxCompiler';
 import { useToast } from '../../context/ToastContext';
@@ -302,6 +302,21 @@ export default function UniversalPrintStudio({
     toggleExpandedWidth: 760,
   });
 
+  // Small screen detection & mobile warning guard state
+  const [isSmallScreen, setIsSmallScreen] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768;
+  });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsSmallScreen(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (!isOpen) return null;
 
   const studioContent = (
@@ -312,6 +327,10 @@ export default function UniversalPrintStudio({
           : 'fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 animate-fade-in text-left font-sans'
       } print:static print:block print:w-full print:h-auto print:p-0 print:m-0 print:bg-white print:backdrop-filter-none print:shadow-none print:overflow-visible`}
     >
+      {/* Small Screen / Mobile Warning Modal Guard */}
+      {isOpen && isSmallScreen && (
+        <DocLabMobileGuard onClose={onClose} />
+      )}
       {/* Dynamic @page Rules for Clean Browser Print Dialog */}
       <style
         dangerouslySetInnerHTML={{
@@ -436,6 +455,7 @@ export default function UniversalPrintStudio({
             autoSaveStatus={autoSaveStatus}
             autoSaveLastSavedAt={autoSaveLastSavedAt}
             isAutoSaving={isAutoSaving}
+            scopeId={scopeId}
           />
 
           {/* Right Configuration Sidebar */}

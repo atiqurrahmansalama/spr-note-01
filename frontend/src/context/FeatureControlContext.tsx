@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { fetchWithAuth } from "../utils/authService";
 import { useAuth } from "./AuthContext";
 
@@ -278,18 +278,29 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
     [origins]
   );
 
+  const contextValue = useMemo<FeatureControlContextType>(
+    () => ({
+      config,
+      origins,
+      loading,
+      isFeatureEnabled,
+      isSectionEnabled: isFeatureEnabled,
+      getFeatureOrigin,
+      refetchConfig: () => fetchEvaluatedConfig(userId),
+    }),
+    [
+      config,
+      origins,
+      loading,
+      isFeatureEnabled,
+      getFeatureOrigin,
+      fetchEvaluatedConfig,
+      userId,
+    ]
+  );
+
   return (
-    <FeatureControlContext.Provider
-      value={{
-        config,
-        origins,
-        loading,
-        isFeatureEnabled,
-        isSectionEnabled: isFeatureEnabled,
-        getFeatureOrigin,
-        refetchConfig: () => fetchEvaluatedConfig(userId),
-      }}
-    >
+    <FeatureControlContext.Provider value={contextValue}>
       {children}
     </FeatureControlContext.Provider>
   );

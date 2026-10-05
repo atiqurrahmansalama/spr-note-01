@@ -3,6 +3,7 @@ import { useAutoSave } from '../../../hooks/useAutoSave';
 import {
   CustomDocxTemplate,
   getSavedDocxTemplates,
+  fetchCloudDocxTemplates,
   saveDocxTemplate,
   deleteDocxTemplate,
   bulkMergeTemplate,
@@ -10,6 +11,9 @@ import {
   mergeTabularTemplateWithData,
   isTabularTemplate,
   separateDocxStylesAndBody,
+  getDocLabCanvasDraft,
+  saveDocLabCanvasDraft,
+  clearDocLabCanvasDraft,
 } from '../docxTemplateEngine';
 import { PaginationEngine } from '../layout/pagination/PaginationEngine';
 import { ControlledLayoutPipeline } from '../layout/measurement/ControlledLayoutPipeline';
@@ -33,7 +37,8 @@ import { buildSubjectRoutineReportData } from '../../../modules/examinations/exa
 
 export const BLANK_PAGE_HTML = '<p><br /></p>';
 
-export function createBlankDocumentTemplate(): any {
+export function createBlankDocumentTemplate(scopeId: string = 'general_document'): any {
+  const canonicalScope = scopeId || 'general_document';
   return {
     id: 'blank_document',
     name: 'Blank Page (Live Canvas)',
@@ -42,6 +47,7 @@ export function createBlankDocumentTemplate(): any {
     body: BLANK_PAGE_HTML,
     html: BLANK_PAGE_HTML,
     rawHtml: BLANK_PAGE_HTML,
+    scopeId: canonicalScope,
     isTableDocument: false,
     columns: [],
     data: [],
@@ -49,6 +55,7 @@ export function createBlankDocumentTemplate(): any {
     templateMeta: {
       id: 'blank_document',
       name: 'Blank Page',
+      scopeId: canonicalScope,
       rawHtml: BLANK_PAGE_HTML,
       detectedPlaceholders: [],
       templateType: 'template',
@@ -111,8 +118,10 @@ export function usePrintDocxEngine({
     }
   });
 
-  // Real-time synchronization of saved templates across tabs, modals, and storage events
+  // Fetch cloud templates and listen for real-time synchronization of saved templates across tabs, modals, and storage events
   useEffect(() => {
+    fetchCloudDocxTemplates().catch(() => {});
+
     const handleTemplateSync = () => {
       try {
         setSavedWordTemplates(getSavedDocxTemplates());
@@ -134,6 +143,33 @@ export function usePrintDocxEngine({
 
   const [customDocxTemplate, setCustomDocxTemplate] = useState<any>(() => {
     try {
+      // 1. Check for active working canvas draft for this scope (crash recovery / reload resilience)
+      const draft = getDocLabCanvasDraft(scopeId);
+      if (draft && (draft.rawHtml || draft.templateBody)) {
+        const { styles, body } = separateDocxStylesAndBody(draft.rawHtml || draft.templateBody || '');
+        const targetBody = draft.templateBody || body || draft.rawHtml;
+        return {
+          id: draft.templateId || `canvas_draft_${scopeId || 'general_document'}`,
+          name: draft.name || 'Working Draft',
+          styles: draft.styles || styles,
+          templateBody: targetBody,
+          body: targetBody,
+          html: draft.rawHtml || targetBody,
+          rawHtml: draft.rawHtml || targetBody,
+          scopeId: scopeId || 'general_document',
+          isTableDocument: draft.isTableDocument,
+          columns: draft.sampleColumns || [],
+          data: draft.sampleData || [],
+          pageSize: draft.pageSize,
+          orientation: draft.orientation,
+          margin: draft.margin,
+          pageProperties: draft.pageProperties,
+          templateType: 'template',
+          isDraft: true,
+        };
+      }
+
+      // 2. Fallback to default template configured for this scope
       const scopeDefault = getDefaultTemplateForScope(scopeId);
       if (scopeDefault) {
         const { styles, body } = separateDocxStylesAndBody(scopeDefault.rawHtml || '');
@@ -152,6 +188,7 @@ export function usePrintDocxEngine({
           body: body || scopeDefault.rawHtml,
           html: scopeDefault.rawHtml,
           rawHtml: scopeDefault.rawHtml,
+          scopeId: scopeId || 'general_document',
           isTableDocument: scopeDefault.isTableDocument,
           columns: scopeDefault.sampleColumns || [],
           data: scopeDefault.sampleData || [],
@@ -162,9 +199,9 @@ export function usePrintDocxEngine({
         };
       }
     } catch (e) {
-      console.warn('Failed to load default template for scope', e);
+      console.warn('Failed to load default template or draft for scope', e);
     }
-    return createBlankDocumentTemplate();
+    return createBlankDocumentTemplate(scopeId);
   });
 
   // Undo / Redo History Stack for Docx Templates and Live Canvas Edits
@@ -215,10 +252,39 @@ export function usePrintDocxEngine({
     setDocxHistoryVersion((v) => v + 1);
   }, []);
 
-  // Re-sync default template for scope whenever modal opens or scopeId changes
+  // Re-sync default template or draft for scope whenever modal opens or scopeId changes
   useEffect(() => {
     if (!isOpen) return;
     try {
+      // 1. Check for active working canvas draft for this scope
+      const draft = getDocLabCanvasDraft(scopeId);
+      if (draft && (draft.rawHtml || draft.templateBody)) {
+        const { styles, body } = separateDocxStylesAndBody(draft.rawHtml || draft.templateBody || '');
+        const targetBody = draft.templateBody || body || draft.rawHtml;
+        setCustomDocxTemplate({
+          id: draft.templateId || `canvas_draft_${scopeId || 'general_document'}`,
+          name: draft.name || 'Working Draft',
+          styles: draft.styles || styles,
+          templateBody: targetBody,
+          body: targetBody,
+          html: draft.rawHtml || targetBody,
+          rawHtml: draft.rawHtml || targetBody,
+          scopeId: scopeId || 'general_document',
+          isTableDocument: draft.isTableDocument,
+          columns: draft.sampleColumns || [],
+          data: draft.sampleData || [],
+          pageSize: draft.pageSize,
+          orientation: draft.orientation,
+          margin: draft.margin,
+          pageProperties: draft.pageProperties,
+          templateType: 'template',
+          isDraft: true,
+        });
+        setDocxRenderMode('template');
+        return;
+      }
+
+      // 2. Otherwise load default template for scope
       const scopeDefault =
         getDefaultTemplateForScope(scopeId) ||
         (templates || []).find((t: any) => (t.scopeId && t.scopeId === scopeId) || (activeTemplateId && t.id === activeTemplateId)) ||
@@ -240,6 +306,7 @@ export function usePrintDocxEngine({
           body: body || scopeDefault.rawHtml,
           html: scopeDefault.rawHtml,
           rawHtml: scopeDefault.rawHtml,
+          scopeId: scopeId || 'general_document',
           isTableDocument: scopeDefault.isTableDocument,
           columns: scopeDefault.sampleColumns || [],
           data: scopeDefault.sampleData || [],
@@ -254,7 +321,7 @@ export function usePrintDocxEngine({
           setDocxRenderMode('template');
         }
       } else {
-        setCustomDocxTemplate(createBlankDocumentTemplate());
+        setCustomDocxTemplate(createBlankDocumentTemplate(scopeId));
         setDocxRenderMode('template');
       }
     } catch (e) {
@@ -326,10 +393,10 @@ export function usePrintDocxEngine({
   // Payload watched by universal useAutoSave engine
   const autoSavePayload = useMemo(() => {
     if (docxRenderMode !== 'template' || !customDocxTemplate) return null;
-    const targetId = customDocxTemplate.id || customDocxTemplate.templateMeta?.id;
-    if (!targetId || targetId === 'blank_document' || targetId === 'default_table' || targetId === 'default_layout') {
-      return null;
-    }
+    const targetId =
+      customDocxTemplate.id ||
+      customDocxTemplate.templateMeta?.id ||
+      `canvas_draft_${scopeId || 'universal'}`;
 
     const styles =
       customDocxTemplate.styles ||
@@ -341,14 +408,22 @@ export function usePrintDocxEngine({
       separateDocxStylesAndBody(customDocxTemplate.rawHtml || customDocxTemplate.html || '').body ||
       '';
 
-    if (!body || body === BLANK_PAGE_HTML) return null;
     const cleanBody = sanitizeLogicalDocumentHtml(body);
     const fullHtml = styles ? `${styles}\n${cleanBody}` : cleanBody;
 
+    const isNamedTemplate =
+      Boolean(targetId) &&
+      targetId !== 'blank_document' &&
+      targetId !== 'default_table' &&
+      targetId !== 'default_layout' &&
+      !targetId.startsWith('canvas_draft_');
+
     return {
       targetId,
+      isNamedTemplate,
       fullHtml,
       cleanBody,
+      styles,
       name: customDocxTemplate.name,
       description: customDocxTemplate.description,
       scopeId: customDocxTemplate.scopeId || scopeId,
@@ -373,39 +448,62 @@ export function usePrintDocxEngine({
   // Persistent auto-save handler invoked by useAutoSave engine
   const handleAutoSave = useCallback(
     async (payload: any) => {
-      if (!payload || !payload.targetId || !payload.fullHtml) return;
+      if (!payload || !payload.targetId || (!payload.fullHtml && !payload.cleanBody)) return;
 
-      const { targetId, fullHtml } = payload;
+      const { targetId, isNamedTemplate, fullHtml, cleanBody, styles } = payload;
       const cleanFullHtml = sanitizeLogicalDocumentHtml(fullHtml);
-      const allSaved = getSavedDocxTemplates();
-      const existing = allSaved.find((t) => t.id === targetId);
-      const scopeDef = getScopeById(scopeId as any);
+      const effectiveScope = payload.scopeId || scopeId || 'universal';
       const detectedKeys = extractTagsFromText(cleanFullHtml);
 
-      const templateToSave: CustomDocxTemplate = {
-        id: targetId,
-        name: payload.name || existing?.name || `${scopeDef?.name || 'Custom'} Template`,
-        description: payload.description || existing?.description || `Custom Template for ${scopeDef?.name || scopeId}`,
-        scopeId: payload.scopeId || existing?.scopeId || scopeId,
+      // 1. ALWAYS persist the canvas draft for this scope so reload / refresh preserves the canvas state 100%
+      saveDocLabCanvasDraft(effectiveScope, {
+        scopeId: effectiveScope,
+        templateId: isNamedTemplate ? targetId : undefined,
+        name: payload.name,
         rawHtml: cleanFullHtml,
-        detectedPlaceholders: detectedKeys,
-        isTableDocument: Boolean(payload.isTableDocument || existing?.isTableDocument),
-        sampleColumns: payload.columns || existing?.sampleColumns || [],
-        sampleData: payload.data || existing?.sampleData || [],
-        pageSize: payload.pageSize || existing?.pageSize,
-        orientation: payload.orientation || existing?.orientation,
-        margin: payload.margin || existing?.margin,
-        pageProperties: payload.pageProperties || existing?.pageProperties,
-        templateType: 'template',
-        createdAt: existing?.createdAt || payload.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+        styles: styles,
+        templateBody: cleanBody,
+        isTableDocument: Boolean(payload.isTableDocument),
+        sampleColumns: payload.columns,
+        sampleData: payload.data,
+        pageSize: payload.pageSize,
+        orientation: payload.orientation,
+        margin: payload.margin,
+        pageProperties: payload.pageProperties,
+      });
 
-      saveDocxTemplate(templateToSave);
-      setSavedWordTemplates(getSavedDocxTemplates());
+      // 2. If editing an authoritative custom template, also persist to saved templates store and cloud database
+      if (isNamedTemplate) {
+        const allSaved = getSavedDocxTemplates();
+        const existing = allSaved.find((t) => t.id === targetId);
+        const scopeDef = getScopeById(effectiveScope as any);
+
+        const templateToSave: CustomDocxTemplate = {
+          id: targetId,
+          name: payload.name || existing?.name || `${scopeDef?.name || 'Custom'} Template`,
+          description: payload.description || existing?.description || `Custom Template for ${scopeDef?.name || effectiveScope}`,
+          scopeId: effectiveScope,
+          rawHtml: cleanFullHtml,
+          detectedPlaceholders: detectedKeys,
+          isTableDocument: Boolean(payload.isTableDocument || existing?.isTableDocument),
+          sampleColumns: payload.columns || existing?.sampleColumns || [],
+          sampleData: payload.data || existing?.sampleData || [],
+          pageSize: payload.pageSize || existing?.pageSize,
+          orientation: payload.orientation || existing?.orientation,
+          margin: payload.margin || existing?.margin,
+          pageProperties: payload.pageProperties || existing?.pageProperties,
+          templateType: existing?.templateType || 'template',
+          createdAt: existing?.createdAt || payload.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        saveDocxTemplate(templateToSave);
+        setSavedWordTemplates(getSavedDocxTemplates());
+      }
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
-          new CustomEvent('spr_doclab_template_saved', { detail: { templateId: targetId } })
+          new CustomEvent('spr_doclab_canvas_saved', { detail: { scopeId: effectiveScope, templateId: targetId } })
         );
       }
     },
@@ -423,9 +521,10 @@ export function usePrintDocxEngine({
   } = useAutoSave({
     data: autoSavePayload,
     onSave: handleAutoSave,
-    debounceMs: 500,
+    debounceMs: 400,
     enabled: Boolean(autoSavePayload),
-    validate: (data: any) => Boolean(data && data.targetId && data.fullHtml),
+    storageKey: `doclab_canvas_${scopeId || 'universal'}`,
+    validate: (data: any) => Boolean(data && data.targetId && (data.fullHtml || data.cleanBody)),
   });
 
   // Flush pending auto-save on component unmount and beforeunload
@@ -761,6 +860,7 @@ export function usePrintDocxEngine({
         return;
       }
       if (tId === 'blank_document' || tId === 'blank_page') {
+        clearDocLabCanvasDraft(scopeId);
         setCustomDocxTemplate({
           id: 'blank_document',
           name: 'Blank Page (Live Canvas)',

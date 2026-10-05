@@ -9,7 +9,132 @@ import {
 } from "../../../../components/ui/Icons";
 import { StudentRecord } from "../types";
 
+export interface SectionGroupItem {
+  label: string;
+  isUnassigned: boolean;
+}
+
+export interface StudentClassDetails {
+  className: string;
+  parts: SectionGroupItem[];
+}
+
+export function getStudentClassDetails(
+  s: StudentRecord,
+  classesMap: Map<string, any>,
+  sectionsByClassMap: Map<string, any[]>,
+  groupsByClassMap: Map<string, any[]>
+): StudentClassDetails {
+  const classId = String(
+    s.student_class_id ||
+    (typeof s.student_class === "object" ? s.student_class?.id : s.student_class) ||
+    ""
+  );
+
+  const classNameFromRecord =
+    s.student_class_name ||
+    s.class_name ||
+    (typeof s.student_class === "object" ? s.student_class?.name : null) ||
+    "";
+
+  // Find class by ID or fallback by name
+  const classObj =
+    (classId ? classesMap.get(classId) : null) ||
+    (classNameFromRecord ? classesMap.get(classNameFromRecord.toLowerCase()) : null);
+
+  const resolvedClassId = classObj ? String(classObj.id) : classId;
+  const className = classObj?.name || classNameFromRecord || "General";
+
+  // Check if class has sections configured (must have active sections created or positive count)
+  const classSectionsList = resolvedClassId ? sectionsByClassMap.get(resolvedClassId) || [] : [];
+  const classHasSections = Boolean(
+    classSectionsList.length > 0 ||
+    (classObj && typeof classObj.section_count === "number" && classObj.section_count > 0)
+  );
+
+  // Check if class has groups configured (must have active groups created or positive count)
+  const classGroupsList = resolvedClassId ? groupsByClassMap.get(resolvedClassId) || [] : [];
+  const classHasGroups = Boolean(
+    classGroupsList.length > 0 ||
+    (classObj && typeof classObj.group_count === "number" && classObj.group_count > 0)
+  );
+
+  // Student's assigned section
+  let assignedSection = (
+    s.section_name ||
+    s.student_section_name ||
+    (typeof s.section === "object" ? s.section?.section_name || s.section?.name : "") ||
+    ""
+  ).trim();
+
+  // Student's assigned group
+  let assignedGroup = (
+    s.student_group_name ||
+    s.group_name ||
+    (typeof s.student_group === "object" ? s.student_group?.name : "") ||
+    ""
+  ).trim();
+
+  // If section and group names are identical (e.g. legacy dirty seed data where section name was copied into group_name)
+  if (assignedSection && assignedGroup && assignedSection.toLowerCase() === assignedGroup.toLowerCase()) {
+    const hasSectionFk = Boolean(s.section_id || s.section || s.student_section);
+    const hasGroupFk = Boolean(s.student_group_id || s.student_group);
+    if (hasSectionFk && !hasGroupFk) {
+      assignedGroup = "";
+    } else if (hasGroupFk && !hasSectionFk) {
+      assignedSection = "";
+    } else if (!classHasGroups && classHasSections) {
+      assignedGroup = "";
+    } else if (!classHasSections && classHasGroups) {
+      assignedSection = "";
+    }
+  }
+
+  const parts: SectionGroupItem[] = [];
+
+  // Section Part
+  if (classHasSections || assignedSection) {
+    if (assignedSection) {
+      parts.push({
+        label: assignedSection.toLowerCase().startsWith("sec") ? assignedSection : `Section: ${assignedSection}`,
+        isUnassigned: false,
+      });
+    } else {
+      parts.push({
+        label: "No Section Assigned",
+        isUnassigned: true,
+      });
+    }
+  }
+
+  // Group Part
+  if (classHasGroups || assignedGroup) {
+    if (assignedGroup) {
+      parts.push({
+        label:
+          assignedGroup.toLowerCase().startsWith("grp") || assignedGroup.toLowerCase().startsWith("group")
+            ? assignedGroup
+            : `Group: ${assignedGroup}`,
+        isUnassigned: false,
+      });
+    } else {
+      parts.push({
+        label: "No Group Assigned",
+        isUnassigned: true,
+      });
+    }
+  }
+
+  return {
+    className,
+    parts,
+  };
+}
+
 interface UseStudentTableColumnsOptions {
+  classes?: any[];
+  groups?: any[];
+  sections?: any[];
   onNavigateProfile: (id: string | number) => void;
   onEditStudent?: (student: StudentRecord) => void;
   onTransferStudent: (student: StudentRecord) => void;
@@ -17,11 +142,58 @@ interface UseStudentTableColumnsOptions {
 }
 
 export function useStudentTableColumns({
+  classes = [],
+  groups = [],
+  sections = [],
   onNavigateProfile,
   onEditStudent,
   onTransferStudent,
   onDeleteStudent,
 }: UseStudentTableColumnsOptions) {
+  // Build fast indexed maps for classes, sections, and groups
+  const classesMap = useMemo(() => {
+    const map = new Map<string, any>();
+    classes.forEach((c) => {
+      if (c && c.id) map.set(String(c.id), c);
+      if (c && c.name) map.set(String(c.name).toLowerCase(), c);
+    });
+    return map;
+  }, [classes]);
+
+  const sectionsByClassMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    sections.forEach((sec) => {
+      const cId = String(
+        sec.student_class_id ||
+        (typeof sec.student_class === "object" ? sec.student_class?.id : sec.student_class) ||
+        ""
+      );
+      if (cId) {
+        const list = map.get(cId) || [];
+        list.push(sec);
+        map.set(cId, list);
+      }
+    });
+    return map;
+  }, [sections]);
+
+  const groupsByClassMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    groups.forEach((grp) => {
+      const cId = String(
+        grp.student_class_id ||
+        (typeof grp.student_class === "object" ? grp.student_class?.id : grp.student_class) ||
+        ""
+      );
+      if (cId) {
+        const list = map.get(cId) || [];
+        list.push(grp);
+        map.set(cId, list);
+      }
+    });
+    return map;
+  }, [groups]);
+
   const getActionMenuItems = useMemo(
     () => (s: StudentRecord) => [
       {
@@ -55,14 +227,15 @@ export function useStudentTableColumns({
       {
         key: "name",
         header: "NAME",
-        headerClassName: "text-left",
+        headerClassName: "text-left min-w-[180px] w-[36%]",
+        cellClassName: "min-w-[180px] w-[30%] text-left",
         align: "left",
         render: (s: StudentRecord) => {
-          const fatherName =
-            s.details?.father_name ||
-            s.father_name ||
-            s.details?.guardian_name ||
-            s.guardian_name;
+          const studentId =
+            s.student_id_card_number ||
+            s.uniq_id ||
+            s.unique_id ||
+            (s.id ? `ID: ${s.id}` : "");
 
           return (
             <div className="flex items-center gap-3 min-w-0">
@@ -73,22 +246,13 @@ export function useStudentTableColumns({
                   ? s.name.charAt(0).toUpperCase()
                   : "S"}
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
-                    {s.name_en || s.name}
-                  </span>
-                  {(s.roll_number != null || s.student_id_card_number || s.uniq_id) && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded theme-bg-sub border theme-border theme-text-secondary leading-normal">
-                      {s.roll_number != null && <span>Roll: {s.roll_number}</span>}
-                      {s.roll_number != null && (s.student_id_card_number || s.uniq_id) && <span>•</span>}
-                      {(s.student_id_card_number || s.uniq_id) && <span>{s.student_id_card_number || s.uniq_id}</span>}
-                    </span>
-                  )}
-                </div>
-                {fatherName && (
-                  <span className="text-[11px] theme-text-secondary block mt-0.5 truncate">
-                    {fatherName}
+              <div className="min-w-0 text-left">
+                <span className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight">
+                  {s.name_en || s.name}
+                </span>
+                {studentId && (
+                  <span className="text-[11px] font-mono theme-text-secondary block mt-0.5 truncate select-all">
+                    {studentId}
                   </span>
                 )}
               </div>
@@ -98,23 +262,52 @@ export function useStudentTableColumns({
       },
       {
         key: "class",
-        header: "CLASS",
-        headerClassName: "text-left",
+        header: "CLASS & SECTION",
+        headerClassName: "text-left min-w-[170px] w-[32%]",
+        cellClassName: "min-w-[170px] w-[32%] text-left",
         align: "left",
-        render: (s: StudentRecord) => (
-          <div className="text-left truncate text-xs">
-            <span className="theme-accent font-bold">
-              {s.student_class_name ||
-                (typeof s.student_class === "object" ? s.student_class?.name : null) ||
-                "General"}
-            </span>
-          </div>
-        ),
+        render: (s: StudentRecord) => {
+          const { className, parts } = getStudentClassDetails(
+            s,
+            classesMap,
+            sectionsByClassMap,
+            groupsByClassMap
+          );
+
+          return (
+            <div className="text-left text-xs min-w-0">
+              <span className="theme-accent font-bold truncate block">
+                {className}
+              </span>
+              {parts.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[11px] leading-tight">
+                  {parts.map((p, pIdx) => (
+                    <React.Fragment key={pIdx}>
+                      {pIdx > 0 && (
+                        <span className="text-zinc-400 dark:text-zinc-600 select-none">•</span>
+                      )}
+                      <span
+                        className={
+                          p.isUnassigned
+                            ? "text-zinc-400 dark:text-zinc-500 italic font-normal"
+                            : "theme-text-secondary font-medium"
+                        }
+                      >
+                        {p.label}
+                      </span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: "guardian",
         header: "GUARDIAN",
-        headerClassName: "text-center",
+        headerClassName: "text-center w-36 min-w-[130px]",
+        cellClassName: "text-center w-36 min-w-[130px]",
         align: "center",
         render: (s: StudentRecord) => (
           <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2">
@@ -142,7 +335,8 @@ export function useStudentTableColumns({
       {
         key: "status",
         header: "STATUS",
-        headerClassName: "text-center",
+        headerClassName: "text-center w-28 min-w-[95px]",
+        cellClassName: "text-center w-28 min-w-[95px]",
         align: "center",
         render: (s: StudentRecord) => {
           const status = (s.status || "Active").toUpperCase();
@@ -154,10 +348,10 @@ export function useStudentTableColumns({
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
                   isActive
-                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                    ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
                     : isAlumni
-                    ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                    : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                    ? "theme-bg-sub theme-text-primary theme-border"
+                    : "theme-bg-sub theme-text-secondary theme-border"
                 }`}
               >
                 {s.status || "Active"}
@@ -170,7 +364,8 @@ export function useStudentTableColumns({
         key: "actions",
         header: "ACTIONS",
         align: "center",
-        headerClassName: "w-20 text-center",
+        headerClassName: "text-center w-16 min-w-[65px]",
+        cellClassName: "text-center w-16 min-w-[65px]",
         render: (s: StudentRecord) => (
           <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
             <ActionMenu items={getActionMenuItems(s)} />
@@ -178,7 +373,7 @@ export function useStudentTableColumns({
         ),
       },
     ],
-    [getActionMenuItems]
+    [getActionMenuItems, classesMap, sectionsByClassMap, groupsByClassMap]
   );
 
   return {

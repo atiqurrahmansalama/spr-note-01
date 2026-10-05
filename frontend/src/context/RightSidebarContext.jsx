@@ -163,7 +163,7 @@ export function RightSidebarProvider({ children }) {
       });
     }
 
-    setRightSidebarConfig({
+    setRightSidebarConfig((prev) => ({
       title: title || 'Action Panel',
       content: content || null,
       size: size || 'md',
@@ -172,9 +172,9 @@ export function RightSidebarProvider({ children }) {
       onClose: onClose || null,
       ownerId: ownerId || null,
       syncUrl,
-      _renderKey: `${drawerKey || 'panel'}-${Date.now()}-${Math.random()}`,
+      _renderKey: prev?.drawerKey === drawerKey ? prev._renderKey : `${drawerKey || 'panel'}-${Date.now()}`,
       ...restConfig,
-    });
+    }));
   }, [setDrawerWidth, closeRightSidebar]);
 
   /**
@@ -254,19 +254,31 @@ export function RightSidebarProvider({ children }) {
 
   const isRightSidebarOpen = Boolean(rightSidebarConfig);
 
+  const contextValue = React.useMemo(
+    () => ({
+      isRightSidebarOpen,
+      rightSidebarConfig,
+      drawerWidth,
+      setDrawerWidth,
+      openRightSidebar,
+      closeRightSidebar,
+      openDrawer,
+      closeDrawer,
+    }),
+    [
+      isRightSidebarOpen,
+      rightSidebarConfig,
+      drawerWidth,
+      setDrawerWidth,
+      openRightSidebar,
+      closeRightSidebar,
+      openDrawer,
+      closeDrawer,
+    ]
+  );
+
   return (
-    <RightSidebarContext.Provider
-      value={{
-        isRightSidebarOpen,
-        rightSidebarConfig,
-        drawerWidth,
-        setDrawerWidth,
-        openRightSidebar,
-        closeRightSidebar,
-        openDrawer,
-        closeDrawer,
-      }}
-    >
+    <RightSidebarContext.Provider value={contextValue}>
       {children}
     </RightSidebarContext.Provider>
   );
@@ -334,7 +346,7 @@ export function useScopedRightSidebar() {
 }
 
 export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) {
-  const { openRightSidebar } = useRightSidebar();
+  const { openRightSidebar, rightSidebarConfig } = useRightSidebar();
   const rendererRef = useRef(rendererFn);
   rendererRef.current = rendererFn;
   const initialCheckedRef = useRef(false);
@@ -379,10 +391,12 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
   }, [drawerKey, openRightSidebar]);
 
   // Update open drawer content when asynchronous dependencies (e.g. classes/teachers) resolve
+  // ONLY if this specific drawer is actively open right now
+  const activeDrawerKey = rightSidebarConfig?.drawerKey;
   useEffect(() => {
     if (!drawerKey) return;
-    const currentParams = getUrlParams();
-    if (currentParams.get('drawer') === drawerKey) {
+    if (activeDrawerKey === drawerKey) {
+      const currentParams = getUrlParams();
       if (drawerKey === 'notifications' && !currentParams.get('id')) return;
       const config = rendererRef.current ? rendererRef.current(currentParams) : null;
       if (config) {

@@ -23,26 +23,42 @@ function normalizeStudentRecord(s: any): StudentRecord {
   const sectionName =
     s.section_name ||
     s.student_section_name ||
-    (typeof s.section === "object" ? s.section?.name : null) ||
+    (typeof s.section === "object" ? s.section?.section_name || s.section?.name : null) ||
     "";
   const groupName =
-    s.group_name ||
     s.student_group_name ||
-    s.group ||
-    s.sub ||
+    s.group_name ||
     (typeof s.student_group === "object" ? s.student_group?.name : null) ||
     "";
   const roll = s.roll_number !== undefined ? s.roll_number : s.roll !== undefined ? s.roll : "";
   const status = s.status || (s.is_active === false ? "Inactive" : "Active");
+
+  const studentClassId =
+    s.student_class_id ||
+    (typeof s.student_class === "object" ? s.student_class?.id : s.student_class) ||
+    "";
+  const sectionId =
+    s.section_id ||
+    s.student_section ||
+    (typeof s.section === "object" ? s.section?.id : s.section) ||
+    "";
+  const studentGroupId =
+    s.student_group_id ||
+    (typeof s.student_group === "object" ? s.student_group?.id : s.student_group) ||
+    "";
 
   return {
     ...s,
     id,
     name_en,
     name,
+    student_class_id: studentClassId,
     student_class_name: className,
     class_name: className,
+    section_id: sectionId,
     section_name: sectionName,
+    student_section_name: sectionName,
+    student_group_id: studentGroupId,
     group_name: groupName,
     student_group_name: groupName,
     roll_number: roll,
@@ -85,6 +101,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
   const [students, setStudents] = useState<StudentRecord[]>(() => getCachedStudents());
   const [classes, setClasses] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(() => getCachedStudents().length === 0);
   const [metrics, setMetrics] = useState<StudentMetrics>(() => {
     const initial = getCachedStudents();
@@ -98,17 +115,22 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
 
   const loadClassesAndGroups = useCallback(async () => {
     try {
-      const [cRes, gRes] = await Promise.all([
+      const [cRes, gRes, sRes] = await Promise.allSettled([
         fetchWithAuth("/api/v1/classes/?page_size=500&all=true"),
         fetchWithAuth("/api/v1/groups/?page_size=500&all=true"),
+        fetchWithAuth("/api/v1/sections/?page_size=500&all=true"),
       ]);
-      if (cRes.ok) {
-        const cData = await cRes.json();
+      if (cRes.status === "fulfilled" && cRes.value.ok) {
+        const cData = await cRes.value.json();
         setClasses(Array.isArray(cData) ? cData : cData.results || []);
       }
-      if (gRes.ok) {
-        const gData = await gRes.json();
+      if (gRes.status === "fulfilled" && gRes.value.ok) {
+        const gData = await gRes.value.json();
         setGroups(Array.isArray(gData) ? gData : gData.results || []);
+      }
+      if (sRes.status === "fulfilled" && sRes.value.ok) {
+        const sData = await sRes.value.json();
+        setSections(Array.isArray(sData) ? sData : sData.results || []);
       }
     } catch {}
   }, []);
@@ -295,6 +317,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
     students,
     classes,
     groups,
+    sections,
     loading,
     metrics,
     refreshData,

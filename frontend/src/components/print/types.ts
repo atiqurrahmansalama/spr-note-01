@@ -1,12 +1,64 @@
-import React from 'react';
-import { CustomDocxTemplate, DocxTemplateType } from './docxTemplateEngine';
-import { KeyTaxonomyItem, DocumentScopeId } from './keyLibrary/types';
+import type React from 'react';
+import type { KeyTaxonomyItem, DocumentScopeId } from './keyLibrary/types';
 
 export type PrintPageSize = 'A3' | 'A4' | 'A5' | 'LEGAL' | 'LETTER' | 'ID_CARD' | 'CUSTOM';
 export type PrintOrientation = 'PORTRAIT' | 'LANDSCAPE';
 export type PrintMargin = 'NONE' | 'TIGHT' | 'NARROW' | 'NORMAL' | 'WIDE' | 'CUSTOM';
 export type PrintDensity = 'ULTRA_COMPACT' | 'COMPACT' | 'NORMAL' | 'RELAXED' | 'SPACIOUS';
 export type PrintColorMode = 'FULL_COLOR' | 'INK_SAVER' | 'GRAYSCALE' | 'MONOCHROME' | 'HIGH_CONTRAST';
+
+export type DocxTemplateType = 'template' | 'generated';
+
+export interface DocxPageProperties {
+  pageSize: PrintPageSize;
+  orientation: PrintOrientation;
+  margin: PrintMargin;
+  pageWidthMm?: number;
+  pageHeightMm?: number;
+  marginTopMm?: number;
+  marginRightMm?: number;
+  marginBottomMm?: number;
+  marginLeftMm?: number;
+  pageUnit?: string;
+}
+
+export interface CustomDocxTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  scopeId?: string;
+  rawHtml: string;
+  detectedPlaceholders: string[];
+  createdAt: string;
+  updatedAt: string;
+  isTableDocument?: boolean;
+  sampleColumns?: Array<{ id: string; header: string; label: string }>;
+  sampleData?: Array<Record<string, any>>;
+  templateType?: DocxTemplateType;
+  recordsCount?: number;
+  sourceTemplateId?: string;
+  pageProperties?: DocxPageProperties;
+  pageSize?: PrintPageSize;
+  orientation?: PrintOrientation;
+  margin?: PrintMargin;
+}
+
+export interface DocLabCanvasDraft {
+  scopeId: string;
+  templateId?: string;
+  name?: string;
+  rawHtml: string;
+  styles?: string;
+  templateBody?: string;
+  isTableDocument?: boolean;
+  sampleColumns?: Array<{ id: string; header: string; label: string }>;
+  sampleData?: Array<Record<string, any>>;
+  pageSize?: PrintPageSize;
+  orientation?: PrintOrientation;
+  margin?: PrintMargin;
+  pageProperties?: DocxPageProperties;
+  updatedAt: string;
+}
 
 export type DocxTemplate = CustomDocxTemplate;
 export type PrintSignatureLine = SignatureLineConfig;

@@ -5,7 +5,7 @@
  */
 
 import { readJSON, writeJSON } from './coreStore';
-import {
+import type {
   PrintOptions,
   PrintPageSize,
   PrintOrientation,

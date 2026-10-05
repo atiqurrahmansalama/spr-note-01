@@ -114,19 +114,23 @@ export function getEventDisplayType(evt, tenantId) {
   return "Academic Event";
 }
 
+const eventColorsCache = new Map();
+
 export function getEventColors(evt, tenantId) {
+  if (!evt) return null;
+  const cacheKey = `${tenantId || 'def'}_${evt.id || evt.title || ''}_${evt.color || ''}_${evt.category || ''}_${evt.type || ''}`;
+  if (eventColorsCache.has(cacheKey)) {
+    return eventColorsCache.get(cacheKey);
+  }
+
   const isWorkingHours = evt?.category === "WORKING_HOURS" || evt?.type === "WORKING_HOURS";
 
   // 1. Direct explicit color on event
   if (evt?.color && EVENT_COLOR_MAP[evt.color]) {
     const base = EVENT_COLOR_MAP[evt.color];
-    if (isWorkingHours) {
-      return {
-        ...base,
-        text: "theme-text-primary",
-      };
-    }
-    return base;
+    const res = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+    eventColorsCache.set(cacheKey, res);
+    return res;
   }
 
   // 2. Dynamic lookup from Developer Tools Event Types & Kinds
@@ -144,31 +148,37 @@ export function getEventColors(evt, tenantId) {
         );
         if (matchedKind?.color && EVENT_COLOR_MAP[matchedKind.color]) {
           const base = EVENT_COLOR_MAP[matchedKind.color];
-          return isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+          const res = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+          eventColorsCache.set(cacheKey, res);
+          return res;
         }
       }
     } catch {}
   }
 
   if (isWorkingHours) {
-    return {
+    const res = {
       bg: "theme-bg-accent-soft",
       border: "border-[var(--accent-main)]/20",
       text: "theme-text-primary",
       dot: "theme-bg-accent",
       hex: "#6366f1",
     };
+    eventColorsCache.set(cacheKey, res);
+    return res;
   }
 
   // 3. Fallback based on display type
   const displayType = getEventDisplayType(evt, tenantId);
-  if (displayType === "Holiday") return EVENT_COLOR_MAP.rose;
-  if (displayType === "Exam") return EVENT_COLOR_MAP.amber;
-  if (displayType === "Meeting") return EVENT_COLOR_MAP.blue;
-  if (displayType === "Sports & Cultural") return EVENT_COLOR_MAP.purple;
-  if (displayType === "Academic") return EVENT_COLOR_MAP.emerald;
+  let fallback = EVENT_COLOR_MAP.emerald;
+  if (displayType === "Holiday") fallback = EVENT_COLOR_MAP.rose;
+  else if (displayType === "Exam") fallback = EVENT_COLOR_MAP.amber;
+  else if (displayType === "Meeting") fallback = EVENT_COLOR_MAP.blue;
+  else if (displayType === "Sports & Cultural") fallback = EVENT_COLOR_MAP.purple;
+  else if (displayType === "Academic") fallback = EVENT_COLOR_MAP.emerald;
 
-  return EVENT_COLOR_MAP.emerald;
+  eventColorsCache.set(cacheKey, fallback);
+  return fallback;
 }
 
 function formatTime12(timeStr) {

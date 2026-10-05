@@ -1434,7 +1434,7 @@ export default function StudentProfileHubView() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft text-emerald-500 border border-emerald-500/20 uppercase tracking-wider">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 uppercase tracking-wider">
                           Active Enrolment
                         </span>
                       </div>

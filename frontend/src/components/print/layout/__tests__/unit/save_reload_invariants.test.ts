@@ -31,6 +31,11 @@ import { PaginationEngine } from '../../pagination/PaginationEngine';
 import { sanitizeLogicalDocumentHtml, stripRuntimePaginationSpacers } from '../../logicalDocument';
 import { CanonicalDocument, ParagraphNode, HeadingNode, TableNode, TokenNode } from '../../../model/types';
 import { LayoutDocument, LayoutPage } from '../../types/paginationTypes';
+import {
+  saveDocLabCanvasDraft,
+  getDocLabCanvasDraft,
+  clearDocLabCanvasDraft,
+} from '../../../docxTemplateEngine';
 
 export function runSaveReloadInvariantsUnitTests(): { passed: number; failed: number } {
   let passed = 0;
@@ -313,6 +318,67 @@ export function runSaveReloadInvariantsUnitTests(): { passed: number; failed: nu
     assert(!cleanOutputHtml.includes('doclab-runtime-overlay'), 'Output clean HTML has zero overlays');
     assert(cleanOutputHtml.includes('data-manual-break="true"'), 'Output clean HTML preserves manual break');
     assert(cleanCanonical.body.length === 3, `Clean canonical AST has 3 blocks: break, p1, p2 (got ${cleanCanonical.body.length})`);
+  }
+
+  // -------------------------------------------------------------------------
+  // 5. Canvas Draft Persistence & Multi-Scope Recovery Invariant
+  // -------------------------------------------------------------------------
+  {
+    const storageMock: Record<string, string> = {};
+    const originalLocalStorage = (global as any).localStorage;
+    const originalWindow = (global as any).window;
+
+    (global as any).window = {};
+    (global as any).localStorage = {
+      getItem: (key: string) => storageMock[key] || null,
+      setItem: (key: string, val: string) => {
+        storageMock[key] = String(val);
+      },
+      removeItem: (key: string) => {
+        delete storageMock[key];
+      },
+      clear: () => {
+        Object.keys(storageMock).forEach((k) => delete storageMock[k]);
+      },
+    };
+
+    try {
+      // A. Save typed draft for a scope
+      const sampleDraft = {
+        scopeId: 'examination_tabulation_ledger',
+        name: 'Live Edited Ledger',
+        templateBody: '<h1>Tabulation Ledger</h1><p>Student Roll: {{roll_number}}</p>',
+        rawHtml: '<h1>Tabulation Ledger</h1><p>Student Roll: {{roll_number}}</p>',
+        pageSize: 'A4' as const,
+        orientation: 'LANDSCAPE' as const,
+      };
+
+      saveDocLabCanvasDraft('examination_tabulation_ledger', sampleDraft);
+
+      const loaded = getDocLabCanvasDraft('examination_tabulation_ledger');
+      assert(loaded !== null, 'Saved draft is retrievable from local storage');
+      assert(loaded?.name === 'Live Edited Ledger', 'Draft name preserved correctly');
+      assert(loaded?.templateBody.includes('Tabulation Ledger'), 'Draft template body preserved correctly');
+      assert(loaded?.orientation === 'LANDSCAPE', 'Draft orientation preserved correctly');
+
+      // B. Cross-scope fallback test (general_document <-> universal)
+      saveDocLabCanvasDraft('general_document', {
+        name: 'General Canvas Draft',
+        templateBody: '<p>Hello world live canvas test</p>',
+      });
+
+      const recoveredFromUniversal = getDocLabCanvasDraft('universal');
+      assert(recoveredFromUniversal !== null, 'Universal scope retrieves general_document draft alias');
+      assert(recoveredFromUniversal?.templateBody.includes('Hello world live canvas test'), 'Draft content matches across scope aliases');
+
+      // C. Clear draft
+      clearDocLabCanvasDraft('examination_tabulation_ledger');
+      const afterClear = getDocLabCanvasDraft('examination_tabulation_ledger');
+      assert(afterClear === null, 'Draft is cleanly cleared when requested');
+    } finally {
+      (global as any).localStorage = originalLocalStorage;
+      (global as any).window = originalWindow;
+    }
   }
 
   return { passed, failed };

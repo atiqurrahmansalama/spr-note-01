@@ -920,6 +920,24 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     [activeStyles, onContentChange, schedulePaginationPass]
   );
 
+  // Synchronize incoming canonical HTML content into authoritative single host on mount & external changes
+  useEffect(() => {
+    if (!editorHostRef.current) return;
+    // If this change was triggered internally by user typing/IME in this component, skip overwriting
+    if (isInternalChangeRef.current) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+
+    const currentHostSanitized = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+    if (currentHostSanitized !== cleanCanonicalBody) {
+      editorHostRef.current.innerHTML = cleanCanonicalBody;
+      historyRef.current = new EditorHistory(cleanCanonicalBody);
+      lastExportedHtmlRef.current = cleanCanonicalBody;
+      runPaginationPass();
+    }
+  }, [cleanCanonicalBody, runPaginationPass]);
+
   // Composition Lifecycle Event Handlers (IME / CJK / Accents / Live Typing Safety)
   const handleCompositionStart = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
     isComposingRef.current = true;
@@ -995,7 +1013,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     runPaginationPass();
   }, [isEditable, saveSelection, activeStyles, onContentChange, runPaginationPass]);
 
-  // Native Input Handler with Debounced Synchronization
+  // Native Input Handler with Immediate and Debounced Synchronization
   const handleInput = useCallback(() => {
     if (!isEditable || !editorHostRef.current) return;
     isInternalChangeRef.current = true;
@@ -1009,6 +1027,19 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
     // Trigger immediate micro-pass for fast visual feedback
     schedulePaginationPass();
+
+    // Instant zero-delay export on every keystroke (0ms latency for crash/reload resilience)
+    try {
+      const rawDom = editorHostRef.current.innerHTML;
+      const cleanHtml = EditorSerializer.sanitize(rawDom);
+      lastExportedHtmlRef.current = cleanHtml;
+      const finalExportHtml = activeStyles
+        ? `<style>${activeStyles}</style>\n${cleanHtml}`
+        : cleanHtml;
+      onContentChange?.(finalExportHtml);
+    } catch (e) {
+      console.warn('Immediate content sync error:', e);
+    }
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -1032,7 +1063,31 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         console.warn('Typing input transaction error:', err);
       }
     }, 150);
-  }, [isEditable, saveSelection, schedulePaginationPass, dispatchTransaction]);
+  }, [isEditable, saveSelection, schedulePaginationPass, activeStyles, onContentChange, dispatchTransaction]);
+
+  // Flush any pending changes synchronously before window unloads
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!editorHostRef.current) return;
+      try {
+        const rawDom = editorHostRef.current.innerHTML;
+        const cleanHtml = EditorSerializer.sanitize(rawDom);
+        const finalExportHtml = activeStyles
+          ? `<style>${activeStyles}</style>\n${cleanHtml}`
+          : cleanHtml;
+        onContentChange?.(finalExportHtml);
+      } catch {}
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
+    };
+  }, [activeStyles, onContentChange]);
 
   // Native Keydown Handler (Enter, Ctrl+Enter, Ctrl+Z, Ctrl+Y, Tab)
   const handleKeyDown = useCallback(

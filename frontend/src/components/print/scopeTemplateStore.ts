@@ -499,8 +499,16 @@ export function getDefaultTemplateIdForScope(scopeId: string): string | null {
  * Retrieves the full CustomDocxTemplate assigned as default for a scope (if any)
  */
 export function getDefaultTemplateForScope(scopeId: string): CustomDocxTemplate | null {
-  const defaultTemplateId = getDefaultTemplateIdForScope(scopeId);
-  if (!defaultTemplateId) return null;
+  const canonicalScope = getScopeById(scopeId)?.id || scopeId;
+  const defaultTemplateId = getDefaultTemplateIdForScope(canonicalScope);
   const allTemplates = getSavedDocxTemplates();
-  return allTemplates.find((t) => t.id === defaultTemplateId) || null;
+  if (defaultTemplateId) {
+    const found = allTemplates.find((t) => t.id === defaultTemplateId);
+    if (found) return found;
+  }
+  // Fallback to the first matching template for this scope
+  const matchingScopeTemplate = allTemplates.find((t) => resolveTemplateScopeId(t) === canonicalScope);
+  if (matchingScopeTemplate) return matchingScopeTemplate;
+
+  return null;
 }

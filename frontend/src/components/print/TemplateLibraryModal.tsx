@@ -21,6 +21,7 @@ import {
 import {
   CustomDocxTemplate,
   getSavedDocxTemplates,
+  fetchCloudDocxTemplates,
   deleteDocxTemplate,
   saveDocxTemplate,
   parseDocxDocument,
@@ -83,6 +84,7 @@ export default function TemplateLibraryModal({
   useEffect(() => {
     if (isOpen) {
       reloadData();
+      fetchCloudDocxTemplates().then(() => reloadData()).catch(() => {});
       if (activeScopeId) {
         setSelectedScope(activeScopeId);
       }

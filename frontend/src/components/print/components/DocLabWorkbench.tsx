@@ -86,6 +86,7 @@ export interface DocLabWorkbenchProps {
   autoSaveStatus?: string;
   autoSaveLastSavedAt?: string | null;
   isAutoSaving?: boolean;
+  scopeId?: string;
 }
 
 export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
@@ -134,6 +135,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
   autoSaveStatus,
   autoSaveLastSavedAt,
   isAutoSaving = false,
+  scopeId,
 }) => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isDebugOverlayOpen, setIsDebugOverlayOpen] = useState(false);
@@ -273,6 +275,7 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
             options={options}
             docxStyles={docxStyles}
             isDebugOverlayOpen={isDebugOverlayOpen}
+            scopeId={scopeId}
           />
         ) : customDocxTemplate ? (
           /* MODE D: Batch Generated Multi-Record Document View */

@@ -43,21 +43,22 @@ export default function useExamData() {
   const [gradingSystems, setGradingSystems] = useState(() => examStore.getGradingSystems(tenantId));
   const [examSubjects, setExamSubjects] = useState(() => examStore.getExamSubjects(tenantId));
 
-  const refetchAcademicRef = useRef(refetchAcademic);
-  refetchAcademicRef.current = refetchAcademic;
-
   const refreshExamData = useCallback(() => {
     setLocalAcademicYears(academicYearsStore.getAcademicYears(tenantId));
     setLocalCurriculumBooks(curriculumStore.getItems(tenantId));
     setExams(examStore.getExams(tenantId));
     setGradingSystems(examStore.getGradingSystems(tenantId));
     setExamSubjects(examStore.getExamSubjects(tenantId));
-    refetchAcademicRef.current?.();
   }, [tenantId]);
 
+  // Sync state when tenantId changes
   useEffect(() => {
-    refreshExamData();
-  }, [refreshExamData]);
+    setLocalAcademicYears(academicYearsStore.getAcademicYears(tenantId));
+    setLocalCurriculumBooks(curriculumStore.getItems(tenantId));
+    setExams(examStore.getExams(tenantId));
+    setGradingSystems(examStore.getGradingSystems(tenantId));
+    setExamSubjects(examStore.getExamSubjects(tenantId));
+  }, [tenantId]);
 
   // System-wide update listener for real-time reactivity
   useEffect(() => {
@@ -292,28 +293,54 @@ export default function useExamData() {
     }));
   }, [gradingSystems]);
 
-  return {
-    tenantId,
-    students,
-    classes,
-    sections,
-    departments,
-    teachers: teachers.length > 0 ? teachers : staff,
-    staff,
-    curriculumBooks: resolvedCurriculumBooks,
-    periodSlots: academicData?.periodSlots || [],
-    academicYears,
-    activeYear,
-    academicYearOptions,
-    branchOptions,
-    departmentOptions,
-    classOptions,
-    sectionOptions,
-    gradingSystemOptions,
-    exams,
-    gradingSystems,
-    examSubjects,
-    academicLoading,
-    refreshExamData,
-  };
+  return useMemo(
+    () => ({
+      tenantId,
+      students,
+      classes,
+      sections,
+      departments,
+      teachers: teachers.length > 0 ? teachers : staff,
+      staff,
+      curriculumBooks: resolvedCurriculumBooks,
+      periodSlots: academicData?.periodSlots || [],
+      academicYears,
+      activeYear,
+      academicYearOptions,
+      branchOptions,
+      departmentOptions,
+      classOptions,
+      sectionOptions,
+      gradingSystemOptions,
+      exams,
+      gradingSystems,
+      examSubjects,
+      academicLoading,
+      refreshExamData,
+    }),
+    [
+      tenantId,
+      students,
+      classes,
+      sections,
+      departments,
+      teachers,
+      staff,
+      resolvedCurriculumBooks,
+      academicData?.periodSlots,
+      academicYears,
+      activeYear,
+      academicYearOptions,
+      branchOptions,
+      departmentOptions,
+      classOptions,
+      sectionOptions,
+      gradingSystemOptions,
+      exams,
+      gradingSystems,
+      examSubjects,
+      academicLoading,
+      refreshExamData,
+    ]
+  );
 }

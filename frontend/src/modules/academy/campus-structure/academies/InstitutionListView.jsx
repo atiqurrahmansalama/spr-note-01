@@ -239,12 +239,26 @@ export default function InstitutionListView({
 
   const handleSwitchContext = useCallback((inst) => {
     if (!inst) return;
-    requestSwitchInstitution(inst.id);
-    showToast(`Active academy switched to "${inst.name}"`, 'info');
-  }, [requestSwitchInstitution, showToast]);
+    if (inst === 'ALL' || inst?.id === 'ALL' || inst === 'global') {
+      requestSwitchInstitution('ALL');
+      showToast('Active workspace switched to "All Campuses (Global Scope)"', 'info');
+      return;
+    }
+    const targetId = typeof inst === 'object' ? inst.id : inst;
+    const targetName = typeof inst === 'object' ? inst.name : institutions.find((i) => String(i.id) === String(inst))?.name || 'Selected Academy';
+    requestSwitchInstitution(targetId);
+    showToast(`Active academy switched to "${targetName}"`, 'info');
+  }, [requestSwitchInstitution, institutions, showToast]);
 
   const activeAcademyOptions = useMemo(() => {
-    return institutions.map((inst) => {
+    const isAllActive = !activeTenantId || activeTenantId === 'ALL';
+    const allOption = {
+      value: 'ALL',
+      label: 'All Campuses (Global Scope)',
+      badge: isAllActive ? 'Active' : undefined,
+    };
+
+    const instOptions = institutions.map((inst) => {
       const isCurrent = String(activeTenantId) === String(inst.id);
       return {
         value: String(inst.id),
@@ -252,6 +266,8 @@ export default function InstitutionListView({
         badge: isCurrent ? 'Active' : undefined,
       };
     });
+
+    return [allOption, ...instOptions];
   }, [institutions, activeTenantId]);
 
   // Reusable Action Items generator
@@ -568,15 +584,20 @@ export default function InstitutionListView({
             </div>
 
             {institutions.length > 0 && (
-              <div className="w-48 sm:w-60 shrink-0">
+              <div className="w-52 sm:w-64 shrink-0">
                 <CustomSelect
                   label="Active Academy"
                   size="md"
                   icon={BuildingOfficeIcon}
-                  value={activeTenantId ? String(activeTenantId) : ''}
+                  value={activeTenantId && activeTenantId !== 'ALL' ? String(activeTenantId) : 'ALL'}
                   onChange={(val) => {
-                    const target = institutions.find((inst) => String(inst.id) === String(val));
-                    if (target) handleSwitchContext(target);
+                    if (val === 'ALL' || !val) {
+                      handleSwitchContext('ALL');
+                    } else {
+                      const target = institutions.find((inst) => String(inst.id) === String(val));
+                      if (target) handleSwitchContext(target);
+                      else handleSwitchContext(val);
+                    }
                   }}
                   options={activeAcademyOptions}
                   placeholder="Switch Active Academy..."

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { FONT_OPTIONS, FONT_SIZES } from "../constants/fontConstants";
 import { FontContext } from "./FontContextObject";
 import { appearanceSettings as appStore } from "../utils/localStore";
@@ -21,25 +21,28 @@ export function FontProvider({ children }) {
     document.documentElement.style.fontSize = activeFontSize.px;
   }, [fontSizeId, activeFontSize]);
 
-  const resetDefaults = () => {
+  const resetDefaults = useCallback(() => {
     setFontId("Outfit");
     setFontSizeId("normal");
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      fontId,
+      setFontId,
+      fontSizeId,
+      setFontSizeId,
+      activeFont,
+      activeFontSize,
+      fontOptions: FONT_OPTIONS,
+      fontSizes: FONT_SIZES,
+      resetDefaults,
+    }),
+    [fontId, fontSizeId, activeFont, activeFontSize, resetDefaults]
+  );
 
   return (
-    <FontContext.Provider
-      value={{
-        fontId,
-        setFontId,
-        fontSizeId,
-        setFontSizeId,
-        activeFont,
-        activeFontSize,
-        fontOptions: FONT_OPTIONS,
-        fontSizes: FONT_SIZES,
-        resetDefaults,
-      }}
-    >
+    <FontContext.Provider value={value}>
       {children}
     </FontContext.Provider>
   );

@@ -79,7 +79,11 @@ export default function AcademyProfileView({
     updated_at: '',
   });
 
+  const institutionKey = currentInstitution?.id || currentInstitution?.slug || 'default';
+
   useEffect(() => {
+    let isMounted = true;
+
     async function loadData() {
       try {
         setIsLoading(true);
@@ -87,6 +91,8 @@ export default function AcademyProfileView({
           getCurrentInstitution(),
           getInstitutionCategories(),
         ]);
+
+        if (!isMounted) return;
 
         if (cats.status === 'fulfilled' && Array.isArray(cats.value)) {
           setDynamicCategories(cats.value);
@@ -119,10 +125,7 @@ export default function AcademyProfileView({
             created_at: instData.created_at || '',
             updated_at: instData.updated_at || '',
           });
-        }
-      } catch (err) {
-        console.error('[AcademyProfileView] Error loading data:', err);
-        if (currentInstitution) {
+        } else if (currentInstitution) {
           setFormData((prev) => ({
             ...prev,
             name: currentInstitution.name || '',
@@ -145,13 +148,21 @@ export default function AcademyProfileView({
             updated_at: currentInstitution.updated_at || '',
           }));
         }
+      } catch (err) {
+        console.error('[AcademyProfileView] Error loading data:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadData();
-  }, [currentInstitution]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [institutionKey]);
 
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];

@@ -24,6 +24,7 @@ from .views import (
     StudentGroupViewSet,
     SessionViewSet,
     SavedMessageViewSet,
+    CustomDocxTemplateViewSet,
     StudentDailyReportViewSet, 
     AcademicGoalViewSet,
     DailyLessonPlanViewSet,
@@ -161,6 +162,8 @@ router.register(r'students', StudentViewSet, basename='student')
 router.register(r'groups', StudentGroupViewSet, basename='group')
 router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'messages', SavedMessageViewSet, basename='message')
+router.register(r'docx-templates', CustomDocxTemplateViewSet, basename='docx-templates')
+router.register(r'doclab/templates', CustomDocxTemplateViewSet, basename='doclab-templates')
 router.register(r'reports', StudentDailyReportViewSet, basename='report')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'document-templates', DocumentTemplateViewSet, basename='document-templates')

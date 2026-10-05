@@ -118,6 +118,7 @@ export default function StudentAdmissionView() {
   const [sharedData, setSharedData] = useState({
     is_editing: Boolean(editId),
     edit_student_id: editId || null,
+    student_type: editId ? 'EXISTING' : 'NEW',
     name: searchParams.get('name') || '',
     bangla_name: '',
     student_id_card_number: '',
@@ -180,11 +181,13 @@ export default function StudentAdmissionView() {
         is_editing: true,
         edit_student_id: stu.id,
         student_type: "EXISTING",
-        name: stu.name_i18n && typeof stu.name_i18n === 'object' && Object.keys(stu.name_i18n).length > 0
+        name: stu.name_en || stu.name || (stu.name_i18n && typeof stu.name_i18n === 'object' ? stu.name_i18n.en || Object.values(stu.name_i18n)[0] : '') || prev.name || '',
+        bangla_name: stu.bangla_name || (stu.name_i18n && typeof stu.name_i18n === 'object' ? stu.name_i18n.bn : '') || stu.details?.name_bn || '',
+        name_i18n: stu.name_i18n && typeof stu.name_i18n === 'object' && Object.keys(stu.name_i18n).length > 0
           ? stu.name_i18n
-          : (stu.bangla_name ? { en: stu.name_en || stu.name || '', bn: stu.bangla_name } : (stu.name_en || stu.name || prev.name || '')),
-        bangla_name: stu.bangla_name || stu.details?.name_bn || '',
+          : { en: stu.name_en || stu.name || '', bn: stu.bangla_name || stu.details?.name_bn || '' },
         student_id_card_number: stu.student_id_card_number || stu.uniq_id || '',
+        uniq_id: stu.uniq_id || stu.student_id_card_number || '',
         gender: stu.gender || 'MALE',
         dob: stu.dob || stu.details?.date_of_birth || '',
         blood_group: stu.blood_group || stu.details?.blood_group || '',
@@ -192,10 +195,18 @@ export default function StudentAdmissionView() {
         nid_no: stu.nid_no || '',
         session_year: a.session_year || stu.session_year || ongoingYear?.name || '2026-2027',
         department: stu.department || a.department || stu.department_id || prev.department || '',
-        student_class: stu.student_class != null ? String(stu.student_class) : (a.student_class != null ? String(a.student_class) : (prev.student_class || '')),
-        student_section: stu.student_section != null ? String(stu.student_section) : (stu.section != null ? String(stu.section) : (stu.student_group != null ? String(stu.student_group) : (a.student_section != null ? String(a.student_section) : (prev.student_section || '')))),
+        student_class: stu.student_class != null
+          ? String(typeof stu.student_class === 'object' ? stu.student_class?.id : stu.student_class)
+          : (a.student_class != null ? String(typeof a.student_class === 'object' ? a.student_class?.id : a.student_class) : (prev.student_class || '')),
+        student_section: stu.student_section != null
+          ? String(typeof stu.student_section === 'object' ? stu.student_section?.id : stu.student_section)
+          : (stu.section != null
+              ? String(typeof stu.section === 'object' ? stu.section?.id : stu.section)
+              : (stu.student_group != null
+                  ? String(typeof stu.student_group === 'object' ? stu.student_group?.id : stu.student_group)
+                  : (a.student_section != null ? String(a.student_section) : (prev.student_section || '')))),
         education_status: stu.education_status || stu.student_class_name || prev.education_status || '',
-        roll_number: stu.roll_number || '',
+        roll_number: stu.roll_number != null ? stu.roll_number : '',
         admission_date: stu.admission_date || a.admission_date || prev.admission_date || new Date().toISOString().split('T')[0],
         target_status: stu.target_status || 'NON_RESIDENTIAL',
         branch_id: stu.branch || '',
@@ -571,7 +582,7 @@ export default function StudentAdmissionView() {
             <div className="p-8 rounded-3xl theme-bg-surface border theme-border shadow-md max-w-xl mx-auto text-center space-y-5 animate-zoom-in">
               <AdmissionSuccessModal
                 student={admittedStudent}
-                isEditing={Boolean(editingStudent || sharedData?.is_editing)}
+                isEditing={Boolean(editingStudent || sharedData?.is_editing || editId)}
                 onReset={handleReset}
                 onClose={handleClose}
               />
@@ -589,6 +600,8 @@ export default function StudentAdmissionView() {
               }}
               sharedData={sharedData}
               setSharedData={setSharedData}
+              isEditing={Boolean(editingStudent || sharedData?.is_editing || editId)}
+              editStudentId={editId || editingStudent?.id || sharedData?.edit_student_id}
             />
           )}
         </div>

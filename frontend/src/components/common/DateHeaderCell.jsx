@@ -18,7 +18,7 @@ const WEEKDAY_2LETTER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
  * - Event Indicator Dot
  * - Centered 2-letter Weekday with Divider
  */
-export default function DateHeaderCell({
+function DateHeaderCell({
   as: Component = "th",
   dayData,
   dateStr: propDateStr,
@@ -176,3 +176,5 @@ export default function DateHeaderCell({
     </Component>
   );
 }
+
+export default React.memo(DateHeaderCell);

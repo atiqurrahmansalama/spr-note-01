@@ -1,9 +1,16 @@
+const hijriDateStringCache = new Map();
+const hijriDetailsCache = new Map();
+
 /**
  * Convert Gregorian date string (YYYY-MM-DD) to Islamic Hijri Date string
  * Format returned: "3 Safar, 1448h"
  */
 export function getHijriDateString(gregorianDateStr) {
   if (!gregorianDateStr) return "";
+
+  if (hijriDateStringCache.has(gregorianDateStr)) {
+    return hijriDateStringCache.get(gregorianDateStr);
+  }
 
   try {
     const [year, month, day] = gregorianDateStr.split("-").map(Number);
@@ -60,7 +67,11 @@ export function getHijriDateString(gregorianDateStr) {
     const hijriDay = Math.max(1, Math.floor(dayOfYear - accumulatedDays) + 1);
     const monthName = ISLAMIC_MONTHS[hijriMonth] || "Safar";
 
-    return `${hijriDay} ${monthName}, ${hijriYear}h`;
+    const formatted = `${hijriDay} ${monthName}, ${hijriYear}h`;
+    if (hijriDateStringCache.size < 500) {
+      hijriDateStringCache.set(gregorianDateStr, formatted);
+    }
+    return formatted;
   } catch {
     return "3 Safar, 1448h";
   }
@@ -71,6 +82,11 @@ export function getHijriDateString(gregorianDateStr) {
  */
 export function getHijriDetails(gregorianDate = new Date()) {
   const d = new Date(gregorianDate);
+  const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (hijriDetailsCache.has(dateKey)) {
+    return hijriDetailsCache.get(dateKey);
+  }
+
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
   const day = d.getDate();
@@ -126,13 +142,19 @@ export function getHijriDetails(gregorianDate = new Date()) {
   const totalDaysInThisMonth = (hijriMonth % 2 === 0) ? 30 : 29;
   const monthName = ISLAMIC_MONTHS[hijriMonth] || "Safar";
 
-  return {
+  const result = {
     year: hijriYear,
     month: hijriMonth + 1,
     monthName,
     day: hijriDay,
     daysInMonth: totalDaysInThisMonth,
   };
+
+  if (hijriDetailsCache.size < 500) {
+    hijriDetailsCache.set(dateKey, result);
+  }
+
+  return result;
 }
 
 /**

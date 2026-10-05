@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import {
@@ -55,6 +55,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     students,
     classes,
     groups,
+    sections,
     loading,
     metrics,
     refreshData,
@@ -78,8 +79,55 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     activeFilterCount,
   } = useStudentFilters(students, classes, groups);
 
+  // Fast maps for StudentCard grid view
+  const classesMap = useMemo(() => {
+    const map = new Map<string, any>();
+    classes.forEach((c) => {
+      if (c && c.id) map.set(String(c.id), c);
+      if (c && c.name) map.set(String(c.name).toLowerCase(), c);
+    });
+    return map;
+  }, [classes]);
+
+  const sectionsByClassMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    sections.forEach((sec) => {
+      const cId = String(
+        sec.student_class_id ||
+        (typeof sec.student_class === "object" ? sec.student_class?.id : sec.student_class) ||
+        ""
+      );
+      if (cId) {
+        const list = map.get(cId) || [];
+        list.push(sec);
+        map.set(cId, list);
+      }
+    });
+    return map;
+  }, [sections]);
+
+  const groupsByClassMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    groups.forEach((grp) => {
+      const cId = String(
+        grp.student_class_id ||
+        (typeof grp.student_class === "object" ? grp.student_class?.id : grp.student_class) ||
+        ""
+      );
+      if (cId) {
+        const list = map.get(cId) || [];
+        list.push(grp);
+        map.set(cId, list);
+      }
+    });
+    return map;
+  }, [groups]);
+
   // Columns & Action Menus hook
   const { tableColumns, getActionMenuItems } = useStudentTableColumns({
+    classes,
+    groups,
+    sections,
     onNavigateProfile: (id) => navigate(`/students/${id}/profile`),
     onEditStudent: (student) => navigate(`/admission?edit=${student.id}`),
     onTransferStudent: (student) => setTransferringStudent(student),
@@ -350,6 +398,9 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               isHighlighted={Boolean(activeHighlightId && String(s.id) === String(activeHighlightId))}
               onNavigateProfile={(id) => navigate(`/students/${id}/profile`)}
               actionMenuItems={getActionMenuItems(s)}
+              classesMap={classesMap}
+              sectionsByClassMap={sectionsByClassMap}
+              groupsByClassMap={groupsByClassMap}
             />
           )}
           isLoading={loading}

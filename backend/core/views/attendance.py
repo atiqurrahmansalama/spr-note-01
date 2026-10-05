@@ -377,6 +377,11 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
 
+        if not tenant_id and class_id and class_id != 'ALL':
+            class_obj = StudentClass.objects.filter(id=class_id).first()
+            if class_obj and class_obj.institution_id:
+                tenant_id = class_obj.institution_id
+
         students_qs = Student.objects.filter(is_deleted=False).select_related('student_class', 'student_group')
         if tenant_id:
             students_qs = students_qs.filter(institution_id=tenant_id)
@@ -388,21 +393,27 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         # Exclude students who were not yet admitted during the requested attendance period
         students_qs = students_qs.filter(
             Q(admission_date__isnull=True) |
-            Q(admission_date__lte=end_date) |
-            Q(attendances__date__gte=start_date, attendances__date__lte=end_date)
-        ).distinct()
+            Q(admission_date__lte=end_date)
+        )
 
         students = list(students_qs.order_by('roll_number', 'name'))
+        student_ids = [s.id for s in students]
+
+        # Auto-infer tenant_id from queried students if still not resolved
+        if not tenant_id and students:
+            inst_ids = list({s.institution_id for s in students if s.institution_id})
+            if len(inst_ids) == 1:
+                tenant_id = inst_ids[0]
 
         # Fetch configured period slots for this class / institution
         # 1. Temporal Resolution Rule:
         # Fetch slots active in [start_date, end_date] OR having recorded student attendance in this date range
         recorded_slot_ids = list(StudentAttendance.objects.filter(
-            student__in=students,
+            student_id__in=student_ids,
             date__gte=start_date,
             date__lte=end_date,
             period_slot_id__isnull=False
-        ).values_list('period_slot_id', flat=True).distinct())
+        ).values_list('period_slot_id', flat=True).distinct()) if student_ids else []
 
         temporal_active_q = (
             (Q(effective_from__isnull=True) | Q(effective_from__lte=end_date)) &
@@ -412,7 +423,7 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         periods_qs = ClassPeriodSlot.objects.filter(
             temporal_active_q | Q(id__in=recorded_slot_ids)
-        ).select_related('teacher', 'teacher__user')
+        ).distinct().select_related('teacher', 'teacher__user')
 
         if tenant_id:
             periods_qs = periods_qs.filter(institution_id=tenant_id)
@@ -429,14 +440,39 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         elif request.query_params.get('include_all_slots') != 'true':
             periods_qs = periods_qs.exclude(slot_type__in=['BREAK_TIFFIN', 'PRAYER_BREAK'])
 
+        def deduplicate_slots(slots_list):
+            seen = set()
+            unique_list = []
+            for sl in slots_list:
+                if sl is None:
+                    if None not in seen:
+                        seen.add(None)
+                        unique_list.append(None)
+                    continue
+                # Key by period_order and times and name to guarantee clean unique routine
+                key = (
+                    sl.period_order,
+                    str(sl.start_time)[:5] if sl.start_time else '',
+                    str(sl.end_time)[:5] if sl.end_time else '',
+                    (sl.period_name or '').strip().lower()
+                )
+                if key not in seen:
+                    seen.add(key)
+                    unique_list.append(sl)
+            return unique_list
+
         if class_id and class_id != 'ALL':
             class_periods = list(periods_qs.filter(student_class_id=class_id).order_by('period_order', 'start_time'))
             if class_periods:
-                period_slots = class_periods
+                period_slots = deduplicate_slots(class_periods)
             else:
-                period_slots = list(periods_qs.filter(student_class__isnull=True).order_by('period_order', 'start_time'))
+                period_slots = deduplicate_slots(list(periods_qs.filter(student_class__isnull=True).order_by('period_order', 'start_time')))
         else:
-            period_slots = list(periods_qs.order_by('period_order', 'start_time'))
+            inst_global = list(periods_qs.filter(student_class__isnull=True).order_by('period_order', 'start_time'))
+            if inst_global:
+                period_slots = deduplicate_slots(inst_global)
+            else:
+                period_slots = deduplicate_slots(list(periods_qs.order_by('period_order', 'start_time')))
 
         if slot_id and slot_id != 'ALL':
             period_slots = [p for p in period_slots if str(p.id) == str(slot_id)]
@@ -444,29 +480,29 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         if teacher_id and teacher_id != 'ALL':
             period_slots = [p for p in period_slots if p.teacher_id and str(p.teacher_id) == str(teacher_id)]
 
-        att_qs = StudentAttendance.objects.filter(
-            student__in=students,
+        att_records = list(StudentAttendance.objects.filter(
+            student_id__in=student_ids,
             date__gte=start_date,
             date__lte=end_date
-        )
+        ).values('student_id', 'period_slot_id', 'session_slot_id', 'date', 'status')) if student_ids else []
 
         att_map = {}
-        for att in att_qs:
-            p_id = str(att.period_slot_id) if att.period_slot_id else (str(att.session_slot_id) if att.session_slot_id else 'DEFAULT')
-            key = f"{att.student_id}_{p_id}"
+        for att in att_records:
+            p_id = str(att['period_slot_id']) if att['period_slot_id'] else (str(att['session_slot_id']) if att['session_slot_id'] else 'DEFAULT')
+            key = f"{att['student_id']}_{p_id}"
             if key not in att_map:
                 att_map[key] = {}
-            date_str = att.date.isoformat()
-            att_map[key][date_str] = att.status
-            att_map[key][att.date.day] = att.status
+            date_str = att['date'].isoformat()
+            att_map[key][date_str] = att['status']
+            att_map[key][att['date'].day] = att['status']
 
             # Only record under DEFAULT if this attendance was not for a specific period
             if p_id == 'DEFAULT':
-                s_key = f"{att.student_id}_DEFAULT"
+                s_key = f"{att['student_id']}_DEFAULT"
                 if s_key not in att_map:
                     att_map[s_key] = {}
-                att_map[s_key][date_str] = att.status
-                att_map[s_key][att.date.day] = att.status
+                att_map[s_key][date_str] = att['status']
+                att_map[s_key][att['date'].day] = att['status']
 
         holidays = []
         if tenant_id:
@@ -502,19 +538,23 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         # Build periods map grouped by student_class_id for fast and accurate student-level resolution
         class_slots_map = {}
-        for p in period_slots:
+        for p in periods_qs.order_by('period_order', 'start_time'):
             class_slots_map.setdefault(p.student_class_id, []).append(p)
-        global_slots = class_slots_map.get(None, [])
+        global_slots = deduplicate_slots(class_slots_map.get(None, []))
 
         matrix_rows = []
-        default_slots = period_slots if len(period_slots) > 0 else [None]
 
         for s in students:
             if class_id and class_id != 'ALL':
                 s_slots_to_iterate = period_slots if len(period_slots) > 0 else [None]
             else:
-                s_slots = class_slots_map.get(s.student_class_id, global_slots)
-                s_slots_to_iterate = s_slots if len(s_slots) > 0 else [None]
+                s_class_slots = class_slots_map.get(s.student_class_id)
+                if s_class_slots:
+                    s_slots_to_iterate = deduplicate_slots(s_class_slots)
+                elif global_slots:
+                    s_slots_to_iterate = global_slots
+                else:
+                    s_slots_to_iterate = [None]
 
             for p_idx, slot in enumerate(s_slots_to_iterate):
                 slot_id_str = str(slot.id) if slot else 'DEFAULT'
@@ -676,6 +716,11 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
 
         tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
 
+        if not tenant_id and class_id and class_id != 'ALL':
+            class_obj = StudentClass.objects.filter(id=class_id).first()
+            if class_obj and class_obj.institution_id:
+                tenant_id = class_obj.institution_id
+
         # 1. Query teaching staff
         teachers_qs = StaffProfile.objects.filter(
             is_deleted=False,
@@ -703,6 +748,12 @@ class StudentAttendanceViewSet(viewsets.ModelViewSet):
         ).distinct()
 
         teachers = list(teachers_qs.order_by('rank_order', 'employee_id'))
+
+        # Auto-infer tenant_id from queried teachers if still not resolved
+        if not tenant_id and teachers:
+            inst_ids = list({t.institution_id for t in teachers if t.institution_id})
+            if len(inst_ids) == 1:
+                tenant_id = inst_ids[0]
 
         # 2. Query configured period slots with temporal validity + teacher conducted roll-calls
         teacher_user_ids = [t.user_id for t in teachers if t.user_id]

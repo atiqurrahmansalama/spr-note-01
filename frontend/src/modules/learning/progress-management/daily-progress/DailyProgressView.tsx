@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { DocLabQuickReportModal } from "@/components/print";
+import DocLabQuickReportModal from "@/components/print/DocLabQuickReportModal";
 import {
   DAILY_PROGRESS_SCOPE_ID,
   buildDailyProgressReportData,

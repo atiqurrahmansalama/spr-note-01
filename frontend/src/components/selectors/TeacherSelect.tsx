@@ -82,7 +82,7 @@ export default function TeacherSelect({
 
   // Fetch staff/teachers if propTeachers is not supplied
   useEffect(() => {
-    if (propTeachers && Array.isArray(propTeachers) && propTeachers.length > 0) {
+    if (propTeachers && Array.isArray(propTeachers)) {
       setInternalTeachers(propTeachers);
       setLoading(false);
       return;
@@ -115,9 +115,9 @@ export default function TeacherSelect({
     return () => {
       isMounted = false;
     };
-  }, [propTeachers, activeTenantId, onlyTeachers]);
+  }, [propTeachers, activeTenantId, onlyTeachers, onTeachersLoaded]);
 
-  const rawTeachers = propTeachers && Array.isArray(propTeachers) && propTeachers.length > 0 ? propTeachers : internalTeachers;
+  const rawTeachers = propTeachers && Array.isArray(propTeachers) ? propTeachers : internalTeachers;
 
   // Filter only teaching staff if requested
   const filteredTeachers = useMemo(() => {

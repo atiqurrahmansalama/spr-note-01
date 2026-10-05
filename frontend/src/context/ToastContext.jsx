@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, CloseIcon, InfoIcon, AlertCircleIcon } from '../components/ui/Icons';
 import IconButton from '../components/ui/IconButton';
@@ -175,8 +175,10 @@ export function ToastProvider({ children }) {
     </aside>
   );
 
+  const value = useMemo(() => ({ showToast }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       {mounted && typeof document !== 'undefined' && createPortal(toastContainer, document.body)}
     </ToastContext.Provider>

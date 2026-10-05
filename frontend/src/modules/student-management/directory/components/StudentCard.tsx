@@ -2,12 +2,16 @@ import React from "react";
 import ActionMenu from "../../../../components/ui/ActionMenu";
 import { WhatsAppIcon } from "../../../../components/ui/Icons";
 import { StudentRecord } from "../types";
+import { getStudentClassDetails } from "../hooks/useStudentTableColumns";
 
 interface StudentCardProps {
   student: StudentRecord;
   onNavigateProfile: (id: string | number) => void;
   actionMenuItems: any[];
   isHighlighted?: boolean;
+  classesMap?: Map<string, any>;
+  sectionsByClassMap?: Map<string, any[]>;
+  groupsByClassMap?: Map<string, any[]>;
 }
 
 export default function StudentCard({
@@ -15,12 +19,22 @@ export default function StudentCard({
   onNavigateProfile,
   actionMenuItems,
   isHighlighted = false,
+  classesMap = new Map(),
+  sectionsByClassMap = new Map(),
+  groupsByClassMap = new Map(),
 }: StudentCardProps) {
-  const fatherName =
-    s.details?.father_name ||
-    s.father_name ||
-    s.details?.guardian_name ||
-    s.guardian_name;
+  const studentId =
+    s.student_id_card_number ||
+    s.uniq_id ||
+    s.unique_id ||
+    (s.id ? `ID: ${s.id}` : "");
+
+  const { className, parts } = getStudentClassDetails(
+    s,
+    classesMap,
+    sectionsByClassMap,
+    groupsByClassMap
+  );
 
   return (
     <div
@@ -41,22 +55,13 @@ export default function StudentCard({
                 ? s.name.charAt(0).toUpperCase()
                 : "S"}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold theme-text-primary text-sm truncate">
-                  {s.name_en || s.name}
-                </h3>
-                {(s.roll_number != null || s.student_id_card_number || s.uniq_id) && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded theme-bg-sub border theme-border theme-text-secondary leading-normal">
-                    {s.roll_number != null && <span>Roll: {s.roll_number}</span>}
-                    {s.roll_number != null && (s.student_id_card_number || s.uniq_id) && <span>•</span>}
-                    {(s.student_id_card_number || s.uniq_id) && <span>{s.student_id_card_number || s.uniq_id}</span>}
-                  </span>
-                )}
-              </div>
-              {fatherName && (
-                <p className="text-[11px] theme-text-secondary truncate mt-0.5">
-                  {fatherName}
+            <div className="min-w-0 flex-1 text-left">
+              <h3 className="font-bold theme-text-primary text-sm truncate leading-tight">
+                {s.name_en || s.name}
+              </h3>
+              {studentId && (
+                <p className="text-[11px] font-mono theme-text-secondary truncate mt-0.5 select-all">
+                  {studentId}
                 </p>
               )}
             </div>
@@ -67,12 +72,30 @@ export default function StudentCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="theme-accent font-bold">
-            {s.student_class_name ||
-              (typeof s.student_class === "object" ? s.student_class?.name : null) ||
-              "General"}
+        <div className="text-left text-xs min-w-0">
+          <span className="theme-accent font-bold truncate block">
+            {className}
           </span>
+          {parts.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[11px] leading-tight">
+              {parts.map((p, pIdx) => (
+                <React.Fragment key={pIdx}>
+                  {pIdx > 0 && (
+                    <span className="text-zinc-400 dark:text-zinc-600 select-none">•</span>
+                  )}
+                  <span
+                    className={
+                      p.isUnassigned
+                        ? "text-zinc-400 dark:text-zinc-500 italic font-normal"
+                        : "theme-text-secondary font-medium"
+                    }
+                  >
+                    {p.label}
+                  </span>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

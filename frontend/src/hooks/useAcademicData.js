@@ -225,21 +225,38 @@ export function useAcademicData() {
     ];
   }, [activeYear]);
 
-  return {
-    branches,
-    academicYears,
-    activeYear,
-    activeTerms,
-    departments,
-    classes,
-    sections,
-    students,
-    periodSlots,
-    teachers,
-    staff,
-    loading,
-    refetch,
-  };
+  return useMemo(
+    () => ({
+      branches,
+      academicYears,
+      activeYear,
+      activeTerms,
+      departments,
+      classes,
+      sections,
+      students,
+      periodSlots,
+      teachers,
+      staff,
+      loading,
+      refetch,
+    }),
+    [
+      branches,
+      academicYears,
+      activeYear,
+      activeTerms,
+      departments,
+      classes,
+      sections,
+      students,
+      periodSlots,
+      teachers,
+      staff,
+      loading,
+      refetch,
+    ]
+  );
 }
 
 export default useAcademicData;

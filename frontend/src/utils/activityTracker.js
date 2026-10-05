@@ -3,6 +3,7 @@ import { auth as authStore } from "./localStore";
 
 let heartbeatInterval = null;
 let currentStatus = "INACTIVE";
+let isInitialized = false;
 
 /**
  * Send Login or Logout event to backend
@@ -51,7 +52,8 @@ export async function sendActivityLog(status = "ACTIVE") {
  * Initialize global event listeners for window focus, blur, and periodic active pings
  */
 export function initActivityTracker() {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || isInitialized) return;
+  isInitialized = true;
 
   const user = authStore.getUser();
   if (user && currentStatus === "INACTIVE") {

@@ -67,4 +67,7 @@ export const common = {
   month: 'Month',
   year: 'Year',
   done: 'Done',
+  docLabMobileTitle: 'Desktop Screen Recommended',
+  docLabMobileDesc: 'DocLab Studio is built for precision document layout, pagination typesetting, and print template design. For the full editing experience, please access this studio on a desktop PC, laptop, or tablet landscape display. Dedicated small screen and mobile editing support will be introduced in a future update.',
+  docLabMobileBack: 'Return Back',
 };

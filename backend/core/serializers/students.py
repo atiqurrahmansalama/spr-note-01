@@ -163,6 +163,7 @@ class StudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'institution', 'institution_name', 'uniq_id', 'unique_id',
+            'student_id_card_number',
             'roll_number', 'roll',
             'name_en', 'name', 'bangla_name', 'name_i18n',
             'student_class', 'student_class_name',
@@ -176,6 +177,7 @@ class StudentSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'uniq_id': {'required': False, 'allow_null': True},
+            'student_id_card_number': {'required': False, 'allow_null': True},
             'roll_number': {'required': False, 'allow_null': True},
             'name_en': {'required': False, 'allow_null': True},
             'bangla_name': {'required': False, 'allow_null': True},
@@ -199,6 +201,15 @@ class StudentSerializer(serializers.ModelSerializer):
                 mutable_data['name_en'] = mutable_data['name_i18n']['en']
             if not mutable_data.get('bangla_name') and mutable_data['name_i18n'].get('bn'):
                 mutable_data['bangla_name'] = mutable_data['name_i18n']['bn']
+
+        # If name is passed as dictionary (e.g. from multi-language inputs)
+        if 'name' in mutable_data and isinstance(mutable_data['name'], dict):
+            name_dict = mutable_data['name']
+            if not mutable_data.get('name_en'):
+                mutable_data['name_en'] = name_dict.get('en') or name_dict.get('bn') or next(iter(name_dict.values()), '')
+            if not mutable_data.get('bangla_name') and name_dict.get('bn'):
+                mutable_data['bangla_name'] = name_dict.get('bn')
+            mutable_data['name'] = mutable_data['name_en']
 
         # Handle legacy keys (label/name -> name_en, sub/group -> group_name, roll -> roll_number, unique_id -> uniq_id)
         if 'label' in mutable_data and 'name_en' not in mutable_data and 'name' not in mutable_data:
@@ -322,14 +333,16 @@ class StudentAcademicDetailSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     class_or_group_name = serializers.CharField(source='class_or_group.name', read_only=True)
-    admission_date = serializers.SerializerMethodField()
+    admission_date = serializers.DateField(required=False, allow_null=True)
 
-    def get_admission_date(self, obj):
-        if not obj.admission_date:
-            return None
-        if hasattr(obj.admission_date, 'strftime'):
-            return obj.admission_date.strftime('%Y-%m-%d')
-        return str(obj.admission_date)
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if hasattr(instance, 'admission_date') and instance.admission_date:
+            if hasattr(instance.admission_date, 'strftime'):
+                ret['admission_date'] = instance.admission_date.strftime('%Y-%m-%d')
+            else:
+                ret['admission_date'] = str(instance.admission_date)
+        return ret
 
     class Meta:
         model = StudentAcademicDetail
@@ -574,6 +587,22 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
 
+        # Handle multi-language name_i18n sync
+        if 'name_i18n' in mutable_data and isinstance(mutable_data['name_i18n'], dict):
+            if not mutable_data.get('name_en') and mutable_data['name_i18n'].get('en'):
+                mutable_data['name_en'] = mutable_data['name_i18n']['en']
+            if not mutable_data.get('bangla_name') and mutable_data['name_i18n'].get('bn'):
+                mutable_data['bangla_name'] = mutable_data['name_i18n']['bn']
+
+        # If name is passed as dictionary
+        if 'name' in mutable_data and isinstance(mutable_data['name'], dict):
+            name_dict = mutable_data['name']
+            if not mutable_data.get('name_en'):
+                mutable_data['name_en'] = name_dict.get('en') or name_dict.get('bn') or next(iter(name_dict.values()), '')
+            if not mutable_data.get('bangla_name') and name_dict.get('bn'):
+                mutable_data['bangla_name'] = name_dict.get('bn')
+            mutable_data['name'] = mutable_data['name_en']
+
         # Map student_section -> section
         if ('section' not in mutable_data or not mutable_data.get('section')) and mutable_data.get('student_section'):
             mutable_data['section'] = mutable_data['student_section']
@@ -598,7 +627,7 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         # Sanitize nested academic_data
         if 'academic_data' in mutable_data and isinstance(mutable_data['academic_data'], dict):
             acad = mutable_data['academic_data'].copy()
-            for extra in ['department', 'student_class', 'student_section']:
+            for extra in ['department', 'student_class', 'student_section', 'section']:
                 acad.pop(extra, None)
             if 'admission_date' in acad and (acad['admission_date'] == '' or acad['admission_date'] == 'null'):
                 acad['admission_date'] = None
@@ -661,7 +690,19 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
             if tenant_id:
                 instance.institution_id = tenant_id
 
-        # Update core student fields safely without wiping existing class/section if not provided
+        # Auto sync section / class / group
+        section = validated_data.get('section')
+        if section:
+            if not validated_data.get('group_name'):
+                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or 'General Group'
+            if not validated_data.get('student_class') and getattr(section, 'student_class', None):
+                validated_data['student_class'] = section.student_class
+
+        student_class = validated_data.get('student_class')
+        if student_class and not validated_data.get('education_status'):
+            validated_data['education_status'] = student_class.name
+
+        # Update core student fields safely
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
         instance.save()
@@ -696,13 +737,33 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
                     setattr(academic_detail, k, v)
             academic_detail.save()
 
-        # Deep Update guardian details
+        # Deep Update guardian details & sync to legacy StudentDetail
         if guardian_data is not None:
-            guardian_detail, _ = StudentGuardian.objects.get_or_create(student=instance)
+            guardian_detail, _ = StudentGuardian.objects.get_or_create(student=instance, defaults={'created_by': creator})
             for k, v in guardian_data.items():
                 if hasattr(guardian_detail, k):
                     setattr(guardian_detail, k, v)
             guardian_detail.save()
+
+            # Also sync to legacy StudentDetail for backward compatibility
+            detail_obj, _ = StudentDetail.objects.get_or_create(student=instance, defaults={'created_by': creator})
+            if guardian_data.get('father_name'):
+                detail_obj.father_name = guardian_data['father_name']
+            if guardian_data.get('mother_name'):
+                detail_obj.mother_name = guardian_data['mother_name']
+            if guardian_data.get('primary_guardian_name'):
+                detail_obj.guardian_name = guardian_data['primary_guardian_name']
+            if guardian_data.get('primary_guardian_phone'):
+                detail_obj.guardian_phone = guardian_data['primary_guardian_phone']
+            elif guardian_data.get('guardian_phone'):
+                detail_obj.guardian_phone = guardian_data['guardian_phone']
+            if guardian_data.get('emergency_contact_phone'):
+                detail_obj.emergency_phone = guardian_data['emergency_contact_phone']
+            if guardian_data.get('guardian_relation'):
+                detail_obj.guardian_relation = guardian_data['guardian_relation']
+            if validated_data.get('bangla_name'):
+                detail_obj.name_bn = validated_data['bangla_name']
+            detail_obj.save()
 
         return instance
 

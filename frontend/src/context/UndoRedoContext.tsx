@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useToast } from './ToastContext';
 
@@ -328,19 +328,33 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  const contextValue: UndoRedoContextType = {
-    canUndo,
-    canRedo,
-    undoTitle,
-    redoTitle,
-    undo,
-    redo,
-    pushAction,
-    clearHistory,
-    activeScope,
-    setActiveScopeOverride: setScopeOverride,
-    registerScopeHandler,
-  };
+  const contextValue = useMemo<UndoRedoContextType>(
+    () => ({
+      canUndo,
+      canRedo,
+      undoTitle,
+      redoTitle,
+      undo,
+      redo,
+      pushAction,
+      clearHistory,
+      activeScope,
+      setActiveScopeOverride: setScopeOverride,
+      registerScopeHandler,
+    }),
+    [
+      canUndo,
+      canRedo,
+      undoTitle,
+      redoTitle,
+      undo,
+      redo,
+      pushAction,
+      clearHistory,
+      activeScope,
+      registerScopeHandler,
+    ]
+  );
 
   return (
     <UndoRedoContext.Provider value={contextValue}>

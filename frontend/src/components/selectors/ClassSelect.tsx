@@ -94,7 +94,7 @@ export default function ClassSelect({
 
   // Fetch classes if propClasses is not supplied
   useEffect(() => {
-    if (propClasses && Array.isArray(propClasses) && propClasses.length > 0) {
+    if (propClasses && Array.isArray(propClasses)) {
       setInternalClasses(propClasses);
       setLoading(false);
       return;
@@ -124,9 +124,9 @@ export default function ClassSelect({
     return () => {
       isMounted = false;
     };
-  }, [propClasses, activeTenantId]);
+  }, [propClasses, activeTenantId, onClassesLoaded]);
 
-  const rawClasses = propClasses && Array.isArray(propClasses) && propClasses.length > 0 ? propClasses : internalClasses;
+  const rawClasses = propClasses && Array.isArray(propClasses) ? propClasses : internalClasses;
 
   // Filter classes according to department, admission rules if admissionFilter is true or allowedClassIds provided
   const activeClasses = useMemo(() => {

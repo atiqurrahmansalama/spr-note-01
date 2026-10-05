@@ -44,6 +44,9 @@ function collectAllData() {
     copyTeacherName: copyReportSettings.getTeacherName(),
     copyAutoCopy: copyReportSettings.getAutoCopy(),
 
+    // DocLab Templates
+    customDocxTemplates: JSON.parse(localStorage.getItem("spr_custom_docx_templates") || "[]"),
+
     // Meta
     exportDate: new Date().toISOString(),
     exportVersion: "v2",
@@ -57,6 +60,7 @@ function restoreAllData(data) {
   if (Array.isArray(data.savedComments))  commentStore.saveAll(data.savedComments);
   if (Array.isArray(data.reports))        localStorage.setItem(KEYS.REPORTS, JSON.stringify(data.reports));
   if (Array.isArray(data.pendingQueue))   localStorage.setItem(KEYS.PENDING_QUEUE, JSON.stringify(data.pendingQueue));
+  if (Array.isArray(data.customDocxTemplates)) localStorage.setItem("spr_custom_docx_templates", JSON.stringify(data.customDocxTemplates));
 
   if (data.fontId)    appStore.saveFontId(data.fontId);
   if (data.fontSize)  appStore.saveFontSize(data.fontSize);
@@ -144,6 +148,29 @@ async function syncImportedDataToBackend(data) {
         });
       } catch (err) {
         console.warn("[BackupImport] Report sync warning:", err.message);
+      }
+    }
+  }
+
+  // 5. Sync DocLab Custom Templates
+  if (Array.isArray(data.customDocxTemplates)) {
+    for (const tmpl of data.customDocxTemplates) {
+      try {
+        await fetchWithAuth("/api/v1/docx-templates/", {
+          method: "POST",
+          body: JSON.stringify(tmpl),
+        });
+      } catch (err) {
+        try {
+          if (tmpl.id) {
+            await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(tmpl.id)}/`, {
+              method: "PUT",
+              body: JSON.stringify(tmpl),
+            });
+          }
+        } catch (updateErr) {
+          console.warn("[BackupImport] DocLab Template sync warning:", updateErr.message);
+        }
       }
     }
   }

@@ -207,7 +207,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
     (templates || []).forEach((t: any) => {
       if (!filterPredicate(t)) return;
       const tResolvedScope = resolveTemplateScopeId(t);
-      if (tResolvedScope === activeCanonicalScope && activeCanonicalScope !== 'general_document') {
+      if (tResolvedScope === activeCanonicalScope) {
         mod.push(t);
       } else {
         oth.push(t);

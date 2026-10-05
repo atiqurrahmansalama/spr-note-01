@@ -7,6 +7,7 @@ import React from 'react';
 import { PaginatedDocumentEditor } from '../../layout';
 import { separateDocxStylesAndBody } from '../../docxStyleUtils';
 import { sanitizeLogicalDocumentHtml } from '../../layout/logicalDocument';
+import { saveDocLabCanvasDraft } from '../../docxTemplateEngine';
 import { PrintOptions } from '../../types';
 
 export interface ModeATemplateEditorProps {
@@ -16,6 +17,7 @@ export interface ModeATemplateEditorProps {
   options: PrintOptions;
   docxStyles: string;
   isDebugOverlayOpen?: boolean;
+  scopeId?: string;
 }
 
 export const ModeATemplateEditor: React.FC<ModeATemplateEditorProps> = ({
@@ -25,27 +27,54 @@ export const ModeATemplateEditor: React.FC<ModeATemplateEditorProps> = ({
   options,
   docxStyles,
   isDebugOverlayOpen = false,
+  scopeId = 'general_document',
 }) => {
+  const effectiveScope =
+    scopeId ||
+    customDocxTemplate?.scopeId ||
+    (options as any)?.scopeId ||
+    'general_document';
+
   const handleContentChange = (newHtml: string) => {
     const cleanWithoutSpacers = sanitizeLogicalDocumentHtml(newHtml);
     const { styles: incomingStyles, body: incomingBody } = separateDocxStylesAndBody(cleanWithoutSpacers);
     const cleanNewHtml = sanitizeLogicalDocumentHtml(incomingBody || cleanWithoutSpacers);
 
+    const preservedStyles =
+      incomingStyles ||
+      customDocxTemplate?.styles ||
+      separateDocxStylesAndBody(customDocxTemplate?.html || customDocxTemplate?.rawHtml || '').styles ||
+      '';
+
+    const fullDocHtml = preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml;
+
+    // Instant zero-latency synchronous local draft backup for 100% crash/reload resilience
+    saveDocLabCanvasDraft(effectiveScope, {
+      scopeId: effectiveScope,
+      templateId: customDocxTemplate?.id,
+      name: customDocxTemplate?.name,
+      rawHtml: fullDocHtml,
+      styles: preservedStyles,
+      templateBody: cleanNewHtml,
+      isTableDocument: Boolean(customDocxTemplate?.isTableDocument),
+      sampleColumns: customDocxTemplate?.columns || customDocxTemplate?.sampleColumns,
+      sampleData: customDocxTemplate?.data || customDocxTemplate?.sampleData,
+      pageSize: options.pageSize || customDocxTemplate?.pageSize,
+      orientation: options.orientation || customDocxTemplate?.orientation,
+      margin: options.margin || customDocxTemplate?.margin,
+      pageProperties: customDocxTemplate?.pageProperties,
+    });
+
     const updater = (prev: any) => {
       if (!prev) return null;
-      const preservedStyles =
-        incomingStyles ||
-        prev.styles ||
-        separateDocxStylesAndBody(prev.html || prev.rawHtml || '').styles ||
-        '';
-
       return {
         ...prev,
+        scopeId: effectiveScope,
         styles: preservedStyles,
         templateBody: cleanNewHtml,
         body: cleanNewHtml,
-        html: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
-        rawHtml: preservedStyles ? `${preservedStyles}\n${cleanNewHtml}` : cleanNewHtml,
+        html: fullDocHtml,
+        rawHtml: fullDocHtml,
       };
     };
 

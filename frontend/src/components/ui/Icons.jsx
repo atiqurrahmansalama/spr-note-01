@@ -1773,4 +1773,8 @@ export function SvgIcon({ className = "w-4 h-4" }) {
   );
 }
 
+export const ArrowLeftIcon = ChevronLeftIcon;
+export const MonitorIcon = LaptopIcon;
+export const DesktopIcon = LaptopIcon;
+
 
