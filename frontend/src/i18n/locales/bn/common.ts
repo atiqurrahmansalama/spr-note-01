@@ -75,4 +75,7 @@ export const common = {
   saveTemplate: 'টেমপ্লেট সংরক্ষণ করুন',
   templateName: 'টেমপ্লেটের নাম',
   templateNamePlaceholder: 'যেমন: অফিসিয়াল দৈনিক অগ্রগতি প্রতিবেদন',
+  savedToDrive: 'ড্রাইভে সংরক্ষিত',
+  savedLocally: 'লোকালে সংরক্ষিত',
+  saveFailed: 'সংরক্ষণ ব্যর্থ হয়েছে',
 };

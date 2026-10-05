@@ -75,4 +75,7 @@ export const common = {
   saveTemplate: 'Save Template',
   templateName: 'Template Name',
   templateNamePlaceholder: 'e.g. Official Daily Progress Report',
+  savedToDrive: 'Saved to Drive',
+  savedLocally: 'Saved locally',
+  saveFailed: 'Save failed',
 };

@@ -75,4 +75,7 @@ export const common = {
   saveTemplate: 'حفظ القالب',
   templateName: 'اسم القالب',
   templateNamePlaceholder: 'مثال: تقرير التقدم اليومي الرسمي',
+  savedToDrive: 'تم الحفظ في Drive',
+  savedLocally: 'تم الحفظ محلياً',
+  saveFailed: 'فشل الحفظ',
 };

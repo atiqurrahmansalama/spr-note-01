@@ -13,12 +13,11 @@
  * 3. Zero In-DOM pagination or HTML reassembly logic inside this component.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import DocLabCanvasViewer from '../DocLabCanvasViewer';
 import DocxFormattingRibbon from '../DocxFormattingRibbon';
-import { DocLabSaveModal } from './sidebar';
-import { PlusIcon, SparklesIcon } from '../../ui/Icons';
-import CustomButton from '../../ui/CustomButton';
+import { useTranslation } from '../../../i18n';
+import { SparklesIcon } from '../../ui/Icons';
 import { PageGeometryCalculator } from '../layout';
 import {
   ModeATemplateEditor,
@@ -138,7 +137,34 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
   isAutoSaving = false,
   scopeId,
 }) => {
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const { t } = useTranslation('common');
+  const [online, setOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const saveStatusText = useMemo(() => {
+    if (isAutoSaving || autoSaveStatus === 'saving') {
+      return t('saving', 'Saving...');
+    }
+    if (autoSaveStatus === 'error') {
+      return t('saveFailed', 'Save failed');
+    }
+    if (online) {
+      return t('savedToDrive', 'Saved to Drive');
+    }
+    return t('savedLocally', 'Saved locally');
+  }, [isAutoSaving, autoSaveStatus, online, t]);
 
   const effectiveDocs = useMemo(() => {
     return (documents && documents.length > 0)
@@ -182,29 +208,23 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
               {customDocxTemplate.name || 'Custom Template'}
             </span>
             {docxRenderMode === 'template' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                <span className={`w-1.5 h-1.5 rounded-full ${isAutoSaving ? 'bg-amber-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`} />
-                <span>{isAutoSaving ? 'Saving...' : autoSaveStatus || 'Auto-saved'}</span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium theme-text-secondary select-none">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isAutoSaving || autoSaveStatus === 'saving'
+                      ? 'bg-amber-500 animate-pulse'
+                      : autoSaveStatus === 'error'
+                      ? 'theme-danger-bg'
+                      : 'bg-emerald-500'
+                  }`}
+                />
+                <span className="truncate">{saveStatusText}</span>
               </span>
             )}
           </div>
 
           {/* Far Right: Actions & Mode Switcher Segment */}
           <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
-            {/* Save Canvas As Template Button */}
-            {onSaveCurrentTemplate && docxRenderMode === 'template' && (
-              <CustomButton
-                variant="primary"
-                size="xs"
-                icon={PlusIcon}
-                onClick={() => setIsSaveModalOpen(true)}
-                title="Save current canvas design as a module template"
-                className="shadow-2xs"
-              >
-                Save Template
-              </CustomButton>
-            )}
-
             {/* Mode Switcher Segment (Template Design vs Generate N Document(s)) */}
             <div className="flex items-center p-0.5 rounded-lg theme-bg-elevated border theme-border shadow-2xs shrink-0">
               <button
@@ -325,16 +345,6 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
           />
         )}
       </DocLabCanvasViewer>
-
-      {/* Save Canvas As Template Modal */}
-      {isSaveModalOpen && onSaveCurrentTemplate && (
-        <DocLabSaveModal
-          isOpen={isSaveModalOpen}
-          onClose={() => setIsSaveModalOpen(false)}
-          onSave={onSaveCurrentTemplate}
-          totalRecordsCount={totalRecordsCount}
-        />
-      )}
     </main>
   );
 };

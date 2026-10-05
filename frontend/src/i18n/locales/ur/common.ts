@@ -75,4 +75,7 @@ export const common = {
   saveTemplate: 'سانچہ محفوظ کریں',
   templateName: 'سانچے کا نام',
   templateNamePlaceholder: 'مثال: سرکاری یومیہ پیش رفت رپورٹ',
+  savedToDrive: 'ڈرائیو میں محفوظ ہو گیا',
+  savedLocally: 'مقامی طور پر محفوظ ہو گیا',
+  saveFailed: 'محفوظ کرنا ناکام رہا',
 };
