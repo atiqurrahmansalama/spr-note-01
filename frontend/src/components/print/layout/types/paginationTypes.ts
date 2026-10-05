@@ -9,7 +9,6 @@ import { LayoutFragment } from './fragmentTypes';
 import { WatermarkConfig, SignatureBlockConfig } from '../chrome/headerFooterTypes';
 import { BlockNode, CanonicalDocument } from '../../model/types';
 import { PageGeometry } from '../geometry/PageGeometry';
-import { LayoutDebugTrace } from '../debug/layoutDebugTypes';
 import { LayoutPerformanceMetrics, LayoutChangeScope } from './performanceTypes';
 
 /**
@@ -241,7 +240,6 @@ export interface PaginationEngineResult {
   isComplete: boolean;
   errors?: string[];
   warnings?: string[];
-  debugTrace?: LayoutDebugTrace | null;
   metrics?: LayoutPerformanceMetrics;
   changeScope?: LayoutChangeScope;
   diagnostics?: LayoutDiagnostics;

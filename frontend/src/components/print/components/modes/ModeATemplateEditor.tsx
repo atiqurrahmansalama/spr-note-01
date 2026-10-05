@@ -16,7 +16,6 @@ export interface ModeATemplateEditorProps {
   updateCustomDocxTemplateWithHistory?: (updater: any) => void;
   options: PrintOptions;
   docxStyles: string;
-  isDebugOverlayOpen?: boolean;
   scopeId?: string;
 }
 
@@ -26,7 +25,6 @@ export const ModeATemplateEditor: React.FC<ModeATemplateEditorProps> = ({
   updateCustomDocxTemplateWithHistory,
   options,
   docxStyles,
-  isDebugOverlayOpen = false,
   scopeId = 'general_document',
 }) => {
   const effectiveScope =
@@ -116,7 +114,6 @@ export const ModeATemplateEditor: React.FC<ModeATemplateEditorProps> = ({
           lineHeight: options.lineHeight,
           styles: docxStyles,
         }}
-        debugLayout={isDebugOverlayOpen}
         onContentChange={handleContentChange}
       />
     </div>

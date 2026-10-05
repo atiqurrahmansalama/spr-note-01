@@ -1183,7 +1183,9 @@ export function usePrintDocxEngine({
         // Saving as Template Blueprint (holding pure {{tokens}})
         let templateBodyToSave = sanitizeLogicalDocumentHtml(baseTemplateBody);
         if (docxRenderMode === 'template') {
-          const container = document.querySelector('.docx-live-container');
+          const container =
+            document.querySelector('[data-doclab-single-host="true"]') ||
+            document.querySelector('.docx-live-container');
           if (container && container.innerHTML) {
             templateBodyToSave = sanitizeLogicalDocumentHtml(container.innerHTML);
           }
@@ -1215,6 +1217,23 @@ export function usePrintDocxEngine({
 
         saveDocxTemplate(newTemplate);
         setSavedWordTemplates(getSavedDocxTemplates());
+
+        // Update canvas draft to bind with new template identity
+        saveDocLabCanvasDraft(scopeId, {
+          scopeId: scopeId,
+          templateId: newId,
+          name: templateName,
+          rawHtml: fullHtml,
+          styles: styles,
+          templateBody: templateBodyToSave,
+          isTableDocument: Boolean(customDocxTemplate?.isTableDocument),
+          sampleColumns: customDocxTemplate?.columns || [],
+          sampleData: customDocxTemplate?.data || [],
+          pageSize: options.pageSize || customDocxTemplate?.pageSize,
+          orientation: options.orientation || customDocxTemplate?.orientation,
+          margin: options.margin || customDocxTemplate?.margin,
+          pageProperties: customDocxTemplate?.pageProperties,
+        });
 
         const normalized = {
           id: newId,

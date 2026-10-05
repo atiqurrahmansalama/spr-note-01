@@ -371,7 +371,24 @@ export function runSaveReloadInvariantsUnitTests(): { passed: number; failed: nu
       assert(recoveredFromUniversal !== null, 'Universal scope retrieves general_document draft alias');
       assert(recoveredFromUniversal?.templateBody.includes('Hello world live canvas test'), 'Draft content matches across scope aliases');
 
-      // C. Clear draft
+      // C. Daily Progress & Hifz Report scope draft test
+      const hifzDraft = {
+        scopeId: 'hifz_daily_report',
+        name: 'Hifzul Quran Daily Progress Report',
+        templateBody: '<h2>Daily Progress & Hifz Tracker</h2><p>Student: {{student-name}}, Page: {{juz-page}}</p>',
+        rawHtml: '<h2>Daily Progress & Hifz Tracker</h2><p>Student: {{student-name}}, Page: {{juz-page}}</p>',
+        pageSize: 'A4' as const,
+        orientation: 'PORTRAIT' as const,
+      };
+
+      saveDocLabCanvasDraft('hifz_daily_report', hifzDraft);
+      const loadedHifz = getDocLabCanvasDraft('hifz_daily_report');
+      assert(loadedHifz !== null, 'Hifz daily report draft is saved and recovered cleanly');
+      assert(loadedHifz?.name === 'Hifzul Quran Daily Progress Report', 'Hifz draft name matches');
+      assert(loadedHifz?.templateBody.includes('Daily Progress & Hifz Tracker'), 'Hifz draft template body preserved');
+      assert(loadedHifz?.templateBody.includes('{{student-name}}'), 'Hifz draft tokens preserved');
+
+      // D. Clear draft
       clearDocLabCanvasDraft('examination_tabulation_ledger');
       const afterClear = getDocLabCanvasDraft('examination_tabulation_ledger');
       assert(afterClear === null, 'Draft is cleanly cleared when requested');

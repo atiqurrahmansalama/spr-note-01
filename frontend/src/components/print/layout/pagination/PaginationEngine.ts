@@ -35,7 +35,6 @@ import { BreakResolver } from './BreakResolver';
 import { KeepTogetherResolver } from './KeepTogetherResolver';
 import { PageBuilder } from './PageBuilder';
 import { PaginationRuleEngine, PaginationRuleDecision } from './PaginationRuleEngine';
-import { LayoutDebugCollector } from '../debug/LayoutDebugCollector';
 import { IncrementalLayoutPlanner } from '../performance/IncrementalLayoutPlanner';
 
 export class PaginationEngine {
@@ -95,8 +94,6 @@ export class PaginationEngine {
     scope?: LayoutChangeScope
   ): PaginationEngineResult {
     const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const isDebug = Boolean(options.debugLayout || LayoutDebugCollector.isEnabled());
-    const debugCollector = isDebug ? new LayoutDebugCollector() : null;
 
     // Instantiate formal PaginationRuleEngine
     const ruleEngine = new PaginationRuleEngine();
@@ -136,10 +133,6 @@ export class PaginationEngine {
       blocksOrNodes = srcDoc.nodes && srcDoc.nodes.length > 0
         ? [...srcDoc.nodes]
         : parseContinuousHtmlToLogicalNodes(srcDoc.rawHtml || '');
-    }
-
-    if (debugCollector) {
-      debugCollector.startSession(docId);
     }
 
     // 2. Authoritative Physical Page Geometry Calculation
@@ -191,15 +184,12 @@ export class PaginationEngine {
         calculationDurationMs: 0,
       };
 
-      const debugTrace = debugCollector ? debugCollector.finalize(totalPages, 0) : undefined;
-
       return {
         document: layoutDoc,
         pages,
         totalPages,
         overflowDetected: false,
         isComplete: true,
-        debugTrace,
       };
     }
 
@@ -625,17 +615,6 @@ export class PaginationEngine {
           hasConflict: false,
           pageIndex: builder.currentValidPageIndex,
         });
-        if (debugCollector) {
-          debugCollector.recordDecision({
-            pageIndex: builder.currentValidPageIndex,
-            blockId: manualBreakId,
-            nodeType: 'manual-page-break',
-            measuredHeightPx: 0,
-            availableHeightPx: builder.availableHeight,
-            decision: 'MANUAL_BREAK',
-            breakType: 'MANUAL',
-          });
-        }
         const isConsecutiveBreak =
           previousItem !== null &&
           typeof previousItem === 'object' &&
@@ -674,17 +653,6 @@ export class PaginationEngine {
           hasConflict: false,
           pageIndex: builder.currentValidPageIndex,
         });
-        if (debugCollector) {
-          debugCollector.recordDecision({
-            pageIndex: builder.currentValidPageIndex,
-            blockId: breakNodeId,
-            nodeType: 'manual-page-break',
-            measuredHeightPx: 0,
-            availableHeightPx: builder.availableHeight,
-            decision: 'MOVE_TO_NEXT_PAGE',
-            breakType: 'MANUAL',
-          });
-        }
         builder.advanceToNextPage();
         prevMarginBottom = 0;
       }
@@ -743,19 +711,6 @@ export class PaginationEngine {
           }
         );
 
-        if (debugCollector) {
-          debugCollector.recordDecision({
-            pageIndex: builder.currentValidPageIndex,
-            blockId: measured.nodeId,
-            nodeType: measured.type,
-            measuredHeightPx: currentHeight,
-            availableHeightPx: builder.availableHeight,
-            decision: 'MOVE_TO_NEXT_PAGE',
-            breakType: ruleDecision.rule === 'KEEP_WITH_NEXT' ? 'KEEP_WITH_NEXT' : 'KEEP_TOGETHER',
-            notes: ruleDecision.reason,
-          });
-        }
-
         builder.advanceToNextPage();
         prevMarginBottom = 0;
         queue.unshift(currentItem);
@@ -796,18 +751,6 @@ export class PaginationEngine {
             }
           );
 
-          if (debugCollector) {
-            debugCollector.recordDecision({
-              pageIndex: builder.currentValidPageIndex,
-              blockId: measured.nodeId,
-              nodeType: measured.type,
-              measuredHeightPx: currentHeight,
-              availableHeightPx: builder.availableHeight,
-              decision: 'PLACE',
-              breakType: breakEval.shouldBreakAfter ? 'MANUAL' : 'NONE',
-            });
-          }
-
           if (breakEval.shouldBreakAfter) {
             builder.advanceToNextPage();
             prevMarginBottom = 0;
@@ -840,18 +783,6 @@ export class PaginationEngine {
             'Atomic element keep-together',
             { rule: 'KEEP_TOGETHER', precedence: 3 }
           );
-          if (debugCollector) {
-            debugCollector.recordDecision({
-              pageIndex: builder.currentValidPageIndex,
-              blockId: measured.nodeId,
-              nodeType: measured.type,
-              measuredHeightPx: currentHeight,
-              availableHeightPx: builder.availableHeight,
-              decision: 'MOVE_TO_NEXT_PAGE',
-              breakType: 'KEEP_TOGETHER',
-              notes: 'Atomic element exceeds remaining space, moving intact to next page',
-            });
-          }
           builder.advanceToNextPage();
           prevMarginBottom = 0;
           queue.unshift(currentItem);
@@ -882,19 +813,6 @@ export class PaginationEngine {
           );
           prevMarginBottom = 0;
 
-          if (debugCollector) {
-            debugCollector.recordDecision({
-              pageIndex: builder.currentValidPageIndex,
-              blockId: measured.nodeId,
-              nodeType: measured.type,
-              measuredHeightPx: currentHeight,
-              availableHeightPx: builder.availableHeight,
-              overflowHeightPx: Math.max(0, currentHeight - builder.availableHeight),
-              decision: 'FRAGMENT',
-              breakType: 'AUTOMATIC',
-            });
-          }
-
           if (fragResult.remainingBlockNode) {
             builder.advanceToNextPage();
             prevMarginBottom = 0;
@@ -905,19 +823,6 @@ export class PaginationEngine {
             queue.unshift(fragResult.remainingNode);
           }
         } else {
-          if (debugCollector) {
-            debugCollector.recordDecision({
-              pageIndex: builder.currentValidPageIndex,
-              blockId: measured.nodeId,
-              nodeType: measured.type,
-              measuredHeightPx: currentHeight,
-              availableHeightPx: builder.availableHeight,
-              overflowHeightPx: Math.max(0, currentHeight - builder.availableHeight),
-              decision: 'MOVE_TO_NEXT_PAGE',
-              breakType: 'AUTOMATIC',
-            });
-          }
-
           if (builder.usedHeight === 0) {
             // Force place on empty page to guarantee algorithm termination
             const forcedFrag = DocumentLayoutEngine.createFragment({
@@ -1075,64 +980,6 @@ export class PaginationEngine {
     const duration = typeof performance !== 'undefined' ? performance.now() - startTime : 0;
     const cacheStats = MeasurementCache.getInstance().getStats();
 
-    // Populate debug collector metrics
-    if (debugCollector) {
-      const fragmentCountsBySourceId: Record<string, number> = {};
-      const fragmentCurrentIndexBySourceId: Record<string, number> = {};
-
-      pages.forEach((page) => {
-        page.fragments.forEach((frag) => {
-          const sId = frag.sourceNodeId || frag.id || 'node';
-          fragmentCountsBySourceId[sId] = (fragmentCountsBySourceId[sId] || 0) + 1;
-        });
-      });
-
-      pages.forEach((page, pIdx) => {
-        const pageFrags = page.fragments.map((frag, fIdx) => {
-          const sourceId = frag.sourceNodeId || frag.id || `paragraph-${fIdx + 1}`;
-          const isMultiple = (fragmentCountsBySourceId[sourceId] || 0) > 1;
-          const currentFragIdx = isMultiple
-            ? (fragmentCurrentIndexBySourceId[sourceId] = (fragmentCurrentIndexBySourceId[sourceId] || 0) + 1)
-            : 1;
-
-          return {
-            id: frag.id,
-            sourceNodeId: sourceId,
-            type: frag.type,
-            name: sourceId,
-            heightPx: Math.round(frag.rect.height),
-            pageIndex: pIdx,
-            pageNumber: pIdx + 1,
-            fragmentIndex: isMultiple ? currentFragIdx : undefined,
-            totalFragments: isMultiple ? fragmentCountsBySourceId[sourceId] : 1,
-            fragmentLabel: isMultiple ? `fragment ${currentFragIdx}` : undefined,
-          };
-        });
-
-        debugCollector.registerPageMetrics({
-          pageIndex: pIdx,
-          pageNumber: pIdx + 1,
-          physicalWidthPx: Math.round(page.width || geometry.paperDimensionsPx.width),
-          physicalHeightPx: Math.round(page.height || geometry.paperDimensionsPx.height),
-          paperHeightPx: Math.round(page.height || geometry.paperDimensionsPx.height),
-          margins: {
-            top: Math.round(page.margins.top),
-            right: Math.round(page.margins.right),
-            bottom: Math.round(page.margins.bottom),
-            left: Math.round(page.margins.left),
-          },
-          contentAreaWidthPx: Math.round(page.contentArea.width || contentWidth),
-          contentAreaHeightPx: Math.round(page.contentArea.height || contentHeight),
-          headerHeightPx: Math.round(geometry.headerAreaPx?.height || 0),
-          footerHeightPx: Math.round(geometry.footerAreaPx?.height || 0),
-          usedHeightPx: Math.round(page.usedHeight),
-          remainingHeightPx: Math.round(page.availableHeight),
-          fragmentsCount: page.fragments.length,
-          fragments: pageFrags,
-        });
-      });
-    }
-
     const metrics: LayoutPerformanceMetrics = {
       totalDurationMs: Math.round(duration * 100) / 100,
       cacheHitCount: cacheStats.hitCount,
@@ -1216,15 +1063,12 @@ export class PaginationEngine {
       diagnostics: layoutDiagnostics,
     };
 
-    const debugTrace = debugCollector ? debugCollector.finalize(totalPages, duration) : undefined;
-
     return {
       document: layoutDoc,
       pages,
       totalPages,
       overflowDetected,
       isComplete: true,
-      debugTrace,
       metrics,
       changeScope: scope,
       diagnostics: layoutDiagnostics,

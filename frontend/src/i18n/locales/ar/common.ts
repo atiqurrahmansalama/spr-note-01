@@ -70,4 +70,9 @@ export const common = {
   docLabMobileTitle: 'يوصى باستخدام شاشة سطح المكتب',
   docLabMobileDesc: 'تم تصميم DocLab Studio لتنسيق المستندات بدقة عالية وتصميم قوالب الطباعة. للحصول على تجربة تحرير كاملة، يرجى استخدام كمبيوتر مكتبي أو شاشة أكبر. سيتم توفير دعم الشاشات الصغيرة والهواتف في تحديث قادم.',
   docLabMobileBack: 'الرجوع',
+  saveCanvasAsTemplate: 'حفظ مساحة العمل كقالب',
+  saveCanvasAsTemplateDesc: 'احفظ تصميم المستند المخصص كقالب قابل لإعادة الاستخدام لهذه الوحدة.',
+  saveTemplate: 'حفظ القالب',
+  templateName: 'اسم القالب',
+  templateNamePlaceholder: 'مثال: تقرير التقدم اليومي الرسمي',
 };

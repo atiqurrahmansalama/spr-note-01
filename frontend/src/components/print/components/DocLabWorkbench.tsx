@@ -17,8 +17,9 @@ import React, { useState, useMemo } from 'react';
 import DocLabCanvasViewer from '../DocLabCanvasViewer';
 import DocxFormattingRibbon from '../DocxFormattingRibbon';
 import { DocLabSaveModal } from './sidebar';
-import { SparklesIcon } from '@/components/ui/Icons';
-import { PageGeometryCalculator, LayoutDebugOverlay } from '../layout';
+import { PlusIcon, SparklesIcon } from '../../ui/Icons';
+import CustomButton from '../../ui/CustomButton';
+import { PageGeometryCalculator } from '../layout';
 import {
   ModeATemplateEditor,
   ModeDBatchGeneratedView,
@@ -138,7 +139,6 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
   scopeId,
 }) => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isDebugOverlayOpen, setIsDebugOverlayOpen] = useState(false);
 
   const effectiveDocs = useMemo(() => {
     return (documents && documents.length > 0)
@@ -189,22 +189,21 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
             )}
           </div>
 
-          {/* Far Right: Mode Switcher Segment */}
+          {/* Far Right: Actions & Mode Switcher Segment */}
           <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
-            {/* Developer Layout Debug Inspector Button */}
-            <button
-              type="button"
-              onClick={() => setIsDebugOverlayOpen((prev) => !prev)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                isDebugOverlayOpen
-                  ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border-amber-500/40 shadow-2xs font-bold'
-                  : 'theme-bg-elevated theme-text-secondary hover:theme-text-primary border-slate-700/40'
-              }`}
-              title="Toggle Layout Debug Mode Inspector (Developer Tool)"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              <span className="font-mono text-[10.5px]">Debug Layout</span>
-            </button>
+            {/* Save Canvas As Template Button */}
+            {onSaveCurrentTemplate && docxRenderMode === 'template' && (
+              <CustomButton
+                variant="primary"
+                size="xs"
+                icon={PlusIcon}
+                onClick={() => setIsSaveModalOpen(true)}
+                title="Save current canvas design as a module template"
+                className="shadow-2xs"
+              >
+                Save Template
+              </CustomButton>
+            )}
 
             {/* Mode Switcher Segment (Template Design vs Generate N Document(s)) */}
             <div className="flex items-center p-0.5 rounded-lg theme-bg-elevated border theme-border shadow-2xs shrink-0">
@@ -274,7 +273,6 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
             updateCustomDocxTemplateWithHistory={updateCustomDocxTemplateWithHistory}
             options={options}
             docxStyles={docxStyles}
-            isDebugOverlayOpen={isDebugOverlayOpen}
             scopeId={scopeId}
           />
         ) : customDocxTemplate ? (
@@ -337,12 +335,6 @@ export const DocLabWorkbench: React.FC<DocLabWorkbenchProps> = ({
           totalRecordsCount={totalRecordsCount}
         />
       )}
-
-      {/* Developer Internal Layout Debug Overlay */}
-      <LayoutDebugOverlay
-        isOpen={isDebugOverlayOpen}
-        onClose={() => setIsDebugOverlayOpen(false)}
-      />
     </main>
   );
 };

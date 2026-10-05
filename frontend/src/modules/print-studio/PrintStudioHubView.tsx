@@ -103,6 +103,8 @@ export default function PrintStudioHubView({
     ? SUBJECT_ROUTINE_DOCLAB_KEYS
     : standardPlaceholderKeys;
 
+  const templateIdParam = searchParams.get('templateId') || searchParams.get('template') || null;
+
   return (
     <div className={`w-full min-h-screen ${className}`}>
       <UniversalPrintStudio
@@ -125,7 +127,21 @@ export default function PrintStudioHubView({
         showWatermarkSection={true}
         showSignaturesSection={true}
         scopeId={scopeParam}
-        activeTemplateId="blank_document"
+        scopeName={
+          isDailyProgressScope
+            ? 'Daily Progress & Hifz Report'
+            : isSubjectRoutineScope
+            ? 'Examination Subject Routine'
+            : 'General Document'
+        }
+        scopeDescription={
+          isDailyProgressScope
+            ? 'Daily attendance, memorization progress, and revision report templates.'
+            : isSubjectRoutineScope
+            ? 'Exam schedule, routine, and session timetable templates.'
+            : 'Universal document templates and print layouts.'
+        }
+        activeTemplateId={templateIdParam || undefined}
         showPrint={true}
         showPDF={true}
         showWord={true}

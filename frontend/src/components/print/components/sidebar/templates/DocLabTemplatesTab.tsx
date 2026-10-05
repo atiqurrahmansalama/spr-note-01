@@ -14,6 +14,7 @@ import Modal, { ConfirmModal } from '@/components/ui/Modal';
 import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
 import { DocLabTemplateCard } from './DocLabTemplateCard';
+import { DocLabSaveModal } from './DocLabSaveModal';
 import { DocxTemplate } from '@/components/print/types';
 import { DocumentScopeDefinition, ScopeValidationResult } from '@/components/print/keyLibrary/types';
 import {
@@ -76,6 +77,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
   const [renameName, setRenameName] = useState('');
   const [renameDescription, setRenameDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
@@ -234,7 +236,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
 
   return (
     <div className="space-y-4 pt-1 pb-6">
-      {/* 1. Header Action & Direct File Upload */}
+      {/* 1. Header Action & Direct File Upload / Save Template */}
       <div className="flex items-center gap-2">
         <input
           ref={fileInputRef}
@@ -253,8 +255,19 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
           className="flex-1 py-2 px-3 rounded-xl border theme-border theme-bg-surface hover:theme-border-accent/40 font-semibold text-xs theme-text-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
         >
           <UploadIcon className="w-3.5 h-3.5 theme-accent" />
-          <span>{isUploading ? 'Importing...' : 'Import Word (.docx)'}</span>
+          <span>{isUploading ? 'Importing...' : 'Import Word'}</span>
         </button>
+
+        {onSaveCurrentTemplate && (
+          <button
+            type="button"
+            onClick={() => setIsSaveModalOpen(true)}
+            className="flex-1 py-2 px-3 rounded-xl theme-bg-accent text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:opacity-90"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>Save as Template</span>
+          </button>
+        )}
       </div>
 
       {/* 2. Base Builtin Layouts Section (Blank Document) */}
@@ -443,6 +456,22 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
           </div>
         </form>
       </Modal>
+
+      {/* Save Canvas As Template Modal */}
+      {isSaveModalOpen && onSaveCurrentTemplate && (
+        <DocLabSaveModal
+          isOpen={isSaveModalOpen}
+          onClose={() => setIsSaveModalOpen(false)}
+          onSave={(name) => {
+            onSaveCurrentTemplate(name, 'template');
+            setIsSaveModalOpen(false);
+            if (showToast) {
+              showToast(`Saved "${name}" as a template for this module.`, 'success');
+            }
+          }}
+          totalRecordsCount={totalRecordsCount}
+        />
+      )}
     </div>
   );
 };
