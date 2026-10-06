@@ -184,7 +184,7 @@ export default function SubjectMatrixHeader({
                   onClick={onToggleViewMode}
                   title={!isTableMode ? "Switch to Subject Routine Table View" : "Open Interactive 2D Routine Studio"}
                 >
-                  {!isTableMode ? 'Matrix Table' : 'Routine Studio'}
+                  {!isTableMode ? 'Matrix Table' : 'Routine Generator'}
                 </CustomButton>
               )}
 

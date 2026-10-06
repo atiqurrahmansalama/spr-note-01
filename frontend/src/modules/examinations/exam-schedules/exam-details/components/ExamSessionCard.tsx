@@ -1,17 +1,16 @@
-import React from 'react';
-import CustomButton from '../../../../../components/ui/CustomButton';
+import React, { useState } from 'react';
 import MetricsGrid from '../../../../../components/ui/MetricsGrid';
 import ActionMenu from '../../../../../components/ui/ActionMenu';
+import ExamLifecycleModal from './ExamLifecycleModal';
+import ExamLifecyclePipeline from './ExamLifecyclePipeline';
 import {
   CalendarIcon,
   EditIcon,
   TrashIcon,
   BookOpenIcon,
-  CheckIcon,
   ClockIcon,
   ChartBarIcon,
   AcademicCapIcon,
-  LockClosedIcon,
   DepartmentIcon,
   CheckCircleIcon,
 } from '../../../../../components/ui/Icons';
@@ -19,8 +18,6 @@ import { Exam } from '../types';
 import {
   buildExamCardMetrics,
   getGroupedDepartmentSchedules,
-  LIFECYCLE_STAGES,
-  getLifecycleStageIndex,
 } from '../utils';
 
 export interface ExamSessionCardProps {
@@ -41,7 +38,7 @@ export interface ExamSessionCardProps {
  * - Header with title, code, academic session, multi-department indicator, and action menu
  * - 4-tile MetricsGrid with routine coverage, full marks, breakdown, and evaluation weights
  * - Department-specific date windows when active
- * - Interactive Lifecycle Pipeline stepper with status transition action triggers
+ * - Interactive Lifecycle Pipeline stepper with status transition managed via ActionMenu modal
  */
 export default function ExamSessionCard({
   exam,
@@ -54,7 +51,7 @@ export default function ExamSessionCard({
   onNavigateToTabulation,
   onStatusChange,
 }: ExamSessionCardProps) {
-  const currentStageIdx = getLifecycleStageIndex(exam.status);
+  const [isLifecycleModalOpen, setIsLifecycleModalOpen] = useState(false);
   const groupedDepartmentSchedules = getGroupedDepartmentSchedules(exam);
 
   return (
@@ -115,6 +112,11 @@ export default function ExamSessionCard({
                     label: 'Subject Routine Matrix',
                     icon: BookOpenIcon,
                     onClick: () => onNavigateToMatrix(exam.id),
+                  },
+                  {
+                    label: 'Exam Lifecycle',
+                    icon: CheckCircleIcon,
+                    onClick: () => setIsLifecycleModalOpen(true),
                   },
                   ...(onNavigateToMarkEntry
                     ? [
@@ -194,114 +196,21 @@ export default function ExamSessionCard({
         </div>
 
         {/* Lifecycle Management Stepper Bar */}
-        <div className="px-4 sm:px-5 lg:px-6 py-2.5 border-t theme-border theme-bg-sub/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          {/* Visual Lifecycle Pipeline */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-            <span className="font-bold theme-text-secondary uppercase tracking-wider text-[10px] mr-0.5 shrink-0">
-              Lifecycle:
-            </span>
-            {LIFECYCLE_STAGES.map((st, idx) => {
-              const isCurrent = currentStageIdx === idx;
-              const isPast = currentStageIdx > idx;
-              return (
-                <React.Fragment key={st.key}>
-                  {idx > 0 && (
-                    <span
-                      className={`text-[10px] select-none ${
-                        isPast ? 'theme-accent font-bold' : 'theme-text-secondary opacity-30'
-                      }`}
-                    >
-                      →
-                    </span>
-                  )}
-                  <div
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all ${
-                      isCurrent
-                        ? 'theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 font-bold shadow-2xs'
-                        : isPast
-                        ? 'theme-text-primary font-medium'
-                        : 'theme-text-secondary opacity-50'
-                    }`}
-                  >
-                    {isPast ? (
-                      <CheckCircleIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-                    ) : (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          isCurrent ? 'bg-[var(--accent-main)]' : 'theme-bg-subtle'
-                        }`}
-                      />
-                    )}
-                    <span>{st.label}</span>
-                  </div>
-                </React.Fragment>
-              );
-            })}
-          </div>
-
-          {/* Transition Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap shrink-0 self-start sm:self-center">
-            {exam.status === 'DRAFT' && (
-              <CustomButton
-                size="xs"
-                variant="primary"
-                icon={EditIcon}
-                onClick={() => onStatusChange(exam.id, 'MARK_ENTRY')}
-                title="Open examination session for teacher mark entry"
-              >
-                Open Mark Entry
-              </CustomButton>
-            )}
-
-            {exam.status === 'MARK_ENTRY' && (
-              <CustomButton
-                size="xs"
-                variant="primary"
-                icon={CheckIcon}
-                onClick={() => onStatusChange(exam.id, 'FIRST_PUBLISHED')}
-                title="Publish first preliminary results and start verification review period"
-              >
-                Publish 1st Result
-              </CustomButton>
-            )}
-
-            {exam.status === 'FIRST_PUBLISHED' && (
-              <>
-                <CustomButton
-                  size="xs"
-                  variant="sub"
-                  icon={ClockIcon}
-                  onClick={() => onStatusChange(exam.id, 'UNDER_REVIEW')}
-                  title="Flag preliminary result as actively under academic review"
-                >
-                  Mark Review
-                </CustomButton>
-                <CustomButton
-                  size="xs"
-                  variant="primary"
-                  icon={LockClosedIcon}
-                  onClick={() => onStatusChange(exam.id, 'FINAL_PUBLISHED')}
-                  title="Publish certified final result and lock grade records"
-                >
-                  Publish Final
-                </CustomButton>
-              </>
-            )}
-
-            {exam.status === 'UNDER_REVIEW' && (
-              <CustomButton
-                size="xs"
-                variant="primary"
-                icon={LockClosedIcon}
-                onClick={() => onStatusChange(exam.id, 'FINAL_PUBLISHED')}
-                title="Publish certified final result and lock grade records"
-              >
-                Publish Final
-              </CustomButton>
-            )}
-          </div>
+        <div className="px-4 sm:px-5 lg:px-6 py-2.5 border-t theme-border theme-bg-sub/15 flex items-center justify-between gap-3 text-xs">
+          <ExamLifecyclePipeline status={exam.status} showLabel={true} />
         </div>
       </div>
+
+      {/* Examination Lifecycle Management Modal */}
+      <ExamLifecycleModal
+        isOpen={isLifecycleModalOpen}
+        onClose={() => setIsLifecycleModalOpen(false)}
+        exam={exam}
+        examTitle={getExamTitle(exam.name)}
+        onStatusChange={onStatusChange}
+      />
     </div>
   );
 }
+
+

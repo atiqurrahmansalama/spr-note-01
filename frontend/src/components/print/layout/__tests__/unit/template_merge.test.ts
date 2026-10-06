@@ -93,6 +93,28 @@ export function runTemplateMergeUnitTests(): { passed: number; failed: number } 
   assert(healedMerged.includes('4: 5–20') && healedMerged.includes('2: 3–2'), 'Auto-heals mangled token attributes and interpolates data');
   assert(!healedMerged.includes('data-token='), 'Purges broken injected attributes completely');
 
+  // 8. Auto-Healing Exact Mangled Pipe-Indent String from Production
+  const prodMangledTemplate = `
+Mistake
+{{detail-mis " data-token="" data-token-key="" data-display="" data-label="" data-category="general" style="color: lab(7.78673 1.82345 -15.0537); scrollbar-color: color(srgb 0.49221 0.529438 0.824148 / 0.26149) rgba(0, 0, 0, 0);">| indent: 5}}
+
+Stuck
+{{detail-stuck " data-token="" data-token-key="" data-display="" data-label="" data-category="general" style="color: lab(7.78673 1.82345 -15.0537); scrollbar-color: color(srgb 0.49221 0.529438 0.824148 / 0.26149) rgba(0, 0, 0, 0);">| indent: 5}}
+  `;
+  const prodHealedMerged = mergeTemplateWithData(prodMangledTemplate, {
+    'detail-mis': '4: Page 9 Ayah 6',
+    'detail-stuck': '4: Page 13 Ayah 9\n3: Page 5 Ayah 5',
+  });
+  assert(prodHealedMerged.includes('4: Page 9 Ayah 6'), 'Auto-heals production mangled detail-mis with trailing >| indent: 5');
+  assert(prodHealedMerged.includes('4: Page 13 Ayah 9') && prodHealedMerged.includes('3: Page 5 Ayah 5'), 'Auto-heals production mangled detail-stuck with multi-line indent');
+  assert(!prodHealedMerged.includes('scrollbar-color'), 'Purges CSS styling attributes from template tags');
+
+  // 9. Lenient Whitespace in Angle Bracket Directive: {{juz-page < | indent: 11>}}
+  const lenientIndentMerged = mergeTemplateWithData('Page: {{juz-page < | indent: 11>}}', {
+    'juz-page': '17: 1–5\n4: 3–4',
+  });
+  assert(lenientIndentMerged.includes('17: 1–5') && lenientIndentMerged.includes('4: 3–4'), 'Correctly parses and merges {{juz-page < | indent: 11>}} with lenient whitespace');
+
   return { passed, failed };
 }
 

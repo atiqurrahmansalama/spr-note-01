@@ -874,7 +874,7 @@ export function TakeAttendanceButton({
   );
 }
 
-const MemoizedAttendanceTable = memo(AttendanceTable) as typeof AttendanceTable & {
+const MemoizedAttendanceTable = memo(AttendanceTable) as unknown as typeof AttendanceTable & {
   TodayButton: typeof TodayButton;
   TakeButton: typeof TakeAttendanceButton;
   TakeAttendanceButton: typeof TakeAttendanceButton;

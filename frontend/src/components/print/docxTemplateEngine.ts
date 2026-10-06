@@ -1283,61 +1283,64 @@ export function normalizeIndentDirectives(html: string): string {
 
   let res = html;
 
-  // 0. Auto-repair mangled tokens containing injected HTML attributes (e.g. {{key" data-token=... >}})
-  res = res.replace(/\{\{([a-zA-Z0-9_\-\.]+)"\s*(?:data-token|data-key|data-display|data-label|data-category|style|class)[^}]*\}\}/gi, (match, key) => {
-    const cleanKey = key.trim();
-    // Recover specific known indent defaults or embedded directives
-    const indentMatch = match.match(/\bindent\s*:\s*(\d+)/i);
-    if (indentMatch) {
-      return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
+  // 0. Auto-repair mangled tokens containing injected HTML attributes (e.g. {{key " data-token=... >| indent: 5}} or {{key" data-token=... >}})
+  res = res.replace(
+    /\{\{\s*([a-zA-Z0-9_\-\.]+)(?:[^\s|}][^"']*)?["'\s]+(?:data-token|data-key|data-token-key|data-display|data-label|data-category|data-source|style|class|scrollbar-color)[^}]*\}\}/gi,
+    (match, rawKey) => {
+      const cleanKey = rawKey.trim();
+      // Recover specific embedded indent directives if present
+      const indentMatch = match.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
+      if (indentMatch) {
+        return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
+      }
+      const dirMatch = match.match(/\bdirection\s*:\s*([a-z]+)/i);
+      if (dirMatch) {
+        return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
+      }
+      if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
+        return `{{${cleanKey} | indent: 11}}`;
+      }
+      if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
+        return `{{${cleanKey} | indent: 5}}`;
+      }
+      return `{{${cleanKey}}}`;
     }
-    const dirMatch = match.match(/\bdirection\s*:\s*([a-z]+)/i);
-    if (dirMatch) {
-      return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
-    }
-    if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
-      return `{{${cleanKey} | indent: 11}}`;
-    }
-    if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
-      return `{{${cleanKey} | indent: 9}}`;
-    }
-    return `{{${cleanKey}}}`;
-  });
+  );
 
   // 1. Direction and Layout Directives:
-  // e.g. {{key <direction: vertical, ...>}} or {{key <direction: horizontal, separator: ', '>}} -> {{key | direction: ...}}
+  // e.g. {{key <direction: vertical, ...>}} or {{key < | direction: ...>}} -> {{key | direction: ...}}
   res = res.replace(
-    /\{\{([a-zA-Z0-9_\-\.\s|]+?)\s*(?:&lt;|<)\s*(direction|orient|layout|separator|order|prefix|limit)\s*:\s*([^>]+?)(?:&gt;|>)\s*\}\}/gi,
+    /\{\{([a-zA-Z0-9_\-\.\s|]+?)\s*(?:&lt;|<)\s*(?:\|\s*)?(direction|orient|layout|separator|order|prefix|limit)\s*:\s*([^>]+?)(?:&gt;|>)\s*\}\}/gi,
     (_, key, firstProp, restProps) => {
-      const cleanKey = key.replace(/\|$/, '').trim();
+      const cleanKey = key.replace(/[|<]+$/, '').trim();
       return `{{${cleanKey} | ${firstProp}: ${restProps.trim()}}}`;
     }
   );
 
   // 2. Direct inside-braces Indent syntax:
-  // e.g. {{key <| indent: 5, from: 2, to: 4>}} or {{key <indent: 5>}} or {{key<| indent: 11>}}
+  // e.g. {{key < | indent: 11>}} or {{key <| indent: 5, from: 2, to: 4>}} or {{key <indent: 5>}} or {{key<| indent: 11>}}
   res = res.replace(
-    /\{\{([a-zA-Z0-9_\-\.\s]+?)\s*(?:\|)?\s*(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)\s*\}\}/gi,
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\s*(?:\|)?\s*(?:&lt;|<)\s*(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)\s*\}\}/gi,
     (_, key, innerArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
   );
 
   // 3. Direct adjacency (with optional spaces/entities):
-  // e.g. {{key}}<| indent: 5, from: 2> or {{key}} <| indent: 5> or {{key}} | indent: 5
+  // e.g. {{key}}<| indent: 5, from: 2> or {{key}} < | indent: 5> or {{key}} | indent: 5
   res = res.replace(
-    /\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}(?:\s|&nbsp;)*(?:(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^}\n<]+))/gi,
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}(?:\s|&nbsp;)*(?:(?:&lt;|<)\s*(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^}\n<]+))/gi,
     (_, key, innerArgs, pipeArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs || pipeArgs || '')}}}`
   );
 
   // 4. Preceding direct adjacency:
-  // e.g. <| indent: 5>{{key}} or <| indent: 5, from: 2> {{key}} or | indent: 5{{key}}
+  // e.g. <| indent: 5>{{key}} or < | indent: 5, from: 2> {{key}} or | indent: 5{{key}}
   res = res.replace(
-    /(?:(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^{\n<]+))(?:\s|&nbsp;)*\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}/gi,
+    /(?:(?:&lt;|<)\s*(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^{\n<]+))(?:\s|&nbsp;)*\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}/gi,
     (_, innerArgs, pipeArgs, key) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs || pipeArgs || '')}}}`
   );
 
   // 5. Robust scanning for any remaining <| indent... > or &lt;| indent... &gt; or <indent... >
   // Associates with the closest preceding placeholder (or following if none preceding)
-  const directiveRegex = /(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/i;
+  const directiveRegex = /(?:&lt;|<)\s*(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/i;
   let match: RegExpExecArray | null;
 
   let safetyCount = 0;
@@ -1392,7 +1395,7 @@ export function normalizeIndentDirectives(html: string): string {
   }
 
   // 6. Final fallback cleanup of any lingering directives
-  res = res.replace(/(?:&lt;|<)(?:\|)?\s*indent[^>]*?(?:&gt;|>)/gi, '');
+  res = res.replace(/(?:&lt;|<)\s*(?:\|)?\s*indent[^>]*?(?:&gt;|>)/gi, '');
 
   return res;
 }
@@ -1420,7 +1423,32 @@ export function sanitizeDocxPlaceholders(html: string): string {
       .replace(/&nbsp;/gi, ' ');
 
     // Strip HTML element tags (span, strong, b, em, i, u, font, a, small, mark, sub, sup, div, p, br, etc.)
-    const stripped = decoded.replace(/<\/?(span|strong|b|em|i|u|font|a|small|mark|sub|sup|div|p|br)[^>]*>/gi, '').trim();
+    let stripped = decoded.replace(/<\/?(span|strong|b|em|i|u|font|a|small|mark|sub|sup|div|p|br)[^>]*>/gi, '').trim();
+
+    // If inner contains injected HTML tag attributes without opening tag (e.g. `key " data-token="" ... >| indent: 5`)
+    if (stripped.includes('data-token') || stripped.includes('data-key') || stripped.includes('style=') || stripped.includes('class=')) {
+      const cleanKeyMatch = stripped.match(/^([a-zA-Z0-9_\-\.]+)/);
+      const indentMatch = stripped.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
+      const dirMatch = stripped.match(/\bdirection\s*:\s*([a-z]+)/i);
+
+      if (cleanKeyMatch) {
+        const cleanKey = cleanKeyMatch[1];
+        if (indentMatch) {
+          return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
+        }
+        if (dirMatch) {
+          return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
+        }
+        if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
+          return `{{${cleanKey} | indent: 11}}`;
+        }
+        if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
+          return `{{${cleanKey} | indent: 5}}`;
+        }
+        return `{{${cleanKey}}}`;
+      }
+    }
+
     // Normalize linebreaks and broken words inside placeholder
     const normalized = stripped
       .replace(/-\s*[\r\n]+\s*/g, '')

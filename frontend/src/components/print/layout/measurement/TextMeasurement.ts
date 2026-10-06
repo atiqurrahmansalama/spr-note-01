@@ -244,9 +244,12 @@ export class TextMeasurement {
       }
 
       const elRect = connectedEl.getBoundingClientRect();
+      const elOffsetWidth = connectedEl.offsetWidth;
+      const elOffsetHeight = connectedEl.offsetHeight;
+      const effectiveScale = (elOffsetWidth > 0 && elRect.width > 0) ? (elRect.width / elOffsetWidth) : 1;
 
       if (textNodes.length === 0) {
-        const h = Math.max(connectedEl.offsetHeight, elRect.height, 24);
+        const h = Math.max(elOffsetHeight, elRect.height > 0 ? elRect.height / effectiveScale : 0, 24);
         return {
           lines: [],
           firstLineHeight: h,
@@ -294,10 +297,10 @@ export class TextMeasurement {
       const flushCurrentRun = (lineTop: number, charEndOffset: number) => {
         if (currentRunText.length > 0) {
           const runRect: Rect = {
-            x: Math.max(0, currentRunLeft - elRect.left),
-            y: Math.max(0, currentRunTop - elRect.top),
-            width: Math.max(4, currentRunRight - currentRunLeft),
-            height: Math.max(12, currentRunBottom - currentRunTop),
+            x: Math.max(0, (currentRunLeft - elRect.left) / effectiveScale),
+            y: Math.max(0, (currentRunTop - elRect.top) / effectiveScale),
+            width: Math.max(4, (currentRunRight - currentRunLeft) / effectiveScale),
+            height: Math.max(12, (currentRunBottom - currentRunTop) / effectiveScale),
           };
           currentLineRuns.push({
             text: currentRunText,
@@ -339,7 +342,7 @@ export class TextMeasurement {
               const charTop = r.top;
               const charBottom = r.bottom;
 
-              // Check if this cluster starts a new visual line (threshold > 4px vertical delta)
+              // Check if this cluster starts a new visual line (threshold > 4px vertical delta adjusted for scale)
               if (currentLineTop === -1) {
                 currentLineTop = charTop;
                 currentLineBottom = charBottom;
@@ -355,22 +358,22 @@ export class TextMeasurement {
                 currentRunRight = r.right;
                 currentRunTop = r.top;
                 currentRunBottom = r.bottom;
-              } else if (Math.abs(charTop - currentLineTop) > 4) {
+              } else if (Math.abs(charTop - currentLineTop) > 4 * effectiveScale) {
                 // 1. Flush active run
                 flushCurrentRun(currentLineTop, globalCharPos);
 
                 // 2. Flush completed line
                 rawLines.push({
                   rect: {
-                    x: Math.max(0, currentLineLeft - elRect.left),
-                    y: Math.max(0, currentLineTop - elRect.top),
-                    width: Math.max(10, currentLineRight - currentLineLeft),
-                    height: Math.max(12, currentLineBottom - currentLineTop),
+                    x: Math.max(0, (currentLineLeft - elRect.left) / effectiveScale),
+                    y: Math.max(0, (currentLineTop - elRect.top) / effectiveScale),
+                    width: Math.max(10, (currentLineRight - currentLineLeft) / effectiveScale),
+                    height: Math.max(12, (currentLineBottom - currentLineTop) / effectiveScale),
                   },
-                  top: currentLineTop - elRect.top,
-                  bottom: currentLineBottom - elRect.top,
-                  left: currentLineLeft - elRect.left,
-                  right: currentLineRight - elRect.left,
+                  top: (currentLineTop - elRect.top) / effectiveScale,
+                  bottom: (currentLineBottom - elRect.top) / effectiveScale,
+                  left: (currentLineLeft - elRect.left) / effectiveScale,
+                  right: (currentLineRight - elRect.left) / effectiveScale,
                   text: currentLineText,
                   charStart: currentLineStart,
                   charEnd: globalCharPos,
@@ -431,15 +434,15 @@ export class TextMeasurement {
         flushCurrentRun(currentLineTop, runningCharOffset);
         rawLines.push({
           rect: {
-            x: Math.max(0, currentLineLeft - elRect.left),
-            y: Math.max(0, currentLineTop - elRect.top),
-            width: Math.max(10, currentLineRight - currentLineLeft),
-            height: Math.max(12, currentLineBottom - currentLineTop),
+            x: Math.max(0, (currentLineLeft - elRect.left) / effectiveScale),
+            y: Math.max(0, (currentLineTop - elRect.top) / effectiveScale),
+            width: Math.max(10, (currentLineRight - currentLineLeft) / effectiveScale),
+            height: Math.max(12, (currentLineBottom - currentLineTop) / effectiveScale),
           },
-          top: currentLineTop - elRect.top,
-          bottom: currentLineBottom - elRect.top,
-          left: currentLineLeft - elRect.left,
-          right: currentLineRight - elRect.left,
+          top: (currentLineTop - elRect.top) / effectiveScale,
+          bottom: (currentLineBottom - elRect.top) / effectiveScale,
+          left: (currentLineLeft - elRect.left) / effectiveScale,
+          right: (currentLineRight - elRect.left) / effectiveScale,
           text: currentLineText,
           charStart: currentLineStart,
           charEnd: runningCharOffset,
@@ -504,7 +507,7 @@ export class TextMeasurement {
         };
       });
 
-      const totalHeight = elRect.height > 0 ? elRect.height : (connectedEl.offsetHeight || Math.max(lines.length * 20, 24));
+      const totalHeight = elOffsetHeight > 0 ? elOffsetHeight : (elRect.height > 0 ? elRect.height / effectiveScale : Math.max(lines.length * 20, 24));
       const firstLineHeight = lines.length > 0 ? lines[0].rect.height : totalHeight;
       const lastLineHeight = lines.length > 0 ? lines[lines.length - 1].rect.height : totalHeight;
 
@@ -558,7 +561,9 @@ export class TextMeasurement {
       if (typeof document === 'undefined' || !connectedEl) return null;
 
       const elRect = connectedEl.getBoundingClientRect();
-      if (elRect.height <= maxAllowedHeightPx) return null;
+      const effectiveScale = (connectedEl.offsetWidth > 0 && elRect.width > 0) ? (elRect.width / connectedEl.offsetWidth) : 1;
+      const unscaledHeight = connectedEl.offsetHeight > 0 ? connectedEl.offsetHeight : (elRect.height > 0 ? elRect.height / effectiveScale : 0);
+      if (unscaledHeight <= maxAllowedHeightPx) return null;
 
       const metrics = this.measureTextLines(connectedEl, context);
       const lines = metrics.lines;
@@ -581,7 +586,7 @@ export class TextMeasurement {
             splitOffset: splitLine.charEnd,
             splitNode: null,
             sliceHeight,
-            remainingHeight: Math.max(16, elRect.height - sliceHeight),
+            remainingHeight: Math.max(16, unscaledHeight - sliceHeight),
           };
         }
       }

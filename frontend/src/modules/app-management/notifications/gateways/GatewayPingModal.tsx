@@ -58,7 +58,7 @@ export default function GatewayPingModal({
       badge={gateway.gateway_type}
       footer={null}
     >
-      <form onSubmit={handlePing} className="p-5 sm:p-6 space-y-4 text-left">
+      <form onSubmit={handlePing} className="space-y-4 text-left">
         <div className="p-3 rounded-xl theme-bg-sub border theme-border flex items-center justify-between shadow-2xs">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary block">

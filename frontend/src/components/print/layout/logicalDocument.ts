@@ -253,15 +253,28 @@ export function sanitizeLogicalDocumentHtml(rawHtml: string): string {
     const container = document.createElement('div');
     container.innerHTML = clean;
 
-    // 1. Unwrap any paper-sheet, runtime page-shell, page-index, or fragment wrappers
+    // 1. Unwrap any paper-sheet, runtime page-shell, page-index, or synthetic layout wrappers
     const sheetWrappers = container.querySelectorAll(
-      '.paper-sheet, [data-page-index], [data-paper-sheet="true"], [data-runtime-page], .doclab-runtime-page-shell, .spr-page-fragment, .docx-layout-fragment, [data-fragment-id], [data-is-fragment]'
+      '.paper-sheet, [data-page-index], [data-paper-sheet="true"], [data-runtime-page], .doclab-runtime-page-shell, .spr-page-fragment, .docx-layout-fragment, [data-fragment-id]'
     );
     sheetWrappers.forEach((sheet) => {
       while (sheet.firstChild) {
         sheet.parentNode?.insertBefore(sheet.firstChild, sheet);
       }
       sheet.parentNode?.removeChild(sheet);
+    });
+
+    // 1.1 Strip transient fragment and continuation metadata attributes without destroying content elements
+    const fragmentElements = container.querySelectorAll(
+      '[data-is-fragment], [data-is-continuation], [data-fragment-index], [data-fragment-total], [data-table-continuation], [data-list-continuation]'
+    );
+    fragmentElements.forEach((el) => {
+      el.removeAttribute('data-is-fragment');
+      el.removeAttribute('data-is-continuation');
+      el.removeAttribute('data-fragment-index');
+      el.removeAttribute('data-fragment-total');
+      el.removeAttribute('data-table-continuation');
+      el.removeAttribute('data-list-continuation');
     });
 
     // 2. Identify transient auto-break artifacts (break elements without explicit manual marker)
@@ -549,10 +562,10 @@ export function parseContinuousHtmlToLogicalNodes(rawHtml: string): SourceNode[]
           return;
         }
 
-        // 6. Generic container divs with block children -> flatten recursively
-        const hasBlockChildren = el.querySelector('p, h1, h2, h3, h4, h5, h6, table, ul, ol, div.spr-page-break, div');
+        // 6. Generic container divs/sections/articles with block children -> flatten recursively
+        const hasBlockChildren = el.querySelector('p, h1, h2, h3, h4, h5, h6, table, ul, ol, div.spr-page-break, div, section, article');
         if (
-          tag === 'div' &&
+          (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'main') &&
           hasBlockChildren &&
           !el.classList.contains('print-avoid-break') &&
           !el.classList.contains('keep-together') &&

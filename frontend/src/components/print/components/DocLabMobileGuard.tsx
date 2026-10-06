@@ -46,7 +46,7 @@ export const DocLabMobileGuard: React.FC<DocLabMobileGuardProps> = ({
         </div>
       }
     >
-      <div className="p-4 sm:p-5 text-center space-y-4 font-sans" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="text-center space-y-4 font-sans" dir={isRTL ? 'rtl' : 'ltr'}>
         {/* Device Artwork Spotlight */}
         <div className="mx-auto w-14 h-14 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center relative shadow-inner">
           <LaptopIcon className="w-7 h-7 theme-accent" />

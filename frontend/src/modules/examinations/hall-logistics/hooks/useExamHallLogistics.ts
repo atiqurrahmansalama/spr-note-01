@@ -11,7 +11,7 @@ import {
 
 export function useExamHallLogistics() {
   const { currentTenant } = useTenant();
-  const examData = useExamData();
+  const examData = useExamData() as any;
   const {
     exams = [],
     classes = [],

@@ -197,7 +197,7 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
   }
 
   // Normalize internal whitespace, linebreaks, and decode HTML entities
-  const normalized = tokenContent
+  let normalized = tokenContent
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&amp;/gi, '&')
@@ -207,8 +207,47 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 1. Check for legacy `<...>` directive syntax: {{key <direction: vertical, order: desc>}} or {{key <| indent: 5>}}
-  const directiveMatch = normalized.match(/^(.*?)\s*<([\s\S]*?)>\s*$/);
+  // 0. Auto-heal mangled online token strings containing injected HTML attributes or tags
+  // e.g. 'detail-mis " data-token="" data-token-key="" ... ">| indent: 5' or 'detail-mis" style="color: ...">'
+  if (/(?:data-token|style\s*=|class\s*=|data-category|scrollbar-color|data-token-key|data-display|data-label)/i.test(normalized)) {
+    const baseKeyMatch = normalized.match(/^([a-zA-Z0-9_\-\.]+)/);
+    const indentMatch = normalized.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
+    const directionMatch = normalized.match(/\b(direction|dir|order|flow|separator|sep|prefix|limit|from|to)\s*:\s*([^,>|"]+)/gi);
+
+    // Check if there is trailing directive syntax after quotes/tags e.g. >| indent: 5 or | indent: 5
+    const trailingMatch = normalized.match(/[>"']\s*(?:\||>|&gt;)?\s*([^"'>]+)$/);
+
+    const recoveredParts: string[] = [];
+    if (trailingMatch && trailingMatch[1].trim()) {
+      const part = trailingMatch[1].replace(/^[|>]+/, '').trim();
+      if (part) recoveredParts.push(part);
+    }
+    if (indentMatch && !recoveredParts.some((p) => p.toLowerCase().includes('indent'))) {
+      recoveredParts.push(`indent: ${indentMatch[1]}`);
+    }
+    if (directionMatch) {
+      directionMatch.forEach((dm) => {
+        if (!recoveredParts.some((p) => p.toLowerCase().includes(dm.toLowerCase()))) {
+          recoveredParts.push(dm);
+        }
+      });
+    }
+
+    if (baseKeyMatch) {
+      const cleanKey = baseKeyMatch[1];
+      if (recoveredParts.length === 0) {
+        if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
+          recoveredParts.push('indent: 11');
+        } else if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
+          recoveredParts.push('indent: 5');
+        }
+      }
+      normalized = cleanKey + (recoveredParts.length > 0 ? ` | ${recoveredParts.join(' | ')}` : '');
+    }
+  }
+
+  // 1. Check for legacy `<...>` directive syntax: {{key <direction: vertical, order: desc>}} or {{key <| indent: 5>}} or {{key < | indent: 11>}}
+  const directiveMatch = normalized.match(/^(.*?)\s*(?:&lt;|<)\s*(?:\|\s*)?([\s\S]*?)(?:&gt;|>)\s*$/);
   if (directiveMatch) {
     const rawKeyPart = directiveMatch[1].trim();
     let rawDirective = directiveMatch[2].trim();
@@ -216,13 +255,13 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
       rawDirective = rawDirective.slice(1).trim();
     }
 
-    const pipeParts = rawKeyPart.split('|').map((p) => p.trim());
-    const baseKey = pipeParts[0].replace(/[\s]/g, '');
+    const pipeParts = rawKeyPart.split('|').map((p) => p.trim()).filter(Boolean);
+    const baseKey = (pipeParts[0] || '').replace(/[\s]/g, '');
     const legacyFilterSpecs = pipeParts.slice(1);
 
     const options = parseKeyValuePairs(rawDirective);
 
-    // If directive is indent (e.g. <| indent: 5> or <indent: 5>), also add to legacyFilterSpecs for standard filter processing
+    // If directive is indent (e.g. <| indent: 5> or <indent: 5> or < | indent: 11>), also add to legacyFilterSpecs for standard filter processing
     if (rawDirective.toLowerCase().startsWith('indent') && !legacyFilterSpecs.some((f) => f.toLowerCase().startsWith('indent'))) {
       legacyFilterSpecs.push(rawDirective);
     }
@@ -237,8 +276,8 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
   }
 
   // 2. Standard unified pipe syntax: {{key | direction: vertical, separator: ', ' | indent: 5 | uppercase}}
-  const pipeParts = normalized.split('|').map((p) => p.trim());
-  const baseKey = pipeParts[0].replace(/[\s]/g, '');
+  const pipeParts = normalized.split('|').map((p) => p.trim()).filter(Boolean);
+  const baseKey = (pipeParts[0] || '').replace(/[\s]/g, '');
   const remainingParts = pipeParts.slice(1);
 
   const options: TokenDirectiveOptions = {};

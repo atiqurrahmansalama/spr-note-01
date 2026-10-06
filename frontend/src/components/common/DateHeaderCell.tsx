@@ -1,7 +1,31 @@
-import React from "react";
-import { getHijriDateString } from "../../utils/hijriUtils";
+import React from 'react';
+import { getHijriDateString } from '../../utils/hijriUtils';
 
-const WEEKDAY_2LETTER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+const WEEKDAY_2LETTER = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+export interface DateHeaderCellProps {
+  as?: React.ElementType;
+  dayData?: any;
+  dateStr?: string;
+  dayNum?: number | string;
+  weekday?: number | string;
+  isHijriEnabled?: boolean;
+  hijriDay?: number | string;
+  hasEvent?: boolean;
+  eventColors?: any;
+  eventTitle?: string;
+  isHoliday?: boolean;
+  holidayTitle?: string;
+  isSelected?: boolean;
+  isToday?: boolean;
+  isCurrentMonth?: boolean;
+  showEventBackground?: boolean;
+  onClick?: (e?: React.MouseEvent) => void;
+  title?: string;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
 
 /**
  * Universal Date Header Cell Component
@@ -18,8 +42,8 @@ const WEEKDAY_2LETTER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
  * - Event Indicator Dot
  * - Centered 2-letter Weekday with Divider
  */
-function DateHeaderCell({
-  as: Component = "th",
+export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
+  as: Component = 'th',
   dayData,
   dateStr: propDateStr,
   dayNum: propDayNum,
@@ -37,10 +61,10 @@ function DateHeaderCell({
   showEventBackground = false,
   onClick,
   title,
-  className = "",
+  className = '',
   children,
   ...restProps
-}) {
+}) => {
   const dateStr = propDateStr || dayData?.date || '';
   const dayNum = propDayNum !== undefined && propDayNum !== null ? propDayNum : dayData?.day;
   const weekday = propWeekday !== undefined && propWeekday !== null ? propWeekday : dayData?.weekday;
@@ -51,21 +75,22 @@ function DateHeaderCell({
   const eventTitle = propEventTitle || dayData?.event_title || '';
   const isToday = propIsToday !== undefined ? propIsToday : Boolean(dayData?.is_today);
   const hijriDay = propHijriDay || dayData?.hijri_day || null;
+
   // Resolve numeric day
   const resolvedDayNum = dayNum !== undefined && dayNum !== null
     ? dayNum
-    : (dateStr ? parseInt(String(dateStr).split("-")[2], 10) : "");
+    : (dateStr ? parseInt(String(dateStr).split('-')[2], 10) : '');
 
   // Resolve Hijri Day number
   const resolvedHijriDay = isHijriEnabled
-    ? (hijriDay || (dateStr ? getHijriDateString(dateStr).split(" ")[0] : null))
+    ? (hijriDay || (dateStr ? getHijriDateString(dateStr).split(' ')[0] : null))
     : null;
 
   // Resolve 2-letter weekday
-  let resolvedWeekday2Letter = "";
-  if (typeof weekday === "number") {
-    resolvedWeekday2Letter = WEEKDAY_2LETTER[weekday % 7] || "";
-  } else if (typeof weekday === "string" && weekday.length > 0) {
+  let resolvedWeekday2Letter = '';
+  if (typeof weekday === 'number') {
+    resolvedWeekday2Letter = WEEKDAY_2LETTER[weekday % 7] || '';
+  } else if (typeof weekday === 'string' && weekday.length > 0) {
     resolvedWeekday2Letter = weekday.slice(0, 2).toUpperCase();
   } else if (dateStr) {
     const dObj = new Date(dateStr);
@@ -80,23 +105,23 @@ function DateHeaderCell({
       ? `Holiday / Class Off: ${holidayTitle || eventTitle || 'Class Attendance Closed'} [${dateStr || resolvedDayNum}]`
       : eventTitle
       ? `${eventTitle} [${dateStr || resolvedDayNum}]`
-      : `${resolvedWeekday2Letter} - ${dateStr || resolvedDayNum}${resolvedHijriDay ? ` (Hijri: ${resolvedHijriDay})` : ""}`
+      : `${resolvedWeekday2Letter} - ${dateStr || resolvedDayNum}${resolvedHijriDay ? ` (Hijri: ${resolvedHijriDay})` : ''}`
   );
 
   // Dynamic status-based background & text styling
-  let statusClasses = "";
+  let statusClasses = '';
   if (isSelected) {
-    statusClasses = "theme-bg-accent text-white font-bold shadow-xs";
+    statusClasses = 'theme-bg-accent text-white font-bold shadow-xs';
   } else if (isToday) {
-    statusClasses = "theme-bg-accent-soft theme-accent font-bold hover:brightness-95";
+    statusClasses = 'theme-bg-accent-soft theme-accent font-bold hover:brightness-95';
   } else if (hasEvent && eventColors && showEventBackground) {
     statusClasses = `${eventColors.bg} ${eventColors.text} font-bold hover:brightness-95`;
   } else if (isHoliday) {
-    statusClasses = "theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary";
+    statusClasses = 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
   } else if (!isCurrentMonth) {
-    statusClasses = "theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary";
+    statusClasses = 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
   } else {
-    statusClasses = "theme-bg-surface hover:theme-bg-sub/40 theme-text-primary";
+    statusClasses = 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
   }
 
   return (
@@ -115,14 +140,14 @@ function DateHeaderCell({
           <div
             className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${
               isSelected
-                ? "text-white"
+                ? 'text-white'
                 : isToday
-                ? "theme-accent"
+                ? 'theme-accent'
                 : hasEvent && eventColors && showEventBackground
                 ? eventColors.text
                 : !isCurrentMonth
-                ? "theme-text-secondary"
-                : "theme-text-primary"
+                ? 'theme-text-secondary'
+                : 'theme-text-primary'
             }`}
           >
             {resolvedDayNum}
@@ -133,8 +158,8 @@ function DateHeaderCell({
             <div
               className={`text-[10px] sm:text-[11px] font-mono font-bold leading-none select-none ${
                 isSelected
-                  ? "text-white/90"
-                  : "theme-accent"
+                  ? 'text-white/90'
+                  : 'theme-accent'
               }`}
             >
               {resolvedHijriDay}
@@ -146,8 +171,8 @@ function DateHeaderCell({
             <span
               className={`w-1 h-1 rounded-full shrink-0 ${
                 isSelected
-                  ? "bg-white"
-                  : eventColors?.dot || "theme-bg-accent"
+                  ? 'bg-white'
+                  : eventColors?.dot || 'theme-bg-accent'
               }`}
               style={
                 !isSelected && eventColors?.hex
@@ -163,8 +188,8 @@ function DateHeaderCell({
           <span
             className={`text-[8px] sm:text-[9px] font-semibold uppercase leading-none text-center block ${
               isSelected
-                ? "text-white/80"
-                : "opacity-60 theme-text-primary"
+                ? 'text-white/80'
+                : 'opacity-60 theme-text-primary'
             }`}
           >
             {resolvedWeekday2Letter}
@@ -175,6 +200,6 @@ function DateHeaderCell({
       </div>
     </Component>
   );
-}
+};
 
 export default React.memo(DateHeaderCell);

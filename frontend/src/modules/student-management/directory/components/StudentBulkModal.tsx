@@ -52,7 +52,7 @@ export default function StudentBulkModal({
         </div>
       }
     >
-      <div className="p-5 sm:p-6 space-y-4 text-left">
+      <div className="space-y-4 text-left">
         <div>
           <CustomSelect
             label="Select Action"

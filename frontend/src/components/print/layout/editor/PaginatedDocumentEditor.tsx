@@ -197,6 +197,10 @@ export function repaginateHostDOM(
   const availHeight = geometry.availableContentHeightPx || Math.max(120, paperHeight - marginTop - marginBottom - headerHeight - footerHeight);
   const baseJump = marginBottom + footerHeight + PAGE_GAP_PX + SCREEN_HEADER_HEIGHT_PX + marginTop + headerHeight;
 
+  // Measure host scale factor (e.g. from canvas zoom transform: scale(...))
+  const hostRect = host.getBoundingClientRect();
+  const hostScale = (host.offsetWidth > 0 && hostRect.width > 0) ? (hostRect.width / host.offsetWidth) : 1;
+
   // Clean any leading runtime spacers at the start (page 1 top never needs a runtime spacer)
   let firstChild = host.firstElementChild as HTMLElement | null;
   while (firstChild && firstChild.getAttribute('data-spr-runtime-pagination') === 'true') {
@@ -261,12 +265,12 @@ export function repaginateHostDOM(
       continue;
     }
 
-    // Measure actual rendered block height in the real browser DOM
+    // Measure actual rendered block height in the real browser DOM (normalized by host scale)
     const rect = child.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(child);
     const mTop = parseFloat(computedStyle.marginTop) || 0;
     const mBottom = parseFloat(computedStyle.marginBottom) || 0;
-    const rawHeight = child.offsetHeight || rect.height;
+    const rawHeight = child.offsetHeight > 0 ? child.offsetHeight : (rect.height > 0 ? rect.height / hostScale : 0);
     const blockHeight = (rawHeight > 0 ? rawHeight : 24) + mTop + mBottom;
 
     // Check if this block fits on the current page.
@@ -344,10 +348,10 @@ export function repaginateHostDOM(
           } else {
             const spacer = createRuntimeSpacer(spacerHeight);
             child.parentNode?.insertBefore(spacer, child);
+            i += 1; // Spacer was inserted before child, so advance loop index past spacer
           }
 
           currentPage += 1;
-          i += 1; // Advance past spacer
 
           if (blockHeight > availHeight) {
             const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
@@ -471,7 +475,7 @@ export function repaginateHostDOM(
             }
 
             // Calculate exact spacer height after first table slice
-            const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+            const firstMeasuredHeight = child.offsetHeight > 0 ? child.offsetHeight : (splitRes.firstFragmentHeight / hostScale);
             const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
             const spacerHeight = remainingAfterFirst + baseJump;
             const spacer = createRuntimeSpacer(spacerHeight);
@@ -549,7 +553,7 @@ export function repaginateHostDOM(
             }
 
             // Calculate exact spacer height after first list slice
-            const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+            const firstMeasuredHeight = child.offsetHeight > 0 ? child.offsetHeight : (splitRes.firstFragmentHeight / hostScale);
             const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
             const spacerHeight = remainingAfterFirst + baseJump;
             const spacer = createRuntimeSpacer(spacerHeight);
@@ -560,7 +564,7 @@ export function repaginateHostDOM(
 
             currentPage += 1;
             currentY = 0;
-            i += 1; // Advance past spacer
+            i += 1; // Advance loop index to spacer so next iteration visits contEl
             splitSuccess = true;
           }
         }
@@ -639,7 +643,7 @@ export function repaginateHostDOM(
               }
 
               // Calculate exact spacer height after first fragment
-              const firstMeasuredHeight = child.offsetHeight || splitRes.firstFragmentHeight;
+              const firstMeasuredHeight = child.offsetHeight > 0 ? child.offsetHeight : (splitRes.firstFragmentHeight / hostScale);
               const remainingAfterFirst = Math.max(0, availHeight - (currentY + firstMeasuredHeight + mTop + mBottom));
               const spacerHeight = remainingAfterFirst + baseJump;
               const spacer = createRuntimeSpacer(spacerHeight);
@@ -674,10 +678,10 @@ export function repaginateHostDOM(
           } else {
             const spacer = createRuntimeSpacer(spacerHeight);
             child.parentNode?.insertBefore(spacer, child);
+            i += 1; // Spacer was inserted before child, so advance loop index past spacer
           }
 
           currentPage += 1;
-          i += 1; // Advance past spacer
 
           if (blockHeight > availHeight) {
             const pagesSpanned = Math.max(1, Math.ceil(blockHeight / availHeight));
@@ -949,6 +953,64 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       runPaginationPass();
     }
   }, [cleanCanonicalBody, runPaginationPass]);
+
+  // Dynamic layout & media observers to trigger pagination when fonts, images, or container dimensions update
+  useEffect(() => {
+    if (!editorHostRef.current) return;
+    const host = editorHostRef.current;
+
+    // 1. ResizeObserver to track container & host dimension changes
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        schedulePaginationPass();
+      });
+      ro.observe(host);
+    }
+
+    // 2. Window resize listener
+    const handleWindowResize = () => {
+      schedulePaginationPass();
+    };
+
+    // 3. Image / Media load event listener (capture phase)
+    const handleMediaLoad = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'IMG' || target.tagName === 'IFRAME' || target.tagName === 'OBJECT')) {
+        schedulePaginationPass();
+      }
+    };
+
+    // 4. Web fonts ready listener
+    if (typeof document !== 'undefined' && (document as any).fonts && typeof (document as any).fonts.ready?.then === 'function') {
+      (document as any).fonts.ready.then(() => {
+        schedulePaginationPass();
+      }).catch(() => {});
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleWindowResize);
+    }
+    host.addEventListener('load', handleMediaLoad, true);
+
+    // Initial micro-pass to ensure fonts and layout have settled
+    const rafId = typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame(() => {
+          runPaginationPass();
+        })
+      : null;
+
+    return () => {
+      if (ro) ro.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleWindowResize);
+      }
+      host.removeEventListener('load', handleMediaLoad, true);
+      if (rafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [schedulePaginationPass, runPaginationPass]);
 
   // Composition Lifecycle Event Handlers (IME / CJK / Accents / Live Typing Safety)
   const handleCompositionStart = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {

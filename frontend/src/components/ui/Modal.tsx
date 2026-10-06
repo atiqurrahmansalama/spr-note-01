@@ -14,6 +14,7 @@ export interface ModalProps {
   children?: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full' | string;
+  padding?: 'none' | 'sm' | 'md' | 'lg' | 'compact' | 'comfortable' | string;
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
@@ -36,6 +37,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   size = '2xl',
+  padding = 'comfortable',
   closeOnOverlayClick = true,
   closeOnEscape = true,
   showCloseButton = true,
@@ -84,7 +86,17 @@ export const Modal: React.FC<ModalProps> = ({
     full: 'max-w-[95vw] sm:max-w-[92vw]',
   };
 
+  const paddingClasses: Record<string, string> = {
+    none: '',
+    sm: 'p-3.5 sm:p-4',
+    md: 'p-5 sm:p-6',
+    lg: 'p-6 sm:p-8',
+    compact: 'p-4 sm:p-5',
+    comfortable: 'p-5 sm:p-6',
+  };
+
   const currentSizeClass = sizeClasses[size] || 'max-w-3xl';
+  const currentPaddingClass = paddingClasses[padding] !== undefined ? paddingClasses[padding] : (padding || 'p-5 sm:p-6');
 
   const modalContent = (
     <div
@@ -122,7 +134,7 @@ export const Modal: React.FC<ModalProps> = ({
                   {badge && <div className="shrink-0">{badge}</div>}
                 </div>
                 {subtitle && (
-                  <p className="text-[11px] sm:text-xs theme-text-secondary mt-0.5 truncate leading-relaxed">
+                  <p className="text-[11px] sm:text-xs theme-text-secondary mt-0.5 leading-relaxed break-words">
                     {subtitle}
                   </p>
                 )}
@@ -148,7 +160,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Body */}
-        <div className={`flex-1 overflow-y-auto ${bodyClassName}`}>
+        <div className={`flex-1 overflow-y-auto ${currentPaddingClass} ${bodyClassName}`}>
           {children}
         </div>
 
@@ -283,7 +295,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       footer={footerActions}
       className={className}
     >
-      <div className="p-4 sm:p-6 space-y-4 text-xs">
+      <div className="space-y-4 text-xs">
         {/* Callout Box */}
         {callout && activeCalloutStyle && (
           <div

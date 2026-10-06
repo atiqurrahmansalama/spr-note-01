@@ -95,6 +95,8 @@ export class TableMeasurement {
       }
 
       const tableRect = connectedTable.getBoundingClientRect();
+      const tableOffsetWidth = connectedTable.offsetWidth;
+      const effectiveScale = (tableOffsetWidth > 0 && tableRect.width > 0) ? (tableRect.width / tableOffsetWidth) : 1;
       const thead = connectedTable.querySelector('thead');
       const tfoot = connectedTable.querySelector('tfoot');
 
@@ -114,14 +116,14 @@ export class TableMeasurement {
         const rect = tr.getBoundingClientRect();
         const textLen = (tr.textContent || '').length;
         const fallbackH = Math.max(32, Math.ceil(textLen / 35) * 22);
-        const rowH = rect.height > 0 ? rect.height : fallbackH;
+        const rowH = rect.height > 0 ? rect.height / effectiveScale : fallbackH;
         return {
           rowIndex: idx,
           height: rowH,
           rect: {
-            x: Math.max(0, rect.left - tableRect.left),
-            y: Math.max(0, rect.top - tableRect.top),
-            width: rect.width || tableRect.width,
+            x: Math.max(0, (rect.left - tableRect.left) / effectiveScale),
+            y: Math.max(0, (rect.top - tableRect.top) / effectiveScale),
+            width: (rect.width || tableRect.width) / effectiveScale,
             height: rowH,
           },
           isHeader: true,
@@ -144,7 +146,7 @@ export class TableMeasurement {
         const rect = tr.getBoundingClientRect();
         const textLen = (tr.textContent || '').length;
         const fallbackH = Math.max(36, Math.ceil(textLen / 35) * 22);
-        const rowH = rect.height > 0 ? rect.height : fallbackH;
+        const rowH = rect.height > 0 ? rect.height / effectiveScale : fallbackH;
         const isKeepTogether =
           tr.classList.contains('print-avoid-break') ||
           tr.classList.contains('keep-together') ||
@@ -154,9 +156,9 @@ export class TableMeasurement {
           rowIndex: idx,
           height: rowH,
           rect: {
-            x: Math.max(0, rect.left - tableRect.left),
-            y: Math.max(0, rect.top - tableRect.top),
-            width: rect.width || tableRect.width,
+            x: Math.max(0, (rect.left - tableRect.left) / effectiveScale),
+            y: Math.max(0, (rect.top - tableRect.top) / effectiveScale),
+            width: (rect.width || tableRect.width) / effectiveScale,
             height: rowH,
           },
           isHeader: false,
@@ -172,14 +174,14 @@ export class TableMeasurement {
         const rect = tr.getBoundingClientRect();
         const textLen = (tr.textContent || '').length;
         const fallbackH = Math.max(32, Math.ceil(textLen / 35) * 22);
-        const rowH = rect.height > 0 ? rect.height : fallbackH;
+        const rowH = rect.height > 0 ? rect.height / effectiveScale : fallbackH;
         return {
           rowIndex: idx,
           height: rowH,
           rect: {
-            x: Math.max(0, rect.left - tableRect.left),
-            y: Math.max(0, rect.top - tableRect.top),
-            width: rect.width || tableRect.width,
+            x: Math.max(0, (rect.left - tableRect.left) / effectiveScale),
+            y: Math.max(0, (rect.top - tableRect.top) / effectiveScale),
+            width: (rect.width || tableRect.width) / effectiveScale,
             height: rowH,
           },
           isHeader: false,
@@ -194,12 +196,12 @@ export class TableMeasurement {
       const footerHtml = footerTrs.map((r) => r.outerHTML).join('');
 
       const totalHeight = Math.max(
-        tableRect.height,
+        connectedTable.offsetHeight > 0 ? connectedTable.offsetHeight : (tableRect.height / effectiveScale),
         headerHeight + dataMeasurements.reduce((s, r) => s + r.height, 0) + footerHeight
       );
 
       return {
-        totalWidth: tableRect.width,
+        totalWidth: tableOffsetWidth > 0 ? tableOffsetWidth : (tableRect.width / effectiveScale),
         totalHeight,
         headerHeight,
         footerHeight,

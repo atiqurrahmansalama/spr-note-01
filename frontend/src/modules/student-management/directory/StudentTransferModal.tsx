@@ -552,7 +552,7 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
         </div>
       }
     >
-      <div className="p-5 sm:p-6 space-y-5 text-left">
+      <div className="space-y-5 text-left">
         {/* Current Academic Placement Summary (Clean 2-Column Text Format) */}
         <div className="p-3.5 rounded-2xl theme-bg-sub/60 border theme-border space-y-2.5 text-xs">
           <div className="flex items-center justify-between gap-2">

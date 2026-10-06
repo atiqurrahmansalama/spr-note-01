@@ -126,7 +126,7 @@ export default function BedAllocationModal({
       badge={bed.status}
       footer={null}
     >
-      <div className="p-5 sm:p-6 space-y-4 text-left">
+      <div className="space-y-4 text-left">
         {/* Current Status Banner */}
         <div className="p-3 rounded-xl theme-bg-sub border theme-border flex items-center justify-between shadow-2xs">
           <div className="space-y-0.5">
