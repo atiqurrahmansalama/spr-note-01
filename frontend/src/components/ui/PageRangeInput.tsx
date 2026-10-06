@@ -39,6 +39,9 @@ export interface PageRangeInputProps {
   required?: boolean;
   idPrefix?: string;
   onEnter?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onStartEnter?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onEndEnter?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onShiftEnter?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onAdd?: () => void;
   onAddNextRange?: () => void;
   onAddShift?: () => void;
@@ -75,6 +78,9 @@ export default function PageRangeInput({
   required = false,
   idPrefix,
   onEnter,
+  onStartEnter,
+  onEndEnter,
+  onShiftEnter,
   onAdd,
   onAddNextRange,
   onAddShift,
@@ -222,14 +228,33 @@ export default function PageRangeInput({
 
   const handleStartEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     handleStartBlur();
-    if (onEnter) onEnter(e);
-    else handleEnterFocusNext(e);
+    if (onStartEnter) {
+      onStartEnter(e);
+    } else {
+      const endEl = document.getElementById(`${prefix}-end`);
+      if (endEl) {
+        e.preventDefault();
+        endEl.focus();
+        if (typeof (endEl as HTMLInputElement).select === 'function') {
+          (endEl as HTMLInputElement).select();
+        }
+      } else if (onEnter) {
+        onEnter(e);
+      } else {
+        handleEnterFocusNext(e);
+      }
+    }
   };
 
   const handleEndEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     handleEndBlur();
-    if (onEnter) onEnter(e);
-    else handleEnterFocusNext(e);
+    if (onEndEnter) {
+      onEndEnter(e);
+    } else if (onEnter) {
+      onEnter(e);
+    } else {
+      handleEnterFocusNext(e);
+    }
   };
 
   // Size styling matching Juz input box (compact: h-9, md: h-10)
@@ -274,6 +299,7 @@ export default function PageRangeInput({
           onChange={handleStartChange}
           onBlur={handleStartBlur}
           onEnter={handleStartEnter}
+          onShiftEnter={onShiftEnter}
           onAdd={onAdd || onAddNextRange}
           onAddShift={onAddShift || onAddJuzRow}
           onEmptyBackspace={handleBackspace}
@@ -305,6 +331,7 @@ export default function PageRangeInput({
           onChange={handleEndChange}
           onBlur={handleEndBlur}
           onEnter={handleEndEnter}
+          onShiftEnter={onShiftEnter}
           onAdd={onAdd || onAddNextRange}
           onAddShift={onAddShift || onAddJuzRow}
           onEmptyBackspace={(e) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import DocLabQuickReportModal from "@/components/print/DocLabQuickReportModal";
 import {
@@ -250,6 +250,49 @@ export default function DailyProgressView({
     showToast("Stuck section reset", "info");
   };
 
+  const focusFirstMistakePage = useCallback(() => {
+    setTimeout(() => {
+      const mistakePageInput =
+        document.querySelector<HTMLInputElement>('[data-section="mistake"] input[id*="page"]') ||
+        document.querySelector<HTMLInputElement>('input[id^="page-mistake-"]') ||
+        document.querySelector<HTMLInputElement>('input[id^="page-"]');
+      if (mistakePageInput) {
+        mistakePageInput.focus();
+        if (typeof mistakePageInput.select === "function") {
+          mistakePageInput.select();
+        }
+      }
+    }, 40);
+  }, []);
+
+  const focusFirstStuckPage = useCallback(() => {
+    setTimeout(() => {
+      const stuckPageInput =
+        document.querySelector<HTMLInputElement>('[data-section="stuck"] input[id*="page"]') ||
+        document.querySelector<HTMLInputElement>('input[id^="page-stuck-"]');
+      if (stuckPageInput) {
+        stuckPageInput.focus();
+        if (typeof stuckPageInput.select === "function") {
+          stuckPageInput.select();
+        }
+      }
+    }, 40);
+  }, []);
+
+  const focusComments = useCallback(() => {
+    setTimeout(() => {
+      const commentEl =
+        document.getElementById("comment-textarea") ||
+        document.querySelector<HTMLTextAreaElement>('textarea[id*="comment"]');
+      if (commentEl) {
+        commentEl.focus();
+        if (typeof (commentEl as HTMLTextAreaElement).select === "function") {
+          (commentEl as HTMLTextAreaElement).select();
+        }
+      }
+    }, 40);
+  }, []);
+
   const activeDragRef = useRef<{ listType: string; index: number } | null>(null);
   const [draggedItem, setDraggedItem] = useState<{ listType: string; index: number } | null>(null);
 
@@ -492,6 +535,7 @@ export default function DailyProgressView({
               data={juzPageData}
               onChange={setJuzPageData}
               onReset={handleJuzPageRefresh}
+              onNextSection={focusFirstMistakePage}
             />
           )}
 
@@ -515,6 +559,7 @@ export default function DailyProgressView({
               onDrop={handleDrop}
               onReorderRows={handleReorderRows}
               onReset={handleMistakeRefresh}
+              onNextSection={focusFirstStuckPage}
             />
           )}
 
@@ -537,6 +582,7 @@ export default function DailyProgressView({
               onDrop={handleDrop}
               onReorderRows={handleReorderRows}
               onReset={handleStuckRefresh}
+              onNextSection={focusComments}
             />
           )}
         </div>
@@ -565,6 +611,7 @@ export default function DailyProgressView({
         title="Daily Progress Report"
         returnUrl="/studies/daily-progress"
         dataRecord={dailyProgressReportData}
+        autoCopy={true}
       />
     </PageContainer>
   );

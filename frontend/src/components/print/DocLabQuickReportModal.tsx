@@ -1,23 +1,24 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getSavedTemplatesForScope,
   getDefaultTemplateIdForScope,
+  setDefaultTemplateForScope,
   type CustomDocxTemplate,
 } from './scopeTemplateStore';
 import { mergeTemplateWithData } from './docxTemplateEngine';
 import { convertDocumentToPlainText } from './docLabTextConverter';
 import {
-  EditIcon,
   CopyIcon,
   SleekCheckIcon,
   ShareIcon,
   SparklesIcon,
-  ChevronDownIcon,
   FileIcon,
 } from '../ui/Icons';
 import Modal from '../ui/Modal';
 import CustomButton from '../ui/CustomButton';
+import ActionMenu from '../ui/ActionMenu';
+import EmptyState from '../ui/EmptyState';
 import { useToast } from '../../context/ToastContext';
 
 export interface DocLabQuickReportModalProps {
@@ -28,6 +29,7 @@ export interface DocLabQuickReportModalProps {
   dataRecord: Record<string, string>;
   title?: string;
   returnUrl?: string;
+  autoCopy?: boolean;
   onNavigateToDocLab?: () => void;
 }
 
@@ -46,6 +48,7 @@ export default function DocLabQuickReportModal({
   dataRecord = {},
   title,
   returnUrl,
+  autoCopy = false,
   onNavigateToDocLab,
 }: DocLabQuickReportModalProps) {
   const navigate = useNavigate();
@@ -53,14 +56,36 @@ export default function DocLabQuickReportModal({
 
   const [savedTemplates, setSavedTemplates] = useState<CustomDocxTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [copied, setCopied] = useState(false);
-  const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
-  const templateMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Hash ref to guard against infinite re-parsing loops and CPU/GPU thrashing
   const prevDataHashRef = useRef<string>('');
+
+  // Copy helper with visual confirmation and feedback
+  const performCopy = useCallback(async (textToCopy?: string) => {
+    const text = textToCopy ?? currentText;
+    if (!text || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      showToast('Report copied to clipboard', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      showToast('Failed to copy to clipboard', 'error');
+    }
+  }, [currentText, showToast]);
+
+  // Set selected template and persist as default template for this scope
+  const handleSelectTemplate = useCallback(
+    (templateId: string) => {
+      setSelectedTemplateId(templateId);
+      if (scopeId && templateId) {
+        setDefaultTemplateForScope(scopeId, templateId);
+      }
+    },
+    [scopeId]
+  );
 
   // 1. Fetch available templates for this scope whenever modal opens
   useEffect(() => {
@@ -81,9 +106,7 @@ export default function DocLabQuickReportModal({
       setSelectedTemplateId(null);
     }
 
-    setIsEditing(false);
     setCopied(false);
-    setIsTemplateMenuOpen(false);
   }, [isOpen, scopeId]);
 
   // 2. Active Template derivation
@@ -91,6 +114,16 @@ export default function DocLabQuickReportModal({
     if (!selectedTemplateId || savedTemplates.length === 0) return null;
     return savedTemplates.find((t) => t.id === selectedTemplateId) || savedTemplates[0] || null;
   }, [selectedTemplateId, savedTemplates]);
+
+  // Menu items for project standard ActionMenu
+  const templateMenuItems = useMemo(() => {
+    return savedTemplates.map((t) => ({
+      label: t.name,
+      icon: t.id === selectedTemplateId ? SleekCheckIcon : undefined,
+      iconClassName: t.id === selectedTemplateId ? 'theme-accent' : undefined,
+      onClick: () => handleSelectTemplate(t.id),
+    }));
+  }, [savedTemplates, selectedTemplateId, handleSelectTemplate]);
 
   // 3. Populate template with data strictly when modal is open and data has genuinely changed
   useEffect(() => {
@@ -120,34 +153,16 @@ export default function DocLabQuickReportModal({
     const mergedHtml = mergeTemplateWithData(templateRaw, dataRecord);
     const plainText = convertDocumentToPlainText(mergedHtml);
     setCurrentText(plainText);
-  }, [isOpen, activeTemplate, dataRecord]);
 
-  // 4. Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
-        setIsTemplateMenuOpen(false);
-      }
-    };
-    if (isTemplateMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    // Auto-copy to clipboard on open if requested
+    if (autoCopy && plainText) {
+      performCopy(plainText);
     }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isTemplateMenuOpen]);
+  }, [isOpen, activeTemplate, dataRecord, autoCopy, performCopy]);
 
   // Copy handler with visual confirmation
-  const handleCopy = async () => {
-    if (!currentText) return;
-    try {
-      await navigator.clipboard.writeText(currentText);
-      setCopied(true);
-      showToast('Report copied to clipboard', 'success');
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      showToast('Failed to copy to clipboard', 'error');
-    }
+  const handleCopy = () => {
+    performCopy();
   };
 
   // Share handler
@@ -159,11 +174,13 @@ export default function DocLabQuickReportModal({
           title: title || `${scopeName} Report`,
           text: currentText,
         });
-      } catch (e) {
-        handleCopy();
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          performCopy();
+        }
       }
     } else {
-      handleCopy();
+      performCopy();
     }
   };
 
@@ -211,69 +228,26 @@ export default function DocLabQuickReportModal({
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
       {/* Template selector switcher in footer if multiple templates exist */}
       {hasTemplates && savedTemplates.length > 1 ? (
-        <div ref={templateMenuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
-            className="px-2.5 py-1.5 rounded-xl theme-bg-surface hover:theme-bg-accent-soft hover:theme-accent theme-text-secondary text-xs font-semibold border theme-border flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <span className="truncate max-w-[140px]">{activeTemplate?.name || 'Template'}</span>
-            <ChevronDownIcon className="w-3.5 h-3.5 opacity-70" />
-          </button>
-
-          {isTemplateMenuOpen && (
-            <div className="absolute left-0 bottom-full mb-2 w-60 rounded-2xl theme-bg-surface border theme-border shadow-2xl py-1.5 z-50 overflow-hidden animate-fade-in">
-              <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider theme-text-secondary border-b theme-border">
-                Select Template
-              </div>
-              <div className="max-h-48 overflow-y-auto">
-                {savedTemplates.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTemplateId(t.id);
-                      setIsTemplateMenuOpen(false);
-                    }}
-                    className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                      t.id === selectedTemplateId
-                        ? 'theme-bg-accent-soft theme-accent font-semibold'
-                        : 'hover:theme-bg-sub theme-text-primary'
-                    }`}
-                  >
-                    <span className="truncate">{t.name}</span>
-                    {t.id === selectedTemplateId && (
-                      <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1.5 theme-accent" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <ActionMenu
+          label={activeTemplate?.name || 'Template'}
+          icon={FileIcon}
+          items={templateMenuItems}
+          align="left"
+          size="sm"
+          variant="surface"
+          header="Select Template"
+        />
       ) : (
         <div className="text-[11px] theme-text-secondary hidden sm:block truncate">
           {activeTemplate?.name ? `Template: ${activeTemplate.name}` : ''}
         </div>
       )}
 
-      {/* Action Buttons: Edit, Copy, Share */}
+      {/* Action Buttons: Copy, Share */}
       <div className="flex items-center justify-end gap-2 w-full sm:w-auto">
         <CustomButton
           type="button"
-          variant={isEditing ? 'primary' : 'sub'}
-          size="sm"
-          icon={EditIcon}
-          onClick={() => setIsEditing(!isEditing)}
-          disabled={!hasTemplates}
-          className="flex-1 sm:flex-initial min-w-[85px]"
-        >
-          {isEditing ? 'Done' : 'Edit'}
-        </CustomButton>
-
-        <CustomButton
-          type="button"
-          variant={copied ? 'success' : 'primary'}
+          variant="primary"
           size="sm"
           icon={copied ? SleekCheckIcon : CopyIcon}
           onClick={handleCopy}
@@ -305,51 +279,38 @@ export default function DocLabQuickReportModal({
       size="lg"
       zIndex={10000}
       title={title || `${scopeName} Report`}
-      subtitle="Preview, edit, copy or export formatted document."
+      subtitle="Edit, copy or share formatted document."
       headerActions={headerActions}
       footer={modalFooter}
       bodyClassName="p-4 sm:p-5"
     >
       <div className="h-[420px] sm:h-[460px] relative flex flex-col rounded-2xl overflow-hidden border theme-border theme-bg-app">
         {hasTemplates ? (
-          isEditing ? (
-            <textarea
-              value={currentText}
-              onChange={(e) => setCurrentText(e.target.value)}
-              className="w-full h-full p-4 theme-bg-surface theme-text-primary text-xs sm:text-sm font-mono border-0 focus:outline-none resize-none leading-relaxed shadow-inner"
-              placeholder="Edit report text..."
-              autoFocus
-            />
-          ) : (
-            <pre className="w-full h-full p-4 theme-bg-surface theme-text-primary text-xs sm:text-sm font-mono whitespace-pre-wrap select-all leading-relaxed shadow-inner overflow-y-auto text-left">
-              {currentText || 'No preview text generated.'}
-            </pre>
-          )
+          <textarea
+            value={currentText}
+            onChange={(e) => setCurrentText(e.target.value)}
+            className="w-full h-full p-4 theme-bg-surface theme-text-primary text-xs sm:text-sm font-mono border-0 focus:outline-none resize-none leading-relaxed shadow-inner"
+            placeholder="Edit report text..."
+            autoFocus
+          />
         ) : (
           /* Empty State: No Template Found */
-          <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 space-y-4 rounded-xl theme-bg-sub border theme-border border-dashed">
-            <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center shadow-inner">
-              <FileIcon className="w-7 h-7" />
-            </div>
-            <div className="space-y-1 max-w-sm">
-              <h3 className="text-base font-bold theme-text-primary">
-                No Template Configured
-              </h3>
-              <p className="text-xs theme-text-secondary leading-relaxed">
-                No document template has been configured for this report scope yet.
-                Open DocLab Studio to customize or design a Word template.
-              </p>
-            </div>
-            <CustomButton
-              type="button"
-              variant="primary"
-              size="sm"
-              icon={SparklesIcon}
-              onClick={handleGoToDocLab}
-            >
-              Open DocLab Studio
-            </CustomButton>
-          </div>
+          <EmptyState
+            icon={FileIcon}
+            iconVariant="accent"
+            iconSize="lg"
+            variant="minimal"
+            title="No Template Configured"
+            description="No document template has been configured for this report scope yet. Open DocLab Studio to customize or design a Word template."
+            action={{
+              label: 'Open DocLab Studio',
+              icon: SparklesIcon,
+              onClick: handleGoToDocLab,
+              variant: 'primary',
+              size: 'sm',
+            }}
+            className="w-full h-full flex flex-col items-center justify-center m-auto"
+          />
         )}
       </div>
     </Modal>

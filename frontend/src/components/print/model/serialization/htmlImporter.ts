@@ -605,12 +605,12 @@ export class HtmlImporter {
   }
 
   /**
-   * Scans a text string for Mustache tokens (e.g. {{student_name}}) and splits into TextNode & TokenNode
+   * Scans a text string for Mustache tokens (e.g. {{student_name}}, {{key | indent: 11}}, {{key | direction: vertical}}) and splits into TextNode & TokenNode
    */
   public static parseInlineTextWithTokens(text: string, marks?: Mark): InlineNode[] {
     if (!text) return [];
 
-    const tokenRegex = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+    const tokenRegex = /\{\{\s*([a-zA-Z0-9_.-]+(?:\s*[|<][^}]+)?)\s*\}\}/g;
     const nodes: InlineNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -618,7 +618,7 @@ export class HtmlImporter {
     while ((match = tokenRegex.exec(text)) !== null) {
       const matchStart = match.index;
       const matchEnd = matchStart + match[0].length;
-      const tokenKey = match[1];
+      const tokenKey = match[1].trim();
 
       // Leading plain text
       if (matchStart > lastIndex) {
@@ -719,7 +719,7 @@ export class HtmlImporter {
   public static parseInlineHtmlString(rawHtml: string): InlineNode[] {
     if (!rawHtml) return [];
 
-    const tokenAndTagRegex = /(<\/?(?:strong|b|em|i|u|s|strike|code|span|a|br)\b[^>]*>|\{\{\s*[a-zA-Z0-9_.-]+\s*\}\})/gi;
+    const tokenAndTagRegex = /(<\/?(?:strong|b|em|i|u|s|strike|code|span|a|br)\b[^>]*>|\{\{\s*[a-zA-Z0-9_.-]+(?:\s*[|<][^}]+)?\s*\}\})/gi;
     const tokens = rawHtml.split(tokenAndTagRegex);
     const nodes: InlineNode[] = [];
 

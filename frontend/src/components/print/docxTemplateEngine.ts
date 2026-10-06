@@ -11,7 +11,7 @@ import type {
   CustomDocxTemplate,
   DocLabCanvasDraft,
 } from './types';
-import { parseTokenDirective, formatMultiValueData, type TokenDirectiveOptions } from './docLabDirectiveEngine';
+import { parseTokenDirective, formatMultiValueData } from './docLabDirectiveEngine';
 import { separateDocxStylesAndBody, sanitizeDocxStyles } from './docxStyleUtils';
 import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
 import { sanitizeLogicalDocumentHtml } from './layout/logicalDocument';
@@ -71,18 +71,6 @@ export function getDocxPaperPadding(
 }
 
 /**
- * Extracts element attributes as a clean string for element reconstruction
- */
-export function getElementAttributesString(el: HTMLElement): string {
-  const attrs: string[] = [];
-  for (let i = 0; i < el.attributes.length; i++) {
-    const attr = el.attributes[i];
-    attrs.push(`${attr.name}="${attr.value}"`);
-  }
-  return attrs.join(' ');
-}
-
-/**
  * Converts any CSS length measurement (mm, cm, in, pt, px, dxa) into standard millimeters (mm).
  */
 export function convertCssLengthToMm(valStr: string | null | undefined): number | null {
@@ -99,6 +87,24 @@ export function convertCssLengthToMm(valStr: string | null | undefined): number 
   if (trimmed.endsWith('pc')) return num * 4.23333;
   if (trimmed.endsWith('dxa') || trimmed.endsWith('twip')) return num * 0.0176389; // 1 dxa = 1/20 pt
   return num;
+}
+
+/**
+ * Helper to parse 1, 2, or 4 CSS padding measurements into millimeter values.
+ */
+function parsePaddingParts(padStr: string): { top?: number; right?: number; bottom?: number; left?: number } | null {
+  if (!padStr) return null;
+  const parts = padStr.trim().split(/\s+/).map(convertCssLengthToMm).filter((v): v is number => v !== null);
+  if (parts.length === 1 && parts[0] > 0) {
+    return { top: parts[0], right: parts[0], bottom: parts[0], left: parts[0] };
+  }
+  if (parts.length === 2 && (parts[0] > 0 || parts[1] > 0)) {
+    return { top: parts[0], bottom: parts[0], right: parts[1], left: parts[1] };
+  }
+  if (parts.length === 4) {
+    return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[3] };
+  }
+  return null;
 }
 
 /**
@@ -163,17 +169,12 @@ export function extractDocxPageProperties(
       // Extract padding from section.docx
       const padMatch = /padding\s*:\s*([^;\}]+)/i.exec(secBody);
       if (padMatch && detectedTopMm === null) {
-        const padParts = padMatch[1].trim().split(/\s+/).map(convertCssLengthToMm).filter((v): v is number => v !== null);
-        if (padParts.length === 1 && padParts[0] > 0) {
-          detectedTopMm = detectedRightMm = detectedBottomMm = detectedLeftMm = padParts[0];
-        } else if (padParts.length === 2 && (padParts[0] > 0 || padParts[1] > 0)) {
-          detectedTopMm = detectedBottomMm = padParts[0];
-          detectedRightMm = detectedLeftMm = padParts[1];
-        } else if (padParts.length === 4) {
-          detectedTopMm = padParts[0];
-          detectedRightMm = padParts[1];
-          detectedBottomMm = padParts[2];
-          detectedLeftMm = padParts[3];
+        const parsed = parsePaddingParts(padMatch[1]);
+        if (parsed) {
+          detectedTopMm = parsed.top ?? null;
+          detectedRightMm = parsed.right ?? null;
+          detectedBottomMm = parsed.bottom ?? null;
+          detectedLeftMm = parsed.left ?? null;
         }
       }
     }
@@ -199,17 +200,12 @@ export function extractDocxPageProperties(
           if (sectionEl.style.paddingLeft) detectedLeftMm = convertCssLengthToMm(sectionEl.style.paddingLeft);
 
           if (detectedTopMm === null && sectionEl.style.padding) {
-            const padParts = sectionEl.style.padding.trim().split(/\s+/).map(convertCssLengthToMm).filter((v): v is number => v !== null);
-            if (padParts.length === 1 && padParts[0] > 0) {
-              detectedTopMm = detectedRightMm = detectedBottomMm = detectedLeftMm = padParts[0];
-            } else if (padParts.length === 2 && (padParts[0] > 0 || padParts[1] > 0)) {
-              detectedTopMm = detectedBottomMm = padParts[0];
-              detectedRightMm = detectedLeftMm = padParts[1];
-            } else if (padParts.length === 4) {
-              detectedTopMm = padParts[0];
-              detectedRightMm = padParts[1];
-              detectedBottomMm = padParts[2];
-              detectedLeftMm = padParts[3];
+            const parsed = parsePaddingParts(sectionEl.style.padding);
+            if (parsed) {
+              detectedTopMm = parsed.top ?? null;
+              detectedRightMm = parsed.right ?? null;
+              detectedBottomMm = parsed.bottom ?? null;
+              detectedLeftMm = parsed.left ?? null;
             }
           }
 
@@ -300,8 +296,7 @@ export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
   ['total', 'total_marks', 'totalmarks', 'grand_total', 'total_full_marks', 'totalfull'],
   ['obtained', 'obtained_marks', 'obtainedmarks', 'total_obtained', 'totalobtained', 'total_obtained_marks'],
   ['average_marks', 'avg_marks', 'averagemarks', 'avgmarks', 'average', 'mean_marks', 'avg', 'average_mark'],
-  ['merit_position', 'merit', 'rank', 'class_rank', 'position', 'standing', 'merit_rank', 'merit_status', 'rank_ordinal'],
-  ['merit_status', 'merit_position', 'result_summary', 'result_merit', 'merit_result'],
+  ['merit_position', 'merit', 'rank', 'class_rank', 'position', 'standing', 'merit_rank', 'merit_status', 'rank_ordinal', 'result_merit', 'merit_result'],
   ['result_status', 'status', 'exam_status', 'pass_status', 'result', 'qualification_status'],
   ['result_summary', 'resultsummary', 'summary', 'result_overview', 'academic_summary'],
   ['total_subjects', 'totalsubjects', 'total_subjects_count', 'subjects_count', 'subject_count'],
@@ -323,9 +318,6 @@ export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
   ['employee_id', 'staff_id', 'emp_id'],
   ['designation', 'designation_name', 'post', 'job_title'],
 ];
-
-/**
-export { sanitizeDocxStyles, separateDocxStylesAndBody } from './docxStyleUtils';
 
 /**
  * Normalizes all SVG vector drawings, lines, and shapes in the parsed docx sandbox.
@@ -547,6 +539,39 @@ function findDomParagraphByText(
 }
 
 /**
+ * Helper to construct a clean shape paragraph containing an SVG line or drawing.
+ */
+function createDocxShapeParagraph(svgEl: SVGElement, isCentered: boolean): HTMLElement {
+  const shapeP = document.createElement('p');
+  shapeP.className = 'docx_p docx-shape-paragraph';
+  shapeP.style.margin = '0px';
+  shapeP.style.padding = '0px';
+  shapeP.style.minHeight = 'auto';
+  shapeP.style.lineHeight = 'normal';
+  shapeP.style.textAlign = isCentered ? 'center' : 'left';
+  shapeP.appendChild(svgEl);
+  return shapeP;
+}
+
+/**
+ * Removes empty intermediate paragraph nodes or orphaned SVGs/HRs between text anchors.
+ */
+function removeIntermediateEmptyNodes(fromNode: HTMLElement | null, toNode: HTMLElement | null, direction: 'forward' | 'backward' = 'forward'): void {
+  const intermediateNodes: HTMLElement[] = [];
+  let curr = direction === 'forward' ? fromNode?.nextElementSibling as HTMLElement | null : fromNode?.previousElementSibling as HTMLElement | null;
+  while (curr && curr !== toNode) {
+    const next = direction === 'forward' ? curr.nextElementSibling as HTMLElement | null : curr.previousElementSibling as HTMLElement | null;
+    if (!curr.textContent?.trim() || curr.querySelector('svg, hr')) {
+      intermediateNodes.push(curr);
+    }
+    curr = next;
+  }
+  intermediateNodes.forEach((node) => {
+    if (node.parentNode) node.parentNode.removeChild(node);
+  });
+}
+
+/**
  * Places an SVG element accurately into the DOM based on surrounding text paragraph anchors,
  * cleaning up any duplicate intermediate DOM nodes (such as docx-preview raw SVGs or excess empty paragraphs).
  */
@@ -602,33 +627,12 @@ function placeSvgElementWithAnchors(
 
   // Case 1: We found a preceding DOM paragraph anchor
   if (prevDomP) {
-    // 1. Collect and remove ALL existing intermediate nodes between prevDomP and nextDomP
-    // (This eliminates duplicate SVGs rendered by docx-preview and duplicate empty paragraphs)
-    const intermediateNodes: HTMLElement[] = [];
-    let curr = prevDomP.nextElementSibling as HTMLElement | null;
-    while (curr && curr !== nextDomP) {
-      const next = curr.nextElementSibling as HTMLElement | null;
-      if (!curr.textContent?.trim() || curr.textContent.trim().length === 0 || curr.querySelector('svg, hr')) {
-        intermediateNodes.push(curr);
-      }
-      curr = next;
-    }
-    intermediateNodes.forEach((node) => {
-      if (node.parentNode) node.parentNode.removeChild(node);
-    });
+    removeIntermediateEmptyNodes(prevDomP, nextDomP, 'forward');
 
-    // 2. Insert the single, pristine Shape Paragraph
-    const shapeP = document.createElement('p');
-    shapeP.className = 'docx_p docx-shape-paragraph';
-    shapeP.style.margin = '0px';
-    shapeP.style.padding = '0px';
-    shapeP.style.minHeight = 'auto';
-    shapeP.style.lineHeight = 'normal';
-    shapeP.style.textAlign = isCentered ? 'center' : 'left';
-    shapeP.appendChild(svgEl);
+    const shapeP = createDocxShapeParagraph(svgEl, isCentered);
     prevDomP.insertAdjacentElement('afterend', shapeP);
 
-    // 3. Count how many empty XML paragraphs exist in Word OpenXML between this shape and nextTextXmlP
+    // Count how many empty XML paragraphs exist in Word OpenXML between this shape and nextTextXmlP
     let emptyXmlCount = 0;
     if (nextTextXmlIdx > xmlIdx + 1) {
       for (let i = xmlIdx + 1; i < nextTextXmlIdx; i++) {
@@ -638,7 +642,7 @@ function placeSvgElementWithAnchors(
       }
     }
 
-    // 4. Insert exactly that number of blank lines (typically 1)
+    // Insert exactly that number of blank lines (typically 1)
     let lastInserted: HTMLElement = shapeP;
     for (let k = 0; k < emptyXmlCount; k++) {
       const blankP = document.createElement('p');
@@ -657,24 +661,9 @@ function placeSvgElementWithAnchors(
 
   // Case 2: No preceding DOM paragraph anchor, but nextDomP exists
   if (nextDomP) {
-    const intermediateNodes: HTMLElement[] = [];
-    let curr = nextDomP.previousElementSibling as HTMLElement | null;
-    while (curr && (!curr.textContent?.trim() || curr.querySelector('svg, hr'))) {
-      intermediateNodes.push(curr);
-      curr = curr.previousElementSibling as HTMLElement | null;
-    }
-    intermediateNodes.forEach((node) => {
-      if (node.parentNode) node.parentNode.removeChild(node);
-    });
+    removeIntermediateEmptyNodes(nextDomP, null, 'backward');
 
-    const shapeP = document.createElement('p');
-    shapeP.className = 'docx_p docx-shape-paragraph';
-    shapeP.style.margin = '0px';
-    shapeP.style.padding = '0px';
-    shapeP.style.minHeight = 'auto';
-    shapeP.style.lineHeight = 'normal';
-    shapeP.style.textAlign = isCentered ? 'center' : 'left';
-    shapeP.appendChild(svgEl);
+    const shapeP = createDocxShapeParagraph(svgEl, isCentered);
     nextDomP.insertAdjacentElement('beforebegin', shapeP);
     return;
   }
@@ -1286,46 +1275,69 @@ export function parseIndentDirectiveArgs(rawInner: string): string {
 }
 
 /**
- * Normalizes directive syntax like <| indent: 5, from: 2, to: 4> into template tokens,
- * associating the indentation directive with its target placeholder, and removing directive tags from output.
- * Examples:
- * - {{field_name<| indent: 5, from: 2, to: 4>}} -> {{field_name | indent: 5, from: 2, to: 4}}
- * - {{summary<| indent: 10>}} -> {{summary | indent: 10}}
- * - {{field_name}}<| indent: 5, from: 2, to: 4> -> {{field_name | indent: 5, from: 2, to: 4}}
- * - {{field_name}} <| indent: 5, from: 3> -> {{field_name | indent: 5, from: 3}}
- * - <| indent: 5>{{field_name}} -> {{field_name | indent: 5}}
- * - {{field_name <| indent: 5, from: 2>}} -> {{field_name | indent: 5, from: 2}}
- * - <p>{{field_name}}</p><p><| indent: 5, from: 2></p> -> <p>{{field_name | indent: 5, from: 2}}</p>
+ * Normalizes both Direction and Indent directive syntax (e.g. <direction: vertical>, <| indent: 11>, <indent: 11>)
+ * into standard, HTML-safe unified Pipe Syntax (e.g. {{key | direction: vertical}}, {{key | indent: 11}}).
  */
 export function normalizeIndentDirectives(html: string): string {
   if (!html) return '';
 
   let res = html;
 
-  // 1. Direct inside-braces syntax:
-  // e.g. {{key <| indent: 5, from: 2, to: 4>}} or {{key<| indent: 5>}}
+  // 0. Auto-repair mangled tokens containing injected HTML attributes (e.g. {{key" data-token=... >}})
+  res = res.replace(/\{\{([a-zA-Z0-9_\-\.]+)"\s*(?:data-token|data-key|data-display|data-label|data-category|style|class)[^}]*\}\}/gi, (match, key) => {
+    const cleanKey = key.trim();
+    // Recover specific known indent defaults or embedded directives
+    const indentMatch = match.match(/\bindent\s*:\s*(\d+)/i);
+    if (indentMatch) {
+      return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
+    }
+    const dirMatch = match.match(/\bdirection\s*:\s*([a-z]+)/i);
+    if (dirMatch) {
+      return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
+    }
+    if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
+      return `{{${cleanKey} | indent: 11}}`;
+    }
+    if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
+      return `{{${cleanKey} | indent: 9}}`;
+    }
+    return `{{${cleanKey}}}`;
+  });
+
+  // 1. Direction and Layout Directives:
+  // e.g. {{key <direction: vertical, ...>}} or {{key <direction: horizontal, separator: ', '>}} -> {{key | direction: ...}}
   res = res.replace(
-    /\{\{([a-zA-Z0-9_\-\.\s]+?)\s*(?:\|)?\s*(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)\s*\}\}/gi,
+    /\{\{([a-zA-Z0-9_\-\.\s|]+?)\s*(?:&lt;|<)\s*(direction|orient|layout|separator|order|prefix|limit)\s*:\s*([^>]+?)(?:&gt;|>)\s*\}\}/gi,
+    (_, key, firstProp, restProps) => {
+      const cleanKey = key.replace(/\|$/, '').trim();
+      return `{{${cleanKey} | ${firstProp}: ${restProps.trim()}}}`;
+    }
+  );
+
+  // 2. Direct inside-braces Indent syntax:
+  // e.g. {{key <| indent: 5, from: 2, to: 4>}} or {{key <indent: 5>}} or {{key<| indent: 11>}}
+  res = res.replace(
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\s*(?:\|)?\s*(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)\s*\}\}/gi,
     (_, key, innerArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
   );
 
-  // 2. Direct adjacency (with optional spaces/entities):
-  // e.g. {{key}}<| indent: 5, from: 2> or {{key}} <| indent: 5>
+  // 3. Direct adjacency (with optional spaces/entities):
+  // e.g. {{key}}<| indent: 5, from: 2> or {{key}} <| indent: 5> or {{key}} | indent: 5
   res = res.replace(
-    /\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}(?:\s|&nbsp;)*(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/gi,
-    (_, key, innerArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
+    /\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}(?:\s|&nbsp;)*(?:(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^}\n<]+))/gi,
+    (_, key, innerArgs, pipeArgs) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs || pipeArgs || '')}}}`
   );
 
-  // 3. Preceding direct adjacency:
-  // e.g. <| indent: 5>{{key}} or <| indent: 5, from: 2> {{key}}
+  // 4. Preceding direct adjacency:
+  // e.g. <| indent: 5>{{key}} or <| indent: 5, from: 2> {{key}} or | indent: 5{{key}}
   res = res.replace(
-    /(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)(?:\s|&nbsp;)*\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}/gi,
-    (_, innerArgs, key) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs)}}}`
+    /(?:(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)|\|\s*indent\s*([^{\n<]+))(?:\s|&nbsp;)*\{\{([a-zA-Z0-9_\-\.\s]+?)\}\}/gi,
+    (_, innerArgs, pipeArgs, key) => `{{${key.trim()} | ${parseIndentDirectiveArgs(innerArgs || pipeArgs || '')}}}`
   );
 
-  // 4. Robust scanning for any remaining <| indent... > or &lt;| indent... &gt;
+  // 5. Robust scanning for any remaining <| indent... > or &lt;| indent... &gt; or <indent... >
   // Associates with the closest preceding placeholder (or following if none preceding)
-  const directiveRegex = /(?:&lt;|<)\|\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/i;
+  const directiveRegex = /(?:&lt;|<)(?:\|)?\s*indent((?:(?!(?:&gt;|>)).)*)(?:&gt;|>)/i;
   let match: RegExpExecArray | null;
 
   let safetyCount = 0;
@@ -1379,8 +1391,8 @@ export function normalizeIndentDirectives(html: string): string {
     }
   }
 
-  // 5. Final fallback cleanup of any lingering directives
-  res = res.replace(/(?:&lt;|<)\|\s*indent[^>]*?(?:&gt;|>)/gi, '');
+  // 6. Final fallback cleanup of any lingering directives
+  res = res.replace(/(?:&lt;|<)(?:\|)?\s*indent[^>]*?(?:&gt;|>)/gi, '');
 
   return res;
 }
@@ -1388,12 +1400,7 @@ export function normalizeIndentDirectives(html: string): string {
 /**
  * Cleans Word HTML by collapsing split run tags inside {{placeholders}} or {placeholders}.
  * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
- * Preserves <| indent... > directives inside placeholders.
- */
-/**
- * Cleans Word HTML by collapsing split run tags inside {{placeholders}} or {placeholders}.
- * Strictly prevents brace expansion (e.g. {{key}} never becomes {{{key}}}).
- * Preserves <| indent... > directives inside placeholders.
+ * Preserves unified pipe directives (e.g. {{key | indent: 11}}, {{key | direction: vertical}}).
  */
 export function sanitizeDocxPlaceholders(html: string): string {
   if (!html) return '';
@@ -1426,7 +1433,7 @@ export function sanitizeDocxPlaceholders(html: string): string {
     return `{{${normalized}}}`;
   });
 
-  // 2. Normalize indent directives now that placeholders are clean
+  // 2. Normalize both indent and direction directives now that placeholders are clean
   cleaned = normalizeIndentDirectives(cleaned);
 
   // 3. Collapse standalone single {variable} ONLY if not preceded or followed by { or }
@@ -1685,15 +1692,7 @@ export function resolveTokenValue(
     processed = String(value);
   }
 
-  // 2. If no legacy filters, return processed value (converting \n to <br> if needed in HTML mode)
-  if (filterSpecs.length === 0) {
-    if (mode === 'html' && typeof processed === 'string' && processed.includes('\n') && !processed.includes('<br') && !processed.includes('<!-- spr-')) {
-      return processed.split(/\r?\n/).join('<br>');
-    }
-    return String(processed);
-  }
-
-  // 3. Apply legacy filters in sequence
+  // 2. Apply legacy filters in sequence if present
   for (const filterSpec of filterSpecs) {
     const colonIdx = filterSpec.indexOf(':');
     const filterName = (colonIdx > -1 ? filterSpec.slice(0, colonIdx) : filterSpec).trim().toLowerCase();
@@ -1830,7 +1829,36 @@ function buildEnrichedLookup(dataRecord: Record<string, any>): Map<string, any> 
 }
 
 /**
+ * Helper to build standardized 1-indexed row data context for tabular repetition.
+ */
+function buildTabularRowData(rec: Record<string, any>, rIdx: number, baseContext: Record<string, any>): Record<string, any> {
+  return {
+    sl: rIdx + 1,
+    serial: rIdx + 1,
+    no: rIdx + 1,
+    index: rIdx + 1,
+    row_num: rIdx + 1,
+    row_number: rIdx + 1,
+    index_0: rIdx,
+    '@index': rIdx + 1,
+    '#index': rIdx + 1,
+    ...baseContext,
+    ...rec,
+  };
+}
 
+/**
+ * Helper to build aggregate count metrics context for tabular documents.
+ */
+function buildTabularFinalContext(recordsLength: number, baseContext: Record<string, any>): Record<string, any> {
+  return {
+    ...baseContext,
+    total_students: recordsLength,
+    total_records: recordsLength,
+    records_count: recordsLength,
+    total_count: recordsLength,
+  };
+}
 
 /**
  * Detects if a template is a Tabular Template (Type 1) containing repeating table rows or loop tags.
@@ -1892,32 +1920,13 @@ export function mergeTabularTemplateWithData(
     const expanded = sanitized.replace(loopBlockRegex, (_, _tagName, blockContent) => {
       return records
         .map((rec, rIdx) => {
-          const rowData = {
-            sl: rIdx + 1,
-            serial: rIdx + 1,
-            no: rIdx + 1,
-            index: rIdx + 1,
-            row_num: rIdx + 1,
-            row_number: rIdx + 1,
-            index_0: rIdx,
-            '@index': rIdx + 1,
-            '#index': rIdx + 1,
-            ...baseContext,
-            ...rec,
-          };
+          const rowData = buildTabularRowData(rec, rIdx, baseContext);
           return mergeTemplateWithData(blockContent, rowData);
         })
         .join('\n');
     });
 
-    const finalContext = {
-      ...baseContext,
-      total_students: records.length,
-      total_records: records.length,
-      records_count: records.length,
-      total_count: records.length,
-    };
-    return mergeTemplateWithData(expanded, finalContext);
+    return mergeTemplateWithData(expanded, buildTabularFinalContext(records.length, baseContext));
   }
 
   // 2. Implicit Table Row Detection via DOMParser
@@ -1944,20 +1953,7 @@ export function mergeTabularTemplateWithData(
 
           // Generate a populated row for each record
           records.forEach((rec, rIdx) => {
-            const rowData = {
-              sl: rIdx + 1,
-              serial: rIdx + 1,
-              no: rIdx + 1,
-              index: rIdx + 1,
-              row_num: rIdx + 1,
-              row_number: rIdx + 1,
-              index_0: rIdx,
-              '@index': rIdx + 1,
-              '#index': rIdx + 1,
-              ...baseContext,
-              ...rec,
-            };
-
+            const rowData = buildTabularRowData(rec, rIdx, baseContext);
             const populatedRowHtml = mergeTemplateWithData(rowTemplateHtml, rowData);
             const tempContainer = doc.createElement('tbody');
             tempContainer.innerHTML = populatedRowHtml;
@@ -1974,14 +1970,7 @@ export function mergeTabularTemplateWithData(
 
       if (tableFoundAndProcessed) {
         const bodyContent = doc.body.innerHTML;
-        const finalContext = {
-          ...baseContext,
-          total_students: records.length,
-          total_records: records.length,
-          records_count: records.length,
-          total_count: records.length,
-        };
-        return mergeTemplateWithData(bodyContent, finalContext);
+        return mergeTemplateWithData(bodyContent, buildTabularFinalContext(records.length, baseContext));
       }
     } catch (e) {
       console.warn('DOM table parsing failed in mergeTabularTemplateWithData, falling back to regex', e);
@@ -1995,32 +1984,13 @@ export function mergeTabularTemplateWithData(
     const templateTr = match[0];
     const repeatedRows = records
       .map((rec, rIdx) => {
-        const rowData = {
-          sl: rIdx + 1,
-          serial: rIdx + 1,
-          no: rIdx + 1,
-          index: rIdx + 1,
-          row_num: rIdx + 1,
-          row_number: rIdx + 1,
-          index_0: rIdx,
-          '@index': rIdx + 1,
-          '#index': rIdx + 1,
-          ...baseContext,
-          ...rec,
-        };
+        const rowData = buildTabularRowData(rec, rIdx, baseContext);
         return mergeTemplateWithData(templateTr, rowData);
       })
       .join('\n');
 
     const expanded = sanitized.replace(templateTr, repeatedRows);
-    const finalContext = {
-      ...baseContext,
-      total_students: records.length,
-      total_records: records.length,
-      records_count: records.length,
-      total_count: records.length,
-    };
-    return mergeTemplateWithData(expanded, finalContext);
+    return mergeTemplateWithData(expanded, buildTabularFinalContext(records.length, baseContext));
   }
 
   return mergeTemplateWithData(sanitized, baseContext);
@@ -2208,6 +2178,15 @@ function expandNestedArraysAndTables(html: string, dataRecord: Record<string, an
 }
 
 /**
+ * Helper to extract outermost opening and closing HTML wrapper tags.
+ */
+function extractSurroundingTags(rawHtml: string): { openTags: string; closeTags: string } {
+  const openTags = (rawHtml.match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+  const closeTags = (rawHtml.match(/<\/[a-z0-9]+>/gi) || []).join('');
+  return { openTags, closeTags };
+}
+
+/**
  * Helper to extract split parts from a cell, preserving internal formatting wrapper tags
  * (such as font-family, font-size, bold, color, align, etc.) across all split parts,
  * and supporting multi-stream zipping when multiple tokens are in the same cell.
@@ -2224,9 +2203,9 @@ function extractCellSplitParts(rawHtml: string): string[] {
     const streamLists: string[][] = streamBlocks.map((blockHtml) => {
       const parts = blockHtml.split('<!-- spr-cell-split -->');
       const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
-      const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
-      const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
-      return cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
+      const { openTags: firstOpenTags, closeTags: lastCloseTags } = extractSurroundingTags(parts[0]);
+      const endCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
+      return cleanValues.map((val) => `${firstOpenTags}${val}${endCloseTags || lastCloseTags}`);
     });
 
     const maxCols = Math.max(...streamLists.map((s) => s.length));
@@ -2247,7 +2226,7 @@ function extractCellSplitParts(rawHtml: string): string[] {
       const streams = streamParts.map((p) => {
         const parts = p.split('<!-- spr-cell-split -->');
         const cleanValues = parts.map((it) => it.replace(/<[^>]*>/g, '').trim());
-        const openTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+        const { openTags } = extractSurroundingTags(parts[0]);
         const closeTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
         return cleanValues.map((val) => `${openTags}${val}${closeTags}`);
       });
@@ -2267,7 +2246,7 @@ function extractCellSplitParts(rawHtml: string): string[] {
   if (parts.length <= 1) return [rawHtml];
 
   const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
-  const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+  const { openTags: firstOpenTags } = extractSurroundingTags(parts[0]);
   const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
 
   return cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
@@ -2352,7 +2331,7 @@ function expandTableCellSplits(html: string): string {
         if (parts.length <= 1) return;
 
         const cleanValues = parts.map((p) => p.replace(/<[^>]*>/g, '').trim());
-        const firstOpenTags = (parts[0].match(/<[a-z0-9]+\b[^>]*>/gi) || []).join('');
+        const { openTags: firstOpenTags } = extractSurroundingTags(parts[0]);
         const lastCloseTags = (parts[parts.length - 1].match(/<\/[a-z0-9]+>/gi) || []).join('');
         const formattedParts = cleanValues.map((val) => `${firstOpenTags}${val}${lastCloseTags}`);
 
@@ -2512,18 +2491,7 @@ export function bulkMergeTemplate(
   const targetBody = body || templateHtml;
 
   return records.map((record) => {
-    let populatedBody = targetBody;
-    populatedBody = expandNestedArraysAndTables(populatedBody, record);
-    const sanitizedBody = sanitizeDocxPlaceholders(populatedBody);
-    const lookup = buildEnrichedLookup(record);
-    const placeholderRegex = /\{\{([\s\S]*?)\}\}/g;
-
-    const merged = sanitizedBody.replace(placeholderRegex, (fullMatch, token) => {
-      const resolved = resolveTokenValue(token.trim(), lookup, 'html');
-      return resolved !== null ? resolved : fullMatch;
-    });
-
-    const finalHtml = expandTableCellSplits(merged);
+    const finalHtml = mergeTemplateWithData(targetBody, record);
     return styles ? `${styles}\n${finalHtml}` : finalHtml;
   });
 }
@@ -2841,6 +2809,19 @@ export interface ExtractKeysOptions {
 }
 
 /**
+ * Resolves a live sample value from an enriched lookup map.
+ */
+function getLiveSampleValue(key: string, lookup: Map<string, any> | null, defaultVal?: string): string | undefined {
+  if (!lookup) return defaultVal;
+  const keyId = key.toLowerCase().trim();
+  const found = lookup.get(keyId) || lookup.get(normalizeKey(keyId)) || lookup.get(key);
+  if (found !== undefined && found !== null && found !== '[object Object]' && found !== '') {
+    return typeof found === 'object' ? JSON.stringify(found) : String(found);
+  }
+  return defaultVal;
+}
+
+/**
  * Extracts and consolidates all available dynamic placeholder keys strictly based on active context.
  * When moduleKeys are provided by the caller module, it strictly adheres to that schema and enriches with live data.
  * 100% Dynamic & Schema-Driven - Zero hardcoded static fallback arrays.
@@ -2888,17 +2869,7 @@ export function extractAvailableKeysFromContext(
     activeModuleKeys.forEach((item) => {
       if (item && item.key) {
         const keyId = item.key.toLowerCase().trim();
-        let liveVal = item.sampleValue;
-
-        if (sampleLookup) {
-          const found =
-            sampleLookup.get(keyId) ||
-            sampleLookup.get(normalizeKey(keyId)) ||
-            sampleLookup.get(item.key);
-          if (found !== undefined && found !== null && found !== '[object Object]' && found !== '') {
-            liveVal = found;
-          }
-        }
+        const liveVal = getLiveSampleValue(item.key, sampleLookup, item.sampleValue);
 
         map.set(keyId, {
           ...item,
@@ -2913,13 +2884,7 @@ export function extractAvailableKeysFromContext(
       activeCustomKeys.forEach((ck) => {
         if (ck && ck.key) {
           const keyId = ck.key.toLowerCase().trim();
-          let liveVal = ck.sampleValue;
-          if (sampleLookup) {
-            const found = sampleLookup.get(keyId) || sampleLookup.get(normalizeKey(keyId));
-            if (found !== undefined && found !== null && found !== '[object Object]') {
-              liveVal = found;
-            }
-          }
+          const liveVal = getLiveSampleValue(ck.key, sampleLookup, ck.sampleValue);
           map.set(keyId, { ...ck, sampleValue: liveVal, category: 'custom', isCustom: true });
         }
       });
@@ -2934,13 +2899,7 @@ export function extractAvailableKeysFromContext(
       if (!col) return;
       const colId = (col.id || col.header || col.label || '').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
       if (colId && !map.has(colId)) {
-        let liveVal = `[${col.label || col.header || col.id}]`;
-        if (sampleLookup) {
-          const found = sampleLookup.get(colId) || sampleLookup.get(normalizeKey(colId));
-          if (found !== undefined && found !== null && found !== '[object Object]') {
-            liveVal = found;
-          }
-        }
+        const liveVal = getLiveSampleValue(colId, sampleLookup, `[${col.label || col.header || col.id}]`);
         map.set(colId, {
           key: colId,
           label: col.label || col.header || col.id,

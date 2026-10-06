@@ -22,7 +22,7 @@ import { TableFragmenter } from '../fragmentation/TableFragmenter';
 import { ListFragmenter } from '../fragmentation/ListFragmenter';
 import { EditorSerializer } from './EditorSerializer';
 import { EditorHistory } from './EditorHistory';
-import { EditorCommands } from './EditorCommands';
+import { EditorCommands, buildTransactionSelection } from './EditorCommands';
 import { EditorDomAdapter } from './EditorDomAdapter';
 import { EditorPositionMapper } from './EditorPositionMapper';
 import { EditorTransaction } from './editorTypes';
@@ -783,6 +783,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const repaginateTimerRef = useRef<any>(null);
   const lastExportedHtmlRef = useRef<string | null>(null);
   const savedSelectionBookmarkRef = useRef<any>(null);
+  const pendingLogicalSelectionRef = useRef<any>(null);
 
   // Total pages derived from real DOM geometry
   const [totalPagesCount, setTotalPagesCount] = useState<number>(1);
@@ -853,7 +854,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
       // Selection safety check: ensure selection is valid and strictly inside host before capturing
       let savedSel: any = null;
-      if (hasFocus) {
+      if (pendingLogicalSelectionRef.current) {
+        savedSel = pendingLogicalSelectionRef.current;
+        pendingLogicalSelectionRef.current = null;
+      } else if (hasFocus) {
         try {
           const sel = typeof window !== 'undefined' ? window.getSelection() : null;
           if (sel && sel.rangeCount > 0) {
@@ -865,6 +869,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         } catch {
           savedSel = null;
         }
+        if (!savedSel && savedSelectionBookmarkRef.current) {
+          savedSel = savedSelectionBookmarkRef.current;
+        }
       } else {
         savedSel = savedSelectionBookmarkRef.current;
       }
@@ -872,7 +879,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       const res = repaginateHostDOM(host, pageGeometry);
       setTotalPagesCount(res.totalPages);
 
-      if (hasFocus && savedSel) {
+      if (savedSel) {
         try {
           EditorPositionMapper.restoreLogicalSelection(host, savedSel);
         } catch (selErr) {
@@ -905,6 +912,11 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
+      }
+      if (tx.selection) {
+        const targetSel = tx.selection.logical || tx.selection;
+        savedSelectionBookmarkRef.current = targetSel;
+        pendingLogicalSelectionRef.current = targetSel;
       }
       const cleanHtml = EditorSerializer.sanitize(tx.canonicalHtml);
       historyRef.current.push(tx);
@@ -1030,6 +1042,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
     // Instant zero-delay export on every keystroke (0ms latency for crash/reload resilience)
     try {
+      const activeSel = EditorPositionMapper.captureLogicalSelection(editorHostRef.current);
+      if (activeSel) {
+        savedSelectionBookmarkRef.current = activeSel;
+      }
       const rawDom = editorHostRef.current.innerHTML;
       const cleanHtml = EditorSerializer.sanitize(rawDom);
       lastExportedHtmlRef.current = cleanHtml;
@@ -1048,6 +1064,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     debounceTimerRef.current = setTimeout(() => {
       if (!editorHostRef.current || isComposingRef.current) return;
       try {
+        const currentSel =
+          EditorPositionMapper.captureLogicalSelection(editorHostRef.current) ||
+          savedSelectionBookmarkRef.current;
         const rawDom = editorHostRef.current.innerHTML;
         const cleanHtml = EditorSerializer.sanitize(rawDom);
         const doc = EditorSerializer.toCanonicalDocument(cleanHtml);
@@ -1055,6 +1074,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         dispatchTransaction({
           doc,
           canonicalHtml: cleanHtml,
+          selection: buildTransactionSelection(editorHostRef.current, currentSel),
           origin: 'typing',
           timestamp: Date.now(),
           description: 'Typing input',
@@ -1118,33 +1138,45 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       }
 
       // Ctrl+Z: Undo
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
-        const prevHtml = historyRef.current.undo();
-        if (prevHtml !== null && editorHostRef.current) {
-          editorHostRef.current.innerHTML = prevHtml;
+        const checkpoint = historyRef.current.undoCheckpoint();
+        if (checkpoint && editorHostRef.current) {
+          editorHostRef.current.innerHTML = checkpoint.html;
           isInternalChangeRef.current = true;
-          lastExportedHtmlRef.current = prevHtml;
-          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${prevHtml}` : prevHtml);
+          lastExportedHtmlRef.current = checkpoint.html;
+          const targetSel = checkpoint.selection?.logical || checkpoint.selection;
+          if (targetSel) {
+            pendingLogicalSelectionRef.current = targetSel;
+            savedSelectionBookmarkRef.current = targetSel;
+            EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, targetSel);
+          }
+          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
           schedulePaginationPass();
         }
         return;
       }
 
-      // Ctrl+Y or Ctrl+Shift+Z: Redo
+      // Ctrl+Shift+Z or Ctrl+Y: Redo
       if (
-        (e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
-        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
+        (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) ||
+        (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey))
       ) {
         e.preventDefault();
         e.stopPropagation();
-        const nextHtml = historyRef.current.redo();
-        if (nextHtml !== null && editorHostRef.current) {
-          editorHostRef.current.innerHTML = nextHtml;
+        const checkpoint = historyRef.current.redoCheckpoint();
+        if (checkpoint && editorHostRef.current) {
+          editorHostRef.current.innerHTML = checkpoint.html;
           isInternalChangeRef.current = true;
-          lastExportedHtmlRef.current = nextHtml;
-          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${nextHtml}` : nextHtml);
+          lastExportedHtmlRef.current = checkpoint.html;
+          const targetSel = checkpoint.selection?.logical || checkpoint.selection;
+          if (targetSel) {
+            pendingLogicalSelectionRef.current = targetSel;
+            savedSelectionBookmarkRef.current = targetSel;
+            EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, targetSel);
+          }
+          onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
           schedulePaginationPass();
         }
         return;
@@ -1322,6 +1354,40 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         case 'removeFormat': {
           const tx = EditorCommands.removeFormat(editorHostRef.current);
           dispatchTransaction(tx);
+          break;
+        }
+        case 'undo': {
+          const checkpoint = historyRef.current.undoCheckpoint();
+          if (checkpoint && editorHostRef.current) {
+            editorHostRef.current.innerHTML = checkpoint.html;
+            isInternalChangeRef.current = true;
+            lastExportedHtmlRef.current = checkpoint.html;
+            const targetSel = checkpoint.selection?.logical || checkpoint.selection;
+            if (targetSel) {
+              pendingLogicalSelectionRef.current = targetSel;
+              savedSelectionBookmarkRef.current = targetSel;
+              EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, targetSel);
+            }
+            onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
+            schedulePaginationPass();
+          }
+          break;
+        }
+        case 'redo': {
+          const checkpoint = historyRef.current.redoCheckpoint();
+          if (checkpoint && editorHostRef.current) {
+            editorHostRef.current.innerHTML = checkpoint.html;
+            isInternalChangeRef.current = true;
+            lastExportedHtmlRef.current = checkpoint.html;
+            const targetSel = checkpoint.selection?.logical || checkpoint.selection;
+            if (targetSel) {
+              pendingLogicalSelectionRef.current = targetSel;
+              savedSelectionBookmarkRef.current = targetSel;
+              EditorPositionMapper.restoreLogicalSelection(editorHostRef.current, targetSel);
+            }
+            onContentChange?.(activeStyles ? `<style>${activeStyles}</style>\n${checkpoint.html}` : checkpoint.html);
+            schedulePaginationPass();
+          }
           break;
         }
         default:

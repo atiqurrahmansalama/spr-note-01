@@ -68,7 +68,7 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
       parts.push(`limit: ${limit}`);
     }
 
-    return `<${parts.join(', ')}>`;
+    return `| ${parts.join(', ')}`;
   }, [direction, separator, order, prefix, limit, indent]);
 
   // Dynamic user-friendly description:
@@ -240,6 +240,7 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
         {/* ─── Bottom Full-Width Generated Snippet with Multi-Line Word Wrap ─── */}
         <div
           onClick={handleInsertAndCopy}
+          onMouseDown={(e) => e.preventDefault()}
           className="mt-2.5 p-2 rounded-lg border theme-border-subtle theme-bg-sub/80 hover:theme-bg-sub flex items-start justify-between gap-2 cursor-pointer transition-all shadow-2xs w-full min-w-0 active:scale-[0.99] group/snippet"
           title="Click to copy and insert snippet at cursor in document"
         >
@@ -253,6 +254,7 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
             variant={copied ? 'accent-soft' : 'ghost'}
             size="xs"
             onClick={handleInsertAndCopy}
+            onMouseDown={(e: any) => e.preventDefault()}
             title="Click to copy and insert snippet"
             ariaLabel="Copy snippet"
             className={`shrink-0 mt-0.5 ${copied ? 'theme-accent' : 'theme-text-secondary hover:theme-text-primary'}`}

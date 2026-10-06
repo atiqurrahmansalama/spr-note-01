@@ -17,11 +17,13 @@ export function JuzRow({
   onChange,
   onRemoveJuz,
   onAddJuz,
+  onNextSection,
 }: {
   rowData: JuzRowData;
   onChange: (updater: (prevRow: JuzRowData) => JuzRowData) => void;
   onRemoveJuz?: () => void;
   onAddJuz?: () => void;
+  onNextSection?: () => void;
 }) {
   const handleJuzChange = (val: string | number) => {
     onChange((prevRow) => ({ ...prevRow, juz: val }));
@@ -88,6 +90,7 @@ export function JuzRow({
             onChange={handleJuzChange}
             onBlur={handleJuzBlur}
             onEnter={handleEnterFocusNext}
+            onShiftEnter={onNextSection}
             onAdd={onAddJuz}
             onAddShift={onAddJuz}
             onEmptyBackspace={(e: any) => {
@@ -123,7 +126,20 @@ export function JuzRow({
                 onRemove={index > 0 ? () => removeRange(index) : undefined}
                 onAdd={addRange}
                 onAddShift={addRange}
-                onEnter={handleEnterFocusNext}
+                onEndEnter={(e) => {
+                  if (isLastRange && onAddJuz) {
+                    e.preventDefault();
+                    onAddJuz();
+                  } else {
+                    handleEnterFocusNext(e);
+                  }
+                }}
+                onShiftEnter={(e) => {
+                  if (onNextSection) {
+                    e?.preventDefault?.();
+                    onNextSection();
+                  }
+                }}
               />
               {!isLastRange && (
                 <span className="theme-text-secondary font-semibold text-xs sm:text-sm select-none -ml-0.5">
@@ -156,10 +172,12 @@ export function JuzPageSection({
   data,
   onChange,
   onReset,
+  onNextSection,
 }: {
   data: JuzRowData[];
   onChange: (updater: JuzRowData[] | ((prevData: JuzRowData[]) => JuzRowData[])) => void;
   onReset?: () => void;
+  onNextSection?: () => void;
 }) {
   const handleRowChange = (index: number, rowUpdater: JuzRowData | ((prevRow: JuzRowData) => JuzRowData)) => {
     onChange((prevData) => {
@@ -254,6 +272,7 @@ export function JuzPageSection({
             onChange={(updater) => handleRowChange(index, updater)}
             onRemoveJuz={data.length > 1 ? () => handleRemoveJuz(index) : undefined}
             onAddJuz={index === data.length - 1 ? addJuzRow : undefined}
+            onNextSection={onNextSection}
           />
         ))}
       </div>

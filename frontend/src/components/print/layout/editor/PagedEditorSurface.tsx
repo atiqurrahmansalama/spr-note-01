@@ -327,7 +327,7 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
       }
 
       // Ctrl+Z: Undo
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         const checkpoint = historyRef.current.undoCheckpoint();
         if (checkpoint && editorHostRef.current) {
@@ -342,10 +342,10 @@ export const PagedEditorSurfaceComponent: React.FC<PagedEditorSurfaceProps> = ({
         return;
       }
 
-      // Ctrl+Y or Ctrl+Shift+Z: Redo
+      // Ctrl+Shift+Z or Ctrl+Y: Redo
       if (
-        (e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
-        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
+        (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) ||
+        (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey))
       ) {
         e.preventDefault();
         const checkpoint = historyRef.current.redoCheckpoint();

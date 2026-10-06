@@ -207,38 +207,61 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 1. Check for modern `<...>` directive syntax: {{key <direction: vertical, order: desc>}}
+  // 1. Check for legacy `<...>` directive syntax: {{key <direction: vertical, order: desc>}} or {{key <| indent: 5>}}
   const directiveMatch = normalized.match(/^(.*?)\s*<([\s\S]*?)>\s*$/);
   if (directiveMatch) {
     const rawKeyPart = directiveMatch[1].trim();
-    const rawDirective = directiveMatch[2].trim();
+    let rawDirective = directiveMatch[2].trim();
+    if (rawDirective.startsWith('|')) {
+      rawDirective = rawDirective.slice(1).trim();
+    }
 
-    // Check if the base key part also contains pipe filters (e.g. key | upper <direction: vertical>)
     const pipeParts = rawKeyPart.split('|').map((p) => p.trim());
     const baseKey = pipeParts[0].replace(/[\s]/g, '');
     const legacyFilterSpecs = pipeParts.slice(1);
 
     const options = parseKeyValuePairs(rawDirective);
 
+    // If directive is indent (e.g. <| indent: 5> or <indent: 5>), also add to legacyFilterSpecs for standard filter processing
+    if (rawDirective.toLowerCase().startsWith('indent') && !legacyFilterSpecs.some((f) => f.toLowerCase().startsWith('indent'))) {
+      legacyFilterSpecs.push(rawDirective);
+    }
+
     return {
       rawToken: normalized,
       baseKey,
       options,
-      hasDirective: true,
+      hasDirective: Object.keys(options).some((k) => k !== 'indent'),
       legacyFilterSpecs,
     };
   }
 
-  // 2. Check for legacy pipe syntax: {{key | indent: 5 | uppercase}}
+  // 2. Standard unified pipe syntax: {{key | direction: vertical, separator: ', ' | indent: 5 | uppercase}}
   const pipeParts = normalized.split('|').map((p) => p.trim());
   const baseKey = pipeParts[0].replace(/[\s]/g, '');
-  const legacyFilterSpecs = pipeParts.slice(1);
+  const remainingParts = pipeParts.slice(1);
+
+  const options: TokenDirectiveOptions = {};
+  let hasDirective = false;
+  const legacyFilterSpecs: string[] = [];
+
+  remainingParts.forEach((part) => {
+    // Check if this pipe part contains layout/direction keywords
+    const isDirectivePart = /\b(direction|dir|layout|orient|orientation|separator|sep|delimiter|delim|order|flow|sort|prefix|list|gap|spacing|limit|count|max|from|to)\s*:/i.test(part);
+    if (isDirectivePart) {
+      hasDirective = true;
+      const parsedOpts = parseKeyValuePairs(part);
+      Object.assign(options, parsedOpts);
+    } else {
+      legacyFilterSpecs.push(part);
+    }
+  });
 
   return {
     rawToken: normalized,
     baseKey,
-    options: {},
-    hasDirective: false,
+    options,
+    hasDirective,
     legacyFilterSpecs,
   };
 }

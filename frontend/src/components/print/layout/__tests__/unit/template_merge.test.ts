@@ -67,6 +67,32 @@ export function runTemplateMergeUnitTests(): { passed: number; failed: number } 
   assert(mergedHtml.includes('101'), 'Interpolates roll_no token');
   assert(!mergedHtml.includes('{{student_name}}'), 'Replaces raw token placeholder completely');
 
+  // 5. Unified Pipe Syntax for Direction and Indent
+  const pipeDirectionToken = parseTokenDirective('subjects | direction: vertical, order: desc');
+  assert(pipeDirectionToken.baseKey === 'subjects', 'Parses pipe directive baseKey');
+  assert(pipeDirectionToken.hasDirective === true, 'Identifies pipe directive presence');
+  assert(pipeDirectionToken.options.direction === 'vertical', 'Parses pipe direction option');
+  assert(pipeDirectionToken.options.order === 'desc', 'Parses pipe order option');
+
+  const pipeIndentMerged = mergeTemplateWithData('<p>Page: {{juz-page | indent: 11}}</p>', {
+    'juz-page': '4: 5–20\n2: 3–2',
+  });
+  assert(pipeIndentMerged.includes('4: 5–20') && pipeIndentMerged.includes('2: 3–2'), 'Interpolates pipe indent token');
+
+  // 6. Backward Compatibility for Legacy <| indent: 11>
+  const legacyIndentMerged = mergeTemplateWithData('<p>Page: {{juz-page<| indent: 11>}}</p>', {
+    'juz-page': '4: 5–20\n2: 3–2',
+  });
+  assert(legacyIndentMerged.includes('4: 5–20') && legacyIndentMerged.includes('2: 3–2'), 'Backward compatibility for legacy <| indent: 11>');
+
+  // 7. Auto-Healing of Mangled Injected HTML Attributes
+  const mangledTemplate = '<p>Page: {{juz-page" data-token="" data-token-key="" data-display="" data-label="" data-category="general" style="color: lab(7.78673 1.82345 -15.0537); scrollbar-color: color(srgb 0.49221 0.529438 0.824148 / 0.26149) rgba(0, 0, 0, 0);">}}</p>';
+  const healedMerged = mergeTemplateWithData(mangledTemplate, {
+    'juz-page': '4: 5–20\n2: 3–2',
+  });
+  assert(healedMerged.includes('4: 5–20') && healedMerged.includes('2: 3–2'), 'Auto-heals mangled token attributes and interpolates data');
+  assert(!healedMerged.includes('data-token='), 'Purges broken injected attributes completely');
+
   return { passed, failed };
 }
 

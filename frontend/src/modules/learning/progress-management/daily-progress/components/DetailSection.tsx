@@ -18,6 +18,7 @@ export function DetailRow({
   onChange,
   onRemoveRow,
   onAddNewRow,
+  onNextSection,
   availableJuzs,
   juzPageData,
   listType = "mistake",
@@ -202,6 +203,7 @@ export function DetailRow({
         onChange={handlePageChange}
         onBlur={handlePageBlur}
         onEnter={handleEnterFocusNext}
+        onShiftEnter={onNextSection}
         onAdd={addAyah}
         onAddShift={addAyah}
         onEmptyBackspace={(e: any) => {
@@ -234,6 +236,7 @@ export function DetailRow({
             onChange={(val) => handleAyahChange(aIdx, val)}
             onBlur={() => handleAyahBlur(aIdx)}
             onEnter={(e: any) => handleAyahEnter(aIdx, e, isLastAyah)}
+            onShiftEnter={onNextSection}
             onAdd={addAyah}
             onAddShift={addAyah}
             onEmptyBackspace={(e: any) => {
@@ -360,6 +363,7 @@ export function DetailSection({
   onDrop,
   onReorderRows,
   onReset,
+  onNextSection,
 }: {
   title: string;
   listType: "mistake" | "stuck" | string;
@@ -374,6 +378,7 @@ export function DetailSection({
   onDrop?: (e: React.DragEvent, listType: string, index?: number) => void;
   onReorderRows?: (sourceListType: string, sourceIndex: number, targetListType: string, targetIndex?: number, isCopy?: boolean) => void;
   onReset?: () => void;
+  onNextSection?: () => void;
 }) {
   const addRow = () => {
     const newId = crypto.randomUUID();
@@ -451,7 +456,7 @@ export function DetailSection({
     );
 
   return (
-    <div className="relative">
+    <div className="relative" data-section={listType} id={`section-${listType}`}>
       <SectionHeaderBar
         title={title}
         count={totalCount}
@@ -468,6 +473,7 @@ export function DetailSection({
             onChange={(updater) => handleRowChange(index, updater)}
             onRemoveRow={data.length > 1 ? () => handleRemoveRow(index) : undefined}
             onAddNewRow={index === data.length - 1 ? addRow : undefined}
+            onNextSection={onNextSection}
             availableJuzs={availableJuzs}
             juzPageData={juzPageData}
             listType={listType}

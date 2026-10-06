@@ -15,9 +15,9 @@ export const DocLabIndentRuleCard: React.FC<DocLabIndentRuleCardProps> = ({ onIn
   const [copied, setCopied] = useState<boolean>(false);
 
   // Dynamic directive snippet generation:
-  // e.g. <| indent: 5> or <| indent: 5, from: 3> or <| indent: 5, from: 2, to: 5>
+  // e.g. | indent: 5 or | indent: 5, from: 3 or | indent: 5, from: 2, to: 5
   const snippet = useMemo(() => {
-    let s = `<| indent: ${spaceCount}`;
+    let s = `| indent: ${spaceCount}`;
     if (fromLine !== undefined && fromLine !== null && fromLine !== 2) {
       s += `, from: ${fromLine}`;
     } else if (fromLine === 2 && toLine) {
@@ -26,7 +26,6 @@ export const DocLabIndentRuleCard: React.FC<DocLabIndentRuleCardProps> = ({ onIn
     if (toLine && Number(toLine) > 0) {
       s += `, to: ${toLine}`;
     }
-    s += `>`;
     return s;
   }, [spaceCount, fromLine, toLine]);
 
@@ -131,6 +130,7 @@ export const DocLabIndentRuleCard: React.FC<DocLabIndentRuleCardProps> = ({ onIn
         {/* ─── Bottom Full-Width Generated Snippet with Multi-Line Word Wrap ─── */}
         <div
           onClick={handleInsertAndCopy}
+          onMouseDown={(e) => e.preventDefault()}
           className="mt-2.5 p-2 rounded-lg border theme-border-subtle theme-bg-sub/80 hover:theme-bg-sub flex items-start justify-between gap-2 cursor-pointer transition-all shadow-2xs w-full min-w-0 active:scale-[0.99] group/snippet"
           title="Click to copy and insert snippet at cursor in document"
         >
@@ -144,6 +144,7 @@ export const DocLabIndentRuleCard: React.FC<DocLabIndentRuleCardProps> = ({ onIn
             variant={copied ? 'accent-soft' : 'ghost'}
             size="xs"
             onClick={handleInsertAndCopy}
+            onMouseDown={(e: any) => e.preventDefault()}
             title="Click to copy and insert snippet"
             ariaLabel="Copy snippet"
             className={`shrink-0 mt-0.5 ${copied ? 'theme-accent' : 'theme-text-secondary hover:theme-text-primary'}`}

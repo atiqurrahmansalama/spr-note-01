@@ -37,10 +37,24 @@ let lastActiveCaret: ActiveCaretState = {
 };
 
 /**
+ * Checks if a given DOM node is inside a sidebar, drawer, modal, or toolbar control
+ * that should not hijack the active document canvas caret.
+ */
+function isSidebarOrControlNode(node: Node | null): boolean {
+  if (!node) return false;
+  const el = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) as HTMLElement | null;
+  if (!el) return false;
+  return Boolean(
+    el.closest('.print-sidebar-control, .doclab-sidebar, .doclab-ribbon, [data-sidebar-panel="true"], .theme-drawer, [role="dialog"]')
+  );
+}
+
+/**
  * Checks if a given DOM node is inside an active document canvas or editable area
  */
 function isEditableNode(node: Node | null): boolean {
   if (!node) return false;
+  if (isSidebarOrControlNode(node)) return false;
   const el = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) as HTMLElement | null;
   if (!el) return false;
   if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return true;
@@ -57,6 +71,13 @@ function findSingleHostEditor(el: HTMLElement | null): HTMLElement | null {
 }
 
 /**
+ * Gets the last known active caret state
+ */
+export function getLastActiveCaret(): ActiveCaretState {
+  return lastActiveCaret;
+}
+
+/**
  * Capture and store current selection if it's within an editable element
  */
 export function captureActiveCaret(): ActiveCaretState {
@@ -64,7 +85,12 @@ export function captureActiveCaret(): ActiveCaretState {
 
   const activeEl = document.activeElement as HTMLElement | null;
 
-  // 1. Check if active element is an Input or Textarea
+  // If the active element is part of sidebar/controls, preserve the previous canvas caret
+  if (activeEl && isSidebarOrControlNode(activeEl)) {
+    return lastActiveCaret;
+  }
+
+  // 1. Check if active element is a document canvas Input or Textarea
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
     const inputEl = activeEl as HTMLInputElement | HTMLTextAreaElement;
     lastActiveCaret = {
@@ -85,7 +111,7 @@ export function captureActiveCaret(): ActiveCaretState {
     const range = selection.getRangeAt(0);
     const container = range.commonAncestorContainer;
 
-    if (isEditableNode(container)) {
+    if (isEditableNode(container) && !isSidebarOrControlNode(container)) {
       const editableEl = (container.nodeType === Node.ELEMENT_NODE
         ? (container as HTMLElement)
         : container.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null;
@@ -244,8 +270,16 @@ export function insertTokenAtActiveCaret(
 
   if (singleHost) {
     try {
-      // Focus single host editor
-      singleHost.focus();
+      // Restore active caret range if available inside singleHost before dispatching command
+      if (range && singleHost.contains(range.commonAncestorContainer)) {
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } else {
+        singleHost.focus();
+      }
 
       // Dispatch authoritative Editor Command Event (handled transactionally by PaginatedDocumentEditor)
       window.dispatchEvent(

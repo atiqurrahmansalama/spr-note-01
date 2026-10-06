@@ -10,6 +10,7 @@
 
 import { EditorPositionMapper, EditorCaretBookmark } from '../../editor/EditorPositionMapper';
 import { LogicalPosition, LogicalSelection } from '../../editor/editorTypes';
+import { normalizeTokenPayload } from '../../../caretInsertManager';
 
 export function runCaretAndSelectionUnitTests(): { passed: number; failed: number } {
   let passed = 0;
@@ -84,6 +85,16 @@ export function runCaretAndSelectionUnitTests(): { passed: number; failed: numbe
     typeof EditorPositionMapper.resolveLogicalPoint === 'function',
     'EditorPositionMapper exposes resolveLogicalPoint'
   );
+
+  // 5. Directive Payload Normalization
+  const normDirective = normalizeTokenPayload('| indent: 11');
+  assert(normDirective.key === '| indent: 11', 'Normalizes pipe indent directive key without bracket stripping');
+
+  const normDirection = normalizeTokenPayload('| direction: vertical');
+  assert(normDirection.key === '| direction: vertical', 'Normalizes pipe direction directive key without bracket stripping');
+
+  const normStandardToken = normalizeTokenPayload('{{student_name}}');
+  assert(normStandardToken.key === 'student_name', 'Strips redundant curly brackets for standard token keys');
 
   return { passed, failed };
 }

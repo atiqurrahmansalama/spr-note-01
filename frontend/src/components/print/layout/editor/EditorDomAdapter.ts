@@ -184,6 +184,67 @@ export class EditorDomAdapter {
       this.setSelectionRange(range);
     }
 
+    // 1. Direct Directive Merging: If selection is inside or directly targeting an existing TokenNode
+    const existingTokenEl = (
+      range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)
+        ? (range.startContainer as HTMLElement)
+        : range.startContainer.parentElement
+    )?.closest('.doclab-token, [data-token-key], [data-token]') as HTMLElement | null;
+
+    if (isDirective && existingTokenEl && host.contains(existingTokenEl)) {
+      const currentKey =
+        existingTokenEl.getAttribute('data-token-key') ||
+        existingTokenEl.getAttribute('data-token') ||
+        existingTokenEl.textContent?.replace(/[{}]/g, '').trim() ||
+        '';
+      const baseKey = currentKey.replace(/\s*(?:\||<\|)[^}>]+>?\s*$/, '').trim();
+      const newKey = `${baseKey} ${cleanKey}`.trim();
+
+      existingTokenEl.setAttribute('data-token', newKey);
+      existingTokenEl.setAttribute('data-token-key', newKey);
+      existingTokenEl.setAttribute('data-display', newKey);
+      existingTokenEl.setAttribute('data-label', newKey);
+      existingTokenEl.textContent = `{{${newKey}}}`;
+
+      let nextNode = existingTokenEl.nextSibling;
+      if (!nextNode || nextNode.nodeType !== (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+        const space = document.createTextNode('\u00A0');
+        if (nextNode) {
+          existingTokenEl.parentNode?.insertBefore(space, nextNode);
+        } else {
+          existingTokenEl.parentNode?.appendChild(space);
+        }
+        nextNode = space;
+      }
+      const newRange = document.createRange();
+      newRange.setStart(nextNode, 1);
+      newRange.collapse(true);
+      this.setSelectionRange(newRange);
+      return true;
+    }
+
+    // 2. Direct Directive Merging: If cursor is inside Mustache text brackets {{ ... }}
+    if (isDirective && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+      const text = range.startContainer.textContent || '';
+      const startOffset = range.startOffset;
+      const beforeText = text.slice(0, startOffset);
+      const afterText = text.slice(range.endOffset);
+
+      const lastOpen = beforeText.lastIndexOf('{{');
+      const lastClose = beforeText.lastIndexOf('}}');
+      if (lastOpen !== -1 && (lastClose === -1 || lastOpen > lastClose) && afterText.includes('}}')) {
+        const prefix = beforeText.endsWith(' ') ? '' : ' ';
+        const inserted = `${prefix}${cleanKey}`;
+        range.startContainer.textContent = beforeText + inserted + afterText;
+
+        const newRange = document.createRange();
+        newRange.setStart(range.startContainer, startOffset + inserted.length);
+        newRange.collapse(true);
+        this.setSelectionRange(newRange);
+        return true;
+      }
+    }
+
     // Smart deduplication for adjacent curly braces
     if (!isDirective && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
       const text = range.startContainer.textContent || '';
