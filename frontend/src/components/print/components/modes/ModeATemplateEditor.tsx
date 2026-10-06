@@ -93,7 +93,7 @@ export const ModeATemplateEditor: React.FC<ModeATemplateEditorProps> = ({
         />
       )}
       <PaginatedDocumentEditor
-        key="doclab_master_paginated_editor"
+        key={`doclab_paginated_editor_${customDocxTemplate.id || customDocxTemplate.name || 'default'}`}
         htmlContent={
           customDocxTemplate.templateBody ||
           customDocxTemplate.body ||

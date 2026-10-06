@@ -317,6 +317,14 @@ export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
   ['due_amount', 'due', 'balance'],
   ['employee_id', 'staff_id', 'emp_id'],
   ['designation', 'designation_name', 'post', 'job_title'],
+  ['detail_mis', 'detailmis', 'detail_mi', 'detailmi', 'detail_mistake', 'detailmistake', 'detail_mistakes', 'detailmistakes', 'mistake_details', 'mistakedetails', 'mistake_detail', 'mistakedetail', 'mistakes', 'mistake'],
+  ['detail_stuck', 'detailstuck', 'detail_stuck_point', 'stuck_details', 'stuckdetails', 'stuck_detail', 'stuckdetail', 'stuck'],
+  ['total_mis', 'totalmis', 'total_mi', 'totalmi', 'total_mistakes', 'totalmistakes', 'total_mistake', 'totalmistake', 'mistakes_count', 'mistake_count'],
+  ['total_stuck', 'totalstuck', 'total_stucks', 'totalstucks', 'stuck_count', 'stucks_count'],
+  ['juz_number', 'juznumber', 'juz_no', 'juzno', 'juz', 'para', 'para_no', 'parano', 'para_number', 'paranumber'],
+  ['juz_page', 'juzpage', 'page', 'pages', 'juz_pages', 'juzpages'],
+  ['remarks', 'remark', 'comment', 'comments', 'teacher_remarks', 'teacher_comment', 'teacher_comments', 'note', 'notes'],
+  ['mention_teacher_name', 'mentionteachername', 'teacher_name', 'teachername', 'teacher', 'evaluated_by', 'evaluator'],
 ];
 
 /**

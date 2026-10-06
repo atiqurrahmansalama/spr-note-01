@@ -33,6 +33,8 @@ import {
   WatermarkLayer,
   RuntimeVariableResolver,
 } from '../chrome';
+import { TokenInspectorPopover } from '../../components/tokens/TokenInspectorPopover';
+import { extractTokenSummary } from '../../components/tokens/tokenChipRenderer';
 
 export interface PaginatedDocumentEditorProps {
   /** Initial canonical HTML content or template body */
@@ -792,6 +794,15 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   // Total pages derived from real DOM geometry
   const [totalPagesCount, setTotalPagesCount] = useState<number>(1);
 
+  // Active token inspector popover state
+  const [activeInspectorToken, setActiveInspectorToken] = useState<{
+    element: HTMLElement;
+    rawToken: string;
+    rect: DOMRect;
+    displayLabel?: string;
+    category?: string;
+  } | null>(null);
+
   // 1. Separate styles and clean canonical body
   const { styles: extractedStyles, body: extractedBody } = useMemo(() => {
     return separateDocxStylesAndBody(htmlContent || '');
@@ -1264,6 +1275,56 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     }, 10);
   }, [saveSelection, handleInput, runPaginationPass]);
 
+  // Apply token updates from TokenInspectorPopover
+  const handleApplyTokenUpdate = useCallback(
+    (newRawToken: string) => {
+      if (!activeInspectorToken || !editorHostRef.current) return;
+      const targetEl = activeInspectorToken.element;
+      if (targetEl && editorHostRef.current.contains(targetEl)) {
+        const summary = extractTokenSummary(newRawToken);
+        const isDirective = newRawToken.startsWith('<') || newRawToken.startsWith('|');
+        const cleanKey = isDirective ? newRawToken : newRawToken.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+
+        targetEl.setAttribute('data-token', cleanKey);
+        targetEl.setAttribute('data-token-key', summary.baseKey);
+        targetEl.setAttribute('data-display', summary.baseKey);
+        targetEl.setAttribute('data-label', summary.baseKey);
+        targetEl.textContent = `{{${cleanKey}}}`;
+
+        const cleanBody = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+        const doc = EditorSerializer.toCanonicalDocument(cleanBody);
+        dispatchTransaction({
+          doc,
+          canonicalHtml: cleanBody,
+          origin: 'command',
+          selection: buildTransactionSelection(editorHostRef.current, savedSelectionBookmarkRef.current),
+          timestamp: Date.now(),
+        });
+      }
+      setActiveInspectorToken(null);
+    },
+    [activeInspectorToken, dispatchTransaction]
+  );
+
+  // Delete token from document via TokenInspectorPopover
+  const handleDeleteToken = useCallback(() => {
+    if (!activeInspectorToken || !editorHostRef.current) return;
+    const targetEl = activeInspectorToken.element;
+    if (targetEl && editorHostRef.current.contains(targetEl)) {
+      targetEl.remove();
+      const cleanBody = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+      const doc = EditorSerializer.toCanonicalDocument(cleanBody);
+      dispatchTransaction({
+        doc,
+        canonicalHtml: cleanBody,
+        origin: 'command',
+        selection: buildTransactionSelection(editorHostRef.current, savedSelectionBookmarkRef.current),
+        timestamp: Date.now(),
+      });
+    }
+    setActiveInspectorToken(null);
+  }, [activeInspectorToken, dispatchTransaction]);
+
   // Click on empty canvas margin to focus editor at end without collapsing selection
   const handleSheetClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1273,6 +1334,30 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       if (sel && !sel.isCollapsed) return;
 
       const target = e.target as HTMLElement;
+
+      // 1. Detect click on variable token chip to trigger Token Inspector Popover
+      const tokenEl = target?.closest('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]') as HTMLElement | null;
+      if (tokenEl && editorHostRef.current.contains(tokenEl)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const raw =
+          tokenEl.getAttribute('data-token') ||
+          tokenEl.getAttribute('data-token-key') ||
+          tokenEl.textContent?.replace(/[{}]/g, '').trim() ||
+          '';
+        const rect = tokenEl.getBoundingClientRect();
+        const label = tokenEl.getAttribute('data-label') || tokenEl.getAttribute('data-display') || undefined;
+        const cat = tokenEl.getAttribute('data-category') || undefined;
+        setActiveInspectorToken({
+          element: tokenEl,
+          rawToken: raw,
+          rect,
+          displayLabel: label,
+          category: cat,
+        });
+        return;
+      }
+
       if (target !== editorHostRef.current && editorHostRef.current.contains(target)) {
         saveSelection();
         return;
@@ -1549,6 +1634,46 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               pointer-events: none;
               background: transparent;
             }
+            .doclab-token, .doclab-token-chip, [data-token] {
+              display: inline-flex !important;
+              align-items: center !important;
+              gap: 3px !important;
+              padding: 2px 8px !important;
+              margin: 1px 3px !important;
+              border-radius: 9999px !important;
+              font-size: 0.88em !important;
+              font-weight: 600 !important;
+              line-height: 1.2 !important;
+              vertical-align: middle !important;
+              cursor: pointer !important;
+              user-select: none !important;
+              -webkit-user-select: none !important;
+              background: rgba(99, 102, 241, 0.12) !important;
+              color: #4338ca !important;
+              border: 1px solid rgba(99, 102, 241, 0.3) !important;
+              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+              transition: all 0.15s ease-in-out !important;
+            }
+            .doclab-token:hover, .doclab-token-chip:hover, [data-token]:hover {
+              background: rgba(99, 102, 241, 0.22) !important;
+              border-color: #4f46e5 !important;
+              box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25) !important;
+              transform: translateY(-0.5px) !important;
+            }
+            .doclab-token::before, .doclab-token-chip::before {
+              content: "⚡" !important;
+              font-size: 0.8em !important;
+              opacity: 0.85 !important;
+            }
+            .doclab-token::after, .doclab-token-chip::after {
+              content: " ✏️" !important;
+              font-size: 0.7em !important;
+              opacity: 0 !important;
+              transition: opacity 0.15s ease !important;
+            }
+            .doclab-token:hover::after, .doclab-token-chip:hover::after {
+              opacity: 0.8 !important;
+            }
             @media print {
               .spr-page-break {
                 display: block !important;
@@ -1565,6 +1690,13 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               .spr-page-break-badge,
               .spr-runtime-page-spacer {
                 display: none !important;
+              }
+              .doclab-token::before,
+              .doclab-token-chip::before,
+              .doclab-token::after,
+              .doclab-token-chip::after {
+                display: none !important;
+                content: "" !important;
               }
             }
           `,
@@ -1758,6 +1890,19 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
             WebkitUserSelect: 'text',
           }}
         />
+
+        {/* 3. Floating Token & Directive Inspector Popover */}
+        {activeInspectorToken && (
+          <TokenInspectorPopover
+            rawToken={activeInspectorToken.rawToken}
+            anchorRect={activeInspectorToken.rect}
+            displayLabel={activeInspectorToken.displayLabel}
+            category={activeInspectorToken.category}
+            onApply={handleApplyTokenUpdate}
+            onDelete={handleDeleteToken}
+            onClose={() => setActiveInspectorToken(null)}
+          />
+        )}
       </div>
     </div>
   );

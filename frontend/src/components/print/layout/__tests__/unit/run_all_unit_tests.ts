@@ -56,6 +56,7 @@ import { runDocLabP5DocumentChromeSectionsUnitTests } from './doclab_p5_document
 import { runDocLabP6DynamicBatchPaginationUnitTests } from './doclab_p6_dynamic_batch_pagination.test';
 import { runDocLabP7PerformanceTortureUnitTests } from './doclab_p7_performance_torture.test';
 import { runDocLabP0PaginationParagraphStabilityUnitTests } from './doclab_p0_pagination_paragraph_stability.test';
+import { runSmartTokenChipsPopoverUnitTests } from './smart_token_chips_popover_phase19.test';
 
 async function main() {
   console.log('================================================================');
@@ -112,6 +113,7 @@ async function main() {
     ['44. Dynamic Data & Batch Pagination (P6)', runDocLabP6DynamicBatchPaginationUnitTests],
     ['45. Performance & Torture Testing (P7)', runDocLabP7PerformanceTortureUnitTests],
     ['46. Pagination & Paragraph Stability (P0)', runDocLabP0PaginationParagraphStabilityUnitTests],
+    ['47. Smart Token Chips & Popover (Phase 19)', runSmartTokenChipsPopoverUnitTests],
   ];
 
   const originalLog = console.log;
