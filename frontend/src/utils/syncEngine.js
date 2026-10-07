@@ -238,7 +238,9 @@ export const checkGracePeriodReports = async () => {
         await commitReportToCloud(rep.id);
       } else {
         const remainingMs = rep.grace_expires_at - now;
-        scheduleGracePeriodSync(rep.id, remainingMs);
+        if (!activeGraceTimers.has(rep.id)) {
+          scheduleGracePeriodSync(rep.id, remainingMs);
+        }
       }
     }
   }

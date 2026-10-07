@@ -6,6 +6,7 @@ export const QURAN_RULES = {
   MIN_JUZ: 1,
   MAX_JUZ: 30,
   MIN_PAGE: 1,
+  MAX_PAGE: 25,
   MIN_AYAH: 1,
   MAX_AYAH: 286,
 } as const;
@@ -20,10 +21,17 @@ export function getMaxPageForJuz(juzNum?: string | number): number {
   return 25;
 }
 
+export interface JuzPageBounds {
+  minPage: number;
+  maxPage: number;
+  allowedPages?: number[];
+  hasExplicitBounds: boolean;
+}
+
 export function getJuzPageBounds(
   juzNum?: string | number,
   juzPageData?: any[]
-): { minPage: number; maxPage: number } {
+): JuzPageBounds {
   let effectiveJuz = juzNum;
   if (
     (effectiveJuz === undefined || effectiveJuz === null || String(effectiveJuz).trim() === "") &&
@@ -37,30 +45,66 @@ export function getJuzPageBounds(
 
   const defaultMax = getMaxPageForJuz(effectiveJuz);
 
-  if (juzPageData && Array.isArray(juzPageData) && juzPageData.length > 0 && effectiveJuz) {
+  if (
+    juzPageData &&
+    Array.isArray(juzPageData) &&
+    juzPageData.length > 0 &&
+    effectiveJuz !== undefined &&
+    effectiveJuz !== null &&
+    String(effectiveJuz).trim() !== ""
+  ) {
     const matchingRows = juzPageData.filter(
       (row) => row.juz && String(row.juz).trim() === String(effectiveJuz).trim()
     );
 
     if (matchingRows.length > 0) {
-      let maxEnd = -Infinity;
+      const allowedSet = new Set<number>();
+      let minFound = Infinity;
+      let maxFound = -Infinity;
+
       matchingRows.forEach((row) => {
         (row.ranges || []).forEach((r: any) => {
+          const s = parseInt(String(r.start), 10);
           const e = parseInt(String(r.end), 10);
-          if (!isNaN(e) && e > 0 && e > maxEnd) maxEnd = e;
+          const validStart = !isNaN(s) && s > 0;
+          const validEnd = !isNaN(e) && e > 0;
+
+          if (validStart && validEnd) {
+            const rangeMin = Math.min(s, e);
+            const rangeMax = Math.max(s, e);
+            if (rangeMin < minFound) minFound = rangeMin;
+            if (rangeMax > maxFound) maxFound = rangeMax;
+            for (let p = rangeMin; p <= rangeMax; p++) {
+              allowedSet.add(p);
+            }
+          } else if (validStart) {
+            if (s < minFound) minFound = s;
+            if (s > maxFound) maxFound = s;
+            allowedSet.add(s);
+          } else if (validEnd) {
+            if (e < minFound) minFound = e;
+            if (e > maxFound) maxFound = e;
+            allowedSet.add(e);
+          }
         });
       });
 
-      const effectiveMax =
-        maxEnd !== -Infinity && maxEnd >= 1
-          ? Math.max(maxEnd, defaultMax)
-          : defaultMax;
-
-      return { minPage: 1, maxPage: effectiveMax };
+      if (minFound !== Infinity && maxFound !== -Infinity) {
+        return {
+          minPage: minFound,
+          maxPage: maxFound,
+          allowedPages: Array.from(allowedSet).sort((a, b) => a - b),
+          hasExplicitBounds: true,
+        };
+      }
     }
   }
 
-  return { minPage: 1, maxPage: defaultMax };
+  return {
+    minPage: QURAN_RULES.MIN_PAGE,
+    maxPage: defaultMax,
+    hasExplicitBounds: false,
+  };
 }
 
 export class QuranTrackingSessionStore {

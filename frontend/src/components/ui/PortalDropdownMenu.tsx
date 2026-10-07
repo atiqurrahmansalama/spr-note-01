@@ -47,7 +47,7 @@ export default function PortalDropdownMenu({
         width: `${coords.width}px`,
         zIndex,
       }}
-      className={`theme-bg-surface border theme-border shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),0_6px_16px_rgba(0,0,0,0.15)] overflow-hidden rounded-2xl p-1.5 backdrop-blur-2xl transition-all duration-200 ease-out ${
+      className={`theme-bg-surface border theme-border shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),0_6px_16px_rgba(0,0,0,0.15)] overflow-hidden rounded-xl p-1 backdrop-blur-2xl transition-all duration-200 ease-out ${
         coords.openUpward ? 'origin-bottom animate-dropdown-up' : 'origin-top animate-dropdown-down'
       } ${className}`}
     >
@@ -57,7 +57,7 @@ export default function PortalDropdownMenu({
         style={{
           maxHeight: `${Math.max(80, coords.maxHeight - (header ? 55 : 10))}px`,
         }}
-        className={`p-1 space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar scroll-smooth ${listClassName}`}
+        className={`space-y-0.5 overflow-y-auto scrollbar-none no-scrollbar scroll-smooth ${listClassName}`}
       >
         {children}
       </div>

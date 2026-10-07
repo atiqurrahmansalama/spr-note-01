@@ -50,16 +50,36 @@ export function useReportForm() {
   const [comment, setComment] = useState<string>("");
   const [savedComments, setSavedComments] = useState<string[]>(() => commentStore.getAll());
 
-  const [studentDatabase, setStudentDatabase] = useState<any[]>([]);
-  const [sessionList, setSessionList] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [studentDatabase, setStudentDatabase] = useState<any[]>(() => {
+    try {
+      return studentStore.getAll() || [];
+    } catch {
+      return [];
+    }
+  });
+  const [sessionList, setSessionList] = useState<any[]>(() => {
+    try {
+      return sessionStore.getAll() || [];
+    } catch {
+      return [];
+    }
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    try {
+      const cached = studentStore.getAll();
+      return !(cached && cached.length > 0);
+    } catch {
+      return false;
+    }
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [editingReport, setEditingReport] = useState<any | null>(null);
 
   const historyStackRef = useRef<string[]>([]);
   const redoStackRef = useRef<string[]>([]);
   const isRestoringRef = useRef(false);
-  const [, setHistoryVersion] = useState(0);
+  const [canUndoDraft, setCanUndoDraft] = useState(false);
+  const [canRedoDraft, setCanRedoDraft] = useState(false);
 
   const captureSnapshot = useCallback(() => {
     return JSON.stringify({
@@ -89,7 +109,8 @@ export function useReportForm() {
       stack.push(snap);
       if (stack.length > 35) stack.shift();
       redoStackRef.current = [];
-      setHistoryVersion((v) => v + 1);
+      setCanUndoDraft(stack.length > 1);
+      setCanRedoDraft(false);
     }
   }, [captureSnapshot]);
 
@@ -101,7 +122,8 @@ export function useReportForm() {
     }
     const currentSnap = stack.pop();
     if (currentSnap) redoStackRef.current.push(currentSnap);
-    setHistoryVersion((v) => v + 1);
+    setCanUndoDraft(stack.length > 1);
+    setCanRedoDraft(redoStackRef.current.length > 0);
 
     const prevSnapStr = stack[stack.length - 1];
     if (prevSnapStr) {
@@ -146,7 +168,8 @@ export function useReportForm() {
     const nextSnapStr = rStack.pop();
     if (!nextSnapStr) return;
     historyStackRef.current.push(nextSnapStr);
-    setHistoryVersion((v) => v + 1);
+    setCanUndoDraft(historyStackRef.current.length > 1);
+    setCanRedoDraft(rStack.length > 0);
 
     try {
       const data = JSON.parse(nextSnapStr);
@@ -177,9 +200,6 @@ export function useReportForm() {
       console.error("Redo restore failed", err);
     }
   }, [showToast]);
-
-  const canUndoDraft = historyStackRef.current.length > 1;
-  const canRedoDraft = redoStackRef.current.length > 0;
   const [draftInfo, setDraftInfo] = useState<DailyProgressDraft[] | null>(null);
 
   const [currentDraftId] = useState(() => {
@@ -413,16 +433,20 @@ export function useReportForm() {
     if (cachedStudents.length > 0 || cachedSessions.length > 0) setIsLoading(false);
     if (!isOnline()) return;
 
+    // Run sync in the background without blocking UI initialization
+    syncSessionsAndComments().catch((err) => {
+      console.warn("[useReportForm] Background sync error:", err);
+    });
+
     try {
-      await syncSessionsAndComments();
-      const [studentsRes, sessionsRes, messagesRes] = await Promise.all([
+      const [studentsSettled, sessionsSettled, messagesSettled] = await Promise.allSettled([
         fetchWithAuth("/students/"),
         fetchWithAuth("/sessions/"),
         fetchWithAuth("/messages/?category=report_builder_comments"),
       ]);
 
-      if (studentsRes.ok) {
-        const rawStudents = await studentsRes.json();
+      if (studentsSettled.status === "fulfilled" && studentsSettled.value.ok) {
+        const rawStudents = await studentsSettled.value.json();
         const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => ({
           ...(typeof s === "object" ? s : {}),
           id: typeof s === "object" ? s.id : null,
@@ -436,8 +460,8 @@ export function useReportForm() {
         setStudentDatabase(merged);
       }
 
-      if (sessionsRes.ok) {
-        const rawSessions = await sessionsRes.json();
+      if (sessionsSettled.status === "fulfilled" && sessionsSettled.value.ok) {
+        const rawSessions = await sessionsSettled.value.json();
         const apiSessions = (Array.isArray(rawSessions) ? rawSessions : []).map((s: any) => ({
           id: typeof s === "object" ? (s.id || s.name) : String(s),
           name: typeof s === "object" ? (s.name || s.session_name || s.label || String(s)) : String(s),
@@ -446,8 +470,8 @@ export function useReportForm() {
         setSessionList(merged);
       }
 
-      if (messagesRes.ok) {
-        const rawMessages = await messagesRes.json();
+      if (messagesSettled.status === "fulfilled" && messagesSettled.value.ok) {
+        const rawMessages = await messagesSettled.value.json();
         const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
           .map((m: any) => (typeof m === "object" ? { id: m.id, text: m.text || m.comment || "" } : { text: String(m) }))
           .filter((c: any) => Boolean(c.text && c.text.trim()));

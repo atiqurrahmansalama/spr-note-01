@@ -1,6 +1,91 @@
 import React from "react";
-import { CloseIcon, RefreshIcon, PlusIcon } from "@/components/ui/Icons";
+import { CloseIcon, RefreshIcon, PlusIcon, DragHandleIcon } from "@/components/ui/Icons";
 import IconButton from "@/components/ui/IconButton";
+
+export function RowDragHandle({
+  draggable = true,
+  onDragStart,
+  onDragEnd,
+  title = "Drag to reorder",
+  className = "",
+}: {
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`w-5 h-10 flex items-center justify-center cursor-grab active:cursor-grabbing theme-text-secondary hover:theme-text-primary shrink-0 opacity-40 group-hover:opacity-100 transition-opacity ${className}`}
+      title={title}
+    >
+      <DragHandleIcon className="w-3.5 h-3.5" />
+    </div>
+  );
+}
+
+export function DropIndicatorLine({ position }: { position: "before" | "after" | null }) {
+  if (!position) return null;
+  return (
+    <div
+      className={`absolute left-0 right-0 h-1 bg-[var(--accent-main)] rounded-full z-20 pointer-events-none ${
+        position === "before" ? "top-0" : "bottom-0"
+      }`}
+    />
+  );
+}
+
+export function ItemCommaSeparator({ className = "" }: { className?: string }) {
+  return (
+    <span className={`theme-text-secondary font-semibold text-xs sm:text-sm select-none -ml-0.5 ${className}`}>
+      ,
+    </span>
+  );
+}
+
+export function DraggableRowWrapper({
+  children,
+  rowContainerProps,
+  dropPosition,
+  dragHandleProps,
+  dragTitle = "Drag to reorder",
+  onRemove,
+  removeTitle = "Remove Row",
+  isDragging = false,
+  className = "",
+}: {
+  children: React.ReactNode;
+  rowContainerProps?: React.HTMLAttributes<HTMLDivElement>;
+  dropPosition?: "before" | "after" | null;
+  dragHandleProps?: {
+    draggable?: boolean;
+    onDragStart?: (e: React.DragEvent) => void;
+    onDragEnd?: () => void;
+  };
+  dragTitle?: string;
+  onRemove?: () => void;
+  removeTitle?: string;
+  isDragging?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      {...rowContainerProps}
+      className={`flex items-start gap-2 sm:gap-3 w-full py-1.5 px-2 sm:px-3 -mx-2 sm:-mx-3 rounded-xl relative group transition-all duration-150 select-none ${
+        isDragging ? "opacity-35 scale-[0.98] border border-dashed theme-border theme-bg-sub" : "hover:theme-bg-elevated"
+      } ${className}`}
+    >
+      <DropIndicatorLine position={dropPosition || null} />
+      <RowDragHandle {...dragHandleProps} title={dragTitle} />
+      {children}
+      <RowRemoveButton onRemove={onRemove} title={removeTitle} />
+    </div>
+  );
+}
 
 export function RowRemoveButton({
   onRemove,

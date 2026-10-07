@@ -251,7 +251,11 @@ export default function DailyClassroomHubView({
   }, [searchParams]);
 
   // ── Custom Hooks ─────────────────────────────────────────────────────────────
-  const { lessons, evaluations, curriculumBooks, loadData } = useDailyClassroomData(tenantId, selectedDate);
+  const { lessons, evaluations, curriculumBooks, loadData } = useDailyClassroomData(
+    tenantId,
+    selectedDate,
+    { enabled: !isProgressHub }
+  );
 
   const {
     hasDepartments,

@@ -243,9 +243,8 @@ export default function ProgressReportsView({
     };
   }, []);
 
-  // Load Reports from LocalStorage & API
-  const loadReports = useCallback(async () => {
-    setLoading(true);
+  // Load Reports from LocalStorage & API (Zero-flicker background sync)
+  const loadReports = useCallback(async (isSilent = false) => {
     let localReps: any[] = [];
     try {
       localReps = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
@@ -254,6 +253,10 @@ export default function ProgressReportsView({
       }
     } catch {
       setReportsList([]);
+    }
+
+    if (!isSilent && localReps.length === 0) {
+      setLoading(true);
     }
 
     if (!isOnline()) {
@@ -339,10 +342,10 @@ export default function ProgressReportsView({
 
   useEffect(() => {
     const handleReportSaved = () => {
-      loadReports();
+      loadReports(true);
     };
     const handleTenantChanged = () => {
-      loadReports();
+      loadReports(true);
     };
     window.addEventListener("spr_report_saved", handleReportSaved);
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
@@ -353,7 +356,7 @@ export default function ProgressReportsView({
   }, [loadReports]);
 
   useEffect(() => {
-    loadReports();
+    loadReports(false);
   }, [loadReports]);
 
   // Date Boundaries Calculation

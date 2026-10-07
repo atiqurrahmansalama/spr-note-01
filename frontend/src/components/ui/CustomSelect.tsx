@@ -354,8 +354,8 @@ export default function CustomSelect({
         isOpen={isOpen}
         coords={coords}
         dropdownRef={dropdownRef}
-        className={compactMode ? 'rounded-xl p-1' : 'rounded-2xl p-1.5'}
-        listClassName={compactMode ? 'p-0.5 space-y-1' : 'p-1 space-y-0.5'}
+        className={compactMode || size === 'xs' ? 'rounded-xl p-1' : size === 'sm' ? 'rounded-xl p-1' : 'rounded-2xl p-1.5'}
+        listClassName={compactMode ? 'p-0.5 space-y-1' : 'space-y-0.5'}
         header={
           !compactMode && searchable ? (
             <div className="p-2 border-b theme-border theme-bg-sub/60">
@@ -403,18 +403,25 @@ export default function CustomSelect({
               );
             }
 
+            const itemPaddingClass = {
+              xs: 'px-2 py-1.5 rounded-lg text-xs',
+              sm: 'px-2.5 py-1.5 rounded-lg text-xs',
+              md: 'px-3 py-2 rounded-xl text-xs sm:text-sm',
+              lg: 'px-3.5 py-2.5 rounded-xl text-sm',
+            }[size] || 'px-3 py-2 rounded-xl text-xs';
+
             return (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleSelect(opt)}
-                className={`w-full px-3 py-2 rounded-xl text-left text-xs transition-colors flex items-center justify-between cursor-pointer group/item ${
+                className={`w-full ${itemPaddingClass} transition-colors flex items-center justify-between cursor-pointer group/item ${
                   isSelected
                     ? 'theme-bg-accent theme-accent-text font-bold shadow-xs'
                     : 'hover:bg-[var(--accent-main)]/15 hover:theme-accent theme-text-primary'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0 pr-2 flex-1">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   {/* Checkbox Icon for Multi-Select */}
                   {isMultiple && (
                     <div
@@ -429,11 +436,11 @@ export default function CustomSelect({
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1.5">
                       <span className="truncate font-medium">{optLabel}</span>
                       {showBadge && typeof opt === 'object' && opt !== null && (opt.typeLabel || opt.badge) && (
                         <span
-                          className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 border ${
+                          className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono shrink-0 border ${
                             isSelected
                               ? 'theme-bg-surface/80 border-[var(--accent-main)]/30 theme-accent font-semibold'
                               : 'theme-bg-sub theme-text-secondary border-current/10'
@@ -454,7 +461,7 @@ export default function CustomSelect({
                     )}
                   </div>
                 </div>
-                {!isMultiple && isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1.5" />}
+                {!isMultiple && isSelected && <SleekCheckIcon className="w-3.5 h-3.5 shrink-0 ml-1 text-current" />}
               </button>
             );
           })

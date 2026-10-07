@@ -337,6 +337,43 @@ export default function DailyProgressView({
     targetIndex?: number,
     isCopy: boolean = false
   ) => {
+    if (sourceListType === "juz" && targetListType === "juz") {
+      let newJuz = [...juzPageData];
+      if (isCopy) {
+        const sourceItem = newJuz[sourceIndex];
+        if (!sourceItem) return;
+        const itemCopy = {
+          ...sourceItem,
+          id: crypto.randomUUID(),
+          juzInputId: `juz-input-${crypto.randomUUID()}`,
+          ranges: (sourceItem.ranges || []).map((r) => ({ ...r, id: crypto.randomUUID() })),
+        };
+        if (targetIndex !== undefined && targetIndex >= 0 && targetIndex <= newJuz.length) {
+          newJuz.splice(targetIndex, 0, itemCopy);
+        } else {
+          newJuz.push(itemCopy);
+        }
+      } else {
+        if (
+          targetIndex !== undefined &&
+          targetIndex >= 0 &&
+          sourceIndex >= 0 &&
+          sourceIndex < newJuz.length
+        ) {
+          const adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+          if (adjustedTarget !== sourceIndex) {
+            const [movedItem] = newJuz.splice(sourceIndex, 1);
+            newJuz.splice(adjustedTarget, 0, movedItem);
+          }
+        }
+      }
+      setJuzPageData(newJuz);
+      activeDragRef.current = null;
+      (window as any).__spr_active_drag_item = null;
+      setDraggedItem(null);
+      return;
+    }
+
     let newMistake = [...mistakeData];
     let newStuck = [...stuckData];
 
@@ -536,6 +573,12 @@ export default function DailyProgressView({
               onChange={setJuzPageData}
               onReset={handleJuzPageRefresh}
               onNextSection={focusFirstMistakePage}
+              draggedItem={draggedItem}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
             />
           )}
 

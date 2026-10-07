@@ -102,20 +102,35 @@ export default function PageRangeInput({
         : String(rawVal).replace(/\D/g, '');
       const nextStart: number | string = cleanVal === '' ? '' : parseInt(cleanVal, 10);
 
+      let nextEnd = effectiveEnd;
+      // If user enters a start page greater than an existing non-empty end page, update end to match start
+      if (
+        nextStart !== '' &&
+        !isNaN(Number(nextStart)) &&
+        effectiveEnd !== '' &&
+        effectiveEnd !== undefined &&
+        effectiveEnd !== null &&
+        !isNaN(Number(effectiveEnd)) &&
+        Number(effectiveEnd) < Number(nextStart)
+      ) {
+        nextEnd = nextStart;
+        if (onEndChange) onEndChange(nextEnd);
+      }
+
       if (onStartChange) onStartChange(nextStart);
       if (onChange) {
         if (range) {
-          (onChange as (val: PageRangeObject) => void)({ ...range, start: nextStart });
+          (onChange as (val: PageRangeObject) => void)({ ...range, start: nextStart, end: nextEnd ?? '' });
         } else {
           (onChange as (val: PageRangeChangeValue) => void)({
             ...(prefix ? { id: prefix } : {}),
             start: nextStart,
-            end: effectiveEnd ?? ''
+            end: nextEnd ?? ''
           });
         }
       }
     },
-    [effectiveEnd, onStartChange, onChange, range, prefix]
+    [effectiveEnd, onStartChange, onEndChange, onChange, range, prefix]
   );
 
   // Handle End Page Change (DURING TYPING - unrestricted input without premature keystroke clamping)
@@ -194,10 +209,9 @@ export default function PageRangeInput({
 
           // Smart relational adjustment after user finishes typing:
           // If start page is set and end page is less than start, adjust end to match start
-          if (!isNaN(curStart) && adjusted < curStart) {
-            adjusted = curStart;
-          } else if (adjusted < min) {
-            adjusted = min;
+          const effectiveMinForEnd = !isNaN(curStart) ? Math.max(curStart, min) : min;
+          if (adjusted < effectiveMinForEnd) {
+            adjusted = effectiveMinForEnd;
           }
 
           if (adjusted > max) {
@@ -281,6 +295,12 @@ export default function PageRangeInput({
     }
   };
 
+  const startNum = (effectiveStart !== '' && effectiveStart !== undefined && effectiveStart !== null && !isNaN(Number(effectiveStart)))
+    ? Number(effectiveStart)
+    : undefined;
+  const minEnd = startNum !== undefined ? Math.max(startNum, min) : min;
+  const initialEndScroll = startNum !== undefined ? startNum : min;
+
   return (
     <div
       className={`flex items-center overflow-hidden transition-all hover:border-[var(--border-hover)] focus-within:border-[var(--accent-main)] ${variantClasses} ${sizeClasses} ${width} ${
@@ -337,8 +357,9 @@ export default function PageRangeInput({
           onEmptyBackspace={(e) => {
             handleBackspaceFocusPrev(e, true);
           }}
-          min={min}
+          min={minEnd}
           max={max}
+          initialScrollValue={initialEndScroll}
           placeholder={placeholderEnd}
           disabled={disabled}
           required={required}

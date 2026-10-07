@@ -47,9 +47,9 @@ export type {
   EmptyStateProps,
   EmptyStateVariant,
   EmptyStateSize,
-  EmptyStateIconVariant,
-  EmptyStateIconSize,
   EmptyStateAction,
 } from './EmptyState';
+export { default as Pagination } from './Pagination';
+export type { PaginationProps } from './Pagination';
 export * from './Icons';
 

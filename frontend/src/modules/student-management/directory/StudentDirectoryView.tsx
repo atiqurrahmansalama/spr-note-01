@@ -17,6 +17,7 @@ import DataCardGrid from "../../../components/ui/DataCardGrid";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
+import Pagination from "../../../components/ui/Pagination";
 import { ClassSelect, GroupSelect } from "../../../components/selectors";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -40,6 +41,17 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
       return (localStorage.getItem("spr_students_display_mode") as "table" | "grid") || "table";
     } catch {
       return "table";
+    }
+  });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("spr_students_page_size");
+      return saved ? Number(saved) : 25;
+    } catch {
+      return 25;
     }
   });
 
@@ -78,6 +90,29 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     hasActiveFilters,
     activeFilterCount,
   } = useStudentFilters(students, classes, groups);
+
+  // Reset pagination to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, classFilter, groupFilter, statusFilter]);
+
+  // Pagination calculations
+  const totalItems = filteredStudents.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, safeCurrentPage, pageSize]);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+    try {
+      localStorage.setItem("spr_students_page_size", String(newSize));
+    } catch {}
+  };
 
   // Fast maps for StudentCard grid view
   const classesMap = useMemo(() => {
@@ -157,7 +192,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     return () => clearTimeout(timer);
   }, [highlightParam, setSearchParams]);
 
-  // Ensure target highlighted student is visible by resetting filters if needed
+  // Ensure target highlighted student is visible by resetting filters if needed and jumping to its page
   useEffect(() => {
     if (!activeHighlightId || loading || students.length === 0) return;
     const targetStudent = students.find((s) => String(s.id) === String(activeHighlightId));
@@ -166,8 +201,15 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
       if (!isVisible && hasActiveFilters) {
         resetAllFilters();
       }
+      const targetIdx = filteredStudents.findIndex((s) => String(s.id) === String(activeHighlightId));
+      if (targetIdx !== -1) {
+        const targetPage = Math.floor(targetIdx / pageSize) + 1;
+        if (targetPage !== currentPage) {
+          setCurrentPage(targetPage);
+        }
+      }
     }
-  }, [activeHighlightId, loading, students, filteredStudents, hasActiveFilters, resetAllFilters]);
+  }, [activeHighlightId, loading, students, filteredStudents, hasActiveFilters, resetAllFilters, pageSize, currentPage]);
 
   // Smoothly scroll and center the highlighted row/card into view
   useEffect(() => {
@@ -181,7 +223,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
       }
     }, 180);
     return () => clearTimeout(timer);
-  }, [activeHighlightId, loading, filteredStudents]);
+  }, [activeHighlightId, loading, paginatedStudents]);
 
   const handleToggleDisplayMode = (mode: "table" | "grid") => {
     setDisplayMode(mode);
@@ -194,7 +236,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     if (Array.isArray(val)) {
       setSelectedIds(val);
     } else if (typeof val === "boolean") {
-      setSelectedIds(val ? filteredStudents.map((s) => s.id) : []);
+      setSelectedIds(val ? paginatedStudents.map((s) => s.id) : []);
     } else {
       setSelectedIds([]);
     }
@@ -366,55 +408,70 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         }
       />
 
-      {/* 4. Data View (Table or Grid) */}
-      {displayMode === "table" ? (
-        <DataTable
-          columns={tableColumns}
-          data={filteredStudents}
-          selectable={true}
-          selectedIds={selectedIds}
-          onSelectRow={handleSelectRow}
-          onSelectAll={handleSelectAll}
-          idField="id"
-          highlightId={activeHighlightId}
-          isLoading={loading}
-          loadingMessage="Loading student roster directory..."
-          emptyIcon={StudentIcon}
-          emptyTitle="No Students Found"
-          emptySubMessage={
-            searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
-              ? "No student records match your active filter criteria."
-              : "No students registered in this academy roster."
-          }
-          onRowClick={(s: StudentRecord) => navigate(`/students/${s.id}/profile`)}
-        />
-      ) : (
-        <DataCardGrid
-          data={filteredStudents}
-          renderCard={(s: StudentRecord) => (
-            <StudentCard
-              key={s.id}
-              student={s}
-              isHighlighted={Boolean(activeHighlightId && String(s.id) === String(activeHighlightId))}
-              onNavigateProfile={(id) => navigate(`/students/${id}/profile`)}
-              actionMenuItems={getActionMenuItems(s)}
-              classesMap={classesMap}
-              sectionsByClassMap={sectionsByClassMap}
-              groupsByClassMap={groupsByClassMap}
-            />
-          )}
-          isLoading={loading}
-          loadingMessage="Loading student roster directory..."
-          emptyIcon={StudentIcon}
-          emptyTitle="No Students Found"
-          emptySubMessage={
-            searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
-              ? "No student records match your active filter criteria."
-              : "No students registered in this academy roster."
-          }
-          gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
-        />
-      )}
+      {/* 4. Data View (Table or Grid) with Integrated Enterprise Pagination */}
+      <div className="space-y-4">
+        {displayMode === "table" ? (
+          <DataTable
+            columns={tableColumns}
+            data={paginatedStudents}
+            selectable={true}
+            selectedIds={selectedIds}
+            onSelectRow={handleSelectRow}
+            onSelectAll={handleSelectAll}
+            idField="id"
+            highlightId={activeHighlightId}
+            isLoading={loading}
+            loadingMessage="Loading student roster directory..."
+            emptyIcon={StudentIcon}
+            emptyTitle="No Students Found"
+            emptySubMessage={
+              searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+                ? "No student records match your active filter criteria."
+                : "No students registered in this academy roster."
+            }
+            onRowClick={(s: StudentRecord) => navigate(`/students/${s.id}/profile`)}
+          />
+        ) : (
+          <DataCardGrid
+            data={paginatedStudents}
+            renderCard={(s: StudentRecord) => (
+              <StudentCard
+                key={s.id}
+                student={s}
+                isHighlighted={Boolean(activeHighlightId && String(s.id) === String(activeHighlightId))}
+                onNavigateProfile={(id) => navigate(`/students/${id}/profile`)}
+                actionMenuItems={getActionMenuItems(s)}
+                classesMap={classesMap}
+                sectionsByClassMap={sectionsByClassMap}
+                groupsByClassMap={groupsByClassMap}
+              />
+            )}
+            isLoading={loading}
+            loadingMessage="Loading student roster directory..."
+            emptyIcon={StudentIcon}
+            emptyTitle="No Students Found"
+            emptySubMessage={
+              searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+                ? "No student records match your active filter criteria."
+                : "No students registered in this academy roster."
+            }
+            gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+          />
+        )}
+
+        {/* 5. Enterprise Reusable Pagination Controls */}
+        {!loading && filteredStudents.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalItems={filteredStudents.length}
+            pageSize={pageSize}
+            onPageChange={(p) => setCurrentPage(p)}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100, 200]}
+            itemLabel="students"
+          />
+        )}
+      </div>
 
       {/* 5. Bulk Operations Modal */}
       <StudentBulkModal

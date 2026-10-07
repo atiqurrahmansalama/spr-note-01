@@ -5,6 +5,10 @@ import {
   getLessonEvaluations as fetchLessonEvaluationsAPI,
 } from '@/api/learning';
 
+export interface UseDailyClassroomDataOptions {
+  enabled?: boolean;
+}
+
 export interface UseDailyClassroomDataReturn {
   lessons: any[];
   evaluations: any[];
@@ -16,13 +20,21 @@ export interface UseDailyClassroomDataReturn {
  * useDailyClassroomData (also useLearningClassroomData)
  * Handles loading lessons, evaluations, and curriculum books
  * from the local store (instant render) + backend API (live sync).
+ * Supports options.enabled to avoid unnecessary API overhead on inactive views.
  */
-export default function useDailyClassroomData(tenantId: string = 'default', selectedDate?: string): UseDailyClassroomDataReturn {
+export default function useDailyClassroomData(
+  tenantId: string = 'default',
+  selectedDate?: string,
+  options: UseDailyClassroomDataOptions = {}
+): UseDailyClassroomDataReturn {
+  const { enabled = true } = options;
   const [lessons, setLessons] = useState<any[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [curriculumBooks, setCurriculumBooks] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
+    if (!enabled) return;
+
     try {
       // 1. Synchronous render from local store
       const localLessons = learningStore.getDailyLessons(tenantId) || [];
@@ -72,10 +84,12 @@ export default function useDailyClassroomData(tenantId: string = 'default', sele
     } catch (e) {
       console.warn('useDailyClassroomData load error:', e);
     }
-  }, [tenantId, selectedDate]);
+  }, [tenantId, selectedDate, enabled]);
 
-  // Initial load + listen for store update events
+  // Initial load + listen for store update events (only if enabled)
   useEffect(() => {
+    if (!enabled) return;
+
     loadData();
 
     const handleUpdate = () => loadData();
@@ -85,7 +99,7 @@ export default function useDailyClassroomData(tenantId: string = 'default', sele
       window.removeEventListener('spr_learning_updated', handleUpdate);
       window.removeEventListener('spr_curriculum_updated', handleUpdate);
     };
-  }, [loadData]);
+  }, [loadData, enabled]);
 
   return { lessons, evaluations, curriculumBooks, loadData };
 }
