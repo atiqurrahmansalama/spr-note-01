@@ -959,6 +959,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     const currentHostSanitized = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
     if (currentHostSanitized !== cleanCanonicalBody) {
       editorHostRef.current.innerHTML = cleanCanonicalBody;
+      EditorDomAdapter.autoConvertMustacheTokensInHost(editorHostRef.current);
       historyRef.current = new EditorHistory(cleanCanonicalBody);
       lastExportedHtmlRef.current = cleanCanonicalBody;
       runPaginationPass();
@@ -1043,6 +1044,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
     isComposingRef.current = false;
     // Single controlled debounced pagination and synchronization pass after composition completes
+    if (editorHostRef.current) {
+      EditorDomAdapter.autoConvertMustacheTokensInHost(editorHostRef.current);
+    }
     saveSelection();
     schedulePaginationPass();
 
@@ -1107,6 +1111,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     if (isComposingRef.current) {
       return;
     }
+
+    // Auto-convert any completed {{...}} into interactive capsule pills instantly
+    EditorDomAdapter.autoConvertMustacheTokensInHost(editorHostRef.current);
 
     saveSelection();
 
@@ -1270,6 +1277,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     if (isComposingRef.current) return;
     saveSelection();
     setTimeout(() => {
+      if (editorHostRef.current) {
+        EditorDomAdapter.autoConvertMustacheTokensInHost(editorHostRef.current);
+      }
       handleInput();
       runPaginationPass();
     }, 10);
@@ -1637,42 +1647,44 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
             .doclab-token, .doclab-token-chip, [data-token] {
               display: inline-flex !important;
               align-items: center !important;
-              gap: 3px !important;
-              padding: 2px 8px !important;
-              margin: 1px 3px !important;
+              justify-content: center !important;
+              width: 22px !important;
+              height: 14px !important;
+              min-width: 22px !important;
+              max-width: 22px !important;
+              margin: 0 2px !important;
+              padding: 0 !important;
               border-radius: 9999px !important;
-              font-size: 0.88em !important;
-              font-weight: 600 !important;
-              line-height: 1.2 !important;
+              font-size: 0 !important;
+              line-height: 0 !important;
+              overflow: hidden !important;
+              color: transparent !important;
+              background: rgba(99, 102, 241, 0.18) !important;
+              border: none !important;
+              box-shadow: none !important;
               vertical-align: middle !important;
               cursor: pointer !important;
               user-select: none !important;
               -webkit-user-select: none !important;
-              background: rgba(99, 102, 241, 0.12) !important;
-              color: #4338ca !important;
-              border: 1px solid rgba(99, 102, 241, 0.3) !important;
-              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-              transition: all 0.15s ease-in-out !important;
-            }
-            .doclab-token:hover, .doclab-token-chip:hover, [data-token]:hover {
-              background: rgba(99, 102, 241, 0.22) !important;
-              border-color: #4f46e5 !important;
-              box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25) !important;
-              transform: translateY(-0.5px) !important;
-            }
-            .doclab-token::before, .doclab-token-chip::before {
-              content: "⚡" !important;
-              font-size: 0.8em !important;
-              opacity: 0.85 !important;
+              transition: background-color 0.15s ease-in-out !important;
             }
             .doclab-token::after, .doclab-token-chip::after {
-              content: " ✏️" !important;
-              font-size: 0.7em !important;
-              opacity: 0 !important;
-              transition: opacity 0.15s ease !important;
+              content: "" !important;
+              display: block !important;
+              width: 6px !important;
+              height: 6px !important;
+              border-radius: 9999px !important;
+              background: var(--accent-main, #6366f1) !important;
+              opacity: 0.8 !important;
+            }
+            .doclab-token:hover, .doclab-token-chip:hover, [data-token]:hover {
+              background: rgba(99, 102, 241, 0.32) !important;
+              border: none !important;
+              box-shadow: none !important;
+              transform: none !important;
             }
             .doclab-token:hover::after, .doclab-token-chip:hover::after {
-              opacity: 0.8 !important;
+              opacity: 1 !important;
             }
             @media print {
               .spr-page-break {
@@ -1691,12 +1703,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               .spr-runtime-page-spacer {
                 display: none !important;
               }
-              .doclab-token::before,
-              .doclab-token-chip::before,
-              .doclab-token::after,
-              .doclab-token-chip::after {
-                display: none !important;
-                content: "" !important;
+              .doclab-token,
+              .doclab-token-chip,
+              [data-token] {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
               }
             }
           `,

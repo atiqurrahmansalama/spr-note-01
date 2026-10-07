@@ -37,18 +37,18 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
   // 1. Layout Direction & Cell Splitting
   if (options.direction === 'horizontal') {
     if (options.separator === 'cell') {
-      directiveBadges.push({ icon: '↔️', text: 'Cell Split', title: 'Layout: Horizontal table cell split' });
+      directiveBadges.push({ icon: '↔', text: 'Cell Split', title: 'Layout: Horizontal table cell split' });
     } else {
-      directiveBadges.push({ icon: '↔️', text: 'Horiz', title: 'Layout: Horizontal flow' });
+      directiveBadges.push({ icon: '↔', text: 'Horiz', title: 'Layout: Horizontal flow' });
     }
   } else if (options.direction === 'vertical') {
-    directiveBadges.push({ icon: '↕️', text: 'Vert', title: 'Layout: Vertical stacked' });
+    directiveBadges.push({ icon: '↕', text: 'Vert', title: 'Layout: Vertical stacked' });
   }
 
   // 2. Custom Separators
   if (options.separator && options.separator !== 'cell') {
     if (options.separator === 'newline') {
-      directiveBadges.push({ icon: '↵', text: 'Line', title: 'Separator: Newline' });
+      directiveBadges.push({ icon: 'Line', text: 'Line', title: 'Separator: Newline' });
     } else if (options.separator === 'comma' || options.separator === ', ') {
       directiveBadges.push({ icon: ',', text: 'Comma', title: 'Separator: Comma' });
     } else {
@@ -74,7 +74,7 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
   if (indentSpaces && indentSpaces > 0) {
     const fromText = fromLine ? ` L${fromLine}+` : '';
     directiveBadges.push({
-      icon: '⇥',
+      icon: 'Indent',
       text: `Indent ${indentSpaces}${fromText}`,
       title: `Multi-line Indentation: ${indentSpaces} spaces${fromLine ? ` starting from line ${fromLine}` : ''}`,
     });
@@ -93,14 +93,14 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
     } else if (low.startsWith('cap') || low === 'capitalize') {
       directiveBadges.push({ icon: 'Ab', text: 'Capitalize', title: 'Filter: Capitalize words' });
     } else if (low.startsWith('date')) {
-      directiveBadges.push({ icon: '📅', text: 'Date', title: 'Filter: Formatted Date' });
+      directiveBadges.push({ icon: 'Date', text: 'Date', title: 'Filter: Formatted Date' });
     } else if (low.startsWith('currency') || low.startsWith('taka') || low.startsWith('money')) {
       directiveBadges.push({ icon: '৳', text: 'Currency', title: 'Filter: Currency format' });
     } else if (low.startsWith('bengali') || low === 'bn') {
       directiveBadges.push({ icon: '১', text: 'বাংলা', title: 'Filter: Bengali digits' });
     } else {
       remainingFilters.push(f);
-      directiveBadges.push({ icon: '⚙️', text: f, title: `Filter: ${f}` });
+      directiveBadges.push({ icon: 'FX', text: f, title: `Filter: ${f}` });
     }
   });
 

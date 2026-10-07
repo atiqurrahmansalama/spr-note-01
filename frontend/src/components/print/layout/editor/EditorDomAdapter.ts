@@ -329,6 +329,160 @@ export class EditorDomAdapter {
   }
 
   /**
+   * Scans the editor host for any raw Mustache variable patterns `{{...}}`
+   * and automatically transforms them into interactive `.doclab-token` capsule pills,
+   * while seamlessly preserving the user's caret position.
+   */
+  public static autoConvertMustacheTokensInHost(host: HTMLElement): boolean {
+    if (!host || typeof document === 'undefined') return false;
+
+    // 1. Get current selection context inside host
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    let activeTextNode: Node | null = null;
+    let activeOffset = 0;
+    if (sel && sel.rangeCount > 0) {
+      const r = sel.getRangeAt(0);
+      if (host.contains(r.startContainer)) {
+        activeTextNode = r.startContainer;
+        activeOffset = r.startOffset;
+      }
+    }
+
+    // 2. Find all candidate text nodes that contain {{...}}
+    const walker = document.createTreeWalker(
+      host,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          const tag = parent.tagName.toLowerCase();
+          if (tag === 'script' || tag === 'style') return NodeFilter.FILTER_REJECT;
+          if (parent.closest('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          if (node.nodeValue && node.nodeValue.includes('{{') && node.nodeValue.includes('}}')) {
+            return NodeFilter.FILTER_ACCEPT;
+          }
+          return NodeFilter.FILTER_SKIP;
+        },
+      }
+    );
+
+    const nodesToConvert: Text[] = [];
+    let currentNode: Node | null = walker.nextNode();
+    while (currentNode) {
+      nodesToConvert.push(currentNode as Text);
+      currentNode = walker.nextNode();
+    }
+
+    if (nodesToConvert.length === 0) return false;
+
+    let modified = false;
+    let newCaretNode: Node | null = null;
+    let newCaretOffset = 0;
+
+    // Pattern matching {{anything except } or with directives}}
+    const tokenPattern = /\{\{([\s\S]*?)\}\}/g;
+
+    for (const textNode of nodesToConvert) {
+      const fullText = textNode.nodeValue || '';
+      tokenPattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      let lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let hasMatch = false;
+
+      const isCaretInThisNode = textNode === activeTextNode;
+
+      while ((match = tokenPattern.exec(fullText)) !== null) {
+        hasMatch = true;
+        const matchStart = match.index;
+        const matchEnd = tokenPattern.lastIndex;
+        const rawContent = match[1]; // everything in between {{ and }}
+        const cleanKey = rawContent.trim();
+
+        // Append text before match
+        if (matchStart > lastIndex) {
+          const textBefore = fullText.slice(lastIndex, matchStart);
+          const beforeNode = document.createTextNode(textBefore);
+          frag.appendChild(beforeNode);
+          if (isCaretInThisNode && activeOffset >= lastIndex && activeOffset <= matchStart) {
+            newCaretNode = beforeNode;
+            newCaretOffset = activeOffset - lastIndex;
+          }
+        }
+
+        // Create the token capsule pill
+        const span = document.createElement('span');
+        span.className = 'doclab-token';
+        const tokenId = `tok_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        span.setAttribute('data-token-id', tokenId);
+        span.setAttribute('data-token', cleanKey);
+
+        const isDirective = cleanKey.startsWith('<') || cleanKey.startsWith('|');
+        const baseKey = isDirective
+          ? cleanKey
+          : cleanKey.replace(/\s*(?:\||<\|)[^}>]+>?\s*$/, '').trim();
+
+        span.setAttribute('data-token-key', baseKey || cleanKey);
+        span.setAttribute('data-display', baseKey || cleanKey);
+        span.setAttribute('data-label', baseKey || cleanKey);
+        span.setAttribute('contenteditable', 'false');
+        span.textContent = `{{${cleanKey}}}`;
+
+        frag.appendChild(span);
+
+        // Trailing separator space to allow typing immediately after the capsule
+        const trailingNode = document.createTextNode('\u00A0');
+        frag.appendChild(trailingNode);
+
+        // If caret was inside or right at the end of the token match, place it on trailing space
+        if (isCaretInThisNode && activeOffset >= matchStart && activeOffset <= matchEnd) {
+          newCaretNode = trailingNode;
+          newCaretOffset = 1;
+        }
+
+        lastIndex = matchEnd;
+      }
+
+      if (hasMatch) {
+        // Append any remaining text after the last match
+        if (lastIndex < fullText.length) {
+          const remainingText = fullText.slice(lastIndex);
+          const afterNode = document.createTextNode(remainingText);
+          frag.appendChild(afterNode);
+          if (isCaretInThisNode && activeOffset > lastIndex) {
+            newCaretNode = afterNode;
+            newCaretOffset = activeOffset - lastIndex;
+          }
+        }
+
+        const parent = textNode.parentNode;
+        if (parent) {
+          parent.replaceChild(frag, textNode);
+          modified = true;
+        }
+      }
+    }
+
+    // 3. Restore caret if it was affected
+    if (modified && newCaretNode && sel) {
+      try {
+        const newRange = document.createRange();
+        newRange.setStart(newCaretNode, Math.min(newCaretOffset, newCaretNode.textContent?.length || 0));
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } catch (e) {
+        console.warn('Could not restore caret after token conversion:', e);
+      }
+    }
+
+    return modified;
+  }
+
+  /**
    * Splits current block (Enter key behavior) creating a clean next paragraph
    */
   public static splitBlockAtSelection(host: HTMLElement): boolean {

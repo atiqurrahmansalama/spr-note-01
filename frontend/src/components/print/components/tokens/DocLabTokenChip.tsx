@@ -116,37 +116,12 @@ export const DocLabTokenChip: React.FC<DocLabTokenChipProps> = ({
         ref={chipRef}
         onClick={handleChipClick}
         contentEditable={false}
-        className={`doclab-token-chip inline-flex items-center gap-1.5 px-2 py-0.5 my-0.5 mx-1 rounded-full text-[11px] font-medium leading-none vertical-baseline transition-all cursor-pointer shadow-2xs select-none theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/30 hover:border-[var(--accent-main)] hover:shadow-xs group ${className}`}
-        title={`{{${rawToken}}}\nClick to configure layout, cell split, indent, or filters`}
+        className={`doclab-token-chip inline-flex items-center justify-center w-[22px] h-[14px] min-w-[22px] max-w-[22px] my-0 mx-0.5 rounded-full text-[0px] leading-none vertical-middle transition-all cursor-pointer select-none bg-[var(--accent-main)]/20 hover:bg-[var(--accent-main)]/35 border-0 ${className}`}
+        title={`{{${rawToken}}}`}
         data-token={rawToken}
         data-token-key={summary.baseKey}
       >
-        {/* Token Icon */}
-        <SparklesIcon className="w-3 h-3 shrink-0 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-transform" />
-
-        {/* Variable Key */}
-        <span className="font-bold tracking-tight">{summary.baseKey}</span>
-
-        {/* Directives Badges */}
-        {summary.directiveBadges.length > 0 && (
-          <span className="inline-flex items-center gap-1 pl-1 border-l border-current/20 shrink-0">
-            {summary.directiveBadges.map((badge, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-semibold bg-white/40 dark:bg-black/30 backdrop-blur-xs text-current"
-                title={badge.title}
-              >
-                <span>{badge.icon}</span>
-                <span>{badge.text}</span>
-              </span>
-            ))}
-          </span>
-        )}
-
-        {/* Hover Pencil Indicator */}
-        {isEditable && (
-          <EditIcon className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5 shrink-0" />
-        )}
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] opacity-80" />
       </span>
 
       {/* Interactive Floating Popover */}
