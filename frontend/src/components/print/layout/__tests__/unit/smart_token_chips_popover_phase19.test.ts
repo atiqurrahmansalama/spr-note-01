@@ -156,5 +156,37 @@ export async function runSmartTokenChipsPopoverUnitTests(): Promise<{
     );
   }
 
+  // 8. Multi-Filter & Custom Delimiter Bidirectional Synthesis
+  {
+    const synthesizedMulti = buildTokenString('fee_total', {
+      direction: 'vertical',
+      separator: 'newline',
+      filters: ['currency', 'bengali_digits'],
+    });
+    assert(
+      synthesizedMulti === '{{fee_total | direction: vertical, separator: newline | currency | bengali_digits}}',
+      'buildTokenString handles layout and multiple formatting filters simultaneously'
+    );
+
+    const parsedMulti = extractTokenSummary(synthesizedMulti);
+    assert(parsedMulti.baseKey === 'fee_total', 'Multi-filter parses baseKey correctly');
+    assert(parsedMulti.direction === 'vertical', 'Multi-filter direction is vertical');
+    assert(parsedMulti.separator === 'newline', 'Multi-filter separator is newline');
+    assert(parsedMulti.filters.includes('currency'), 'Parsed filters include currency');
+    assert(parsedMulti.filters.includes('bengali_digits'), 'Parsed filters include bengali_digits');
+  }
+
+  // 9. Comma-separated Inline Layout Synthesis
+  {
+    const synthesizedComma = buildTokenString('subject_names', {
+      direction: 'horizontal',
+      separator: ', ',
+    });
+    assert(
+      synthesizedComma === "{{subject_names | direction: horizontal, separator: ', '}}",
+      'buildTokenString synthesizes comma-separated horizontal layout'
+    );
+  }
+
   return { passed, failed, suiteName };
 }

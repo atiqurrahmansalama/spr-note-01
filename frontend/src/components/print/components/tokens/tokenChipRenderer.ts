@@ -81,10 +81,12 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
   }
 
   // 4. Formatting Filters (Upper, Lower, Cap, Date, Currency, Bengali)
-  const remainingFilters: string[] = [];
+  const allFilters: string[] = [];
   filterSpecs.forEach((f) => {
     const low = f.toLowerCase().trim();
     if (low.startsWith('indent')) return;
+
+    allFilters.push(f.trim());
 
     if (low.startsWith('upper') || low === 'uppercase') {
       directiveBadges.push({ icon: 'Aa', text: 'UPPER', title: 'Filter: Uppercase' });
@@ -99,7 +101,6 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
     } else if (low.startsWith('bengali') || low === 'bn') {
       directiveBadges.push({ icon: '১', text: 'বাংলা', title: 'Filter: Bengali digits' });
     } else {
-      remainingFilters.push(f);
       directiveBadges.push({ icon: 'FX', text: f, title: `Filter: ${f}` });
     }
   });
@@ -112,7 +113,7 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
     indent: indentSpaces,
     fromLine,
     toLine,
-    filters: remainingFilters,
+    filters: allFilters,
     displayBadgeText: directiveBadges.map((b) => b.text).join(' | '),
     directiveBadges,
   };
@@ -145,6 +146,8 @@ export function buildTokenString(
   if (options.separator) {
     if (['cell', 'newline', 'comma', 'tab'].includes(options.separator)) {
       layoutParts.push(`separator: ${options.separator}`);
+    } else if (options.separator === ', ') {
+      layoutParts.push(`separator: ', '`);
     } else {
       layoutParts.push(`separator: "${options.separator}"`);
     }

@@ -801,7 +801,22 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     rect: DOMRect;
     displayLabel?: string;
     category?: string;
+    isPinned?: boolean;
   } | null>(null);
+  const tokenHoverTimerRef = useRef<any>(null);
+
+  const clearTokenHoverTimer = useCallback(() => {
+    if (tokenHoverTimerRef.current) {
+      clearTimeout(tokenHoverTimerRef.current);
+      tokenHoverTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearTokenHoverTimer();
+    };
+  }, [clearTokenHoverTimer]);
 
   // 1. Separate styles and clean canonical body
   const { styles: extractedStyles, body: extractedBody } = useMemo(() => {
@@ -894,7 +909,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       const res = repaginateHostDOM(host, pageGeometry);
       setTotalPagesCount(res.totalPages);
 
-      if (savedSel) {
+      if (savedSel && hasFocus) {
         try {
           EditorPositionMapper.restoreLogicalSelection(host, savedSel);
         } catch (selErr) {
@@ -947,12 +962,40 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     [activeStyles, onContentChange, schedulePaginationPass]
   );
 
+  const isInitializedRef = useRef<boolean>(false);
+  const previousExternalBodyRef = useRef<string>('');
+
   // Synchronize incoming canonical HTML content into authoritative single host on mount & external changes
   useEffect(() => {
     if (!editorHostRef.current) return;
-    // If this change was triggered internally by user typing/IME in this component, skip overwriting
+
+    // 1. Initial Mount: populate single host and run initial pagination
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      previousExternalBodyRef.current = cleanCanonicalBody;
+      editorHostRef.current.innerHTML = cleanCanonicalBody;
+      EditorDomAdapter.autoConvertMustacheTokensInHost(editorHostRef.current);
+      historyRef.current = new EditorHistory(cleanCanonicalBody);
+      lastExportedHtmlRef.current = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+      runPaginationPass();
+      return;
+    }
+
+    // 2. If this change was triggered internally by user typing/IME/popover in this component, skip overwriting
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
+      previousExternalBodyRef.current = cleanCanonicalBody;
+      return;
+    }
+
+    // 3. Skip if incoming cleanCanonicalBody is identical to previous external state
+    if (previousExternalBodyRef.current === cleanCanonicalBody) {
+      return;
+    }
+    previousExternalBodyRef.current = cleanCanonicalBody;
+
+    // 4. Skip if incoming cleanCanonicalBody is an echo of what this editor just exported
+    if (cleanCanonicalBody === lastExportedHtmlRef.current) {
       return;
     }
 
@@ -1299,9 +1342,14 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         targetEl.setAttribute('data-token-key', summary.baseKey);
         targetEl.setAttribute('data-display', summary.baseKey);
         targetEl.setAttribute('data-label', summary.baseKey);
+        targetEl.setAttribute('contenteditable', 'false');
+        if (!targetEl.classList.contains('doclab-token')) {
+          targetEl.classList.add('doclab-token');
+        }
         targetEl.textContent = `{{${cleanKey}}}`;
 
         const cleanBody = EditorSerializer.sanitize(editorHostRef.current.innerHTML);
+        lastExportedHtmlRef.current = cleanBody;
         const doc = EditorSerializer.toCanonicalDocument(cleanBody);
         dispatchTransaction({
           doc,
@@ -1311,9 +1359,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
           timestamp: Date.now(),
         });
       }
+      clearTokenHoverTimer();
       setActiveInspectorToken(null);
     },
-    [activeInspectorToken, dispatchTransaction]
+    [activeInspectorToken, dispatchTransaction, clearTokenHoverTimer]
   );
 
   // Delete token from document via TokenInspectorPopover
@@ -1335,21 +1384,33 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     setActiveInspectorToken(null);
   }, [activeInspectorToken, dispatchTransaction]);
 
-  // Click on empty canvas margin to focus editor at end without collapsing selection
-  const handleSheetClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isEditable || !editorHostRef.current) return;
+  // Helper to schedule grace dismissal of hover inspector
+  const scheduleInspectorDismissal = useCallback(
+    (delayMs = 300) => {
+      if (activeInspectorToken && !activeInspectorToken.isPinned) {
+        clearTokenHoverTimer();
+        tokenHoverTimerRef.current = setTimeout(() => {
+          setActiveInspectorToken(null);
+        }, delayMs);
+      }
+    },
+    [activeInspectorToken, clearTokenHoverTimer]
+  );
 
-      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
-      if (sel && !sel.isCollapsed) return;
+  // Hover detection for tokens inside single host editor
+  const handleTokenHover = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isEditable || !editorHostRef.current || activeInspectorToken?.isPinned) return;
 
       const target = e.target as HTMLElement;
+      const tokenEl = target?.closest(
+        '.doclab-token, .doclab-token-chip, [data-token], [data-token-key]'
+      ) as HTMLElement | null;
 
-      // 1. Detect click on variable token chip to trigger Token Inspector Popover
-      const tokenEl = target?.closest('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]') as HTMLElement | null;
       if (tokenEl && editorHostRef.current.contains(tokenEl)) {
-        e.preventDefault();
-        e.stopPropagation();
+        clearTokenHoverTimer();
+        if (activeInspectorToken?.element === tokenEl) return;
+
         const raw =
           tokenEl.getAttribute('data-token') ||
           tokenEl.getAttribute('data-token-key') ||
@@ -1358,12 +1419,73 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         const rect = tokenEl.getBoundingClientRect();
         const label = tokenEl.getAttribute('data-label') || tokenEl.getAttribute('data-display') || undefined;
         const cat = tokenEl.getAttribute('data-category') || undefined;
+
         setActiveInspectorToken({
           element: tokenEl,
           rawToken: raw,
           rect,
           displayLabel: label,
           category: cat,
+          isPinned: false,
+        });
+      } else {
+        scheduleInspectorDismissal(300);
+      }
+    },
+    [isEditable, activeInspectorToken, clearTokenHoverTimer, scheduleInspectorDismissal]
+  );
+
+  const handleEditorMouseLeave = useCallback(() => {
+    scheduleInspectorDismissal(300);
+  }, [scheduleInspectorDismissal]);
+
+  const handlePopoverMouseEnter = useCallback(() => {
+    clearTokenHoverTimer();
+  }, [clearTokenHoverTimer]);
+
+  const handlePopoverMouseLeave = useCallback(() => {
+    scheduleInspectorDismissal(300);
+  }, [scheduleInspectorDismissal]);
+
+  // Click on empty canvas margin to focus editor at end without collapsing selection
+  const handleSheetClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isEditable || !editorHostRef.current) return;
+
+      const target = e.target as HTMLElement;
+
+      // Ignore any clicks originating from inside Token Inspector Popover
+      if (target?.closest('.doclab-token-popover, [data-token-popover="true"]')) {
+        return;
+      }
+
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (sel && !sel.isCollapsed) return;
+
+      // 1. Detect click on variable token chip to trigger Token Inspector Popover (Pinned)
+      const tokenEl = target?.closest(
+        '.doclab-token, .doclab-token-chip, [data-token], [data-token-key]'
+      ) as HTMLElement | null;
+      if (tokenEl && editorHostRef.current.contains(tokenEl)) {
+        e.preventDefault();
+        e.stopPropagation();
+        clearTokenHoverTimer();
+        const raw =
+          tokenEl.getAttribute('data-token') ||
+          tokenEl.getAttribute('data-token-key') ||
+          tokenEl.textContent?.replace(/[{}]/g, '').trim() ||
+          '';
+        const rect = tokenEl.getBoundingClientRect();
+        const label = tokenEl.getAttribute('data-label') || tokenEl.getAttribute('data-display') || undefined;
+        const cat = tokenEl.getAttribute('data-category') || undefined;
+
+        setActiveInspectorToken({
+          element: tokenEl,
+          rawToken: raw,
+          rect,
+          displayLabel: label,
+          category: cat,
+          isPinned: true,
         });
         return;
       }
@@ -1874,6 +1996,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
           suppressContentEditableWarning={true}
           data-doclab-single-host="true"
           onClick={handleSheetClick}
+          onMouseMove={handleTokenHover}
+          onMouseLeave={handleEditorMouseLeave}
           onFocus={handleFocus}
           onBlur={handleBlur}
           onInput={handleInput}
@@ -1908,13 +2032,31 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         {/* 3. Floating Token & Directive Inspector Popover */}
         {activeInspectorToken && (
           <TokenInspectorPopover
+            key={
+              activeInspectorToken.element
+                ? (activeInspectorToken.element.getAttribute('data-token-id') ||
+                   activeInspectorToken.element.getAttribute('data-token') ||
+                   activeInspectorToken.rawToken)
+                : activeInspectorToken.rawToken
+            }
             rawToken={activeInspectorToken.rawToken}
             anchorRect={activeInspectorToken.rect}
+            targetElement={activeInspectorToken.element}
             displayLabel={activeInspectorToken.displayLabel}
             category={activeInspectorToken.category}
+            isPinned={activeInspectorToken.isPinned}
             onApply={handleApplyTokenUpdate}
             onDelete={handleDeleteToken}
-            onClose={() => setActiveInspectorToken(null)}
+            onClose={() => {
+              clearTokenHoverTimer();
+              setActiveInspectorToken(null);
+            }}
+            onMouseEnter={handlePopoverMouseEnter}
+            onMouseLeave={handlePopoverMouseLeave}
+            onPinChange={(isPinned) => {
+              clearTokenHoverTimer();
+              setActiveInspectorToken((prev) => (prev ? { ...prev, isPinned } : null));
+            }}
           />
         )}
       </div>
