@@ -147,14 +147,29 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
 
   const [config, setConfig] = useState<Record<string, boolean>>(() => getCachedConfig(userId));
   const [origins, setOrigins] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      return !Boolean(localStorage.getItem(getCacheKey(userId)));
+    } catch {
+      return false;
+    }
+  });
 
   const currentVersionRef = useRef<number>(0);
   const lastUserIdRef = useRef<string | number | null>(userId);
 
   // ── Fetch evaluated config from server ────────────────────────────────────
   const fetchEvaluatedConfig = useCallback(async (forUserId: string | number | null) => {
-    setLoading(true);
+    const hasCached = (() => {
+      try {
+        return Boolean(localStorage.getItem(getCacheKey(forUserId ?? userId)));
+      } catch {
+        return false;
+      }
+    })();
+    if (!hasCached) {
+      setLoading(true);
+    }
     try {
       const candidatePaths = [
         `/api/v1/section-control/evaluate/?_t=${Date.now()}`,

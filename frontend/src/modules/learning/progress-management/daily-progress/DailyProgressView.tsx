@@ -190,7 +190,7 @@ export default function DailyProgressView({
   const initialFocusDoneRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoading && !featureLoading && !initialFocusDoneRef.current) {
+    if (!initialFocusDoneRef.current) {
       initialFocusDoneRef.current = true;
       setTimeout(() => {
         const studentInput = document.querySelector<HTMLInputElement>(
@@ -199,7 +199,7 @@ export default function DailyProgressView({
         if (studentInput) studentInput.focus();
       }, 150);
     }
-  }, [isLoading, featureLoading]);
+  }, []);
 
   const handleMakeReportClick = () => {
     const safeStudent = (studentName || "").trim();
@@ -487,7 +487,7 @@ export default function DailyProgressView({
     )
   );
 
-  if (isLoading || featureLoading) {
+  if (isLoading && (!studentDatabase || studentDatabase.length === 0)) {
     return <SkeletonLoader type="form" />;
   }
 
