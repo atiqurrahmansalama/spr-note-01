@@ -28,7 +28,7 @@ if _raw_allowed_hosts.strip() == "*":
 else:
     ALLOWED_HOSTS = [h.strip() for h in _raw_allowed_hosts.split(",") if h.strip()]
 
-for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app", ".netlify.app", ".pages.dev", ".koyeb.app", ".onrender.com", "spr-app.netlify.app", "spr-note-01.pages.dev", "spr-note-01.onrender.com"]:
+for default_host in ["localhost", "127.0.0.1", "[::1]", ".vercel.app", ".pages.dev", ".onrender.com", "spr-note-01.pages.dev", "spr-note-01.onrender.com"]:
     if default_host not in ALLOWED_HOSTS and "*" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(default_host)
 
@@ -301,7 +301,6 @@ _default_cors_origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "https://spr-note-01.pages.dev",
-    "https://spr-app.netlify.app",
     "https://spr-note.vercel.app",
 ]
 
@@ -314,23 +313,17 @@ if _raw_cors_env:
 
 CORS_ALLOWED_ORIGINS = _default_cors_origins
 
-# Dynamic Regexes for preview deployments (Netlify, Vercel, Railway, Render, Koyeb, Cloudflare Pages)
+# Dynamic Regexes for preview deployments (Cloudflare Pages, Render, Vercel)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https:\/\/.*\.pages\.dev$",
-    r"^https:\/\/.*\.koyeb\.app$",
-    r"^https:\/\/.*\.netlify\.app$",
     r"^https:\/\/.*\.vercel\.app$",
-    r"^https:\/\/.*\.railway\.app$",
     r"^https:\/\/.*\.onrender\.com$",
 ]
 
 # CSRF Trusted Origins for HTTPS form submissions
 CSRF_TRUSTED_ORIGINS = [
     "https://*.pages.dev",
-    "https://*.koyeb.app",
-    "https://*.netlify.app",
     "https://*.vercel.app",
-    "https://*.railway.app",
     "https://*.onrender.com",
     "http://localhost:5173",
     "http://localhost:3000",
@@ -414,7 +407,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
 
-# Reverse proxy SSL termination settings for Vercel / Railway
+# Reverse proxy SSL termination settings for Render / Vercel
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
