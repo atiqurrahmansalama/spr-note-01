@@ -11,3 +11,7 @@ export * from './ClassPeriodSwitcherBar';
 
 export { default as ClassroomConfigurationView } from './ClassroomConfigurationView';
 export * from './ClassroomConfigurationView';
+
+export { default as HubTabSkeletonLoader } from './DailyClassroomHubSkeletons';
+export * from './DailyClassroomHubSkeletons';
+

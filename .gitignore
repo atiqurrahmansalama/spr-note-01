@@ -45,3 +45,6 @@ frontend/coverage/
 # 5. Extra Unused Folders
 # ==========================================
 modern-report/
+
+# Local Netlify folder
+.netlify

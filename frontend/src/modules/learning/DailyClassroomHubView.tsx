@@ -17,6 +17,7 @@ import useDailyClassroomData from './hooks/useDailyClassroomData';
 import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
 import { getClassroomTodayDate } from '@/constants/calendarConstants';
 import { doesLessonMatchClass } from './utils/dailyClassroomUtils';
+import { HubTabSkeletonLoader, DrawerFallbackSkeleton } from './components';
 
 // ── Lazy-Loaded Feature Views & Drawers for Instant Sub-50ms Mounts ──────────
 const LessonDeliveryManagementView = lazy(
@@ -43,32 +44,6 @@ const StudentReportsView = lazy(
 const ProgressAnalyticsView = lazy(
   () => import('./progress-management/analytics/ProgressAnalyticsView')
 );
-
-// ── Lightweight Skeleton Fallback for Async Sub-views ────────────────────────
-function HubTabSkeletonLoader() {
-  return (
-    <div className="w-full space-y-4 animate-pulse">
-      <div className="h-14 rounded-xl theme-card theme-border border" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="h-20 rounded-xl theme-card theme-border border" />
-        <div className="h-20 rounded-xl theme-card theme-border border" />
-        <div className="h-20 rounded-xl theme-card theme-border border" />
-        <div className="h-20 rounded-xl theme-card theme-border border" />
-      </div>
-      <div className="h-96 rounded-xl theme-card theme-border border" />
-    </div>
-  );
-}
-
-function DrawerFallbackSkeleton() {
-  return (
-    <div className="p-4 space-y-4 animate-pulse">
-      <div className="h-8 rounded theme-card" />
-      <div className="h-24 rounded theme-card" />
-      <div className="h-32 rounded theme-card" />
-    </div>
-  );
-}
 
 const LESSON_MANAGEMENT_TABS = [
   { id: 'LESSON', label: 'Daily Lessons', icon: BookOpenIcon, path: '/studies/daily-lessons' },
@@ -855,7 +830,7 @@ export default function DailyClassroomHubView({
           className={activeTab === 'PROGRESS' ? 'w-full pt-1' : 'hidden'}
           aria-hidden={activeTab !== 'PROGRESS'}
         >
-          <Suspense fallback={<HubTabSkeletonLoader />}>
+          <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
             <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
           </Suspense>
         </div>
@@ -866,7 +841,7 @@ export default function DailyClassroomHubView({
           className={(activeTab === 'PROGRESS_ASSESSMENT' || activeTab === 'PROGRESS_ASSESSMENTS') ? 'w-full pt-1' : 'hidden'}
           aria-hidden={activeTab !== 'PROGRESS_ASSESSMENT' && activeTab !== 'PROGRESS_ASSESSMENTS'}
         >
-          <Suspense fallback={<HubTabSkeletonLoader />}>
+          <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
             <StudentReportsView isEmbedded={true} />
           </Suspense>
         </div>
@@ -877,7 +852,7 @@ export default function DailyClassroomHubView({
           className={activeTab === 'PROGRESS_ANALYTICS' ? 'w-full pt-1' : 'hidden'}
           aria-hidden={activeTab !== 'PROGRESS_ANALYTICS'}
         >
-          <Suspense fallback={<HubTabSkeletonLoader />}>
+          <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
             <ProgressAnalyticsView filterProps={sharedFilterProps} isEmbedded={true} />
           </Suspense>
         </div>

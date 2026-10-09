@@ -488,7 +488,66 @@ export default function DailyProgressView({
   );
 
   if (isLoading && (!studentDatabase || studentDatabase.length === 0)) {
-    return <SkeletonLoader type="form" />;
+    return (
+      <PageContainer
+        isEmbedded={isEmbedded || Boolean(filterProps)}
+        maxWidth={maxWidth}
+        className={`space-y-6 pb-12 animate-pulse ${className}`}
+      >
+        {/* 1. Classroom Filter Controls Skeleton */}
+        <div className="w-full rounded-2xl theme-bg-surface border theme-border p-4 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+          </div>
+        </div>
+
+        {/* 2. Student & Session Input Card Skeleton */}
+        <div className="w-full rounded-2xl theme-bg-surface border theme-border p-5 shadow-sm space-y-4">
+          <div className="h-4 w-40 rounded bg-slate-400/20" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="h-11 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-11 rounded-xl bg-slate-400/10 border theme-border" />
+          </div>
+        </div>
+
+        {/* 3. Juz & Page Target Section Skeleton */}
+        <div className="w-full rounded-2xl theme-bg-surface border theme-border p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="h-4 w-48 rounded bg-slate-400/20" />
+            <div className="h-8 w-24 rounded-lg bg-slate-400/10" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="h-11 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-11 rounded-xl bg-slate-400/10 border theme-border" />
+            <div className="h-11 rounded-xl bg-slate-400/10 border theme-border" />
+          </div>
+        </div>
+
+        {/* 4. Mistakes & Stuck Trackers (2 columns) Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="w-full rounded-2xl theme-bg-surface border theme-border p-5 shadow-sm space-y-3">
+            <div className="h-4 w-36 rounded bg-slate-400/20" />
+            <div className="h-28 rounded-xl bg-slate-400/10 border theme-border" />
+          </div>
+          <div className="w-full rounded-2xl theme-bg-surface border theme-border p-5 shadow-sm space-y-3">
+            <div className="h-4 w-36 rounded bg-slate-400/20" />
+            <div className="h-28 rounded-xl bg-slate-400/10 border theme-border" />
+          </div>
+        </div>
+
+        {/* 5. Comment & Action Footer Skeleton */}
+        <div className="w-full rounded-2xl theme-bg-surface border theme-border p-5 shadow-sm space-y-4">
+          <div className="h-20 rounded-xl bg-slate-400/10 border theme-border" />
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="h-10 w-28 rounded-xl bg-slate-400/15" />
+            <div className="h-10 w-36 rounded-xl bg-slate-400/20" />
+          </div>
+        </div>
+      </PageContainer>
+    );
   }
 
   return (
@@ -496,7 +555,7 @@ export default function DailyProgressView({
       isEmbedded={isEmbedded || Boolean(filterProps)}
       maxWidth={maxWidth}
       style={{ fontFamily: activeFont?.css, fontSize: activeFontSize?.px }}
-      className={`space-y-6 pb-12 transition-all ${className}`}
+      className={`space-y-6 pb-12 transition-all animate-fade-in ${className}`}
     >
       {/* Edit Mode Banner */}
       <EditModeBanner editingReport={editingReport} onCancel={cancelEditMode} />
