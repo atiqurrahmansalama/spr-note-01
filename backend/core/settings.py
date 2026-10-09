@@ -28,7 +28,7 @@ if _raw_allowed_hosts.strip() == "*":
 else:
     ALLOWED_HOSTS = [h.strip() for h in _raw_allowed_hosts.split(",") if h.strip()]
 
-for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app", ".netlify.app", ".pages.dev", ".onrender.com", "spr-app.netlify.app", "spr-note-01.pages.dev", "spr-note-01.onrender.com"]:
+for default_host in ["localhost", "127.0.0.1", "[::1]", ".railway.app", ".vercel.app", ".netlify.app", ".pages.dev", ".koyeb.app", ".onrender.com", "spr-app.netlify.app", "spr-note-01.pages.dev", "spr-note-01.onrender.com"]:
     if default_host not in ALLOWED_HOSTS and "*" not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(default_host)
 
@@ -314,9 +314,10 @@ if _raw_cors_env:
 
 CORS_ALLOWED_ORIGINS = _default_cors_origins
 
-# Dynamic Regexes for preview deployments (Netlify, Vercel, Railway, Render, Cloudflare Pages)
+# Dynamic Regexes for preview deployments (Netlify, Vercel, Railway, Render, Koyeb, Cloudflare Pages)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https:\/\/.*\.pages\.dev$",
+    r"^https:\/\/.*\.koyeb\.app$",
     r"^https:\/\/.*\.netlify\.app$",
     r"^https:\/\/.*\.vercel\.app$",
     r"^https:\/\/.*\.railway\.app$",
@@ -326,6 +327,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 # CSRF Trusted Origins for HTTPS form submissions
 CSRF_TRUSTED_ORIGINS = [
     "https://*.pages.dev",
+    "https://*.koyeb.app",
     "https://*.netlify.app",
     "https://*.vercel.app",
     "https://*.railway.app",
